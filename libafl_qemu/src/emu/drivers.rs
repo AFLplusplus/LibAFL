@@ -112,6 +112,8 @@ pub struct StdEmulatorDriver {
     allow_page_on_start: bool,
     #[builder(default = true)]
     process_only: bool,
+    #[builder(default = false)]
+    print_commands: bool,
 }
 
 impl StdEmulatorDriver {
@@ -162,6 +164,17 @@ where
         if !emulator.driver.hooks_locked {
             emulator.modules.pre_exec_all(input);
         }
+
+        let input_location = { emulator.driver.input_location.get().cloned() };
+
+        if let Some(input_location) = input_location {
+            let input_command =
+                InputCommand::new(input_location.mem_chunk.clone(), input_location.cpu);
+
+            input_command
+                .run(emulator, input, input_location.ret_register)
+                .unwrap();
+        }
     }
 
     fn post_harness_exec<OT>(
@@ -177,18 +190,7 @@ where
         }
     }
 
-    fn pre_qemu_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
-        let input_location = { emulator.driver.input_location.get().cloned() };
-
-        if let Some(input_location) = input_location {
-            let input_command =
-                InputCommand::new(input_location.mem_chunk.clone(), input_location.cpu);
-
-            input_command
-                .run(emulator, input, input_location.ret_register)
-                .unwrap();
-        }
-    }
+    fn pre_qemu_exec(_emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
 
     fn post_qemu_exec(
         emulator: &mut Emulator<CM, Self, ET, S, SM>,
@@ -239,6 +241,9 @@ where
         };
 
         if let Some(cmd) = command {
+            if emulator.driver.print_commands {
+                println!("Received command: {cmd:?}")
+            }
             cmd.run(emulator, input, ret_reg)
         } else {
             Ok(Some(EmulatorDriverResult::ReturnToHarness(

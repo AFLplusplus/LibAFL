@@ -28,6 +28,7 @@ use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, GuestPhysAddr, GuestReg, InputLocation,
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
+use crate::command::parser::TestCommandParser;
 
 pub mod parser;
 
@@ -51,28 +52,43 @@ macro_rules! define_std_command_manager {
     ($name:ident, [$($command:ty),+], [$($native_command_parser:ty),+]) => {
         paste! {
             pub struct $name<S> {
+                has_started: bool,
                 phantom: PhantomData<S>,
             }
 
             impl<S> Clone for $name<S> {
                 fn clone(&self) -> Self {
                     Self {
-                        phantom: PhantomData
+                        has_started: self.has_started,
+                        phantom: PhantomData,
                     }
                 }
             }
 
             impl<S> Debug for $name<S> {
                 fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-                    write!(f, stringify!($name))
+                    write!(f, "{} (has started? {:?})", stringify!($name), self.has_started)
                 }
             }
 
             impl<S> Default for $name<S> {
                 fn default() -> Self {
                     Self {
-                        phantom: PhantomData
+                        has_started: false,
+                        phantom: PhantomData,
                     }
+                }
+            }
+
+            impl<S> $name<S> {
+                fn start(&mut self) -> bool {
+                    let tmp = self.has_started;
+                    self.has_started = true;
+                    tmp
+                }
+
+                fn has_started(&self) -> bool {
+                    self.has_started
                 }
             }
 
@@ -85,6 +101,7 @@ macro_rules! define_std_command_manager {
             {
                 type Commands = [<$name Commands>];
 
+                #[deny(unreachable_patterns)]
                 fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError> {
                     let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
                     let cmd_id = qemu.read_reg::<Regs, GuestReg>(arch_regs_map[ExitArgs::Cmd])? as c_uint;
@@ -171,7 +188,8 @@ define_std_command_manager!(
         EndCommand,
         VersionCommand,
         AddressAllowCommand,
-        LqprintfCommand
+        LqprintfCommand,
+        TestCommand
     ],
     [
         StartPhysCommandParser,
@@ -183,7 +201,8 @@ define_std_command_manager!(
         EndCommandParser,
         VersionCommandParser,
         VaddrFilterAllowRangeCommandParser,
-        LqprintfCommandParser
+        LqprintfCommandParser,
+        TestCommandParser
     ]
 );
 
@@ -223,6 +242,9 @@ pub enum CommandError {
     UnknownCommand(GuestReg),
     RWError(QemuRWError),
     VersionDifference(u64),
+    TestDifference(GuestReg, GuestReg), // received, expected
+    StartedTwice,
+    EndBeforeStart,
 }
 
 impl From<QemuRWError> for CommandError {
@@ -364,10 +386,8 @@ where
 pub struct StartCommand {
     input_location: QemuMemoryChunk,
 }
-
-impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for StartCommand
+impl<ET, S, SM> IsCommand<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for StartCommand
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
@@ -379,11 +399,15 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
+    ) -> Result<Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
+        if emu.command_manager_mut().start() {
+            return Err(EmulatorDriverError::CommandError(CommandError::StartedTwice));
+        }
+
         let qemu = emu.qemu();
 
         // Snapshot VM
@@ -446,10 +470,11 @@ pub struct EndCommand {
     exit_kind: Option<ExitKind>,
 }
 
-impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for EndCommand
+impl<ET, S, SM> IsCommand<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for EndCommand
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -458,12 +483,16 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
+    ) -> Result<Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
+
+        if !emu.command_manager_mut().has_started() {
+            return Err(EmulatorDriverError::CommandError(CommandError::EndBeforeStart));
+        }
 
         let snapshot_id = emu
             .driver_mut()
@@ -590,6 +619,45 @@ where
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         print!("LQPRINTF: {}", self.content);
         Ok(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TestCommand {
+    expected_value: GuestReg,
+    received_value: GuestReg,
+}
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for TestCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
+        if self.expected_value != self.received_value {
+            Err(EmulatorDriverError::CommandError(CommandError::TestDifference(self.received_value, self.expected_value)))
+        } else {
+            println!("Test succeeded");
+            Ok(None)
+        }
+    }
+}
+
+impl TestCommand {
+    pub fn new(received_value: GuestReg, expected_value: GuestReg) -> Self {
+        Self {
+            received_value,
+            expected_value,
+        }
     }
 }
 

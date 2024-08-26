@@ -1,6 +1,7 @@
-# Qemu Systemmode for Linux Kernel fuzzing
+# LibAFL QEMU Systemmode for Linux process fuzzing
 
-This folder contains an example linux kernel fuzzer using qemu systemmode.
+This folder contains an example linux process fuzzer using qemu systemmode.
+This is demo, most of the time for classic linux process fuzzing, it is better to use a more conventional method.
 
 ## Prerequisite
 

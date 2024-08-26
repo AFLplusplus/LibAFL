@@ -50,7 +50,7 @@ pub fn fuzz() {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
     };
     // Hardcoded parameters
-    let timeout = Duration::from_secs(60);
+    let timeout = Duration::from_secs(120);
     let broker_port = 1337;
     let cores = Cores::from_cmdline("1").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];

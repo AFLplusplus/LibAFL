@@ -15,6 +15,8 @@
 #define LIBAFL_SYNC_EXIT_OPCODE 0x66f23a0f
 #define LIBAFL_BACKDOOR_OPCODE 0x44f23a0f
 
+#define LIBAFL_QEMU_TEST_VALUE 0xdeadbeefcafebabe
+
 #define LIBAFL_QEMU_HDR_VERSION_NUMBER 0111  // TODO: find a nice way to set it.
 
 typedef enum LibaflQemuCommand {
@@ -29,6 +31,7 @@ typedef enum LibaflQemuCommand {
   LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW = 8,
   LIBAFL_QEMU_COMMAND_INTERNAL_ERROR = 9,
   LIBAFL_QEMU_COMMAND_LQPRINTF = 10,
+  LIBAFL_QEMU_COMMAND_TEST = 11,
 } LibaflExit;
 
 #endif

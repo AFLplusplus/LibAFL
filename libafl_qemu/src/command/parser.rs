@@ -19,6 +19,7 @@ use crate::{
     sync_exit::ExitArgs,
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
+use crate::command::{StdCommandManager, TestCommand};
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
@@ -93,10 +94,9 @@ where
 
 pub struct StartPhysCommandParser;
 
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartPhysCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for StartPhysCommandParser
 where
     ET: EmulatorModuleTuple<S>,
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -122,10 +122,9 @@ where
 
 pub struct StartVirtCommandParser;
 
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartVirtCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for StartVirtCommandParser
 where
     ET: EmulatorModuleTuple<S>,
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
@@ -190,10 +189,11 @@ where
 
 pub struct EndCommandParser;
 
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for EndCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for EndCommandParser
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
     type OutputCommand = EndCommand;
@@ -299,5 +299,25 @@ where
         let c_str: &CStr = CStr::from_bytes_with_nul(str_copy.as_slice()).unwrap();
 
         Ok(LqprintfCommand::new(c_str.to_str().unwrap().to_string()))
+    }
+}
+
+pub struct TestCommandParser;
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for TestCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
+{
+    type OutputCommand = TestCommand;
+    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_TEST.0;
+
+    fn parse(
+        qemu: Qemu,
+        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        let received_value: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+
+        Ok(TestCommand::new(received_value, bindings::LIBAFL_QEMU_TEST_VALUE as GuestReg))
     }
 }

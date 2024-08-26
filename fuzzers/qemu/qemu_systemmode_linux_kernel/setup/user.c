@@ -7,6 +7,7 @@
 int main() {
   const char *device = "/dev/harness";
   int         fd;
+
   // Open the device
   fd = open(device, O_RDWR);
   if (fd == -1) { return 1; }

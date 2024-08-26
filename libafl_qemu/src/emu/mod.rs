@@ -86,7 +86,7 @@ where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             EmulatorExitResult::QemuExit(qemu_exit) => {
                 write!(f, "{qemu_exit:?}")
@@ -150,10 +150,10 @@ where
 }
 
 impl Debug for GuestAddrKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            GuestAddrKind::Physical(paddr) => write!(f, "vaddr {paddr:x}"),
-            GuestAddrKind::Virtual(vaddr) => write!(f, "paddr {vaddr:x}"),
+            GuestAddrKind::Physical(paddr) => write!(f, "paddr {paddr:#x}"),
+            GuestAddrKind::Virtual(vaddr) => write!(f, "vaddr {vaddr:#x}"),
         }
     }
 }
@@ -293,6 +293,14 @@ where
     #[must_use]
     pub fn snapshot_manager_mut(&mut self) -> &mut SM {
         &mut self.snapshot_manager
+    }
+
+    pub fn command_manager(&self) -> &CM {
+        &self.command_manager
+    }
+
+    pub fn command_manager_mut(&mut self) -> &mut CM {
+        &mut self.command_manager
     }
 }
 

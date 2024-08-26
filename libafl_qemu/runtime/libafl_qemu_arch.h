@@ -44,6 +44,8 @@
       #include <stdint.h>
       #include <stdarg.h>
 
+      #define noinline __attribute__((noinline))
+
       #if defined(__x86_64__) || defined(__aarch64__)
         typedef uint64_t libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())

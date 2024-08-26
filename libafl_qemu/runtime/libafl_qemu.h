@@ -44,6 +44,12 @@ void libafl_qemu_internal_error(void);
 
 void __attribute__((format(printf, 1, 2))) lqprintf(const char *fmt, ...);
 
+void libafl_qemu_test(void);
+
+void libafl_qemu_trace_vaddr_range(libafl_word start, libafl_word end);
+
+void libafl_qemu_trace_vaddr_size(libafl_word start, libafl_word size);
+
 #include "libafl_qemu_impl.h"
 
 #endif
