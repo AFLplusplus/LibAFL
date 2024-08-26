@@ -52,7 +52,8 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         }
     }
     let metadata = bin_path.metadata()?;
-    let is_reg = !bin_path.is_symlink() && !bin_path.is_dir();
+    // AFL++ does not follow symlinks, BUT we do.
+    let is_reg = bin_path.is_file();
     let bin_size = metadata.st_size();
     let is_executable = metadata.permissions().mode() & 0o111 != 0;
     if !is_reg || !is_executable || bin_size < 4 {

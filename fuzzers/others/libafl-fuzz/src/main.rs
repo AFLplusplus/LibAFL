@@ -111,6 +111,7 @@ fn main() {
 /// The Configuration
 struct Opt {
     executable: PathBuf,
+    target_args: Vec<String>,
 
     // NOTE: afl-fuzz does not accept multiple input directories
     #[arg(short = 'i')]

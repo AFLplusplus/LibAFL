@@ -1,4 +1,4 @@
-use std::{borrow::Cow, env, marker::PhantomData, path::PathBuf, time::Duration};
+use std::{borrow::Cow, marker::PhantomData, path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
@@ -400,7 +400,7 @@ fn base_executor<'a>(
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .debug_child(opt.debug_child)
         .is_persistent(opt.is_persistent)
-        .is_deferred_frksrv(opt.defer_forkserver)
+        .is_deferred_frksrv(opt.defer_forkserver || opt.unicorn_mode)
         .min_input_size(opt.min_input_len.unwrap_or(AFL_DEFAULT_INPUT_LEN_MIN))
         .max_input_size(opt.max_input_len.unwrap_or(AFL_DEFAULT_INPUT_LEN_MAX))
         .timeout(Duration::from_millis(opt.hang_timeout));
@@ -414,18 +414,7 @@ fn base_executor<'a>(
         executor = executor.shmem_provider(shmem_provider);
     }
     // Set arguments for the target if necessary
-    let exec = opt.executable.display().to_string();
-    // we skip all libafl-fuzz arguments.
-    let (mut skip, _) = env::args()
-        .enumerate()
-        .find(|i| i.1 == exec)
-        .expect("invariant; should never occur");
-    // we need the binary to remain as an argument if we are in qemu_mode
-    if !opt.qemu_mode {
-        skip += 1;
-    }
-    let args = env::args().skip(skip);
-    for arg in args {
+    for arg in &opt.target_args {
         if arg == AFL_HARNESS_FILE_INPUT {
             let mut file = get_unique_std_input_file();
             if let Some(ext) = &opt.input_ext {
@@ -441,6 +430,8 @@ fn base_executor<'a>(
         }
     }
     if opt.qemu_mode {
+        // We need to give the harness as the first argument to afl-qemu-trace.
+        executor = executor.arg(opt.executable.clone());
         executor = executor.program(
             find_afl_binary("afl-qemu-trace", Some(opt.executable.clone()))
                 .expect("to find afl-qemu-trace"),
