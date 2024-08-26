@@ -232,7 +232,7 @@ where
                     .on_remove(state, idx, &Some(removed))?;
             }
 
-            *state.corpus().current() = None;
+            *state.corpus_mut().current_mut() = None; //we may have removed the current ID from the corpus
             Ok(())
         } else {
             Err(Error::unknown("Corpus minimization failed; unsat."))
