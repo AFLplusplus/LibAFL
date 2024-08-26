@@ -416,11 +416,15 @@ fn base_executor<'a>(
     // Set arguments for the target if necessary
     let exec = opt.executable.display().to_string();
     // we skip all libafl-fuzz arguments.
-    let (skip, _) = env::args()
+    let (mut skip, _) = env::args()
         .enumerate()
         .find(|i| i.1 == exec)
         .expect("invariant; should never occur");
-    let args = env::args().skip(skip + 1);
+    // we need the binary to remain as an argument if we are in qemu_mode
+    if !opt.qemu_mode {
+        skip += 1;
+    }
+    let args = env::args().skip(skip);
     for arg in args {
         if arg == AFL_HARNESS_FILE_INPUT {
             let mut file = get_unique_std_input_file();
