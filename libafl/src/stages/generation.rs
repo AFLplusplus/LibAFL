@@ -1,4 +1,4 @@
-//! The [`generation::GenStage`] generates a single input and evaluates it.
+//! The [`GenStage`] generates a single input and evaluates it.
 //!
 //! A [`Stage`] that generates a single input via a
 //! [`crate::generators::Generator`] and evaluates it using the fuzzer, possibly

@@ -29,6 +29,7 @@ pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOU
 pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 
 /// The max count of edges found.
+///
 /// This is either computed during the compilation time or at runtime (in this case this is used to shrink the map).
 /// You can use this for the initial map size for the observer only if you compute this time at compilation time.
 pub static mut MAX_EDGES_FOUND: usize = 0;
