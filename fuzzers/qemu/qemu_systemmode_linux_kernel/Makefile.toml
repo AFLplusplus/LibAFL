@@ -98,7 +98,7 @@ else
   LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu
 fi
 
-${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux \
+${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel \
   -accel tcg \
   -m 4G \
   -drive if=pflash,format=raw,readonly=on,file="${LINUX_BUILDER_OUT}/OVMF_CODE.fd" \
@@ -118,7 +118,7 @@ ${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux \
 dependencies = ["build"]
 command = "time"
 args = [
-  "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux",
+  "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel",
   "-accel", "kvm",
   "-m", "4G",
   "-drive", "if=pflash,format=raw,readonly=on,file=${LINUX_BUILDER_OUT}/OVMF_CODE.fd",
@@ -136,7 +136,7 @@ command = "perf"
 args = [
   "record",
   "--call-graph", "dwarf",
-  "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux",
+  "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel",
   "-accel", "tcg",
   "-m", "4G",
   "-drive", "if=pflash,format=raw,readonly=on,file=${LINUX_BUILDER_OUT}/OVMF_CODE.fd",

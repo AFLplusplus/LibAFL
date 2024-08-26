@@ -1,7 +1,7 @@
 [package]
-name = "qemu_systemmode_linux_kernel"
+name = "qemu_systemmode_linux_process"
 version = "0.13.2"
-authors = [ "Romain Malmain <rmalmain@pm.me>", ""]
+authors = [ "Romain Malmain <rmalmain@pm.me>" ]
 edition = "2021"
 
 [features]
@@ -19,12 +19,12 @@ libafl_bolts = { path = "../../../libafl_bolts" }
 libafl_qemu = { path = "../../../libafl_qemu", features = [
   "x86_64",
   "systemmode",
-  "paranoid_debug"
+  # "paranoid_debug"
 ] }
 libafl_qemu_sys = { path = "../../../libafl_qemu/libafl_qemu_sys", features = [
   "x86_64",
   "systemmode",
-  "paranoid_debug"
+  # "paranoid_debug"
 ] }
 env_logger = "*"
 
