@@ -231,10 +231,14 @@ where
                     .scheduler_mut()
                     .on_remove(state, idx, &Some(removed))?;
             }
+
+            *state.corpus().current() = None;
             Ok(())
         } else {
             Err(Error::unknown("Corpus minimization failed; unsat."))
         };
+
+        
 
         res
     }
