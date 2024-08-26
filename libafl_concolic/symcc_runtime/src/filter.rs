@@ -81,7 +81,7 @@ pub trait Filter {
 }
 
 /// A `FilterRuntime` wraps a [`Runtime`] with a [`Filter`].
-/// 
+///
 /// It applies the filter before passing expressions to the inner runtime.
 /// It also implements [`Runtime`], allowing for composing multiple [`Filter`]'s in a chain.
 #[allow(clippy::module_name_repetitions)]
