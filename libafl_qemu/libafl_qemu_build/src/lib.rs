@@ -253,7 +253,9 @@ fn include_path(build_dir: &Path, path: &str) -> String {
     }
 }
 
-/// If `fresh_content` != `content_file_to_update` (the file is read directly if `content_file_to_update` is None), update the file. prefix is not considered for comparison.
+/// If `fresh_content` != `content_file_to_update` (the file is read directly if `content_file_to_update` is None), update the file.
+///
+/// The prefix is not considered for comparison.
 /// If a prefix is given, it will be added as the first line of the file.
 pub fn store_generated_content_if_different(
     file_to_update: &Path,
