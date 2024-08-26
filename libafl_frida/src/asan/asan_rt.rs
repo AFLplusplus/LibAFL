@@ -88,7 +88,6 @@ fn nt_current_teb() -> *mut TEB {
 /// This was observed on Windows, so for now for other platforms we assume that we have TLS.
 #[cfg(target_os = "windows")]
 unsafe fn has_tls() -> bool {
-    use std::arch::asm;
     let teb = nt_current_teb();
     if teb.is_null() {
         return false;
