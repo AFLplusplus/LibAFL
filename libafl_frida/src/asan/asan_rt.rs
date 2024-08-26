@@ -67,7 +67,7 @@ extern "C" {
 
 /// The count of registers that need to be saved by the `ASan` runtime.
 ///
-/// Sixteen general purpose registers are put in this order, `rax``, `rbx`, `rcx`, `rdx`, `rbp`, `rsp`, `rsi`, `rdi`, `r8-r15`, plus instrumented `rip`, accessed memory addr and true `rip`
+/// Sixteen general purpose registers are put in this order, `rax`, `rbx`, `rcx`, `rdx`, `rbp`, `rsp`, `rsi`, `rdi`, `r8-r15`, plus instrumented `rip`, accessed memory addr and true `rip`
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
