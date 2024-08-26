@@ -196,7 +196,7 @@ test -n "$( ls ./test/output-qemu-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/nul
 	exit 1
 }
 '''
-dependencies = ["build_afl", "build_qemuafl","build_libafl_fuzz"]
+dependencies = ["build_afl", "build_qemuafl", "build_libafl_fuzz"]
 
 [tasks.test_unicorn_mode]
 script_runner = "@shell"
