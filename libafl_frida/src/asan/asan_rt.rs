@@ -63,7 +63,7 @@ extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 
-use std::arch::asm;
+#[cfg(target_os = "windows")]
 #[repr(C)]
 struct TEB {
     reserved1: [u8; 0x58],
@@ -71,19 +71,11 @@ struct TEB {
     reserved2: [u8; 0xC0],
 }
 
-#[cfg(target_arch = "x86")]
-#[inline(always)]
-fn nt_current_teb() -> *mut TEB {
-    let teb: *mut TEB;
-    unsafe {
-        asm!("mov {}, fs:0x18", out(reg) teb);
-    }
-    teb
-}
-
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
+#[cfg(target_os = "windows")]
 fn nt_current_teb() -> *mut TEB {
+    use std::arch::asm;
     let teb: *mut TEB;
     unsafe {
         asm!("mov {}, gs:0x30", out(reg) teb);
@@ -93,7 +85,10 @@ fn nt_current_teb() -> *mut TEB {
 
 /// Some of our hooks can be invoked from threads that do not have TLS yet.
 /// Many Rust and Frida functions require TLS to be set up, so we need to check if we have TLS.
+/// This was observed on Windows, so for now for other platforms we assume that we have TLS.
+#[cfg(target_os = "windows")]
 unsafe fn has_tls() -> bool {
+    use std::arch::asm;
     let teb = nt_current_teb();
     if teb.is_null() {
         return false;
@@ -103,7 +98,12 @@ unsafe fn has_tls() -> bool {
     if tls_array.is_null() {
         return false;
     }
-    return true;
+    true
+}
+
+#[cfg(not(target_os = "windows"))]
+fn has_tls() -> bool {
+    true
 }
 
 // Reentrancy guard for the hooks
@@ -113,7 +113,7 @@ thread_local! {
     static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
 }
 
-/// RAII guard to set and reset the ASAN_IN_HOOK properly
+/// RAII guard to set and reset the `ASAN_IN_HOOK` properly
 struct AsanInHookGuard;
 
 impl AsanInHookGuard {
@@ -332,7 +332,7 @@ impl Debug for AsanRuntime {
     }
 }
 
-/// A helper function that fixes the implementation of ModuleDetails::with_name on Windows
+/// A helper function that fixes the implementation of `ModuleDetails::with_name` on Windows
 fn module_base_address_with_name(name: &str) -> usize {
     use core::ffi::{c_void, CStr};
     use std::path::Path;
@@ -370,10 +370,12 @@ fn module_base_address_with_name(name: &str) -> usize {
         address: 0,
     };
 
+    let context_ptr = std::ptr::NonNull::from(&mut context);
     unsafe {
         gum_sys::gum_process_enumerate_modules(
             Some(save_module_address_by_name),
-            &mut context as *mut _ as *mut c_void,
+            // &mut context as *mut _ as *mut c_void,
+            context_ptr.as_ptr() as *mut c_void,
         );
     }
 
@@ -558,7 +560,7 @@ impl AsanRuntime {
         let (tls_start, tls_end) = Self::current_tls();
         println!(
             "registering thread {:?} with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}", 
-                unsafe{winapi::um::processthreadsapi::GetCurrentThreadId()}
+            get_thread_id()
         );
         self.allocator_mut()
             .map_shadow_for_region(stack_start, stack_end, true);
@@ -805,6 +807,7 @@ impl AsanRuntime {
                     let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
                     #[allow(non_snake_case)] // depends on the values the macro is invoked with
+                    #[allow(clippy::redundant_else)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();

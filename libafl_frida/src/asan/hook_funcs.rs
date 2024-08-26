@@ -917,10 +917,10 @@ impl AsanRuntime {
         nmemb: usize,
         size: usize,
     ) -> *mut c_void {
-        log::trace!("hook_calloc");
         extern "system" {
             fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
+        log::trace!("hook_calloc");
         let ret = unsafe { self.allocator_mut().alloc(size * nmemb, 8) };
         unsafe {
             memset(ret, 0, size * nmemb);
@@ -936,10 +936,10 @@ impl AsanRuntime {
         nmemb: usize,
         size: usize,
     ) -> *mut c_void {
-        log::trace!("hook__o_calloc");
         extern "system" {
             fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
         }
+        log::trace!("hook__o_calloc");
         let ret = unsafe { self.allocator_mut().alloc(size * nmemb, 8) };
         unsafe {
             memset(ret, 0, size * nmemb);
@@ -1862,11 +1862,11 @@ impl AsanRuntime {
         s: *mut c_char,
         c: i32,
     ) -> *mut c_char {
-        log::trace!("hook_strchr");
         extern "system" {
 
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strchr");
         if !self
             .allocator_mut()
             .check_shadow(s as *const c_void, unsafe { strlen(s) })
@@ -1889,10 +1889,10 @@ impl AsanRuntime {
         s: *mut c_char,
         c: i32,
     ) -> *mut c_char {
-        log::trace!("hook_strrchr");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strrchr");
         if !self
             .allocator_mut()
             .check_shadow(s as *const c_void, unsafe { strlen(s) })
@@ -1915,10 +1915,10 @@ impl AsanRuntime {
         s1: *const c_char,
         s2: *const c_char,
     ) -> i32 {
-        log::trace!("hook_strcasecmp");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strcasecmp");
         if !self
             .allocator_mut()
             .check_shadow(s1 as *const c_void, unsafe { strlen(s1) })
@@ -1983,10 +1983,10 @@ impl AsanRuntime {
         s1: *mut c_char,
         s2: *const c_char,
     ) -> *mut c_char {
-        log::trace!("hook_strcat");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strcat");
         if !self
             .allocator_mut()
             .check_shadow(s1 as *const c_void, unsafe { strlen(s1) })
@@ -2021,10 +2021,10 @@ impl AsanRuntime {
         s1: *const c_char,
         s2: *const c_char,
     ) -> i32 {
-        log::trace!("hook_strcmp");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strcmp");
         if !self
             .allocator_mut()
             .check_shadow(s1 as *const c_void, unsafe { strlen(s1) })
@@ -2060,10 +2060,10 @@ impl AsanRuntime {
         s2: *const c_char,
         n: usize,
     ) -> i32 {
-        log::trace!("hook_strncmp");
         extern "system" {
             fn strnlen(s: *const c_char, n: usize) -> usize;
         }
+        log::trace!("hook_strncmp");
         if !self
             .allocator_mut()
             .check_shadow(s1 as *const c_void, unsafe { strnlen(s1, n) })
@@ -2098,10 +2098,10 @@ impl AsanRuntime {
         dest: *mut c_char,
         src: *const c_char,
     ) -> *mut c_char {
-        log::trace!("hook_strcpy");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strcpy");
         if !self
             .allocator_mut()
             .check_shadow(dest as *const c_void, unsafe { strlen(src) })
@@ -2166,10 +2166,10 @@ impl AsanRuntime {
         dest: *mut c_char,
         src: *const c_char,
     ) -> *mut c_char {
-        log::trace!("hook_stpcpy");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_stpcpy");
         if !self
             .allocator_mut()
             .check_shadow(dest as *const c_void, unsafe { strlen(src) })
@@ -2213,11 +2213,11 @@ impl AsanRuntime {
         _original: extern "C" fn(s: *const c_char) -> *mut c_char,
         s: *const c_char,
     ) -> *mut c_char {
-        log::trace!("hook_strdup");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
             fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
         }
+        log::trace!("hook_strdup");
         let size = unsafe { strlen(s) };
         if !self.allocator_mut().check_shadow(s as *const c_void, size) {
             AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgRead((
@@ -2284,10 +2284,10 @@ impl AsanRuntime {
         haystack: *const c_char,
         needle: *const c_char,
     ) -> *mut c_char {
-        log::trace!("hook_strstr");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strstr");
         if !self
             .allocator_mut()
             .check_shadow(haystack as *const c_void, unsafe { strlen(haystack) })
@@ -2322,10 +2322,10 @@ impl AsanRuntime {
         haystack: *const c_char,
         needle: *const c_char,
     ) -> *mut c_char {
-        log::trace!("hook_strcasestr");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_strcasestr");
         if !self
             .allocator_mut()
             .check_shadow(haystack as *const c_void, unsafe { strlen(haystack) })
@@ -2359,10 +2359,10 @@ impl AsanRuntime {
         original: extern "C" fn(s: *const c_char) -> i32,
         s: *const c_char,
     ) -> i32 {
-        log::trace!("hook_atoi");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_atoi");
         if !self
             .allocator_mut()
             .check_shadow(s as *const c_void, unsafe { strlen(s) })
@@ -2385,10 +2385,10 @@ impl AsanRuntime {
         original: extern "C" fn(s: *const c_char) -> i32,
         s: *const c_char,
     ) -> i32 {
-        log::trace!("hook_atol");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_atol");
         if !self
             .allocator_mut()
             .check_shadow(s as *const c_void, unsafe { strlen(s) })
@@ -2411,10 +2411,10 @@ impl AsanRuntime {
         original: extern "C" fn(s: *const c_char) -> i64,
         s: *const c_char,
     ) -> i64 {
-        log::trace!("hook_atoll");
         extern "system" {
             fn strlen(s: *const c_char) -> usize;
         }
+        log::trace!("hook_atoll");
         if !self
             .allocator_mut()
             .check_shadow(s as *const c_void, unsafe { strlen(s) })
@@ -2462,10 +2462,10 @@ impl AsanRuntime {
         dest: *mut wchar_t,
         src: *const wchar_t,
     ) -> *mut wchar_t {
-        log::trace!("hook_wcscpy");
         extern "system" {
             fn wcslen(s: *const wchar_t) -> usize;
         }
+        log::trace!("hook_wcscpy");
         if !self
             .allocator_mut()
             .check_shadow(dest as *const c_void, unsafe { (wcslen(src) + 1) * 2 })
@@ -2501,10 +2501,10 @@ impl AsanRuntime {
         s1: *const wchar_t,
         s2: *const wchar_t,
     ) -> i32 {
-        log::trace!("hook_wcscmp");
         extern "system" {
             fn wcslen(s: *const wchar_t) -> usize;
         }
+        log::trace!("hook_wcscmp");
         if !self
             .allocator_mut()
             .check_shadow(s1 as *const c_void, unsafe { (wcslen(s1) + 1) * 2 })

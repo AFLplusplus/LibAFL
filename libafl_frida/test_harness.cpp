@@ -1,11 +1,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string>
+#ifndef _MSC_VER
+  #include <string.h>
+#endif
 
 #ifdef _MSC_VER
   #include <windows.h>
   #include <winnt.h>
   #include <winternl.h>
+
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD ul_reason_for_call,
                       LPVOID lpReserved) {
   (void)hModule;
@@ -169,7 +173,7 @@ EXTERN int heap_oob_memcpy_write(const uint8_t *_data, size_t _size) {
 
   const size_t REAL_SIZE = 10;
   const size_t LARGER_SIZE = REAL_SIZE + 1;
-  
+
   char *dest = new char[REAL_SIZE];
   char *src = new char[LARGER_SIZE];
   memcpy(dest, src, LARGER_SIZE);
@@ -185,7 +189,7 @@ EXTERN int heap_oob_memcpy_read(const uint8_t *_data, size_t _size) {
 
   const size_t REAL_SIZE = 10;
   const size_t LARGER_SIZE = REAL_SIZE + 1;
-  
+
   char *dest = new char[LARGER_SIZE];
   char *src = new char[REAL_SIZE];
   memcpy(dest, src, LARGER_SIZE);

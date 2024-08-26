@@ -968,12 +968,12 @@ impl SimpleStdoutLogger {
     }
 }
 
-use std::arch::asm;
 #[cfg(target_os = "windows")]
 #[allow(clippy::cast_ptr_alignment)]
 #[must_use]
 /// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
+    use std::arch::asm;
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let teb: *const u8;
@@ -990,7 +990,11 @@ pub fn get_thread_id() -> u64 {
         *thread_id_ptr as u64
     }
 }
+
 #[cfg(target_os = "linux")]
+#[must_use]
+#[allow(clippy::cast_sign_loss)]
+/// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
     use libc::{syscall, SYS_gettid};
 
@@ -998,65 +1002,68 @@ pub fn get_thread_id() -> u64 {
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[must_use]
+/// Return thread ID using Rust's `std::thread`
 pub fn get_thread_id() -> u64 {
     // Fallback for other platforms
     thread::current().id().as_u64().into()
 }
 
-use std::ptr;
-
-use once_cell::sync::OnceCell;
-use winapi::um::{
-    fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
-    winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
-};
-
-// Safe wrapper around HANDLE
-struct StdOutHandle(HANDLE);
-
-// Implement Send and Sync for StdOutHandle, assuming it's safe to share
-unsafe impl Send for StdOutHandle {}
-unsafe impl Sync for StdOutHandle {}
-
-static H_STDOUT: OnceCell<StdOutHandle> = OnceCell::new();
-
-fn get_stdout_handle() -> HANDLE {
-    H_STDOUT
-        .get_or_init(|| {
-            let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
-            StdOutHandle(handle)
-        })
-        .0
-}
-
-/// A function that writes directly to stdout using `WinAPI`.
-/// Works much faster than println and does not need TLS
 #[cfg(target_os = "windows")]
-pub fn direct_log(message: &str) {
-    // Get the handle to standard output
-    let h_stdout: HANDLE = get_stdout_handle();
+mod windows_logging {
+    use std::ptr;
 
-    if h_stdout == INVALID_HANDLE_VALUE {
-        eprintln!("Failed to get standard output handle");
-        return;
-    }
-
-    let bytes = message.as_bytes();
-    let mut bytes_written = 0;
-
-    // Write the message to standard output
-    let result = unsafe {
-        WriteFile(
-            h_stdout,
-            bytes.as_ptr() as *const _,
-            bytes.len() as u32,
-            &mut bytes_written,
-            ptr::null_mut(),
-        )
+    use once_cell::sync::OnceCell;
+    use winapi::um::{
+        fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
+        winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
     };
 
-    if result == 0 {
-        eprintln!("Failed to write to standard output");
+    // Safe wrapper around HANDLE
+    struct StdOutHandle(HANDLE);
+
+    // Implement Send and Sync for StdOutHandle, assuming it's safe to share
+    unsafe impl Send for StdOutHandle {}
+    unsafe impl Sync for StdOutHandle {}
+
+    static H_STDOUT: OnceCell<StdOutHandle> = OnceCell::new();
+
+    fn get_stdout_handle() -> HANDLE {
+        H_STDOUT
+            .get_or_init(|| {
+                let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+                StdOutHandle(handle)
+            })
+            .0
+    }
+    /// A function that writes directly to stdout using `WinAPI`.
+    /// Works much faster than println and does not need TLS
+    pub fn direct_log(message: &str) {
+        // Get the handle to standard output
+        let h_stdout: HANDLE = get_stdout_handle();
+
+        if h_stdout == INVALID_HANDLE_VALUE {
+            eprintln!("Failed to get standard output handle");
+            return;
+        }
+
+        let bytes = message.as_bytes();
+        let mut bytes_written = 0;
+
+        // Write the message to standard output
+        let result = unsafe {
+            WriteFile(
+                h_stdout,
+                bytes.as_ptr() as *const _,
+                bytes.len() as u32,
+                &mut bytes_written,
+                ptr::null_mut(),
+            )
+        };
+
+        if result == 0 {
+            eprintln!("Failed to write to standard output");
+        }
     }
 }
 
@@ -1090,7 +1097,7 @@ impl log::Log for SimpleStdoutLogger {
             record.level(),
             record.args()
         );
-        direct_log(msg.as_str());
+        windows_logging::direct_log(msg.as_str());
     }
 
     fn flush(&self) {}
