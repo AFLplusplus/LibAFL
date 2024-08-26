@@ -68,7 +68,8 @@ pub mod multi_machine;
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {};
 
-/// A signal handler for catching ctrl-c.
+/// A signal handler for catching `ctrl-c`.
+///
 /// The purpose of this signal handler is solely for calling `exit()` with a specific exit code 100
 /// In this way, the restarting manager can tell that we really want to exit
 #[cfg(all(unix, feature = "std"))]

@@ -1,4 +1,5 @@
 //! Concolic feedback for concolic fuzzing.
+//!
 //! It is used to attach concolic tracing metadata to the testcase.
 //! This feedback should be used in combination with another feedback as this feedback always considers testcases
 //! to be not interesting.
@@ -23,6 +24,7 @@ use crate::{
 };
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.
+///
 /// This feedback should be used in combination with another feedback as this feedback always considers testcases
 /// to be not interesting.
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
