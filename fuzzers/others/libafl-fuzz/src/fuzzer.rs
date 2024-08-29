@@ -408,7 +408,9 @@ fn base_executor<'a>(
     if let Some(target_env) = &opt.target_env {
         executor = executor.envs(target_env);
     }
-    let kill_signal = if let Some(signal) = opt.kill_signal { signal } else {
+    let kill_signal = if let Some(signal) = opt.kill_signal {
+        signal
+    } else {
         let mut signal = if opt.unicorn_mode || opt.qemu_mode {
             SIGKILL
         } else {
