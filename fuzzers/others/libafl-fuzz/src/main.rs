@@ -240,8 +240,9 @@ struct Opt {
     /// use binary-only instrumentation (QEMU mode)
     #[arg(short = 'Q')]
     qemu_mode: bool,
+    /// use VM fuzzing (NYX mode - standalone mode)
     #[cfg(target_os = "linux")]
-    #[clap(skip)]
+    #[arg(short = 'X')]
     nyx_mode: bool,
     /// use unicorn-based instrumentation (Unicorn mode)
     #[arg(short = 'U')]

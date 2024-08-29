@@ -40,6 +40,7 @@ use libafl_bolts::{
     AsSliceMut,
 };
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
+use nix::sys::signal::Signal::{SIGKILL, SIGTERM};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -407,9 +408,22 @@ fn base_executor<'a>(
     if let Some(target_env) = &opt.target_env {
         executor = executor.envs(target_env);
     }
-    if let Some(kill_signal) = opt.kill_signal {
-        executor = executor.kill_signal(kill_signal);
-    }
+    let kill_signal = match opt.kill_signal {
+        Some(signal) => signal,
+        None => {
+            let mut signal = if opt.unicorn_mode || opt.qemu_mode {
+                SIGKILL
+            } else {
+                SIGTERM
+            };
+            #[cfg(target_os = "linux")]
+            if opt.nyx_mode {
+                signal = SIGKILL
+            };
+            signal
+        }
+    };
+    executor = executor.kill_signal(kill_signal);
     if opt.is_persistent || opt.qemu_mode || opt.unicorn_mode {
         executor = executor.shmem_provider(shmem_provider);
     }
