@@ -253,7 +253,7 @@ python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_packer.py \
         --fast_reload_mode \
         --purge > /dev/null
 
-python3 .${AFL_DIR}/nyx_mode/packer/packer/nyx_config_gen.py out-nyx Kernel > /dev/null
+python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_config_gen.py out-nyx Kernel > /dev/null
 
 sudo modprobe -r kvm-intel
 sudo modprobe -r kvm
