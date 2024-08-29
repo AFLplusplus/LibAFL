@@ -408,20 +408,17 @@ fn base_executor<'a>(
     if let Some(target_env) = &opt.target_env {
         executor = executor.envs(target_env);
     }
-    let kill_signal = match opt.kill_signal {
-        Some(signal) => signal,
-        None => {
-            let mut signal = if opt.unicorn_mode || opt.qemu_mode {
-                SIGKILL
-            } else {
-                SIGTERM
-            };
-            #[cfg(target_os = "linux")]
-            if opt.nyx_mode {
-                signal = SIGKILL
-            };
-            signal
-        }
+    let kill_signal = if let Some(signal) = opt.kill_signal { signal } else {
+        let mut signal = if opt.unicorn_mode || opt.qemu_mode {
+            SIGKILL
+        } else {
+            SIGTERM
+        };
+        #[cfg(target_os = "linux")]
+        if opt.nyx_mode {
+            signal = SIGKILL;
+        };
+        signal
     };
     executor = executor.kill_signal(kill_signal);
     if opt.is_persistent || opt.qemu_mode || opt.unicorn_mode {
