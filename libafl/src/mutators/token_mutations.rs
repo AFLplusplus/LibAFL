@@ -472,7 +472,7 @@ where
             }
             CmpValues::U16(v) => {
                 if len >= size_of::<u16>() {
-                    for i in off..len - (size_of::<u16>() - 1) {
+                    for i in off..=len - size_of::<u16>() {
                         let val =
                             u16::from_ne_bytes(bytes[i..i + size_of::<u16>()].try_into().unwrap());
                         if val == v.0 {
@@ -501,7 +501,7 @@ where
             }
             CmpValues::U32(v) => {
                 if len >= size_of::<u32>() {
-                    for i in off..len - (size_of::<u32>() - 1) {
+                    for i in off..=len - size_of::<u32>() {
                         let val =
                             u32::from_ne_bytes(bytes[i..i + size_of::<u32>()].try_into().unwrap());
                         if val == v.0 {
@@ -530,7 +530,7 @@ where
             }
             CmpValues::U64(v) => {
                 if len >= size_of::<u64>() {
-                    for i in off..len - (size_of::<u64>() - 1) {
+                    for i in off..=len - size_of::<u64>() {
                         let val =
                             u64::from_ne_bytes(bytes[i..i + size_of::<u64>()].try_into().unwrap());
                         if val == v.0 {
