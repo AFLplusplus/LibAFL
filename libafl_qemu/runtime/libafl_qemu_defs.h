@@ -1,8 +1,8 @@
 #ifndef LIBAFL_QEMU_DEFS
 #define LIBAFL_QEMU_DEFS
 
-#define STRINGIFY(s) #s
-#define XSTRINGIFY(s) STRINGIFY(s)
+#define LIBAFL_STRINGIFY(s) #s
+#define XSTRINGIFY(s) LIBAFL_STRINGIFY(s)
 
 #if __STDC_VERSION__ >= 201112L
   #define STATIC_CHECKS                                   \
