@@ -18,7 +18,6 @@ use std::{
 #[cfg(feature = "std")]
 use libafl_bolts::core_affinity::{CoreId, Cores};
 use libafl_bolts::{
-    current_time,
     rands::{Rand, StdRand},
     serdeany::{NamedSerdeAnyMap, SerdeAnyMap},
 };

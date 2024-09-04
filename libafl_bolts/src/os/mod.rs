@@ -48,12 +48,6 @@ pub struct ChildHandle {
 }
 
 #[cfg(unix)]
-use nix::{
-    sys::wait::{waitpid, WaitStatus},
-    unistd::Pid,
-};
-
-#[cfg(unix)]
 impl ChildHandle {
     /// Block until the child exited and the status code becomes available
     #[must_use]
