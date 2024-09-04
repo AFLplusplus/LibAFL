@@ -1227,11 +1227,7 @@ where
             rand,
             executions: 0,
             imported: 0,
-<<<<<<< HEAD
-            start_time: current_time(),
-=======
             start_time: libafl_bolts::current_time(),
->>>>>>> main
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,

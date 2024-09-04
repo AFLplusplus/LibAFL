@@ -11,11 +11,7 @@ use libafl::{
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-<<<<<<< HEAD:fuzzers/baby_fuzzer_wasm/src/lib.rs
-    stages::{StdMutationalStage, StdRestartHelper},
-=======
     stages::{RetryCountRestartHelper, StdMutationalStage},
->>>>>>> main:fuzzers/baby/baby_fuzzer_wasm/src/lib.rs
     state::{HasSolutions, StdState},
     Fuzzer, StdFuzzer,
 };

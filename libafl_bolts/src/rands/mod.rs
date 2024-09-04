@@ -1,14 +1,8 @@
 //! The random number generators of `LibAFL`
 
-<<<<<<< HEAD
-#[cfg(target_has_atomic = "ptr")]
-use core::sync::atomic::Ordering;
-use core::{debug_assert, fmt::Debug, sync::atomic::AtomicUsize};
-=======
 #[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::{debug_assert, fmt::Debug};
->>>>>>> main
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 

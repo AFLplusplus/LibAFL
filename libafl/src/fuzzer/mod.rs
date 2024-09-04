@@ -1,19 +1,7 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-<<<<<<< HEAD
-use alloc::string::ToString;
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
-#[cfg(all(feature = "std", feature = "dump_state"))]
-use std::{
-    fs::{self, File},
-    hash::{BuildHasher, Hasher},
-    io::Write,
-    path::PathBuf,
-};
-=======
 use alloc::{string::ToString, vec::Vec};
 use core::{fmt::Debug, time::Duration};
->>>>>>> main
 
 #[cfg(all(feature = "std", feature = "dump_state"))]
 use ahash::RandomState;
