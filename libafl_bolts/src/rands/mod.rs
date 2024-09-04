@@ -1,13 +1,22 @@
 //! The random number generators of `LibAFL`
 
+<<<<<<< HEAD
 #[cfg(target_has_atomic = "ptr")]
 use core::sync::atomic::Ordering;
 use core::{debug_assert, fmt::Debug, sync::atomic::AtomicUsize};
+=======
+#[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
+use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{debug_assert, fmt::Debug};
+>>>>>>> main
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "alloc")]
 pub mod loaded_dice;
+
+#[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
+static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// Return a pseudo-random seed. For `no_std` environments, a single deterministic sequence is used.
 #[must_use]
@@ -21,10 +30,7 @@ pub fn random_seed() -> u64 {
     4
 }
 
-static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-#[allow(dead_code)]
-#[cfg(target_has_atomic = "ptr")]
+#[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
 fn random_seed_deterministic() -> u64 {
     let mut seed = SEED_COUNTER.fetch_add(1, Ordering::Relaxed) as u64;
     splitmix64(&mut seed)
@@ -49,7 +55,8 @@ fn splitmix64(x: &mut u64) -> u64 {
     z ^ (z >> 31)
 }
 
-/// The standard rand implementation for `LibAFL`.
+/// The standard [`Rand`] implementation for `LibAFL`.
+///
 /// It is usually the right choice, with very good speed and a reasonable randomness.
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuDuoJrRand;
@@ -687,7 +694,7 @@ pub mod pybind {
         }
     }
 
-    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[derive(Serialize, Deserialize, Debug)]
     enum PythonRandWrapper {
         Std(Py<PythonStdRand>),
     }
@@ -695,7 +702,7 @@ pub mod pybind {
     /// Rand Trait binding
     #[pyclass(unsendable, name = "Rand")]
     #[allow(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[derive(Serialize, Deserialize, Debug)]
     pub struct PythonRand {
         wrapper: PythonRandWrapper,
     }
@@ -728,7 +735,7 @@ pub mod pybind {
     }
 
     /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<PythonStdRand>()?;
         m.add_class::<PythonRand>()?;
         Ok(())

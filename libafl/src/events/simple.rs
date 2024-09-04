@@ -32,7 +32,7 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    state::{HasExecutions, HasLastReportTime, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
@@ -50,7 +50,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 /// A simple, single-threaded event manager that just logs
 pub struct SimpleEventManager<MT, S>
 where
-    S: UsesInput,
+    S: UsesInput + Stoppable,
 {
     /// The monitor
     monitor: MT,
@@ -64,7 +64,7 @@ where
 impl<MT, S> Debug for SimpleEventManager<MT, S>
 where
     MT: Debug,
-    S: UsesInput,
+    S: UsesInput + Stoppable,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SimpleEventManager")
@@ -128,6 +128,10 @@ where
         }
         Ok(count)
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
@@ -163,7 +167,7 @@ where
 impl<MT, S> HasEventManagerId for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: UsesInput + Stoppable,
 {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId(0)
@@ -173,7 +177,7 @@ where
 #[cfg(feature = "std")]
 impl<S> SimpleEventManager<SimplePrintingMonitor, S>
 where
-    S: UsesInput,
+    S: UsesInput + Stoppable,
 {
     /// Creates a [`SimpleEventManager`] that just prints to `stdout`.
     #[must_use]
@@ -185,7 +189,7 @@ where
 impl<MT, S> SimpleEventManager<MT, S>
 where
     MT: Monitor, //TODO CE: CustomEvent,
-    S: UsesInput,
+    S: UsesInput + Stoppable,
 {
     /// Creates a new [`SimpleEventManager`].
     pub fn new(monitor: MT) -> Self {
@@ -281,27 +285,34 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
-            //_ => Ok(BrokerEventResult::Forward),
+            Event::Stop => Ok(BrokerEventResult::Forward),
         }
     }
 
     // Handle arriving events in the client
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
     fn handle_in_client(&mut self, state: &mut S, event: Event<S::Input>) -> Result<(), Error> {
-        if let Event::CustomBuf { tag, buf } = &event {
-            for handler in &mut self.custom_buf_handlers {
-                handler(state, tag, buf)?;
+        match event {
+            Event::CustomBuf { buf, tag } => {
+                for handler in &mut self.custom_buf_handlers {
+                    handler(state, &tag, &buf)?;
+                }
+                Ok(())
             }
-            Ok(())
-        } else {
-            Err(Error::unknown(format!(
+            Event::Stop => {
+                state.request_stop();
+                Ok(())
+            }
+            _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {event:?}."
-            )))
+            ))),
         }
     }
 }
 
-/// Provides a `builder` which can be used to build a [`SimpleRestartingEventManager`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`SimpleRestartingEventManager`].
+///
+/// The [`SimpleRestartingEventManager`] is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
@@ -309,7 +320,7 @@ where
 #[derive(Debug)]
 pub struct SimpleRestartingEventManager<MT, S, SP>
 where
-    S: UsesInput,
+    S: UsesInput + Stoppable,
     SP: ShMemProvider, //CE: CustomEvent<I, OT>,
 {
     /// The actual simple event mgr
@@ -388,6 +399,9 @@ where
     ) -> Result<usize, Error> {
         self.simple_event_mgr.process(fuzzer, state, executor)
     }
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 #[cfg(feature = "std")]
@@ -427,7 +441,7 @@ where
 impl<MT, S, SP> HasEventManagerId for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    S: UsesInput,
+    S: UsesInput + Stoppable,
     SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -439,7 +453,7 @@ where
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
 impl<MT, S, SP> SimpleRestartingEventManager<MT, S, SP>
 where
-    S: UsesInput,
+    S: UsesInput + Stoppable,
     SP: ShMemProvider,
     MT: Monitor, //TODO CE: CustomEvent,
 {

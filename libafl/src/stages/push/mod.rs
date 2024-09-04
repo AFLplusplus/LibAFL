@@ -1,3 +1,5 @@
+//! [`PushStage`]`s` return inputs instead of calling an executor
+//!
 //! While normal stages call the executor over and over again, push stages turn this concept upside down:
 //! A push stage instead returns an iterator that generates a new result for each time it gets called.
 //! With the new testcase, you will have to take care about testcase execution, manually.
@@ -38,7 +40,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -59,7 +61,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -84,7 +86,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -114,7 +116,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -183,7 +185,7 @@ where
     CS::State: HasRand + HasExecutions + HasMetadata + HasCorpus + HasLastReportTime,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {

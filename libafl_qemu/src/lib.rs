@@ -2,6 +2,7 @@
 //!
 //! __Warning__: The documentation is built by default for `x86_64` in `usermode`. To access the documentation of other architectures or `systemmode`, the documentation must be rebuilt with the right features.
 /*! */
+#![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 #![forbid(unexpected_cfgs)]
 // libafl_qemu only supports Linux currently
@@ -37,11 +38,7 @@ pub use arch::*;
 
 pub mod elf;
 
-pub mod helpers;
-pub use helpers::*;
-
-pub mod hooks;
-pub use hooks::*;
+pub mod modules;
 
 pub mod executor;
 pub use executor::QemuExecutor;
@@ -57,6 +54,10 @@ pub use emu::*;
 pub mod breakpoint;
 pub mod command;
 pub mod sync_exit;
+
+pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
+#[cfg(emulation_mode = "systemmode")]
+pub use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
@@ -82,28 +83,30 @@ use pyo3::prelude::*;
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
 #[allow(clippy::items_after_statements, clippy::too_many_lines)]
-pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    let regsm = PyModule::new(py, "regs")?;
+pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    use pyo3::types::PyString;
+
+    let regsm = PyModule::new_bound(m.py(), "regs")?;
     for r in Regs::iter() {
         let v: i32 = r.into();
-        regsm.add(&format!("{r:?}"), v)?;
+        regsm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
     }
-    m.add_submodule(regsm)?;
+    m.add_submodule(&regsm)?;
 
-    let mmapm = PyModule::new(py, "mmap")?;
-    for r in sys::MmapPerms::iter() {
+    let mmapm = PyModule::new_bound(m.py(), "mmap")?;
+    for r in MmapPerms::iter() {
         let v: i32 = r.into();
-        mmapm.add(&format!("{r:?}"), v)?;
+        mmapm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
     }
-    m.add_submodule(mmapm)?;
+    m.add_submodule(&mmapm)?;
 
     m.add_class::<sys::MapInfo>()?;
 
     #[cfg(emulation_mode = "usermode")]
-    m.add_class::<qemu::GuestMaps>()?;
+    m.add_class::<GuestMaps>()?;
 
-    m.add_class::<qemu::SyscallHookResult>()?;
-    m.add_class::<qemu::pybind::Qemu>()?;
+    m.add_class::<SyscallHookResult>()?;
+    m.add_class::<pybind::Qemu>()?;
 
     Ok(())
 }

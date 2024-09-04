@@ -18,6 +18,7 @@ vendor
 *.bin
 *.dll
 *.exe
+*.dylib
 *.dSYM
 *.obj
 
@@ -38,7 +39,6 @@ test.dict
 .idea/
 
 # Ignore all built fuzzers
-fuzzer_*
 AFLplusplus
 test_*
 *_fuzzer

@@ -1,0 +1,69 @@
+
+# Variables
+[env]
+FUZZER_NAME = 'nyx_libxml2_standalone'
+PROJECT_DIR = { script = ["pwd"] }
+
+[config]
+skip_core_tasks = true # skip `cargo test` to avoid error
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this platform"
+'''
+
+[tasks.build]
+dependencies = ["libxml2"]
+
+[tasks.libxml2]
+linux_alias = "libxml2_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.libxml2_unix]
+# condition = { files_not_exist = ["./libxml2"]}
+script_runner = "@shell"
+script = '''
+./setup_libxml2.sh
+'''
+
+[tasks.enable_kvm_vmware_hypercall]
+script_runner = "@shell"
+script = '''
+if [ ! -e /sys/module/kvm/parameters/enable_vmware_backdoor ] ||
+  ! grep -qF Y /sys/module/kvm/parameters/enable_vmware_backdoor; then
+  sudo modprobe -r kvm-intel # or kvm-amd for AMD
+  sudo modprobe -r kvm
+  sudo modprobe kvm enable_vmware_backdoor=y
+  sudo modprobe kvm-intel
+fi;
+'''
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script = '''
+cargo run
+'''
+dependencies = ["libxml2", "enable_kvm_vmware_hypercall"]
+
+# Clean up
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+make -C ./libxml2 clean
+cargo clean
+'''

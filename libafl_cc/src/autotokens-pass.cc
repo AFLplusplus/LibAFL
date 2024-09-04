@@ -498,6 +498,11 @@ bool AutoTokensPass::runOnModule(Module &M) {
             Value       *op2 = callInst->getArgOperand(2);
             ConstantInt *ilen = dyn_cast<ConstantInt>(op2);
 
+            if (!ilen) {
+              op2 = callInst->getArgOperand(1);
+              ilen = dyn_cast<ConstantInt>(op2);
+            }
+
             if (ilen) {
               uint64_t literalLength = optLen;
               optLen = ilen->getZExtValue();

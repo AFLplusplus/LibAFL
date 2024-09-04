@@ -3,7 +3,7 @@
 Nautilus is a coverage guided, grammar-based mutator. You can use it to improve your test coverage and find more bugs. By specifying the grammar of semi-valid inputs, Nautilus is able to perform complex mutation and to uncover more interesting test cases. Many of the ideas behind the original fuzzer are documented in a paper published at NDSS 2019.
 
 <p>
-<a href="https://www.syssec.ruhr-uni-bochum.de/media/emma/veroeffentlichungen/2018/12/17/NDSS19-Nautilus.pdf"> <img align="right" width="200"  src="https://github.com/RUB-SysSec/nautilus/raw/master/paper.png"> </a>
+<a href="https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04A-3_Aschermann_paper.pdf"> <img align="right" width="200"  src="https://github.com/RUB-SysSec/nautilus/raw/master/paper.png"> </a>
 </p>
 
 Version 2.0 has added many improvements to this early prototype.

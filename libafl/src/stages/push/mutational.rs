@@ -8,6 +8,7 @@ use core::{
 };
 
 use libafl_bolts::rands::Rand;
+use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 use crate::{
@@ -28,7 +29,9 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
+
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
+///
 /// Mutational push stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
 /// The push version, in contrast to the normal stage, will return each testcase, instead of executing it.
@@ -43,9 +46,9 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State: HasRand + HasCorpus + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -63,9 +66,9 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State: HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -86,10 +89,10 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State:
         HasCorpus + HasRand + HasExecutions + HasLastReportTime + HasMetadata + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -169,7 +172,7 @@ where
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
 
-        fuzzer.execute_and_process(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        fuzzer.evaluate_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
         self.mutator.post_exec(state, self.current_corpus_id)?;
@@ -197,10 +200,10 @@ where
     CS: Scheduler,
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = CS::State>,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State:
         HasCorpus + HasRand + HasExecutions + HasMetadata + HasLastReportTime + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
@@ -216,9 +219,9 @@ where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::Input, CS::State>,
-    OT: ObserversTuple<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize,
     CS::State: HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State>
+    Z: ExecutionProcessor<State = CS::State>
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {

@@ -58,8 +58,11 @@ const WRAPPER_HEADER: &str = r#"
 #include "hw/core/sysemu-cpu-ops.h"
 #include "exec/address-spaces.h"
 #include "sysemu/tcg.h"
+#include "sysemu/runstate.h"
 #include "sysemu/replay.h"
 
+#include "libafl/system.h"
+#include "libafl/qemu_snapshot.h"
 #include "libafl/syx-snapshot/device-save.h"
 #include "libafl/syx-snapshot/syx-snapshot.h"
 
@@ -81,10 +84,26 @@ const WRAPPER_HEADER: &str = r#"
 
 #include "qemu/plugin-memory.h"
 
+#include "libafl/cpu.h"
+#include "libafl/gdb.h"
 #include "libafl/exit.h"
-#include "libafl/hook.h"
 #include "libafl/jit.h"
 #include "libafl/utils.h"
+
+#include "libafl/hook.h"
+
+#include "libafl/hooks/tcg/backdoor.h"
+#include "libafl/hooks/tcg/block.h"
+#include "libafl/hooks/tcg/cmp.h"
+#include "libafl/hooks/tcg/edge.h"
+#include "libafl/hooks/tcg/instruction.h"
+#include "libafl/hooks/tcg/read_write.h"
+#include "libafl/hooks/cpu_run.h"
+#include "libafl/hooks/thread.h"
+
+#ifdef CONFIG_USER_ONLY
+#include "libafl/hooks/syscall.h"
+#endif
 
 "#;
 
@@ -95,7 +114,13 @@ pub fn generate(
 ) -> Result<Bindings, BindgenError> {
     let wrapper_h = build_dir.join("wrapper.h");
 
-    store_generated_content_if_different(&wrapper_h, WRAPPER_HEADER.as_bytes(), None, None, false);
+    store_generated_content_if_different(
+        &wrapper_h,
+        WRAPPER_HEADER.as_bytes(),
+        None,
+        vec![],
+        false,
+    );
 
     let bindings = bindgen::Builder::default()
         .derive_debug(true)
@@ -127,7 +152,7 @@ pub fn generate(
         .allowlist_type("Syx.*")
         .allowlist_type("libafl_mapinfo")
         .allowlist_type("IntervalTreeRoot")
-        .allowlist_function("qemu_user_init")
+        .allowlist_function("qemu_system_debug_request")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
         .allowlist_function("target_munmap")
@@ -147,6 +172,9 @@ pub fn generate(
         .allowlist_function("read_self_maps")
         .allowlist_function("free_self_maps")
         .allowlist_function("pageflags_get_root")
+        .allowlist_function("vm_start")
+        .allowlist_function("qemu_main_loop")
+        .allowlist_function("qemu_cleanup")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 

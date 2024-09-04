@@ -35,13 +35,15 @@ pub use multi_map::*;
 pub mod owned_map;
 pub use owned_map::*;
 
+/// A trait indicating tracking of observed map values after testcase execution
+///
 /// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
 /// Implementors of feedbacks similar to [`crate::feedbacks::MapFeedback`] may wish to use this to
 /// ensure that edge metadata is recorded as is appropriate for the provided observer.
 ///
 /// If you get a type constraint failure for your map due to this type being unfulfilled, you must
 /// call [`CanTrack::track_indices`] or [`CanTrack::track_novelties`] **at
-/// the initialisation site of your map**.
+/// the initialization site of your map**.
 ///
 /// This trait allows various components which interact with map metadata to ensure that the
 /// information they need is actually recorded by the map feedback.
@@ -244,11 +246,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_index_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::CanTrack> {
+            struct TrackingEnabledCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> TrackingEnabledCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -264,7 +266,7 @@ pub mod macros {
                         SPACING, "| ",
                     )
                 };
-                const TRACKING_SANITY: bool = {
+                const TRACKING_ENABLED: bool = {
                     if !O::INDICES {
                         panic!("{}", Self::MESSAGE)
                     } else {
@@ -273,13 +275,13 @@ pub mod macros {
                 };
 
                 #[inline(always)]
-                fn check_sanity() {
-                    if !Self::TRACKING_SANITY {
+                fn check_enabled() {
+                    if !Self::TRACKING_ENABLED {
                         unreachable!("{}", Self::MESSAGE);
                     }
                 }
             }
-            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+            TrackingEnabledCheck::<$obs>::check_enabled(); // check that tracking is enabled for this map
         };
     }
 
@@ -307,11 +309,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_novelties_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::CanTrack> {
+            struct TrackingEnabledCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> TrackingEnabledCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -328,7 +330,7 @@ pub mod macros {
                         SPACING, "| ",
                     )
                 };
-                const TRACKING_SANITY: bool = {
+                const TRACKING_ENABLED: bool = {
                     if !O::NOVELTIES {
                         panic!("{}", Self::MESSAGE)
                     } else {
@@ -337,13 +339,13 @@ pub mod macros {
                 };
 
                 #[inline(always)]
-                fn check_sanity() {
-                    if !Self::TRACKING_SANITY {
+                fn check_enabled() {
+                    if !Self::TRACKING_ENABLED {
                         unreachable!("{}", Self::MESSAGE);
                     }
                 }
             }
-            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+            TrackingEnabledCheck::<$obs>::check_enabled(); // check that tracking is enabled for this map
         };
     }
 }

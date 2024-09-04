@@ -35,6 +35,8 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
 };
+#[cfg(any(unix, feature = "std"))]
+use crate::{ExecutionProcessor, HasScheduler};
 
 /// The inner structure of `InProcessExecutor`.
 pub mod inner;
@@ -243,7 +245,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -284,7 +286,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -313,7 +315,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -348,7 +350,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, Z, State = S> + HasObservers,
+        Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: State,
@@ -499,7 +501,9 @@ where
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF, State = E::State>
+        + HasScheduler<State = E::State>
+        + ExecutionProcessor,
 {
     let data = addr_of_mut!(GLOBAL_STATE);
     let in_handler = (*data).set_in_handler(true);
@@ -556,7 +560,7 @@ mod tests {
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-        let mut fuzzer = StdFuzzer::<_, _, _, ()>::new(sche, feedback, objective);
+        let mut fuzzer = StdFuzzer::<_, _, _>::new(sche, feedback, objective);
 
         let mut in_process_executor = InProcessExecutor::new(
             &mut harness,

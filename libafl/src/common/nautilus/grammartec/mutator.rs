@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
-use std::{collections::HashSet, mem};
+use core::mem;
 
+use hashbrown::HashSet;
 use libafl_bolts::{rands::Rand, Error};
 
 use crate::common::nautilus::grammartec::{
@@ -310,8 +311,9 @@ mod tests {
         string::{String, ToString},
         vec::Vec,
     };
-    use std::{collections::HashSet, str};
+    use core::str;
 
+    use hashbrown::HashSet;
     use libafl_bolts::rands::StdRand;
 
     use crate::{

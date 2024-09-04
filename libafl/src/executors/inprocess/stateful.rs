@@ -33,8 +33,8 @@ pub type StatefulInProcessExecutor<'a, H, OT, S, ES> =
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 /// The internal state of the executor is made available to the harness.
 pub type OwnedInProcessExecutor<OT, S, ES> = StatefulGenericInProcessExecutor<
-    dyn FnMut(&<S as UsesInput>::Input, &mut ES) -> ExitKind,
-    Box<dyn FnMut(&<S as UsesInput>::Input, &mut ES) -> ExitKind>,
+    dyn FnMut(&mut ES, &<S as UsesInput>::Input) -> ExitKind,
+    Box<dyn FnMut(&mut ES, &<S as UsesInput>::Input) -> ExitKind>,
     (),
     OT,
     S,
@@ -46,7 +46,7 @@ pub type OwnedInProcessExecutor<OT, S, ES> = StatefulGenericInProcessExecutor<
 #[allow(dead_code)]
 pub struct StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
@@ -63,7 +63,7 @@ where
 
 impl<H, HB, HT, OT, S, ES> Debug for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S> + Debug,
@@ -79,7 +79,7 @@ where
 
 impl<H, HB, HT, OT, S, ES> UsesState for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
@@ -90,7 +90,7 @@ where
 
 impl<H, HB, HT, OT, S, ES> UsesObservers for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
@@ -103,7 +103,7 @@ impl<EM, H, HB, HT, OT, S, Z, ES> Executor<EM, Z>
     for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
@@ -125,7 +125,7 @@ where
         }
         self.inner.hooks.pre_exec_all(state, input);
 
-        let ret = (self.harness_fn.borrow_mut())(input, &mut self.exposed_executor_state);
+        let ret = self.harness_fn.borrow_mut()(&mut self.exposed_executor_state, input);
 
         self.inner.hooks.post_exec_all(state, input);
         self.inner.leave_target(fuzzer, state, mgr, input);
@@ -135,7 +135,7 @@ where
 
 impl<H, HB, HT, OT, S, ES> HasObservers for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
@@ -154,7 +154,7 @@ where
 
 impl<'a, H, OT, S, ES> StatefulInProcessExecutor<'a, H, OT, S, ES>
 where
-    H: FnMut(&<S as UsesInput>::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &<S as UsesInput>::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
 {
@@ -265,7 +265,7 @@ where
 
 impl<H, HB, HT, OT, S, ES> StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
@@ -284,7 +284,7 @@ where
 
 impl<H, HB, HT, OT, S, ES> StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
@@ -414,7 +414,7 @@ where
 impl<H, HB, HT, OT, S, ES> HasInProcessHooks<S>
     for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&<S as UsesInput>::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,

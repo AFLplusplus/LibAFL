@@ -12,16 +12,17 @@ use libafl_qemu_sys::{
     libafl_save_qemu_snapshot, qemu_cleanup, qemu_main_loop, vm_start, GuestAddr, GuestPhysAddr,
     GuestUsize, GuestVirtAddr,
 };
+use libc::EXIT_SUCCESS;
 use num_traits::Zero;
 
 use crate::{
-    EmulatorMemoryChunk, FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuExitError,
-    QemuExitReason, QemuSnapshotCheckResult, CPU,
+    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuSnapshotCheckResult,
+    CPU,
 };
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {
     unsafe {
-        qemu_cleanup();
+        qemu_cleanup(EXIT_SUCCESS);
     }
 }
 
@@ -200,27 +201,19 @@ impl Qemu {
         );
     }
 
-    /// This function will run the emulator until the next breakpoint / sync exit, or until finish.
-    /// It is a low-level function and simply kicks QEMU.
-    /// # Safety
-    ///
-    /// Should, in general, be safe to call.
-    /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
-    pub unsafe fn run(&self) -> Result<QemuExitReason, QemuExitError> {
+    pub(super) unsafe fn run_inner(&self) {
         vm_start();
         qemu_main_loop();
-
-        self.post_run()
     }
 
     pub fn save_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _, sync) };
+        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *mut i8, sync) };
     }
 
     pub fn load_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _, sync) };
+        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *mut i8, sync) };
     }
 
     #[must_use]
@@ -262,9 +255,7 @@ impl Qemu {
     ) -> QemuSnapshotCheckResult {
         let check_result = libafl_qemu_sys::syx_snapshot_check(ref_snapshot);
 
-        QemuSnapshotCheckResult {
-            nb_page_inconsistencies: check_result.nb_inconsistencies,
-        }
+        QemuSnapshotCheckResult::new(check_result.nb_inconsistencies)
     }
 
     pub fn list_devices(&self) -> Vec<String> {
@@ -295,7 +286,7 @@ impl Qemu {
     }
 }
 
-impl EmulatorMemoryChunk {
+impl QemuMemoryChunk {
     pub fn phys_iter(&self, qemu: Qemu) -> PhysMemoryIter {
         PhysMemoryIter {
             addr: self.addr,

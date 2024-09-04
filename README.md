@@ -93,7 +93,7 @@ cargo make run
 
 as long as the fuzzer directory has `Makefile.toml` file.
 
-The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
+The best-tested fuzzer is [`./fuzzers/libpng/libfuzzer_libpng`](./fuzzers/libpng/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
 
 ## Resources
 

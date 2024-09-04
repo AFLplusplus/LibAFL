@@ -1,4 +1,5 @@
 //! The [`InMemoryOnDiskCorpus`] stores [`Testcase`]s to disk.
+//!
 //! Additionally, _all_ of them are kept in memory.
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
@@ -9,6 +10,7 @@ use core::cell::RefCell;
 use std::{fs, fs::File, io::Write};
 use std::{
     fs::OpenOptions,
+    io,
     path::{Path, PathBuf},
 };
 
@@ -25,6 +27,25 @@ use crate::{
     inputs::{Input, UsesInput},
     Error, HasMetadata,
 };
+
+/// Creates the given `path` and returns an error if it fails.
+/// If the create succeeds, it will return the file.
+/// If the create fails for _any_ reason, including, but not limited to, a preexisting existing file of that name,
+/// it will instead return the respective [`io::Error`].
+fn create_new<P: AsRef<Path>>(path: P) -> Result<File, io::Error> {
+    OpenOptions::new().write(true).create_new(true).open(path)
+}
+
+/// Tries to create the given `path` and returns `None` _only_ if the file already existed.
+/// If the create succeeds, it will return the file.
+/// If the create fails for some other reason, it will instead return the respective [`io::Error`].
+fn try_create_new<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
+    match create_new(path) {
+        Ok(ret) => Ok(Some(ret)),
+        Err(err) if err.kind() == io::ErrorKind::AlreadyExists => Ok(None),
+        Err(err) => Err(err),
+    }
+}
 
 /// A corpus able to store [`Testcase`]s to disk, while also keeping all of them in memory.
 ///
@@ -295,7 +316,7 @@ where
     ) -> Result<Self, Error> {
         match fs::create_dir_all(dir_path) {
             Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
             Err(e) => return Err(e.into()),
         }
         Ok(InMemoryOnDiskCorpus {
@@ -331,16 +352,11 @@ where
                 let new_lock_filename = format!(".{new_filename}.lafl_lock");
 
                 // Try to create lock file for new testcases
-                if OpenOptions::new()
-                    .create_new(true)
-                    .write(true)
-                    .open(self.dir_path.join(new_lock_filename))
-                    .is_err()
-                {
+                if let Err(err) = create_new(self.dir_path.join(&new_lock_filename)) {
                     *testcase.filename_mut() = Some(old_filename);
-                    return Err(Error::illegal_state(
-                        "unable to create lock file for new testcase",
-                    ));
+                    return Err(Error::illegal_state(format!(
+                        "Unable to create lock file {new_lock_filename} for new testcase: {err}"
+                    )));
                 }
             }
 
@@ -387,12 +403,7 @@ where
                 let lockfile_name = format!(".{file_name}.lafl_lock");
                 let lockfile_path = self.dir_path.join(lockfile_name);
 
-                if OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(lockfile_path)
-                    .is_ok()
-                {
+                if try_create_new(lockfile_path)?.is_some() {
                     break file_name;
                 }
 
@@ -403,11 +414,7 @@ where
             file_name
         };
 
-        if testcase
-            .file_path()
-            .as_ref()
-            .map_or(true, |path| !path.starts_with(&self.dir_path))
-        {
+        if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
         }
         *testcase.filename_mut() = Some(file_name);
@@ -463,5 +470,29 @@ where
     #[must_use]
     pub fn dir_path(&self) -> &PathBuf {
         &self.dir_path
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, fs, io::Write};
+
+    use super::{create_new, try_create_new};
+
+    #[test]
+    fn test() {
+        let tmp = env::temp_dir();
+        let path = tmp.join("testfile.tmp");
+        _ = fs::remove_file(&path);
+        let mut f = create_new(&path).unwrap();
+        f.write_all(&[0; 1]).unwrap();
+
+        match try_create_new(&path) {
+            Ok(None) => (),
+            Ok(_) => panic!("File {path:?} did not exist even though it should have?"),
+            Err(e) => panic!("An unexpected error occurred: {e}"),
+        };
+        drop(f);
+        fs::remove_file(path).unwrap();
     }
 }

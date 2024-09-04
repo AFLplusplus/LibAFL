@@ -164,7 +164,7 @@ macro_rules! export_rust_runtime_fn {
     // special case for build_integer_from_buffer cuz the next one just doesn't work!!!!!!!
     (pub fn build_integer_from_buffer(
         buffer: *mut ::std::os::raw::c_void,
-        num_bits: ::std::os::raw::c_uint,) -> RSymExpr,$c_name:ident; $rt_cb:path) => {
+        num_bits: ::std::os::raw::c_uint$(,)?) -> RSymExpr,$c_name:ident; $rt_cb:path) => {
         #[allow(clippy::missing_safety_doc)]
         #[no_mangle]
         pub unsafe extern "C" fn _rsym_build_integer_from_buffer(buffer: *mut ::std::os::raw::c_void, num_bits: ::std::os::raw::c_uint) {
@@ -207,7 +207,9 @@ impl Runtime for NopRuntime {
     invoke_macro_with_rust_runtime_exports!(impl_nop_runtime_fn;);
 }
 
-/// This runtime can be constructed from an [`Option`] of a runtime, concretizing all expressions in the `None` case and forwarding expressions to the respective runtime in the `Some` case.
+/// This runtime can be constructed from an [`Option`] of a runtime.
+///
+/// It concretizes all expressions in the `None` case and forwards expressions to the respective runtime in the `Some` case.
 /// This is especially useful for parts of the processing pipeline that should be activated based on a runtime configuration, such as an environment variable.
 pub struct OptionalRuntime<RT> {
     inner: Option<RT>,

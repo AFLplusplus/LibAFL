@@ -19,7 +19,7 @@ use libafl::{
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
-use libafl_bolts::{rands::Rand, AsSlice, Named};
+use libafl_bolts::{rands::Rand, AsSlice, HasLen, Named};
 
 extern "C" {
     fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
@@ -197,7 +197,9 @@ where
     }
 }
 
-/// A mutator which invokes a libFuzzer-like custom mutator or crossover. The `CROSSOVER` constant
+/// A mutator which invokes a libFuzzer-like custom mutator or crossover.
+///
+/// The `CROSSOVER` constant
 /// controls whether this mutator invokes `LLVMFuzzerCustomMutate` and `LLVMFuzzerCustomCrossover`.
 /// You should avoid using crossover-like mutators with custom mutators as this may lead to the
 /// injection of some input portions to another in ways which violate structure.
@@ -322,10 +324,9 @@ where
         input: &mut S::Input,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
-        let target = input.bytes();
-        let mut bytes = Vec::with_capacity(state.max_size());
-        bytes.extend_from_slice(target.as_slice());
-        bytes.resize(state.max_size(), 0);
+        let len_orig = input.bytes().len();
+        let len_max = state.max_size();
+        input.resize(len_max, 0);
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
@@ -334,11 +335,11 @@ where
             let mut mutator = mutator.borrow_mut();
             mutator.replace(Box::new(proxy.weak()))
         });
-        let new_size = unsafe {
+        let new_len = unsafe {
             libafl_targets_libfuzzer_custom_mutator(
-                bytes.as_mut_ptr(),
-                target.as_slice().len(),
-                bytes.len(),
+                input.bytes_mut().as_mut_ptr(),
+                len_orig,
+                len_max,
                 seed as u32,
             )
         };
@@ -350,15 +351,17 @@ where
         if result.deref().borrow().is_err() {
             return result.replace(Ok(MutationResult::Skipped));
         }
-        bytes.truncate(new_size);
-        input.bytes_mut().copy_from_slice(&bytes);
+        if new_len > len_max {
+            return Err(Error::illegal_state("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
+        }
+        input.resize(new_len, 0);
         Ok(MutationResult::Mutated)
     }
 }
 
 impl<MT, SM> Named for LLVMCustomMutator<MT, SM, true> {
     fn name(&self) -> &Cow<'static, str> {
-        static NAME: Cow<'static, str> = Cow::Borrowed("LLVMCustomCrossover");
+        static NAME: Cow<'static, str> = Cow::Borrowed("LLVMCustomMutator");
         &NAME
     }
 }
@@ -411,7 +414,11 @@ where
 
         let seed = state.rand_mut().next();
         let mut out = vec![0u8; state.max_size()];
-        let data1 = input.bytes();
+
+        let len_max = state.max_size();
+        let len_orig = input.len();
+
+        input.resize(len_max, 0);
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
@@ -420,14 +427,14 @@ where
             let mut mutator = mutator.borrow_mut();
             mutator.replace(Box::new(proxy.weak()))
         });
-        let new_size = unsafe {
+        let new_len = unsafe {
             libafl_targets_libfuzzer_custom_crossover(
-                data1.as_ptr(),
-                data1.len(),
+                input.bytes_mut().as_mut_ptr(),
+                len_orig,
                 data2.as_ptr(),
                 data2.len(),
                 out.as_mut_ptr(),
-                out.len(),
+                len_max,
                 seed as u32,
             )
         };
@@ -439,8 +446,12 @@ where
         if result.deref().borrow().is_err() {
             return result.replace(Ok(MutationResult::Skipped));
         }
-        out.truncate(new_size);
-        input.bytes_mut().copy_from_slice(&out);
+
+        if new_len > len_max {
+            return Err(Error::illegal_state("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
+        }
+
+        input.resize(new_len, 0);
         Ok(MutationResult::Mutated)
     }
 }

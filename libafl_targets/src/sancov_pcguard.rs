@@ -1,11 +1,15 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
 #[rustversion::nightly]
-#[cfg(feature = "sancov_ngram4")]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 use core::simd::num::SimdUint;
-use core::{mem::align_of, ptr, slice};
+use core::{mem::align_of, slice};
 
-#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
+#[cfg(any(
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx",
+    feature = "sancov_ngram8"
+))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
 
 #[cfg(any(
@@ -17,7 +21,7 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_FOUND;
-#[cfg(feature = "sancov_ngram4")]
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[allow(unused)]
 use crate::EDGES_MAP_SIZE_IN_USE;
 #[cfg(feature = "pointer_maps")]
@@ -61,6 +65,7 @@ pub static SHR_4: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
 #[rustversion::nightly]
 pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 
+use alloc::vec::Vec;
 #[cfg(any(
     feature = "sancov_ngram4",
     feature = "sancov_ngram8",
@@ -287,23 +292,27 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     }
 }
 
-static mut PCS_BEG: *const usize = ptr::null();
-static mut PCS_END: *const usize = ptr::null();
+static mut PC_TABLES: Vec<&'static [PcTableEntry]> = Vec::new();
 
 #[no_mangle]
 unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *const usize) {
     // "The Unsafe Code Guidelines also notably defines that usize and isize are respectively compatible with uintptr_t and intptr_t defined in C."
-    assert!(
-        pcs_beg == PCS_BEG || PCS_BEG.is_null(),
-        "__sanitizer_cov_pcs_init can be called only once."
+    let len = pcs_end.offset_from(pcs_beg);
+    let Ok(len) = usize::try_from(len) else {
+        panic!("Invalid PC Table bounds - start: {pcs_beg:x?} end: {pcs_end:x?}")
+    };
+    assert_eq!(
+        len % 2,
+        0,
+        "PC Table size is not evens - start: {pcs_beg:x?} end: {pcs_end:x?}"
     );
-    assert!(
-        pcs_end == PCS_END || PCS_END.is_null(),
-        "__sanitizer_cov_pcs_init can be called only once."
+    assert_eq!(
+        (pcs_beg as usize) % align_of::<PcTableEntry>(),
+        0,
+        "Unaligned PC Table - start: {pcs_beg:x?} end: {pcs_end:x?}"
     );
 
-    PCS_BEG = pcs_beg;
-    PCS_END = pcs_end;
+    PC_TABLES.push(slice::from_raw_parts(pcs_beg as *const PcTableEntry, len));
 }
 
 /// An entry to the `sanitizer_cov` `pc_table`
@@ -328,33 +337,9 @@ impl PcTableEntry {
     }
 }
 
-/// Returns a slice containing the PC table.
-#[must_use]
-pub fn sanitizer_cov_pc_table() -> Option<&'static [PcTableEntry]> {
+/// Returns an iterator over the PC tables. If no tables were registered, this will be empty.
+pub fn sanitizer_cov_pc_table() -> impl Iterator<Item = &'static [PcTableEntry]> {
     // SAFETY: Once PCS_BEG and PCS_END have been initialized, will not be written to again. So
     // there's no TOCTOU issue.
-    unsafe {
-        if PCS_BEG.is_null() || PCS_END.is_null() {
-            return None;
-        }
-        let len = PCS_END.offset_from(PCS_BEG);
-        assert!(
-            len > 0,
-            "Invalid PC Table bounds - start: {PCS_BEG:x?} end: {PCS_END:x?}"
-        );
-        assert_eq!(
-            len % 2,
-            0,
-            "PC Table size is not evens - start: {PCS_BEG:x?} end: {PCS_END:x?}"
-        );
-        assert_eq!(
-            (PCS_BEG as usize) % align_of::<PcTableEntry>(),
-            0,
-            "Unaligned PC Table - start: {PCS_BEG:x?} end: {PCS_END:x?}"
-        );
-        Some(slice::from_raw_parts(
-            PCS_BEG as *const PcTableEntry,
-            (len / 2).try_into().unwrap(),
-        ))
-    }
+    unsafe { PC_TABLES.iter().copied() }
 }

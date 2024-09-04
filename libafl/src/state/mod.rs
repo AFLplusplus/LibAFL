@@ -59,6 +59,7 @@ pub trait State:
     + MaybeHasScalabilityMonitor
     + HasCurrentCorpusId
     + HasCurrentStage
+    + Stoppable
 {
 }
 
@@ -227,6 +228,15 @@ pub trait HasStartTime {
 }
 
 /// Trait for the last report time, the last time this node reported progress
+pub trait HasLastFoundTime {
+    /// The last time we found something by ourselves
+    fn last_found_time(&self) -> &Duration;
+
+    /// The last time we found something by ourselves (mutable)
+    fn last_found_time_mut(&mut self) -> &mut Duration;
+}
+
+/// Trait for the last report time, the last time this node reported progress
 pub trait HasLastReportTime {
     /// The last time we reported progress,if available/used.
     /// This information is used by fuzzer `maybe_report_progress`.
@@ -299,8 +309,13 @@ pub struct StdState<I, C, R, SC> {
     /// The last time we reported progress (if available/used).
     /// This information is used by fuzzer `maybe_report_progress`.
     last_report_time: Option<Duration>,
+    /// The last time something was added to the corpus
+    last_found_time: Duration,
     /// The current index of the corpus; used to record for resumable fuzzing.
     corpus_id: Option<CorpusId>,
+    /// Request the fuzzer to stop at the start of the next stage
+    /// or at the beginning of the next fuzzing iteration
+    stop_requested: bool,
     stage_stack: StageStack,
     #[cfg(feature = "dump_state")]
     dump_state_dir: Option<PathBuf>,
@@ -510,6 +525,20 @@ impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
     }
 }
 
+impl<I, C, R, SC> HasLastFoundTime for StdState<I, C, R, SC> {
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time(&self) -> &Duration {
+        &self.last_found_time
+    }
+
+    /// Return the number of new paths that imported from other fuzzers
+    #[inline]
+    fn last_found_time_mut(&mut self) -> &mut Duration {
+        &mut self.last_found_time
+    }
+}
+
 impl<I, C, R, SC> HasLastReportTime for StdState<I, C, R, SC> {
     /// The last time we reported progress,if available/used.
     /// This information is used by fuzzer `maybe_report_progress`.
@@ -619,6 +648,32 @@ where
     fn current_input_cloned(&self) -> Result<I, Error> {
         let mut testcase = self.current_testcase_mut()?;
         Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
+    }
+}
+
+/// A trait for types that want to expose a stop API
+pub trait Stoppable {
+    /// Check if stop is requested
+    fn stop_requested(&self) -> bool;
+
+    /// Request to stop
+    fn request_stop(&mut self);
+
+    /// Discard the stop request
+    fn discard_stop_request(&mut self);
+}
+
+impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
+    }
+
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
+    }
+
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 
@@ -1172,12 +1227,17 @@ where
             rand,
             executions: 0,
             imported: 0,
+<<<<<<< HEAD
             start_time: current_time(),
+=======
+            start_time: libafl_bolts::current_time(),
+>>>>>>> main
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
+            stop_requested: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             #[cfg(feature = "scalability_introspection")]
@@ -1187,6 +1247,7 @@ where
             #[cfg(feature = "std")]
             dont_reenter: None,
             last_report_time: None,
+            last_found_time: libafl_bolts::current_time(),
             corpus_id: None,
             stage_stack: StageStack::default(),
             phantom: PhantomData,
@@ -1268,6 +1329,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
     execution: u64,
+    stop_requested: bool,
     rand: StdRand,
     phantom: PhantomData<I>,
 }
@@ -1280,6 +1342,7 @@ impl<I> NopState<I> {
             metadata: SerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
+            stop_requested: false,
             phantom: PhantomData,
         }
     }
@@ -1322,6 +1385,20 @@ impl<I> HasExecutions for NopState<I> {
 
     fn executions_mut(&mut self) -> &mut u64 {
         &mut self.execution
+    }
+}
+
+impl<I> Stoppable for NopState<I> {
+    fn request_stop(&mut self) {
+        self.stop_requested = true;
+    }
+
+    fn discard_stop_request(&mut self) {
+        self.stop_requested = false;
+    }
+
+    fn stop_requested(&self) -> bool {
+        self.stop_requested
     }
 }
 

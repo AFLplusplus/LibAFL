@@ -2,6 +2,7 @@
 
 use alloc::{
     borrow::{Cow, ToOwned},
+    string::ToString,
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
@@ -20,7 +21,7 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{Stage, StdRestartHelper},
+    stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -260,7 +261,14 @@ where
             let map = observers[&self.map_observer_handle].as_ref();
 
             let mut bitmap_size = map.count_bytes();
-            assert!(bitmap_size != 0);
+
+            if bitmap_size < 1 {
+                return Err(Error::invalid_corpus(
+                    "This testcase doesnot trigger trigger any edges. Check your instrumentation!"
+                        .to_string(),
+                ));
+            }
+
             bitmap_size = bitmap_size.max(1); // just don't make it 0 because we take log2 of it later.
             let psmeta = state
                 .metadata_map_mut()
@@ -353,7 +361,7 @@ where
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
-        StdRestartHelper::no_retry(state, &self.name)
+        RetryCountRestartHelper::no_retry(state, &self.name)
 
         // todo
         // remove this guy from corpus queue
@@ -361,7 +369,7 @@ where
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 

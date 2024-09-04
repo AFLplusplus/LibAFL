@@ -38,8 +38,8 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
+    observers::{ObserversTuple, TimeObserver, UsesObservers},
+    state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
 
@@ -279,6 +279,7 @@ where
         self.inner.should_send()
     }
 
+    #[allow(clippy::match_same_arms)]
     fn fire(
         &mut self,
         state: &mut Self::State,
@@ -295,6 +296,7 @@ where
                     true
                 }
                 Event::UpdateExecStats { .. } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::Stop => true,
                 _ => false,
             };
 
@@ -369,12 +371,13 @@ where
     EM: AdaptiveSerializer + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     EMH: EventManagerHooksTuple<EM::State>,
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     S: State,
     Self::State: HasExecutions + HasMetadata,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<E::Observers, State = Self::State>,
+        + ExecutionProcessor<State = Self::State>,
 {
     fn process(
         &mut self,
@@ -391,11 +394,17 @@ where
             self.inner.process(fuzzer, state, executor)
         }
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.on_shutdown()?;
+        self.client.sender_mut().send_exiting()
+    }
 }
 
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
 where
     E: HasObservers<State = Self::State> + Executor<Self, Z>,
+    <E as UsesObservers>::Observers: Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EM: AdaptiveSerializer + EventManager<E, Z>,
     EM::State: HasExecutions + HasMetadata + HasLastReportTime,
@@ -403,7 +412,7 @@ where
     S: State,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<E::Observers, State = Self::State>,
+        + ExecutionProcessor<State = Self::State>,
 {
 }
 
@@ -476,7 +485,7 @@ impl<EM, EMH, S, SP> CentralizedEventManager<EM, EMH, S, SP>
 where
     EM: UsesState + EventFirer + AdaptiveSerializer + HasEventManagerId,
     EMH: EventManagerHooksTuple<EM::State>,
-    S: State,
+    S: State + Stoppable,
     SP: ShMemProvider,
 {
     #[cfg(feature = "llmp_compression")]
@@ -520,9 +529,10 @@ where
     ) -> Result<usize, Error>
     where
         E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
+        <E as UsesObservers>::Observers: Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+        Z: ExecutionProcessor<State = <Self as UsesState>::State>
             + EvaluatorObservers<E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
@@ -569,8 +579,8 @@ where
     where
         E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
-        for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = <Self as UsesState>::State>
+        for<'a> E::Observers: Deserialize<'a> + Serialize,
+        Z: ExecutionProcessor<State = <Self as UsesState>::State>
             + EvaluatorObservers<E::Observers>,
     {
         log::debug!("handle_in_main!");
@@ -608,7 +618,7 @@ where
                             process::id(),
                             event_name
                         );
-                        fuzzer.execute_and_process(
+                        fuzzer.evaluate_execution(
                             state,
                             self,
                             input.clone(),
@@ -661,6 +671,9 @@ where
                 } else {
                     log::debug!("[{}] {} was discarded...)", process::id(), event_name);
                 }
+            }
+            Event::Stop => {
+                state.request_stop();
             }
             _ => {
                 return Err(Error::unknown(format!(

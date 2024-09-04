@@ -1,3 +1,5 @@
+//! An AFL++-style scheduler with a weighted queue.
+//!
 //! The queue corpus scheduler with weighted queue item selection [from AFL++](https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32).
 //! This queue corpus scheduler needs calibration stage.
 
@@ -19,7 +21,7 @@ use crate::{
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
-        AflScheduler, RemovableScheduler, Scheduler,
+        AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
     state::{HasCorpus, HasRand, State, UsesState},
     Error, HasMetadata,
@@ -100,6 +102,7 @@ pub struct WeightedScheduler<C, F, O, S> {
     strat: Option<PowerSchedule>,
     map_observer_handle: Handle<C>,
     last_hash: usize,
+    queue_cycles: u64,
     phantom: PhantomData<(F, O, S)>,
     /// Cycle `PowerSchedule` on completion of every queue cycle.
     cycle_schedules: bool,
@@ -128,6 +131,7 @@ where
             strat,
             map_observer_handle: map_observer.handle(),
             last_hash: 0,
+            queue_cycles: 0,
             table_invalidated: true,
             cycle_schedules: false,
             phantom: PhantomData,
@@ -307,6 +311,18 @@ where
     }
 }
 
+impl<C, F, O, S> HasQueueCycles for WeightedScheduler<C, F, O, S>
+where
+    F: TestcaseScore<S>,
+    O: MapObserver,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    C: AsRef<O> + Named,
+{
+    fn queue_cycles(&self) -> u64 {
+        self.queue_cycles
+    }
+}
+
 impl<C, F, O, S> Scheduler for WeightedScheduler<C, F, O, S>
 where
     F: TestcaseScore<S>,
@@ -369,8 +385,9 @@ where
 
             // Update depth
             if runs_in_current_cycle >= corpus_counts {
+                self.queue_cycles += 1;
                 let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-                psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
+                psmeta.set_queue_cycles(self.queue_cycles());
                 if self.cycle_schedules {
                     self.cycle_schedule(psmeta)?;
                 }

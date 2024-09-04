@@ -29,6 +29,8 @@ use std::process::Stdio;
 use std::{fs::File, os::unix::io::AsRawFd};
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
+use libafl_bolts::llmp::Broker;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::llmp::Brokers;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use libafl_bolts::llmp::LlmpBroker;
@@ -478,6 +480,8 @@ where
     }
 }
 
+/// A Launcher that minimizes re-execution of shared testcases.
+///
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -716,7 +720,8 @@ where
                                 self.time_obs.clone(),
                             )?;
 
-                            self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)
+                            self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
+                            Err(Error::shutting_down())
                         } else {
                             // Secondary clients
                             log::debug!("Running secondary client on PID {}", std::process::id());
@@ -733,7 +738,8 @@ where
                                 self.time_obs.clone(),
                             )?;
 
-                            self.secondary_run_client.take().unwrap()(state, c_mgr, *bind_to)
+                            self.secondary_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
+                            Err(Error::shutting_down())
                         }
                     }?,
                 };
@@ -756,6 +762,7 @@ where
         };
 
         let mut brokers = Brokers::new();
+        let exit_cleanly_after = NonZeroUsize::try_from(self.cores.ids.len()).unwrap();
 
         // Add centralized broker
         brokers.add(Box::new({
@@ -769,12 +776,14 @@ where
             let centralized_hooks = tuple_list!(CentralizedLlmpHook::<S::Input>::new()?);
 
             // TODO switch to false after solving the bug
-            LlmpBroker::with_keep_pages_attach_to_tcp(
+            let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
                 self.shmem_provider.clone(),
                 centralized_hooks,
                 self.centralized_broker_port,
                 true,
-            )?
+            )?;
+            broker.set_exit_after(exit_cleanly_after);
+            broker
         }));
 
         #[cfg(feature = "multi_machine")]
@@ -808,19 +817,11 @@ where
                 broker.inner_mut().connect_b2b(remote_broker_addr)?;
             };
 
-            let exit_cleanly_after = NonZeroUsize::try_from(self.cores.ids.len()).unwrap();
-
-            broker
-                .inner_mut()
-                .set_exit_cleanly_after(exit_cleanly_after);
+            broker.set_exit_after(exit_cleanly_after);
 
             brokers.add(Box::new(broker));
         }
-
-        log::debug!(
-            "Brokers have been initialized on port {}.",
-            std::process::id()
-        );
+        log::debug!("Broker has been initialized; pid {}.", std::process::id());
 
         // Loop over all the brokers that should be polled
         brokers.loop_with_timeouts(Duration::from_secs(30), Some(Duration::from_millis(5)));

@@ -1,3 +1,5 @@
+//! The [`FRIDA`](https://frida.re) `CmpLog` runtime
+//!
 //! Functionality for [`frida`](https://frida.re)-based binary-only `CmpLog`.
 //! With it, a fuzzer can collect feedback about each compare that happened in the target
 //! This allows the fuzzer to potentially solve the compares, if a compare value is directly
@@ -6,8 +8,6 @@
 
 #[cfg(target_arch = "aarch64")]
 use core::ffi::c_void;
-#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use dynasmrt::dynasm;
@@ -22,6 +22,8 @@ use frida_gum::{
     stalker::StalkerOutput,
 };
 use frida_gum_sys::Insn;
+#[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
+use hashbrown::HashMap;
 #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
 use iced_x86::{
     BlockEncoder, Code, DecoderOptions, Instruction, InstructionBlock, MemoryOperand, MemorySize,

@@ -1,4 +1,7 @@
-//! The `StatefulGenericInProcessForkExecutor` to do forking before executing the harness in-processly. Harness can access internal state.
+//! A version of `InProcessForkExecutor` with a state accessible from the harness.
+//!
+//! The `StatefulGenericInProcessForkExecutor` to do forking before executing the harness in-process.
+//! The harness can access internal state.
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,

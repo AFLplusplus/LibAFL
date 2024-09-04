@@ -1,27 +1,22 @@
 [package]
 name = "libafl_libfuzzer"
-version.workspace = true
+version = "0.13.2"
 description = "libFuzzer shim which uses LibAFL with common defaults"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
-categories = ["development-tools::testing", "fuzzing"]
+categories = ["development-tools::testing"]
 
-include = [
-    "/src",
-    "/Cargo.toml",
-    "/build.rs",
-    "/libafl_libfuzzer_runtime",
-    "!/libafl_libfuzzer_runtime/target",
-]
+include = ["/src", "/Cargo.toml", "/build.rs", "/runtime"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
 cc = "1.0"
 rustversion = "1.0"
+toml = { version = "0.8.14", features = ["preserve_order"] }
 
 [features]
 default = ["fork"]
@@ -31,9 +26,6 @@ document-features = ["dep:document-features"]
 
 ## Enables the derive macros for the arbitrary dependency, transparently forwarded from libfuzzer-sys
 arbitrary-derive = ["libfuzzer-sys/arbitrary-derive"]
-
-## Enables fuzzer introspection with LibAFL's `introspection` feature
-introspection = []
 
 ## Enables forking in the fuzzer runtime for restarting managers for Unix systems (on by default)
 fork = []
@@ -45,6 +37,9 @@ embed-runtime = []
 
 ## 🐇
 rabbit = []
+
+## For testing and publishing purposes only: enforce that the runtime uses versions rather than paths
+libafl-libfuzzer-use-version = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }

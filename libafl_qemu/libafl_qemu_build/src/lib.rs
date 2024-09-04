@@ -25,6 +25,9 @@ mod build;
 
 pub use build::build;
 
+#[rustversion::nightly]
+use crate::build::QEMU_REVISION;
+
 const LLVM_VERSION_MAX: i32 = 33;
 
 static mut CARGO_RPATH: Option<Vec<String>> = None;
@@ -105,13 +108,14 @@ fn find_llvm_config() -> Result<String, String> {
 
     if which("llvm-config").is_ok() {
         if let Some(ver) = find_llvm_version("llvm-config".to_owned()) {
-            if ver >= rustc_llvm_ver {
-                return Ok("llvm-config".to_owned());
+            if ver < rustc_llvm_ver {
+                println!("cargo:warning=Version of llvm-config is {ver} but needs to be at least rustc's version ({rustc_llvm_ver})! We will (try to) continue to build. Continue at your own risk, or rebuild with a set LLVM_CONFIG_PATH env variable, pointing to a newer version.");
             }
+            return Ok("llvm-config".to_owned());
         }
     }
 
-    Err("could not find llvm-config".to_owned())
+    Err("Could not find llvm-config".to_owned())
 }
 
 fn exec_llvm_config(llvm_config: String, args: &[&str]) -> String {
@@ -165,7 +169,7 @@ fn qemu_bindgen_clang_args(
     is_usermode: bool,
 ) -> Vec<String> {
     if env::var("LLVM_CONFIG_PATH").is_err() {
-        let found = find_llvm_config().expect("Cannot find a suitable llvm-config, it must be a version equal or greater than the rustc LLVM version");
+        let found = find_llvm_config().expect("Cannot find a suitable llvm-config, it must be a version equal or greater than the rustc LLVM version. Try specifying LLVM_CONFIG_PATH.");
         env::set_var("LLVM_CONFIG_PATH", found);
     }
 
@@ -249,13 +253,15 @@ fn include_path(build_dir: &Path, path: &str) -> String {
     }
 }
 
-/// If `fresh_content` != `content_file_to_update` (the file is read directly if `content_file_to_update` is None), update the file. prefix is not considered for comparison.
+/// If `fresh_content` != `content_file_to_update` (the file is read directly if `content_file_to_update` is None), update the file.
+///
+/// The prefix is not considered for comparison.
 /// If a prefix is given, it will be added as the first line of the file.
 pub fn store_generated_content_if_different(
     file_to_update: &Path,
     fresh_content: &[u8],
     content_file_to_update: Option<Vec<u8>>,
-    first_line_prefix: Option<&str>,
+    first_line_prefixes: Vec<&str>,
     force_regeneration: bool,
 ) {
     let mut must_rewrite_file = true;
@@ -297,13 +303,91 @@ pub fn store_generated_content_if_different(
         };
 
     if must_rewrite_file {
-        if let Some(prefix) = first_line_prefix {
+        println!(
+            "cargo::warning={} has been regenerated.",
+            file_to_update.file_name().unwrap().to_str().unwrap()
+        );
+
+        for prefix in first_line_prefixes {
             writeln!(&file_to_check, "{prefix}").expect("Could not write prefix");
         }
 
         file_to_check
             .write_all(fresh_content)
             .unwrap_or_else(|_| panic!("Unable to write in {}", file_to_update.display()));
+    }
+}
+
+#[rustversion::nightly]
+fn parse_stub(
+    stub_bindings_file: &Path,
+    current_rustc_version: &Version,
+) -> (bool, bool, Option<Vec<u8>>) {
+    let semver_re = Regex::new(r"/\* (.*) \*/").unwrap();
+    let qemu_hash_re = Regex::new(r"/\* qemu git hash: (.*) \*/").unwrap();
+
+    if let Ok(stub_file) = File::open(stub_bindings_file) {
+        let mut stub_rdr = BufReader::new(stub_file);
+
+        let mut first_line = String::new(); // rustc version
+        let mut second_line = String::new(); // qemu hash
+        let mut stub_content = Vec::<u8>::new();
+
+        assert!(
+            stub_rdr
+                .read_line(&mut first_line)
+                .expect("Could not read first line")
+                > 0,
+            "Error while reading first line."
+        );
+
+        assert!(
+            stub_rdr
+                .read_line(&mut second_line)
+                .expect("Could not read second line")
+                > 0,
+            "Error while reading second line."
+        );
+
+        if let Some((_, [version_str])) = semver_re
+            .captures_iter(&first_line)
+            .next()
+            .map(|caps| caps.extract())
+        {
+            // The first line matches the regex
+
+            if let Some((_, [qemu_hash_str])) = qemu_hash_re
+                .captures_iter(&second_line)
+                .next()
+                .map(|caps| caps.extract())
+            {
+                // The second line matches the regex
+
+                if let Ok(version) = Version::parse(version_str) {
+                    // The first line contains a version
+
+                    stub_rdr
+                        .read_to_end(&mut stub_content)
+                        .expect("could not read stub content");
+
+                    return (
+                        (current_rustc_version > &version) || (qemu_hash_str != QEMU_REVISION),
+                        false,
+                        Some(stub_content),
+                    );
+                }
+            }
+        }
+
+        stub_rdr.seek(SeekFrom::Start(0)).unwrap();
+        stub_rdr
+            .read_to_end(&mut stub_content)
+            .expect("could not read stub content");
+
+        (true, true, Some(stub_content))
+    } else {
+        // No stub file stored
+        (true, true, None)
     }
 }
 
@@ -317,58 +401,11 @@ pub fn maybe_generate_stub_bindings(
     if env::var("CARGO_CFG_DOC").is_ok() && cpu_target == "x86_64" && emulation_mode == "usermode" {
         let current_rustc_version =
             rustc_version::version().expect("Could not get current rustc version");
-        let semver_re = Regex::new(r"/\* (.*) \*/").unwrap();
 
         // We only try to store the stub if the current rustc version is strictly bigger than the one used to generate
-        // the versioned stub.
-        let (try_generate, force_regeneration, stub_content): (bool, bool, Option<Vec<u8>>) =
-            if let Ok(stub_file) = File::open(stub_bindings_file) {
-                let mut stub_rdr = BufReader::new(stub_file);
-
-                let mut first_line = String::new();
-                let mut stub_content = Vec::<u8>::new();
-                assert!(
-                    stub_rdr
-                        .read_line(&mut first_line)
-                        .expect("Could not read first line")
-                        > 0,
-                    "Error while reading first line."
-                );
-
-                if let Some((_, [version_str])) = semver_re
-                    .captures_iter(&first_line)
-                    .next()
-                    .map(|caps| caps.extract())
-                {
-                    // The first line matches the regex
-
-                    if let Ok(version) = Version::parse(version_str) {
-                        // The first line contains a version
-
-                        stub_rdr
-                            .read_to_end(&mut stub_content)
-                            .expect("could not read stub content");
-                        (current_rustc_version > version, false, Some(stub_content))
-                    } else {
-                        stub_rdr.seek(SeekFrom::Start(0)).unwrap();
-                        stub_rdr
-                            .read_to_end(&mut stub_content)
-                            .expect("could not read stub content");
-
-                        (true, true, Some(stub_content))
-                    }
-                } else {
-                    stub_rdr.seek(SeekFrom::Start(0)).unwrap();
-                    stub_rdr
-                        .read_to_end(&mut stub_content)
-                        .expect("could not read stub content");
-
-                    (true, true, Some(stub_content))
-                }
-            } else {
-                // No stub file stored
-                (true, true, None)
-            };
+        // the versioned stub or the qemu hash differs.
+        let (try_generate, force_regeneration, stub_content) =
+            parse_stub(stub_bindings_file, &current_rustc_version);
 
         let header = format!("/* {current_rustc_version} */");
 
@@ -379,10 +416,15 @@ pub fn maybe_generate_stub_bindings(
                     .expect("Could not read generated bindings file")
                     .as_slice(),
                 stub_content,
-                Some(header.as_str()),
+                vec![
+                    header.as_str(),
+                    format!("/* qemu git hash: {QEMU_REVISION} */").as_str(),
+                ],
                 force_regeneration,
             );
         }
+    } else if env::var("CARGO_CFG_DOC").is_ok() {
+        println!("cargo:warning=Bindings regeneration has been skipped. Please rerun with x86_64 with usermode to trigger the bindings regeneration.");
     }
 }
 

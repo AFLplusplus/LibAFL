@@ -11,6 +11,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled, MatchNameRef},
     HasLen, Named,
 };
+use serde::Serialize;
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
@@ -22,7 +23,7 @@ use crate::{
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple},
+    observers::{MapObserver, ObserversTuple, UsesObservers},
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
@@ -44,6 +45,7 @@ pub trait TMinMutationalStage<E, EM, F, IP, M, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F, E::Observers>
 where
     E: UsesState<State = Self::State> + HasObservers,
+    <E as UsesObservers>::Observers: Serialize,
     EM: UsesState<State = Self::State> + EventFirer,
     F: Feedback<Self::State>,
     Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions,
@@ -54,7 +56,7 @@ where
         + HasScheduler
         + HasFeedback
         + ExecutesInput<E, EM>
-        + ExecutionProcessor<E::Observers>,
+        + ExecutionProcessor,
     Z::Scheduler: RemovableScheduler<State = Self::State>,
 {
     /// The mutator registered for this stage
@@ -139,7 +141,7 @@ where
                 // TODO replace if process_execution adds a return value for solution index
                 let solution_count = state.solutions().count();
                 let corpus_count = state.corpus().count();
-                let (_, corpus_id) = fuzzer.execute_and_process(
+                let (_, corpus_id) = fuzzer.evaluate_execution(
                     state,
                     manager,
                     input.clone(),
@@ -236,9 +238,10 @@ where
 
 impl<E, EM, F, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
-    Z: HasScheduler + ExecutionProcessor<E::Observers> + ExecutesInput<E, EM> + HasFeedback,
+    Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler,
     E: HasObservers<State = Self::State>,
+    <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = Self::State>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
@@ -297,9 +300,10 @@ pub static TMIN_STAGE_NAME: &str = "tmin";
 impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
     for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
-    Z: HasScheduler + ExecutionProcessor<E::Observers> + ExecutesInput<E, EM> + HasFeedback,
+    Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler,
     E: HasObservers<State = Self::State>,
+    <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = Self::State>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,

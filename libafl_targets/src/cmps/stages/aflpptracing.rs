@@ -5,7 +5,7 @@ use libafl::{
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
-    stages::{colorization::TaintMetadata, Stage, StdRestartHelper},
+    stages::{colorization::TaintMetadata, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -127,12 +127,12 @@ where
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         // Tracing stage is always deterministic
         // don't restart
-        StdRestartHelper::no_retry(state, &self.name)
+        RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
-        StdRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 

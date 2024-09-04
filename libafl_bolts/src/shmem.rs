@@ -102,8 +102,10 @@ impl ShMemDescription {
     }
 }
 
+/// The id describing shared memory for the current provider
+///
 /// An id associated with a given shared memory mapping ([`ShMem`]), which can be used to
-/// establish shared-mappings between proccesses.
+/// establish shared-mappings between processes.
 /// Id is a file descriptor if you use `MmapShMem` or `AshmemShMem`.
 /// That means you have to use shmem server to access to the shmem segment from other processes in these cases.
 /// On the other hand, id is a unique identifier if you use `CommonUnixShMem` or `Win32ShMem`.
@@ -193,6 +195,7 @@ impl Display for ShMemId {
 }
 
 /// A [`ShMem`] is an interface to shared maps.
+///
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
 pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
@@ -239,6 +242,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
 }
 
 /// A [`ShMemProvider`] provides access to shared maps.
+///
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Clone + Default + Debug {
@@ -317,6 +321,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 }
 
 /// An [`ShMemProvider`] that does not provide any [`ShMem`].
+///
 /// This is mainly for testing and type magic.
 /// The resulting [`NopShMem`] is backed by a simple byte buffer to do some simple non-shared things with.
 /// Calling [`NopShMemProvider::shmem_from_id_and_size`] will return new maps for the same id every time.
@@ -651,11 +656,11 @@ pub mod unix_shmem {
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::process;
+        use std::{io, process};
 
         use libc::{
-            c_int, c_uchar, close, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat, shmctl,
-            shmdt, shmget,
+            c_int, c_uchar, close, fcntl, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat,
+            shmctl, shmdt, shmget,
         };
 
         use crate::{
@@ -824,6 +829,35 @@ pub mod unix_shmem {
             #[must_use]
             pub fn filename_path(&self) -> &Option<[u8; MAX_MMAP_FILENAME_LEN]> {
                 &self.filename_path
+            }
+
+            /// If called, the shared memory will also be available in subprocesses.
+            ///
+            /// You likely want to pass the [`crate::shmem::ShMemDescription`] and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
+            ///
+            /// # Errors
+            ///
+            /// This function will return an error if the appropriate flags could not be extracted or set.
+            pub fn persist_for_child_processes(&self) -> Result<&Self, Error> {
+                unsafe {
+                    let flags = fcntl(self.shm_fd, libc::F_GETFD);
+
+                    if flags == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to retrieve FD flags",
+                        ));
+                    }
+
+                    if fcntl(self.shm_fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to set FD flags",
+                        ));
+                    }
+                }
+
+                Ok(self)
             }
         }
 

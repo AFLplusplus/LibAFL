@@ -35,10 +35,13 @@ use libafl_bolts::{
     tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
-pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
-use libafl_qemu::QemuCmpLogHelper;
-use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
+use libafl_qemu::modules::CmpLogModule;
+pub use libafl_qemu::qemu::Qemu;
+use libafl_qemu::{
+    modules::edges::{self, EdgeCoverageModule},
+    Emulator, QemuExecutor,
+};
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
@@ -119,7 +122,7 @@ where
 {
     /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self, qemu: &Qemu) {
+    pub fn run(&mut self, qemu: Qemu) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -214,27 +217,29 @@ where
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // The wrapped harness function, calling out to the LLVM-style harness
-            let mut harness = |input: &BytesInput| {
-                let target = input.target_bytes();
-                let buf = target.as_slice();
-                harness_bytes(buf);
-                ExitKind::Ok
-            };
-
             if self.use_cmplog.unwrap_or(false) {
-                let mut hooks = QemuHooks::new(
-                    *qemu,
+                let modules = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
-                    tuple_list!(
-                        QemuEdgeCoverageHelper::default(),
-                        QemuCmpLogHelper::default(),
-                    ),
+                    {
+                        tuple_list!(EdgeCoverageModule::default(), CmpLogModule::default(),)
+                    }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
-                    tuple_list!(QemuEdgeCoverageHelper::default()),
-                );
+                    {
+                        tuple_list!(EdgeCoverageModule::default())
+                    }
+                };
+
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
+                };
+
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let executor = QemuExecutor::new(
-                    &mut hooks,
+                    emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -334,11 +339,19 @@ where
                     }
                 }
             } else {
-                let mut hooks =
-                    QemuHooks::new(*qemu, tuple_list!(QemuEdgeCoverageHelper::default()));
+                let modules = tuple_list!(EdgeCoverageModule::default());
+
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
+                };
+
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let mut executor = QemuExecutor::new(
-                    &mut hooks,
+                    emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -477,6 +490,16 @@ pub mod pybind {
         /// Create a new [`QemuBytesCoverageSugar`]
         #[new]
         #[allow(clippy::too_many_arguments)]
+        #[pyo3(signature = (
+            input_dirs,
+            output_dir,
+            broker_port,
+            cores,
+            use_cmplog=None,
+            iterations=None,
+            tokens_file=None,
+            timeout=None
+        ))]
         fn new(
             input_dirs: Vec<PathBuf>,
             output_dir: PathBuf,
@@ -509,7 +532,7 @@ pub mod pybind {
                 .cores(&self.cores)
                 .harness(|buf| {
                     Python::with_gil(|py| -> PyResult<()> {
-                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        let args = (PyBytes::new_bound(py, buf),); // TODO avoid copy
                         harness.call1(py, args)?;
                         Ok(())
                     })
@@ -520,12 +543,12 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&qemu.qemu);
+                .run(qemu.qemu);
         }
     }
 
     /// Register this class
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<QemuBytesCoverageSugar>()?;
         Ok(())
     }

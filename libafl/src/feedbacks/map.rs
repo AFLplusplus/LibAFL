@@ -822,7 +822,7 @@ mod tests {
 
     #[test]
     fn test_map_is_novel() {
-        // sanity check
+        // This should always hold
         assert!(AllIsNovel::is_novel(0_u8, 0));
 
         assert!(!NextPow2IsNovel::is_novel(0_u8, 0));
