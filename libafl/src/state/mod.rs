@@ -291,10 +291,9 @@ where
 impl<I, C, R, SC> State for StdState<I, C, R, SC>
 where
     C: Corpus<Input = Self::Input>,
-    I: Input,
     R: Rand,
     SC: Corpus<Input = Self::Input>,
-    Self: UsesInput<Input = I>,
+    Self: UsesInput,
 {
 }
 
@@ -1122,7 +1121,8 @@ where
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
 
-    fn new<F, O>(
+    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
+    pub fn new<F, O>(
         rand: R,
         corpus: C,
         solutions: SC,
