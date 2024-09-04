@@ -207,9 +207,6 @@ pub trait Evaluator<E, EM>: UsesState {
     ) -> Result<CorpusId, Error>;
 }
 
-/// The fuzzer should stop at the end of the current run.
-pub static mut INTERRUPT_FUZZER: bool = false;
-
 /// The main fuzzer trait.
 pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
@@ -247,9 +244,7 @@ where
         loop {
             manager.maybe_report_progress(state, monitor_timeout)?;
 
-            let fuzzer_ret = self.fuzz_one(stages, executor, state, manager);
-
-            fuzzer_ret?;
+            self.fuzz_one(stages, executor, state, manager)?;
         }
     }
 

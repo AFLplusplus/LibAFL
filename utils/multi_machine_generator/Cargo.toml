@@ -1,4 +1,4 @@
-s[package]
+[package]
 name = "multi_machine_generator"
 authors = ["Romain Malmain <romain.malmain@pm.me>"]
 version = "0.13.2"

@@ -48,7 +48,6 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
-#[cfg(not(feature = "std"))]
 pub trait State:
     UsesInput
     + Serialize
@@ -58,22 +57,6 @@ pub trait State:
     + HasCurrentCorpusId
     + HasCurrentStage
     + Stoppable
-{
-}
-
-/// The [`State`] of the fuzzer.
-/// Contains all important information about the current run.
-/// Will be used to restart the fuzzing process at any time.
-#[cfg(feature = "std")]
-pub trait State:
-    UsesInput
-    + Serialize
-    + DeserializeOwned
-    + MaybeHasClientPerfMonitor
-    + MaybeHasScalabilityMonitor
-    + MaybeCanDumpState
-    + HasCurrentCorpusId
-    + HasCurrentStage
 {
 }
 
@@ -1139,8 +1122,7 @@ where
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
 
-    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    fn _new<F, O>(
+    fn new<F, O>(
         rand: R,
         corpus: C,
         solutions: SC,
@@ -1181,27 +1163,6 @@ where
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
         Ok(state)
-    }
-
-    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    pub fn new<F, O>(
-        rand: R,
-        corpus: C,
-        solutions: SC,
-        feedback: &mut F,
-        objective: &mut O,
-    ) -> Result<Self, Error>
-    where
-        F: Feedback<Self>,
-        O: Feedback<Self>,
-    {
-        Self::_new(
-            rand,
-            corpus,
-            solutions,
-            feedback,
-            objective,
-        )
     }
 }
 
