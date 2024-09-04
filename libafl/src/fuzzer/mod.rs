@@ -3,15 +3,9 @@
 use alloc::{string::ToString, vec::Vec};
 use core::{fmt::Debug, time::Duration};
 
-#[cfg(all(feature = "std", feature = "dump_state"))]
-use ahash::RandomState;
 use libafl_bolts::current_time;
-#[cfg(all(unix, feature = "dump_state"))]
-use libafl_bolts::os::CTRL_C_EXIT;
 use serde::{de::DeserializeOwned, Serialize};
 
-#[cfg(all(feature = "std", feature = "dump_state"))]
-use crate::state::MaybeCanDumpState;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
@@ -254,41 +248,6 @@ where
             manager.maybe_report_progress(state, monitor_timeout)?;
 
             let fuzzer_ret = self.fuzz_one(stages, executor, state, manager);
-
-            #[cfg(feature = "dump_state")]
-            unsafe {
-                if INTERRUPT_FUZZER {
-                    log::info!("Interrupting fuzzer...");
-
-                    let dump_path: Option<PathBuf> = state.dump_state_dir().cloned();
-
-                    // Dump state if needed.
-                    if let Some(dump_path) = dump_path {
-                        log::info!("Dumping state to disk...");
-                        let state_dump = state.gen_dump_state()?;
-                        let dump_serialized = postcard::to_allocvec(&state_dump)?;
-
-                        // Taken from staterestorer
-                        // generate a filename
-                        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
-                        // Using the last few k as randomness for a filename, hoping it's unique.
-                        hasher
-                            .write(&dump_serialized[dump_serialized.len().saturating_sub(4096)..]);
-
-                        let filename = format!("{:016x}.libafl_state", hasher.finish());
-                        let dump_file = dump_path.join(filename);
-
-                        fs::create_dir_all(dump_path.as_path())?;
-                        File::create(dump_file)?.write_all(&dump_serialized)?;
-                    }
-
-                    #[cfg(unix)]
-                    libc::exit(CTRL_C_EXIT);
-
-                    #[cfg(windows)]
-                    windows::Win32::System::Threading::ExitProcess(100);
-                }
-            }
 
             fuzzer_ret?;
         }

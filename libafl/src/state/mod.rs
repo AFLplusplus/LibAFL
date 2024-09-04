@@ -27,8 +27,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 mod stack;
 pub use stack::StageStack;
 
-#[cfg(all(feature = "std", feature = "dump_state"))]
-use crate::corpus::testcase::TestcaseDump;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
@@ -170,26 +168,6 @@ impl<T> MaybeHasScalabilityMonitor for T {}
 #[cfg(feature = "scalability_introspection")]
 impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
 
-/// Trait for getting the optional dump directory for the state
-#[cfg(all(feature = "std", feature = "dump_state"))]
-pub trait MaybeCanDumpState {
-    /// The dump state type
-    type StateDump: Serialize + for<'de> Deserialize<'de>;
-
-    /// Get the dump dir, if there is one.
-    fn dump_state_dir(&self) -> Option<&PathBuf>;
-
-    /// Generate the state dump
-    fn gen_dump_state(&mut self) -> Result<Self::StateDump, Error>;
-}
-
-/// Trait for getting the optional dump directory for the state
-#[cfg(all(feature = "std", not(feature = "dump_state")))]
-pub trait MaybeCanDumpState {}
-
-#[cfg(all(feature = "std", not(feature = "dump_state")))]
-impl<T> MaybeCanDumpState for T {}
-
 /// Trait for offering a [`ScalabilityMonitor`]
 #[cfg(feature = "scalability_introspection")]
 pub trait HasScalabilityMonitor {
@@ -317,27 +295,7 @@ pub struct StdState<I, C, R, SC> {
     /// or at the beginning of the next fuzzing iteration
     stop_requested: bool,
     stage_stack: StageStack,
-    #[cfg(feature = "dump_state")]
-    dump_state_dir: Option<PathBuf>,
     phantom: PhantomData<I>,
-}
-
-/// The standard state dump
-#[cfg(all(feature = "std", feature = "dump_state"))]
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct StdStateDump<I>
-where
-    I: Input,
-{
-    /// Fuzzer start time.
-    pub start_time: Duration,
-
-    /// Total nb of execs
-    pub executions: u64,
-
-    /// Loaded inputs
-    pub testcases: Vec<TestcaseDump<I>>,
 }
 
 impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
@@ -345,35 +303,6 @@ where
     I: Input,
 {
     type Input = I;
-}
-
-#[cfg(all(feature = "std", feature = "dump_state"))]
-impl<I, C, R, SC> MaybeCanDumpState for StdState<I, C, R, SC>
-where
-    C: Corpus<Input = I>,
-    I: Input,
-{
-    type StateDump = StdStateDump<I>;
-
-    fn dump_state_dir(&self) -> Option<&PathBuf> {
-        self.dump_state_dir.as_ref()
-    }
-
-    fn gen_dump_state(&mut self) -> Result<Self::StateDump, Error> {
-        let mut tcs: Vec<TestcaseDump<I>> = Vec::new();
-        for corpus_id in self.corpus.ids() {
-            let mut tc = self.corpus.get(corpus_id)?.clone();
-            let tc_ref = tc.get_mut();
-            tc_ref.load_input(&self.corpus)?;
-            tcs.push(tc_ref.clone().try_into()?);
-        }
-
-        Ok(StdStateDump {
-            start_time: self.start_time,
-            executions: self.executions,
-            testcases: tcs,
-        })
-    }
 }
 
 impl<I, C, R, SC> State for StdState<I, C, R, SC>
@@ -1217,7 +1146,6 @@ where
         solutions: SC,
         feedback: &mut F,
         objective: &mut O,
-        #[cfg(feature = "dump_state")] dump_state_dir: Option<PathBuf>,
     ) -> Result<Self, Error>
     where
         F: Feedback<Self>,
@@ -1249,29 +1177,10 @@ where
             phantom: PhantomData,
             #[cfg(feature = "std")]
             multicore_inputs_processed: None,
-            #[cfg(feature = "dump_state")]
-            dump_state_dir,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
         Ok(state)
-    }
-
-    /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    #[cfg(feature = "dump_state")]
-    pub fn with_dump_state<F, O>(
-        rand: R,
-        corpus: C,
-        solutions: SC,
-        feedback: &mut F,
-        objective: &mut O,
-        dump_state_dir: Option<PathBuf>,
-    ) -> Result<Self, Error>
-    where
-        F: Feedback<Self>,
-        O: Feedback<Self>,
-    {
-        Self::_new(rand, corpus, solutions, feedback, objective, dump_state_dir)
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
@@ -1292,8 +1201,6 @@ where
             solutions,
             feedback,
             objective,
-            #[cfg(feature = "dump_state")]
-            None,
         )
     }
 }
@@ -1351,19 +1258,6 @@ impl<I> HasMaxSize for NopState<I> {
 
     fn set_max_size(&mut self, _max_size: usize) {
         unimplemented!("NopState doesn't allow setting a max size")
-    }
-}
-
-#[cfg(all(feature = "std", feature = "dump_state"))]
-impl<I> MaybeCanDumpState for NopState<I> {
-    type StateDump = ();
-
-    fn dump_state_dir(&self) -> Option<&PathBuf> {
-        None
-    }
-
-    fn gen_dump_state(&mut self) -> Result<Self::StateDump, Error> {
-        Ok(())
     }
 }
 

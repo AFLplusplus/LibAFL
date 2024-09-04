@@ -11,8 +11,6 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::PathBuf;
 
-#[cfg(feature = "dump_state")]
-use libafl_bolts::current_time;
 use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
@@ -77,49 +75,6 @@ where
     /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
     #[cfg(feature = "track_hit_feedbacks")]
     hit_objectives: Vec<Cow<'static, str>>,
-    /// Timestamp from epoch
-    #[cfg(feature = "dump_state")]
-    timestamp: Duration,
-}
-
-/// A [`Testcase`] ready for being dumped to memory
-#[cfg(feature = "dump_state")]
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TestcaseDump<I>
-where
-    I: Input,
-{
-    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
-    pub input: I,
-    /// Parent [`CorpusId`], if known
-    parent_id: Option<CorpusId>,
-    /// If the testcase is "disabled"
-    disabled: bool,
-    /// has found crash (or timeout) or not
-    objectives_found: usize,
-    /// Timestamp from epoch
-    #[cfg(feature = "dump_state")]
-    pub timestamp: Duration,
-}
-
-#[cfg(feature = "dump_state")]
-#[cfg(all(feature = "std", feature = "dump_state"))]
-impl<I> TryFrom<Testcase<I>> for TestcaseDump<I>
-where
-    I: Input,
-{
-    type Error = Error;
-
-    fn try_from(tc: Testcase<I>) -> Result<Self, Self::Error> {
-        Ok(TestcaseDump {
-            input: tc.input.clone().ok_or(Error::empty("No input loaded"))?,
-            parent_id: tc.parent_id,
-            disabled: tc.disabled,
-            objectives_found: tc.objectives_found,
-            timestamp: tc.timestamp,
-        })
-    }
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -315,8 +270,6 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
-            #[cfg(feature = "dump_state")]
-            timestamp: current_time(),
         }
     }
 
@@ -343,8 +296,6 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
-            #[cfg(feature = "dump_state")]
-            timestamp: current_time(),
         }
     }
 
@@ -371,8 +322,6 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
-            #[cfg(feature = "dump_state")]
-            timestamp: current_time(),
         }
     }
 
@@ -399,8 +348,6 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
-            #[cfg(feature = "dump_state")]
-            timestamp: current_time(),
         }
     }
 
@@ -457,8 +404,6 @@ where
             hit_feedbacks: Vec::new(),
             #[cfg(feature = "track_hit_feedbacks")]
             hit_objectives: Vec::new(),
-            #[cfg(feature = "dump_state")]
-            timestamp: current_time(),
         }
     }
 }

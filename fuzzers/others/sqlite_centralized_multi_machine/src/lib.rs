@@ -178,7 +178,7 @@ pub extern "C" fn libafl_main() {
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
-            StdState::with_dump_state(
+            StdState::new(
                 // RNG
                 StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
@@ -191,7 +191,6 @@ pub extern "C" fn libafl_main() {
                 &mut feedback,
                 // Same for objective feedbacks
                 &mut objective,
-                Some(PathBuf::from("./dumped_state")),
             )
             .unwrap()
         });
