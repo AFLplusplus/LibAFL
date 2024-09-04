@@ -71,6 +71,9 @@ pub mod alloc;
 
 pub mod asan;
 
+// Frida gumjs devkit bindings
+pub mod bindings;
+
 #[cfg(windows)]
 /// Windows specific hooks to catch __fastfail like exceptions with Frida, see <https://github.com/AFLplusplus/LibAFL/issues/395> for more details
 pub mod windows_hooks;
@@ -91,6 +94,9 @@ pub mod drcov_rt;
 
 /// The frida executor
 pub mod executor;
+
+/// Frida scripting support
+pub mod script;
 
 /// Utilities
 pub mod utils;

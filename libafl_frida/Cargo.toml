@@ -44,7 +44,13 @@ track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
 
 [build-dependencies]
+anyhow = "1.0"
+bindgen = "0.69.4"
 cc = { version = "1.0", features = ["parallel"] }
+reqwest = { version = "0.11", features = ["blocking"] }
+flate2 = "1.0"
+tar = "0.4"
+xz2 = "0.1"
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 yaxpeax-arm = "0.2.4"
@@ -100,6 +106,7 @@ bit_reverse = "0.1.8"
 yaxpeax-arch = "0.2.7"
 
 document-features = { version = "0.2", optional = true } # Document all features of this crate (for `cargo doc`)
+anyhow = "1.0"
 
 [target.'cfg(windows)'.dependencies]
 winsafe = { version = "0.0.21", features = ["kernel"] }
