@@ -6,14 +6,14 @@ if [ ! -d "sqlite3" ]; then
     find ./sqlite3 -name "*.test" -exec cp {} corpus/ \;
 fi
 
-if [ "$1" = "release" ]; then
-  cargo build --release
-else
+if [ "$1" = "d" ]; then
   cargo build
+else
+  cargo build --release
 fi
 
-export CC=`pwd`/target/debug/libafl_cc
-export CXX=`pwd`/target/debug/libafl_cxx
+export CC=`pwd`/target/release/libafl_cc
+export CXX=`pwd`/target/release/libafl_cxx
 export CFLAGS='--libafl'
 export CXXFLAGS='--libafl'
 export CFLAGS="$CFLAGS -DSQLITE_MAX_LENGTH=128000000 \

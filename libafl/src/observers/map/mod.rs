@@ -82,8 +82,9 @@ pub use owned_map::*;
 /// #     InMemoryCorpus::<BytesInput>::new(),
 /// #     InMemoryCorpus::new(),
 /// #     &mut feedback,
-/// #     &mut ()
+/// #     &mut (),
 /// # ).unwrap();
+///
 /// # feedback.init_state(&mut state).unwrap();
 ///
 /// let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
