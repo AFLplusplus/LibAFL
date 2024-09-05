@@ -429,7 +429,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+        let res = self.is_interesting_default(state, observers);
         #[cfg(feature = "track_hit_feedbacks")]
         {
             self.last_result = Some(res);
@@ -450,7 +450,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+        let res = self.is_interesting_default(state, observers);
 
         #[cfg(feature = "track_hit_feedbacks")]
         {
@@ -580,6 +580,161 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
+        self.is_interesting_u8_simd_optimized(state, observers)
+    }
+}
+
+impl<C, N, O, R, T> Named for MapFeedback<C, N, O, R, T> {
+    #[inline]
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+impl<C, N, O, R, T> HasObserverHandle for MapFeedback<C, N, O, R, T>
+where
+    O: Named,
+    C: AsRef<O>,
+{
+    type Observer = C;
+
+    #[inline]
+    fn observer_handle(&self) -> &Handle<C> {
+        &self.map_ref
+    }
+}
+
+#[allow(clippy::ptr_arg)]
+fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
+    if name.chars().all(char::is_lowercase) {
+        name.clone()
+    } else {
+        name.to_lowercase().into()
+    }
+}
+
+impl<C, N, O, R, T> MapFeedback<C, N, O, R, T>
+where
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    R: Reducer<T>,
+    O: MapObserver<Entry = T>,
+    for<'it> O: AsIter<'it, Item = T>,
+    N: IsNovel<T>,
+    C: CanTrack + AsRef<O> + Named,
+{
+    /// Create new `MapFeedback`
+    #[must_use]
+    pub fn new(map_observer: &C) -> Self {
+        Self {
+            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
+            name: map_observer.name().clone(),
+            map_ref: map_observer.handle(),
+            stats_name: create_stats_name(map_observer.name()),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
+    /// feedback is needed twice, but with a different history. Using `new()` always results in the
+    /// same name and therefore also the same history.
+    #[must_use]
+    pub fn with_name(name: &'static str, map_observer: &C) -> Self {
+        let name = Cow::from(name);
+        Self {
+            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
+            map_ref: map_observer.handle(),
+            stats_name: create_stats_name(&name),
+            name,
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+            phantom: PhantomData,
+        }
+    }
+
+    #[allow(clippy::needless_range_loop)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    fn is_interesting_default<S, OT>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+    ) -> bool
+    where
+        OT: ObserversTuple<S>,
+        S: UsesInput + HasNamedMetadata,
+    {
+        let mut interesting = false;
+        // TODO Replace with match_name_type when stable
+        let observer = observers.get(&self.map_ref).unwrap().as_ref();
+
+        let map_state = state
+            .named_metadata_map_mut()
+            .get_mut::<MapFeedbackMetadata<T>>(&self.name)
+            .unwrap();
+        let len = observer.len();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, observer.initial());
+        }
+
+        let history_map = map_state.history_map.as_slice();
+
+        let initial = observer.initial();
+
+        if let Some(novelties) = self.novelties.as_mut() {
+            novelties.clear();
+            for (i, item) in observer
+                .as_iter()
+                .map(|x| *x)
+                .enumerate()
+                .filter(|(_, item)| *item != initial)
+            {
+                let existing = unsafe { *history_map.get_unchecked(i) };
+                let reduced = R::reduce(existing, item);
+                if N::is_novel(existing, reduced) {
+                    interesting = true;
+                    novelties.push(i);
+                }
+            }
+        } else {
+            for (i, item) in observer
+                .as_iter()
+                .map(|x| *x)
+                .enumerate()
+                .filter(|(_, item)| *item != initial)
+            {
+                let existing = unsafe { *history_map.get_unchecked(i) };
+                let reduced = R::reduce(existing, item);
+                if N::is_novel(existing, reduced) {
+                    interesting = true;
+                    break;
+                }
+            }
+        }
+
+        interesting
+    }
+}
+
+
+/// Specialize for the common coverage map size, maximization of u8s
+#[rustversion::nightly]
+impl<C, O, S> MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8>
+where
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    S: State + HasNamedMetadata,
+    C: CanTrack + AsRef<O> + Observer<S>,
+{
+    #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::needless_range_loop)]
+    fn is_interesting_u8_simd_optimized<OT>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple<S>,
+    {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
 
@@ -679,142 +834,6 @@ where
     }
 }
 
-impl<C, N, O, R, T> Named for MapFeedback<C, N, O, R, T> {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-}
-
-impl<C, N, O, R, T> HasObserverHandle for MapFeedback<C, N, O, R, T>
-where
-    O: Named,
-    C: AsRef<O>,
-{
-    type Observer = C;
-
-    #[inline]
-    fn observer_handle(&self) -> &Handle<C> {
-        &self.map_ref
-    }
-}
-
-#[allow(clippy::ptr_arg)]
-fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
-    if name.chars().all(char::is_lowercase) {
-        name.clone()
-    } else {
-        name.to_lowercase().into()
-    }
-}
-
-impl<C, N, O, R, T> MapFeedback<C, N, O, R, T>
-where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsIter<'it, Item = T>,
-    N: IsNovel<T>,
-    C: CanTrack + AsRef<O> + Named,
-{
-    /// Create new `MapFeedback`
-    #[must_use]
-    pub fn new(map_observer: &C) -> Self {
-        Self {
-            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: map_observer.name().clone(),
-            map_ref: map_observer.handle(),
-            stats_name: create_stats_name(map_observer.name()),
-            #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
-    /// feedback is needed twice, but with a different history. Using `new()` always results in the
-    /// same name and therefore also the same history.
-    #[must_use]
-    pub fn with_name(name: &'static str, map_observer: &C) -> Self {
-        let name = Cow::from(name);
-        Self {
-            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            map_ref: map_observer.handle(),
-            stats_name: create_stats_name(&name),
-            name,
-            #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
-            phantom: PhantomData,
-        }
-    }
-
-    #[allow(clippy::wrong_self_convention)]
-    #[allow(clippy::needless_range_loop)]
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_interesting_default<EM, S, OT>(
-        &mut self,
-        state: &mut S,
-        _manager: &mut EM,
-        _input: &S::Input,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> bool
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-        S: UsesInput + HasNamedMetadata,
-    {
-        let mut interesting = false;
-        // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.map_ref).unwrap().as_ref();
-
-        let map_state = state
-            .named_metadata_map_mut()
-            .get_mut::<MapFeedbackMetadata<T>>(&self.name)
-            .unwrap();
-        let len = observer.len();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, observer.initial());
-        }
-
-        let history_map = map_state.history_map.as_slice();
-
-        let initial = observer.initial();
-
-        if let Some(novelties) = self.novelties.as_mut() {
-            novelties.clear();
-            for (i, item) in observer
-                .as_iter()
-                .map(|x| *x)
-                .enumerate()
-                .filter(|(_, item)| *item != initial)
-            {
-                let existing = unsafe { *history_map.get_unchecked(i) };
-                let reduced = R::reduce(existing, item);
-                if N::is_novel(existing, reduced) {
-                    interesting = true;
-                    novelties.push(i);
-                }
-            }
-        } else {
-            for (i, item) in observer
-                .as_iter()
-                .map(|x| *x)
-                .enumerate()
-                .filter(|(_, item)| *item != initial)
-            {
-                let existing = unsafe { *history_map.get_unchecked(i) };
-                let reduced = R::reduce(existing, item);
-                if N::is_novel(existing, reduced) {
-                    interesting = true;
-                    break;
-                }
-            }
-        }
-
-        interesting
-    }
-}
 
 #[cfg(test)]
 mod tests {

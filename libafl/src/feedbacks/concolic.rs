@@ -44,6 +44,22 @@ impl<'map, S> ConcolicFeedback<'map, S> {
             phantom: PhantomData,
         }
     }
+
+    fn add_concolic_feedback_to_metadata<OT>(
+        &mut self,
+        observers: &OT,
+        testcase: &mut Testcase<S::Input>,
+    )
+    where
+        OT: ObserversTuple<S>,
+    {
+        if let Some(metadata) = observers
+            .get(&self.observer_handle)
+            .map(ConcolicObserver::create_metadata_from_current_map)
+        {
+            testcase.metadata_map_mut().insert(metadata);
+        }
+    }
 }
 
 impl<S> Named for ConcolicFeedback<'_, S> {
@@ -83,12 +99,7 @@ where
         OT: ObserversTuple<S>,
         EM: EventFirer<State = S>,
     {
-        if let Some(metadata) = observers
-            .get(&self.observer_handle)
-            .map(ConcolicObserver::create_metadata_from_current_map)
-        {
-            testcase.metadata_map_mut().insert(metadata);
-        }
+        self.add_concolic_feedback_to_metadata(observers, testcase);
         Ok(())
     }
 

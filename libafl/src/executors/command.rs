@@ -209,19 +209,14 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<OT, S, T> CommandExecutor<OT, S, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S>,
-    Z: UsesState<State = S>,
+    T: Debug,
+    OT: Debug,
 {
-    fn run_target(
+    fn execute_input_with_command(
         &mut self,
-        _fuzzer: &mut Z,
         state: &mut Self::State,
-        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
@@ -280,6 +275,27 @@ where
             obs.observe_stderr(&stderr);
         }
         res
+    }
+}
+
+// this only works on unix because of the reliance on checking the process signal for detecting OOM
+#[cfg(all(feature = "std", unix))]
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+where
+    EM: UsesState<State = S>,
+    S: State + HasExecutions,
+    T: CommandConfigurator<S::Input> + Debug,
+    OT: Debug + MatchName + ObserversTuple<S>,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.execute_input_with_command(state, input)
     }
 }
 

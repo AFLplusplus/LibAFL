@@ -82,6 +82,53 @@ libafl_bolts::impl_serdeany!(
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<bool>,<char>,<usize>
 );
 
+impl<S, T> ListFeedback<T>
+where
+    S: State + HasNamedMetadata,
+    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
+{
+    fn has_interesting_list_observer_feedback<OT>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple<S>,
+    {
+        // TODO Replace with match_name_type when stable
+        let observer = observers.get(&self.observer_handle).unwrap();
+        // TODO register the list content in a testcase metadata
+        self.novelty.clear();
+        // can't fail
+        let history_set = state
+            .named_metadata_map_mut()
+            .get_mut::<ListFeedbackMetadata<T>>(self.name())
+            .unwrap();
+        for v in observer.list() {
+            if !history_set.set.contains(v) {
+                self.novelty.insert(*v);
+            }
+        }
+        Ok(!self.novelty.is_empty())
+    }
+    fn append_list_observer_metadata(
+        &mut self,
+        state: &mut S,
+    )
+    {
+        let history_set = state
+            .named_metadata_map_mut()
+            .get_mut::<ListFeedbackMetadata<T>>(self.name())
+            .unwrap();
+
+        for v in &self.novelty {
+            history_set.set.insert(*v);
+        }
+        Ok(())
+    }
+    
+}
+
 impl<S, T> Feedback<S> for ListFeedback<T>
 where
     S: State + HasNamedMetadata,
@@ -105,21 +152,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        // TODO Replace with match_name_type when stable
-        let observer = observers.get(&self.observer_handle).unwrap();
-        // TODO register the list content in a testcase metadata
-        self.novelty.clear();
-        // can't fail
-        let history_set = state
-            .named_metadata_map_mut()
-            .get_mut::<ListFeedbackMetadata<T>>(self.name())
-            .unwrap();
-        for v in observer.list() {
-            if !history_set.set.contains(v) {
-                self.novelty.insert(*v);
-            }
-        }
-        Ok(!self.novelty.is_empty())
+        self.has_interesting_list_observer_feedback(state, observers)
     }
 
     fn append_metadata<EM, OT>(
@@ -133,14 +166,7 @@ where
         OT: ObserversTuple<S>,
         EM: EventFirer<State = S>,
     {
-        let history_set = state
-            .named_metadata_map_mut()
-            .get_mut::<ListFeedbackMetadata<T>>(self.name())
-            .unwrap();
-
-        for v in &self.novelty {
-            history_set.set.insert(*v);
-        }
+        self.append_list_observer_metadata(state);
         Ok(())
     }
     #[cfg(feature = "track_hit_feedbacks")]

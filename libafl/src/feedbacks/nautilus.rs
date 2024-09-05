@@ -71,6 +71,21 @@ impl<'a, S> NautilusFeedback<'a, S> {
             phantom: PhantomData,
         }
     }
+    fn append_nautilus_metadata_to_state(
+        &mut self,
+        state: &mut S,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error>
+    {
+        state.corpus().load_input_into(testcase)?;
+        let input = testcase.input().as_ref().unwrap().clone();
+        let meta = state
+            .metadata_map_mut()
+            .get_mut::<NautilusChunksMetadata>()
+            .expect("NautilusChunksMetadata not in the state");
+        meta.cks.add_tree(input.tree, self.ctx);
+        Ok(())
+    }
 }
 
 impl<'a, S> Named for NautilusFeedback<'a, S> {
@@ -110,14 +125,7 @@ where
     where
         OT: ObserversTuple<S>,
     {
-        state.corpus().load_input_into(testcase)?;
-        let input = testcase.input().as_ref().unwrap().clone();
-        let meta = state
-            .metadata_map_mut()
-            .get_mut::<NautilusChunksMetadata>()
-            .expect("NautilusChunksMetadata not in the state");
-        meta.cks.add_tree(input.tree, self.ctx);
-        Ok(())
+        self.append_nautilus_metadata_to_state(state, testcase)
     }
 
     fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
