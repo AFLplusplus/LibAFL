@@ -399,6 +399,8 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     attr.size = size_of::<perf_event_attr>() as u32;
     attr.type_ = intel_pt_perf_type()?;
     attr.set_disabled(1);
+    //TODO parametrize?
+    attr.set_exclude_kernel(1);
     attr.config |= PtConfig::NORETCOMP.bits();
 
     Ok(attr)
@@ -594,8 +596,8 @@ mod test {
     fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
         let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
         let mut file = OpenOptions::new()
-            .append(true)
             .create(true)
+            .write(true)
             .open(trace_path)
             .expect("Failed to open trace output file");
 
