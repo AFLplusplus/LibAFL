@@ -570,7 +570,7 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                if start > self.shadow_offset {
+                if start >= self.shadow_offset {
                     log::trace!("Reached the shadow/allocator region - stopping");
                     return false;
                 } else {
