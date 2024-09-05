@@ -211,14 +211,15 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<OT, S, T> CommandExecutor<OT, S, T>
 where
-    T: Debug,
-    OT: Debug,
+    S: State + HasExecutions,
+    T: CommandConfigurator<S::Input> + Debug,
+    OT: Debug + ObserversTuple<S>,
 {
     fn execute_input_with_command(
         &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+        state: &mut S,
+        input: &<S as UsesInput>::Input,
+    ) -> Result<ExitKind, Error>{
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;

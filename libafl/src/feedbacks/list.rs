@@ -82,18 +82,18 @@ libafl_bolts::impl_serdeany!(
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<bool>,<char>,<usize>
 );
 
-impl<S, T> ListFeedback<T>
+impl<T> ListFeedback<T>
 where
-    S: State + HasNamedMetadata,
     T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
 {
-    fn has_interesting_list_observer_feedback<OT>(
+    fn has_interesting_list_observer_feedback<S, OT>(
         &mut self,
         state: &mut S,
         observers: &OT,
     ) -> Result<bool, Error>
     where
         OT: ObserversTuple<S>,
+        S: State + HasNamedMetadata,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.get(&self.observer_handle).unwrap();
@@ -111,7 +111,7 @@ where
         }
         Ok(!self.novelty.is_empty())
     }
-    fn append_list_observer_metadata(&mut self, state: &mut S) {
+    fn append_list_observer_metadata<S: State + HasNamedMetadata>(&mut self, state: &mut S) {
         let history_set = state
             .named_metadata_map_mut()
             .get_mut::<ListFeedbackMetadata<T>>(self.name())
@@ -120,7 +120,6 @@ where
         for v in &self.novelty {
             history_set.set.insert(*v);
         }
-        Ok(())
     }
 }
 

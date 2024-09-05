@@ -98,28 +98,6 @@ where
             })
         }
     }
-
-    #[allow(clippy::wrong_self_convention)]
-    fn has_interesting_observer_difference<OT>(&mut self, observers: &OT) -> Result<bool, Error>
-    where
-        OT: ObserversTuple<S> + MatchName,
-    {
-        fn err(name: &str) -> Error {
-            Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
-        }
-        let o1: &O1 = observers
-            .get(&self.o1_ref)
-            .ok_or_else(|| err(self.o1_ref.name()))?;
-        let o2: &O2 = observers
-            .get(&self.o2_ref)
-            .ok_or_else(|| err(self.o2_ref.name()))?;
-        let res = (self.compare_fn)(o1, o2) == DiffResult::Diff;
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
-        Ok(res)
-    }
 }
 
 impl<F, I, O1, O2, S, T> FeedbackFactory<DiffFeedback<F, I, O1, O2, S>, T>
@@ -191,7 +169,21 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S> + MatchName,
     {
-        self.has_interesting_observer_difference(observers)
+        fn err(name: &str) -> Error {
+            Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
+        }
+        let o1: &O1 = observers
+            .get(&self.o1_ref)
+            .ok_or_else(|| err(self.o1_ref.name()))?;
+        let o2: &O2 = observers
+            .get(&self.o2_ref)
+            .ok_or_else(|| err(self.o2_ref.name()))?;
+        let res = (self.compare_fn)(o1, o2) == DiffResult::Diff;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
     }
 
     #[cfg(feature = "track_hit_feedbacks")]

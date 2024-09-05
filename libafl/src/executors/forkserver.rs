@@ -618,18 +618,21 @@ where
     }
 
     #[inline]
-    fn execute_input_tracked(
+    fn execute_input_tracked<I: Input + HasTargetBytes>(
         &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+        state: &mut S,
+        input: &I,
+    ) -> Result<ExitKind, Error>
+    where
+        S: HasExecutions
+    {
         *state.executions_mut() += 1;
 
         self.execute_input(input)
     }
 
     #[inline]
-    fn execute_input(&mut self, input: &Self::Input) -> Result<ExitKind, Error> {
+    fn execute_input<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();

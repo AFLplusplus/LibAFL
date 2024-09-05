@@ -51,6 +51,7 @@ impl<'map, S> ConcolicFeedback<'map, S> {
         testcase: &mut Testcase<S::Input>,
     ) where
         OT: ObserversTuple<S>,
+        S: UsesInput
     {
         if let Some(metadata) = observers
             .get(&self.observer_handle)

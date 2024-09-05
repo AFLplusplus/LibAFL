@@ -10,13 +10,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Testcase,
-    events::EventFirer,
-    executors::ExitKind,
-    feedbacks::Feedback,
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::State,
-    Error, HasMetadata,
+    corpus::Testcase, events::EventFirer, executors::ExitKind, feedbacks::Feedback, inputs::UsesInput, observers::{ObserversTuple, StdErrObserver, StdOutObserver}, state::State, Error, HasMetadata
 };
 
 /// Metadata for [`StdOutToMetadataFeedback`].
@@ -38,12 +32,13 @@ pub struct StdOutToMetadataFeedback {
 impl StdOutToMetadataFeedback {
     /// Append to the testcase the generated metadata in case of a new corpus item.
     #[inline]
-    fn append_stdout_observation_to_testcase<OT>(
+    fn append_stdout_observation_to_testcase<S, OT>(
         &mut self,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
+        S: State + UsesInput,
         OT: ObserversTuple<S>,
     {
         let observer = observers

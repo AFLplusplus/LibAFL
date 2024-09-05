@@ -441,10 +441,10 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
-        manager: &mut EM,
-        input: &<S as UsesInput>::Input,
+        _manager: &mut EM,
+        _input: &<S as UsesInput>::Input,
         observers: &OT,
-        exit_kind: &ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,

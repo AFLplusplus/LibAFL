@@ -57,8 +57,17 @@ impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
     pub fn secondary(&mut self) -> &mut B {
         &mut self.secondary
     }
+}
 
-    fn execute_input(
+impl<A, B, DOT, EM, Z> Executor<EM, Z> for DiffExecutor<A, B, DOT, A::Observers, B::Observers>
+where
+    A: Executor<EM, Z> + HasObservers,
+    B: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers,
+    EM: UsesState<State = <Self as UsesState>::State>,
+    DOT: DifferentialObserversTuple<A::Observers, B::Observers, <Self as UsesState>::State>,
+    Z: UsesState<State = <Self as UsesState>::State>,
+{
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
@@ -100,25 +109,6 @@ impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
                 secondary: ret2.into(),
             })
         }
-    }
-}
-
-impl<A, B, DOT, EM, Z> Executor<EM, Z> for DiffExecutor<A, B, DOT, A::Observers, B::Observers>
-where
-    A: Executor<EM, Z> + HasObservers,
-    B: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    DOT: DifferentialObserversTuple<A::Observers, B::Observers, <Self as UsesState>::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
-{
-    fn run_target(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
-        self.execute_input(fuzzer, state, mgr, input)
     }
 }
 
