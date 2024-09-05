@@ -623,18 +623,13 @@ where
         state: &mut Self::State,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-
         *state.executions_mut() += 1;
 
         self.execute_input(input)
     }
 
     #[inline]
-    fn execute_input(
-        &mut self,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
-
+    fn execute_input(&mut self, input: &Self::Input) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();

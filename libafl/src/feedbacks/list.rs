@@ -111,11 +111,7 @@ where
         }
         Ok(!self.novelty.is_empty())
     }
-    fn append_list_observer_metadata(
-        &mut self,
-        state: &mut S,
-    )
-    {
+    fn append_list_observer_metadata(&mut self, state: &mut S) {
         let history_set = state
             .named_metadata_map_mut()
             .get_mut::<ListFeedbackMetadata<T>>(self.name())
@@ -126,7 +122,6 @@ where
         }
         Ok(())
     }
-    
 }
 
 impl<S, T> Feedback<S> for ListFeedback<T>

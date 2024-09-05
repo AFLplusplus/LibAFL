@@ -75,8 +75,7 @@ impl<'a, S> NautilusFeedback<'a, S> {
         &mut self,
         state: &mut S,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    {
+    ) -> Result<(), Error> {
         state.corpus().load_input_into(testcase)?;
         let input = testcase.input().as_ref().unwrap().clone();
         let meta = state

@@ -100,10 +100,7 @@ where
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn has_interesting_observer_difference<OT>(
-        &mut self,
-        observers: &OT,
-    ) -> Result<bool, Error>
+    fn has_interesting_observer_difference<OT>(&mut self, observers: &OT) -> Result<bool, Error>
     where
         OT: ObserversTuple<S> + MatchName,
     {

@@ -655,11 +655,7 @@ where
 
     #[allow(clippy::needless_range_loop)]
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_interesting_default<S, OT>(
-        &mut self,
-        state: &mut S,
-        observers: &OT,
-    ) -> bool
+    fn is_interesting_default<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
     where
         OT: ObserversTuple<S>,
         S: UsesInput + HasNamedMetadata,
@@ -715,7 +711,6 @@ where
         interesting
     }
 }
-
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
@@ -833,7 +828,6 @@ where
         Ok(interesting)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
