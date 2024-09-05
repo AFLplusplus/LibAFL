@@ -453,6 +453,7 @@ impl Allocator {
         let shadow_addr = map_to_shadow!(self, (address as usize));
         let shadow_size = size >> 3;
         let buf = unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
+        //log::trace!("aligned shadow buf: {:?}", buf);
         let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
         if !prefix.iter().all(|&x| x == 0xff)
             || !suffix.iter().all(|&x| x == 0xff)
@@ -479,15 +480,16 @@ impl Allocator {
         //5. The post-alignment is the same as pre-alignment except it is the qword following the aligned portion. Use a specialized check to ensure that [end & ~7, end) is valid.
 
         if size == 0
-        /*|| !self.is_managed(address as *mut c_void)*/
         {
             return true;
         }
 
         if !self.is_managed(address as *mut c_void) {
-            log::trace!("unmanaged address to check_shadow: {:?}, {size:x}", address);
+            //log::trace!("unmanaged address to check_shadow: {:?}, {size:x}", address);
             return true;
         }
+
+      //  log::trace!("Check shadow for region: {:#x}-{:#x}", address as usize, address as usize + size);
 
         //fast path. most buffers are likely 8 byte aligned in size and address
         if (address as usize).trailing_zeros() >= 3 && size.trailing_zeros() >= 3 {
@@ -544,11 +546,11 @@ impl Allocator {
         map_to_shadow!(self, start)
     }
 
-    /// Checks if the currennt address is one of ours
+    /// Checks if the currennt address is one of ours - is this address in the allocator region
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))
-        self.shadow_offset <= ptr as usize && (ptr as usize) < self.current_mapping_addr
+        self.base_mapping_addr <= ptr as usize && (ptr as usize) < self.current_mapping_addr
     }
 
     /// Checks if any of the allocations has not been freed
@@ -568,8 +570,9 @@ impl Allocator {
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                if self.is_managed(start as *mut c_void) {
-                    log::trace!("Not unpoisoning: {:#x}-{:#x}, is_managed", start, end);
+                if start > self.shadow_offset {
+                    log::trace!("Reached the shadow/allocator region - stopping");
+                    return false;
                 } else {
                     log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                     self.map_shadow_for_region(start, end, true);

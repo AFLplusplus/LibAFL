@@ -60,7 +60,7 @@ extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(target_vendor = "apple"))]
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
@@ -186,7 +186,7 @@ impl FridaRuntime for AsanRuntime {
         self.register_hooks(gum);
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
-
+        log::trace!("Finished unpoisoning all existing memory");
         self.register_thread();
     }
 
@@ -320,7 +320,7 @@ impl AsanRuntime {
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
     #[allow(clippy::unused_self)]
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(not(target_vendor = "apple"))]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
         let (tls_start, tls_end) = Self::current_tls();
@@ -337,7 +337,7 @@ impl AsanRuntime {
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack mapping.
     #[allow(clippy::unused_self)]
-    #[cfg(target_os = "ios")]
+    #[cfg(target_vendor = "apple")]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
         self.allocator
@@ -379,14 +379,17 @@ impl AsanRuntime {
     fn range_for_address(address: usize) -> (usize, usize) {
         let mut start = 0;
         let mut end = 0;
-        RangeDetails::enumerate_with_prot(PageProtection::NoAccess, &mut |range: &RangeDetails| {
+
+        RangeDetails::enumerate_with_prot(PageProtection::Read, &mut |range: &RangeDetails| {
             let range_start = range.memory_range().base_address().0 as usize;
             let range_end = range_start + range.memory_range().size();
             if range_start <= address && range_end >= address {
                 start = range_start;
                 end = range_end;
-                // I want to stop iteration here
                 return false;
+            }
+            if address < start { //if the address is less than the start then we cannot find it
+                return false
             }
             true
         });
@@ -410,51 +413,24 @@ impl AsanRuntime {
         let stack_address = addr_of_mut!(stack_var) as usize;
         // let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
+        
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
         }
-        let mut range = None;
-        for area in mmap_rs::MemoryAreas::open(None).unwrap() {
-            let area_ref = area.as_ref().unwrap();
-            if area_ref.start() <= stack_address && stack_address <= area_ref.end() {
-                range = Some((area_ref.end() - 1024 * 1024, area_ref.end()));
-                break;
-            }
-        }
-        if let Some((start, end)) = range {
-            //     #[cfg(unix)]
-            //     {
-            //         let max_start = end - Self::max_stack_size();
-            //
-            //         let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
-            //         #[cfg(not(target_vendor = "apple"))]
-            //         let flags = flags | MapFlags::MAP_STACK;
-            //
-            //         if start != max_start {
-            //             let mapping = unsafe {
-            //                 mmap(
-            //                     NonZeroUsize::new(max_start),
-            //                     NonZeroUsize::new(start - max_start).unwrap(),
-            //                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            //                     flags,
-            //                     -1,
-            //                     0,
-            //                 )
-            //             };
-            //             assert!(mapping.unwrap() as usize == max_start);
-            //         }
-            //         (max_start, end)
-            //     }
-            //     #[cfg(windows)]
-            (start, end)
-        } else {
+
+        let range = Self::range_for_address(stack_address);
+
+        if range.0 == 0 {
             panic!("Couldn't find stack mapping!");
         }
+    
+        (range.1 - 1024*1024, range.1)
+        
     }
 
     /// Determine the tls start, end for the currently running thread
     #[must_use]
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(not(target_vendor = "apple"))]
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { tls_ptr() } as usize;
 
@@ -514,18 +490,13 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
-                        if this.hooks_enabled {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        if !ASAN_IN_HOOK.get() && this.hooks_enabled { //not in hook and hooks are enabled
+                            ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            ASAN_IN_HOOK.set(false);
                             ret
                         } else {
-
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
                     }
@@ -600,8 +571,9 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
-
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
+                        //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
+                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator. 
+                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){ 
                             ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
                             ASAN_IN_HOOK.set(false);
@@ -639,8 +611,9 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
+                        //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
+                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator. 
+                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
                             ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
                             ASAN_IN_HOOK.set(false);
