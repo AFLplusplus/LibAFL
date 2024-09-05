@@ -207,15 +207,15 @@ fn build_pass(
                         if required {
                             panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
                         } else {
-                            println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}");
+                            println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error.");
                         }
                     }
                 }
                 Err(err) => {
                     if required {
-                        panic!("Failed to compile required compiler pass src/{src_file} - Error: {err}");
+                        panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
                     } else {
-                        println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Error: {err}");
+                        println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error.");
                     }
                 }
             }
