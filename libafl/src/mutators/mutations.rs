@@ -1204,7 +1204,7 @@ impl<'a, S, F, I> Mutator<I, S> for MappedCrossoverInsertMutator<'a, F>
 where
     S: HasCorpus + HasMaxSize + HasRand + UsesInput,
     I: HasMutatorBytes,
-    F: for<'b> Fn(&'b S::Input) -> Option<&'b Vec<u8>>,
+    F: for<'b> Fn(&'b S::Input) -> Option<&'b [u8]>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1224,7 +1224,7 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            (self.input_from_corpus_mapper)(other_input).map_or(0, Vec::len)
+            (self.input_from_corpus_mapper)(other_input).map_or(0, <[u8]>::len)
         };
 
         if other_size < 2 {
@@ -1288,7 +1288,7 @@ impl<'a, S, I, F> Mutator<I, S> for MappedCrossoverReplaceMutator<'a, F>
 where
     S: HasCorpus + HasMaxSize + HasRand + UsesInput,
     I: HasMutatorBytes,
-    F: for<'b> Fn(&'b S::Input) -> Option<&'b Vec<u8>>,
+    F: for<'b> Fn(&'b S::Input) -> Option<&'b [u8]>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1307,7 +1307,7 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            (self.input_from_corpus_mapper)(other_input).map_or(0, Vec::len)
+            (self.input_from_corpus_mapper)(other_input).map_or(0, <[u8]>::len)
         };
 
         if other_size < 2 {
