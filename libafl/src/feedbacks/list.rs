@@ -90,7 +90,7 @@ where
         &mut self,
         state: &mut S,
         observers: &OT,
-    ) -> Result<bool, Error>
+    ) -> bool
     where
         OT: ObserversTuple<S>,
         S: State + HasNamedMetadata,
@@ -109,7 +109,7 @@ where
                 self.novelty.insert(*v);
             }
         }
-        Ok(!self.novelty.is_empty())
+        !self.novelty.is_empty()
     }
     fn append_list_observer_metadata<S: State + HasNamedMetadata>(&mut self, state: &mut S) {
         let history_set = state
@@ -146,7 +146,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        self.has_interesting_list_observer_feedback(state, observers)
+        Ok(self.has_interesting_list_observer_feedback(state, observers))
     }
 
     fn append_metadata<EM, OT>(

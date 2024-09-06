@@ -580,7 +580,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        self.is_interesting_u8_simd_optimized(state, observers)
+        Ok(self.is_interesting_u8_simd_optimized(state, observers))
     }
 }
 
@@ -721,11 +721,7 @@ where
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
-    fn is_interesting_u8_simd_optimized<S, OT>(
-        &mut self,
-        state: &mut S,
-        observers: &OT,
-    ) -> Result<bool, Error>
+    fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
     where
         OT: ObserversTuple<S>,
         S: State + HasNamedMetadata,
@@ -825,7 +821,7 @@ where
         {
             self.last_result = Some(interesting);
         }
-        Ok(interesting)
+        interesting
     }
 }
 
