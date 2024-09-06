@@ -420,10 +420,10 @@ where
     default fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
+        _manager: &mut EM,
+        _input: &S::Input,
         observers: &OT,
-        exit_kind: &ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
