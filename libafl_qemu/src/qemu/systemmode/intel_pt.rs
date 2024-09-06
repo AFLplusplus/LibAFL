@@ -178,6 +178,8 @@ impl IntelPT {
         smp_rmb(); // TODO double check impl
 
         // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;??
+        // apparently the rust library doesn't have the context parameter for the set_callback
+        // also, under the hood looks like it is passing the callback itself as context to the C fn 🤔
         // TODO remove unwrap()
         let mut config =
             ConfigBuilder::new(unsafe { slice::from_raw_parts_mut(data, len) }).unwrap();
@@ -186,7 +188,6 @@ impl IntelPT {
         }
         let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
         decoder.set_image(Some(image)).expect("Failed to set image");
-
         // TODO rewrite decently
         // TODO consider dropping libipt-rs and using sys, or bindgen ourselves
         let mut status;
@@ -237,7 +238,7 @@ impl IntelPT {
                         status = s;
                         ips.push(b.ip());
 
-                        if s.eos() {
+                        if status.eos() {
                             break;
                         }
                     }
