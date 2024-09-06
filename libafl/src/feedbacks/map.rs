@@ -717,7 +717,7 @@ where
 impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8>
 where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    C: CanTrack + AsRef<O> + Observer<S>,
+    C: CanTrack + AsRef<O>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
