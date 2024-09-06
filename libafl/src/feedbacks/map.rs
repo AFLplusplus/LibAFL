@@ -714,21 +714,21 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<C, O, S> MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8>
+impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8>
 where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
-    S: State + HasNamedMetadata,
     C: CanTrack + AsRef<O> + Observer<S>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
-    fn is_interesting_u8_simd_optimized<OT>(
+    fn is_interesting_u8_simd_optimized<S, OT>(
         &mut self,
         state: &mut S,
         observers: &OT,
     ) -> Result<bool, Error>
     where
         OT: ObserversTuple<S>,
+        S: State + HasNamedMetadata,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
