@@ -4,7 +4,7 @@ use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, observers::VariableLengthMapObserver, HasMetadata};
 use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 use libafl_targets::EDGES_MAP;
 use serde::{Deserialize, Serialize};
@@ -514,13 +514,13 @@ where
     AF: AddressFilter,
     PF: PageFilter,
 {
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.address_filter.allowed(&addr)
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr, page_id: Option<GuestPhysAddr>) -> bool {
         if let Some(page_id) = page_id {
@@ -541,7 +541,7 @@ where
     const HOOKS_DO_SIDE_EFFECTS: bool = V::DO_SIDE_EFFECTS;
 
     type ModuleAddressFilter = AF;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = PF;
 
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
@@ -600,14 +600,14 @@ where
             assert_ne!(*addr_of!(LIBAFL_QEMU_EDGES_MAP_SIZE_PTR), ptr::null_mut());
         }
 
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         {
             if !module.must_instrument(src) && !module.must_instrument(dest) {
                 return None;
             }
         }
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             let paging_id = emulator_modules
                 .qemu()
@@ -678,12 +678,12 @@ where
     V: EdgeCoverageVariant<AF, PF>,
 {
     if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         if !module.must_instrument(src) && !module.must_instrument(dest) {
             return None;
         }
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             let paging_id = emulator_modules
                 .qemu()
@@ -744,13 +744,13 @@ where
 {
     // first check if we should filter
     if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         {
             if !module.must_instrument(pc) {
                 return None;
             }
         }
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             let page_id = emulator_modules
                 .qemu()

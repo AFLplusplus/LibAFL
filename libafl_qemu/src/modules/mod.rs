@@ -6,14 +6,14 @@ use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[allow(unused_imports)]
 pub use systemmode::*;
 

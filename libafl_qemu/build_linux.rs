@@ -16,17 +16,16 @@ void __libafl_qemu_testfile() {}
 #[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
-    println!(r#"cargo::rustc-check-cfg=cfg(emulation_mode, values("usermode", "systemmode"))"#);
     println!(
         r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "x86_64"))"#
     );
 
     let emulation_mode = if cfg!(feature = "usermode") {
-        "usermode".to_string()
+        "usermode"
     } else if cfg!(feature = "systemmode") {
-        "systemmode".to_string()
+        "systemmode"
     } else {
-        env::var("EMULATION_MODE").unwrap_or_else(|_| "usermode".to_string())
+        unreachable!();
     };
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -70,10 +69,6 @@ pub fn build() {
     let runtime_bindings_file = out_dir.join("libafl_qemu_bindings.rs");
     let stub_runtime_bindings_file = src_dir.join("runtime/libafl_qemu_stub_bindings.rs");
 
-    println!("cargo::rustc-check-cfg=cfg(emulation_mode, values(\"usermode\", \"systemmode\"))");
-    println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
-    println!("cargo:rerun-if-env-changed=EMULATION_MODE");
-
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=build_linux.rs");
     println!("cargo:rerun-if-changed={}", libafl_runtime_dir.display());
@@ -99,7 +94,7 @@ pub fn build() {
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
     println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\"))");
 
-    let cross_cc = if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
+    let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
         let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
             println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
@@ -162,12 +157,12 @@ pub fn build() {
 
     maybe_generate_stub_bindings(
         &cpu_target,
-        &emulation_mode,
+        emulation_mode,
         stub_runtime_bindings_file.as_path(),
         runtime_bindings_file.as_path()
     );
 
-    if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
+    if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
         println!("cargo:rerun-if-changed={}", qasan_dir.display());

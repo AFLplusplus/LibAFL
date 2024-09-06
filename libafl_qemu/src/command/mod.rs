@@ -572,7 +572,7 @@ pub struct PageAllowCommand {
     page_id: GuestPhysAddr,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for PageAllowCommand
 where
     ET: EmulatorModuleTuple<S>,
@@ -760,7 +760,7 @@ impl Display for AddressAllowCommand {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Display for PageAllowCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Allowed page: {:?}", self.page_id)

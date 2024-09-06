@@ -300,14 +300,14 @@ where
         if let Some(h) = emulator_modules.modules().match_first_type::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 unsafe {
                     std::slice::from_raw_parts(qemu.g2h(pc), 512)
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 &mut [0; 512]
             };
-            #[cfg(emulation_mode = "systemmode")]
+            #[cfg(feature = "systemmode")]
             unsafe {
                 qemu.read_mem(pc, code)
             }; // TODO handle faults
@@ -342,11 +342,11 @@ where
 
                 iaddr += insn.bytes().len() as GuestAddr;
 
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 unsafe {
                     code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 unsafe {
                     qemu.read_mem(pc, code);
                 } // TODO handle faults

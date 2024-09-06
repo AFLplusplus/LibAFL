@@ -14,24 +14,27 @@ macro_rules! assert_unique_feature {
     }
 }
 
-pub fn build() {
-    // Make sure that exactly one qemu mode is set
-    assert_unique_feature!("usermode", "systemmode");
-    let emulation_mode = if cfg!(feature = "usermode") {
-        "usermode".to_string()
-    } else if cfg!(feature = "systemmode") {
-        "systemmode".to_string()
-    } else {
-        env::var("EMULATION_MODE").unwrap_or_else(|_| {
-            println!(
-                "cargo:warning=No emulation mode feature enabled or EMULATION_MODE env specified for libafl_qemu, supported: usermode, systemmmode - defaulting to usermode"
-            );
-            "usermode".to_string()
-        })
+#[macro_export]
+macro_rules! assert_at_least_one_feature {
+    ($($feature:literal),+) => {
+        #[cfg(not(any($(feature = $feature),+)))]
+        compile_error!(concat!("At least one of the following features must be enabled:", $(" ", $feature),+));
     };
-    println!("cargo::rustc-check-cfg=cfg(emulation_mode, values(\"usermode\", \"systemmode\"))");
-    println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
-    println!("cargo:rerun-if-env-changed=EMULATION_MODE");
+}
+
+pub fn build() {
+    // Make sure that at most one qemu mode is set
+    assert_unique_feature!("usermode", "systemmode");
+    // Make sure that at least one qemu mode is set
+    assert_at_least_one_feature!("usermode", "systemmode");
+
+    let emulation_mode = if cfg!(feature = "usermode") {
+        "usermode"
+    } else if cfg!(feature = "systemmode") {
+        "systemmode"
+    } else {
+        unreachable!();
+    };
 
     // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
@@ -100,7 +103,7 @@ pub fn build() {
     // If the bindings are built and differ from the current stub, replace it with the freshly generated bindings
     maybe_generate_stub_bindings(
         &cpu_target,
-        &emulation_mode,
+        emulation_mode,
         stub_bindings_file.as_path(),
         bindings_file.as_path(),
     );

@@ -4,7 +4,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use std::ptr;
 #[cfg(emulation_mode = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,13 +31,13 @@ use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     tuples::RefIndexable,
 };
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use libafl_qemu_sys::libafl_exit_request_timeout;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use libafl_qemu_sys::libafl_qemu_handle_crash;
 use libc::siginfo_t;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use crate::EmulatorModules;
 use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
 
@@ -56,7 +56,7 @@ where
 /// # Safety
 ///
 /// This should be used as a crash handler, and nothing else.
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 unsafe fn inproc_qemu_crash_handler<ET, S>(
     signal: Signal,
     info: &mut siginfo_t,
@@ -79,7 +79,7 @@ unsafe fn inproc_qemu_crash_handler<ET, S>(
     libafl_qemu_handle_crash(signal as i32, info, puc);
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
 
 /// # Safety
@@ -176,7 +176,7 @@ where
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
         )?;
 
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         {
             inner.inprocess_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<ET, S> as *const c_void;
@@ -220,7 +220,7 @@ where
         &self.inner
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     pub fn break_on_timeout(&mut self) {
         BREAK_ON_TMOUT.store(true, Ordering::Release);
     }

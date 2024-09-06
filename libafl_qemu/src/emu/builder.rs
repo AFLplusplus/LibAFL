@@ -6,7 +6,7 @@ use libafl::{
 };
 use libafl_bolts::tuples::{tuple_list, Prepend};
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
 use crate::{
     command::{CommandManager, NopCommandManager, StdCommandManager},
@@ -53,7 +53,7 @@ where
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
 where
     S: State + HasExecutions + Unpin,
@@ -73,7 +73,7 @@ where
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
 where
     S: State + HasExecutions + Unpin,
