@@ -8,11 +8,11 @@ use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    common::HasMetadata,
     corpus::HasTestcase,
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, HasMutatorBytes, Input},
     stages::Stage,
     state::{HasCorpus, HasCurrentTestcase, State, UsesState},
-    HasMetadata,
 };
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input
@@ -89,9 +89,10 @@ impl<S> UnicodeIdentificationStage<S> {
             phantom: PhantomData,
         }
     }
-    fn identify_unicode_in_current_testcase(&mut self, state: &mut S) -> Result<(), Error>
+    fn identify_unicode_in_current_testcase<I>(state: &mut S) -> Result<(), Error>
     where
-        S: HasTestcase + HasCorpus,
+        I: Input + HasMutatorBytes,
+        S: HasCurrentTestcase<I> + HasCorpus<Input = I>,
     {
         let mut tc = state.current_testcase_mut()?;
         if tc.has_metadata::<UnicodeIdentificationMetadata>() {
@@ -129,7 +130,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        self.identify_unicode_in_current_testcase(state)
+        UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
     }
 
     #[inline]

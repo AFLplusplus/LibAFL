@@ -13,7 +13,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::Feedback,
     generators::NautilusContext,
-    inputs::NautilusInput,
+    inputs::{NautilusInput, UsesInput},
     observers::ObserversTuple,
     state::{HasCorpus, State},
     Error, HasMetadata,
@@ -75,7 +75,10 @@ impl<'a, S> NautilusFeedback<'a, S> {
         &mut self,
         state: &mut S,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        S: UsesInput + HasCorpus<Input = NautilusInput> + HasMetadata,
+    {
         state.corpus().load_input_into(testcase)?;
         let input = testcase.input().as_ref().unwrap().clone();
         let meta = state
