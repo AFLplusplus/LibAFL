@@ -35,14 +35,14 @@ pub use drivers::*;
 mod snapshot;
 pub use snapshot::*;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub use systemmode::*;
 
 #[derive(Clone, Copy)]

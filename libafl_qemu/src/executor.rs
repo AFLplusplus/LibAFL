@@ -4,7 +4,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use std::ptr;
 
 #[cfg(feature = "fork")]
@@ -31,16 +31,16 @@ use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
     tuples::RefIndexable,
 };
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use libafl_qemu_sys::libafl_qemu_handle_crash;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use libafl_qemu_sys::qemu_system_debug_request;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use libafl_qemu_sys::siginfo_t;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use libc::siginfo_t;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use crate::EmulatorModules;
 use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator};
 
@@ -55,7 +55,7 @@ where
     inner: StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>>,
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub unsafe fn inproc_qemu_crash_handler(
     signal: Signal,
     info: &mut siginfo_t,
@@ -69,10 +69,10 @@ pub unsafe fn inproc_qemu_crash_handler(
     libafl_qemu_handle_crash(signal as i32, ptr::from_mut::<siginfo_t>(info), puc);
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub(crate) static mut BREAK_ON_TMOUT: bool = false;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     signal: Signal,
     info: &mut siginfo_t,
@@ -136,7 +136,7 @@ where
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
         )?;
 
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         {
             inner.inprocess_hooks_mut().crash_handler = inproc_qemu_crash_handler as *const c_void;
 
@@ -156,7 +156,7 @@ where
                 .crash_closure(Box::new(handler));
         }
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
                 StatefulInProcessExecutor<'a, H, OT, S, Emulator<CM, ED, ET, S, SM>>,
@@ -173,7 +173,7 @@ where
         &self.inner
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     pub fn break_on_timeout(&mut self) {
         unsafe {
             BREAK_ON_TMOUT = true;

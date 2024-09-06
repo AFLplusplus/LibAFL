@@ -56,7 +56,7 @@ pub mod command;
 pub mod sync_exit;
 
 pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
 
 #[must_use]
@@ -102,7 +102,7 @@ pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_class::<sys::MapInfo>()?;
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     m.add_class::<GuestMaps>()?;
 
     m.add_class::<SyscallHookResult>()?;

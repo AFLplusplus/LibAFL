@@ -3,7 +3,7 @@ use std::{cell::UnsafeCell, cmp::max};
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, HasMetadata};
 use libafl_qemu_sys::GuestAddr;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 pub use libafl_targets::{
     edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX,
@@ -11,7 +11,7 @@ pub use libafl_targets::{
 };
 use serde::{Deserialize, Serialize};
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use crate::modules::QemuInstrumentationPagingFilter;
 use crate::{
     emu::EmulatorModules,
@@ -44,14 +44,14 @@ impl QemuEdgesMapMetadata {
 
 libafl_bolts::impl_serdeany!(QemuEdgesMapMetadata);
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 #[derive(Debug)]
 pub struct EdgeCoverageModule {
     address_filter: QemuInstrumentationAddressRangeFilter,
     use_hitcounts: bool,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Debug)]
 pub struct EdgeCoverageModule {
     address_filter: QemuInstrumentationAddressRangeFilter,
@@ -59,7 +59,7 @@ pub struct EdgeCoverageModule {
     use_hitcounts: bool,
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl EdgeCoverageModule {
     #[must_use]
     pub fn new(address_filter: QemuInstrumentationAddressRangeFilter) -> Self {
@@ -83,7 +83,7 @@ impl EdgeCoverageModule {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl EdgeCoverageModule {
     #[must_use]
     pub fn new(
@@ -115,14 +115,14 @@ impl EdgeCoverageModule {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl Default for EdgeCoverageModule {
     fn default() -> Self {
         Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Default for EdgeCoverageModule {
     fn default() -> Self {
         Self::new(
@@ -142,7 +142,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for EdgeCov
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for EdgeCoverageModule {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
@@ -193,14 +193,14 @@ where
 
 pub type CollidingEdgeCoverageModule = EdgeCoverageChildModule;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 #[derive(Debug)]
 pub struct EdgeCoverageChildModule {
     address_filter: QemuInstrumentationAddressRangeFilter,
     use_hitcounts: bool,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Debug)]
 pub struct EdgeCoverageChildModule {
     address_filter: QemuInstrumentationAddressRangeFilter,
@@ -208,7 +208,7 @@ pub struct EdgeCoverageChildModule {
     use_hitcounts: bool,
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl EdgeCoverageChildModule {
     #[must_use]
     pub fn new(address_filter: QemuInstrumentationAddressRangeFilter) -> Self {
@@ -232,7 +232,7 @@ impl EdgeCoverageChildModule {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl EdgeCoverageChildModule {
     #[must_use]
     pub fn new(
@@ -264,14 +264,14 @@ impl EdgeCoverageChildModule {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl Default for EdgeCoverageChildModule {
     fn default() -> Self {
         Self::new(QemuInstrumentationAddressRangeFilter::None)
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Default for EdgeCoverageChildModule {
     fn default() -> Self {
         Self::new(
@@ -291,7 +291,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for EdgeCov
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for EdgeCoverageChildModule {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
@@ -326,7 +326,7 @@ where
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 #[derive(Debug)]
 pub struct EdgeCoverageClassicModule {
     address_filter: QemuInstrumentationAddressRangeFilter,
@@ -334,7 +334,7 @@ pub struct EdgeCoverageClassicModule {
     use_jit: bool,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Debug)]
 pub struct EdgeCoverageClassicModule {
     address_filter: QemuInstrumentationAddressRangeFilter,
@@ -343,7 +343,7 @@ pub struct EdgeCoverageClassicModule {
     use_jit: bool,
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl EdgeCoverageClassicModule {
     #[must_use]
     pub fn new(address_filter: QemuInstrumentationAddressRangeFilter, use_jit: bool) -> Self {
@@ -372,7 +372,7 @@ impl EdgeCoverageClassicModule {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl EdgeCoverageClassicModule {
     #[must_use]
     pub fn new(
@@ -408,14 +408,14 @@ impl EdgeCoverageClassicModule {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl Default for EdgeCoverageClassicModule {
     fn default() -> Self {
         Self::new(QemuInstrumentationAddressRangeFilter::None, false)
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Default for EdgeCoverageClassicModule {
     fn default() -> Self {
         Self::new(
@@ -436,7 +436,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for EdgeCov
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for EdgeCoverageClassicModule {
     fn filter(&self) -> &QemuInstrumentationPagingFilter {
         &self.paging_filter
@@ -517,14 +517,14 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     if let Some(h) = emulator_modules.get::<EdgeCoverageModule>() {
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         {
             if !h.must_instrument(src) && !h.must_instrument(dest) {
                 return None;
             }
         }
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             let paging_id = emulator_modules
                 .qemu()
@@ -585,12 +585,12 @@ where
     S: Unpin + UsesInput,
 {
     if let Some(h) = emulator_modules.get::<EdgeCoverageChildModule>() {
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             let paging_id = emulator_modules
                 .qemu()
@@ -631,13 +631,13 @@ where
     ET: EmulatorModuleTuple<S>,
 {
     if let Some(h) = emulator_modules.get::<EdgeCoverageClassicModule>() {
-        #[cfg(emulation_mode = "usermode")]
+        #[cfg(feature = "usermode")]
         {
             if !h.must_instrument(pc) {
                 return None;
             }
         }
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             let paging_id = emulator_modules
                 .qemu()

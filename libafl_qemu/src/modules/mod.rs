@@ -8,14 +8,14 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
 use crate::Qemu;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub use systemmode::*;
 
 pub mod edges;

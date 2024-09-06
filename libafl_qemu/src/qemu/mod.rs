@@ -16,7 +16,7 @@ use std::{
 };
 
 use libafl_bolts::os::unix_signals::Signal;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use libafl_qemu_sys::{guest_base, VerifyAccess};
 use libafl_qemu_sys::{
     libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
@@ -34,14 +34,14 @@ use crate::{GuestAddrKind, GuestReg, Regs};
 pub mod config;
 use config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[allow(unused_imports)]
 pub use systemmode::*;
 
@@ -312,19 +312,19 @@ impl CPU {
         }
     }
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
         unsafe { (addr as usize + guest_base) as *mut T }
     }
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     #[must_use]
     pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
         unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     #[must_use]
     pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
         unsafe {
@@ -544,7 +544,7 @@ impl Qemu {
             libafl_qemu_init(argc, argv.as_ptr() as *mut *mut i8);
         }
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         unsafe {
             libc::atexit(qemu_cleanup_atexit);
             libafl_qemu_sys::syx_snapshot_init(true);
@@ -925,12 +925,12 @@ impl QemuMemoryChunk {
 
         match self.addr {
             GuestAddrKind::Physical(hwaddr) => unsafe {
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 {
                     // For now the default behaviour is to fall back to virtual addresses
                     qemu.write_mem(hwaddr.try_into().unwrap(), input_sliced);
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 {
                     qemu.write_phys_mem(hwaddr, input_sliced);
                 }
