@@ -624,7 +624,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error>
     where
-        S: HasExecutions
+        S: HasExecutions,
     {
         *state.executions_mut() += 1;
 

@@ -10,7 +10,14 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Testcase, events::EventFirer, executors::ExitKind, feedbacks::Feedback, inputs::UsesInput, observers::{ObserversTuple, StdErrObserver, StdOutObserver}, state::State, Error, HasMetadata
+    corpus::Testcase,
+    events::EventFirer,
+    executors::ExitKind,
+    feedbacks::Feedback,
+    inputs::UsesInput,
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
+    state::State,
+    Error, HasMetadata,
 };
 
 /// Metadata for [`StdOutToMetadataFeedback`].

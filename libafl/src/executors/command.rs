@@ -219,7 +219,7 @@ where
         &mut self,
         state: &mut S,
         input: &<S as UsesInput>::Input,
-    ) -> Result<ExitKind, Error>{
+    ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
