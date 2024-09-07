@@ -264,7 +264,7 @@ where
 
             if bitmap_size < 1 {
                 return Err(Error::invalid_corpus(
-                    "This testcase doesnot trigger trigger any edges. Check your instrumentation!"
+                    "This testcase does not trigger any edges. Check your instrumentation!"
                         .to_string(),
                 ));
             }
