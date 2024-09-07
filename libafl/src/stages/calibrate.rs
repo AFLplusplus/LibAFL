@@ -260,7 +260,7 @@ where
             let observers = executor.observers();
             let map = observers[&self.map_observer_handle].as_ref();
 
-            let mut bitmap_size = map.count_bytes();
+            let bitmap_size = map.count_bytes();
 
             if bitmap_size < 1 {
                 return Err(Error::invalid_corpus(
