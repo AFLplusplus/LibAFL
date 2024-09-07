@@ -269,7 +269,6 @@ where
                 ));
             }
 
-            bitmap_size = bitmap_size.max(1); // just don't make it 0 because we take log2 of it later.
             let psmeta = state
                 .metadata_map_mut()
                 .get_mut::<SchedulerMetadata>()
