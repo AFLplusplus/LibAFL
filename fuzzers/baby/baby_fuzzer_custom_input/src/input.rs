@@ -6,7 +6,7 @@ use std::{
 use libafl::{
     corpus::CorpusId,
     generators::Generator,
-    inputs::Input,
+    inputs::{Input, MutVecInput},
     prelude::{MutationResult, Mutator},
     state::HasRand,
     Error, SerdeAny,
@@ -24,6 +24,7 @@ use serde::{Deserialize, Serialize};
 pub struct CustomInput {
     pub byte_array: Vec<u8>,
     pub optional_byte_array: Option<Vec<u8>>,
+    pub byte_array_custom_mapper: Vec<u8>,
     pub boolean: bool,
 }
 
@@ -56,6 +57,14 @@ impl CustomInput {
     pub fn optional_byte_array_optional(&self) -> Option<&[u8]> {
         self.optional_byte_array.as_deref()
     }
+
+    pub fn byte_array_custom_mapper(&mut self) -> MutVecInput<'_> {
+        MutVecInput::from(&mut self.byte_array_custom_mapper)
+    }
+
+    pub fn byte_array_custom_mapper_corpus_extractor(&self) -> Option<&[u8]> {
+        Some(&self.byte_array_custom_mapper)
+    }
 }
 
 /// A generator for [`CustomInput`] used in this example
@@ -80,11 +89,13 @@ where
             .rand_mut()
             .coinflip(0.5)
             .then(|| generate_bytes(self.max_len, state));
+        let byte_array_custom_mapper = generate_bytes(self.max_len, state);
         let boolean = state.rand_mut().coinflip(0.5);
 
         Ok(CustomInput {
             byte_array,
             optional_byte_array,
+            byte_array_custom_mapper,
             boolean,
         })
     }

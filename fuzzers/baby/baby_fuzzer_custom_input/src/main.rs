@@ -18,6 +18,10 @@ use libafl::{
         mapped_havoc_mutations, optional_mapped_havoc_mutations, scheduled::StdScheduledMutator,
     },
     observers::StdMapObserver,
+    prelude::{
+        havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover,
+        ToMutVecFunctionMappingMutatorMapper,
+    },
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -25,7 +29,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    tuples::{tuple_list, Append, Merge},
+    tuples::{tuple_list, Append, Map, Merge},
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -126,6 +130,14 @@ pub fn main() {
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
+    let custom_mapped_mutators = havoc_mutations_no_crossover()
+        .merge(havoc_crossover_with_corpus_mapper(
+            &CustomInput::byte_array_custom_mapper_corpus_extractor,
+        ))
+        .map(ToMutVecFunctionMappingMutatorMapper::new(
+            CustomInput::byte_array_custom_mapper,
+        ));
+
     // Merging multiple lists of mutators that mutate a sub-part of the custom input
     // This collection could be expanded with default or custom mutators as needed for the input
     // First, mutators for the simple byte array
@@ -140,6 +152,7 @@ pub fn main() {
     ))
     // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
     .append(ToggleOptionalByteArrayMutator::new(1))
+    .merge(custom_mapped_mutators)
     // Finally, a custom mutator that toggles the boolean part of the input
     .append(ToggleBooleanMutator);
 

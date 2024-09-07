@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use libafl_bolts::{tuples::MappingFunctor, Named};
 
 use crate::{
-    inputs::MutVecInput,
+    inputs::{HasMutatorBytes, MutVecInput},
     mutators::{MutationResult, Mutator},
     Error,
 };
@@ -166,6 +166,35 @@ impl<M, F> Named for FunctionMappingMutator<M, F> {
     }
 }
 
+#[derive(Debug)]
+pub struct MutVecFunctionMappingMutator<M, F> {
+    mapper: F,
+    inner: M,
+}
+
+impl<M, F> MutVecFunctionMappingMutator<M, F> {
+    /// Creates a new [`OwnedFunctionMappingMutator`]
+    pub fn new(mapper: F, inner: M) -> Self {
+        Self { mapper, inner }
+    }
+}
+
+impl<M, S, F, IO> Mutator<IO, S> for MutVecFunctionMappingMutator<M, F>
+where
+    F: for<'a> FnMut(&'a mut IO) -> MutVecInput<'a>,
+    M: for<'a> Mutator<MutVecInput<'a>, S>,
+{
+    fn mutate(&mut self, state: &mut S, input: &mut IO) -> Result<MutationResult, Error> {
+        self.inner.mutate(state, &mut &mut (self.mapper)(input))
+    }
+}
+
+impl<M, F> Named for MutVecFunctionMappingMutator<M, F> {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("OwnedFunctionMappingMutator")
+    }
+}
+
 /// Mapper to use when mapping a `tuple_list` of [`Mutator`]s defined for a certain input type for (parts of) a custom input type using a [`FunctionMappingMutator`].
 ///
 /// # Example
@@ -224,6 +253,28 @@ where
 
     fn apply(&mut self, from: M) -> Self::Output {
         FunctionMappingMutator::new(self.mapper.clone(), from)
+    }
+}
+#[derive(Debug)]
+pub struct ToMutVecFunctionMappingMutatorMapper<F> {
+    mapper: F,
+}
+
+impl<F> ToMutVecFunctionMappingMutatorMapper<F> {
+    /// Creates a new [`ToOwnedFunctionMappingMutatorMapper`]
+    pub fn new(mapper: F) -> Self {
+        Self { mapper }
+    }
+}
+
+impl<M, F> MappingFunctor<M> for ToMutVecFunctionMappingMutatorMapper<F>
+where
+    F: Clone,
+{
+    type Output = MutVecFunctionMappingMutator<M, F>;
+
+    fn apply(&mut self, from: M) -> Self::Output {
+        MutVecFunctionMappingMutator::new(self.mapper.clone(), from)
     }
 }
 
