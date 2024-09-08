@@ -260,7 +260,7 @@ where
             let observers = executor.observers();
             let map = observers[&self.map_observer_handle].as_ref();
 
-            let mut bitmap_size = map.count_bytes();
+            let bitmap_size = map.count_bytes();
 
             if bitmap_size < 1 {
                 return Err(Error::invalid_corpus(
@@ -269,7 +269,6 @@ where
                 ));
             }
 
-            bitmap_size = bitmap_size.max(1); // just don't make it 0 because we take log2 of it later.
             let psmeta = state
                 .metadata_map_mut()
                 .get_mut::<SchedulerMetadata>()
