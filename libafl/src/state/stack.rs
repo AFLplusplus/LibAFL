@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
-use crate::stages::{HasCurrentStage, HasNestedStageStatus, StageId};
+use crate::stages::{HasCurrentStageId, HasNestedStageStatus, StageId};
 
 /// A stack to keep track of which stage is executing
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -14,8 +14,8 @@ pub struct StageStack {
     stage_depth: usize,
 }
 
-impl HasCurrentStage for StageStack {
-    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error> {
+impl HasCurrentStageId for StageStack {
+    fn set_current_stage_id(&mut self, idx: StageId) -> Result<(), Error> {
         // ensure we are in the right frame
         if self.stage_depth != self.stage_idx_stack.len() {
             return Err(Error::illegal_state(
@@ -26,12 +26,12 @@ impl HasCurrentStage for StageStack {
         Ok(())
     }
 
-    fn clear_stage(&mut self) -> Result<(), Error> {
+    fn clear_stage_id(&mut self) -> Result<(), Error> {
         self.stage_idx_stack.truncate(self.stage_depth);
         Ok(())
     }
 
-    fn current_stage_idx(&self) -> Result<Option<StageId>, Error> {
+    fn current_stage_id(&self) -> Result<Option<StageId>, Error> {
         Ok(self.stage_idx_stack.get(self.stage_depth).copied())
     }
 
