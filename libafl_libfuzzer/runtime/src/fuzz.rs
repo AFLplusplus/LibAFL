@@ -19,7 +19,7 @@ use libafl::{
     executors::ExitKind,
     inputs::UsesInput,
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
-    stages::{HasCurrentStage, StagesTuple},
+    stages::{HasCurrentStageId, StagesTuple},
     state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable, UsesState},
     Error, Fuzzer, HasMetadata,
 };
@@ -68,7 +68,7 @@ where
         + UsesInput
         + HasSolutions
         + HasLastReportTime
-        + HasCurrentStage
+        + HasCurrentStageId
         + Stoppable,
     E: UsesState<State = S>,
     EM: ProgressReporter<State = S> + EventProcessor<E, F>,
