@@ -372,7 +372,7 @@ where
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
-    max_stack_pow: usize,
+    max_stack_pow: NonZeroUsize,
     phantom: PhantomData<(I, S)>,
 }
 

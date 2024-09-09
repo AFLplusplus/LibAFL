@@ -1,7 +1,7 @@
 //! Corpus pruning stage
 
 use alloc::string::ToString;
-use core::marker::PhantomData;
+use core::{marker::PhantomData, num::NonZero};
 
 use libafl_bolts::{rands::Rand, Error};
 
@@ -78,7 +78,7 @@ where
         let mut enabled_to_disabled = vec![];
         // do it backwards so that the index won't change even after remove
         for i in (0..n_all).rev() {
-            let r = state.rand_mut().below(100) as f64;
+            let r = state.rand_mut().below(NonZero::new(100).unwrap()) as f64;
             if self.prob * 100_f64 < r {
                 let idx = state.corpus().nth_from_all(i);
 

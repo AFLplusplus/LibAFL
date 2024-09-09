@@ -245,7 +245,9 @@ where
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
         Ok(
             // fall back to random
-            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
+            1 + state
+                .rand_mut()
+                .below(NonZero::new(DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap()),
         )
     }
 }

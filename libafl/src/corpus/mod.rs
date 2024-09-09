@@ -68,7 +68,7 @@ impl From<CorpusId> for usize {
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
         let cnt = $corpus.count();
-        let nth = $rand.below(cnt);
+        let nth = $rand.below(NonZero::new(cnt).expect("Corpus may not be empty!"));
         $corpus.nth(nth)
     }};
 }
@@ -79,7 +79,7 @@ macro_rules! random_corpus_id {
 macro_rules! random_corpus_id_with_disabled {
     ($corpus:expr, $rand:expr) => {{
         let cnt = $corpus.count_all();
-        let nth = $rand.below(cnt);
+        let nth = $rand.below(NonZero::new(cnt).expect("Corpus should not be empty"));
         $corpus.nth_from_all(nth)
     }};
 }

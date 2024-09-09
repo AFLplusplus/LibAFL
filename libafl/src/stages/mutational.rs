@@ -160,7 +160,7 @@ pub struct StdMutationalStage<E, EM, I, M, Z> {
     /// The mutator(s) to use
     mutator: M,
     /// The maximum amount of iterations we should do each round
-    max_iterations: usize,
+    max_iterations: NonZeroUsize,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, Z)>,
 }
@@ -255,11 +255,14 @@ where
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
-        Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
+        Self::transforming_with_max_iterations(
+            mutator,
+            NonZero::new(DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap(),
+        )
     }
 
     /// Creates a new mutational stage with the given max iterations
-    pub fn with_max_iterations(mutator: M, max_iterations: usize) -> Self {
+    pub fn with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
         Self::transforming_with_max_iterations(mutator, max_iterations)
     }
 }
@@ -278,7 +281,7 @@ where
     }
 
     /// Creates a new transforming mutational stage with the given max iterations
-    pub fn transforming_with_max_iterations(mutator: M, max_iterations: usize) -> Self {
+    pub fn transforming_with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
         let stage_id = unsafe {
             let ret = MUTATIONAL_STAGE_ID;

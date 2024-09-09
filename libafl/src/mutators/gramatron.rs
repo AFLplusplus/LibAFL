@@ -4,6 +4,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::cmp::max;
 
+use crossterm::terminal;
 use hashbrown::HashMap;
 use libafl_bolts::{
     rands::{choose, Rand},
@@ -42,7 +43,9 @@ where
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
         if !input.terminals().is_empty() {
-            let size = state.rand_mut().below(input.terminals().len() + 1);
+            let size = state
+                .rand_mut()
+                .below(NonZero::new(input.terminals().len() + 1).unwrap());
             input.terminals_mut().truncate(size);
         }
         if self.generator.append_generated_terminals(input, state) > 0 {
@@ -114,13 +117,15 @@ where
         state: &mut S,
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
-        if input.terminals().is_empty() {
+        let terminals_len = if let Some(terminals_len) = NonZero::new(input.terminals().len()) {
+            terminals_len
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
 
-        let insert_at = state.rand_mut().below(input.terminals().len());
+        let insert_at = state.rand_mut().below(terminals_len);
 
         let rand_num = state.rand_mut().next();
 
@@ -216,6 +221,12 @@ where
         let chosen = *state.rand_mut().choose(&self.states).unwrap();
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
+        let non_zero_chosen_nums = if let Some(non_zero_chose_nums) = NonZero::new(chosen_nums) {
+            non_zero_chose_nums
+        } else {
+            return Ok(MutationResult::Skipped);
+        };
+
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut first = state.rand_mut().below(chosen_nums - 1) as i64;
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
@@ -249,7 +260,10 @@ where
 
         input.terminals_mut().truncate(idx_1);
 
-        for _ in 0..state.rand_mut().below(RECUR_THRESHOLD) {
+        for _ in 0..state
+            .rand_mut()
+            .below(NonZero::new(RECUR_THRESHOLD).unwrap())
+        {
             input.terminals_mut().extend_from_slice(&self.feature);
         }
 

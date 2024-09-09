@@ -25,6 +25,7 @@ Original code by @eqv, see <https://github.com/eqv/loaded_dice>
 use alloc::vec::Vec;
 
 use super::Rand;
+use crate::Error;
 
 /// Helper struct for [`LoadedDiceSampler`]
 #[derive(Clone, Debug, PartialEq)]
@@ -54,14 +55,23 @@ pub struct LoadedDiceSampler {
 impl LoadedDiceSampler {
     /// Create a new [`LoadedDiceSampler`] with the given probabilities
     #[must_use]
-    pub fn new(probs: &[f64]) -> Self {
+    pub fn new(probs: &[f64]) -> Result<Self, Error> {
+        if probs.is_empty() {
+            return Err(Error::illegal_argument(
+                "Tried to construct LoadedDiceSampler with empty probs array",
+            ));
+        }
         let entries = LoadedDiceSampler::construct_table(probs);
-        Self { entries }
+        Ok(Self { entries })
     }
 
     /// Get one sample according to the predefined probabilities.
     pub fn sample<R: Rand>(&mut self, rand: &mut R) -> usize {
-        let index = rand.below(self.entries.len());
+        let len = self.entries.len();
+        debug_assert_ne!(len, 0, "Lenght should never be 0 here.");
+        // # SAFETY
+        // len can never be 0 here.
+        let index = rand.below(unsafe { len.try_into().unwrap_unchecked() });
         let coin = rand.next_float();
         let entry = &self.entries[index];
         if coin > entry.prob_of_val {

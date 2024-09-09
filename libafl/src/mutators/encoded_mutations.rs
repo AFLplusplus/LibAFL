@@ -209,10 +209,10 @@ where
             }
         }
 
-        let from = if size == len {
-            0
-        } else {
+        let from = if let Some(bound) = NonZero::new(size - len) {
             state.rand_mut().below(size - len)
+        } else {
+            0
         };
 
         input.codes_mut().resize(size + len, 0);
@@ -250,9 +250,11 @@ pub struct EncodedCopyMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
-        if size <= 1 {
+        let size = if let Some(size) = NonZero::new(size) {
+            size
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let from = state.rand_mut().below(size);
         let to = state.rand_mut().below(size);
@@ -300,6 +302,12 @@ where
             }
         }
 
+        let non_zero_size = if let Some(size) = size {
+            size
+        } else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.codes().len()
@@ -309,9 +317,15 @@ where
             return Ok(MutationResult::Skipped);
         }
 
+        let non_zero_other_size = if let Some(other_size) = NonZero::new(other_size) {
+            other_size
+        } else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let max_size = state.max_size();
-        let from = state.rand_mut().below(other_size);
-        let to = state.rand_mut().below(size);
+        let from = state.rand_mut().below(non_zero_other_size);
+        let to = state.rand_mut().below(non_zero_size);
         let mut len = 1 + state.rand_mut().below(other_size - from);
 
         if size + len > max_size {
@@ -361,9 +375,6 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
-        if size == 0 {
-            return Ok(MutationResult::Skipped);
-        }
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
@@ -373,8 +384,13 @@ where
             }
         }
 
+        let non_zero_size = if let Some(size) = size {
+            size
+        } else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let other_size = {
-            // new scope to make the borrow checker happy
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.codes().len()
         };
@@ -383,9 +399,26 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let from = state.rand_mut().below(other_size);
-        let len = state.rand_mut().below(min(other_size - from, size));
-        let to = state.rand_mut().below(size - len);
+        let non_zero_other_size = if let Some(other_size) = NonZero::new(other_size) {
+            other_size
+        } else {
+            return Ok(MutationResult::Skipped);
+        };
+
+        let from = state.rand_mut().below(non_zero_other_size);
+
+        let non_zero_max_len =
+            if let Some(non_zero_max_len) = NonZero::new(min(other_size - from, size)) {
+                non_zero_max_len
+            } else {
+                return Ok(MutationResult::Skipped);
+            };
+
+        let len = state.rand_mut().below(non_zero_max_len);
+        let to = state.rand_mut().below(
+            NonZero::new(size - len)
+                .expect("Zero value for `to` field in EncodedCorssoverReplaceMutator."),
+        );
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.

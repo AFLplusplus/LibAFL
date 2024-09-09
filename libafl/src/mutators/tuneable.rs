@@ -88,7 +88,7 @@ where
 {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: usize,
+    max_stack_pow: NonZeroUsize,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -181,7 +181,6 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(self.mutations.len() != 0);
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
 
@@ -224,7 +223,10 @@ where
         }
 
         // fall back to random if no entries in either vec, the scheduling is not tuned.
-        state.rand_mut().below(self.mutations.len()).into()
+        state
+            .rand_mut()
+            .below(NonZero::new(self.mutations.len()).expect("No mutations provided!"))
+            .into()
     }
 }
 
@@ -241,7 +243,7 @@ where
         TuneableScheduledMutator {
             name: Cow::from(format!("TuneableMutator[{}]", mutations.names().join(", "))),
             mutations,
-            max_stack_pow: 7,
+            max_stack_pow: NonZero::new(7).unwrap(),
             phantom: PhantomData,
         }
     }

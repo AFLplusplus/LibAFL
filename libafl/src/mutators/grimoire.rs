@@ -246,10 +246,11 @@ where
         let tokens_len = {
             let meta = state.metadata_map().get::<Tokens>();
             if let Some(tokens) = meta {
-                if tokens.is_empty() {
+                if let Some(tokens_len) = NonZero::new(tokens.tokens().len()) {
+                    tokens_len
+                } else {
                     return Ok(MutationResult::Skipped);
                 }
-                tokens.tokens().len()
             } else {
                 return Ok(MutationResult::Skipped);
             }
@@ -363,8 +364,17 @@ where
         {
             self.gap_indices.push(i);
         }
-        let min_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
-        let max_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
+
+        let gap_indeces_len = if let Some(gap_indices_len) = NonZero::new(self.gap_indices.len()) {
+            gap_indices_len
+        } else {
+            return Err(Error::illegal_state(
+                "Gap indices may not be empty in grimoire mutator!",
+            ));
+        };
+
+        let min_idx = self.gap_indices[state.rand_mut().below(gap_indeces_len)];
+        let max_idx = self.gap_indices[state.rand_mut().below(gap_indeces_len)];
 
         let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 

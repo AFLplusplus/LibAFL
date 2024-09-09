@@ -2,7 +2,11 @@
 
 #[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
 use core::sync::atomic::{AtomicUsize, Ordering};
-use core::{debug_assert, fmt::Debug};
+use core::{
+    debug_assert,
+    fmt::Debug,
+    num::{NonZero, NonZeroUsize},
+};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -70,12 +74,14 @@ where
     // create iterator
     let mut iter = from.into_iter();
 
-    if iter.len() == 0 {
+    let len = if let Some(len) = NonZero::new(iter.len()) {
+        len
+    } else {
         return None;
-    }
+    };
 
     // pick a random, valid index
-    let index = fast_bound(rand, iter.len());
+    let index = fast_bound(rand, len);
 
     // return the item chosen
     Some(iter.nth(index).unwrap())
@@ -89,9 +95,8 @@ where
 /// See: [An optimal algorithm for bounded random integers](https://github.com/apple/swift/pull/39143).
 #[inline]
 #[must_use]
-pub fn fast_bound(rand: u64, n: usize) -> usize {
-    debug_assert_ne!(n, 0);
-    let mul = u128::from(rand).wrapping_mul(u128::from(n as u64));
+fn fast_bound(rand: u64, n: NonZeroUsize) -> usize {
+    let mul = u128::from(rand).wrapping_mul(u128::from(u64::try_from(usize::from(n)).unwrap()));
     (mul >> 64) as usize
 }
 
@@ -125,7 +130,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
 
     /// Gets a value below the given bound (exclusive)
     #[inline]
-    fn below(&mut self, upper_bound_excl: usize) -> usize {
+    fn below(&mut self, upper_bound_excl: NonZeroUsize) -> usize {
         fast_bound(self.next(), upper_bound_excl)
     }
 
@@ -133,7 +138,8 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     #[inline]
     fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
-        lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
+        lower_bound_incl
+            + self.below(NonZero::new(upper_bound_incl - lower_bound_incl + 1).unwrap())
     }
 
     /// Convenient variant of [`choose`].
@@ -158,17 +164,17 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         // when the Iterator is an ExactSizeIterator. This has a large performance impact on e.g.
         // seq_iter_choose_from_1000.
         if upper == Some(lower) {
-            return if lower == 0 {
-                None
-            } else {
+            return if let Some(lower) = NonZero::new(lower) {
                 iter.nth(self.below(lower))
+            } else {
+                None
             };
         }
 
         // Continue until the iterator is exhausted
         loop {
             if lower > 1 {
-                let ix = self.below(lower + consumed);
+                let ix = self.below(NonZero::new(lower + consumed).unwrap());
                 let skip = if ix < lower {
                     result = iter.nth(ix);
                     lower - (ix + 1)
@@ -188,7 +194,9 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
                     return result;
                 }
                 consumed += 1;
-                if self.below(consumed) == 0 {
+                // # SAFETY
+                // `consumed` can never be 0 here. We just increased it by 1 above.
+                if self.below(unsafe { NonZero::new(consumed).unwrap_unchecked() }) == 0 {
                     result = elem;
                 }
             }
