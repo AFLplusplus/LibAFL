@@ -13,15 +13,17 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
+    inputs::MutVecInput,
     monitors::SimpleMonitor,
     mutators::{
-        mapped_havoc_mutations, optional_mapped_havoc_mutations, scheduled::StdScheduledMutator,
+        havoc_mutations::{
+            havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover,
+            mapped_havoc_mutations, optional_mapped_havoc_mutations,
+        },
+        mapping::ToWrapsReferenceFunctionMappingMutatorMapper,
+        scheduled::StdScheduledMutator,
     },
     observers::StdMapObserver,
-    prelude::{
-        havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover,
-        ToMutVecFunctionMappingMutatorMapper,
-    },
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -132,11 +134,12 @@ pub fn main() {
 
     let custom_mapped_mutators = havoc_mutations_no_crossover()
         .merge(havoc_crossover_with_corpus_mapper(
-            &CustomInput::byte_array_custom_mapper_corpus_extractor,
+            &CustomInput::byte_array_mutvec_mapper_corpus_extractor,
         ))
-        .map(ToMutVecFunctionMappingMutatorMapper::new(
-            CustomInput::byte_array_custom_mapper,
-        ));
+        .map(ToWrapsReferenceFunctionMappingMutatorMapper::<
+            _,
+            MutVecInput<'_>,
+        >::new(CustomInput::byte_array_mutvec_mapper));
 
     // Merging multiple lists of mutators that mutate a sub-part of the custom input
     // This collection could be expanded with default or custom mutators as needed for the input

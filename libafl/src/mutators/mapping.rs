@@ -1,10 +1,12 @@
 //! Allowing mixing and matching between [`Mutator`] and [`crate::inputs::Input`] types.
+use core::marker::PhantomData;
+
 use alloc::{borrow::Cow, vec::Vec};
 
 use libafl_bolts::{tuples::MappingFunctor, Named};
 
 use crate::{
-    inputs::{HasMutatorBytes, MutVecInput},
+    inputs::{MutVecInput, WrapsReference},
     mutators::{MutationResult, Mutator},
     Error,
 };
@@ -167,31 +169,38 @@ impl<M, F> Named for FunctionMappingMutator<M, F> {
 }
 
 #[derive(Debug)]
-pub struct MutVecFunctionMappingMutator<M, F> {
+pub struct WrapsReferenceFunctionMappingMutator<M, F, II> {
     mapper: F,
     inner: M,
+    phantom: PhantomData<II>,
 }
 
-impl<M, F> MutVecFunctionMappingMutator<M, F> {
-    /// Creates a new [`OwnedFunctionMappingMutator`]
+impl<M, F, II> WrapsReferenceFunctionMappingMutator<M, F, II> {
+    /// Creates a new [`WrapsReferenceFunctionMappingMutator`]
     pub fn new(mapper: F, inner: M) -> Self {
-        Self { mapper, inner }
+        Self {
+            mapper,
+            inner,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<M, S, F, IO> Mutator<IO, S> for MutVecFunctionMappingMutator<M, F>
+impl<M, S, F, IO, II> Mutator<IO, S> for WrapsReferenceFunctionMappingMutator<M, F, II>
 where
-    F: for<'a> FnMut(&'a mut IO) -> MutVecInput<'a>,
-    M: for<'a> Mutator<MutVecInput<'a>, S>,
+    for<'a> M: Mutator<II::Type<'a>, S>,
+    for<'a> II: WrapsReference + 'a,
+    F: for<'a> FnMut(&'a mut IO) -> II::Type<'a>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut IO) -> Result<MutationResult, Error> {
-        self.inner.mutate(state, &mut &mut (self.mapper)(input))
+        let mapped = &mut (self.mapper)(input);
+        self.inner.mutate(state, mapped)
     }
 }
 
-impl<M, F> Named for MutVecFunctionMappingMutator<M, F> {
+impl<M, F, II> Named for WrapsReferenceFunctionMappingMutator<M, F, II> {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("OwnedFunctionMappingMutator")
+        &Cow::Borrowed("WrapsReferenceFunctionMappingMutator")
     }
 }
 
@@ -255,26 +264,31 @@ where
         FunctionMappingMutator::new(self.mapper.clone(), from)
     }
 }
+
 #[derive(Debug)]
-pub struct ToMutVecFunctionMappingMutatorMapper<F> {
+pub struct ToWrapsReferenceFunctionMappingMutatorMapper<F, II> {
     mapper: F,
+    phantom: PhantomData<II>,
 }
 
-impl<F> ToMutVecFunctionMappingMutatorMapper<F> {
-    /// Creates a new [`ToOwnedFunctionMappingMutatorMapper`]
+impl<F, II> ToWrapsReferenceFunctionMappingMutatorMapper<F, II> {
+    /// Creates a new [`ToWrapsReferenceFunctionMappingMutatorMapper`]
     pub fn new(mapper: F) -> Self {
-        Self { mapper }
+        Self {
+            mapper,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<M, F> MappingFunctor<M> for ToMutVecFunctionMappingMutatorMapper<F>
+impl<M, F, II> MappingFunctor<M> for ToWrapsReferenceFunctionMappingMutatorMapper<F, II>
 where
     F: Clone,
 {
-    type Output = MutVecFunctionMappingMutator<M, F>;
+    type Output = WrapsReferenceFunctionMappingMutator<M, F, II>;
 
     fn apply(&mut self, from: M) -> Self::Output {
-        MutVecFunctionMappingMutator::new(self.mapper.clone(), from)
+        WrapsReferenceFunctionMappingMutator::new(self.mapper.clone(), from)
     }
 }
 

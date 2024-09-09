@@ -195,6 +195,12 @@ pub trait HasMutatorBytes: HasLen {
     }
 }
 
+pub trait WrapsReference {
+    type Type<'a>
+    where
+        Self: 'a;
+}
+
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
 #[derive(Debug)]
 pub struct MutVecInput<'a>(&'a mut Vec<u8>);
@@ -242,6 +248,10 @@ impl<'a> HasMutatorBytes for MutVecInput<'a> {
     {
         self.0.drain(range)
     }
+}
+
+impl<'a> WrapsReference for MutVecInput<'a> {
+    type Type<'b> = MutVecInput<'b> where Self: 'b;
 }
 
 /// Defines the input type shared across traits of the type.

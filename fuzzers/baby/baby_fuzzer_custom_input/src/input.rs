@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 pub struct CustomInput {
     pub byte_array: Vec<u8>,
     pub optional_byte_array: Option<Vec<u8>>,
-    pub byte_array_custom_mapper: Vec<u8>,
+    pub byte_array_mutvec_mapper: Vec<u8>,
     pub boolean: bool,
 }
 
@@ -58,12 +58,13 @@ impl CustomInput {
         self.optional_byte_array.as_deref()
     }
 
-    pub fn byte_array_custom_mapper(&mut self) -> MutVecInput<'_> {
-        MutVecInput::from(&mut self.byte_array_custom_mapper)
+    pub fn byte_array_mutvec_mapper(&mut self) -> MutVecInput<'_> {
+        MutVecInput::from(&mut self.byte_array_mutvec_mapper)
     }
 
-    pub fn byte_array_custom_mapper_corpus_extractor(&self) -> Option<&[u8]> {
-        Some(&self.byte_array_custom_mapper)
+    // TODO: Comment
+    pub fn byte_array_mutvec_mapper_corpus_extractor(&self) -> Option<&[u8]> {
+        Some(&self.byte_array_mutvec_mapper)
     }
 }
 
@@ -89,13 +90,13 @@ where
             .rand_mut()
             .coinflip(0.5)
             .then(|| generate_bytes(self.max_len, state));
-        let byte_array_custom_mapper = generate_bytes(self.max_len, state);
+        let byte_array_mutvec_mapper = generate_bytes(self.max_len, state);
         let boolean = state.rand_mut().coinflip(0.5);
 
         Ok(CustomInput {
             byte_array,
             optional_byte_array,
-            byte_array_custom_mapper,
+            byte_array_mutvec_mapper,
             boolean,
         })
     }
