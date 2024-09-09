@@ -388,8 +388,9 @@ impl AsanRuntime {
                 end = range_end;
                 return false;
             }
-            if address < start { //if the address is less than the start then we cannot find it
-                return false
+            if address < start {
+                //if the address is less than the start then we cannot find it
+                return false;
             }
             true
         });
@@ -413,19 +414,16 @@ impl AsanRuntime {
         let stack_address = addr_of_mut!(stack_var) as usize;
         // let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
-        
+
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
         }
 
         let range = Self::range_for_address(stack_address);
 
-        if range.0 == 0 {
-            panic!("Couldn't find stack mapping!");
-        }
-    
-        (range.1 - 1024*1024, range.1)
-        
+        assert!(!(range.0 == 0), "Couldn't find stack mapping!");
+
+        (range.1 - 1024 * 1024, range.1)
     }
 
     /// Determine the tls start, end for the currently running thread
@@ -572,8 +570,8 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
                         //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
-                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator. 
-                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){ 
+                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
+                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
                             ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
                             ASAN_IN_HOOK.set(false);
@@ -612,7 +610,7 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
                         //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
-                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator. 
+                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
                         if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
                             ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);

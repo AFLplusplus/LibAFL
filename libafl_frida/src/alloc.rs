@@ -479,8 +479,7 @@ impl Allocator {
         //4. The aligned check is where the address and the size is 8 byte aligned. Use check_shadow_aligned to check it
         //5. The post-alignment is the same as pre-alignment except it is the qword following the aligned portion. Use a specialized check to ensure that [end & ~7, end) is valid.
 
-        if size == 0
-        {
+        if size == 0 {
             return true;
         }
 
@@ -489,7 +488,7 @@ impl Allocator {
             return true;
         }
 
-      //  log::trace!("Check shadow for region: {:#x}-{:#x}", address as usize, address as usize + size);
+        //  log::trace!("Check shadow for region: {:#x}-{:#x}", address as usize, address as usize + size);
 
         //fast path. most buffers are likely 8 byte aligned in size and address
         if (address as usize).trailing_zeros() >= 3 && size.trailing_zeros() >= 3 {
@@ -573,10 +572,9 @@ impl Allocator {
                 if start >= self.shadow_offset {
                     log::trace!("Reached the shadow/allocator region - stopping");
                     return false;
-                } else {
-                    log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
-                    self.map_shadow_for_region(start, end, true);
                 }
+                log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
+                self.map_shadow_for_region(start, end, true);
                 true
             },
         );
