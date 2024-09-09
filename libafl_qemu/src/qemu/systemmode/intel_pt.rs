@@ -15,8 +15,9 @@ use std::{
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
 use libafl::Error;
-use libipt::{block::BlockDecoder, ConfigBuilder, Cpu, Image};
+use libipt::{block::BlockDecoder, Asid, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
+use object::read::macho::address_to_file_offset;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
@@ -158,7 +159,39 @@ impl IntelPT {
         }
     }
 
-    pub fn decode(&mut self, image: &mut Image, copy_buffer: Option<&mut Vec<u8>>) -> Vec<u64> {
+    pub fn decode_with_image(
+        &mut self,
+        image: &mut Image,
+        copy_buffer: Option<&mut Vec<u8>>,
+    ) -> Vec<u64> {
+        self.decode(
+            None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
+            Some(image),
+            copy_buffer,
+        )
+    }
+
+    pub fn decode_with_callback<F: Fn(&mut [u8], u64)>(
+        &mut self,
+        read_memory: F,
+        copy_buffer: Option<&mut Vec<u8>>,
+    ) -> Vec<u64> {
+        self.decode(
+            Some(|buff: &mut [u8], addr: u64, _: Asid| {
+                read_memory(buff, addr);
+                buff.len() as i32
+            }),
+            None,
+            copy_buffer,
+        )
+    }
+
+    fn decode<F: Fn(&mut [u8], u64, Asid) -> i32>(
+        &mut self,
+        read_memory: Option<F>,
+        image: Option<&mut Image>,
+        copy_buffer: Option<&mut Vec<u8>>,
+    ) -> Vec<u64> {
         let mut ips = Vec::new();
 
         let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
@@ -178,7 +211,7 @@ impl IntelPT {
         smp_rmb(); // TODO double check impl
 
         // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;??
-        // apparently the rust library doesn't have the context parameter for the set_callback
+        // apparently the rust library doesn't have the context parameter for the image.set_callback
         // also, under the hood looks like it is passing the callback itself as context to the C fn 🤔
         // TODO remove unwrap()
         let mut config =
@@ -187,7 +220,16 @@ impl IntelPT {
             config.cpu(cpu);
         }
         let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
-        decoder.set_image(Some(image)).expect("Failed to set image");
+        if let Some(i) = image {
+            decoder.set_image(Some(i)).expect("Failed to set image");
+        }
+        if let Some(rm) = read_memory {
+            decoder
+                .image()
+                .unwrap()
+                .set_callback(Some(rm))
+                .expect("Failed to set get memory callback");
+        }
         // TODO rewrite decently
         // TODO consider dropping libipt-rs and using sys, or bindgen ourselves
         let mut status;
@@ -571,8 +613,9 @@ mod test {
                 }
             }
         }
+
         let mut trace = Vec::new();
-        let mut ips = pt.decode(&mut image, Some(&mut trace));
+        let mut ips = pt.decode_with_image(&mut image, Some(&mut trace));
         let _ = dump_trace_to_file(&trace)
             .inspect_err(|e| println!("Failed to dump trace to file: {e}"));
         // remove kernel ips
@@ -582,7 +625,7 @@ mod test {
             .collect();
         ips.sort();
         ips.dedup();
-        println!("Intel PT traces unique non kernel block ips: {:#x?}", ips);
+        println!("Intel PT traces unique block ips: {:#x?}", ips);
         // TODO: it seems like some userspace traces are not decoded
         // probably because of smth like this in the traces:
         // PSB

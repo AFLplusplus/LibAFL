@@ -2,7 +2,6 @@ use std::{fmt::Debug, fs::OpenOptions, io::Write};
 
 use libafl::{inputs::UsesInput, observers::ObserversTuple, HasMetadata};
 use libafl_qemu_sys::CPUArchStatePtr;
-use libipt::Image;
 
 use crate::{
     modules::{EmulatorModule, EmulatorModuleTuple, ExitKind},
@@ -13,7 +12,6 @@ use crate::{
 //#[derive(Debug)]
 pub struct IntelPTModule {
     pt: Option<IntelPT>,
-    image: Option<Image<'static>>,
 }
 
 impl Debug for IntelPTModule {
@@ -27,10 +25,7 @@ impl Debug for IntelPTModule {
 
 impl IntelPTModule {
     pub fn new() -> Self {
-        Self {
-            pt: None,
-            image: None,
-        }
+        Self { pt: None }
     }
 }
 
@@ -90,17 +85,11 @@ where
     ) where
         ET: EmulatorModuleTuple<S>,
     {
-        if self.image.is_none() {
-            // emulator_modules.qemu()
-            // we need the memory map to decode the traces here take it in prexec. use QemuMemoryChunk
-            // TODO handle self modifying code
-            self.image = Some(Image::new(Some("empty_image")).expect("Failed to create image"));
-        }
     }
 
     fn post_exec<OT, ET>(
         &mut self,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -112,16 +101,18 @@ where
             panic!("Intel PT module not initialized.");
         }
 
-        if self.image.is_none() {
-            panic!("Intel PT module: memory image not initialized.");
-        }
+        // we need the memory map to decode the traces here take it in prexec. use QemuMemoryChunk
+        // TODO handle self modifying code
 
+        let qemu = emulator_modules.qemu();
+        // qemu.read_mem()
+
+        // TODO: raw traces buff just for debugging
         let mut buff = Vec::new();
-        let block_ips = self
-            .pt
-            .as_mut()
-            .unwrap()
-            .decode(&mut self.image.as_mut().unwrap(), Some(&mut buff));
+        let block_ips = self.pt.as_mut().unwrap().decode_with_callback(
+            |addr, out_buff| unsafe { qemu.read_mem(out_buff, addr.into()) },
+            Some(&mut buff),
+        );
 
         let trace_path = "trace.out";
         let mut file = OpenOptions::new()
@@ -131,6 +122,6 @@ where
             .expect("Failed to open trace output file");
 
         file.write_all(&buff).unwrap();
-        println!("Block IPs: {:#x?}", block_ips);
+        // println!("Block IPs: {:#x?}", block_ips);
     }
 }
