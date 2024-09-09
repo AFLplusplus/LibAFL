@@ -421,7 +421,7 @@ impl AsanRuntime {
 
         let range = Self::range_for_address(stack_address);
 
-        assert!(!(range.0 == 0), "Couldn't find stack mapping!");
+        assert!(range.0 != 0, "Couldn't find stack mapping!");
 
         (range.1 - 1024 * 1024, range.1)
     }
