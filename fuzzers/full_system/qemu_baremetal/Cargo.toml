@@ -32,7 +32,7 @@ libafl_targets = { path = "../../../libafl_targets" }
 libafl_qemu = { path = "../../../libafl_qemu", features = [
   "arm",
   "systemmode",
-] }
+], default-features = false }
 libafl_qemu_sys = { path = "../../../libafl_qemu/libafl_qemu_sys", features = [
   "arm",
   "systemmode",
