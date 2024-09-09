@@ -46,48 +46,31 @@ The best-tested fuzzer is [`./fuzzers/libpng/libfuzzer_libpng`](./fuzzers/libpng
 
 ## Building and installing
 
-1. Install the Dependecies
-- The Rust development language.  
-We highly recommend *not* to use e.g. your Linux distribition package as this is likely outdated. So rather install
-Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
-
-- LLVM tools  
-The LLVM tools (including clang, clang++) are needed (newer than LLVM 15.0.0 up to LLVM 18.1.3)
-If you are using Debian/Ubuntu, again, we highly recommmend that you install the package from [here](https://apt.llvm.org/)
-
-(In `libafl_concolic`, we only support LLVM version newer than 18)
-
-- Cargo-make  
-We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
-
-```sh
-cargo install cargo-make
-```
-
+1. Install the Dependencies
+- **The Rust development language**
+    - We highly recommend *not* to use e.g. your Linux distribution package as this is likely outdated. So rather install Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
+- **LLVM tools**
+    - The LLVM tools (including clang, clang++) are needed (newer than LLVM 15.0.0 up to LLVM 18.1.3) If you are using Debian/Ubuntu, again, we highly recommmend that you install the package from [here](https://apt.llvm.org/)
+    - (In `libafl_concolic`, we only support LLVM version newer than 18)
+- Cargo-make:
+    - We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with `cargo install cargo-make`
+ 
 2. Clone the LibAFL repository with
-
 ```sh
 git clone https://github.com/AFLplusplus/LibAFL
 ```
-
 3. Build the library using
-
 ```sh
 cargo build --release
 ```
-
 4. Build the API documentation with
-
 ```sh
 cargo doc
 ```
-
 5. Browse the LibAFL book (WIP!) with (requires [mdbook](https://rust-lang.github.io/mdBook/index.html))
-
 ```sh
 cd docs && mdbook serve
 ```
-
 
 ## Why LibAFL?
 
