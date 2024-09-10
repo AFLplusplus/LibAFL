@@ -7,12 +7,11 @@ set -e
 # Function to run Clippy on a single directory
 run_clippy() {
    local dir="$1"
-   local all_features="$2"
-   echo "All features: $all_features"
+   local features="$2"
    echo "Running Clippy on $dir"
    pushd "$dir" || return 1
 
-   RUST_BACKTRACE=full cargo +nightly clippy --all ${all_features:+"$all_features"} --no-deps --tests --examples --benches -- -Z macro-backtrace \
+   RUST_BACKTRACE=full cargo +nightly clippy --all ${features:+"$features"} --no-deps --tests --examples --benches -- -Z macro-backtrace \
       -D clippy::all \
       -D clippy::pedantic \
       -W clippy::similar_names \
@@ -79,12 +78,12 @@ RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --no-deps --tests
 for project in "${PROJECTS[@]}"; do
    # Trim leading and trailing whitespace
    project=$(echo "$project" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-   all_features="--all-features"
+   features="--all-features"
    if [[ " ${NO_ALL_FEATURES[*]} " =~ ${project} ]]; then
-      all_features="--features=clippy"
+      features="--features=clippy"
    fi
    if [ -d "$project" ]; then
-      run_clippy "$project" $all_features
+      run_clippy "$project" $features
    else
       echo "Warning: Directory $project does not exist. Skipping."
    fi
