@@ -1,6 +1,6 @@
 # Variables
 [env]
-FUZZER_NAME = 'libpng_harness'
+FUZZER_NAME = 'fuzzbench_qemu'
 PROJECT_DIR = { script = ["pwd"] }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 PROFILE_DIR = { value = "release", condition = { env_not_set = [
@@ -11,20 +11,6 @@ PROFILE_DIR = { value = "release", condition = { env_not_set = [
 script_runner = "@shell"
 script = '''
 echo "Qemu fuzzer not supported on windows"
-'''
-
-# libpng
-[tasks.libpng]
-linux_alias = "libpng_unix"
-mac_alias = "libpng_unix"
-windows_alias = "unsupported"
-
-[tasks.libpng_unix]
-condition = { files_not_exist = ["./libpng-1.6.37"] }
-script_runner = "@shell"
-script = '''
-wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
-tar -xvf v1.6.37.tar.gz
 '''
 
 # fuzzer
@@ -46,20 +32,13 @@ windows_alias = "unsupported"
 [tasks.harness_unix]
 script_runner = "@shell"
 script = '''
-cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-cd "${PROJECT_DIR}"
-make -C libpng-1.6.37
 cc -c "${PROJECT_DIR}/libfuzzer_main.c"
-# Build the libpng harness    
-c++ \
-    ../../libpng/libfuzzer_libpng/harness.cc \
-    ./libpng-1.6.37/.libs/libpng16.a \
+cc \
+    ./fuzz.c \
     ./libfuzzer_main.o \
-    -I./libpng-1.6.37/ \
     -o ${FUZZER_NAME} \
     -lm -lz
 '''
-dependencies = ["libpng"]
 
 # Run the fuzzer
 [tasks.run]
@@ -76,7 +55,7 @@ args = [
   "./${FUZZER_NAME}",
   "--",
   "--libafl-in",
-  "../../libpng/libfuzzer_libpng/corpus",
+  "./corpus",
   "--libafl-out",
   "./out",
   "./${FUZZER_NAME}",
@@ -108,7 +87,6 @@ windows_alias = "unsupported"
 clear = true
 script_runner = "@shell"
 script = '''
-rm -f ./${FUZZER_NAME} libfuzzer_main.o
-make -C libpng-1.6.37 clean
+rm -f ./${FUZZER_NAME}
 cargo clean
 '''
