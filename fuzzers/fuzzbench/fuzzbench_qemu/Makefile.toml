@@ -1,6 +1,6 @@
 # Variables
 [env]
-FUZZER_NAME = 'fuzzbench_qemu'
+FUZZER_NAME = 'harness'
 PROJECT_DIR = { script = ["pwd"] }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 PROFILE_DIR = { value = "release", condition = { env_not_set = [
@@ -72,7 +72,13 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script = '''
-echo "This test is skipped. QEMU-based fuzzer doesn't work on Github runners"
+timeout 11s ./target/release/fuzzbench_qemu ./harness -- --libafl-in ./corpus --libafl-out ./out ./harness | tee fuzz_stdout.log || true
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
 '''
 dependencies = ["harness", "fuzzer"]
 
