@@ -55,7 +55,7 @@ for project in "${PROJECTS[@]}"; do
    project=$(echo "$project" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
    all_features="--all-features"
    if [[ " ${NO_ALL_FEATURES[*]} " =~ ${project} ]]; then
-      all_features=""
+      all_features="--features=clippy"
    fi
    if [ -d "$project" ]; then
       run_clippy "$project" $all_features
