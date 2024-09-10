@@ -279,8 +279,7 @@ jobs:
 
           # Fuzzbench
           - ./fuzzers/fuzzbench/fuzzbench
-          - ./fuzzers/fuzzbench/fuzzbench_qemu
-          - ./fuzzers/fuzzbench/fuzzbench_fork_qemu
+
           - ./fuzzers/fuzzbench/fuzzbench_text
           - ./fuzzers/fuzzbench/fuzzbench_ctx
           - ./fuzzers/fuzzbench/fuzzbench_forkserver_cmplog
@@ -359,6 +358,8 @@ jobs:
           - ./fuzzers/qemu/qemu_systemmode
           - ./fuzzers/qemu/qemu_coverage
           - ./fuzzers/qemu/qemu_launcher
+          - ./fuzzers/fuzzbench/fuzzbench_qemu
+          - ./fuzzers/fuzzbench/fuzzbench_fork_qemu
 
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
