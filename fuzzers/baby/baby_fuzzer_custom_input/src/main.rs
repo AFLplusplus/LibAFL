@@ -15,23 +15,28 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::MutVecInput,
     monitors::SimpleMonitor,
-    mutators::{
-        havoc_mutations::{
-            havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover,
-            mapped_havoc_mutations, optional_mapped_havoc_mutations,
-        },
-        mapping::ToWrapsReferenceFunctionMappingMutatorMapper,
-        scheduled::StdScheduledMutator,
-    },
+    mutators::{mapping::MappedInputFunctionMappingMutator, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
+
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    tuples::{tuple_list, Append, Map, Merge},
+    tuples::{tuple_list, Append, Merge},
+};
+
+#[cfg(feature = "simple_interface")]
+use libafl::mutators::havoc_mutations::{mapped_havoc_mutations, optional_mapped_havoc_mutations};
+#[cfg(not(feature = "simple_interface"))]
+use {
+    libafl::mutators::{
+        havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
+        mapping::{ToMappedInputFunctionMappingMutatorMapper, ToOptionMappingMutatorMapper},
+    },
+    libafl_bolts::tuples::Map,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -132,37 +137,78 @@ pub fn main() {
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
-    let custom_mapped_mutators = havoc_mutations_no_crossover()
-        .merge(havoc_crossover_with_corpus_mapper(
-            &CustomInput::byte_array_mutvec_mapper_corpus_extractor,
-        ))
-        .map(ToWrapsReferenceFunctionMappingMutatorMapper::<
+    #[cfg(feature = "simple_interface")]
+    let (mapped_mutators, optional_mapped_mutators) = {
+        // Creating mutators that will operate on input.byte_array
+        // For now, due to a limitation in lifetime management (see the MappedInput trait),
+        // the types have to be partially specified
+        let mapped_mutators: (MappedInputFunctionMappingMutator<_, _, MutVecInput<'_>>, _) =
+            mapped_havoc_mutations(
+                CustomInput::byte_array_mut,
+                &CustomInput::byte_array_optional,
+            );
+
+        // Creating mutators that will operate on input.optional_byte_array
+        // For now, due to a limitation in lifetime management (see the MappedInput trait),
+        // the types have to be partially specified
+        let optional_mapped_mutators: (
+            MappedInputFunctionMappingMutator<_, _, Option<MutVecInput<'_>>>,
             _,
-            MutVecInput<'_>,
-        >::new(CustomInput::byte_array_mutvec_mapper));
+        ) = optional_mapped_havoc_mutations(
+            CustomInput::optional_byte_array_mut,
+            &CustomInput::optional_byte_array_optional,
+        );
+        (mapped_mutators, optional_mapped_mutators)
+    };
+
+    #[cfg(not(feature = "simple_interface"))]
+    let (mapped_mutators, optional_mapped_mutators) = {
+        // Creating mutators that will operate on input.byte_array
+        // For now, due to a limitation in lifetime management (see the MappedInput trait),
+        // the types have to be partially specified
+        let mapped_mutators: (MappedInputFunctionMappingMutator<_, _, MutVecInput<'_>>, _) =
+            havoc_mutations_no_crossover()
+                .merge(havoc_crossover_with_corpus_mapper(
+                    &CustomInput::byte_array_optional,
+                ))
+                .map(ToMappedInputFunctionMappingMutatorMapper::new(
+                    CustomInput::byte_array_mut,
+                ));
+
+        // Creating mutators that will operate on input.optional_byte_array
+        // For now, due to a limitation in lifetime management (see the MappedInput trait),
+        // the types have to be partially specified
+        let optional_mapped_mutators: (
+            MappedInputFunctionMappingMutator<_, _, Option<MutVecInput<'_>>>,
+            _,
+        ) = havoc_mutations_no_crossover()
+            .merge(havoc_crossover_with_corpus_mapper(
+                &CustomInput::optional_byte_array_optional,
+            ))
+            .map(ToOptionMappingMutatorMapper)
+            .map(ToMappedInputFunctionMappingMutatorMapper::new(
+                CustomInput::optional_byte_array_mut,
+            ));
+
+        (mapped_mutators, optional_mapped_mutators)
+    };
 
     // Merging multiple lists of mutators that mutate a sub-part of the custom input
     // This collection could be expanded with default or custom mutators as needed for the input
-    // First, mutators for the simple byte array
-    let mutations = mapped_havoc_mutations(
-        CustomInput::byte_array_mut,
-        &CustomInput::byte_array_optional,
-    )
-    // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
-    .merge(optional_mapped_havoc_mutations(
-        CustomInput::optional_byte_array_mut,
-        &CustomInput::optional_byte_array_optional,
-    ))
-    // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
-    .append(ToggleOptionalByteArrayMutator::new(1))
-    .merge(custom_mapped_mutators)
-    // Finally, a custom mutator that toggles the boolean part of the input
-    .append(ToggleBooleanMutator);
+    let mutators = tuple_list!()
+        // First, mutators for the simple byte array
+        .merge(mapped_mutators)
+        // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
+        .merge(optional_mapped_mutators)
+        // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
+        .append(ToggleOptionalByteArrayMutator::new(1))
+        // Finally, a custom mutator that toggles the boolean part of the input
+        .append(ToggleBooleanMutator);
 
     // Scheduling layer for the mutations
-    let mutator = StdScheduledMutator::new(mutations);
+    let mutator_scheduler = StdScheduledMutator::new(mutators);
     // Defining the mutator stage
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator_scheduler));
 
     // Run the fuzzer
     fuzzer

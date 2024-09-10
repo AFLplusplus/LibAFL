@@ -13,7 +13,7 @@ use libafl_bolts::{
 
 use crate::inputs::HasMutatorBytes;
 
-use super::WrapsReference;
+use super::MappedInput;
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
@@ -203,7 +203,7 @@ where
     }
 }
 
-impl<'a, I> WrapsReference for BytesSubInput<'a, I> {
+impl<'a, I> MappedInput for BytesSubInput<'a, I> {
     type Type<'b> = BytesSubInput<'b, I> where Self: 'b;
 }
 

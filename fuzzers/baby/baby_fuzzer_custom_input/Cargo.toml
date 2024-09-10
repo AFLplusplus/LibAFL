@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Valentin Huber <contact@valentinhuber.me>"]
 edition = "2021"
 
+[features]
+default = ["simple_interface"]
+simple_interface = []
+
 [profile.dev]
 panic = "abort"
 
