@@ -32,25 +32,6 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 + `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./libafl_qemu)
 + `TinyInst`, in [libafl_tinyinst](./libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
 
-## Getting started 
-We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
-Be sure to read their documentation (and source), this is *the natural way to get started!*
-```sh
-cargo make run
-```
-You can run each example fuzzer with this following command, as long as the fuzzer directory has `Makefile.toml` file. The best-tested fuzzer is [`./fuzzers/libpng/libfuzzer_libpng`](./fuzzers/libpng/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
-
-### Ressources 
-- [Installation guide](./docs/src/getting_started/setup.md)
-- [Online API documentation](https://docs.rs/libafl/)
-- The LibAFL book (WIP) [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
-- Our research [paper](https://www.s3.eurecom.fr/docs/ccs22_fioraldi.pdf)
-- Our RC3 [talk](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO") explaining the core concepts
-- Our Fuzzcon Europe [talk](https://www.youtube.com/watch?v=PWB8GIhFAaI "LibAFL: The Advanced Fuzzing Library") with a (a bit but not so much outdated) step-by-step discussion on how to build some example fuzzers
-- The Fuzzing101 [solutions](https://github.com/epi052/fuzzing-101-solutions) & series of [blog posts](https://epi052.gitlab.io/notes-to-self/blog/2021-11-01-fuzzing-101-with-libafl/) by [epi](https://github.com/epi052)
-- Blogpost on binary-only fuzzing lib libaf_qemu, [Hacking TMNF - Fuzzing the game server](https://blog.bricked.tech/posts/tmnf/part1/), by [RickdeJager](https://github.com/RickdeJager).
-- [A LibAFL Introductory Workshop](https://www.atredis.com/blog/2023/12/4/a-libafl-introductory-workshop), by [Jordan Whitehead](https://github.com/jordan9001)
-
 ## Building and installing
 
 #### Install the Dependencies
@@ -78,6 +59,25 @@ cargo doc
 ```sh
 cd docs && mdbook serve
 ```
+## Getting started 
+We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
+Be sure to read their documentation (and source), this is *the natural way to get started!*
+```sh
+cargo make run
+```
+You can run each example fuzzer with this following command, as long as the fuzzer directory has `Makefile.toml` file. The best-tested fuzzer is [`./fuzzers/libpng/libfuzzer_libpng`](./fuzzers/libpng/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
+
+### Ressources 
+- [Installation guide](./docs/src/getting_started/setup.md)
+- [Online API documentation](https://docs.rs/libafl/)
+- The LibAFL book (WIP) [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
+- Our research [paper](https://www.s3.eurecom.fr/docs/ccs22_fioraldi.pdf)
+- Our RC3 [talk](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO") explaining the core concepts
+- Our Fuzzcon Europe [talk](https://www.youtube.com/watch?v=PWB8GIhFAaI "LibAFL: The Advanced Fuzzing Library") with a (a bit but not so much outdated) step-by-step discussion on how to build some example fuzzers
+- The Fuzzing101 [solutions](https://github.com/epi052/fuzzing-101-solutions) & series of [blog posts](https://epi052.gitlab.io/notes-to-self/blog/2021-11-01-fuzzing-101-with-libafl/) by [epi](https://github.com/epi052)
+- Blogpost on binary-only fuzzing lib libaf_qemu, [Hacking TMNF - Fuzzing the game server](https://blog.bricked.tech/posts/tmnf/part1/), by [RickdeJager](https://github.com/RickdeJager).
+- [A LibAFL Introductory Workshop](https://www.atredis.com/blog/2023/12/4/a-libafl-introductory-workshop), by [Jordan Whitehead](https://github.com/jordan9001)
+
 
 ## Contributing
 Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for the contributing guideline.
