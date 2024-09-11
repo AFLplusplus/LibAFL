@@ -6,8 +6,9 @@ use std::{
 use libafl::{
     corpus::CorpusId,
     generators::Generator,
-    inputs::{Input, MutVecInput},
+    inputs::{BytesInput, HasTargetBytes, Input, MutVecInput},
     mutators::{MutationResult, Mutator},
+    prelude::RandBytesGenerator,
     state::HasRand,
     Error, SerdeAny,
 };
@@ -75,11 +76,13 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<CustomInput, Error> {
-        let byte_array = generate_bytes(self.max_len, state);
+        let mut generator = RandBytesGenerator::new(self.max_len);
+
+        let byte_array = generator.generate(state).unwrap().target_bytes().into();
         let optional_byte_array = state
             .rand_mut()
             .coinflip(0.5)
-            .then(|| generate_bytes(self.max_len, state));
+            .then(|| generator.generate(state).unwrap().target_bytes().into());
         let boolean = state.rand_mut().coinflip(0.5);
 
         Ok(CustomInput {
@@ -90,41 +93,38 @@ where
     }
 }
 
-/// Generate a [`Vec<u8>`] of a length between 1 (incl.) and `length` (incl.) filled with random bytes
-fn generate_bytes<S: HasRand>(length: usize, state: &mut S) -> Vec<u8> {
-    let rand = state.rand_mut();
-    let len = rand.between(1, length);
-    let mut vec = Vec::new();
-    vec.resize_with(len, || rand.next() as u8);
-    vec
-}
-
 /// [`Mutator`] that toggles the optional byte array of a [`CustomInput`], i.e. sets it to [`None`] if it is not, and to a random byte array if it is [`None`]
-pub struct ToggleOptionalByteArrayMutator {
-    length: usize,
+pub struct ToggleOptionalByteArrayMutator<G> {
+    generator: G,
 }
 
-impl ToggleOptionalByteArrayMutator {
-    /// Creates a new [`ToggleOptionalByteArrayMutator`]
-    pub fn new(length: usize) -> Self {
-        Self { length }
-    }
-}
-
-impl<S> Mutator<CustomInput, S> for ToggleOptionalByteArrayMutator
+impl<S> ToggleOptionalByteArrayMutator<RandBytesGenerator<S>>
 where
     S: HasRand,
 {
+    /// Creates a new [`ToggleOptionalByteArrayMutator`]
+    pub fn new(length: usize) -> Self {
+        Self {
+            generator: RandBytesGenerator::new(length),
+        }
+    }
+}
+
+impl<G, S> Mutator<CustomInput, S> for ToggleOptionalByteArrayMutator<G>
+where
+    S: HasRand,
+    G: Generator<BytesInput, S>,
+{
     fn mutate(&mut self, state: &mut S, input: &mut CustomInput) -> Result<MutationResult, Error> {
         input.optional_byte_array = match input.optional_byte_array {
-            None => Some(generate_bytes(self.length, state)),
+            None => Some(self.generator.generate(state)?.target_bytes().into()),
             Some(_) => None,
         };
         Ok(MutationResult::Mutated)
     }
 }
 
-impl Named for ToggleOptionalByteArrayMutator {
+impl<G> Named for ToggleOptionalByteArrayMutator<G> {
     fn name(&self) -> &Cow<'static, str> {
         &Cow::Borrowed("ToggleOptionalByteArrayMutator")
     }

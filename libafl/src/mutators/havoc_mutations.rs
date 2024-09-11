@@ -201,10 +201,10 @@ pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
 }
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy with custom corpus extraction logic
-pub fn havoc_crossover_with_corpus_mapper<F>(corpus_mapper: &F) -> MappedHavocCrossoverType<'_, F> {
+pub fn havoc_crossover_with_corpus_mapper<F>(input_mapper: &F) -> MappedHavocCrossoverType<'_, F> {
     tuple_list!(
-        MappedCrossoverInsertMutator::new(corpus_mapper),
-        MappedCrossoverReplaceMutator::new(corpus_mapper),
+        MappedCrossoverInsertMutator::new(input_mapper),
+        MappedCrossoverReplaceMutator::new(input_mapper),
     )
 }
 

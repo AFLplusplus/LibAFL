@@ -1197,7 +1197,7 @@ impl<I> CrossoverReplaceMutator<I> {
 /// Crossover insert mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
 pub struct MappedCrossoverInsertMutator<'a, F> {
-    input_from_corpus_mapper: &'a F,
+    input_mapper: &'a F,
 }
 
 impl<'a, S, F, I> Mutator<I, S> for MappedCrossoverInsertMutator<'a, F>
@@ -1224,7 +1224,7 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            (self.input_from_corpus_mapper)(other_input).map_or(0, <[u8]>::len)
+            (self.input_mapper)(other_input).map_or(0, <[u8]>::len)
         };
 
         if other_size < 2 {
@@ -1237,7 +1237,7 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_from_corpus_mapper)(other_input);
+        let wrapped_mapped_other_input = (self.input_mapper)(other_input);
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -1262,25 +1262,21 @@ impl<'a, F> Named for MappedCrossoverInsertMutator<'a, F> {
 
 impl<'a, F> MappedCrossoverInsertMutator<'a, F> {
     /// Creates a new [`MappedCrossoverInsertMutator`].
-    pub fn new(input_from_corpus_mapper: &'a F) -> Self {
-        Self {
-            input_from_corpus_mapper,
-        }
+    pub fn new(input_mapper: &'a F) -> Self {
+        Self { input_mapper }
     }
 }
 
 /// Crossover replace mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
 pub struct MappedCrossoverReplaceMutator<'a, F> {
-    input_from_corpus_mapper: &'a F,
+    input_mapper: &'a F,
 }
 
 impl<'a, F> MappedCrossoverReplaceMutator<'a, F> {
     /// Creates a new [`MappedCrossoverReplaceMutator`].
-    pub fn new(input_from_corpus_mapper: &'a F) -> Self {
-        Self {
-            input_from_corpus_mapper,
-        }
+    pub fn new(input_mapper: &'a F) -> Self {
+        Self { input_mapper }
     }
 }
 
@@ -1307,7 +1303,7 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            (self.input_from_corpus_mapper)(other_input).map_or(0, <[u8]>::len)
+            (self.input_mapper)(other_input).map_or(0, <[u8]>::len)
         };
 
         if other_size < 2 {
@@ -1320,7 +1316,7 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_from_corpus_mapper)(other_input);
+        let wrapped_mapped_other_input = (self.input_mapper)(other_input);
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
         }
