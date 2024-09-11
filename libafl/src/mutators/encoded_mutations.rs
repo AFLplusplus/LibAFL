@@ -1,7 +1,7 @@
 //! Mutations for [`EncodedInput`]s
 //!
 use alloc::{borrow::Cow, vec::Vec};
-use core::cmp::{max, min};
+use core::{cmp::{max, min}, num::NonZero};
 
 use libafl_bolts::{
     rands::Rand,
@@ -383,12 +383,6 @@ where
                 return Ok(MutationResult::Skipped);
             }
         }
-
-        let non_zero_size = if let Some(size) = size {
-            size
-        } else {
-            return Ok(MutationResult::Skipped);
-        };
 
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();

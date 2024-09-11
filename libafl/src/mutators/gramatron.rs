@@ -2,7 +2,7 @@
 //!
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
 use alloc::{borrow::Cow, vec::Vec};
-use core::cmp::max;
+use core::{cmp::max, num::NonZero};
 
 use crossterm::terminal;
 use hashbrown::HashMap;
@@ -221,14 +221,15 @@ where
         let chosen = *state.rand_mut().choose(&self.states).unwrap();
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
-        let non_zero_chosen_nums = if let Some(non_zero_chose_nums) = NonZero::new(chosen_nums) {
-            non_zero_chose_nums
-        } else {
-            return Ok(MutationResult::Skipped);
-        };
+        let non_zero_chosen_nums_minus_one =
+            if let Some(non_zero_chose_nums_minus_one) = NonZero::new(chosen_nums - 1) {
+                non_zero_chose_nums_minus_one
+            } else {
+                return Ok(MutationResult::Skipped);
+            };
 
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut first = state.rand_mut().below(chosen_nums - 1) as i64;
+        let mut first = state.rand_mut().below(non_zero_chosen_nums) as i64;
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut second = state
             .rand_mut()
