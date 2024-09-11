@@ -9,16 +9,6 @@ use input::{
 };
 #[cfg(feature = "simple_interface")]
 use libafl::mutators::havoc_mutations::{mapped_havoc_mutations, optional_mapped_havoc_mutations};
-
-#[cfg(not(feature = "simple_interface"))]
-use {
-    libafl::mutators::{
-        havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
-        mapping::{ToMappedInputFunctionMappingMutatorMapper, ToOptionMappingMutatorMapper},
-    },
-    libafl_bolts::tuples::Map,
-};
-
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -37,6 +27,14 @@ use libafl_bolts::{
     current_nanos,
     rands::StdRand,
     tuples::{tuple_list, Merge, Prepend},
+};
+#[cfg(not(feature = "simple_interface"))]
+use {
+    libafl::mutators::{
+        havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
+        mapping::{ToMappedInputFunctionMappingMutatorMapper, ToOptionMappingMutatorMapper},
+    },
+    libafl_bolts::tuples::Map,
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
