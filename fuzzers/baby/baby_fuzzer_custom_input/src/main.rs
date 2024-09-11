@@ -25,7 +25,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    tuples::{tuple_list, Append, Merge},
+    tuples::{tuple_list, Merge, Prepend},
 };
 
 #[cfg(feature = "simple_interface")]
@@ -201,9 +201,9 @@ pub fn main() {
         // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
         .merge(optional_mapped_mutators)
         // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
-        .append(ToggleOptionalByteArrayMutator::new(1))
+        .prepend(ToggleOptionalByteArrayMutator::new(1))
         // Finally, a custom mutator that toggles the boolean part of the input
-        .append(ToggleBooleanMutator);
+        .prepend(ToggleBooleanMutator);
 
     // Scheduling layer for the mutations
     let mutator_scheduler = StdScheduledMutator::new(mutators);
