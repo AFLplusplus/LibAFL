@@ -18,6 +18,7 @@ libafl_bolts = { path = "../../../libafl_bolts", features = [
   "errors_backtrace",
 ] }
 libafl_targets = { path = "../../../libafl_targets" }
+libafl_nyx = { path = "../../../libafl_nyx" }
 memmap2 = "0.9.4"
 nix = { version = "0.29", features = ["fs"] }
 regex = "1.10.5"

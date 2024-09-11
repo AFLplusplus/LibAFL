@@ -15,6 +15,7 @@ use libafl::{
         scheduled::havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
+    prelude::{AdaptiveSerializer, HasEventManagerId, HasTestcase, UsesInput},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
         StdWeightedScheduler,
@@ -24,8 +25,8 @@ use libafl::{
         StagesTuple, StdMutationalStage, StdPowerMutationalStage, SyncFromDiskStage,
     },
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
-        UsesState,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasRand, HasStartTime,
+        State, StdState, UsesState,
     },
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
@@ -37,7 +38,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
+    AsSliceMut, HasLen,
 };
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
 use nix::sys::signal::Signal::{SIGKILL, SIGTERM};
@@ -47,7 +48,7 @@ use crate::{
     afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
-    executor::find_afl_binary,
+    executor::{find_afl_binary, SupportedExecutors},
     feedback::{
         filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
         seed::SeedFeedback,
@@ -57,27 +58,24 @@ use crate::{
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, AFL_HARNESS_FILE_INPUT,
     SHMEM_ENV_VAR,
 };
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 
 pub type LibaflFuzzState =
     StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
 
-pub fn run_client<EMH, SP>(
+pub fn run_client(
     state: Option<LibaflFuzzState>,
     mut restarting_mgr: CentralizedEventManager<
-        LlmpRestartingEventManager<(), LibaflFuzzState, SP>,
-        EMH,
+        LlmpRestartingEventManager<(), LibaflFuzzState, StdShMemProvider>,
+        (),
         LibaflFuzzState,
-        SP,
+        StdShMemProvider,
     >,
     fuzzer_dir: &PathBuf,
     core_id: CoreId,
     opt: &Opt,
     is_main_node: bool,
-) -> Result<(), Error>
-where
-    EMH: EventManagerHooksTuple<LibaflFuzzState> + Copy + Clone,
-    SP: ShMemProvider,
-{
+) -> Result<(), Error> {
     // Create the shared memory map for comms with the forkserver
     let mut shmem_provider = StdShMemProvider::new().unwrap();
     let mut shmem = shmem_provider
@@ -87,9 +85,23 @@ where
     let shmem_buf = shmem.as_slice_mut();
 
     // Create an observation channel to keep track of edges hit.
-    let edges_observer = unsafe {
-        HitcountsMapObserver::new(StdMapObserver::new("edges", shmem_buf)).track_indices()
+    // If we are in Nyx Mode, we need to use a different map observer.
+    let (nyx_helper, edges_observer) = if opt.nyx_mode {
+        let nyx_settings = NyxSettings::builder()
+            .cpu_id(core_id.0)
+            .parent_cpu_id(Some(core_id.0))
+            .build();
+        let nyx_helper = NyxHelper::new("/tmp/nyx_libxml2/", nyx_settings).unwrap();
+        let observer = unsafe {
+            StdMapObserver::from_mut_ptr("edges", nyx_helper.bitmap_buffer, nyx_helper.bitmap_size)
+        };
+        (Some(nyx_helper), observer)
+    } else {
+        let observer = unsafe { StdMapObserver::new("edges", shmem_buf) };
+        (None, observer)
     };
+
+    let edges_observer = HitcountsMapObserver::new(edges_observer).track_indices();
 
     // Create a MapFeedback for coverage guided fuzzin'
     let map_feedback = MaxMapFeedback::new(&edges_observer);
@@ -234,23 +246,33 @@ where
         std::env::set_var("LD_PRELOAD", &preload);
         std::env::set_var("DYLD_INSERT_LIBRARIES", &preload);
     }
+    let mut executor = if opt.nyx_mode {
+        SupportedExecutors::Nyx(
+            NyxExecutor::builder().build(
+                nyx_helper.unwrap(),
+                tuple_list!(time_observer, edges_observer),
+            ),
+            PhantomData,
+        )
+    } else {
+        // Create the base Executor
+        let mut executor = base_forkserver(opt, &mut shmem_provider, fuzzer_dir)?;
+        // Set a custom exit code to be interpreted as a Crash if configured.
+        if let Some(crash_exitcode) = opt.crash_exitcode {
+            executor = executor.crash_exitcode(crash_exitcode);
+        }
 
-    // Create the base Executor
-    let mut executor = base_executor(opt, &mut shmem_provider, fuzzer_dir)?;
-    // Set a custom exit code to be interpreted as a Crash if configured.
-    if let Some(crash_exitcode) = opt.crash_exitcode {
-        executor = executor.crash_exitcode(crash_exitcode);
-    }
-
-    // Enable autodict if configured
-    if !opt.no_autodict {
-        executor = executor.autotokens(&mut tokens);
+        // Enable autodict if configured
+        if !opt.no_autodict {
+            executor = executor.autotokens(&mut tokens);
+        };
+        // Finalize and build our Executor
+        let executor = executor
+            .build(tuple_list!(time_observer, edges_observer))
+            .unwrap();
+        let executor = SupportedExecutors::Forkserver(executor, PhantomData);
+        executor
     };
-
-    // Finalize and build our Executor
-    let mut executor = executor
-        .build(tuple_list!(time_observer, edges_observer))
-        .unwrap();
 
     // Load our seeds.
     if state.must_load_initial_inputs() {
@@ -308,7 +330,6 @@ where
         },
     };
     let run_cmplog = cmplog_executable_path != "-" && is_main_node;
-
     if run_cmplog {
         // The CmpLog map shared between the CmpLog observer and CmpLog executor
         let mut cmplog_shmem = shmem_provider.uninit_on_shmem::<AFLppCmpLogMap>().unwrap();
@@ -323,7 +344,7 @@ where
 
         // Create the CmpLog executor.
         // Cmplog has 25% execution overhead so we give it double the timeout
-        let cmplog_executor = base_executor(opt, &mut shmem_provider, fuzzer_dir)?
+        let cmplog_executor = base_forkserver(opt, &mut shmem_provider, fuzzer_dir)?
             .timeout(Duration::from_millis(opt.hang_timeout * 2))
             .program(cmplog_executable_path)
             .build(tuple_list!(cmplog_observer))
@@ -376,7 +397,6 @@ where
     } else {
         // The order of the stages matter!
         let mut stages = tuple_list!(calibration, mutational_stage, afl_stats_stage, sync_stage);
-
         // Run our fuzzer; NO CmpLog
         run_fuzzer_with_stages(
             opt,
@@ -391,7 +411,7 @@ where
     // TODO: serialize state when exiting.
 }
 
-fn base_executor<'a>(
+fn base_forkserver<'a>(
     opt: &'a Opt,
     shmem_provider: &'a mut StdShMemProvider,
     fuzzer_dir: &PathBuf,

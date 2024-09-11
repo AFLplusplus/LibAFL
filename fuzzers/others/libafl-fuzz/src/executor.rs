@@ -1,10 +1,21 @@
 use std::{
     fs::File,
+    marker::PhantomData,
     os::{linux::fs::MetadataExt, unix::fs::PermissionsExt},
     path::{Path, PathBuf},
 };
 
-use libafl::Error;
+use libafl::{
+    executors::{Executor, ExitKind},
+    prelude::{
+        ForkserverExecutor, HasObservers, HasTargetBytes, ObserversTuple, UsesInput, UsesObservers,
+        WithObservers,
+    },
+    stages::HasCurrentStage,
+    state::{HasExecutions, State, UsesState},
+    Error,
+};
+use libafl_bolts::{shmem::ShMemProvider, tuples::RefIndexable};
 use memmap2::{Mmap, MmapOptions};
 use nix::libc::{S_IRUSR, S_IXUSR};
 
@@ -237,4 +248,71 @@ fn check_file_found(file: &PathBuf, perm: u32) -> bool {
         return metadata.permissions().mode() & perm != 0;
     }
     false
+}
+
+pub enum SupportedExecutors<S, OT, FSV, NYX> {
+    Forkserver(FSV, PhantomData<(S, OT)>),
+    Nyx(NYX, PhantomData<(S, OT)>),
+}
+
+impl<S, OT, FSV, NYX> UsesState for SupportedExecutors<S, OT, FSV, NYX>
+where
+    S: State,
+{
+    type State = S;
+}
+
+impl<S, OT, FSV, NYX, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV, NYX>
+where
+    S: State + HasExecutions + HasCurrentStage,
+    S::Input: HasTargetBytes,
+    Z: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    FSV: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+    NYX: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S::Input,
+    ) -> Result<ExitKind, Error> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
+            Self::Nyx(nyx, _) => nyx.run_target(fuzzer, state, mgr, input),
+        }
+    }
+}
+
+impl<S, OT, FSV, NYX> UsesObservers for SupportedExecutors<S, OT, FSV, NYX>
+where
+    S: State,
+    OT: ObserversTuple<S>,
+{
+    type Observers = OT;
+}
+
+impl<S, OT, FSV, NYX> HasObservers for SupportedExecutors<S, OT, FSV, NYX>
+where
+    OT: ObserversTuple<S>,
+    S: State + HasExecutions + HasCurrentStage,
+    FSV: HasObservers<Observers = OT>,
+    NYX: HasObservers<Observers = OT>,
+{
+    #[inline]
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers(),
+            Self::Nyx(nyx, _) => nyx.observers(),
+        }
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers_mut(),
+            Self::Nyx(nyx, _) => nyx.observers_mut(),
+        }
+    }
 }
