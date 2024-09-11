@@ -9,7 +9,10 @@
 	"customizations": {
 		"vscode": {
 			// Add the IDs of extensions you want installed when the container is created.
-			"extensions": ["matklad.rust-analyzer", "microsoft.Docker"],
+			"extensions": [
+				"rust-lang.rust-analyzer",
+				"microsoft.Docker"
+			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
 				"rust-analyzer.cargo.noDefaultFeatures": true
