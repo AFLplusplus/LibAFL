@@ -1336,9 +1336,8 @@ impl<I> HasScalabilityMonitor for NopState<I> {
     }
 }
 
-/// Tests for the [`StdState`]
 #[cfg(test)]
-pub mod test {
+mod test {
     use libafl_bolts::rands::StdRand;
 
     use crate::{corpus::InMemoryCorpus, inputs::BytesInput, state::StdState};

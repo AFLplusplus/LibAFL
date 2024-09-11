@@ -698,9 +698,8 @@ impl ExecutionCountRestartHelper {
     }
 }
 
-/// Tests the stages
 #[cfg(test)]
-pub mod test {
+mod test {
     use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
