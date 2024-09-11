@@ -11,7 +11,9 @@ use crate::{
     Error,
 };
 
-/// Mapping [`Mutator`] that allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type using a function returning a reference.
+/// Mapping [`Mutator`] using a function returning a reference.
+///
+/// Allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
@@ -77,7 +79,9 @@ impl<M, F> Named for FunctionMappingMutator<M, F> {
     }
 }
 
-/// Mapper to use when mapping a [`tuple_list`] of [`Mutator`]s defined for a certain input type for (parts of) a custom input type using a [`FunctionMappingMutator`].
+/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`ToFunctionMappingMutatorMapper`]s.
+///
+/// See the explanation of [`ToFunctionMappingMutatorMapper`] for details.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
@@ -141,7 +145,9 @@ where
     }
 }
 
-/// Mapping [`Mutator`] that allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type using a function returning a wrapped reference (see [`MappedInput`]).
+/// Mapping [`Mutator`] using a function returning a wrapped reference (see [`MappedInput`]).
+///
+/// Allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
@@ -208,7 +214,9 @@ impl<M, F, II> Named for MappedInputFunctionMappingMutator<M, F, II> {
     }
 }
 
-/// Mapper to use when mapping a [`tuple_list`] of [`Mutator`]s defined for a certain input type for (parts of) a custom input type using a [`MappedInputFunctionMappingMutator`].
+/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`MappedInputFunctionMappingMutator`]s.
+///
+/// See the explanation of [`MappedInputFunctionMappingMutator`] for details.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
@@ -270,7 +278,9 @@ where
     }
 }
 
-/// Mapping [`Mutator`] that allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to an [`Option`] of said type.
+/// Mapping [`Mutator`] for dealing with input parts wrapped in [`Option`].
+///
+/// Allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to an [`Option`] of said type.
 ///
 /// Returns [`MutationResult::Skipped`] if the mapper returns [`None`].
 ///
@@ -331,7 +341,9 @@ where
     }
 }
 
-/// Mapper to use when mapping a `tuple_list` of [`Mutator`]s defined for a certain input type for (parts of) a custom input type that can be mapped to an [`Option`] of said type using a [`OptionMappingMutator`].
+/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`OptionMappingMutator`]s.
+///
+/// See the explanation of [`OptionMappingMutator`] for details.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
