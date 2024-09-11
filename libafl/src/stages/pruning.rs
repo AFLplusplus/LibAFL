@@ -16,7 +16,8 @@ use crate::{
 use crate::{events::EventRestarter, state::Stoppable};
 
 #[derive(Debug)]
-/// The stage to probablistically disable a corpus entry.
+/// The stage to probabilistically disable a corpus entry.
+///
 /// This stage should be wrapped in a if stage and run only when the fuzzer perform restarting
 /// The idea comes from `https://mschloegel.me/paper/schiller2023fuzzerrestarts.pdf`
 pub struct CorpusPruning<EM> {

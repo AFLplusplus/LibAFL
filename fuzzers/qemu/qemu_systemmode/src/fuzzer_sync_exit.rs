@@ -27,13 +27,11 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 use libafl_qemu::{
-    command::StdCommandManager,
     emu::Emulator,
-    executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    executor::QemuExecutor,
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    FastSnapshotManager, StdEmulatorExitHandler,
 };
 
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
@@ -54,33 +52,22 @@ pub fn fuzz() {
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
-        let env: Vec<(String, String)> = env::vars().collect();
-
-        // let emu_snapshot_manager = QemuSnapshotBuilder::new(true);
-        let emu_snapshot_manager = FastSnapshotManager::new(); // Create a snapshot manager (normal or fast for now).
-        let emu_exit_handler: StdEmulatorExitHandler<FastSnapshotManager> =
-            StdEmulatorExitHandler::new(emu_snapshot_manager); // Create an exit handler: it is the entity taking the decision of what should be done when QEMU returns.
-
-        let cmd_manager = StdCommandManager::new();
 
         // Choose modules to use
         let modules = tuple_list!(EdgeCoverageModule::default());
 
-        let mut emu = Emulator::new(&args, &env, modules, emu_exit_handler, cmd_manager).unwrap(); // Create the emulator
+        let emu = Emulator::builder()
+            .qemu_cli(args)
+            .modules(modules)
+            .build()?;
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness =
-            |input: &BytesInput, qemu_executor_state: &mut QemuExecutorState<_, _, _, _>| unsafe {
-                qemu_executor_state
-                    .emulator_mut()
-                    .run(input)
-                    .unwrap()
-                    .try_into()
-                    .unwrap()
-            };
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| unsafe {
+            emulator.run(input).unwrap().try_into().unwrap()
+        };
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
@@ -142,8 +129,8 @@ pub fn fuzz() {
         );
 
         // Create a QEMU in-process executor
-        let mut executor = StatefulQemuExecutor::new(
-            &mut emu,
+        let mut executor = QemuExecutor::new(
+            emu,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

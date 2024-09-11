@@ -15,7 +15,7 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{HasCurrentStage, StagesTuple},
+    stages::{HasCurrentStageId, StagesTuple},
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
@@ -242,8 +242,8 @@ where
     ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
-            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
+
             self.fuzz_one(stages, executor, state, manager)?;
         }
     }
@@ -769,7 +769,7 @@ where
         + HasTestcase
         + HasLastReportTime
         + HasCurrentCorpusId
-        + HasCurrentStage,
+        + HasCurrentStageId,
     ST: StagesTuple<E, EM, Self::State, Self>,
 {
     fn fuzz_one(
@@ -940,7 +940,7 @@ pub mod test {
     use crate::{
         corpus::CorpusId,
         events::{EventProcessor, ProgressReporter},
-        stages::{HasCurrentStage, StagesTuple},
+        stages::{HasCurrentStageId, StagesTuple},
         state::{HasExecutions, HasLastReportTime, State, UsesState},
         Fuzzer, HasMetadata,
     };
@@ -977,7 +977,7 @@ pub mod test {
         E: UsesState,
         EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
         ST: StagesTuple<E, EM, Self::State, Self>,
-        Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
+        Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId,
     {
         fn fuzz_one(
             &mut self,

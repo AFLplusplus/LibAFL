@@ -9,7 +9,9 @@ use core::{
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
-/// A `SymExprRef` identifies a [`SymExpr`] in a trace. Reading a `SymExpr` from a trace will always also yield its
+/// A `SymExprRef` identifies a [`SymExpr`] in a trace.
+///
+/// Reading a `SymExpr` from a trace will always also yield its
 /// `SymExprRef`, which can be used later in the trace to identify the `SymExpr`.
 /// It is also never zero, which allows for efficient use of `Option<SymExprRef>`.
 ///
@@ -17,7 +19,9 @@ use serde::{Deserialize, Serialize};
 /// `SymExprRef`s are not valid across traces.
 pub type SymExprRef = NonZeroUsize;
 
-/// [`Location`]s are code locations encountered during concolic tracing, that are constructed from pointers, but not always in a meaningful way.
+/// [`Location`]s are code locations encountered during concolic tracing
+///
+/// [`Location`]s are constructed from pointers, but not always in a meaningful way.
 /// Therefore, a location is an opaque value that can only be compared against itself.
 ///
 /// It is possible to get at the underlying value using [`Into::into`], should this restriction be too inflexible for your usecase.

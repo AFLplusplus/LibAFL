@@ -1,5 +1,8 @@
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
+
+use std::fmt::Debug;
+
 #[cfg(not(cpu_target = "hexagon"))]
 pub use drcov::DrCovModule;
 
@@ -28,12 +31,12 @@ pub use asan_guest::{init_qemu_with_asan_guest, AsanGuestModule};
 use crate::modules::{HasInstrumentationFilter, QemuInstrumentationAddressRangeFilter};
 
 pub trait StdInstrumentationFilter:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
+    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> + Debug
 {
 }
 
 impl<Head> StdInstrumentationFilter for (Head, ()) where
-    Head: HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
+    Head: HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> + Debug
 {
 }
 

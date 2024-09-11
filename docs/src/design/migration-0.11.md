@@ -12,7 +12,7 @@ Some cross-platform things in bolts include
 * ShMem: A cross-platform (Windows, Linux, Android, MacOS) shared memory implementation
 * LLMP: A fast, lock-free IPC mechanism via SharedMap
 * Core_affinity: A maintained version of `core_affinity` that can be used to get core information and bind processes to cores
-* Rands: Fast random number generators for fuzzing (like [RomuRand](http://www.romu-random.org/))
+* Rands: Fast random number generators for fuzzing (like [RomuRand](https://www.romu-random.org/))
 * MiniBSOD: get and print information about the current process state including important registers.
 * Tuples: Haskel-like compile-time tuple lists
 * Os: OS specific stuff like signal handling, windows exception handling, pipes, and helpers for `fork`

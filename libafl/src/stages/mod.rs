@@ -68,7 +68,6 @@ pub mod concolic;
 #[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
-/// The [`generation::GenStage`] generates a single input and evaluates it.
 pub mod generation;
 pub mod logics;
 pub mod power;
@@ -136,7 +135,7 @@ where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S: UsesInput + HasCurrentStage,
+    S: UsesInput + HasCurrentStageId,
 {
     /// Performs all `Stages` in this tuple.
     fn perform_all(
@@ -153,7 +152,7 @@ where
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S: UsesInput + HasCurrentStage,
+    S: UsesInput + HasCurrentStageId,
 {
     fn perform_all(
         &mut self,
@@ -162,7 +161,7 @@ where
         stage: &mut S,
         _: &mut EM,
     ) -> Result<(), Error> {
-        if stage.current_stage_idx()?.is_some() {
+        if stage.current_stage_id()?.is_some() {
             Err(Error::illegal_state(
                 "Got to the end of the tuple without completing resume.",
             ))
@@ -179,7 +178,7 @@ where
     E: UsesState<State = Head::State>,
     EM: UsesState<State = Head::State> + EventProcessor<E, Z>,
     Z: UsesState<State = Head::State>,
-    Head::State: HasCurrentStage,
+    Head::State: HasCurrentStageId,
 {
     /// Performs all stages in the tuple,
     /// Checks after every stage if state wants to stop
@@ -191,7 +190,7 @@ where
         state: &mut Head::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        match state.current_stage_idx()? {
+        match state.current_stage_id()? {
             Some(idx) if idx < StageId(Self::LEN) => {
                 // do nothing; we are resuming
             }
@@ -201,19 +200,19 @@ where
 
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
 
-                state.clear_stage()?;
+                state.clear_stage_id()?;
             }
             Some(idx) if idx > StageId(Self::LEN) => {
                 unreachable!("We should clear the stage index before we get here...");
             }
             // this is None, but the match can't deduce that
             _ => {
-                state.set_current_stage_idx(StageId(Self::LEN))?;
+                state.set_current_stage_id(StageId(Self::LEN))?;
 
                 let stage = &mut self.0;
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
 
-                state.clear_stage()?;
+                state.clear_stage_id()?;
             }
         }
 
@@ -238,7 +237,7 @@ where
     E: UsesState<State = Head::State>,
     EM: UsesState<State = Head::State>,
     Z: UsesState<State = Head::State>,
-    Head::State: HasCurrentStage,
+    Head::State: HasCurrentStageId,
 {
     fn into_vec_reversed(
         self,
@@ -287,7 +286,7 @@ where
     E: UsesState<State = S>,
     EM: UsesState<State = S> + EventProcessor<E, Z>,
     Z: UsesState<State = S>,
-    S: UsesInput + HasCurrentStage + State,
+    S: UsesInput + HasCurrentStageId + State,
 {
     /// Performs all stages in the `Vec`
     /// Checks after every stage if state wants to stop
@@ -593,15 +592,15 @@ impl fmt::Display for StageId {
 }
 
 /// Trait for types which track the current stage
-pub trait HasCurrentStage {
+pub trait HasCurrentStageId {
     /// Set the current stage; we have started processing this stage
-    fn set_current_stage_idx(&mut self, idx: StageId) -> Result<(), Error>;
+    fn set_current_stage_id(&mut self, id: StageId) -> Result<(), Error>;
 
     /// Clear the current stage; we are done processing this stage
-    fn clear_stage(&mut self) -> Result<(), Error>;
+    fn clear_stage_id(&mut self) -> Result<(), Error>;
 
     /// Fetch the current stage -- typically used after a state recovery or transfer
-    fn current_stage_idx(&self) -> Result<Option<StageId>, Error>;
+    fn current_stage_id(&self) -> Result<Option<StageId>, Error>;
 
     /// Notify of a reset from which we may recover
     fn on_restart(&mut self) -> Result<(), Error> {
@@ -611,7 +610,7 @@ pub trait HasCurrentStage {
 
 /// Trait for types which track nested stages. Stages which themselves contain stage tuples should
 /// ensure that they constrain the state with this trait accordingly.
-pub trait HasNestedStageStatus: HasCurrentStage {
+pub trait HasNestedStageStatus: HasCurrentStageId {
     /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
     /// resumed.
     fn enter_inner_stage(&mut self) -> Result<(), Error>;

@@ -207,7 +207,9 @@ impl Runtime for NopRuntime {
     invoke_macro_with_rust_runtime_exports!(impl_nop_runtime_fn;);
 }
 
-/// This runtime can be constructed from an [`Option`] of a runtime, concretizing all expressions in the `None` case and forwarding expressions to the respective runtime in the `Some` case.
+/// This runtime can be constructed from an [`Option`] of a runtime.
+///
+/// It concretizes all expressions in the `None` case and forwards expressions to the respective runtime in the `Some` case.
 /// This is especially useful for parts of the processing pipeline that should be activated based on a runtime configuration, such as an environment variable.
 pub struct OptionalRuntime<RT> {
     inner: Option<RT>,

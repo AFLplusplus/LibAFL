@@ -1,4 +1,5 @@
 //! Executor for differential fuzzing.
+//!
 //! It wraps two executors that will be run after each other with the same input.
 //! In comparison to the [`crate::executors::CombinedExecutor`] it also runs the secondary executor in `run_target`.
 //!

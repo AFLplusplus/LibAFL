@@ -10,7 +10,6 @@ use core::{
 };
 use std::os::raw::{c_long, c_void};
 
-use log::info;
 use num_enum::FromPrimitive;
 pub use windows::Win32::{
     Foundation::{BOOL, NTSTATUS},
@@ -462,7 +461,7 @@ unsafe fn internal_handle_exception(
         .unwrap();
     match &EXCEPTION_HANDLERS[index] {
         Some(handler_holder) => {
-            info!(
+            log::info!(
                 "{:?}: Handling exception {}",
                 std::process::id(),
                 exception_code
@@ -472,7 +471,7 @@ unsafe fn internal_handle_exception(
             EXCEPTION_CONTINUE_EXECUTION
         }
         None => {
-            info!(
+            log::info!(
                 "{:?}: No handler for exception {}",
                 std::process::id(),
                 exception_code
@@ -512,7 +511,7 @@ pub unsafe extern "system" fn handle_exception(
 /// It is just casting into another type, nothing unsafe.
 #[must_use]
 pub const unsafe fn sig_ign() -> NativeSignalHandlerType {
-    core::mem::transmute(1u64)
+    core::mem::transmute(1usize)
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
@@ -601,11 +600,11 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     let result = SetConsoleCtrlHandler(Some(ctrl_handler), true);
     match result {
         Ok(()) => {
-            info!("SetConsoleCtrlHandler succeeded");
+            log::info!("SetConsoleCtrlHandler succeeded");
             Ok(())
         }
         Err(err) => {
-            info!("SetConsoleCtrlHandler failed");
+            log::info!("SetConsoleCtrlHandler failed");
             Err(Error::from(err))
         }
     }
@@ -615,7 +614,7 @@ unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
     let handler = ptr::read_volatile(addr_of!(CTRL_HANDLER));
     match handler {
         Some(handler_holder) => {
-            info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
+            log::info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
             let handler = &mut *handler_holder.handler.get();
             if let Some(ctrl_handler) = handler.as_mut() {
                 (*ctrl_handler).handle(ctrl_type).into()

@@ -30,14 +30,13 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    command::NopCommandManager,
+    config,
     elf::EasyElf,
-    executor::{stateful::StatefulQemuExecutor, QemuExecutorState},
+    executor::QemuExecutor,
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    Emulator, NopEmulatorExitHandler, QemuExitError, QemuExitReason, QemuRWError,
-    QemuShutdownCause, Regs,
+    Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -87,22 +86,30 @@ pub fn fuzz() {
     println!("Breakpoint address = {breakpoint:#x}");
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+        let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
         // Initialize QEMU
-        let args: Vec<String> = env::args().collect();
-        let env: Vec<(String, String)> = env::vars().collect();
+        let qemu = Qemu::builder()
+            .machine("mps2-an385")
+            .monitor(config::Monitor::Null)
+            .kernel(format!("{target_dir}/example.elf"))
+            .serial(config::Serial::Null)
+            .no_graphic(true)
+            .snapshot(true)
+            .drives([config::Drive::builder()
+                .interface(config::DriveInterface::None)
+                .format(config::DiskImageFileFormat::Qcow2)
+                .file(format!("{target_dir}/dummy.qcow2"))
+                .build()])
+            .start_cpu(false)
+            .build()
+            .expect("Failed to initialized QEMU");
 
         let emulator_modules = tuple_list!(EdgeCoverageModule::default());
 
-        let mut emulator = Emulator::new(
-            args.as_slice(),
-            env.as_slice(),
-            emulator_modules,
-            NopEmulatorExitHandler,
-            NopCommandManager,
-        )
-        .unwrap();
-
-        let qemu = emulator.qemu();
+        let emulator = Emulator::empty()
+            .qemu(qemu)
+            .modules(emulator_modules)
+            .build()?;
 
         qemu.set_breakpoint(main_addr);
 
@@ -129,8 +136,7 @@ pub fn fuzz() {
         let snap = qemu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |input: &BytesInput, state: &mut QemuExecutorState<_, _, _, _>| {
-            let emulator = state.emulator_mut();
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
             let target = input.target_bytes();
             let mut buf = target.as_slice();
             let len = buf.len();
@@ -229,8 +235,8 @@ pub fn fuzz() {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // Create a QEMU in-process executor
-        let mut executor = StatefulQemuExecutor::new(
-            &mut emulator,
+        let mut executor = QemuExecutor::new(
+            emulator,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

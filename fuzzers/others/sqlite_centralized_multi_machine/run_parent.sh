@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./ossfuzz --cores 4-7 --input ./corpus
+./ossfuzz --cores 0-1 --input ./corpus

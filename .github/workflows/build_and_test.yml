@@ -221,6 +221,15 @@ jobs:
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
+  md-links-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Markdown Link checks
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          config-file: '.github/workflows/md-config.json'
+
   fuzzers-preflight:
     runs-on: ubuntu-24.04
     steps:

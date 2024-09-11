@@ -39,9 +39,7 @@
 //! fn fuzz_with_qemu(mut options: FuzzerOptions) {
 //!     env::remove_var("LD_LIBRARY_PATH");
 //!
-//!     let env: Vec<(String, String)> = env::vars().collect();
-//!
-//!     let qemu = Qemu::init(&mut options.qemu_args.to_vec(), &mut env).unwrap();
+//!     let qemu = Qemu::init(&mut options.qemu_args.to_vec()).unwrap();
 //!     // do other stuff...
 //! }
 //!

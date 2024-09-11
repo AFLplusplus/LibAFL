@@ -6,10 +6,10 @@ use std::{
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk, libafl_load_addr,
     libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
-    pageflags_get_root, read_self_maps, strlen, GuestAddr, GuestUsize, IntervalTreeNode,
-    IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
+    pageflags_get_root, read_self_maps, GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot,
+    MapInfo, MmapPerms, VerifyAccess,
 };
-use libc::c_int;
+use libc::{c_char, c_int, strlen};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
 
@@ -138,7 +138,12 @@ impl Qemu {
 
     #[must_use]
     pub fn binary_path<'a>(&self) -> &'a str {
-        unsafe { from_utf8_unchecked(from_raw_parts(exec_path, strlen(exec_path))) }
+        unsafe {
+            from_utf8_unchecked(from_raw_parts(
+                exec_path,
+                strlen(exec_path as *const c_char),
+            ))
+        }
     }
 
     #[must_use]

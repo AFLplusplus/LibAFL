@@ -19,7 +19,7 @@ use crate::{
     },
     qemu::{MemAccessInfo, QemuInitError},
     sys::TCGTemp,
-    GuestAddr, Qemu, Regs,
+    Qemu, Regs,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -149,6 +149,7 @@ impl AllocTreeItem {
 }
 use std::pin::Pin;
 
+use libafl_qemu_sys::GuestAddr;
 use object::{Object, ObjectSection};
 
 use crate::{
@@ -684,6 +685,7 @@ pub fn init_qemu_with_asan(
     let add_asan =
         |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
 
+    // TODO: adapt since qemu does not take envp anymore as parameter
     let mut added = false;
     for (k, v) in &mut *env {
         if k == "QEMU_SET_ENV" {
@@ -716,7 +718,7 @@ pub fn init_qemu_with_asan(
         ASAN_INITED = true;
     }
 
-    let qemu = Qemu::init(args, env)?;
+    let qemu = Qemu::init(args)?;
     let rt = AsanGiovese::new(qemu.hooks());
 
     Ok((qemu, rt))

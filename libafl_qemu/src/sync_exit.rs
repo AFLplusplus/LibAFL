@@ -1,17 +1,9 @@
-use std::{
-    fmt::{Display, Formatter},
-    rc::Rc,
-};
+use std::fmt::{Debug, Formatter};
 
 use enum_map::Enum;
-use libafl::state::{HasExecutions, State};
+use libafl::inputs::UsesInput;
 
-use crate::{
-    command::{CommandManager, IsCommand},
-    get_exit_arch_regs,
-    modules::EmulatorModuleTuple,
-    EmulatorExitHandler, GuestReg, Regs, CPU,
-};
+use crate::{command::CommandManager, get_exit_arch_regs, GuestReg, Regs, CPU};
 
 #[derive(Debug, Clone, Enum)]
 pub enum ExitArgs {
@@ -25,32 +17,49 @@ pub enum ExitArgs {
     Arg6,
 }
 
-#[derive(Debug)]
-pub struct SyncExit<CM, EH, ET, S>
+pub struct SyncExit<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
 {
-    command: Rc<dyn IsCommand<CM, EH, ET, S>>,
+    command: CM::Commands,
 }
 
-impl<CM, EH, ET, S> SyncExit<CM, EH, ET, S>
+impl<CM, ED, ET, S, SM> Clone for SyncExit<CM, ED, ET, S, SM>
 where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn clone(&self) -> Self {
+        Self {
+            command: self.command.clone(),
+        }
+    }
+}
+
+impl<CM, ED, ET, S, SM> Debug for SyncExit<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Sync Exit")
+    }
+}
+
+impl<CM, ED, ET, S, SM> SyncExit<CM, ED, ET, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput,
 {
     #[must_use]
-    pub fn new(command: Rc<dyn IsCommand<CM, EH, ET, S>>) -> Self {
+    pub fn new(command: CM::Commands) -> Self {
         Self { command }
     }
 
     #[must_use]
-    pub fn command(&self) -> Rc<dyn IsCommand<CM, EH, ET, S>> {
-        self.command.clone()
+    pub fn command(&self) -> &CM::Commands {
+        &self.command
     }
 
     pub fn ret(&self, cpu: &CPU, value: GuestReg) {
@@ -61,17 +70,5 @@ where
     #[must_use]
     pub fn ret_reg(&self) -> Regs {
         get_exit_arch_regs()[ExitArgs::Ret]
-    }
-}
-
-impl<CM, EH, ET, S> Display for SyncExit<CM, EH, ET, S>
-where
-    CM: CommandManager<EH, ET, S>,
-    EH: EmulatorExitHandler<ET, S>,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + State + HasExecutions,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.command)
     }
 }

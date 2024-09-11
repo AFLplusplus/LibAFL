@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::modules::{
@@ -6,7 +8,8 @@ use crate::modules::{
 };
 
 pub trait StdInstrumentationFilter:
-    HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
+    Debug
+    + HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
     + HasInstrumentationFilter<QemuInstrumentationPagingFilter>
 {
 }
@@ -14,6 +17,7 @@ pub trait StdInstrumentationFilter:
 impl<Head> crate::modules::StdInstrumentationFilter for (Head, ()) where
     Head: HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter>
         + HasInstrumentationFilter<QemuInstrumentationPagingFilter>
+        + Debug
 {
 }
 
