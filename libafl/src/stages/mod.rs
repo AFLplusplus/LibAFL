@@ -710,7 +710,7 @@ mod test {
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
         stages::{RetryCountRestartHelper, Stage},
-        state::{test::test_std_state, HasCorpus, State, UsesState},
+        state::{HasCorpus, State, StdState, UsesState},
         HasMetadata,
     };
 
@@ -811,7 +811,7 @@ mod test {
             }
         }
 
-        let mut state = test_std_state();
+        let mut state = StdState::nop()?;
         let stage = StageWithOneTry;
 
         let corpus_id = state.corpus_mut().add(Testcase::new(NopInput {}))?;
