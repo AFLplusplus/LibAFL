@@ -853,7 +853,6 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 */
 
-/// Tests for tuples
 #[cfg(test)]
 mod test {
     use tuple_list::{tuple_list, tuple_list_type};
