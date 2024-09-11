@@ -74,7 +74,6 @@ dependencies = [
   "test_frida",
   "test_qemu",
   "test_unicorn_mode",
-  "test_nyx_mode",
 ]
 
 [tasks.build_libafl_fuzz]
@@ -251,15 +250,9 @@ python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_packer.py \
         afl \
         instrumentation \
         --fast_reload_mode \
-        --purge > /dev/null
+        --purge
 
-python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_config_gen.py out-nyx Kernel > /dev/null
-
-sudo modprobe -r kvm-intel
-sudo modprobe -r kvm
-sudo modprobe  kvm enable_vmware_backdoor=y
-sudo modprobe  kvm-intel
-
+python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_config_gen.py ./test/out-nyx Kernel
 
 timeout 5s ${FUZZER} -i ./test/seeds_nyx -o ./test/output-nyx  -X -- ./test/out-nyx
 test -n "$( ls ./test/output-nyx/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
@@ -267,7 +260,7 @@ test -n "$( ls ./test/output-nyx/fuzzer_main/queue/id:000002* 2>/dev/null )" || 
 	exit 1
 }
 '''
-dependencies = ["build_afl", "build_libafl_fuzz", "build_nyx_mode"]
+dependencies = ["build_afl", "build_libafl_fuzz"]
 
 [tasks.clean]
 linux_alias = "clean_unix"
