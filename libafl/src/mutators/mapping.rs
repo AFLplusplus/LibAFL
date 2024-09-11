@@ -1,7 +1,6 @@
 //! Allowing mixing and matching between [`Mutator`] and [`crate::inputs::Input`] types.
-use core::marker::PhantomData;
-
 use alloc::borrow::Cow;
+use core::marker::PhantomData;
 
 use libafl_bolts::{tuples::MappingFunctor, Named};
 

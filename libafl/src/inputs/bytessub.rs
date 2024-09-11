@@ -11,9 +11,7 @@ use libafl_bolts::{
     HasLen,
 };
 
-use crate::inputs::HasMutatorBytes;
-
-use super::MappedInput;
+use crate::inputs::{HasMutatorBytes, MappedInput};
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
