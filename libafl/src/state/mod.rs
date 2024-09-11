@@ -1358,7 +1358,6 @@ mod test {
     use crate::{inputs::BytesInput, state::StdState};
 
     #[test]
-    #[must_use]
     fn test_std_state() {
         StdState::nop::<BytesInput>().expect("couldn't instantiate the test state");
     }
