@@ -11,29 +11,35 @@ use crate::{
     Error,
 };
 
-/// Mapping [`Mutator`] that allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type using a function.
+/// Mapping [`Mutator`] that allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type using a function returning a reference.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
 #[cfg_attr(not(feature = "std"), doc = " ```ignore")]
-///
 /// use std::vec::Vec;
 ///
 /// use libafl::{
+///     inputs::MutVecInput,
 ///     mutators::{
-///         mapping::{FunctionMappingMutator, MutVecMappingMutator},
-///         ByteIncMutator, MutationResult, Mutator,
+///         ByteIncMutator, FunctionMappingMutator, MappedInputFunctionMappingMutator,
+///         MutationResult, Mutator,
 ///     },
 ///     state::NopState,
 /// };
 ///
 /// type CustomInput = (Vec<u8>,);
-/// fn extract(input: &mut CustomInput) -> &mut Vec<u8> {
+/// fn extract_to_ref(input: &mut CustomInput) -> &mut Vec<u8> {
 ///     &mut input.0
 /// }
 ///
-/// let inner = MutVecMappingMutator::new(ByteIncMutator::new());
-/// let mut outer = FunctionMappingMutator::new(extract, inner);
+/// fn extract_from_ref(input: &mut Vec<u8>) -> MutVecInput<'_> {
+///     input.into()
+/// }
+///
+/// // construct a mapper that works on &mut Vec<u8>
+/// let inner: MappedInputFunctionMappingMutator<_, _, MutVecInput<'_>> =
+///     MappedInputFunctionMappingMutator::new(extract_from_ref, ByteIncMutator::new());
+/// let mut outer = FunctionMappingMutator::new(extract_to_ref, inner);
 ///
 /// let mut input: CustomInput = (vec![1],);
 ///
@@ -71,40 +77,43 @@ impl<M, F> Named for FunctionMappingMutator<M, F> {
     }
 }
 
-/// Mapper to use when mapping a `tuple_list` of [`Mutator`]s defined for a certain input type for (parts of) a custom input type using a [`FunctionMappingMutator`].
+/// Mapper to use when mapping a [`tuple_list`] of [`Mutator`]s defined for a certain input type for (parts of) a custom input type using a [`FunctionMappingMutator`].
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
 #[cfg_attr(not(feature = "std"), doc = " ```ignore")]
-///
 /// use std::vec::Vec;
-///
-/// use libafl_bolts::tuples::Map;
-/// use tuple_list::tuple_list;
 ///
 /// use libafl::{
 ///     inputs::MutVecInput,
 ///     mutators::{
-///         mapping::{
-///             ToFunctionMappingMutatorMapper, ToMutVecMappingMutatorMapper,
-///         },
-///         ByteIncMutator, MutationResult, Mutator,
+///         ByteIncMutator, MappedInputFunctionMappingMutator, MutationResult, Mutator,
+///         ToFunctionMappingMutatorMapper,
 ///     },
 ///     state::NopState,
 /// };
 ///
+/// use libafl_bolts::tuples::{tuple_list, Map};
+///
 /// type CustomInput = (Vec<u8>,);
-/// fn extract(input: &mut CustomInput) -> &mut Vec<u8> {
+/// fn extract_to_ref(input: &mut CustomInput) -> &mut Vec<u8> {
 ///     &mut input.0
 /// }
 ///
-/// let inner = tuple_list!(ByteIncMutator::new()).map(ToMutVecMappingMutatorMapper);
-/// let outer_list = inner.map(ToFunctionMappingMutatorMapper::new(extract));
+/// fn extract_from_ref(input: &mut Vec<u8>) -> MutVecInput<'_> {
+///     input.into()
+/// }
+///
+/// // construct a mapper that works on &mut Vec<u8>
+/// let inner: MappedInputFunctionMappingMutator<_, _, MutVecInput<'_>> =
+///     MappedInputFunctionMappingMutator::new(extract_from_ref, ByteIncMutator::new());
+/// let inner_list = tuple_list!(inner);
+/// let outer_list = inner_list.map(ToFunctionMappingMutatorMapper::new(extract_to_ref));
 /// let mut outer = outer_list.0;
 ///
 /// let mut input: CustomInput = (vec![1],);
 ///
-/// let mut state: NopState<Option<MutVecInput>> = NopState::new();
+/// let mut state: NopState<CustomInput> = NopState::new();
 /// let res = outer.mutate(&mut state, &mut input).unwrap();
 /// assert_eq!(res, MutationResult::Mutated);
 /// assert_eq!(input, (vec![2],));
@@ -132,6 +141,37 @@ where
     }
 }
 
+/// Mapping [`Mutator`] that allows using [`Mutator`]s for a certain type on (parts of) other input types that can be mapped to this type using a function returning a wrapped reference (see [`MappedInput`]).
+///
+/// # Example
+#[cfg_attr(feature = "std", doc = " ```")]
+#[cfg_attr(not(feature = "std"), doc = " ```ignore")]
+/// use std::vec::Vec;
+///
+/// use libafl::{
+///     inputs::MutVecInput,
+///     mutators::{
+///         ByteIncMutator, MappedInputFunctionMappingMutator, MutationResult, Mutator,
+///     },
+///     state::NopState,
+/// };
+///
+/// type CustomInput = (Vec<u8>,);
+/// fn extract(input: &mut CustomInput) -> MutVecInput<'_> {
+///     (&mut input.0).into()
+/// }
+///
+/// let inner = ByteIncMutator::new();
+/// let mut outer: MappedInputFunctionMappingMutator<_, _, MutVecInput<'_>> =
+///     MappedInputFunctionMappingMutator::new(extract, inner);
+///
+/// let mut input: CustomInput = (vec![1],);
+///
+/// let mut state: NopState<CustomInput> = NopState::new();
+/// let res = outer.mutate(&mut state, &mut input).unwrap();
+/// assert_eq!(res, MutationResult::Mutated);
+/// assert_eq!(input, (vec![2],));
+/// ```
 #[derive(Debug)]
 pub struct MappedInputFunctionMappingMutator<M, F, II> {
     mapper: F,
@@ -168,6 +208,41 @@ impl<M, F, II> Named for MappedInputFunctionMappingMutator<M, F, II> {
     }
 }
 
+/// Mapper to use when mapping a [`tuple_list`] of [`Mutator`]s defined for a certain input type for (parts of) a custom input type using a [`MappedInputFunctionMappingMutator`].
+///
+/// # Example
+#[cfg_attr(feature = "std", doc = " ```")]
+#[cfg_attr(not(feature = "std"), doc = " ```ignore")]
+/// use std::vec::Vec;
+///
+/// use libafl::{
+///     inputs::MutVecInput,
+///     mutators::{
+///         ByteIncMutator, MappedInputFunctionMappingMutator, MutationResult, Mutator,
+///         ToMappedInputFunctionMappingMutatorMapper,
+///     },
+///     state::NopState,
+/// };
+///
+/// use libafl_bolts::tuples::{tuple_list, Map};
+///
+/// type CustomInput = (Vec<u8>,);
+/// fn extract(input: &mut CustomInput) -> MutVecInput<'_> {
+///     (&mut input.0).into()
+/// }
+///
+/// let inner = tuple_list!(ByteIncMutator::new());
+/// let outer_list: (MappedInputFunctionMappingMutator<_, _, MutVecInput<'_>>, _) =
+///     inner.map(ToMappedInputFunctionMappingMutatorMapper::new(extract));
+/// let mut outer = outer_list.0;
+///
+/// let mut input: CustomInput = (vec![1],);
+///
+/// let mut state: NopState<CustomInput> = NopState::new();
+/// let res = outer.mutate(&mut state, &mut input).unwrap();
+/// assert_eq!(res, MutationResult::Mutated);
+/// assert_eq!(input, (vec![2],));
+/// ```
 #[derive(Debug)]
 pub struct ToMappedInputFunctionMappingMutatorMapper<F, II> {
     mapper: F,
@@ -202,14 +277,12 @@ where
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
 #[cfg_attr(not(feature = "std"), doc = " ```ignore")]
-///
 /// use libafl::{
 ///     inputs::MutVecInput,
-///     mutators::{
-///         ByteIncMutator, MutationResult, Mutator, OptionMappingMutator
-///     },
+///     mutators::{ByteIncMutator, MutationResult, Mutator, OptionMappingMutator},
 ///     state::NopState,
 /// };
+///
 /// let inner = ByteIncMutator::new();
 /// let mut outer = OptionMappingMutator::new(inner);
 ///
@@ -263,17 +336,13 @@ where
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
 #[cfg_attr(not(feature = "std"), doc = " ```ignore")]
-///
-/// use libafl_bolts::tuples::Map;
-/// use tuple_list::tuple_list;
-///
 /// use libafl::{
 ///     inputs::MutVecInput,
-///     mutators::{
-///         ByteIncMutator, MutationResult, Mutator, ToOptionMappingMutatorMapper
-///     },
+///     mutators::{ByteIncMutator, MutationResult, Mutator, ToOptionMappingMutatorMapper},
 ///     state::NopState,
 /// };
+/// use libafl_bolts::tuples::{tuple_list, Map};
+///
 /// let inner = tuple_list!(ByteIncMutator::new());
 /// let outer_list = inner.map(ToOptionMappingMutatorMapper);
 /// let mut outer = outer_list.0;
@@ -289,7 +358,6 @@ where
 /// let mut empty_input: Option<MutVecInput> = None;
 /// let res2 = outer.mutate(&mut state, &mut empty_input).unwrap();
 /// assert_eq!(res2, MutationResult::Skipped);
-
 /// ```
 #[derive(Debug)]
 pub struct ToOptionMappingMutatorMapper;
