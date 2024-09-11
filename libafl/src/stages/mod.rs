@@ -698,6 +698,7 @@ impl ExecutionCountRestartHelper {
     }
 }
 
+/// Tests the stages
 #[cfg(test)]
 pub mod test {
     use alloc::borrow::Cow;
@@ -714,11 +715,13 @@ pub mod test {
         HasMetadata,
     };
 
+    /// A stage that succeeds to resume
     #[derive(Debug)]
     pub struct ResumeSucceededStage<S> {
         phantom: PhantomData<S>,
     }
 
+    /// A progress state for testing
     #[derive(Serialize, Deserialize, Debug)]
     pub struct TestProgress {
         count: usize,
@@ -790,6 +793,7 @@ pub mod test {
         }
     }
 
+    /// Test to test retries in stages
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
         // # Safety

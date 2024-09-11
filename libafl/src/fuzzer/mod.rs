@@ -931,6 +931,7 @@ where
     }
 }
 
+/// Tests for the fuzzer trait and [`StdFuzzer`]
 #[cfg(test)]
 pub mod test {
     use core::marker::PhantomData;
@@ -945,12 +946,14 @@ pub mod test {
         Fuzzer, HasMetadata,
     };
 
+    /// A [`NopFuzzer`] that does nothing
     #[derive(Clone, Debug)]
     pub struct NopFuzzer<S> {
         phantom: PhantomData<S>,
     }
 
     impl<S> NopFuzzer<S> {
+        /// Creates a new [`NopFuzzer`]
         #[must_use]
         pub fn new() -> Self {
             Self {

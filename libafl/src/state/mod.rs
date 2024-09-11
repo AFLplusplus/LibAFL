@@ -1336,23 +1336,23 @@ impl<I> HasScalabilityMonitor for NopState<I> {
     }
 }
 
+/// Tests for the [`StdState`]
 #[cfg(test)]
 pub mod test {
     use libafl_bolts::rands::StdRand;
 
-    use super::StdState;
-    use crate::{corpus::InMemoryCorpus, inputs::Input};
+    use crate::{corpus::InMemoryCorpus, inputs::BytesInput, state::StdState};
 
+    #[test]
     #[must_use]
-    pub fn test_std_state<I: Input>() -> StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>
-    {
+    fn test_std_state() {
         StdState::new(
             StdRand::with_seed(0),
-            InMemoryCorpus::<I>::new(),
+            InMemoryCorpus::<BytesInput>::new(),
             InMemoryCorpus::new(),
             &mut (),
             &mut (),
         )
-        .expect("couldn't instantiate the test state")
+        .expect("couldn't instantiate the test state");
     }
 }

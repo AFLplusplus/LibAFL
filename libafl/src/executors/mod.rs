@@ -165,6 +165,7 @@ pub fn common_signals() -> Vec<Signal> {
 }
 
 #[cfg(test)]
+/// Tests for executors
 pub mod test {
     use core::marker::PhantomData;
 
@@ -186,6 +187,7 @@ pub mod test {
     }
 
     impl<S> NopExecutor<S> {
+        /// Creates a new [`NopExecutor`]
         #[must_use]
         pub fn new() -> Self {
             Self {
