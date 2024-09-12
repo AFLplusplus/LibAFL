@@ -1,0 +1,63 @@
+env_scripts = ['''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''', '''
+#!@duckscript
+runs_on_ci = get_env RUN_ON_CI
+
+if ${runs_on_ci}
+    cargo_target_dir = get_env CARGO_MAKE_CRATE_TARGET_DIRECTORY
+    set_env TARGET_DIR ${cargo_target_dir}
+    set_env KERNEL ${cargo_target_dir}/example.elf
+end
+''']
+
+[env]
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+KERNEL = "${TARGET_DIR}/example.elf"
+
+[tasks.target_dir]
+condition = { files_not_exist = ["${TARGET_DIR}"] }
+script_runner = "@shell"
+script = '''
+mkdir -p ${TARGET_DIR}
+'''
+
+[tasks.build_target]
+dependencies = ["target_dir"]
+command = "nasm"
+args = [
+  "-o",
+  "${TARGET_DIR}/boot.bin",
+  "${CARGO_MAKE_WORKING_DIRECTORY}/example/boot.s",
+]
+
+[tasks.build_fuzzer]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}", "--target-dir", "${TARGET_DIR}"]
+
+[tasks.add_caps_fuzzer]
+script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${TARGET_DIR}/${PROFILE_DIR}/${CARGO_MAKE_PROJECT_NAME}"
+
+[tasks.run]
+command = "${TARGET_DIR}/${PROFILE_DIR}/${CARGO_MAKE_PROJECT_NAME}"
+dependencies = ["build_target", "build_fuzzer", "add_caps_fuzzer"]
+
+[tasks.clean]
+clear = true
+script_runner = "@shell"
+script = '''
+rm -rf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+cargo clean
+'''
+
+[tasks.default]
+alias = "run"

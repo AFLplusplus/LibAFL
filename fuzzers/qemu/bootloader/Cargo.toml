@@ -1,0 +1,15 @@
+[package]
+name = "bootloader"
+version = "0.1.0"
+authors = ["Marco Cavenati <cavenati.marco@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_qemu = { path = "../../../libafl_qemu", features = [
+  "x86_64",
+  "systemmode",
+], default-features = false }
+libafl_qemu_sys = { path = "../../../libafl_qemu/libafl_qemu_sys", default-features = false }
+env_logger = "0.11.5"
