@@ -89,7 +89,7 @@ pub fn run_client(
     let (nyx_helper, edges_observer) = if opt.nyx_mode {
         let nyx_settings = NyxSettings::builder()
             .cpu_id(core_id.0)
-            .parent_cpu_id(Some(core_id.0))
+            .parent_cpu_id(None)
             .build();
         let nyx_helper = NyxHelper::new("/tmp/nyx_libxml2/", nyx_settings).unwrap();
         let observer = unsafe {
@@ -246,6 +246,7 @@ pub fn run_client(
         std::env::set_var("LD_PRELOAD", &preload);
         std::env::set_var("DYLD_INSERT_LIBRARIES", &preload);
     }
+
     let mut executor = if opt.nyx_mode {
         SupportedExecutors::Nyx(
             NyxExecutor::builder().build(

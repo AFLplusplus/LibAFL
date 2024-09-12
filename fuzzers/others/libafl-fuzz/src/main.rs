@@ -7,7 +7,6 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::struct_excessive_bools)]
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
-
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 mod afl_stats;
 mod env_parser;
