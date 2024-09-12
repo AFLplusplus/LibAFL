@@ -39,7 +39,7 @@ use crate::{
         ReadExecNHook, ReadGenHook, ReadHookId, TcgHookState, WriteExecHook, WriteExecNHook,
         WriteGenHook, WriteHookId,
     },
-    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, Qemu,
+    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, CrashHookFn, HookState, MemAccessInfo, Qemu,
 };
 
 macro_rules! get_raw_hook {
@@ -80,12 +80,11 @@ where
         for crash_hook in &mut (*addr_of_mut!(emulator_modules.hooks.crash_hooks)) {
             match crash_hook {
                 HookRepr::Function(ptr) => {
-                    let func: fn(&mut EmulatorModules<ET, S>, i32) = transmute(*ptr);
+                    let func: CrashHookFn<ET, S> = transmute(*ptr);
                     func(emulator_modules, target_sig);
                 }
                 HookRepr::Closure(ptr) => {
-                    let func: &mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, i32)> =
-                        transmute(ptr);
+                    let func: &mut CrashHookClosure<ET, S> = transmute(ptr);
                     func(emulator_modules, target_sig);
                 }
                 HookRepr::Empty => (),
