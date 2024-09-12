@@ -44,7 +44,7 @@ dependencies = ["build_afl"]
 script_runner = "@shell"
 script = '''
 cd ${AFL_DIR}/nyx_mode
-./build_nyx_support.sh || true
+bash ./build_nyx_support.sh || true
 cd ../..
 '''
 dependencies = ["build_afl"]
@@ -251,9 +251,9 @@ python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_packer.py \
         instrumentation \
         --fast_reload_mode \
         --purge
-
+echo 1
 python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_config_gen.py ./test/out-nyx Kernel
-
+echo 2
 timeout 15s ${FUZZER} -i ./test/seeds_nyx -o ./test/output-nyx  -X -- ./test/out-nyx
 test -n "$( ls ./test/output-nyx/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for Nyx mode!"
