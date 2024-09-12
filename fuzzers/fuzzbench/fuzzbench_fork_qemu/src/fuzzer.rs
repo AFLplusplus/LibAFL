@@ -338,12 +338,20 @@ fn fuzz(
             qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
             match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {}
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
+                Ok(QemuExitReason::Breakpoint(_)) => {
+                    return ExitKind::Ok;
                 }
-                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                _ => panic!("Unexpected QEMU exit."),
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                    let signal = Signal::from(signal);
+                    signal.handle();
+                    panic!("Unexpected signal: {signal:?}");
+                }
+                Err(QemuExitError::UnexpectedExit) => {
+                    return ExitKind::Crash;
+                }
+                _ => {
+                    panic!("Unexpected QEMU exit.")
+                }
             }
         }
 

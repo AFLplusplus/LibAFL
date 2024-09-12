@@ -69,26 +69,24 @@ macro_rules! hook_to_repr {
 static mut EMULATOR_TOOLS: *mut () = ptr::null_mut();
 
 #[cfg(emulation_mode = "usermode")]
-static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
-
-#[cfg(emulation_mode = "usermode")]
 pub extern "C" fn crash_hook_wrapper<ET, S>(target_sig: i32)
 where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     unsafe {
-        let hooks = Qemu::get().unwrap().hooks();
+        let emulator_modules = EmulatorModules::<ET, S>::emulator_modules_mut().unwrap();
 
-        for crash_hook in &mut (*addr_of_mut!(CRASH_HOOKS)) {
+        for crash_hook in &mut (*addr_of_mut!(emulator_modules.hooks.crash_hooks)) {
             match crash_hook {
                 HookRepr::Function(ptr) => {
-                    let func: fn(QemuHooks, i32) = transmute(*ptr);
-                    func(hooks, target_sig);
+                    let func: fn(&mut EmulatorModules<ET, S>, i32) = transmute(*ptr);
+                    func(emulator_modules, target_sig);
                 }
                 HookRepr::Closure(ptr) => {
-                    let func: &mut Box<dyn FnMut(QemuHooks, i32)> = transmute(ptr);
-                    func(hooks, target_sig);
+                    let func: &mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, i32)> =
+                        transmute(ptr);
+                    func(emulator_modules, target_sig);
                 }
                 HookRepr::Empty => (),
             }

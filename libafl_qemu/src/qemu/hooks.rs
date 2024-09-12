@@ -1035,7 +1035,7 @@ impl QemuHooks {
     #[allow(clippy::unused_self)]
     pub(crate) fn set_crash_hook(self, callback: extern "C" fn(i32)) {
         unsafe {
-            libafl_dump_core_hook = callback;
+            libafl_dump_core_hook = Some(callback);
         }
     }
 }

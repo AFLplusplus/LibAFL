@@ -69,7 +69,12 @@
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
-use std::{io, io::ErrorKind, path::PathBuf, str::from_utf8};
+use std::{
+    fs, io,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+    str::from_utf8,
+};
 
 use clap::Parser;
 use regex::RegexSet;
@@ -79,9 +84,27 @@ use which::which;
 
 const REF_LLVM_VERSION: u32 = 18;
 
-async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
+fn is_workspace(path: &Path) -> bool {
+    for line in fs::read_to_string(path).unwrap().lines() {
+        if line == "[workspace]" {
+            return true;
+        }
+    }
+
+    false
+}
+
+async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
     // Make sure we parse the correct file
-    assert_eq!(path.file_name().unwrap().to_str().unwrap(), "Cargo.toml");
+    assert_eq!(
+        cargo_file_path.file_name().unwrap().to_str().unwrap(),
+        "Cargo.toml"
+    );
+
+    // exit early if the cargo file is a workspace file
+    if is_workspace(cargo_file_path.as_path()) {
+        return Ok(());
+    }
 
     let task_str = if is_check { "Checking" } else { "Formatting" };
 
@@ -91,14 +114,18 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
         .arg("+nightly")
         .arg("fmt")
         .arg("--manifest-path")
-        .arg(path.as_path());
+        .arg(cargo_file_path.as_path());
 
     if is_check {
         fmt_command.arg("--check");
     }
 
     if verbose {
-        println!("[*] {} {}...", task_str, path.as_path().display());
+        println!(
+            "[*] {} {}...",
+            task_str,
+            cargo_file_path.as_path().display()
+        );
     }
 
     let res = fmt_command.output().await?;
@@ -109,7 +136,7 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
         return Err(io::Error::new(
             ErrorKind::Other,
             format!(
-                "Cargo fmt failed. Run cargo fmt for {path:#?}.\nstdout: {stdout}\nstderr: {stderr}"),
+                "Cargo fmt failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"),
         ));
     }
 
@@ -117,7 +144,7 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
 }
 
 async fn run_clang_fmt(
-    path: PathBuf,
+    c_file_path: PathBuf,
     clang: String,
     is_check: bool,
     verbose: bool,
@@ -130,16 +157,16 @@ async fn run_clang_fmt(
         .arg("-i")
         .arg("--style")
         .arg("file")
-        .arg(path.as_path());
+        .arg(c_file_path.as_path());
 
     if is_check {
         fmt_command.arg("-Werror").arg("--dry-run");
     }
 
-    fmt_command.arg(path.as_path());
+    fmt_command.arg(c_file_path.as_path());
 
     if verbose {
-        println!("[*] {} {}...", task_str, path.as_path().display());
+        println!("[*] {} {}...", task_str, c_file_path.as_path().display());
     }
 
     let res = fmt_command.output().await?;
