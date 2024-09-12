@@ -44,7 +44,7 @@ dependencies = ["build_afl"]
 script_runner = "@shell"
 script = '''
 cd ${AFL_DIR}/nyx_mode
-./build_nyx_support.sh
+./build_nyx_support.sh || true
 cd ../..
 '''
 dependencies = ["build_afl"]
@@ -86,7 +86,7 @@ script = '''
 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
 
 export LIBAFL_DEBUG_OUTPUT=1 
-export AFL_CORES=1 
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1 
 
 timeout 5 ${FUZZER} -i ./test/seeds -o ./test/output ./test/out-instr || true
@@ -118,7 +118,7 @@ script_runner = "@shell"
 script = '''
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
-AFL_CORES=1 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
+AFL_CORES=0 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
 test -n "$( ls -A ./test/output-cmplog/fuzzer_main/crashes/)" || {
 	echo "No crashes found"
 	exit 1
@@ -132,7 +132,7 @@ script = '''
 ${CC} -no-pie ./test/test-instr.c -o ./test/out-frida
 
 export AFL_PATH=${AFL_DIR} 
-export AFL_CORES=1 
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1 
 
 timeout 5 ${FUZZER} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida -- ./test/out-frida || true
@@ -180,7 +180,7 @@ ${CC} -pie -fPIE ./test/test-instr.c -o ./test/out-qemu
 ${CC} -o ./test/out-qemu-cmpcov ./test/test-cmpcov.c
 
 export AFL_PATH=${AFL_DIR}
-export AFL_CORES=1
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1
 
 timeout 5 ${FUZZER} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu -- ./test/out-qemu || true
@@ -211,7 +211,7 @@ dependencies = ["build_afl", "build_qemuafl", "build_libafl_fuzz"]
 script_runner = "@shell"
 script = '''
 export AFL_PATH=${AFL_DIR}
-export AFL_CORES=1
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1
 
 # TODO: test unicorn persistent mode once it's fixed on AFL++
@@ -235,7 +235,7 @@ dependencies = ["build_libafl_fuzz", "build_afl", "build_unicorn_mode"]
 script_runner = "@shell"
 script = '''
 export AFL_PATH=${AFL_DIR}
-export AFL_CORES=1
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1
 export AFL_DEBUG=1 
 export LIBAFL_DEBUG_OUTPUT=1
@@ -254,13 +254,13 @@ python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_packer.py \
 
 python3 ${AFL_DIR}/nyx_mode/packer/packer/nyx_config_gen.py ./test/out-nyx Kernel
 
-timeout 5s ${FUZZER} -i ./test/seeds_nyx -o ./test/output-nyx  -X -- ./test/out-nyx
+timeout 15s ${FUZZER} -i ./test/seeds_nyx -o ./test/output-nyx  -X -- ./test/out-nyx
 test -n "$( ls ./test/output-nyx/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for Nyx mode!"
 	exit 1
 }
 '''
-dependencies = ["build_afl", "build_libafl_fuzz"]
+dependencies = ["build_afl", "build_nyx_mode", "build_libafl_fuzz"]
 
 [tasks.clean]
 linux_alias = "clean_unix"

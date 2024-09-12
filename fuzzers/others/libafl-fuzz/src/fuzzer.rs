@@ -40,6 +40,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut, HasLen,
 };
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
 use nix::sys::signal::Signal::{SIGKILL, SIGTERM};
 use serde::{Deserialize, Serialize};
@@ -58,7 +59,6 @@ use crate::{
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, AFL_HARNESS_FILE_INPUT,
     SHMEM_ENV_VAR,
 };
-use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 
 pub type LibaflFuzzState =
     StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
@@ -91,7 +91,7 @@ pub fn run_client(
             .cpu_id(core_id.0)
             .parent_cpu_id(None)
             .build();
-        let nyx_helper = NyxHelper::new("/tmp/nyx_libxml2/", nyx_settings).unwrap();
+        let nyx_helper = NyxHelper::new(opt.executable.clone(), nyx_settings).unwrap();
         let observer = unsafe {
             StdMapObserver::from_mut_ptr("edges", nyx_helper.bitmap_buffer, nyx_helper.bitmap_size)
         };
