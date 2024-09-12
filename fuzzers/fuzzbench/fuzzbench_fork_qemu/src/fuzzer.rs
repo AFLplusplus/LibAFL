@@ -148,7 +148,6 @@ fn fuzz(
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
 
     let emulator_modules = tuple_list!(
         EdgeCoverageChildModule::default(),
@@ -341,7 +340,7 @@ fn fuzz(
                 Ok(QemuExitReason::Breakpoint(_)) => {
                     return ExitKind::Ok;
                 }
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
                     let signal = Signal::from(signal);
                     signal.handle();
                     panic!("Unexpected signal: {signal:?}");
@@ -354,8 +353,6 @@ fn fuzz(
                 }
             }
         }
-
-        ExitKind::Ok
     };
 
     let executor = QemuForkExecutor::new(
