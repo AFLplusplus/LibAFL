@@ -394,7 +394,7 @@ mod tests {
                 hooks::inprocess_fork::InChildProcessHooks,
                 inprocess_fork::GenericInProcessForkExecutor,
             },
-            fuzzer::test::NopFuzzer,
+            fuzzer::NopFuzzer,
             state::NopState,
         };
 
