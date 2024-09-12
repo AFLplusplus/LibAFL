@@ -165,7 +165,7 @@ pub fn common_signals() -> Vec<Signal> {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use core::marker::PhantomData;
 
     use libafl_bolts::{AsSlice, Error};
@@ -173,7 +173,7 @@ pub mod test {
     use crate::{
         events::NopEventManager,
         executors::{Executor, ExitKind},
-        fuzzer::test::NopFuzzer,
+        fuzzer::NopFuzzer,
         inputs::{BytesInput, HasTargetBytes},
         state::{HasExecutions, NopState, State, UsesState},
     };
@@ -186,6 +186,7 @@ pub mod test {
     }
 
     impl<S> NopExecutor<S> {
+        /// Creates a new [`NopExecutor`]
         #[must_use]
         pub fn new() -> Self {
             Self {

@@ -1163,7 +1163,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    pub fn test_dump_registers() {
+    fn test_dump_registers() {
         let ucontext = ucontext().unwrap();
         let mut writer = BufWriter::new(stdout());
         dump_registers(&mut writer, &ucontext).unwrap();
@@ -1193,7 +1193,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    pub fn test_dump_registers() {
+    fn test_dump_registers() {
         let (tx, rx) = mpsc::channel();
         let (evt_tx, evt_rx) = mpsc::channel();
         let t = std::thread::spawn(move || {

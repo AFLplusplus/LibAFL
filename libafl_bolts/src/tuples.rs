@@ -824,22 +824,6 @@ macro_rules! tuple_for_each_mut {
     };
 }
 
-#[cfg(test)]
-#[cfg(feature = "std")]
-#[test]
-#[allow(clippy::items_after_statements)]
-pub fn test_macros() {
-    let mut t = tuple_list!(1, "a");
-
-    tuple_for_each!(f1, std::fmt::Display, t, |x| {
-        log::info!("{x}");
-    });
-
-    tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
-        log::info!("{x}");
-    });
-}
-
 /*
 
 // Define trait and implement it for several primitive types.
@@ -943,5 +927,21 @@ mod test {
         // this won't compile if the mapped type is not correct
         #[allow(clippy::no_effect_underscore_binding)]
         let _type_assert: tuple_list_type!(W<A>, W<B>, W<C>) = mapped;
+    }
+
+    /// Function that tests the tuple macros
+    #[test]
+    #[cfg(feature = "std")]
+    #[allow(clippy::items_after_statements)]
+    fn test_macros() {
+        let mut t = tuple_list!(1, "a");
+
+        tuple_for_each!(f1, std::fmt::Display, t, |x| {
+            log::info!("{x}");
+        });
+
+        tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
+            log::info!("{x}");
+        });
     }
 }
