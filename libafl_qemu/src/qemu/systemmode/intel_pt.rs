@@ -295,8 +295,10 @@ impl IntelPT {
     /// This function can be helpful when `IntelPT::try_new` or `set_ip_filter` fail for an unclear
     /// reason.
     ///
-    /// Returns `Ok(())` if Intel PT is available with all the features used by LibAFL, otherwise
+    /// Returns `Ok(())` if Intel PT is available and has the features used by LibAFL, otherwise
     /// returns an `Err` containing the reasons.
+    ///
+    /// If you use this with QEMU check out [`Self::availability_in_qemu()`] instead.
     pub fn availability() -> Result<(), Error> {
         let mut reasons = Vec::new();
         if cfg!(not(target_os = "linux")) {
@@ -346,21 +348,6 @@ impl IntelPT {
         // https://askubuntu.com/questions/1400874/what-does-perf-paranoia-level-four-do
         // CAP_SYS_ADMIN might make this check useless
 
-        let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
-        if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
-            match s.trim().parse::<i32>().map(|i| i.try_into()) {
-                Ok(Ok(KvmPTMode::System)) => (),
-                Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
-                    "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
-                    KvmPTMode::System,
-                    KvmPTMode::System as i32
-                )),
-                _ => reasons.push(format!(
-                    "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
-                )),
-            }
-        };
-
         if let Ok(current_capabilities) = caps::read(None, CapSet::Permitted) {
             let required_caps = [
                 Capability::CAP_IPC_LOCK,
@@ -377,6 +364,39 @@ impl IntelPT {
         } else {
             reasons.push("Failed to read linux capabilities".to_owned());
         }
+
+        if reasons.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::unsupported(reasons.join("\n")))
+        }
+    }
+
+    /// Check if Intel PT is available on the current system and can be used in combination with
+    /// QEMU.
+    ///
+    /// If you don't use this with QEMU check out [`Self::availability()`] instead.
+    pub fn availability_in_qemu() -> Result<(), Error> {
+        let mut reasons = match Self::availability() {
+            Err(Error::Unsupported(s, _)) => vec![s],
+            Err(e) => panic!("IntelPT::availability() returned an unknown error {e}"),
+            Ok(()) => Vec::new(),
+        };
+
+        let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
+        if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
+            match s.trim().parse::<i32>().map(|i| i.try_into()) {
+                Ok(Ok(KvmPTMode::System)) => (),
+                Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
+                    "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
+                    KvmPTMode::System,
+                    KvmPTMode::System as i32
+                )),
+                _ => reasons.push(format!(
+                    "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
+                )),
+            }
+        };
 
         if reasons.is_empty() {
             Ok(())
