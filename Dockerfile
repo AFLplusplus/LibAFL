@@ -25,7 +25,7 @@ RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja
 RUN set -ex &&\
     wget https://apt.llvm.org/llvm.sh &&\
     chmod +x llvm.sh &&\
-    ./llvm.sh
+    ./llvm.sh ${LLVM_VERSION}
 
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
@@ -37,6 +37,10 @@ COPY scripts/dummy.rs libafl_derive/src/lib.rs
 
 COPY libafl/Cargo.toml libafl/build.rs libafl/README.md libafl/
 COPY scripts/dummy.rs libafl/src/lib.rs
+
+# Set up LLVM aliases
+COPY scripts/createAliases.sh libafl/
+RUN bash libafl/createAliases.sh
 
 COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/README.md libafl_bolts/
 COPY libafl_bolts/examples libafl_bolts/examples
