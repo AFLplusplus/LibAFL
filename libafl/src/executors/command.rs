@@ -620,7 +620,7 @@ mod tests {
             command::{CommandExecutor, InputLocation},
             Executor,
         },
-        fuzzer::test::NopFuzzer,
+        fuzzer::NopFuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         state::NopState,

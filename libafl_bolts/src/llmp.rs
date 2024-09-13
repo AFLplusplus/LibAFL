@@ -3778,7 +3778,7 @@ mod tests {
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
-    pub fn test_llmp_connection() {
+    fn test_llmp_connection() {
         #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
         let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
