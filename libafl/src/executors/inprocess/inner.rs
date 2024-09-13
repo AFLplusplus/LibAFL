@@ -34,12 +34,7 @@ use crate::{
 };
 
 /// The internal state of `GenericInProcessExecutor`.
-pub struct GenericInProcessExecutorInner<HT, OT, S>
-where
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
-    S: State,
-{
+pub struct GenericInProcessExecutorInner<HT, OT, S> {
     /// The observers, observing each run
     pub(super) observers: OT,
     // Crash and timeout hah
@@ -49,9 +44,7 @@ where
 
 impl<HT, OT, S> Debug for GenericInProcessExecutorInner<HT, OT, S>
 where
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S> + Debug,
-    S: State,
+    OT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutorState")
@@ -62,8 +55,6 @@ where
 
 impl<HT, OT, S> UsesState for GenericInProcessExecutorInner<HT, OT, S>
 where
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
     S: State,
 {
     type State = S;
@@ -71,7 +62,6 @@ where
 
 impl<HT, OT, S> UsesObservers for GenericInProcessExecutorInner<HT, OT, S>
 where
-    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -80,7 +70,6 @@ where
 
 impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S>
 where
-    HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State,
 {
@@ -98,7 +87,6 @@ where
 impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
 where
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
     S: State,
 {
     /// This function marks the boundary between the fuzzer and the target
@@ -162,7 +150,7 @@ impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
 where
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
-    S: HasExecutions + HasSolutions + HasCorpus + State,
+    S: HasCorpus + HasExecutions + HasSolutions,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<E, EM, OF, Z>(
@@ -285,9 +273,7 @@ where
 
 impl<HT, OT, S> HasInProcessHooks<S> for GenericInProcessExecutorInner<HT, OT, S>
 where
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
-    S: State + HasExecutions + HasSolutions + HasCorpus,
+    S: UsesInput,
 {
     /// the timeout handler
     #[inline]

@@ -39,7 +39,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
-    os::{dup2, unix_signals::Signal},
+    os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -319,7 +319,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -337,17 +337,12 @@ fn fuzz(
             qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
             match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {
-                    return ExitKind::Ok;
-                }
+                Ok(QemuExitReason::Breakpoint(_)) => ExitKind::Ok,
                 Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
-                    let signal = Signal::from(signal);
                     signal.handle();
                     panic!("Unexpected signal: {signal:?}");
                 }
-                Err(QemuExitError::UnexpectedExit) => {
-                    return ExitKind::Crash;
-                }
+                Err(QemuExitError::UnexpectedExit) => ExitKind::Crash,
                 _ => {
                     panic!("Unexpected QEMU exit.")
                 }

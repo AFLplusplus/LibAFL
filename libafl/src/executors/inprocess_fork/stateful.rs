@@ -24,7 +24,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{HasExecutions, HasSolutions, State, UsesState},
+    state::{HasExecutions, State, UsesState},
     Error,
 };
 
@@ -32,15 +32,11 @@ use crate::{
 pub type StatefulInProcessForkExecutor<'a, H, OT, S, SP, ES, EM, Z> =
     StatefulGenericInProcessForkExecutor<'a, H, (), OT, S, SP, ES, EM, Z>;
 
-impl<'a, H, OT, S, SP, ES, EM, Z, OF> StatefulInProcessForkExecutor<'a, H, OT, S, SP, ES, EM, Z>
+impl<'a, H, OT, S, SP, ES, EM, Z> StatefulInProcessForkExecutor<'a, H, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
-    S: State + HasSolutions,
-    Z: HasObjective<Objective = OF, State = S>,
+    S: State,
 {
     #[allow(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
@@ -71,30 +67,26 @@ where
 /// [`StatefulGenericInProcessForkExecutor`] is an executor that forks the current process before each execution. Harness can access some internal state.
 pub struct StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
+    /// The harness function, being executed for each fuzzing loop execution
     harness_fn: &'a mut H,
-    exposed_executor_state: ES,
-    inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
+    /// The state used as argument of the harness
+    pub exposed_executor_state: ES,
+    /// Inner state of the executor
+    pub inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
     phantom: PhantomData<ES>,
 }
 
 impl<'a, H, HT, OT, S, SP, ES, EM, Z> Debug
     for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S> + Debug,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
+    HT: Debug,
+    OT: Debug,
     S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S> + Debug,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    SP: Debug,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -116,13 +108,8 @@ where
 impl<'a, H, HT, OT, S, SP, ES, EM, Z> UsesState
     for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     S: State,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type State = S;
 }
@@ -130,14 +117,14 @@ where
 impl<'a, EM, H, HT, OT, S, SP, Z, ES, OF> Executor<EM, Z>
     for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
+    HT: ExecutorHooksTuple<S>,
+    OF: Feedback<S>,
     OT: ObserversTuple<S> + Debug,
     S: State + HasExecutions,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
     Z: HasObjective<Objective = OF, State = S>,
-    OF: Feedback<S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -156,7 +143,7 @@ where
                 Ok(ForkResult::Child) => {
                     // Child
                     self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
-                    (self.harness_fn)(input, &mut self.exposed_executor_state);
+                    (self.harness_fn)(&mut self.exposed_executor_state, input);
                     self.inner.post_run_target_child(fuzzer, state, mgr, input);
                     Ok(ExitKind::Ok)
                 }
@@ -170,18 +157,13 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z, OF>
+impl<'a, H, HT, OT, S, SP, ES, EM, Z>
     StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    Z: UsesState<State = S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
-    S: State + HasSolutions,
-    Z: HasObjective<Objective = OF, State = S>,
+    S: State,
 {
     /// Creates a new [`StatefulGenericInProcessForkExecutor`] with custom hooks
     #[allow(clippy::too_many_arguments)]
@@ -228,13 +210,9 @@ where
 impl<'a, H, HT, OT, S, SP, ES, EM, Z> UsesObservers
     for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple<S>,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: State,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type Observers = OT;
 }
@@ -242,13 +220,9 @@ where
 impl<'a, H, HT, OT, S, SP, ES, EM, Z> HasObservers
     for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple<S>,
-    S: State,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    S: State,
 {
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
