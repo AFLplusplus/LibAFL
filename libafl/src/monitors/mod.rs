@@ -318,8 +318,11 @@ fn prettify_float(value: f64) -> String {
         value => (value, ""),
     };
     match value {
+        value if value >= 1000000.0 => {
+            format!("{value.2}{suffix}")
+        }
         value if value >= 1000.0 => {
-            format!("{value}{suffix}")
+            format!("{value.1}{suffix}")
         }
         value if value >= 100.0 => {
             format!("{value:.1}{suffix}")
