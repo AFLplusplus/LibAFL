@@ -5,9 +5,9 @@
 
 LLVMFILES=/usr/bin/llvm*
 CLANGFILES=/usr/bin/clang*
-LLC=/usr/bin/llc-17
-OPT=/usr/bin/opt-17
-LLD=/usr/bin/lld-17
+LLC=/usr/bin/llc-$1
+OPT=/usr/bin/opt-$1
+LLD=/usr/bin/lld-$1
 
 for f in $LLVMFILES $CLANGFILES $LLC $OPT $LLD
 do

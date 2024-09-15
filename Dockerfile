@@ -40,7 +40,7 @@ COPY scripts/dummy.rs libafl/src/lib.rs
 
 # Set up LLVM aliases
 COPY scripts/createAliases.sh libafl/
-RUN bash libafl/createAliases.sh
+RUN bash libafl/createAliases.sh ${LLVM_VERSION}
 
 COPY libafl_bolts/Cargo.toml libafl_bolts/build.rs libafl_bolts/README.md libafl_bolts/
 COPY libafl_bolts/examples libafl_bolts/examples
