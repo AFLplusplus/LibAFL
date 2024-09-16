@@ -20,6 +20,12 @@ pub mod profiling;
 #[cfg(feature = "std")]
 pub use profiling::*;
 
+/// Intel Processor Trace (PT) observer
+#[cfg(feature = "intel_pt")]
+pub mod intel_pt;
+#[cfg(feature = "intel_pt")]
+pub use intel_pt::*;
+
 pub mod concolic;
 pub mod map;
 pub use map::*;

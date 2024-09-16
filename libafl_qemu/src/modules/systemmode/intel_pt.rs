@@ -1,11 +1,14 @@
 use std::{fmt::Debug, fs::OpenOptions, io::Write};
 
-use libafl::{inputs::UsesInput, observers::ObserversTuple, HasMetadata};
+use libafl::{
+    inputs::UsesInput,
+    observers::{IntelPT, ObserversTuple},
+    HasMetadata,
+};
 use libafl_qemu_sys::CPUArchStatePtr;
 
 use crate::{
     modules::{EmulatorModule, EmulatorModuleTuple, ExitKind},
-    qemu::intel_pt::IntelPT,
     EmulatorModules, NewThreadHook,
 };
 
@@ -62,6 +65,7 @@ where
         .enable_tracing()
         .unwrap();
 
+    println!("IntelPT initialized!");
     // What does this bool mean? ignore for the moment
     true
 }

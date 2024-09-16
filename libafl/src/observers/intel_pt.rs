@@ -1,8 +1,9 @@
-// TODO: This module is not bound to QEMU. Consider moving it somewhere else, it could be used in
-// other libafl modules.
+// TODO: docs
+#![allow(missing_docs)]
 
 use core::{ops::Range, ptr, slice};
 use std::{
+    borrow::ToOwned,
     ffi::CString,
     fs,
     os::{
@@ -10,20 +11,22 @@ use std::{
         raw::c_void,
     },
     path::Path,
+    string::String,
+    vec::Vec,
 };
 
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
-use libafl::Error;
 use libipt::{block::BlockDecoder, Asid, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
-use object::read::macho::address_to_file_offset;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
 use raw_cpuid::CpuId;
+
+use crate::{std::string::ToString, Error};
 
 const PAGE_SIZE: usize = 4096;
 const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
@@ -425,7 +428,7 @@ const fn next_page_aligned_addr(address: u64) -> u64 {
 fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, Error> {
     match unsafe {
         libc::mmap(
-            std::ptr::null_mut(),
+            ptr::null_mut(),
             PERF_BUFFER_SIZE,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_SHARED,
@@ -442,7 +445,7 @@ fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_
     // PROT_WRITE sets PT to stop when the buffer is full
     match unsafe {
         libc::mmap(
-            std::ptr::null_mut(),
+            ptr::null_mut(),
             size as usize,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_SHARED,
@@ -521,9 +524,8 @@ pub fn current_cpu() -> Option<Cpu> {
 
 #[cfg(test)]
 mod test {
-    use std::{arch::asm, env, fs::OpenOptions, io::Write, process};
+    use std::{arch::asm, fs::OpenOptions, io::Write, process};
 
-    use libc::getpid;
     use nix::{
         sys::{
             signal::{kill, raise, Signal},
@@ -531,7 +533,7 @@ mod test {
         },
         unistd::{fork, ForkResult},
     };
-    use proc_maps::{get_process_maps, MapRange, Pid};
+    use proc_maps::get_process_maps;
     use static_assertions::{assert_eq_size, const_assert_eq};
 
     use super::*;
@@ -554,7 +556,7 @@ mod test {
     /// #!/bin/bash
     ///
     /// # Find the test binaries
-    /// for test_bin in target/debug/deps/libafl_qemu*; do
+    /// for test_bin in target/debug/deps/libafl*; do
     ///   # Check if the file is a binary
     ///   if file "$test_bin" | grep -q "ELF"; then
     ///     # Set the desired capabilities on the binary
@@ -569,7 +571,7 @@ mod test {
     /// runner = 'sudo -E'
     /// ```
     #[test]
-    fn trace_pid() {
+    fn intel_pt_trace_fork() {
         if let Err(reason) = IntelPT::availability() {
             // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
             println!("Intel PT is not available, skipping test. Reasons:");

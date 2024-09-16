@@ -89,6 +89,7 @@ libafl = { path = "../libafl", version = "0.13.2", default-features = false, fea
   "std",
   "derive",
   "regex",
+  "intel_pt"
 ] }
 libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features = false, features = [
   "std",
@@ -129,11 +130,6 @@ bytes-utils = "0.1"
 typed-builder = "0.19"
 memmap2 = "0.9"
 getset = "0.1"
-bitflags = "2.6.0"
-perf-event-open-sys = "4.0.0" # Uses Linux 5.19.4 headers, consider forking if we need to bump
-caps = "0.5.5" # TODO: Mark deps used only in systemmode as optional (requires fixing linux_build.rs)
-raw-cpuid = "11.1.0"
-libipt = { git = "https://github.com/Marcondiro/libipt-rs" } # v2 is not on crates.io
 # Document all features of this crate (for `cargo doc`)
 document-features = { version = "0.2", optional = true }
 
@@ -143,11 +139,6 @@ pyo3-build-config = { version = "0.22", optional = true }
 rustversion = "1.0"
 bindgen = "0.69"
 cc = "1.0"
-
-[dev-dependencies]
-static_assertions = "1.1.0"
-nix = { version = "0.29.0", features = ["signal", "process"] }
-proc-maps = "0.3.2"
 
 [lib]
 name = "libafl_qemu"
