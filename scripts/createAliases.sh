@@ -13,8 +13,8 @@ for f in $LLVMFILES $CLANGFILES $LLC $OPT $LLD
 do
 	link=${f::-3}
 	echo "linking" "$f" "to" "$link"
-	ln -s $f $link
-	if [ -e $f ]
-	  then cp $link /usr/local/bin/
+	ln -s "$f" "$link"
+	if [ -e "$f" ]
+	  then cp "$link" /usr/local/bin/
 	fi
 done
