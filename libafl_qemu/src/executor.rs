@@ -259,6 +259,8 @@ where
     }
 }
 
+pub type QemuInProcessForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> = StatefulInProcessForkExecutor<'a, H, OT, S, SP, Emulator<CM, ED, ET, S, SM>, EM, Z>;
+
 #[cfg(feature = "fork")]
 pub struct QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
@@ -270,7 +272,7 @@ where
     SP: ShMemProvider,
     Z: UsesState<State = S>,
 {
-    inner: StatefulInProcessForkExecutor<'a, H, OT, S, SP, Emulator<CM, ED, ET, S, SM>, EM, Z>,
+    inner: QemuInProcessForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>,
 }
 
 #[cfg(feature = "fork")]
@@ -337,13 +339,13 @@ where
 
     pub fn inner(
         &self,
-    ) -> &StatefulInProcessForkExecutor<'a, H, OT, S, SP, Emulator<CM, ED, ET, S, SM>, EM, Z> {
+    ) -> &QemuInProcessForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> {
         &self.inner
     }
 
     pub fn inner_mut(
         &mut self,
-    ) -> &mut StatefulInProcessForkExecutor<'a, H, OT, S, SP, Emulator<CM, ED, ET, S, SM>, EM, Z>
+    ) -> &mut QemuInProcessForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
     {
         &mut self.inner
     }
