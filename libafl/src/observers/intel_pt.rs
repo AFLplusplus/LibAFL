@@ -1,6 +1,7 @@
 // TODO: docs
 #![allow(missing_docs)]
 
+use alloc::borrow::Cow;
 use core::{ops::Range, ptr, slice};
 use std::{
     borrow::ToOwned,
@@ -17,6 +18,7 @@ use std::{
 
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
+use libafl_bolts::Named;
 use libipt::{block::BlockDecoder, Asid, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
@@ -26,7 +28,9 @@ use perf_event_open_sys::{
 };
 use raw_cpuid::CpuId;
 
-use crate::{std::string::ToString, Error};
+use crate::{
+    executors::ExitKind, observers::Observer, prelude::State, std::string::ToString, Error,
+};
 
 const PAGE_SIZE: usize = 4096;
 const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
@@ -72,8 +76,50 @@ pub struct IntelPT {
     buff_metadata: *mut perf_event_mmap_page,
 }
 
+#[derive(Debug, Default)]
+pub struct IntelPTObserver {
+    pt: Option<IntelPT>,
+}
+
+impl Named for IntelPTObserver {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("IntelPTObserver")
+    }
+}
+
+impl<S> Observer<S> for IntelPTObserver
+where
+    S: State,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &S::Input,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+        todo!()
+    }
+
+    fn post_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &S::Input,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        todo!()
+    }
+}
+
 impl IntelPT {
-    pub fn try_new(pid: i32) -> Result<Self, Error> {
+    fn try_new(pid: i32) -> Result<Self, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
 
         let fd = match unsafe {
