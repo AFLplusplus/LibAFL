@@ -553,7 +553,10 @@ mod test {
     /// To run this test ensure that the executable has the required capabilities.
     /// This can be achieved with the following command:
     /// ```bash
-    /// #!/bin/bash
+    /// #!/usr/bin/env bash
+    ///
+    /// # Trigger test compilation
+    /// cargo test intel_pt  -p libafl --features=intel_pt --no-default-features
     ///
     /// # Find the test binaries
     /// for test_bin in target/debug/deps/libafl*; do
@@ -563,7 +566,11 @@ mod test {
     ///     sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep "$test_bin"
     ///   fi
     /// done
+    ///
+    /// # Run tests with caps
+    /// cargo test intel_pt  -p libafl --features=intel_pt --no-default-features -- --show-output
     /// ```
+    ///
     /// Or by running with `sudo`:
     /// ```toml
     /// # libafl_qemu/.cargo/config.toml
