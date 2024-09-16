@@ -38,7 +38,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
-    os::{dup2, unix_signals::Signal},
+    os::dup2,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
