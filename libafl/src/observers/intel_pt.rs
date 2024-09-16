@@ -78,11 +78,11 @@ impl IntelPT {
 
         let fd = match unsafe {
             perf_event_open(
-                &mut perf_event_attr as *mut _,
+                ptr::from_mut(&mut perf_event_attr),
                 pid,
                 -1,
                 -1,
-                PERF_FLAG_FD_CLOEXEC as u64,
+                PERF_FLAG_FD_CLOEXEC.into(),
             )
         } {
             -1 => return Err(Error::last_os_error("Failed to open Intel PT perf event")),
@@ -129,7 +129,7 @@ impl IntelPT {
             str_filter.push_str(format!("filter {:#x}/{:#x} ", filter.start, size).as_str());
         }
 
-        debug_assert!(!str_filter.contains("\0"));
+        debug_assert!(!str_filter.contains('\0'));
         // SAFETY: CString::from_vec_unchecked is safe because no null bytes are present in the
         // string
         let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
@@ -174,6 +174,7 @@ impl IntelPT {
         )
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     pub fn decode_with_callback<F: Fn(&mut [u8], u64)>(
         &mut self,
         read_memory: F,
@@ -181,6 +182,7 @@ impl IntelPT {
     ) -> Vec<u64> {
         self.decode(
             Some(|buff: &mut [u8], addr: u64, _: Asid| {
+                debug_assert!(i32::try_from(buff.len()).is_ok());
                 read_memory(buff, addr);
                 buff.len() as i32
             }),
@@ -206,7 +208,7 @@ impl IntelPT {
         let len = (head - tail) as usize;
 
         debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail");
-        println!("Intel PT: decoding {} bytes", len);
+        println!("Intel PT: decoding {len} bytes");
         if let Some(copy_buffer) = copy_buffer {
             copy_buffer.extend_from_slice(unsafe { slice::from_raw_parts(data, len) });
         }
@@ -240,7 +242,7 @@ impl IntelPT {
             status = match decoder.sync_forward() {
                 Ok(s) => s,
                 Err(e) => {
-                    println!("pterror in sync {:?}", e);
+                    println!("pterror in sync {e:?}");
                     break;
                 }
             };
@@ -256,7 +258,7 @@ impl IntelPT {
                             status = s;
                         }
                         Err(e) => {
-                            println!("pterror in event {:?}", e);
+                            println!("pterror in event {e:?}");
                             break Err(e);
                         }
                     };
@@ -273,7 +275,7 @@ impl IntelPT {
                         // Even in case of errors, we may have succeeded in decoding some instructions.
                         // https://github.com/intel/libipt/blob/4a06fdffae39dadef91ae18247add91029ff43c0/ptxed/src/ptxed.c#L1954
                         // Using my fork that fixes this atm
-                        println!("pterror in packet next {:?}", e);
+                        println!("pterror in packet next {e:?}");
                         println!("err block ip: 0x{:x?}", b.ip());
                         ips.push(b.ip());
                         // status = Status::from_bits(e.code() as u32).unwrap();
@@ -298,7 +300,7 @@ impl IntelPT {
     /// This function can be helpful when `IntelPT::try_new` or `set_ip_filter` fail for an unclear
     /// reason.
     ///
-    /// Returns `Ok(())` if Intel PT is available and has the features used by LibAFL, otherwise
+    /// Returns `Ok(())` if Intel PT is available and has the features used by `LibAFL`, otherwise
     /// returns an `Err` containing the reasons.
     ///
     /// If you use this with QEMU check out [`Self::availability_in_qemu()`] instead.
@@ -388,7 +390,7 @@ impl IntelPT {
 
         let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
         if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
-            match s.trim().parse::<i32>().map(|i| i.try_into()) {
+            match s.trim().parse::<i32>().map(TryInto::try_into) {
                 Ok(Ok(KvmPTMode::System)) => (),
                 Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
                     "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
@@ -441,8 +443,10 @@ fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, Error> {
     }
 }
 
+#[allow(clippy::cast_possible_wrap)]
 fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_void, Error> {
     // PROT_WRITE sets PT to stop when the buffer is full
+    debug_assert!(i64::try_from(offset).is_ok());
     match unsafe {
         libc::mmap(
             ptr::null_mut(),
@@ -515,11 +519,12 @@ pub fn smp_rmb() {
 }
 
 #[inline]
+#[must_use]
 pub fn current_cpu() -> Option<Cpu> {
     let cpuid = CpuId::new();
     cpuid
         .get_feature_info()
-        .map(|fi| Cpu::intel(fi.family_id() as u16, fi.model_id(), fi.stepping_id()))
+        .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
 }
 
 #[cfg(test)]
@@ -648,13 +653,10 @@ mod test {
         let _ = dump_trace_to_file(&trace)
             .inspect_err(|e| println!("Failed to dump trace to file: {e}"));
         // remove kernel ips
-        ips = ips
-            .into_iter()
-            .filter(|&addr| addr < 0xff00_0000_0000_0000)
-            .collect();
-        ips.sort();
+        ips.retain(|&addr| addr < 0xff00_0000_0000_0000);
+        ips.sort_unstable();
         ips.dedup();
-        println!("Intel PT traces unique block ips: {:#x?}", ips);
+        println!("Intel PT traces unique block ips: {ips:#x?}");
         // TODO: it seems like some userspace traces are not decoded
         // probably because of smth like this in the traces:
         // PSB
@@ -670,6 +672,7 @@ mod test {
         let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
         let mut file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(trace_path)
             .expect("Failed to open trace output file");
