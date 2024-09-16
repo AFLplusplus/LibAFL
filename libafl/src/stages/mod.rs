@@ -699,7 +699,7 @@ impl ExecutionCountRestartHelper {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
@@ -710,15 +710,17 @@ pub mod test {
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
         stages::{RetryCountRestartHelper, Stage},
-        state::{test::test_std_state, HasCorpus, State, UsesState},
+        state::{HasCorpus, State, StdState, UsesState},
         HasMetadata,
     };
 
+    /// A stage that succeeds to resume
     #[derive(Debug)]
     pub struct ResumeSucceededStage<S> {
         phantom: PhantomData<S>,
     }
 
+    /// A progress state for testing
     #[derive(Serialize, Deserialize, Debug)]
     pub struct TestProgress {
         count: usize,
@@ -790,6 +792,7 @@ pub mod test {
         }
     }
 
+    /// Test to test retries in stages
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
         // # Safety
@@ -808,7 +811,7 @@ pub mod test {
             }
         }
 
-        let mut state = test_std_state();
+        let mut state = StdState::nop()?;
         let stage = StageWithOneTry;
 
         let corpus_id = state.corpus_mut().add(Testcase::new(NopInput {}))?;

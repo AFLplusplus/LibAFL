@@ -366,6 +366,7 @@ pub mod child_signal_handlers {
 }
 
 #[cfg(test)]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 mod tests {
     use libafl_bolts::tuples::tuple_list;
     use serial_test::serial;
@@ -378,7 +379,6 @@ mod tests {
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
-    #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use core::marker::PhantomData;
 
@@ -394,7 +394,7 @@ mod tests {
                 hooks::inprocess_fork::InChildProcessHooks,
                 inprocess_fork::GenericInProcessForkExecutor,
             },
-            fuzzer::test::NopFuzzer,
+            fuzzer::NopFuzzer,
             state::NopState,
         };
 
