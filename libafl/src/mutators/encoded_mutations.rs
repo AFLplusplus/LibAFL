@@ -1,7 +1,10 @@
 //! Mutations for [`EncodedInput`]s
 //!
 use alloc::{borrow::Cow, vec::Vec};
-use core::{cmp::{max, min}, num::NonZero};
+use core::{
+    cmp::{max, min},
+    num::NonZero,
+};
 
 use libafl_bolts::{
     rands::Rand,
@@ -195,11 +198,16 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.codes().len();
-        if size == 0 {
+        let nonzero_size = if let Some(nonzero_size) = NonZero::new(size) {
+            nonzero_size
+        } else {
             return Ok(MutationResult::Skipped);
-        }
-        let off = state.rand_mut().below(size + 1);
-        let mut len = 1 + state.rand_mut().below(min(16, size));
+        };
+
+        let off = state
+            .rand_mut()
+            .below(NonZero::new(size.saturating_add(1)).unwrap());
+        let mut len = 1 + state.rand_mut().below(nonzero_size);
 
         if size + len > max_size {
             if max_size > size {
@@ -210,7 +218,7 @@ where
         }
 
         let from = if let Some(bound) = NonZero::new(size - len) {
-            state.rand_mut().below(size - len)
+            state.rand_mut().below(bound)
         } else {
             0
         };
@@ -302,7 +310,7 @@ where
             }
         }
 
-        let non_zero_size = if let Some(size) = size {
+        let non_zero_size = if let Some(size) = NonZero::new(size) {
             size
         } else {
             return Ok(MutationResult::Skipped);
@@ -326,7 +334,9 @@ where
         let max_size = state.max_size();
         let from = state.rand_mut().below(non_zero_other_size);
         let to = state.rand_mut().below(non_zero_size);
-        let mut len = 1 + state.rand_mut().below(other_size - from);
+        let mut len = 1 + state
+            .rand_mut()
+            .below(NonZero::new(other_size - from).expect("Length too small"));
 
         if size + len > max_size {
             if max_size > size {
