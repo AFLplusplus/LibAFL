@@ -3,8 +3,10 @@ FROM rust:1.76.0 AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
+# Install cargo-binstall to download the sccache build
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
 # install sccache to cache subsequent builds of dependencies
-RUN cargo install --locked sccache
+RUN cargo binstall --no-confirm sccache
 
 ENV HOME=/root
 ENV SCCACHE_CACHE_SIZE="1G"
