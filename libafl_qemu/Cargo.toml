@@ -89,7 +89,7 @@ libafl = { path = "../libafl", version = "0.13.2", default-features = false, fea
   "std",
   "derive",
   "regex",
-  "intel_pt"
+  "intel_pt",
 ] }
 libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features = false, features = [
   "std",

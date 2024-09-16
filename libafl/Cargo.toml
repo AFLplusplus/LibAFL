@@ -116,7 +116,7 @@ intel_pt = [
   "dep:caps",
   "dep:perf-event-open-sys",
   "dep:raw-cpuid",
-  "dep:libipt"
+  "dep:libipt",
 ]
 
 ## Enables features for corpus minimization
@@ -292,7 +292,7 @@ clap = { version = "4.5", optional = true }
 bitflags = { version = "2.6.0", optional = true }
 num_enum = { version = "0.7.3", optional = true }
 caps = { version = "0.5.5", optional = true }
-perf-event-open-sys = { version = "4.0.0", optional = true } # Uses Linux 5.19.4 headers, consider forking if we need to bump
+perf-event-open-sys = { version = "4.0.0", optional = true }                  # Uses Linux 5.19.4 headers, consider forking if we need to bump
 raw-cpuid = { version = "11.1.0", optional = true }
 libipt = { git = "https://github.com/Marcondiro/libipt-rs", optional = true } # v2 is not on crates.io, also I made a couple of changes. TODO: rplace this dep
 
