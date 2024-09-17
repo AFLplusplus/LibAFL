@@ -689,8 +689,12 @@ where
         emulator_modules.after_syscalls(Hook::Function(trace_mmap_snapshot::<ET, S>));
     }
 
-    fn pre_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _input: &S::Input)
-    where
+    fn pre_exec<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _input: &S::Input,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         if self.empty {

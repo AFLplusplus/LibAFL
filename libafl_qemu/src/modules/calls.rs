@@ -412,8 +412,12 @@ where
         );
     }
 
-    fn pre_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, input: &S::Input)
-    where
+    fn pre_exec<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        input: &S::Input,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         self.collectors
@@ -427,6 +431,7 @@ where
         emulator_modules: &mut EmulatorModules<ET, S>,
         input: &S::Input,
         observers: &mut OT,
+        _state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,

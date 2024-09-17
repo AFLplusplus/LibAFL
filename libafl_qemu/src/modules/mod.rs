@@ -48,14 +48,18 @@ where
     {
     }
 
-    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
-    fn pre_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _input: &S::Input)
-    where
+    fn pre_exec<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _input: &S::Input,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
     }
@@ -65,6 +69,7 @@ where
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
+        _state: &mut S,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -84,14 +89,18 @@ where
     where
         ET: EmulatorModuleTuple<S>;
 
-    fn first_exec_all<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
-    where
+    fn first_exec_all<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>;
 
     fn pre_exec_all<ET>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
+        _state: &mut S,
     ) where
         ET: EmulatorModuleTuple<S>;
 
@@ -100,6 +109,7 @@ where
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
+        _state: &mut S,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -118,7 +128,7 @@ where
     {
     }
 
-    fn first_exec_all<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec_all<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -128,6 +138,7 @@ where
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
+        _state: &mut S,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
@@ -138,6 +149,7 @@ where
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
+        _state: &mut S,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -162,20 +174,24 @@ where
         self.1.init_modules_all(emulator_modules);
     }
 
-    fn first_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.first_exec(emulator_modules);
-        self.1.first_exec_all(emulator_modules);
+        self.0.first_exec(emulator_modules, state);
+        self.1.first_exec_all(emulator_modules, state);
     }
 
-    fn pre_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, input: &S::Input)
-    where
+    fn pre_exec_all<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        input: &S::Input,
+        state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.pre_exec(emulator_modules, input);
-        self.1.pre_exec_all(emulator_modules, input);
+        self.0.pre_exec(emulator_modules, input, state);
+        self.1.pre_exec_all(emulator_modules, input, state);
     }
 
     fn post_exec_all<OT, ET>(
@@ -183,15 +199,16 @@ where
         emulator_modules: &mut EmulatorModules<ET, S>,
         input: &S::Input,
         observers: &mut OT,
+        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
         ET: EmulatorModuleTuple<S>,
     {
         self.0
-            .post_exec(emulator_modules, input, observers, exit_kind);
+            .post_exec(emulator_modules, input, observers, state, exit_kind);
         self.1
-            .post_exec_all(emulator_modules, input, observers, exit_kind);
+            .post_exec_all(emulator_modules, input, observers, state, exit_kind);
     }
 }
 
