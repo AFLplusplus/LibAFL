@@ -92,7 +92,7 @@ impl<S> Default for IntelPTHook<S> {
     fn default() -> Self {
         Self {
             pt: None,
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 }
@@ -101,6 +101,7 @@ impl<S> ExecutorHook<S> for IntelPTHook<S>
 where
     S: UsesInput,
 {
+    #[allow(clippy::cast_possible_wrap)]
     fn init<E: HasObservers>(&mut self, _state: &mut S) {
         assert!(self.pt.is_none(), "Intel PT was already set up");
         let pid = process::id();
@@ -111,6 +112,7 @@ where
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.pt.as_mut().unwrap().disable_tracing().unwrap();
         let mut image = Image::new(Some("test_trace_pid")).unwrap();
@@ -742,7 +744,7 @@ fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
     let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
     let mut file = OpenOptions::new()
         .create(true)
-        .append(true)
+        .truncate(true)
         .write(true)
         .open(trace_path)
         .expect("Failed to open trace output file");
