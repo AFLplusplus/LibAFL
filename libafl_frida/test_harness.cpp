@@ -9,7 +9,7 @@
   #include <windows.h>
   #include <winnt.h>
   #include <winternl.h>
-
+   
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD ul_reason_for_call,
                       LPVOID lpReserved) {
   (void)hModule;
@@ -52,7 +52,7 @@ EXTERN int heap_oob_read(const uint8_t *_data, size_t _size) {
 
   // OutputDebugStringA("heap_oob_read\n");
   int *array = new int[100];
-  fprintf(stdout, "heap_oob_read%d\n", array[100]);
+  fprintf(stdout, "heap_oob_read %d\n", array[100]);
   delete[] array;
   return 0;
 }
@@ -70,7 +70,7 @@ EXTERN int malloc_heap_uaf_read(const uint8_t *_data, size_t _size) {
   (void)_size;
   int *array = static_cast<int *>(malloc(100 * sizeof(int)));
   free(array);
-  fprintf(stdout, "%d\n", array[5]);
+  fprintf(stdout, "malloc_heap_uaf_read %d\n", array[5]);
   return 0;
 }
 
@@ -87,7 +87,7 @@ EXTERN int malloc_heap_oob_read(const uint8_t *_data, size_t _size) {
   (void)_data;
   (void)_size;
   int *array = static_cast<int *>(malloc(100 * sizeof(int)));
-  fprintf(stdout, "%d\n", array[100]);
+  fprintf(stdout, "malloc_heap_oob_read %d\n", array[100]);
   free(array);
   return 0;
 }
@@ -188,6 +188,23 @@ EXTERN int heap_oob_memcpy_read(const uint8_t *_data, size_t _size) {
   (void)_size;
 
   const size_t REAL_SIZE = 10;
+  const size_t LARGER_SIZE = REAL_SIZE + 1;
+
+  char *dest = new char[LARGER_SIZE];
+  char *src = new char[REAL_SIZE];
+  memcpy(dest, src, LARGER_SIZE);
+
+  delete[] dest;
+  delete[] src;
+  return 0;
+}
+
+EXTERN int heap_oob_memcpy_write_avx(const uint8_t *_data, size_t _size) {
+  (void)_data;
+  (void)_size;
+
+  // Using 127 bytes to make sure to fall on the AVX instruction in the optimized implementation
+  const size_t REAL_SIZE = 127;
   const size_t LARGER_SIZE = REAL_SIZE + 1;
 
   char *dest = new char[LARGER_SIZE];

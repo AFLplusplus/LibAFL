@@ -78,9 +78,7 @@ where
         let target_bytes = self.target_bytes_converter.to_target_bytes(input);
         self.helper.pre_exec(target_bytes.as_slice())?;
         if self.helper.stalker_enabled() {
-            if self.followed {
-                self.stalker.activate(NativePointer(core::ptr::null_mut()));
-            } else {
+            if !(self.followed) {
                 self.followed = true;
                 let transformer = self.helper.transformer();
                 if let Some(thread_id) = self.thread_id {
@@ -93,6 +91,12 @@ where
                     self.stalker.follow_me::<NoneEventSink>(transformer, None);
                 }
             }
+            // We removed the fuzzer from the stalked ranges,
+            // but we need to pass the harness entry point
+            // so that Stalker knows to pick it despite the module being excluded
+            let harness_fn_ref: &H = self.base.harness();
+            let ptr: *const H = harness_fn_ref as *const H;
+            self.stalker.activate(NativePointer(ptr as *mut c_void));
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
         if self.helper.stalker_enabled() {
@@ -195,15 +199,18 @@ where
                 && (Self::with_target_bytes_converter as usize as u64)
                     < module.base_address as u64 + module.size as u64
             {
-                ranges.insert(
-                    module.base_address as u64..(module.base_address as u64 + module.size as u64),
-                    (0xffff, "fuzzer".to_string()),
-                );
                 log::info!(
                     "Fuzzer range: {:x}-{:x}",
                     module.base_address,
                     module.base_address + module.size
                 );
+                // Exclude the fuzzer from the stalked ranges, it is really unnecessary and harmfull.
+                // Otherwise, Stalker starts messing with our hooks and their callbacks
+                // wrecking havoc and causing deadlocks
+                stalker.exclude(&MemoryRange::new(
+                    NativePointer(module.base_address as *mut c_void),
+                    module.size,
+                ));
                 break;
             }
         }

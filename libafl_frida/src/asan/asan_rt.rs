@@ -65,6 +65,7 @@ extern "C" {
 
 #[cfg(target_os = "windows")]
 #[repr(C)]
+#[allow(clippy::upper_case_acronyms)]
 struct TEB {
     reserved1: [u8; 0x58],
     tls_pointer: *mut *mut u8,
@@ -212,8 +213,8 @@ impl Drop for LastErrorGuard {
     fn drop(&mut self) {
         #[cfg(target_os = "windows")]
         unsafe {
-            SetLastError(self.last_error)
-        };
+            SetLastError(self.last_error);
+        }
         #[cfg(target_os = "linux")]
         set_errno(self.last_error);
     }
@@ -864,6 +865,7 @@ impl AsanRuntime {
                     let _ = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
                     #[allow(non_snake_case)]
+                    #[allow(clippy::redundant_else)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let _last_error_guard = LastErrorGuard::new();
                         let mut invocation = Interceptor::current_invocation();
@@ -891,7 +893,6 @@ impl AsanRuntime {
                                         TLS_LESS_LOCK.unlock(); // Return the original function
                                     }
                                 }
-
                             }
                         }
                         (original)($($param),*)
@@ -1136,14 +1137,14 @@ impl AsanRuntime {
                             *const c_void
                         );
                     }
-                    "UnmapViewOfFile" => {
-                        hook_func!(
-                            $libname, $lib_ident,
-                            UnmapViewOfFile,
-                            (ptr: *const c_void),
-                            bool
-                        );
-                    }
+                    // "UnmapViewOfFile" => {
+                    //     hook_func!(
+                    //         $libname, $lib_ident,
+                    //         UnmapViewOfFile,
+                    //         (ptr: *const c_void),
+                    //         bool
+                    //     );
+                    // }
                     "LoadLibraryExW" => {
                         hook_func!(
                             $libname, $lib_ident,
