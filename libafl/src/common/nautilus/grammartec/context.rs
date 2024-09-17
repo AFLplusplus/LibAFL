@@ -258,7 +258,7 @@ impl Context {
         max_len: usize,
         nt: NTermId,
         p_include_short_rules: usize,
-    ) -> impl Iterator<Item = &RuleId> + 'a {
+    ) -> impl Iterator<Item = &'a RuleId> + 'a {
         self.nts_to_rules[&nt]
             .iter()
             .take_while(move |r| self.rules_to_min_size[*r] <= max_len)
