@@ -81,7 +81,7 @@ impl<S> EmulatorModule<S> for CmpLogModule
 where
     S: Unpin + UsesInput + HasMetadata,
 {
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -124,7 +124,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -363,7 +363,7 @@ impl<S> EmulatorModule<S> for CmpLogRoutinesModule
 where
     S: Unpin + UsesInput,
 {
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
