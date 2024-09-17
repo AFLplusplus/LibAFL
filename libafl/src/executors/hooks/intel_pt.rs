@@ -1,24 +1,26 @@
 // TODO: docs
 #![allow(missing_docs)]
 
-use alloc::borrow::Cow;
 use core::{ops::Range, ptr, slice};
 use std::{
     borrow::ToOwned,
     ffi::CString,
     fs,
+    fs::OpenOptions,
+    io::Write,
+    marker::PhantomData,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
     path::Path,
+    process,
     string::String,
     vec::Vec,
 };
 
 use bitflags::bitflags;
 use caps::{CapSet, Capability};
-use libafl_bolts::Named;
 use libipt::{block::BlockDecoder, Asid, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
@@ -26,10 +28,14 @@ use perf_event_open_sys::{
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
+use proc_maps::get_process_maps;
 use raw_cpuid::CpuId;
 
 use crate::{
-    executors::ExitKind, observers::Observer, prelude::State, std::string::ToString, Error,
+    executors::{hooks::ExecutorHook, HasObservers},
+    inputs::UsesInput,
+    std::string::ToString,
+    Error,
 };
 
 const PAGE_SIZE: usize = 4096;
@@ -76,50 +82,64 @@ pub struct IntelPT {
     buff_metadata: *mut perf_event_mmap_page,
 }
 
-#[derive(Debug, Default)]
-pub struct IntelPTObserver {
+#[derive(Debug)]
+pub struct IntelPTHook<S> {
     pt: Option<IntelPT>,
+    phantom: PhantomData<S>,
 }
 
-impl Named for IntelPTObserver {
-    fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("IntelPTObserver")
+impl<S> Default for IntelPTHook<S> {
+    fn default() -> Self {
+        Self {
+            pt: None,
+            phantom: PhantomData::default(),
+        }
     }
 }
 
-impl<S> Observer<S> for IntelPTObserver
+impl<S> ExecutorHook<S> for IntelPTHook<S>
 where
-    S: State,
+    S: UsesInput,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        todo!()
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {
+        assert!(self.pt.is_none(), "Intel PT was already set up");
+        let pid = process::id();
+        self.pt = Some(IntelPT::try_new(pid as i32).unwrap());
     }
 
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        todo!()
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        todo!()
-    }
-
-    fn post_exec_child(
-        &mut self,
-        _state: &mut S,
-        _input: &S::Input,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        todo!()
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        self.pt.as_mut().unwrap().disable_tracing().unwrap();
+        let mut image = Image::new(Some("test_trace_pid")).unwrap();
+        let pid = process::id();
+        let maps = get_process_maps(pid as i32).unwrap();
+        for map in maps {
+            if map.is_exec() && map.filename().is_some() {
+                let _ = image.add_file(
+                    map.filename().unwrap().to_str().unwrap(),
+                    map.offset as u64,
+                    map.size() as u64,
+                    None,
+                    map.start() as u64,
+                );
+            }
+        }
+        let mut buff = Vec::new();
+        let ips = self
+            .pt
+            .as_mut()
+            .unwrap()
+            .decode_with_image(&mut image, Some(&mut buff));
+        dump_trace_to_file(&buff).unwrap();
+        println!("IPs: {ips:x?}");
     }
 }
 
 impl IntelPT {
-    fn try_new(pid: i32) -> Result<Self, Error> {
+    pub(crate) fn try_new(pid: i32) -> Result<Self, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
 
         let fd = match unsafe {
@@ -338,6 +358,9 @@ impl IntelPT {
                 }
             }
         }
+
+        unsafe { aux_tail.write_volatile(head) };
+
         ips
     }
 
@@ -575,7 +598,7 @@ pub fn current_cpu() -> Option<Cpu> {
 
 #[cfg(test)]
 mod test {
-    use std::{arch::asm, fs::OpenOptions, io::Write, process};
+    use std::{arch::asm, process};
 
     use nix::{
         sys::{
@@ -607,7 +630,7 @@ mod test {
     /// #!/usr/bin/env bash
     ///
     /// # Trigger test compilation
-    /// cargo test intel_pt  -p libafl --features=intel_pt --no-default-features
+    /// cargo test intel_pt -p libafl --features=intel_pt --no-default-features
     ///
     /// # Find the test binaries
     /// for test_bin in target/debug/deps/libafl*; do
@@ -619,7 +642,7 @@ mod test {
     /// done
     ///
     /// # Run tests with caps
-    /// cargo test intel_pt  -p libafl --features=intel_pt --no-default-features -- --show-output
+    /// cargo test intel_pt -p libafl --features=intel_pt --no-default-features -- --show-output
     /// ```
     ///
     /// Or by running with `sudo`:
@@ -713,19 +736,19 @@ mod test {
         // PSB                      <----
         // ...
     }
+}
 
-    fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
-        let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
-        let mut file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(trace_path)
-            .expect("Failed to open trace output file");
+fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
+    let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .write(true)
+        .open(trace_path)
+        .expect("Failed to open trace output file");
 
-        file.write_all(buff)
-            .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
+    file.write_all(buff)
+        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
 
-        Ok(())
-    }
+    Ok(())
 }
