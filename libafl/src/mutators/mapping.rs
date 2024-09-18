@@ -199,7 +199,7 @@ impl<M, S, F, IO, II> Mutator<IO, S> for MappedInputFunctionMappingMutator<M, F,
 where
     for<'a> M: Mutator<II::Type<'a>, S>,
     for<'a> II: MappedInput + 'a,
-    F: for<'a> FnMut(&'a mut IO) -> II::Type<'a>,
+    for<'a> F: FnMut(&'a mut IO) -> II::Type<'a>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut IO) -> Result<MutationResult, Error> {
         let mapped = &mut (self.mapper)(input);
@@ -258,7 +258,10 @@ pub struct ToMappedInputFunctionMappingMutatorMapper<F, II> {
 
 impl<F, II> ToMappedInputFunctionMappingMutatorMapper<F, II> {
     /// Creates a new [`ToMappedInputFunctionMappingMutatorMapper`]
-    pub fn new(mapper: F) -> Self {
+    pub fn new<IO>(mapper: F) -> Self
+    where
+        F: FnMut(IO) -> II,
+    {
         Self {
             mapper,
             phantom: PhantomData,

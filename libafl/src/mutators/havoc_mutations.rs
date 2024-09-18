@@ -218,12 +218,12 @@ pub fn havoc_mutations<I>() -> HavocMutationsType<I> {
 ///
 /// Check the example fuzzer for details on how to use this.
 #[must_use]
-pub fn mapped_havoc_mutations<F1, F2, II>(
+pub fn mapped_havoc_mutations<F1, F2, IO, II>(
     current_input_mapper: F1,
     input_from_corpus_mapper: &F2,
 ) -> MappedHavocMutationsType<'_, F1, F2, II>
 where
-    F1: Clone,
+    F1: Clone + FnMut(IO) -> II,
 {
     havoc_mutations_no_crossover()
         .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
@@ -236,12 +236,12 @@ where
 ///
 /// Check the example fuzzer for details on how to use this.
 #[must_use]
-pub fn optional_mapped_havoc_mutations<F1, F2, II>(
+pub fn optional_mapped_havoc_mutations<F1, F2, IO, II>(
     current_input_mapper: F1,
     input_from_corpus_mapper: &F2,
 ) -> OptionMappedHavocMutationsType<'_, F1, F2, II>
 where
-    F1: Clone,
+    F1: Clone + FnMut(IO) -> II,
 {
     havoc_mutations_no_crossover()
         .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
