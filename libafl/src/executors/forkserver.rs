@@ -1525,6 +1525,7 @@ mod tests {
         let executor = ForkserverExecutor::builder()
             .program(bin)
             .args(args)
+            .coverage_map_size(MAP_SIZE)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
             .build::<_, ()>(tuple_list!(edges_observer));
