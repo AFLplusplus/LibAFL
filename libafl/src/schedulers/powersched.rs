@@ -8,7 +8,6 @@ use libafl_bolts::{
     Named,
 };
 use serde::{Deserialize, Serialize};
-use typed_builder::TypedBuilder;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
@@ -157,7 +156,7 @@ impl SchedulerMetadata {
 }
 
 /// The struct for the powerschedule algorithm
-#[derive(Debug, Clone, Serialize, Deserialize, Copy, TypedBuilder)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy)]
 pub struct PowerSchedule {
     base: BaseSchedule,
     avoid_crash: bool,
@@ -165,6 +164,7 @@ pub struct PowerSchedule {
 
 impl PowerSchedule {
     /// Use `explore` power schedule
+    #[must_use]
     pub fn explore() -> Self {
         Self {
             base: BaseSchedule::EXPLORE,
@@ -173,6 +173,7 @@ impl PowerSchedule {
     }
 
     /// Use `exploit` power schedule
+    #[must_use]
     pub fn exploit() -> Self {
         Self {
             base: BaseSchedule::EXPLOIT,
@@ -181,6 +182,7 @@ impl PowerSchedule {
     }
 
     /// Use `fast` power schedule
+    #[must_use]
     pub fn fast() -> Self {
         Self {
             base: BaseSchedule::FAST,
@@ -189,6 +191,7 @@ impl PowerSchedule {
     }
 
     /// Use `coe` power schedule
+    #[must_use]
     pub fn coe() -> Self {
         Self {
             base: BaseSchedule::COE,
@@ -197,6 +200,7 @@ impl PowerSchedule {
     }
 
     /// Use `lin` power schedule
+    #[must_use]
     pub fn lin() -> Self {
         Self {
             base: BaseSchedule::LIN,
@@ -205,6 +209,7 @@ impl PowerSchedule {
     }
 
     /// Use `quad` power schedule
+    #[must_use]
     pub fn quad() -> Self {
         Self {
             base: BaseSchedule::QUAD,
@@ -213,6 +218,7 @@ impl PowerSchedule {
     }
 
     /// Getter to `avoid_crash`
+    #[must_use]
     pub fn avoid_crash(&self) -> bool {
         self.avoid_crash
     }
@@ -223,6 +229,7 @@ impl PowerSchedule {
     }
 
     /// Getter to the base scheduler
+    #[must_use]
     pub fn base(&self) -> &BaseSchedule {
         &self.base
     }
