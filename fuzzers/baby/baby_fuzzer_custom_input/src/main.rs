@@ -142,13 +142,13 @@ pub fn main() {
         // Creating mutators that will operate on input.byte_array
         let mapped_mutators = mapped_havoc_mutations(
             CustomInput::byte_array_mut,
-            &CustomInput::byte_array_optional,
+            CustomInput::byte_array_optional,
         );
 
         // Creating mutators that will operate on input.optional_byte_array
         let optional_mapped_mutators = optional_mapped_havoc_mutations(
             CustomInput::optional_byte_array_mut,
-            &CustomInput::optional_byte_array_optional,
+            CustomInput::optional_byte_array_optional,
         );
         (mapped_mutators, optional_mapped_mutators)
     };

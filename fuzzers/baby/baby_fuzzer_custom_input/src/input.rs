@@ -44,8 +44,8 @@ impl CustomInput {
     }
 
     /// Returns an immutable reference to the byte array wrapped in [`Some`]
-    pub fn byte_array_optional(&self) -> Option<&[u8]> {
-        Some(&self.byte_array)
+    pub fn byte_array_optional<'a>(&'a self) -> &'a [u8] {
+        &self.byte_array
     }
 
     /// Returns a mutable reference to the optional byte array
@@ -54,7 +54,7 @@ impl CustomInput {
     }
 
     /// Returns an immutable reference to the optional byte array
-    pub fn optional_byte_array_optional(&self) -> Option<&[u8]> {
+    pub fn optional_byte_array_optional<'a>(&'a self) -> Option<&'a [u8]> {
         self.optional_byte_array.as_deref()
     }
 }
