@@ -1196,35 +1196,30 @@ impl<I> CrossoverReplaceMutator<I> {
 }
 
 trait IntoOptionBytes {
-    type Type<'b>
-    where
-        Self: 'b;
+    type Type<'b>;
 
     fn into_option_bytes<'a>(self) -> Option<&'a [u8]>
     where
-        Self: 'a,
-        Self::Type<'a>:;
+        Self: 'a;
 }
 
 impl<'a> IntoOptionBytes for &'a [u8] {
-    type Type<'b> = &'b [u8] where Self: 'b;
+    type Type<'b> = &'b [u8];
 
     fn into_option_bytes<'b>(self) -> Option<&'b [u8]>
     where
         Self: 'b,
-        Self::Type<'b>:,
     {
         Some(self)
     }
 }
 
 impl<'a> IntoOptionBytes for Option<&'a [u8]> {
-    type Type<'b> = Option<&'b [u8]> where Self: 'b;
+    type Type<'b> = Option<&'b [u8]>;
 
     fn into_option_bytes<'b>(self) -> Option<&'b [u8]>
     where
         Self: 'b,
-        Self::Type<'b>:,
     {
         self
     }
@@ -1251,7 +1246,7 @@ impl<S, F, I, O> Mutator<I, S> for MappedCrossoverInsertMutator<F, O>
 where
     S: HasCorpus + HasMaxSize + HasRand + UsesInput,
     I: HasMutatorBytes,
-    O: IntoOptionBytes,
+    for<'a> O: IntoOptionBytes,
     for<'a> O::Type<'a>: IntoOptionBytes,
     for<'a> F: Fn(&'a S::Input) -> <O as IntoOptionBytes>::Type<'a>,
 {
