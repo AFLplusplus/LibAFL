@@ -32,6 +32,7 @@ use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, AsSlice};
 use libc::wchar_t;
+use os_thread_local::ThreadLocal;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -95,10 +96,6 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "actual rip",
 ];
 
-thread_local! {
-    static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
-}
-
 /// The count of registers that need to be saved by the asan runtime
 #[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
@@ -142,6 +139,7 @@ pub struct AsanRuntime {
     pc: Option<usize>,
     hooks: Vec<NativePointer>,
     pub(crate) hooks_enabled: bool,
+    thread_in_hook: ThreadLocal<Cell<bool>>,
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
 }
@@ -514,18 +512,13 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
-                        if this.hooks_enabled {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        if !this.thread_in_hook.with(|f| f.get()) && this.hooks_enabled {
+                            this.thread_in_hook.with(|f|f.set(true));
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            this.thread_in_hook.with(|f|f.set(false));
                             ret
                         } else {
-
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
                     }
@@ -558,10 +551,10 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled {
-                            ASAN_IN_HOOK.set(true);
+                        if !this.thread_in_hook.with(|f| f.get()) && this.hooks_enabled {
+                            this.thread_in_hook.with(|f|f.set(true));
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
+                            this.thread_in_hook.with(|f|f.set(false));
                             ret
                         } else {
                             let ret = (original)($($param),*);
@@ -601,10 +594,10 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
 
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
-                            ASAN_IN_HOOK.set(true);
+                        if !this.thread_in_hook.with(|f| f.get()) && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
+                            this.thread_in_hook.with(|f|f.set(true));
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
+                            this.thread_in_hook.with(|f|f.set(false));
                             ret
                         } else {
                             let ret = (original)($($param),*);
@@ -640,10 +633,10 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
 
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
-                            ASAN_IN_HOOK.set(true);
+                        if !this.thread_in_hook.with(|f|f.get()) && this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
+                            this.thread_in_hook.with(|f|f.set(true));
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
+                            this.thread_in_hook.with(|f|f.set(false));
                             ret
                         } else {
                             let ret = (original)($($param),*);
@@ -2751,6 +2744,7 @@ impl Default for AsanRuntime {
             pc: None,
             hooks: Vec::new(),
             hooks_enabled: false,
+            thread_in_hook: ThreadLocal::new(|| Cell::new(false)),
         }
     }
 }
