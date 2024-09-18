@@ -142,21 +142,29 @@ pub fn check_autoresume(
         create_dir_if_not_exists(&hangs_dir).expect("should be able to create hangs dir");
         create_dir_if_not_exists(&queue_dir).expect("should be able to create queue dir");
         // Copy all our seeds to queue
-        for file in std::fs::read_dir(intial_inputs)? {
-            let path = file?.path();
-            let cpy_res = std::fs::copy(
-                &path,
-                queue_dir.join(path.file_name().ok_or(Error::illegal_state(format!(
-                    "file {} in input directory does not have a filename",
-                    path.display()
-                )))?),
-            );
-            match cpy_res {
-                Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
-                    println!("skipping {} since it is not a regular file", path.display());
+        let mut initial_input_dirs = vec![intial_inputs.clone()];
+        while let Some(dir) = initial_input_dirs.pop() {
+            let entries = std::fs::read_dir(dir)?;
+            for entry in entries {
+                let path = entry?.path();
+                if path.is_dir() {
+                    initial_input_dirs.push(path.clone());
+                    continue;
                 }
-                Err(e) => return Err(e.into()),
-                Ok(_) => {}
+                let cpy_res = std::fs::copy(
+                    &path,
+                    queue_dir.join(path.file_name().ok_or(Error::illegal_state(format!(
+                        "file {} in input directory does not have a filename",
+                        path.display()
+                    )))?),
+                );
+                match cpy_res {
+                    Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
+                        println!("skipping {} since it is not a regular file", path.display());
+                    }
+                    Err(e) => return Err(e.into()),
+                    Ok(_) => {}
+                }
             }
         }
     }
