@@ -313,7 +313,7 @@ fn fuzz(
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()),
     );
 
     // A fuzzer with feedbacks and a corpus scheduler
