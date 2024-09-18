@@ -267,7 +267,7 @@ where
         emulator_modules.syscalls(Hook::Function(syscall_hook::<ET, S>));
     }
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
+    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {

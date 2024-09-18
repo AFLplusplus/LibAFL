@@ -273,7 +273,7 @@ impl<S> EmulatorModule<S> for AsanGuestModule
 where
     S: Unpin + UsesInput,
 {
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
+    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,

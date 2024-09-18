@@ -691,9 +691,9 @@ where
 
     fn pre_exec<ET>(
         &mut self,
+        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
-        _state: &mut S,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
