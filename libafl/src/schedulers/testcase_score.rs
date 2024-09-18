@@ -340,7 +340,7 @@ where
         }
 
         if entry.objectives_found() > 0 && psmeta.strat().map_or(false, |s| s.avoid_crash()) {
-            perf_score *= 0.01;
+            weight *= 0.01;
         }
 
         assert!(weight.is_normal());
