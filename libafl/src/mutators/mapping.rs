@@ -53,12 +53,21 @@ use crate::{
 pub struct FunctionMappingMutator<M, F> {
     mapper: F,
     inner: M,
+    name: Cow<'static, str>,
 }
 
 impl<M, F> FunctionMappingMutator<M, F> {
     /// Creates a new [`FunctionMappingMutator`]
-    pub fn new(mapper: F, inner: M) -> Self {
-        Self { mapper, inner }
+    pub fn new(mapper: F, inner: M) -> Self
+    where
+        M: Named,
+    {
+        let name = Cow::Owned(format!("FunctionMappingMutator<{}>", inner.name()));
+        Self {
+            mapper,
+            inner,
+            name,
+        }
     }
 }
 
@@ -74,7 +83,7 @@ where
 
 impl<M, F> Named for FunctionMappingMutator<M, F> {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("FunctionMappingMutator")
+        &self.name
     }
 }
 
@@ -136,6 +145,7 @@ impl<F> ToFunctionMappingMutatorMapper<F> {
 impl<M, F> MappingFunctor<M> for ToFunctionMappingMutatorMapper<F>
 where
     F: Clone,
+    M: Named,
 {
     type Output = FunctionMappingMutator<M, F>;
 
@@ -181,15 +191,25 @@ where
 pub struct MappedInputFunctionMappingMutator<M, F, II> {
     mapper: F,
     inner: M,
+    name: Cow<'static, str>,
     phantom: PhantomData<II>,
 }
 
 impl<M, F, II> MappedInputFunctionMappingMutator<M, F, II> {
     /// Creates a new [`MappedInputFunctionMappingMutator`]
-    pub fn new(mapper: F, inner: M) -> Self {
+    pub fn new(mapper: F, inner: M) -> Self
+    where
+        M: Named,
+    {
+        let name = Cow::Owned(format!(
+            "MappedInputFunctionMappingMutator<{}>",
+            inner.name()
+        ));
+
         Self {
             mapper,
             inner,
+            name,
             phantom: PhantomData,
         }
     }
@@ -209,7 +229,7 @@ where
 
 impl<M, F, II> Named for MappedInputFunctionMappingMutator<M, F, II> {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("MappedInputFunctionMappingMutator")
+        &self.name
     }
 }
 
@@ -272,6 +292,7 @@ impl<F, II> ToMappedInputFunctionMappingMutatorMapper<F, II> {
 impl<M, F, II> MappingFunctor<M> for ToMappedInputFunctionMappingMutatorMapper<F, II>
 where
     F: Clone,
+    M: Named,
 {
     type Output = MappedInputFunctionMappingMutator<M, F, II>;
 
@@ -313,12 +334,17 @@ where
 #[derive(Debug)]
 pub struct OptionMappingMutator<M> {
     inner: M,
+    name: Cow<'static, str>,
 }
 
 impl<M> OptionMappingMutator<M> {
     /// Creates a new [`OptionMappingMutator`]
-    pub fn new(inner: M) -> Self {
-        Self { inner }
+    pub fn new(inner: M) -> Self
+    where
+        M: Named,
+    {
+        let name = Cow::Owned(format!("OptionMappingMutator<{}>", inner.name()));
+        Self { inner, name }
     }
 }
 
@@ -339,7 +365,7 @@ where
     M: Named,
 {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("OptionMappingMutator")
+        &self.name
     }
 }
 
@@ -376,7 +402,10 @@ where
 #[derive(Debug)]
 pub struct ToOptionMappingMutatorMapper;
 
-impl<M> MappingFunctor<M> for ToOptionMappingMutatorMapper {
+impl<M> MappingFunctor<M> for ToOptionMappingMutatorMapper
+where
+    M: Named,
+{
     type Output = OptionMappingMutator<M>;
 
     fn apply(&mut self, from: M) -> Self::Output {
