@@ -8,6 +8,7 @@ use libafl_bolts::{
     Named,
 };
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
@@ -155,10 +156,87 @@ impl SchedulerMetadata {
     }
 }
 
+/// The struct for the powerschedule algorithm
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, TypedBuilder)]
+pub struct PowerSchedule {
+    base: BaseSchedule,
+    avoid_crash: bool,
+}
+
+impl PowerSchedule {
+    /// Use `explore` power schedule
+    pub fn explore() -> Self {
+        Self {
+            base: BaseSchedule::EXPLORE,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `exploit` power schedule
+    pub fn exploit() -> Self {
+        Self {
+            base: BaseSchedule::EXPLOIT,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `fast` power schedule
+    pub fn fast() -> Self {
+        Self {
+            base: BaseSchedule::FAST,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `coe` power schedule
+    pub fn coe() -> Self {
+        Self {
+            base: BaseSchedule::COE,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `lin` power schedule
+    pub fn lin() -> Self {
+        Self {
+            base: BaseSchedule::LIN,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `quad` power schedule
+    pub fn quad() -> Self {
+        Self {
+            base: BaseSchedule::QUAD,
+            avoid_crash: false,
+        }
+    }
+
+    /// Getter to `avoid_crash`
+    pub fn avoid_crash(&self) -> bool {
+        self.avoid_crash
+    }
+
+    /// Avoid scheduling testcases that caused crashes
+    pub fn set_avoid_crash(&mut self) {
+        self.avoid_crash = true;
+    }
+
+    /// Getter to the base scheduler
+    pub fn base(&self) -> &BaseSchedule {
+        &self.base
+    }
+
+    /// Setter to the base scheduler
+    pub fn set_base(&mut self, base: BaseSchedule) {
+        self.base = base;
+    }
+}
+
 /// The power schedule to use
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-pub enum PowerSchedule {
+pub enum BaseSchedule {
     /// The `explore` power schedule
     EXPLORE,
     /// The `exploit` power schedule

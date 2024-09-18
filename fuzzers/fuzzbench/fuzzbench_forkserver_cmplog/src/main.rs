@@ -309,7 +309,7 @@ fn fuzz(
         StdWeightedScheduler::with_schedule(
             &mut state,
             &edges_observer,
-            Some(PowerSchedule::EXPLORE),
+            Some(PowerSchedule::explore()),
         ),
     );
 

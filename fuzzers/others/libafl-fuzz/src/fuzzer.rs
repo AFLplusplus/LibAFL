@@ -185,7 +185,7 @@ where
         )
     };
     let mutational_stage = TimeTrackingStageWrapper::<FuzzTime, _, _>::new(inner_mutational_stage);
-    let strategy = opt.power_schedule.unwrap_or(PowerSchedule::EXPLORE);
+    let strategy = opt.power_schedule.unwrap_or(PowerSchedule::explore());
 
     // Create our ColorizationStage
     let colorization = ColorizationStage::new(&edges_observer);
