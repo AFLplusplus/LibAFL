@@ -163,6 +163,15 @@ pub struct PowerSchedule {
 }
 
 impl PowerSchedule {
+    #[must_use]
+    /// Constructor
+    pub fn new(base: BaseSchedule) -> Self {
+        Self {
+            base,
+            avoid_crash: false,
+        }
+    }
+
     /// Use `explore` power schedule
     #[must_use]
     pub fn explore() -> Self {

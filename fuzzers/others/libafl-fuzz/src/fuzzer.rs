@@ -16,8 +16,8 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
-        StdWeightedScheduler,
+        powersched::{BaseSchedule, PowerSchedule},
+        IndexesLenTimeMinimizerScheduler, QueueScheduler, StdWeightedScheduler,
     },
     stages::{
         mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
@@ -185,7 +185,7 @@ where
         )
     };
     let mutational_stage = TimeTrackingStageWrapper::<FuzzTime, _, _>::new(inner_mutational_stage);
-    let strategy = opt.power_schedule.unwrap_or(PowerSchedule::explore());
+    let strategy = opt.power_schedule.unwrap_or(BaseSchedule::EXPLORE);
 
     // Create our ColorizationStage
     let colorization = ColorizationStage::new(&edges_observer);
@@ -197,8 +197,9 @@ where
     if opt.sequential_queue {
         scheduler = SupportedSchedulers::Queue(QueueScheduler::new(), PhantomData);
     } else {
+        let ps = PowerSchedule::new(strategy);
         let mut weighted_scheduler =
-            StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(strategy));
+            StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(ps));
         if opt.cycle_schedules {
             weighted_scheduler = weighted_scheduler.cycling_scheduler();
         }

@@ -10,12 +10,6 @@ pub struct LibAflFuzzEventHook {
     exit_on_solution: bool,
 }
 
-impl LibAflFuzzEventHook {
-    pub fn new(exit_on_solution: bool) -> Self {
-        Self { exit_on_solution }
-    }
-}
-
 impl<S> EventManagerHook<S> for LibAflFuzzEventHook
 where
     S: State + Stoppable,
