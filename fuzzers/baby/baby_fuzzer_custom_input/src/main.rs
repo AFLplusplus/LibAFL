@@ -152,7 +152,7 @@ pub fn main() {
     let (mapped_mutators, optional_mapped_mutators) = {
         // Creating mutators that will operate on input.byte_array
         let mapped_mutators = havoc_mutations_no_crossover()
-            .merge(havoc_crossover_with_corpus_mapper(&CustomInput::byte_array))
+            .merge(havoc_crossover_with_corpus_mapper(CustomInput::byte_array))
             .map(ToMappedInputFunctionMappingMutatorMapper::new(
                 CustomInput::byte_array_mut,
             ));
