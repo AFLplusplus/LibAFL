@@ -95,7 +95,7 @@ where
 /// See: [An optimal algorithm for bounded random integers](https://github.com/apple/swift/pull/39143).
 #[inline]
 #[must_use]
-fn fast_bound(rand: u64, n: NonZeroUsize) -> usize {
+pub fn fast_bound(rand: u64, n: NonZeroUsize) -> usize {
     let mul = u128::from(rand).wrapping_mul(u128::from(u64::try_from(usize::from(n)).unwrap()));
     (mul >> 64) as usize
 }

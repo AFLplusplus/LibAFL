@@ -2,7 +2,10 @@
 //! See the original repo [`Grimoire`](https://github.com/RUB-SysSec/grimoire) for more details.
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::cmp::{max, min};
+use core::{
+    cmp::{max, min},
+    num::NonZero,
+};
 
 use libafl_bolts::{
     rands::{choose, fast_bound, Rand},
@@ -272,7 +275,10 @@ where
         let mut mutated = MutationResult::Skipped;
 
         let gen = generalised_meta.generalized_mut();
-        let rand_idx = fast_bound(rand_idx, gen.len());
+        let rand_idx = fast_bound(
+            rand_idx,
+            NonZero::new(gen.len()).ok_or_else(|| Error::empty("No Generalized Metadata found"))?,
+        );
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {

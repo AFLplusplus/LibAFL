@@ -6,6 +6,7 @@ use core::slice::from_raw_parts;
 use core::{
     fmt::Debug,
     mem::size_of,
+    num::NonZero,
     ops::{Add, AddAssign, Deref},
     slice::Iter,
 };
@@ -313,15 +314,18 @@ where
             let Some(meta) = state.metadata_map().get::<Tokens>() else {
                 return Ok(MutationResult::Skipped);
             };
-            if meta.tokens().is_empty() {
+            if let Some(tokens_len) = NonZero::new(meta.tokens().len()) {
+                tokens_len
+            } else {
                 return Ok(MutationResult::Skipped);
             }
-            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len);
 
         let size = input.bytes().len();
-        let off = state.rand_mut().below(size + 1);
+        let off = state
+            .rand_mut()
+            .below(NonZero::new(size.wrapping_add(1)).unwrap());
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -372,22 +376,25 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        if size == 0 {
+        let nonzero_size = if let Some(nonzero_size) = NonZero::new(size) {
+            nonzero_size
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let tokens_len = {
             let Some(meta) = state.metadata_map().get::<Tokens>() else {
                 return Ok(MutationResult::Skipped);
             };
-            if meta.tokens().is_empty() {
+            if let Some(tokens_len) = NonZero::new(meta.tokens().len()) {
+                tokens_len
+            } else {
                 return Ok(MutationResult::Skipped);
             }
-            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len);
 
-        let off = state.rand_mut().below(size);
+        let off = state.rand_mut().below(nonzero_size);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -432,20 +439,26 @@ where
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        if size == 0 {
+        let size = if let Some(size) = NonZero::new(size) {
+            size
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let cmps_len = {
             let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
                 return Ok(MutationResult::Skipped);
             };
             log::trace!("meta: {:x?}", meta);
-            if meta.list.is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
             meta.list.len()
         };
+
+        let cmps_len = if let Some(cmps_len) = NonZero::new(cmps_len) {
+            cmps_len
+        } else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let idx = state.rand_mut().below(cmps_len);
 
         let off = state.rand_mut().below(size);

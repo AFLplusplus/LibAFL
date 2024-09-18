@@ -4,7 +4,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     vec::Vec,
 };
-use core::{cmp::min, marker::PhantomData, mem::size_of, ops::Range};
+use core::{cmp::min, marker::PhantomData, mem::size_of, num::NonZero, ops::Range};
 
 use libafl_bolts::{rands::Rand, Named};
 
@@ -356,8 +356,8 @@ macro_rules! add_mutator_impl {
                     let val = <$size>::from_ne_bytes(bytes.try_into().unwrap());
 
                     // mutate
-                    let num = 1 + state.rand_mut().below(ARITH_MAX) as $size;
-                    let new_val = match state.rand_mut().below(4) {
+                    let num = 1 + state.rand_mut().below(onZero::new(ARITH_MAX).unwrap()) as $size;
+                    let new_val = match state.rand_mut().below(NonZero::new(4).unwrap()) {
                         0 => val.wrapping_add(num),
                         1 => val.wrapping_sub(num),
                         2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
@@ -414,7 +414,11 @@ macro_rules! interesting_mutator_impl {
                 } else {
                     let bytes = input.bytes_mut();
                     let upper_bound = (bytes.len() + 1 - size_of::<$size>());
-                    let idx = state.rand_mut().below(upper_bound);
+                    // # Safety
+                    // the length is at least as large as the size here (checked above), and we add a 1 -> never zero.
+                    let idx = state
+                        .rand_mut()
+                        .below(unsafe { NonZero::new(upper_bound).unwrap_unchecked() });
                     let val = *state.rand_mut().choose(&$interesting).unwrap() as $size;
                     let new_bytes = match state.rand_mut().choose(&[0, 1]).unwrap() {
                         0 => val.to_be_bytes(),
@@ -733,7 +737,11 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size);
+        // # Safety
+        // size is always larger than 0 here (checked above)
+        let target = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
         let range = rand_range(state, size, size - target);
 
         unsafe {
@@ -1068,6 +1076,7 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
+        let nonzero_size = if let Some(size) = Nonz 
         let max_size = state.max_size();
         if size >= max_size {
             return Ok(MutationResult::Skipped);
@@ -1091,7 +1100,7 @@ where
         }
 
         let range = rand_range(state, other_size, min(other_size, max_size - size));
-        let target = state.rand_mut().below(size); // TODO: fix bug if size is 0
+        let target = state.rand_mut().below(size);
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
@@ -1173,7 +1182,9 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let target = state.rand_mut().below(size);
+        // # Safety
+        // Size is > 0 here (checked above)
+        let target = state.rand_mut().below(unsafe { NonZero::new(size).unwrap_unchecked() });
         let range = rand_range(state, other_size, min(other_size, size - target));
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();

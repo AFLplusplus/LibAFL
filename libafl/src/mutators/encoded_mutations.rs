@@ -126,8 +126,8 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
             Ok(MutationResult::Skipped)
         } else {
             let val = state.rand_mut().choose(input.codes_mut()).unwrap();
-            let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
-            *val = match state.rand_mut().below(2) {
+            let num = 1 + state.rand_mut().below(NonZero::new(ARITH_MAX).unwrap()) as u32;
+            *val = match state.rand_mut().below(NonZero::new(2).unwrap()) {
                 0 => val.wrapping_add(num),
                 _ => val.wrapping_sub(num),
             };
@@ -161,9 +161,16 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
         if size <= 2 {
             return Ok(MutationResult::Skipped);
         }
-
-        let off = state.rand_mut().below(size);
-        let len = state.rand_mut().below(size - off);
+        // # Safety
+        // The size is larger than 1 here (checked just above)
+        let off = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+        // # Safety
+        // The size of the offset is below size, the value is never 0.
+        let len = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size - off).unwrap_unchecked() });
         input.codes_mut().drain(off..off + len);
 
         Ok(MutationResult::Mutated)
@@ -266,7 +273,11 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
 
         let from = state.rand_mut().below(size);
         let to = state.rand_mut().below(size);
-        let len = 1 + state.rand_mut().below(size - max(from, to));
+        // # Safety
+        // Both from and to are smaller than size, so size minus any of these can never be 0.
+        let len = 1 + state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size.get() - max(from, to)).unwrap_unchecked() });
 
         unsafe {
             buffer_self_copy(input.codes_mut(), from, to, len);

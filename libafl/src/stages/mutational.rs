@@ -5,7 +5,10 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    num::{NonZero, NonZeroUsize},
+};
 
 use libafl_bolts::{rands::Rand, Named};
 
@@ -277,7 +280,10 @@ where
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
-        Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS)
+        Self::transforming_with_max_iterations(
+            mutator,
+            NonZero::new(DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap(),
+        )
     }
 
     /// Creates a new transforming mutational stage with the given max iterations
