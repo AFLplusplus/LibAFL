@@ -202,15 +202,20 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.inner.exposed_executor_state.first_exec_all();
+        self.inner
+            .exposed_executor_state_mut()
+            .first_exec_all(state);
 
-        self.inner.exposed_executor_state.pre_exec_all(input);
+        self.inner
+            .exposed_executor_state_mut()
+            .pre_exec_all(input, state);
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 
         self.inner.exposed_executor_state.post_exec_all(
             input,
             &mut *self.inner.inner.observers_mut(),
+            state,
             &mut exit_kind,
         );
 

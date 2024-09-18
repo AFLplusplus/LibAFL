@@ -25,7 +25,7 @@ use fuzzer::run_client;
 use libafl::{
     events::{CentralizedLauncher, EventConfig},
     monitors::MultiMonitor,
-    schedulers::powersched::PowerSchedule,
+    schedulers::powersched::BaseSchedule,
     Error,
 };
 use libafl_bolts::{
@@ -126,7 +126,7 @@ struct Opt {
     rng_seed: Option<u64>,
     /// power schedules compute a seed's performance score: explore(default), fast, exploit, seek, rare, mmopt, coe, lin
     #[arg(short = 'p')]
-    power_schedule: Option<PowerSchedule>,
+    power_schedule: Option<BaseSchedule>,
     /// enable `CmpLog` by specifying a binary compiled for it.
     #[arg(short = 'c')]
     cmplog: Option<String>,
