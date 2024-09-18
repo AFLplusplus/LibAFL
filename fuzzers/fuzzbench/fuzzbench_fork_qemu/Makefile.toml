@@ -60,7 +60,7 @@ args = [
   "./out",
   "./${FUZZER_NAME}",
 ]
-dependencies = ["harness", "fuzzer"]
+dependencies = ["harness"]
 
 # Run the fuzzer
 [tasks.test]
