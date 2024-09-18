@@ -254,6 +254,7 @@ jobs:
           - ./fuzzers/baby/baby_fuzzer_grimoire
           - ./fuzzers/baby/baby_fuzzer_gramatron
           - ./fuzzers/baby/baby_fuzzer
+          - ./fuzzers/baby/baby_fuzzer_custom_input
           - ./fuzzers/baby/baby_fuzzer_nautilus
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode

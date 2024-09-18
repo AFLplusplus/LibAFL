@@ -20,7 +20,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     monitors::MultiMonitor,
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
+        havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator,
         token_mutations::I2SRandReplace,
     },
     observers::{
