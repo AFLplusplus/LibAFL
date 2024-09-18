@@ -1,9 +1,13 @@
 // TODO: docs
 #![allow(missing_docs)]
 
-use core::{ops::Range, ptr, slice};
+use core::{
+    ops::{Range, RangeInclusive},
+    ptr, slice,
+};
 use std::{
     borrow::ToOwned,
+    convert::Into,
     ffi::CString,
     fs,
     fs::OpenOptions,
@@ -19,7 +23,6 @@ use std::{
     vec::Vec,
 };
 
-use bitflags::bitflags;
 use caps::{CapSet, Capability};
 use libipt::{block::BlockDecoder, Asid, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
@@ -30,6 +33,7 @@ use perf_event_open_sys::{
 };
 use proc_maps::get_process_maps;
 use raw_cpuid::CpuId;
+use typed_builder::TypedBuilder;
 
 use crate::{
     executors::{hooks::ExecutorHook, HasObservers},
@@ -50,13 +54,28 @@ enum KvmPTMode {
     HostGuest = 1,
 }
 
-bitflags! {
-    /// IA32_RTIT_CTL MSR flags
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    struct PtConfig: u64 {
-        /// Disable call return address compression.
-        /// AKA DisRETC in Intel SDM
-        const NORETCOMP = 0b1 << 11;
+/// Perf event config for `IntelPT` (internally mapped to `IA32_RTIT_CTL MSR`)
+#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
+struct PtConfig {
+    #[builder(
+        default,
+        setter(doc = "Disable call return address compression. AKA DisRETC in Intel SDM")
+    )]
+    noretcomp: bool,
+    #[builder(default)]
+    psb_period: u64, // TODO: ensure this is actually <16 how about this: https://crates.io/crates/bitbybit
+}
+
+// Positions of the different configurations in the u64 bitfield
+impl PtConfig {
+    const NORETCOMP_SHIFT: u64 = 11;
+    const PSB_PERIOD_RANGE: RangeInclusive<u64> = (24..=27);
+}
+
+impl From<PtConfig> for u64 {
+    fn from(val: PtConfig) -> Self {
+        (u64::from(val.noretcomp) << PtConfig::NORETCOMP_SHIFT)
+            | (val.psb_period << PtConfig::PSB_PERIOD_RANGE.start())
     }
 }
 
@@ -102,13 +121,12 @@ where
     S: UsesInput,
 {
     #[allow(clippy::cast_possible_wrap)]
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         assert!(self.pt.is_none(), "Intel PT was already set up");
         let pid = process::id();
         self.pt = Some(IntelPT::try_new(pid as i32).unwrap());
-    }
-
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
@@ -116,6 +134,7 @@ where
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.pt.as_mut().unwrap().disable_tracing().unwrap();
         let mut image = Image::new(Some("test_trace_pid")).unwrap();
+        // TODO optimize, move  this stuff
         let pid = process::id();
         let maps = get_process_maps(pid as i32).unwrap();
         for map in maps {
@@ -137,12 +156,14 @@ where
             .decode_with_image(&mut image, Some(&mut buff));
         dump_trace_to_file(&buff).unwrap();
         println!("IPs: {ips:x?}");
+        self.pt = None;
     }
 }
 
 impl IntelPT {
     pub(crate) fn try_new(pid: i32) -> Result<Self, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
+        // TODO: take advantage of PTWRITE to better isolate target code?
 
         let fd = match unsafe {
             perf_event_open(
@@ -542,12 +563,17 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     attr.set_disabled(1);
     //TODO parametrize?
     attr.set_exclude_kernel(1);
-    attr.config |= PtConfig::NORETCOMP.bits();
+    attr.config = PtConfig::builder()
+        .noretcomp(true)
+        .psb_period(0)
+        .build()
+        .into();
 
     Ok(attr)
 }
 
 fn intel_pt_perf_type() -> Result<u32, Error> {
+    //TODO this can be cached in a static smth
     let path = format!("{PT_EVENT_PATH}/type");
     let s = fs::read_to_string(&path).map_err(|e| {
         Error::os_error(
@@ -625,6 +651,8 @@ mod test {
     const_assert_eq!(PERF_AUX_BUFFER_SIZE & (PERF_AUX_BUFFER_SIZE - 1), 0);
     // Only 64-bit systems are supported, ensure we can use usize and u64 interchangeably
     assert_eq_size!(usize, u64);
+
+    // TODO check that stuff in PtConfig corresponds to /sys/bus/event_source/devices/intel_pt/format/
 
     /// To run this test ensure that the executable has the required capabilities.
     /// This can be achieved with the following command:
@@ -740,8 +768,10 @@ mod test {
     }
 }
 
+static mut FILE_NUM: u128 = 0;
 fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
-    let trace_path = "test_trace_pid_ipt_raw_trace.tmp";
+    let trace_path = unsafe { format!("./traces/test_trace_pid_ipt_raw_trace_{FILE_NUM:06}.tmp") };
+    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
     let mut file = OpenOptions::new()
         .create(true)
         .truncate(true)
@@ -752,5 +782,8 @@ fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
     file.write_all(buff)
         .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
 
+    unsafe {
+        FILE_NUM += 1;
+    }
     Ok(())
 }
