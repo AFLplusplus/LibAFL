@@ -271,14 +271,15 @@ where
                 )))?
                 .to_string();
             filename = format!("id:{id:0>6},time:0,execs:0,orig:{filename}");
-            id += 1;
             let cpy_res = std::fs::copy(&path, queue_dir.join(filename));
             match cpy_res {
                 Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
                     println!("skipping {} since it is not a regular file", path.display());
                 }
                 Err(e) => return Err(e.into()),
-                Ok(_) => {}
+                Ok(_) => {
+                    id += 1;
+                }
             }
             Ok(())
         })?;
