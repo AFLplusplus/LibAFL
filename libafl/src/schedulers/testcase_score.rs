@@ -9,7 +9,7 @@ use crate::{
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
-        powersched::{PowerSchedule, SchedulerMetadata},
+        powersched::{BaseSchedule, SchedulerMetadata},
     },
     state::HasCorpus,
     Error, HasMetadata,
@@ -71,7 +71,7 @@ where
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
-            if strat == PowerSchedule::COE {
+            if *strat.base() == BaseSchedule::COE {
                 let corpus = state.corpus();
                 let mut n_paths = 0;
                 let mut v = 0.0;
@@ -175,14 +175,14 @@ where
         // COE and Fast schedule are fairly different from what are described in the original thesis,
         // This implementation follows the changes made in this pull request https://github.com/AFLplusplus/AFLplusplus/pull/568
         if let Some(strat) = psmeta.strat() {
-            match strat {
-                PowerSchedule::EXPLORE => {
+            match strat.base() {
+                BaseSchedule::EXPLORE => {
                     // Nothing happens in EXPLORE
                 }
-                PowerSchedule::EXPLOIT => {
+                BaseSchedule::EXPLOIT => {
                     factor = MAX_FACTOR;
                 }
-                PowerSchedule::COE => {
+                BaseSchedule::COE => {
                     if libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()])) > fuzz_mu
                         && !favored
                     {
@@ -190,7 +190,7 @@ where
                         factor = 0.0;
                     }
                 }
-                PowerSchedule::FAST => {
+                BaseSchedule::FAST => {
                     if entry.scheduled_count() != 0 {
                         let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
 
@@ -229,11 +229,11 @@ where
                         }
                     }
                 }
-                PowerSchedule::LIN => {
+                BaseSchedule::LIN => {
                     factor = (entry.scheduled_count() as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
-                PowerSchedule::QUAD => {
+                BaseSchedule::QUAD => {
                     factor = ((entry.scheduled_count() * entry.scheduled_count()) as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
@@ -241,7 +241,7 @@ where
         }
 
         if let Some(strat) = psmeta.strat() {
-            if strat != PowerSchedule::EXPLORE {
+            if *strat.base() != BaseSchedule::EXPLORE {
                 if factor > MAX_FACTOR {
                     factor = MAX_FACTOR;
                 }
@@ -252,7 +252,7 @@ where
 
         // Lower bound if the strat is not COE.
         if let Some(strat) = psmeta.strat() {
-            if strat == PowerSchedule::COE && perf_score < 1.0 {
+            if *strat.base() == BaseSchedule::COE && perf_score < 1.0 {
                 perf_score = 1.0;
             }
         }
@@ -260,6 +260,10 @@ where
         // Upper bound
         if perf_score > HAVOC_MAX_MULT * 100.0 {
             perf_score = HAVOC_MAX_MULT * 100.0;
+        }
+
+        if entry.objectives_found() > 0 && psmeta.strat().map_or(false, |s| s.avoid_crash()) {
+            perf_score *= 0.00;
         }
 
         Ok(perf_score)
@@ -303,13 +307,15 @@ where
 
         let q_bitmap_size = tcmeta.bitmap_size() as f64;
 
-        if let Some(
-            PowerSchedule::FAST | PowerSchedule::COE | PowerSchedule::LIN | PowerSchedule::QUAD,
-        ) = psmeta.strat()
-        {
-            let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
-            if hits > 0 {
-                weight /= libm::log10(f64::from(hits)) + 1.0;
+        if let Some(ps) = psmeta.strat() {
+            match ps.base() {
+                BaseSchedule::FAST | BaseSchedule::COE | BaseSchedule::LIN | BaseSchedule::QUAD => {
+                    let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
+                    if hits > 0 {
+                        weight /= libm::log10(f64::from(hits)) + 1.0;
+                    }
+                }
+                _ => (),
             }
         }
 
@@ -331,6 +337,10 @@ where
         // was it fuzzed before?
         if entry.scheduled_count() == 0 {
             weight *= 2.0;
+        }
+
+        if entry.objectives_found() > 0 && psmeta.strat().map_or(false, |s| s.avoid_crash()) {
+            weight *= 0.00;
         }
 
         assert!(weight.is_normal());

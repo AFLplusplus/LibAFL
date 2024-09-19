@@ -10,7 +10,10 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+    mutators::{
+        havoc_mutations::havoc_mutations,
+        scheduled::{tokens_mutations, StdScheduledMutator},
+    },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
@@ -114,7 +117,11 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        StdWeightedScheduler::with_schedule(&mut state, &edges_observer, Some(PowerSchedule::FAST)),
+        StdWeightedScheduler::with_schedule(
+            &mut state,
+            &edges_observer,
+            Some(PowerSchedule::fast()),
+        ),
     );
 
     // A fuzzer with feedbacks and a corpus scheduler

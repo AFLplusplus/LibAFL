@@ -22,8 +22,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
+        StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{
@@ -319,7 +319,7 @@ fn fuzz(
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
         &edges_observer,
-        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+        PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()),
     );
 
     // A fuzzer with feedbacks and a corpus scheduler

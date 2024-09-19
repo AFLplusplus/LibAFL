@@ -338,26 +338,28 @@ where
         })
     }
 
-    pub fn first_exec_all(&mut self) {
+    pub fn first_exec_all(&mut self, state: &mut S) {
         if self.first_exec {
-            self.modules.first_exec_all();
+            self.modules.first_exec_all(state);
             self.first_exec = false;
         }
     }
 
-    pub fn pre_exec_all(&mut self, input: &S::Input) {
-        self.modules.pre_exec_all(input);
+    pub fn pre_exec_all(&mut self, input: &S::Input, state: &mut S) {
+        self.modules.pre_exec_all(input, state);
     }
 
     pub fn post_exec_all<OT>(
         &mut self,
         input: &S::Input,
         observers: &mut OT,
+        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
     {
-        self.modules.post_exec_all(input, observers, exit_kind);
+        self.modules
+            .post_exec_all(input, observers, state, exit_kind);
     }
 }
 

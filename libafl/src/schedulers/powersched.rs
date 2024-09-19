@@ -155,10 +155,104 @@ impl SchedulerMetadata {
     }
 }
 
+/// The struct for the powerschedule algorithm
+#[derive(Debug, Clone, Serialize, Deserialize, Copy)]
+pub struct PowerSchedule {
+    base: BaseSchedule,
+    avoid_crash: bool,
+}
+
+impl PowerSchedule {
+    #[must_use]
+    /// Constructor
+    pub fn new(base: BaseSchedule) -> Self {
+        Self {
+            base,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `explore` power schedule
+    #[must_use]
+    pub fn explore() -> Self {
+        Self {
+            base: BaseSchedule::EXPLORE,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `exploit` power schedule
+    #[must_use]
+    pub fn exploit() -> Self {
+        Self {
+            base: BaseSchedule::EXPLOIT,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `fast` power schedule
+    #[must_use]
+    pub fn fast() -> Self {
+        Self {
+            base: BaseSchedule::FAST,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `coe` power schedule
+    #[must_use]
+    pub fn coe() -> Self {
+        Self {
+            base: BaseSchedule::COE,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `lin` power schedule
+    #[must_use]
+    pub fn lin() -> Self {
+        Self {
+            base: BaseSchedule::LIN,
+            avoid_crash: false,
+        }
+    }
+
+    /// Use `quad` power schedule
+    #[must_use]
+    pub fn quad() -> Self {
+        Self {
+            base: BaseSchedule::QUAD,
+            avoid_crash: false,
+        }
+    }
+
+    /// Getter to `avoid_crash`
+    #[must_use]
+    pub fn avoid_crash(&self) -> bool {
+        self.avoid_crash
+    }
+
+    /// Avoid scheduling testcases that caused crashes
+    pub fn set_avoid_crash(&mut self) {
+        self.avoid_crash = true;
+    }
+
+    /// Getter to the base scheduler
+    #[must_use]
+    pub fn base(&self) -> &BaseSchedule {
+        &self.base
+    }
+
+    /// Setter to the base scheduler
+    pub fn set_base(&mut self, base: BaseSchedule) {
+        self.base = base;
+    }
+}
+
 /// The power schedule to use
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-pub enum PowerSchedule {
+pub enum BaseSchedule {
     /// The `explore` power schedule
     EXPLORE,
     /// The `exploit` power schedule

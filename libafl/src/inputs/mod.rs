@@ -195,6 +195,24 @@ pub trait HasMutatorBytes: HasLen {
     }
 }
 
+/// Mapping types to themselves, used to ensure lifetime consistency for mapped mutators.
+///
+/// Specifically, this is for [`Input`] types that are owned wrappers around a reference. The lifetime of the associated type should be the same as the reference.
+pub trait MappedInput {
+    /// The type for which this trait is implemented
+    type Type<'a>
+    where
+        Self: 'a;
+}
+
+impl<T> MappedInput for Option<T>
+where
+    T: MappedInput,
+{
+    type Type<'a> = Option<T::Type<'a>>
+        where T: 'a;
+}
+
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
 #[derive(Debug)]
 pub struct MutVecInput<'a>(&'a mut Vec<u8>);
@@ -242,6 +260,10 @@ impl<'a> HasMutatorBytes for MutVecInput<'a> {
     {
         self.0.drain(range)
     }
+}
+
+impl<'a> MappedInput for MutVecInput<'a> {
+    type Type<'b> = MutVecInput<'b> where Self: 'b;
 }
 
 /// Defines the input type shared across traits of the type.

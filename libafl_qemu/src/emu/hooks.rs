@@ -1118,17 +1118,17 @@ where
         modules
     }
 
-    pub fn first_exec_all(&mut self) {
+    pub fn first_exec_all(&mut self, state: &mut S) {
         unsafe {
             self.modules_mut()
-                .first_exec_all(Self::emulator_modules_mut_unchecked());
+                .first_exec_all(Self::emulator_modules_mut_unchecked(), state);
         }
     }
 
-    pub fn pre_exec_all(&mut self, input: &S::Input) {
+    pub fn pre_exec_all(&mut self, input: &S::Input, state: &mut S) {
         unsafe {
             self.modules_mut()
-                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input);
+                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input, state);
         }
     }
 
@@ -1136,6 +1136,7 @@ where
         &mut self,
         input: &S::Input,
         observers: &mut OT,
+        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -1145,6 +1146,7 @@ where
                 Self::emulator_modules_mut_unchecked(),
                 input,
                 observers,
+                state,
                 exit_kind,
             );
         }

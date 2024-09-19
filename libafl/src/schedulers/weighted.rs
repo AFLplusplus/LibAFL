@@ -13,13 +13,14 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::powersched::PowerSchedule;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     schedulers::{
-        powersched::{PowerSchedule, SchedulerMetadata},
+        powersched::{BaseSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
@@ -236,21 +237,23 @@ where
     }
 
     /// Cycles the strategy of the scheduler; tries to mimic AFL++'s cycling formula
-    fn cycle_schedule(&mut self, metadata: &mut SchedulerMetadata) -> Result<PowerSchedule, Error> {
-        let next_strat = match metadata.strat().ok_or(Error::illegal_argument(
+    fn cycle_schedule(&mut self, metadata: &mut SchedulerMetadata) -> Result<(), Error> {
+        let mut ps = metadata.strat().ok_or(Error::illegal_argument(
             "No strategy specified when initializing scheduler; cannot cycle!",
-        ))? {
-            PowerSchedule::EXPLORE => PowerSchedule::EXPLOIT,
-            PowerSchedule::COE => PowerSchedule::LIN,
-            PowerSchedule::LIN => PowerSchedule::QUAD,
-            PowerSchedule::FAST => PowerSchedule::COE,
-            PowerSchedule::QUAD => PowerSchedule::FAST,
-            PowerSchedule::EXPLOIT => PowerSchedule::EXPLORE,
+        ))?;
+        let new_base = match ps.base() {
+            BaseSchedule::EXPLORE => BaseSchedule::EXPLOIT,
+            BaseSchedule::COE => BaseSchedule::LIN,
+            BaseSchedule::LIN => BaseSchedule::QUAD,
+            BaseSchedule::FAST => BaseSchedule::COE,
+            BaseSchedule::QUAD => BaseSchedule::FAST,
+            BaseSchedule::EXPLOIT => BaseSchedule::EXPLORE,
         };
-        metadata.set_strat(Some(next_strat));
+        ps.set_base(new_base);
+        metadata.set_strat(Some(ps));
         // We need to recalculate the scores of testcases.
         self.table_invalidated = true;
-        Ok(next_strat)
+        Ok(())
     }
 }
 
