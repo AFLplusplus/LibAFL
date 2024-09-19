@@ -11,30 +11,26 @@
 // Note: for RETADDR to give us the fuzz target caller address we need 
 //       to guarantee that this code is inlined. `inline` keyword provides
 //       no such guarantees, but a macro does.
-#if defined(SANCOV_VALUE_PROFILE) && defined(SANCOV_CMPLOG)
-  #define HANDLE_SANCOV_TRACE_CMP(arg_size, arg1, arg2, arg1_is_const) {\
-    uintptr_t k = RETADDR; \
-    k = (k >> 4) ^ (k << 8); \
+#define SANCOV_VALUE_PROFILE_CALL ;
+#ifdef SANCOV_VALUE_PROFILE
+  #define SANCOV_VALUE_PROFILE_CALL \
     k &= CMP_MAP_SIZE - 1; \
-    __libafl_targets_value_profile1(k, arg1, arg2); \
-    k &= CMPLOG_MAP_W - 1; \
-    cmplog_instructions_checked(k, arg_size, (uint64_t)arg1, (uint64_t)arg2, arg1_is_const); \
-  }
-#elif defined(SANCOV_VALUE_PROFILE)
-  #define HANDLE_SANCOV_TRACE_CMP(arg_size, arg1, arg2, arg1_is_const) {\
-    uintptr_t k = RETADDR; \
-    k = (k >> 4) ^ (k << 8); \
-    k &= CMP_MAP_SIZE - 1; \
-    __libafl_targets_value_profile1(k, arg1, arg2); \
-  }
-#elif defined(SANCOV_CMPLOG)
-  #define HANDLE_SANCOV_TRACE_CMP(arg_size, arg1, arg2, arg1_is_const) {\
-    uintptr_t k = RETADDR; \
-    k = (k >> 4) ^ (k << 8); \
-    k &= CMPLOG_MAP_W - 1; \
-    cmplog_instructions_checked(k, arg_size, (uint64_t)arg1, (uint64_t)arg2, arg1_is_const); \
-  }
+    __libafl_targets_value_profile1(k, arg1, arg2);
 #endif
+
+#define SANCOV_CMPLOG_CALL ;
+#ifdef SANCOV_CMPLOG
+  #define SANCOV_CMPLOG_CALL \
+    k &= CMPLOG_MAP_W - 1; \
+    cmplog_instructions_checked(k, arg_size, (uint64_t)arg1, (uint64_t)arg2, arg1_is_const);
+#endif
+
+#define HANDLE_SANCOV_TRACE_CMP(arg_size, arg1, arg2, arg1_is_const) { \
+  uintptr_t k = RETADDR; \
+  k = (k >> 4) ^ (k << 8); \
+  SANCOV_VALUE_PROFILE_CALL \
+  SANCOV_CMPLOG_CALL \
+}
 
 void __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2) {
   HANDLE_SANCOV_TRACE_CMP(1, arg1, arg2, 0);
