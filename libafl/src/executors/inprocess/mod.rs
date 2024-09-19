@@ -20,6 +20,8 @@ use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
+#[cfg(feature = "intel_pt")]
+use crate::executors::hooks::IntelPTHook;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
@@ -44,6 +46,10 @@ pub mod inner;
 pub mod stateful;
 
 /// The process executor simply calls a target function, as mutable reference to a closure.
+#[cfg(feature = "intel_pt")]
+pub type InProcessExecutor<'a, H, OT, S> =
+    GenericInProcessExecutor<H, &'a mut H, (IntelPTHook<S>, ()), OT, S>;
+#[cfg(not(feature = "intel_pt"))]
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, (), OT, S>;
 
 /// The inprocess executor that allows hooks
@@ -184,8 +190,14 @@ where
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
+        // TODO: dirty trick to use intelPT in babyfuzzer,
+        #[cfg(feature = "intel_pt")]
+        let hooks = tuple_list!(IntelPTHook::default());
+        #[cfg(not(feature = "intel_pt"))]
+        let hooks = tuple_list!();
+
         Self::with_timeout_generic(
-            tuple_list!(),
+            hooks,
             harness_fn,
             observers,
             fuzzer,
@@ -196,7 +208,7 @@ where
     }
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
-    #[cfg(all(feature = "std", target_os = "linux"))]
+    #[cfg(all(feature = "std", target_os = "linux", not(feature = "intel_pt")))]
     pub fn batched_timeout<EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,
@@ -236,6 +248,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
+    #[cfg(not(feature = "intel_pt"))]
     pub fn with_timeout<EM, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,

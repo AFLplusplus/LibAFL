@@ -1,10 +1,7 @@
 // TODO: docs
 #![allow(missing_docs)]
 
-use core::{
-    ops::{Range, RangeInclusive},
-    ptr, slice,
-};
+use core::{ops::Range, ptr, slice};
 use std::{
     borrow::ToOwned,
     convert::Into,
@@ -20,9 +17,12 @@ use std::{
     path::Path,
     process,
     string::String,
+    sync::Mutex,
     vec::Vec,
 };
 
+use arbitrary_int::u4;
+use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libipt::{block::BlockDecoder, Asid, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
@@ -33,7 +33,7 @@ use perf_event_open_sys::{
 };
 use proc_maps::get_process_maps;
 use raw_cpuid::CpuId;
-use typed_builder::TypedBuilder;
+use serde::Serialize;
 
 use crate::{
     executors::{hooks::ExecutorHook, HasObservers},
@@ -47,6 +47,9 @@ const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
 const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
+// Cannot use `LazyLock` for this since libafl_bolts is not `Clone`.
+static PT_PERF_TYPE: Mutex<Option<u32>> = Mutex::new(None);
+
 #[derive(TryFromPrimitive, Debug)]
 #[repr(i32)]
 enum KvmPTMode {
@@ -54,29 +57,16 @@ enum KvmPTMode {
     HostGuest = 1,
 }
 
-/// Perf event config for `IntelPT` (internally mapped to `IA32_RTIT_CTL MSR`)
-#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
+/// Perf event config for `IntelPT`
+///
+/// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
+#[bitfield(u64, default = 0)]
 struct PtConfig {
-    #[builder(
-        default,
-        setter(doc = "Disable call return address compression. AKA DisRETC in Intel SDM")
-    )]
+    /// Disable call return address compression. AKA DisRETC in Intel SDM
+    #[bit(11, rw)]
     noretcomp: bool,
-    #[builder(default)]
-    psb_period: u64, // TODO: ensure this is actually <16 how about this: https://crates.io/crates/bitbybit
-}
-
-// Positions of the different configurations in the u64 bitfield
-impl PtConfig {
-    const NORETCOMP_SHIFT: u64 = 11;
-    const PSB_PERIOD_RANGE: RangeInclusive<u64> = (24..=27);
-}
-
-impl From<PtConfig> for u64 {
-    fn from(val: PtConfig) -> Self {
-        (u64::from(val.noretcomp) << PtConfig::NORETCOMP_SHIFT)
-            | (val.psb_period << PtConfig::PSB_PERIOD_RANGE.start())
-    }
+    #[bits(24..=27, rw)]
+    psb_period: u4,
 }
 
 // pub trait IntelPTDecoder {
@@ -118,20 +108,21 @@ impl<S> Default for IntelPTHook<S> {
 
 impl<S> ExecutorHook<S> for IntelPTHook<S>
 where
-    S: UsesInput,
+    S: UsesInput + Serialize,
 {
-    #[allow(clippy::cast_possible_wrap)]
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
-
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {
         assert!(self.pt.is_none(), "Intel PT was already set up");
         let pid = process::id();
         self.pt = Some(IntelPT::try_new(pid as i32).unwrap());
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
     #[allow(clippy::cast_possible_wrap)]
-    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
+    fn post_exec(&mut self, state: &mut S, _input: &S::Input) {
         self.pt.as_mut().unwrap().disable_tracing().unwrap();
         let mut image = Image::new(Some("test_trace_pid")).unwrap();
         // TODO optimize, move  this stuff
@@ -154,9 +145,10 @@ where
             .as_mut()
             .unwrap()
             .decode_with_image(&mut image, Some(&mut buff));
+        let s = serde_json::to_vec(&state).unwrap();
+        dump_corpus(&s).unwrap();
         dump_trace_to_file(&buff).unwrap();
         println!("IPs: {ips:x?}");
-        self.pt = None;
     }
 }
 
@@ -564,28 +556,35 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     //TODO parametrize?
     attr.set_exclude_kernel(1);
     attr.config = PtConfig::builder()
-        .noretcomp(true)
-        .psb_period(0)
+        .with_noretcomp(true)
+        .with_psb_period(u4::new(0))
         .build()
-        .into();
+        .raw_value;
 
     Ok(attr)
 }
 
 fn intel_pt_perf_type() -> Result<u32, Error> {
-    //TODO this can be cached in a static smth
-    let path = format!("{PT_EVENT_PATH}/type");
-    let s = fs::read_to_string(&path).map_err(|e| {
-        Error::os_error(
-            e,
-            format!("Failed to read Intel PT perf event type from {path}"),
-        )
-    })?;
-    s.trim().parse::<u32>().map_err(|_| {
-        Error::unsupported(format!(
-            "Failed to parse Intel PT perf event type in {path}"
-        ))
-    })
+    let mut cache = PT_PERF_TYPE.lock().unwrap();
+    let perf_type = if let Some(perf_type) = *cache {
+        perf_type
+    } else {
+        let path = format!("{PT_EVENT_PATH}/type");
+        let s = fs::read_to_string(&path).map_err(|e| {
+            Error::os_error(
+                e,
+                format!("Failed to read Intel PT perf event type from {path}"),
+            )
+        })?;
+        let perf_type = s.trim().parse::<u32>().map_err(|_| {
+            Error::unsupported(format!(
+                "Failed to parse Intel PT perf event type in {path}"
+            ))
+        })?;
+        *cache = Some(perf_type);
+        perf_type
+    };
+    Ok(perf_type)
 }
 
 fn intel_pt_nr_addr_filters() -> Result<u32, Error> {
@@ -622,6 +621,42 @@ pub fn current_cpu() -> Option<Cpu> {
     cpuid
         .get_feature_info()
         .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
+}
+
+static mut FILE_NUM: u128 = 0;
+fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
+    let trace_path = unsafe { format!("./traces/test_trace_pid_ipt_raw_trace_{FILE_NUM:06}.tmp") };
+    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(trace_path)
+        .expect("Failed to open trace output file");
+
+    file.write_all(buff)
+        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
+
+    unsafe {
+        FILE_NUM += 1;
+    }
+    Ok(())
+}
+
+fn dump_corpus(buff: &[u8]) -> Result<(), Error> {
+    let trace_path = unsafe { format!("./corpus/{FILE_NUM:06}.json") };
+    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(trace_path)
+        .expect("Failed to open trace output file");
+
+    file.write_all(buff)
+        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -766,24 +801,4 @@ mod test {
         // PSB                      <----
         // ...
     }
-}
-
-static mut FILE_NUM: u128 = 0;
-fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
-    let trace_path = unsafe { format!("./traces/test_trace_pid_ipt_raw_trace_{FILE_NUM:06}.tmp") };
-    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(trace_path)
-        .expect("Failed to open trace output file");
-
-    file.write_all(buff)
-        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
-
-    unsafe {
-        FILE_NUM += 1;
-    }
-    Ok(())
 }
