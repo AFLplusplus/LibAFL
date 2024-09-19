@@ -697,7 +697,8 @@ pub mod unix_shmem {
                     let mut full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
                     full_file_name.truncate(MAX_MMAP_FILENAME_LEN);
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    filename_path.copy_from_slice(&full_file_name.as_bytes());
+                    filename_path[0..full_file_name.len()]
+                        .copy_from_slice(&full_file_name.as_bytes());
                     filename_path[MAX_MMAP_FILENAME_LEN - 1] = 0; // Null terminate!
                     log::info!(
                         "{} Creating shmem {} {:#?}",
