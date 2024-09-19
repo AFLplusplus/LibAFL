@@ -584,20 +584,34 @@ impl Allocator {
         let mut address: mach_vm_address_t = 0;
         let mut size: mach_vm_size_t = 0;
         let mut depth: natural_t = 0;
-        let mut info = vm_region_submap_info_64::default();
+        
         loop {
-            let kr;
+            let mut kr;
             let mut info_count: mach_msg_type_number_t = VM_REGION_SUBMAP_INFO_COUNT_64;
-            kr = unsafe {
-                mach_vm_region_recurse(
-                    task,
-                    addr_of_mut!(address),
-                    addr_of_mut!(size),
-                    addr_of_mut!(depth),
-                    addr_of_mut!(info) as vm_region_recurse_info_t,
-                    addr_of_mut!(info_count),
-                )
-            };
+            let mut info = vm_region_submap_info_64::default();
+            loop {
+                kr = unsafe {
+                    mach_vm_region_recurse(
+                        task,
+                        addr_of_mut!(address),
+                        addr_of_mut!(size),
+                        addr_of_mut!(depth),
+                        addr_of_mut!(info) as vm_region_recurse_info_t,
+                        addr_of_mut!(info_count),
+                    )
+                };
+
+                if kr != KERN_SUCCESS {
+                    break;
+                }
+
+                if info.is_submap != 0 {
+                    depth += 1;
+                    continue;
+                } else {
+                    break;
+                }
+            }
 
             if kr != KERN_SUCCESS {
                 break;
