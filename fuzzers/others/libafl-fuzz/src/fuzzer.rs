@@ -251,6 +251,29 @@ where
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
+    let queue_dir = fuzzer_dir.join("queue");
+    if opt.auto_resume {
+        // TODO - see afl-fuzz-init.c line 1898 onwards
+    } else {
+        // If we aren't auto resuming, copy all the files to our queue directory.
+        state.walk_initial_inputs(&[opt.input_dir.clone()], |path| {
+            let cpy_res = std::fs::copy(
+                &path,
+                queue_dir.join(path.file_name().ok_or(Error::illegal_state(format!(
+                    "file {} in input directory does not have a filename",
+                    path.display()
+                )))?),
+            );
+            match cpy_res {
+                Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
+                    println!("skipping {} since it is not a regular file", path.display());
+                }
+                Err(e) => return Err(e.into()),
+                Ok(_) => {}
+            }
+            Ok(())
+        })?;
+    }
     // Load our seeds.
     if state.must_load_initial_inputs() {
         state
@@ -258,7 +281,7 @@ where
                 &mut fuzzer,
                 &mut executor,
                 &mut restarting_mgr,
-                &[fuzzer_dir.join("queue")],
+                &[queue_dir],
                 &core_id,
                 opt.cores.as_ref().expect("invariant; should never occur"),
             )
