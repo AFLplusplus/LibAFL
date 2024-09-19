@@ -1,3 +1,5 @@
+#[cfg(target_vendor = "apple")]
+use std::ptr::addr_of_mut;
 #[cfg(any(
     windows,
     target_os = "linux",
@@ -13,6 +15,16 @@ use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
+#[cfg(target_vendor = "apple")]
+use mach_sys::{
+    kern_return::KERN_SUCCESS,
+    message::mach_msg_type_number_t,
+    traps::mach_task_self,
+    vm::mach_vm_region_recurse,
+    vm_prot::VM_PROT_READ,
+    vm_region::{vm_region_recurse_info_t, vm_region_submap_info_64},
+    vm_types::{mach_vm_address_t, mach_vm_size_t, natural_t},
+};
 #[cfg(any(
     windows,
     target_os = "linux",
@@ -25,11 +37,6 @@ use libafl_bolts::cli::FuzzerOptions;
 use mmap_rs::{MmapFlags, MmapMut, MmapOptions, ReservedMut};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
-
-#[cfg(target_vendor = "apple")]
-use std::ptr::addr_of_mut;
-#[cfg(target_vendor = "apple")]
-use mach_sys::{traps::mach_task_self, vm::mach_vm_region_recurse, vm_region::{vm_region_submap_info_64, vm_region_recurse_info_t}, vm_types::{mach_vm_size_t, mach_vm_address_t, natural_t}, message::mach_msg_type_number_t, kern_return::KERN_SUCCESS, vm_prot::VM_PROT_READ};
 
 use crate::asan::errors::{AsanError, AsanErrors};
 
@@ -244,7 +251,11 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        log::trace!("serving address: {:#x}, size: {:#x}", address as usize, size);
+        log::trace!(
+            "serving address: {:#x}, size: {:#x}",
+            address as usize,
+            size
+        );
         address
     }
 
@@ -494,7 +505,6 @@ impl Allocator {
             return true;
         }
 
-
         //fast path. most buffers are likely 8 byte aligned in size and address
         if (address as usize).trailing_zeros() >= 3 && size.trailing_zeros() >= 3 {
             return self.check_shadow_aligned(address, size);
@@ -566,7 +576,7 @@ impl Allocator {
             }
         }
     }
-    
+
     /// Unpoison all the memory that is currently mapped with read permissions.
     #[cfg(target_vendor = "apple")]
     pub fn unpoison_all_existing_memory(&mut self) {
@@ -578,20 +588,30 @@ impl Allocator {
         loop {
             let kr;
             let mut info_count: mach_msg_type_number_t = VM_REGION_SUBMAP_INFO_COUNT_64;
-            kr = unsafe { mach_vm_region_recurse(task, addr_of_mut!(address), addr_of_mut!(size), addr_of_mut!(depth), addr_of_mut!(info) as vm_region_recurse_info_t, addr_of_mut!(info_count)) };
+            kr = unsafe {
+                mach_vm_region_recurse(
+                    task,
+                    addr_of_mut!(address),
+                    addr_of_mut!(size),
+                    addr_of_mut!(depth),
+                    addr_of_mut!(info) as vm_region_recurse_info_t,
+                    addr_of_mut!(info_count),
+                )
+            };
 
             if kr != KERN_SUCCESS {
                 break;
             }
-            
-            let start = address as usize;
-            let end = (address+size) as usize;
 
-            if info.protection & VM_PROT_READ == VM_PROT_READ { //if its at least readable
+            let start = address as usize;
+            let end = (address + size) as usize;
+
+            if info.protection & VM_PROT_READ == VM_PROT_READ {
+                //if its at least readable
                 if self.shadow_offset <= start && end <= self.current_mapping_addr {
                     log::trace!("Reached the shadow/allocator region - skipping");
                 } else {
-                    log::trace!("Unpoisoning: {:#x}:{:#x}", address, address+size);
+                    log::trace!("Unpoisoning: {:#x}:{:#x}", address, address + size);
                     self.map_shadow_for_region(start, end, true);
                 }
             }
@@ -616,7 +636,6 @@ impl Allocator {
             },
         );
     }
-
 
     /// Initialize the allocator, making sure a valid shadow bit is selected.
     pub fn init(&mut self) {
@@ -732,7 +751,7 @@ impl Allocator {
                         break;
                     }
                     log::warn!("shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory");
-                }   
+                }
             }
         }
 

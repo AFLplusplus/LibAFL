@@ -487,7 +487,7 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                      let original = [<$name:snake:upper _PTR>].get().unwrap();
-                     
+
                      if !ASAN_IN_HOOK.get() && this.hooks_enabled {
                         ASAN_IN_HOOK.set(true);
                         let ret = this.[<hook_ $name>](*original, $($param),*);
@@ -1736,7 +1736,7 @@ impl AsanRuntime {
                 ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 1) 
+                ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; mov x2, #1
                 ; add x1, x1, x2, lsl #shadow_bit //x1 contains the offset of the shadow byte
                 ; ldr w1, [x1, #0] //w1 contains our shadow check
