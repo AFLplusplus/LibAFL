@@ -584,7 +584,7 @@ impl Allocator {
         let mut address: mach_vm_address_t = 0;
         let mut size: mach_vm_size_t = 0;
         let mut depth: natural_t = 0;
-        
+
         loop {
             let mut kr;
             let mut info_count: mach_msg_type_number_t = VM_REGION_SUBMAP_INFO_COUNT_64;
