@@ -799,9 +799,13 @@ where
     }
 
     /// Recursively walk supplied corpus directories
-    pub fn walk_initial_inputs<F>(&mut self, in_dirs: &[PathBuf], closure: F) -> Result<(), Error>
+    pub fn walk_initial_inputs<F>(
+        &mut self,
+        in_dirs: &[PathBuf],
+        mut closure: F,
+    ) -> Result<(), Error>
     where
-        F: Fn(&PathBuf) -> Result<(), Error>,
+        F: FnMut(&PathBuf) -> Result<(), Error>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
         loop {
