@@ -186,7 +186,6 @@ impl FridaRuntime for AsanRuntime {
         self.register_hooks(gum);
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
-        log::trace!("Finished unpoisoning all existing memory");
         self.register_thread();
     }
 
@@ -487,17 +486,18 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
-                        let original = [<$name:snake:upper _PTR>].get().unwrap();
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled { //not in hook and hooks are enabled
-                            ASAN_IN_HOOK.set(true);
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
-                            ret
-                        } else {
-                            let ret = (original)($($param),*);
-                            ret
-                        }
+                     let original = [<$name:snake:upper _PTR>].get().unwrap();
+                     
+                     if !ASAN_IN_HOOK.get() && this.hooks_enabled {
+                        ASAN_IN_HOOK.set(true);
+                        let ret = this.[<hook_ $name>](*original, $($param),*);
+                        ASAN_IN_HOOK.set(false);
+                        ret
+                    } else {
+                        let ret = (original)($($param),*);
+                        ret
                     }
+                 }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
                     let _ = interceptor.replace(
@@ -1731,14 +1731,14 @@ impl AsanRuntime {
         macro_rules! shadow_check {
             ($ops:ident, $width:expr) => {dynasm!($ops
                 ; .arch aarch64
-//              ; brk #0xe
+                //; brk #0xe
                 ; stp x2, x3, [sp, #-0x10]!
                 ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
-                ; ubfx x1, x1, #0, #(shadow_bit + 1)
+                ; ubfx x1, x1, #0, #(shadow_bit + 1) 
                 ; mov x2, #1
-                ; add x1, x1, x2, lsl #shadow_bit
+                ; add x1, x1, x2, lsl #shadow_bit //x1 contains the offset of the shadow byte
                 ; ldr w1, [x1, #0] //w1 contains our shadow check
                 ; and x0, x0, #7 //x0 is the offset for unaligned accesses
                 ; rev32 x1, x1

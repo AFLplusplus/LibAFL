@@ -26,7 +26,15 @@ use mmap_rs::{MmapFlags, MmapMut, MmapOptions, ReservedMut};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_vendor = "apple")]
+use std::ptr::addr_of_mut;
+#[cfg(target_vendor = "apple")]
+use mach_sys::{traps::mach_task_self, vm::mach_vm_region_recurse, vm_region::{vm_region_submap_info_64, vm_region_recurse_info_t}, vm_types::{mach_vm_size_t, mach_vm_address_t, natural_t}, message::mach_msg_type_number_t, kern_return::KERN_SUCCESS, vm_prot::VM_PROT_READ};
+
 use crate::asan::errors::{AsanError, AsanErrors};
+
+#[cfg(target_vendor = "apple")]
+const VM_REGION_SUBMAP_INFO_COUNT_64: mach_msg_type_number_t = 19;
 
 /// An allocator wrapper with binary-only address sanitization
 #[derive(Debug)]
@@ -236,7 +244,7 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        log::trace!("serving address: {:?}, size: {:x}", address, size);
+        log::trace!("serving address: {:#x}, size: {:#x}", address as usize, size);
         address
     }
 
@@ -453,7 +461,6 @@ impl Allocator {
         let shadow_addr = map_to_shadow!(self, (address as usize));
         let shadow_size = size >> 3;
         let buf = unsafe { std::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
-        //log::trace!("aligned shadow buf: {:?}", buf);
         let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
         if !prefix.iter().all(|&x| x == 0xff)
             || !suffix.iter().all(|&x| x == 0xff)
@@ -484,11 +491,9 @@ impl Allocator {
         }
 
         if !self.is_managed(address as *mut c_void) {
-            //log::trace!("unmanaged address to check_shadow: {:?}, {size:x}", address);
             return true;
         }
 
-        //  log::trace!("Check shadow for region: {:#x}-{:#x}", address as usize, address as usize + size);
 
         //fast path. most buffers are likely 8 byte aligned in size and address
         if (address as usize).trailing_zeros() >= 3 && size.trailing_zeros() >= 3 {
@@ -545,7 +550,7 @@ impl Allocator {
         map_to_shadow!(self, start)
     }
 
-    /// Checks if the currennt address is one of ours - is this address in the allocator region
+    /// Checks if the current address is one of ours - is this address in the allocator region
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))
@@ -561,24 +566,57 @@ impl Allocator {
             }
         }
     }
-
+    
     /// Unpoison all the memory that is currently mapped with read permissions.
+    #[cfg(target_vendor = "apple")]
+    pub fn unpoison_all_existing_memory(&mut self) {
+        let task = unsafe { mach_task_self() };
+        let mut address: mach_vm_address_t = 0;
+        let mut size: mach_vm_size_t = 0;
+        let mut depth: natural_t = 0;
+        let mut info = vm_region_submap_info_64::default();
+        loop {
+            let kr;
+            let mut info_count: mach_msg_type_number_t = VM_REGION_SUBMAP_INFO_COUNT_64;
+            kr = unsafe { mach_vm_region_recurse(task, addr_of_mut!(address), addr_of_mut!(size), addr_of_mut!(depth), addr_of_mut!(info) as vm_region_recurse_info_t, addr_of_mut!(info_count)) };
+
+            if kr != KERN_SUCCESS {
+                break;
+            }
+            
+            let start = address as usize;
+            let end = (address+size) as usize;
+
+            if info.protection & VM_PROT_READ == VM_PROT_READ { //if its at least readable
+                if self.shadow_offset <= start && end <= self.current_mapping_addr {
+                    log::trace!("Reached the shadow/allocator region - skipping");
+                } else {
+                    log::trace!("Unpoisoning: {:#x}:{:#x}", address, address+size);
+                    self.map_shadow_for_region(start, end, true);
+                }
+            }
+            address += size;
+            size = 0;
+        }
+    }
+    #[cfg(not(target_vendor = "apple"))]
     pub fn unpoison_all_existing_memory(&mut self) {
         RangeDetails::enumerate_with_prot(
             PageProtection::Read,
             &mut |range: &RangeDetails| -> bool {
                 let start = range.memory_range().base_address().0 as usize;
                 let end = start + range.memory_range().size();
-                if start >= self.shadow_offset {
-                    log::trace!("Reached the shadow/allocator region - stopping");
-                    return false;
+                if self.shadow_offset <= start && end <= self.current_mapping_addr {
+                    log::trace!("Reached the shadow/allocator region - skipping");
+                } else {
+                    log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
+                    self.map_shadow_for_region(start, end, true);
                 }
-                log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
-                self.map_shadow_for_region(start, end, true);
                 true
             },
         );
     }
+
 
     /// Initialize the allocator, making sure a valid shadow bit is selected.
     pub fn init(&mut self) {
@@ -694,7 +732,7 @@ impl Allocator {
                         break;
                     }
                     log::warn!("shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory");
-                }
+                }   
             }
         }
 
