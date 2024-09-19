@@ -97,7 +97,7 @@ paste = "1.0"
 log = "0.4.20"
 mmap-rs = "0.6.0"
 bit_reverse = "0.1.8"
-yaxpeax-arch = "0.2.7" 
+yaxpeax-arch = "0.2.7"
 
 document-features = { version = "0.2", optional = true } # Document all features of this crate (for `cargo doc`)
 
