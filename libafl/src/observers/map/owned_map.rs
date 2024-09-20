@@ -73,7 +73,7 @@ impl<T> AsMut<Self> for OwnedMapObserver<T> {
 
 impl<T> MapObserver for OwnedMapObserver<T>
 where
-    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
     type Entry = T;
 

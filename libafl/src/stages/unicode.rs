@@ -1,17 +1,16 @@
 //! Stages which analysis common to Unicode-style mutations
 
 use alloc::{collections::VecDeque, rc::Rc, vec::Vec};
-use core::marker::PhantomData;
 
 use bitvec::{bitvec, vec::BitVec};
 use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{HasCorpus, HasTestcase},
+    corpus::{Corpus, HasCorpus},
     inputs::{BytesInput, HasMutatorBytes},
     stages::Stage,
-    state::{HasCurrentTestcase, State, UsesState},
+    state::HasCurrentTestcase,
     HasMetadata,
 };
 
@@ -71,45 +70,32 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> UnicodeIdentificationMetadata {
 
 /// Stage which identifies potential strings in the provided input
 #[derive(Debug)]
-pub struct UnicodeIdentificationStage<S> {
-    phantom: PhantomData<S>,
-}
+pub struct UnicodeIdentificationStage {}
 
-impl<S> Default for UnicodeIdentificationStage<S> {
+impl Default for UnicodeIdentificationStage {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> UnicodeIdentificationStage<S> {
+impl UnicodeIdentificationStage {
     /// Create a new instance of the string identification stage
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self {}
     }
 }
 
-impl<S> UsesState for UnicodeIdentificationStage<S>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage
 where
-    S: State,
-{
-    type State = S;
-}
-
-impl<S, E, EM, Z> Stage<E, EM, Z> for UnicodeIdentificationStage<S>
-where
-    S: HasTestcase<Input = BytesInput> + HasCorpus + State,
-    E: UsesState<State = S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    S: HasCorpus + HasCurrentTestcase,
+    S::Corpus: Corpus<Input = BytesInput>,
 {
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         let mut tc = state.current_testcase_mut()?;
@@ -127,13 +113,13 @@ where
     }
 
     #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Stage does not run the target. No reset helper needed.
         Ok(true)
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Stage does not run the target. No reset helper needed.
         Ok(())
     }

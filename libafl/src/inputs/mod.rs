@@ -12,7 +12,6 @@ use std::{fs::File, hash::Hash, io::Read, path::Path};
 pub use bytes::BytesInput;
 pub use bytessub::BytesSubInput;
 pub use encoded::*;
-// pub use generalized::*;
 pub use gramatron::*;
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
@@ -30,6 +29,11 @@ use serde::{Deserialize, Serialize};
 use crate::corpus::CorpusId;
 
 pub mod bytes;
+pub use bytes::*;
+
+pub mod generalized;
+pub use generalized::*;
+
 pub mod bytessub;
 pub mod encoded;
 // pub mod generalized;

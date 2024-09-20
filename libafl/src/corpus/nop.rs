@@ -1,4 +1,5 @@
 //! The null corpus does not store any [`Testcase`]s.
+use alloc::fmt::Debug;
 use core::{cell::RefCell, marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,7 @@ use crate::{
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct NopCorpus<I> {
     empty: Option<CorpusId>,
-    phantom: PhantomData<I>,
+    phantom: PhantomData<fn() -> I>,
 }
 
 impl<I> Corpus for NopCorpus<I> {

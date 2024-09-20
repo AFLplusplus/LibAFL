@@ -1,13 +1,11 @@
 //! The `MOpt` mutation scheduler used in AFL++. It uses a modified Particle Swarm Optimization algorithm to determine an optimal distribution of mutators.
 //! See <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
+use core::fmt::{self, Debug};
 
 use libafl_bolts::{
     rands::{Rand, StdRand},
+    tuples::NamedTuple,
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -368,8 +366,8 @@ pub struct StdMOptMutator<MT> {
 
 impl<I, MT, S> Mutator<I, S> for StdMOptMutator<MT>
 where
+    S: HasCorpus + HasSolutions + HasRand + HasMetadata,
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -493,18 +491,19 @@ where
 
 impl<MT> StdMOptMutator<MT> {
     /// Create a new [`StdMOptMutator`].
-    pub fn new<S>(
+    pub fn new<I, S>(
         state: &mut S,
         mutations: MT,
         max_stack_pow: usize,
         swarm_num: usize,
     ) -> Result<Self, Error>
     where
-        S: HasMetadata,
+        S: HasMetadata + HasRand,
+        MT: NamedTuple,
     {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();
-            state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
+            state.add_metadata::<MOpt>(MOpt::new(MT::LEN, swarm_num, rand_seed)?);
         }
         Ok(Self {
             name: Cow::from(format!("StdMOptMutator[{}]", mutations.names().join(","))),
@@ -517,8 +516,8 @@ impl<MT> StdMOptMutator<MT> {
 
     fn core_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>
     where
+        S: HasMetadata + HasRand + HasSolutions + HasCorpus,
         MT: MutatorsTuple<I, S>,
-        S: HasRand + HasMetadata + HasCorpus + HasSolutions,
     {
         let mut r = MutationResult::Skipped;
         let mopt = state.metadata_map_mut().get_mut::<MOpt>().unwrap();
@@ -542,7 +541,11 @@ impl<MT> StdMOptMutator<MT> {
         Ok(r)
     }
 
-    fn pilot_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+    fn pilot_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>
+    where
+        S: HasMetadata + HasRand + HasSolutions + HasCorpus,
+        MT: MutatorsTuple<I, S>,
+    {
         let mut r = MutationResult::Skipped;
         let swarm_now;
         {
@@ -573,11 +576,9 @@ impl<MT> StdMOptMutator<MT> {
     }
 }
 
-impl<I, MT, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
-{
+impl<MT> ComposedByMutations for StdMOptMutator<MT> {
+    type Mutations = MT;
+
     /// Get the mutations
     #[inline]
     fn mutations(&self) -> &MT {
@@ -591,20 +592,16 @@ where
     }
 }
 
-impl<I, MT, S> Named for StdMOptMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
-{
+impl<MT> Named for StdMOptMutator<MT> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<I, MT, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, S>
+impl<I, MT, S> ScheduledMutator<I, S> for StdMOptMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
+    S: HasRand + HasSolutions + HasMetadata + HasCorpus,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {

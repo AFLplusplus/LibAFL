@@ -1,9 +1,7 @@
 //! Stage wrappers that add logics to stage list
 
-use core::marker::PhantomData;
-
 use crate::{
-    stages::{HasCurrentStage, HasNestedStageStatus, Stage, StageId, StagesTuple},
+    stages::{HasNestedStageStatus, Stage, StageId, StagesTuple},
     Error,
 };
 
@@ -31,33 +29,22 @@ impl NestedStageRetryCountRestartHelper {
 
 #[derive(Debug)]
 /// Perform the stage while the closure evaluates to true
-pub struct WhileStage<CB, E, EM, ST, Z> {
+pub struct WhileStage<CB, ST> {
     closure: CB,
     stages: ST,
-    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, ST, Z> UsesState for WhileStage<CB, E, EM, ST, Z>
+impl<CB, E, EM, S, ST, Z> Stage<E, EM, S, Z> for WhileStage<CB, ST>
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<CB, E, EM, ST, Z> Stage<E, EM, Z> for WhileStage<CB, E, EM, ST, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut Self::State, &mut EM) -> Result<bool, Error>,
-    E: UsesState,
-    EM: UsesState<State = E::State>,
-    ST: StagesTuple<E, EM, Self::State, Z>,
-    Z: UsesState<State = Self::State>,
-    Self::State: HasNestedStageStatus,
+    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
+    ST: StagesTuple<E, EM, S, Z>,
+    S: HasNestedStageStatus,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         while state.current_stage_idx()?.is_some()
@@ -69,60 +56,44 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
-impl<CB, E, EM, ST, Z> WhileStage<CB, E, EM, ST, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut <Self as UsesState>::State, &mut EM) -> Result<bool, Error>,
-    E: UsesState,
-{
+impl<CB, ST> WhileStage<CB, ST> {
     /// Constructor
-    pub fn new(closure: CB, stages: ST) -> Self {
-        Self {
-            closure,
-            stages,
-            phantom: PhantomData,
-        }
+    pub fn new<E, EM, S, Z>(closure: CB, stages: ST) -> Self
+    where
+        CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
+    {
+        Self { closure, stages }
     }
 }
 
 /// A conditionally enabled stage.
 /// If the closure returns true, the wrapped stage will be executed, else it will be skipped.
 #[derive(Debug)]
-pub struct IfStage<CB, E, EM, ST, Z> {
+pub struct IfStage<CB, ST> {
     closure: CB,
     if_stages: ST,
-    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, ST, Z> UsesState for IfStage<CB, E, EM, ST, Z>
+impl<CB, E, EM, S, ST, Z> Stage<E, EM, S, Z> for IfStage<CB, ST>
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<CB, E, EM, ST, Z> Stage<E, EM, Z> for IfStage<CB, E, EM, ST, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut Self::State, &mut EM) -> Result<bool, Error>,
-    E: UsesState,
-    EM: UsesState<State = Self::State>,
-    ST: StagesTuple<E, EM, Self::State, Z>,
-    Z: UsesState<State = Self::State>,
-    Self::State: HasNestedStageStatus,
+    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
+    ST: StagesTuple<E, EM, S, Z>,
+    S: HasNestedStageStatus,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         if state.current_stage_idx()?.is_some() || (self.closure)(fuzzer, executor, state, manager)?
@@ -133,62 +104,46 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
-impl<CB, E, EM, ST, Z> IfStage<CB, E, EM, ST, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut <Self as UsesState>::State, &mut EM) -> Result<bool, Error>,
-    E: UsesState,
-{
+impl<CB, ST> IfStage<CB, ST> {
     /// Constructor for this conditionally enabled stage.
     /// If the closure returns true, the wrapped stage will be executed, else it will be skipped.
-    pub fn new(closure: CB, if_stages: ST) -> Self {
-        Self {
-            closure,
-            if_stages,
-            phantom: PhantomData,
-        }
+    pub fn new<E, EM, S, Z>(closure: CB, if_stages: ST) -> Self
+    where
+        CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
+    {
+        Self { closure, if_stages }
     }
 }
 
 /// Perform the stage if closure evaluates to true
 #[derive(Debug)]
-pub struct IfElseStage<CB, E, EM, ST1, ST2, Z> {
+pub struct IfElseStage<CB, ST1, ST2> {
     closure: CB,
     if_stages: ST1,
     else_stages: ST2,
-    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, ST1, ST2, Z> UsesState for IfElseStage<CB, E, EM, ST1, ST2, Z>
+impl<CB, E, EM, S, ST1, ST2, Z> Stage<E, EM, S, Z> for IfElseStage<CB, ST1, ST2>
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<CB, E, EM, ST1, ST2, Z> Stage<E, EM, Z> for IfElseStage<CB, E, EM, ST1, ST2, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut Self::State, &mut EM) -> Result<bool, Error>,
-    E: UsesState,
-    EM: UsesState<State = Self::State>,
-    ST1: StagesTuple<E, EM, Self::State, Z>,
-    ST2: StagesTuple<E, EM, Self::State, Z>,
-    Z: UsesState<State = Self::State>,
-    Self::State: HasNestedStageStatus,
+    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
+    ST1: StagesTuple<E, EM, S, Z>,
+    ST2: StagesTuple<E, EM, S, Z>,
+    S: HasNestedStageStatus,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let current = state.current_stage_idx()?;
@@ -218,58 +173,45 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
-impl<CB, E, EM, ST1, ST2, Z> IfElseStage<CB, E, EM, ST1, ST2, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut <Self as UsesState>::State, &mut EM) -> Result<bool, Error>,
-    E: UsesState,
-{
+impl<CB, ST1, ST2> IfElseStage<CB, ST1, ST2> {
     /// Constructor
-    pub fn new(closure: CB, if_stages: ST1, else_stages: ST2) -> Self {
+    pub fn new<E, EM, S, Z>(closure: CB, if_stages: ST1, else_stages: ST2) -> Self
+    where
+        CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
+    {
         Self {
             closure,
             if_stages,
             else_stages,
-            phantom: PhantomData,
         }
     }
 }
 
 /// A stage wrapper where the stages do not need to be initialized, but can be [`None`].
 #[derive(Debug)]
-pub struct OptionalStage<E, EM, ST, Z> {
+pub struct OptionalStage<ST> {
     stages: Option<ST>,
-    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<E, EM, ST, Z> UsesState for OptionalStage<E, EM, ST, Z>
+impl<E, EM, ST, S, Z> Stage<E, EM, S, Z> for OptionalStage<ST>
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<E, EM, ST, Z> Stage<E, EM, Z> for OptionalStage<E, EM, ST, Z>
-where
-    E: UsesState,
-    EM: UsesState<State = Self::State>,
-    ST: StagesTuple<E, EM, Self::State, Z>,
-    Z: UsesState<State = Self::State>,
-    Self::State: HasNestedStageStatus,
+    ST: StagesTuple<E, EM, S, Z>,
+    S: HasNestedStageStatus,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         if let Some(stages) = &mut self.stages {
@@ -279,23 +221,20 @@ where
         }
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         NestedStageRetryCountRestartHelper::clear_progress(state, self)
     }
 }
 
-impl<E, EM, ST, Z> OptionalStage<E, EM, ST, Z> {
+impl<ST> OptionalStage<ST> {
     /// Constructor for this conditionally enabled stage.
     #[must_use]
     pub fn new(stages: Option<ST>) -> Self {
-        Self {
-            stages,
-            phantom: PhantomData,
-        }
+        Self { stages }
     }
 
     /// Constructor for this conditionally enabled stage with set stages.
@@ -303,16 +242,12 @@ impl<E, EM, ST, Z> OptionalStage<E, EM, ST, Z> {
     pub fn some(stages: ST) -> Self {
         Self {
             stages: Some(stages),
-            phantom: PhantomData,
         }
     }
 
     /// Constructor for this conditionally enabled stage, without stages set.
     #[must_use]
     pub fn none() -> Self {
-        Self {
-            stages: None,
-            phantom: PhantomData,
-        }
+        Self { stages: None }
     }
 }

@@ -12,67 +12,79 @@ use alloc::{
 };
 use core::fmt;
 
-// pub use calibrate::CalibrationStage;
-// pub use colorization::*;
-// #[cfg(all(feature = "std", unix))]
-// pub use concolic::ConcolicTracingStage;
 // #[cfg(all(feature = "std", feature = "concolic_mutation", unix))]
 // pub use concolic::SimpleConcolicMutationalStage;
-// #[cfg(feature = "std")]
-// pub use dump::*;
-// pub use generalization::GeneralizationStage;
 use hashbrown::HashSet;
 use libafl_bolts::{
     impl_serdeany,
     tuples::{HasConstLen, IntoVec},
     Named,
 };
-// pub use logics::*;
-// pub use mutational::{MutationalStage, StdMutationalStage};
-// pub use power::{PowerMutationalStage, StdPowerMutationalStage};
-use push::PushStage;
 use serde::{Deserialize, Serialize};
-// pub use stats::AflStatsStage;
-// #[cfg(feature = "std")]
-// pub use sync::*;
-// pub use tmin::{
-//     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
-// };
-// pub use tracing::{ShadowTracingStage, TracingStage};
-// pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
 
-// #[cfg(feature = "unicode")]
-// pub use unicode::*;
+/// Mutational stage is the normal fuzzing stage.
+pub mod mutational;
+pub use mutational::*;
 
-// /// Mutational stage is the normal fuzzing stage.
-// pub mod mutational;
+pub mod power;
+pub use power::*;
+
+pub mod calibrate;
+pub use calibrate::*;
+
+pub mod colorization;
+pub use colorization::*;
+
+#[cfg(all(feature = "std", unix))]
+pub mod concolic;
+#[cfg(all(feature = "std", unix))]
+pub use concolic::*;
+
+pub mod tracing;
+pub use tracing::*;
+
+#[cfg(feature = "std")]
+pub mod dump;
+#[cfg(feature = "std")]
+pub use dump::*;
+
+#[cfg(feature = "std")]
+pub mod generalization;
+#[cfg(feature = "std")]
+pub use generalization::*;
+
+/// The [`generation::GenStage`] generates a single input and evaluates it.
+pub mod generation;
+pub use generation::*;
+
+pub mod logics;
+pub use logics::*;
+
+pub mod stats;
+pub use stats::*;
+
+#[cfg(feature = "std")]
+pub mod sync;
+#[cfg(feature = "std")]
+pub use sync::*;
+
+#[cfg(feature = "unicode")]
+pub mod unicode;
+#[cfg(feature = "unicode")]
+pub use unicode::*;
+
+pub mod tmin;
+pub use tmin::*;
+
+pub mod tuneable;
+pub use tuneable::*;
+
 pub mod push;
-// pub mod tmin;
-//
-// pub mod calibrate;
-// pub mod colorization;
-// #[cfg(all(feature = "std", unix))]
-// pub mod concolic;
-// #[cfg(feature = "std")]
-// pub mod dump;
-// pub mod generalization;
-// /// The [`generation::GenStage`] generates a single input and evaluates it.
-// pub mod generation;
-// pub mod logics;
-// pub mod power;
-// pub mod stats;
-// #[cfg(feature = "std")]
-// pub mod sync;
-// pub mod tracing;
-// pub mod tuneable;
-// #[cfg(feature = "unicode")]
-// pub mod unicode;
-//
-// pub mod pruning;
-// pub use pruning::*;
+pub use push::*;
+
 use crate::{
-    corpus::{CorpusId, HasCurrentCorpusId},
+    corpus::{Corpus, CorpusId, HasCorpus, HasCurrentCorpusId},
     events::EventProcessor,
     executors::HasObservers,
     state::{HasExecutions, Stoppable},
@@ -373,9 +385,9 @@ impl<PS> Named for PushStageAdapter<PS> {
 impl<E, EM, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<PS>
 where
     E: HasObservers,
-    PS: PushStage<EM, E::Observers, S, Z>,
-    S: HasNamedMetadata + HasCurrentCorpusId,
-    Z: ExecutesInput<E, EM, PS::Input, S>,
+    S: HasNamedMetadata + HasCurrentCorpusId + HasCorpus,
+    Z: ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>,
+    PS: PushStage<EM, E::Observers, S, Z, Input = <S::Corpus as Corpus>::Input>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

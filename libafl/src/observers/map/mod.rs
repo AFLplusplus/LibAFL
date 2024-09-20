@@ -396,7 +396,7 @@ impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFF
 
 impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
     type Entry = T;
 

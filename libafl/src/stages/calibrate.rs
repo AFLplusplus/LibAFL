@@ -8,21 +8,20 @@ use alloc::{
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, AsIter, Named};
+use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, Named};
 use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCorpus, SchedulerTestcaseMetadata},
+    corpus::{Corpus, HasCorpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
-    fuzzer::Evaluator,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCurrentTestcase, HasExecutions},
+    state::HasCurrentTestcase,
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -69,36 +68,28 @@ impl Default for UnstableEntriesMetadata {
 pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, O, OT> {
+pub struct CalibrationStage<C, O> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    phantom: PhantomData<(E, O, OT)>,
+    phantom: PhantomData<O>,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<C, E, O, OT> UsesState for CalibrationStage<C, E, O, OT>
+impl<C, E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, O>
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<C, E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<C, E, O, OT>
-where
-    E: Executor<EM, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<State = Self::State>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     O: MapObserver,
+    <O as MapObserver>::Entry: Bounded + Default + Debug + Serialize + DeserializeOwned + 'static,
     C: AsRef<O>,
-    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
-    Z: Evaluator<E, EM, State = Self::State>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasMetadata + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId,
 {
     #[inline]
     #[allow(
@@ -110,7 +101,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry and only if we haven't already inspected it
@@ -355,7 +346,7 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Calibration stage disallow restarts
         // If a testcase that causes crash/timeout in the queue, we need to remove it from the queue immediately.
         RetryCountRestartHelper::no_retry(state, &self.name)
@@ -364,20 +355,13 @@ where
         // remove this guy from corpus queue
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         // TODO: Make sure this is the correct way / there may be a better way?
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<C, E, O, OT> CalibrationStage<C, E, O, OT>
-where
-    O: MapObserver,
-    for<'it> O: AsIter<'it, Item = O::Entry>,
-    C: AsRef<O>,
-    OT: ObserversTuple<<Self as UsesState>::State>,
-    E: UsesState,
-{
+impl<C, O> CalibrationStage<C, O> {
     /// Create a new [`CalibrationStage`].
     #[must_use]
     pub fn new<F>(map_feedback: &F) -> Self
@@ -409,7 +393,7 @@ where
     }
 }
 
-impl<C, E, O, OT> Named for CalibrationStage<C, E, O, OT> {
+impl<C, O> Named for CalibrationStage<C, O> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

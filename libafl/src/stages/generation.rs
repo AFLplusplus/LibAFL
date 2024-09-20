@@ -2,10 +2,12 @@
 //! [`crate::generators::Generator`] and evaluates it using the fuzzer, possibly
 //! adding it to the corpus.
 
-use core::marker::PhantomData;
-
 use crate::{
-    corpus::HasCorpus, generators::Generator, stages::Stage, state::HasRand, Error, Evaluator,
+    corpus::{Corpus, HasCorpus},
+    generators::Generator,
+    stages::Stage,
+    state::HasRand,
+    Error, Evaluator,
 };
 
 /// A [`Stage`] that generates a single input via a [`Generator`] and evaluates
@@ -13,36 +15,27 @@ use crate::{
 ///
 /// This stage can be used to construct black-box (e.g., grammar-based) fuzzers.
 #[derive(Debug)]
-pub struct GenStage<G, Z>(G, PhantomData<Z>);
+pub struct GenStage<G>(G);
 
-impl<G, Z> GenStage<G, Z> {
+impl<G> GenStage<G> {
     /// Create a new [`GenStage`].
     pub fn new(g: G) -> Self {
-        Self(g, PhantomData)
+        Self(g)
     }
 }
 
-impl<G, Z> UsesState for GenStage<G, Z>
+impl<E, EM, G, S, Z> Stage<E, EM, S, Z> for GenStage<G>
 where
-    Z: UsesState,
-{
-    type State = Z::State;
-}
-
-impl<E, EM, Z, G> Stage<E, EM, Z> for GenStage<G, Z>
-where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand,
-    G: Generator<<<Self as UsesState>::State as UsesInput>::Input, Self::State>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasRand,
+    G: Generator<<S::Corpus as Corpus>::Input, S>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let input = self.0.generate(state)?;
@@ -50,13 +43,13 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // It's a random generation stage
         // so you can restart for whatever times you want
         Ok(true)
     }
 
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 }

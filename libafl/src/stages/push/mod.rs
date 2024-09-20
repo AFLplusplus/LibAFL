@@ -5,15 +5,14 @@
 //!
 
 use alloc::rc::Rc;
+
+pub mod mutational;
 use core::{cell::RefCell, time::Duration};
+
+pub use mutational::*;
 
 // pub use mutational::StdMutationalPushStage;
 use crate::{corpus::CorpusId, events::ProgressReporter, executors::ExitKind, Error};
-
-/// Mutational stage is the normal fuzzing stage.
-// pub mod mutational;
-/// Send a monitor update all 15 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]
@@ -43,8 +42,8 @@ impl<EM, OT, S, Z> PushStageSharedState<EM, OT, S, Z> {
 }
 
 /// Helper class for the [`PushStage`] trait, taking care of borrowing the shared state
-#[derive(Clone, Debug)]
-pub struct PushStageHelper<EM, OT, I, S, Z> {
+#[derive(Debug)]
+pub struct PushStageHelper<EM, I, OT, S, Z> {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
     pub initialized: bool,
@@ -63,7 +62,7 @@ pub struct PushStageHelper<EM, OT, I, S, Z> {
     exit_kind: Rc<RefCell<Option<ExitKind>>>,
 }
 
-impl<EM, OT, I, S, Z> PushStageHelper<EM, OT, I, S, Z> {
+impl<EM, I, OT, S, Z> PushStageHelper<EM, I, OT, S, Z> {
     /// Create a new [`PushStageHelper`]
     #[must_use]
     #[allow(clippy::type_complexity)]
@@ -127,9 +126,9 @@ pub trait PushStage<EM, OT, S, Z> {
     type Input;
 
     /// Gets the [`PushStageHelper`]
-    fn push_stage_helper(&self) -> &PushStageHelper<EM, OT, Self::Input, S, Z>;
+    fn push_stage_helper(&self) -> &PushStageHelper<EM, Self::Input, OT, S, Z>;
     /// Gets the [`PushStageHelper`] (mutable)
-    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<EM, OT, Self::Input, S, Z>;
+    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<EM, Self::Input, OT, S, Z>;
 
     /// Set the current corpus index this stage works on
     fn set_current_corpus_id(&mut self, corpus_id: CorpusId) {
@@ -193,6 +192,9 @@ pub trait PushStageNext<EM, OT, S, Z>: PushStage<EM, OT, S, Z> {
     /// This is the default implementation for `next` for this stage
     fn next_std(&mut self) -> Option<Result<Self::Input, Error>>;
 }
+
+/// Send a monitor update all 15 (or more) seconds
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 impl<PS, EM, OT, S, Z> PushStageNext<EM, OT, S, Z> for PS
 where

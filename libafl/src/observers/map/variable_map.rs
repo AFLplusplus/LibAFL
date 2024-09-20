@@ -77,7 +77,7 @@ impl<'a, T> AsMut<Self> for VariableMapObserver<'a, T> {
 
 impl<'a, T> MapObserver for VariableMapObserver<'a, T>
 where
-    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
     type Entry = T;
 

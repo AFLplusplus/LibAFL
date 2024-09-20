@@ -14,9 +14,13 @@ use crate::{
 };
 
 /// Compute the favor factor of a [`Testcase`]. Higher is better.
-pub trait TestcaseScore<I, S> {
+pub trait TestcaseScore<S>
+where
+    S: HasCorpus,
+{
     /// Computes the favor factor of a [`Testcase`]. Higher is better.
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
+    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>)
+        -> Result<f64, Error>;
 }
 
 /// Multiply the testcase size with the execution time.
@@ -24,7 +28,7 @@ pub trait TestcaseScore<I, S> {
 #[derive(Debug, Copy, Clone)]
 pub struct LenTimeMulTestcaseScore;
 
-impl<S> TestcaseScore<<S::Corpus as Corpus>::Input, S> for LenTimeMulTestcaseScore
+impl<S> TestcaseScore<S> for LenTimeMulTestcaseScore
 where
     <S::Corpus as Corpus>::Input: HasLen,
     S: HasCorpus + HasMetadata,
@@ -50,7 +54,7 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 #[derive(Debug, Copy, Clone)]
 pub struct CorpusPowerTestcaseScore;
 
-impl<I, S> TestcaseScore<I, S> for CorpusPowerTestcaseScore
+impl<S> TestcaseScore<S> for CorpusPowerTestcaseScore
 where
     S: HasCorpus + HasMetadata,
 {
@@ -61,7 +65,10 @@ where
         clippy::cast_sign_loss,
         clippy::cast_lossless
     )]
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
@@ -265,13 +272,16 @@ where
 #[derive(Debug, Copy, Clone)]
 pub struct CorpusWeightTestcaseScore;
 
-impl<I, S> TestcaseScore<I, S> for CorpusWeightTestcaseScore
+impl<S> TestcaseScore<S> for CorpusWeightTestcaseScore
 where
     S: HasCorpus + HasMetadata,
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 

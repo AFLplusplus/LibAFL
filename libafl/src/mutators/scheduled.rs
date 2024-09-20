@@ -159,7 +159,10 @@ where
     }
 }
 
-impl<MT> StdScheduledMutator<MT> {
+impl<MT> StdScheduledMutator<MT>
+where
+    MT: NamedTuple,
+{
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {

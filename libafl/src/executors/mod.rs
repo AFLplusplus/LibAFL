@@ -16,7 +16,6 @@ pub use differential::DiffExecutor;
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_bolts::tuples::RefIndexable;
 use serde::{Deserialize, Serialize};
-pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
 use crate::Error;
@@ -34,6 +33,7 @@ pub mod differential;
 // pub mod inprocess_fork;
 //
 pub mod shadow;
+pub use shadow::*;
 
 pub mod with_observers;
 

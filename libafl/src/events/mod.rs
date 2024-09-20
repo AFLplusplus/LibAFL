@@ -1,26 +1,22 @@
 //! An [`EventManager`] manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
-// pub mod events_hooks;
-// pub use events_hooks::*;
+pub mod events_hooks;
+pub use events_hooks::*;
 
+#[cfg(all(unix, feature = "std"))]
+pub mod centralized;
 pub mod simple;
-// #[cfg(all(unix, feature = "std"))]
-// pub mod centralized;
-// #[cfg(all(unix, feature = "std"))]
-// pub use centralized::*;
-// #[cfg(feature = "std")]
-// #[allow(clippy::ignored_unit_patterns)]
-// pub mod launcher;
-// #[allow(clippy::ignored_unit_patterns)]
-// pub mod llmp;
-// pub use llmp::*;
-// #[cfg(feature = "tcp_manager")]
-// #[allow(clippy::ignored_unit_patterns)]
-// pub mod tcp;
+#[cfg(all(unix, feature = "std"))]
+pub use centralized::*;
 
-// pub mod broker_hooks;
-use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
+#[allow(clippy::ignored_unit_patterns)]
+pub mod llmp;
+#[cfg(feature = "tcp_manager")]
+#[allow(clippy::ignored_unit_patterns)]
+pub mod tcp;
+
+use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -29,16 +25,21 @@ use core::{
 };
 
 use ahash::RandomState;
-// pub use broker_hooks::*;
-// #[cfg(feature = "std")]
-// pub use launcher::*;
+pub mod broker_hooks;
+pub use broker_hooks::*;
+#[cfg(feature = "std")]
+#[allow(clippy::ignored_unit_patterns)]
+pub mod launcher;
+#[cfg(feature = "std")]
+pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
 use libafl_bolts::{
     current_time,
-    tuples::{Handle, MatchName, MatchNameRef},
+    tuples::{Handle, MatchNameRef},
     ClientId,
 };
+pub use llmp::*;
 use serde::{Deserialize, Serialize};
 pub use simple::*;
 #[cfg(feature = "std")]
@@ -425,14 +426,6 @@ pub trait EventFirer<I, S> {
         )
     }
 
-    /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: Serialize,
-    {
-        Ok(Some(postcard::to_allocvec(observers)?))
-    }
-
     /// Get the configuration
     fn configuration(&self) -> EventConfig {
         EventConfig::AlwaysUnique
@@ -440,6 +433,57 @@ pub trait EventFirer<I, S> {
 
     /// Return if we really send this event or not
     fn should_send(&self) -> bool;
+}
+
+/// Serialize all observers for this type and manager
+/// Serialize the observer using the `time_factor` and `percentage_threshold`.
+/// These parameters are unique to each of the different types of `EventManager`
+pub(crate) fn serialize_observers_adaptive<EM, S, OT>(
+    manager: &mut EM,
+    observers: &OT,
+    time_factor: u32,
+    percentage_threshold: usize,
+) -> Result<Option<Vec<u8>>, Error>
+where
+    EM: AdaptiveSerializer,
+    OT: MatchNameRef + Serialize,
+{
+    match manager.time_ref() {
+        Some(t) => {
+            let exec_time = observers
+                .get(t)
+                .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+                .unwrap();
+
+            let mut must_ser = (manager.serialization_time() + manager.deserialization_time())
+                * time_factor
+                < exec_time;
+            if must_ser {
+                *manager.should_serialize_cnt_mut() += 1;
+            }
+
+            if manager.serializations_cnt() > 32 {
+                must_ser = (manager.should_serialize_cnt() * 100 / manager.serializations_cnt())
+                    > percentage_threshold;
+            }
+
+            if manager.serialization_time() == Duration::ZERO
+                || must_ser
+                || manager.serializations_cnt().trailing_zeros() >= 8
+            {
+                let start = current_time();
+                let ser = postcard::to_allocvec(observers)?;
+                *manager.serialization_time_mut() = current_time() - start;
+
+                *manager.serializations_cnt_mut() += 1;
+                Ok(Some(ser))
+            } else {
+                *manager.serializations_cnt_mut() += 1;
+                Ok(None)
+            }
+        }
+        None => Ok(None),
+    }
 }
 
 /// Default implementation of [`ProgressReporter::maybe_report_progress`] for implementors with the
@@ -557,7 +601,7 @@ pub trait ProgressReporter<S> {
 /// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
 /// constraints
 pub fn default_on_restart<S>(
-    restarter: &mut impl EventRestarter<S>,
+    restarter: &mut (impl EventRestarter<S> + ManagerExit),
     state: &mut S,
 ) -> Result<(), Error>
 where
@@ -576,7 +620,14 @@ pub trait EventRestarter<S> {
     ///
     /// Implementors: if in doubt, use [`default_on_restart`].
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error>;
+}
 
+pub trait CanSerializeObserver<OT> {
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>;
+}
+
+/// APIs called before exiting
+pub trait ManagerExit {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -607,101 +658,6 @@ pub trait HasEventManagerId {
     fn mgr_id(&self) -> EventManagerId;
 }
 
-/// The handler function for custom buffers exchanged via [`EventManager`]. This signature matches
-/// [`CustomBufHandler::handle`].
-///
-/// In previous versions, you could dynamically add such fn-based handlers with the
-/// `add_custom_buf_handler` function. If you wish to continue to do so, use [`Vec::new`] as your
-/// [`CustomBufHandlerTuple`] in the associated `handlers` parameter for your event manager. You may
-/// then use [`SupportsDynamicHandlers::add_custom_buf_handler`].
-#[deprecated(
-    note = "Using function pointers may limit your ability to use some stages due to type conflicts regarding the state"
-)]
-type CustomBufHandlerFn<S> = dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>;
-
-/// A handler for custom buffers exchanged via event managers
-pub trait CustomBufHandler<S> {
-    /// Attempt to handle the custom buffer
-    fn handle(
-        &mut self,
-        state: &mut S,
-        name: &str,
-        buf: &[u8],
-    ) -> Result<CustomBufEventResult, Error>;
-}
-
-/// A tuple of custom buffer handlers
-pub trait CustomBufHandlerTuple<S> {
-    /// Attempt to handle the custom buffer, breaking at the first successful usage
-    fn handle_all(&mut self, state: &mut S, name: &str, buf: &[u8]) -> Result<(), Error>;
-}
-
-impl<S> CustomBufHandlerTuple<S> for () {
-    fn handle_all(&mut self, _state: &mut S, _name: &str, _buf: &[u8]) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<Head, Tail, S> CustomBufHandlerTuple<S> for (Head, Tail)
-where
-    Head: CustomBufHandler<S>,
-    Tail: CustomBufHandlerTuple<S>,
-{
-    fn handle_all(&mut self, state: &mut S, name: &str, buf: &[u8]) -> Result<(), Error> {
-        if let CustomBufEventResult::Next = self.0.handle(state, name, buf)? {
-            self.1.handle_all(state, name, buf)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-#[allow(deprecated)]
-impl<S> CustomBufHandlerTuple<S> for Vec<Box<CustomBufHandlerFn<S>>> {
-    fn handle_all(&mut self, state: &mut S, name: &str, buf: &[u8]) -> Result<(), Error> {
-        for handler in self {
-            if let CustomBufEventResult::Handled = handler(state, name, buf)? {
-                return Ok(());
-            }
-        }
-        Ok(())
-    }
-}
-
-/// An event manager which can handle custom buffers
-pub trait HasCustomBufHandlers {
-    /// The type of the handlers
-    type Handlers;
-
-    /// Getter for the handlers
-    fn handlers(&self) -> &Self::Handlers;
-    /// Mutable getter for the handlers
-    fn handlers_mut(&mut self) -> &mut Self::Handlers;
-}
-
-/// Utility trait to maintain compatibility with previous versions which strictly used a list of
-/// dynamic custom buf handlers.
-///
-/// This is automatically implemented for the appropriate traits.
-pub trait SupportsDynamicHandlers<S> {
-    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    #[deprecated(
-        note = "Using function pointers may limit your ability to use some stages due to type conflicts regarding the state"
-    )]
-    #[allow(deprecated)]
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>);
-}
-
-#[allow(deprecated)]
-impl<EM, S> SupportsDynamicHandlers<S> for EM
-where
-    EM: HasCustomBufHandlers<Handlers = Vec<Box<CustomBufHandlerFn<S>>>>,
-{
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>) {
-        self.handlers_mut().push(handler);
-    }
-}
-
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct NopEventManager;
@@ -725,6 +681,8 @@ where
     }
 }
 
+impl ManagerExit for NopEventManager {}
+
 impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
     fn process(
         &mut self,
@@ -737,6 +695,15 @@ impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
         Ok(())
+    }
+}
+
+impl<OT> CanSerializeObserver<OT> for NopEventManager
+where
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
     }
 }
 
@@ -775,6 +742,15 @@ impl<EM> MonitorTypedEventManager<EM> {
     }
 }
 
+impl<EM, OT> CanSerializeObserver<OT> for MonitorTypedEventManager<EM>
+where
+    OT: Serialize,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
+}
+
 impl<EM, I, S> EventFirer<I, S> for MonitorTypedEventManager<EM>
 where
     EM: EventFirer<I, S>,
@@ -795,14 +771,6 @@ where
     }
 
     #[inline]
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: Serialize,
-    {
-        self.inner.serialize_observers(observers)
-    }
-
-    #[inline]
     fn configuration(&self) -> EventConfig {
         self.inner.configuration()
     }
@@ -820,7 +788,12 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.on_restart(state)
     }
+}
 
+impl<EM> ManagerExit for MonitorTypedEventManager<EM>
+where
+    EM: ManagerExit,
+{
     #[inline]
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.inner.send_exiting()
@@ -843,21 +816,6 @@ where
 
     fn on_shutdown(&mut self) -> Result<(), Error> {
         self.inner.on_shutdown()
-    }
-}
-
-impl<EM> HasCustomBufHandlers for MonitorTypedEventManager<EM>
-where
-    EM: HasCustomBufHandlers,
-{
-    type Handlers = EM::Handlers;
-
-    fn handlers(&self) -> &Self::Handlers {
-        self.inner.handlers()
-    }
-
-    fn handlers_mut(&mut self) -> &mut Self::Handlers {
-        self.inner.handlers_mut()
     }
 }
 
@@ -912,55 +870,6 @@ pub trait AdaptiveSerializer {
 
     /// A [`Handle`] to the time observer to determine the `time_factor`
     fn time_ref(&self) -> &Option<Handle<TimeObserver>>;
-
-    /// Serialize the observer using the `time_factor` and `percentage_threshold`.
-    /// These parameters are unique to each of the different types of `EventManager`
-    fn serialize_observers_adaptive<S, OT>(
-        &mut self,
-        observers: &OT,
-        time_factor: u32,
-        percentage_threshold: usize,
-    ) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: MatchName + Serialize,
-    {
-        match self.time_ref() {
-            Some(t) => {
-                let exec_time = observers
-                    .get(t)
-                    .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
-                    .unwrap();
-
-                let mut must_ser = (self.serialization_time() + self.deserialization_time())
-                    * time_factor
-                    < exec_time;
-                if must_ser {
-                    *self.should_serialize_cnt_mut() += 1;
-                }
-
-                if self.serializations_cnt() > 32 {
-                    must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
-                        > percentage_threshold;
-                }
-
-                if self.serialization_time() == Duration::ZERO
-                    || must_ser
-                    || self.serializations_cnt().trailing_zeros() >= 8
-                {
-                    let start = current_time();
-                    let ser = postcard::to_allocvec(observers)?;
-                    *self.serialization_time_mut() = current_time() - start;
-
-                    *self.serializations_cnt_mut() += 1;
-                    Ok(Some(ser))
-                } else {
-                    *self.serializations_cnt_mut() += 1;
-                    Ok(None)
-                }
-            }
-            None => Ok(None),
-        }
-    }
 }
 
 #[cfg(test)]
