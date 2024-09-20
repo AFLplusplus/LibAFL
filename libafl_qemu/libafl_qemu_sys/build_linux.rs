@@ -33,7 +33,10 @@ pub fn build() {
     } else if cfg!(feature = "systemmode") {
         "systemmode"
     } else {
-        unreachable!();
+        unreachable!(
+            "The above macros, `assert_unique_feature` and `assert_at_least_one_feature`, should \
+             panic before this code is reached."
+        );
     };
 
     // Make sure we have at most one architecutre feature set

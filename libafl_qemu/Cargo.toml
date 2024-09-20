@@ -96,7 +96,7 @@ libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features 
   "derive",
 ] }
 libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.13.2" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.13.2", default-features = false }
 libafl_derive = { path = "../libafl_derive", version = "0.13.2" }
 
 serde = { workspace = true, default-features = false, features = [

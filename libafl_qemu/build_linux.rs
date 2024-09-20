@@ -25,7 +25,10 @@ pub fn build() {
     } else if cfg!(feature = "systemmode") {
         "systemmode"
     } else {
-        unreachable!();
+        unreachable!(
+            "The macros `assert_unique_feature` and `assert_at_least_one_feature` in \
+            `libafl_qemu_sys/build_linux.rs` should panic before this code is reached."
+        );
     };
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -56,15 +59,19 @@ pub fn build() {
     let libafl_qemu_impl_hdr = libafl_runtime_dir.join(libafl_qemu_impl_hdr_name);
 
     let libafl_runtime_testfile = out_dir.join("runtime_test.c");
-    fs::write(&libafl_runtime_testfile, LIBAFL_QEMU_RUNTIME_TEST).expect("Could not write runtime test file");
+    fs::write(&libafl_runtime_testfile, LIBAFL_QEMU_RUNTIME_TEST)
+        .expect("Could not write runtime test file");
 
     let mut runtime_test_cc_compiler = cc::Build::new();
 
-    runtime_test_cc_compiler.cpp(false)
+    runtime_test_cc_compiler
+        .cpp(false)
         .include(&libafl_runtime_dir)
         .file(&libafl_runtime_testfile);
 
-    runtime_test_cc_compiler.try_compile("runtime_test").unwrap();
+    runtime_test_cc_compiler
+        .try_compile("runtime_test")
+        .unwrap();
 
     let runtime_bindings_file = out_dir.join("libafl_qemu_bindings.rs");
     let stub_runtime_bindings_file = src_dir.join("runtime/libafl_qemu_stub_bindings.rs");
@@ -159,7 +166,7 @@ pub fn build() {
         &cpu_target,
         emulation_mode,
         stub_runtime_bindings_file.as_path(),
-        runtime_bindings_file.as_path()
+        runtime_bindings_file.as_path(),
     );
 
     if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
