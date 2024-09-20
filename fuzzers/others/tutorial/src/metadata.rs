@@ -22,7 +22,7 @@ pub struct PacketLenMetadata {
 
 pub struct PacketLenTestcaseScore {}
 
-impl<S> TestcaseScore<S> for PacketLenTestcaseScore
+impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore
 where
     S: HasCorpus<Input = PacketData> + HasMetadata,
 {
@@ -34,8 +34,8 @@ where
     }
 }
 
-pub type PacketLenMinimizerScheduler<CS, O> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata, O>;
+pub type PacketLenMinimizerScheduler<CS, O, S> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, PacketData, MapIndexesMetadata, O, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {
