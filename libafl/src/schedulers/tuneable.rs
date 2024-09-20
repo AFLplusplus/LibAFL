@@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
 use super::RemovableScheduler;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
+    inputs::Input,
     schedulers::Scheduler,
-    state::{HasCorpus, State, UsesState},
+    state::{HasCorpus, State},
     Error, HasMetadata,
 };
 
@@ -30,11 +31,11 @@ impl_serdeany!(TuneableSchedulerMetadata);
 /// Walk the corpus in a queue-like fashion
 /// With the specific `set_next` method, we can chose the next corpus entry manually
 #[derive(Debug, Clone)]
-pub struct TuneableScheduler<S> {
-    phantom: PhantomData<S>,
+pub struct TuneableScheduler<I, S> {
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> TuneableScheduler<S>
+impl<I, S> TuneableScheduler<I, S>
 where
     S: HasMetadata + HasCorpus,
 {
@@ -88,23 +89,13 @@ where
     }
 }
 
-impl<S> UsesState for TuneableScheduler<S>
-where
-    S: State,
-{
-    type State = S;
-}
+impl<I, S> RemovableScheduler<I, S> for TuneableScheduler<I, S> where I: Input {}
 
-impl<S> RemovableScheduler for TuneableScheduler<S> where
-    S: HasCorpus + HasMetadata + HasTestcase + State
-{
-}
-
-impl<S> Scheduler for TuneableScheduler<S>
+impl<I, S> Scheduler<I, S> for TuneableScheduler<I, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
         state
@@ -117,7 +108,7 @@ where
     }
 
     /// Gets the next entry in the queue
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             return Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented."

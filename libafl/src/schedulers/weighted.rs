@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use super::powersched::PowerSchedule;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::UsesInput,
+    inputs::Input,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     schedulers::{
@@ -24,7 +24,7 @@ use crate::{
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State},
     Error, HasMetadata,
 };
 
@@ -98,22 +98,23 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<C, F, O, S> {
+pub struct WeightedScheduler<C, F, I, O, S> {
     table_invalidated: bool,
     strat: Option<PowerSchedule>,
     map_observer_handle: Handle<C>,
     last_hash: usize,
     queue_cycles: u64,
-    phantom: PhantomData<(F, O, S)>,
+    phantom: PhantomData<(F, I, O, S)>,
     /// Cycle `PowerSchedule` on completion of every queue cycle.
     cycle_schedules: bool,
 }
 
-impl<C, F, O, S> WeightedScheduler<C, F, O, S>
+impl<C, F, I, O, S> WeightedScheduler<C, F, I, O, S>
 where
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
+    I: Input,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
     C: AsRef<O> + Named,
 {
     /// Create a new [`WeightedScheduler`] without any power schedule
@@ -257,26 +258,20 @@ where
     }
 }
 
-impl<C, F, O, S> UsesState for WeightedScheduler<C, F, O, S>
+impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, I, O, S>
 where
-    S: State,
-{
-    type State = S;
-}
-
-impl<C, F, O, S> RemovableScheduler for WeightedScheduler<C, F, O, S>
-where
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
     O: MapObserver,
+    I: Input,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
     C: AsRef<O> + Named,
 {
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_remove(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _prev: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _prev: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())
@@ -285,18 +280,19 @@ where
     /// This will *NOT* neutralize the effect of this removed testcase from the global data such as `SchedulerMetadata`
     fn on_replace(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _prev: &Testcase<I>,
     ) -> Result<(), Error> {
         self.table_invalidated = true;
         Ok(())
     }
 }
 
-impl<C, F, O, S> AflScheduler<C, O, S> for WeightedScheduler<C, F, O, S>
+impl<C, I, F, O, S> AflScheduler<C, I, O, S> for WeightedScheduler<C, F, I, O, S>
 where
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
+    I: Input,
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasTestcase + HasRand + State,
     C: AsRef<O> + Named,
@@ -314,9 +310,10 @@ where
     }
 }
 
-impl<C, F, O, S> HasQueueCycles for WeightedScheduler<C, F, O, S>
+impl<C, F, I, O, S> HasQueueCycles for WeightedScheduler<C, F, I, O, S>
 where
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
+    I: Input,
     O: MapObserver,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
     C: AsRef<O> + Named,
@@ -326,11 +323,12 @@ where
     }
 }
 
-impl<C, F, O, S> Scheduler for WeightedScheduler<C, F, O, S>
+impl<C, F, I, O, S> Scheduler<I, S> for WeightedScheduler<C, F, I, O, S>
 where
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
+    I: Input,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase + State,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand + HasTestcase + State,
     C: AsRef<O> + Named,
 {
     /// Called when a [`Testcase`] is added to the corpus
@@ -340,14 +338,9 @@ where
         Ok(())
     }
 
-    fn on_evaluation<OT>(
-        &mut self,
-        state: &mut Self::State,
-        input: &<Self::State as UsesInput>::Input,
-        observers: &OT,
-    ) -> Result<(), Error>
+    fn on_evaluation<OT>(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error>
     where
-        OT: ObserversTuple<Self::State>,
+        OT: ObserversTuple<S>,
     {
         self.on_evaluation_metadata(state, input, observers)
     }
@@ -404,7 +397,7 @@ where
     /// Set current fuzzed corpus id and `scheduled_count`
     fn set_current_scheduled(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         self.on_next_metadata(state, next_id)?;
@@ -415,4 +408,5 @@ where
 }
 
 /// The standard corpus weight, same as in `AFL++`
-pub type StdWeightedScheduler<C, O, S> = WeightedScheduler<C, CorpusWeightTestcaseScore<S>, O, S>;
+pub type StdWeightedScheduler<C, I, O, S> =
+    WeightedScheduler<C, CorpusWeightTestcaseScore<S>, I, O, S>;

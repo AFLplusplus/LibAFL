@@ -35,7 +35,7 @@ pub use tuneable::*;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::UsesInput,
+    inputs::Input,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
     state::{HasCorpus, HasRand, State, UsesState},
@@ -43,17 +43,17 @@ use crate::{
 };
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.
-pub trait RemovableScheduler: Scheduler
+pub trait RemovableScheduler<I, S>
 where
-    Self::State: HasCorpus,
+    I: Input,
 {
     /// Removed the given entry from the corpus at the given index
     /// When you remove testcases, make sure that that testcase is not currently fuzzed one!
     fn on_remove(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -61,18 +61,18 @@ where
     /// Replaced the given testcase at the given idx
     fn on_replace(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _prev: &Testcase<I>,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
 /// Defines the common metadata operations for the AFL-style schedulers
-pub trait AflScheduler<C, O, S>: Scheduler
+pub trait AflScheduler<C, I, O, S>
 where
-    Self::State: HasCorpus + HasMetadata + HasTestcase,
+    S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
     C: AsRef<O>,
 {
@@ -86,7 +86,7 @@ where
     fn map_observer_handle(&self) -> &Handle<C>;
 
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add_metadata(&self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add_metadata(&self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let current_id = *state.corpus().current();
 
         let mut depth = match current_id {
@@ -114,12 +114,12 @@ where
     /// Called when a [`Testcase`] is evaluated
     fn on_evaluation_metadata<OT>(
         &mut self,
-        state: &mut Self::State,
-        _input: &<Self::State as UsesInput>::Input,
+        state: &mut S,
+        _input: &I,
         observers: &OT,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<Self::State>,
+        OT: ObserversTuple<S>,
     {
         let observer = observers
             .get(self.map_observer_handle())
@@ -140,11 +140,7 @@ where
     }
 
     /// Called when choosing the next [`Testcase`]
-    fn on_next_metadata(
-        &mut self,
-        state: &mut Self::State,
-        _next_id: Option<CorpusId>,
-    ) -> Result<(), Error> {
+    fn on_next_metadata(&mut self, state: &mut S, _next_id: Option<CorpusId>) -> Result<(), Error> {
         let current_id = *state.corpus().current();
 
         if let Some(id) = current_id {
@@ -163,45 +159,42 @@ where
 }
 
 /// Trait for Schedulers which track queue cycles
-pub trait HasQueueCycles: Scheduler
-where
-    Self::State: HasCorpus,
-{
+pub trait HasQueueCycles {
     /// The amount of cycles the scheduler has completed.
     fn queue_cycles(&self) -> u64;
 }
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler: UsesState
+pub trait Scheduler<I, S>
 where
-    Self::State: HasCorpus,
+    S: HasCorpus,
 {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, _state: &mut Self::State, _id: CorpusId) -> Result<(), Error>;
+    fn on_add(&mut self, _state: &mut S, _id: CorpusId) -> Result<(), Error>;
     // Add parent_id here if it has no inner
 
     /// An input has been evaluated
     fn on_evaluation<OT>(
         &mut self,
-        _state: &mut Self::State,
-        _input: &<Self::State as UsesInput>::Input,
+        _state: &mut S,
+        _input: &I,
         _observers: &OT,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<Self::State>,
+        OT: ObserversTuple<S>,
     {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error>;
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error>;
     // Increment corpus.current() here if it has no inner
 
     /// Set current fuzzed corpus id and `scheduled_count`
     fn set_current_scheduled(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         *state.corpus_mut().current_mut() = next_id;
@@ -222,11 +215,11 @@ where
     type State = S;
 }
 
-impl<S> Scheduler for RandScheduler<S>
+impl<I, S> Scheduler<I, S> for RandScheduler<S>
 where
     S: HasCorpus + HasRand + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
         state
@@ -239,7 +232,7 @@ where
     }
 
     /// Gets the next entry at random
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented."
@@ -247,7 +240,7 @@ where
             ))
         } else {
             let id = random_corpus_id!(state.corpus(), state.rand_mut());
-            self.set_current_scheduled(state, Some(id))?;
+            <Self as Scheduler<I, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
         }
     }
