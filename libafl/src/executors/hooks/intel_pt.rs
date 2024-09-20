@@ -1,23 +1,23 @@
 // TODO: docs
 #![allow(missing_docs)]
 
-use core::{ops::Range, ptr, slice};
 use std::{
     borrow::ToOwned,
+    cell::Cell,
     convert::Into,
     ffi::CString,
     fs,
     fs::OpenOptions,
     io::Write,
     marker::PhantomData,
+    ops::Range,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
     path::Path,
-    process,
+    process, ptr, slice,
     string::String,
-    sync::Mutex,
     vec::Vec,
 };
 
@@ -47,8 +47,10 @@ const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
 const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
-// Cannot use `LazyLock` for this since libafl_bolts is not `Clone`.
-static PT_PERF_TYPE: Mutex<Option<u32>> = Mutex::new(None);
+thread_local! {
+    // Cannot use `LazyCell` for this since `libafl_bolts::Error` is not `Clone`.
+    static PT_PERF_TYPE: Cell<Option<u32>> = Cell::new(None);
+}
 
 #[derive(TryFromPrimitive, Debug)]
 #[repr(i32)]
@@ -564,9 +566,9 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     Ok(attr)
 }
 
+// TODO: reduce the scope of PT_PERF_TYPE to avoid misusage
 fn intel_pt_perf_type() -> Result<u32, Error> {
-    let mut cache = PT_PERF_TYPE.lock().unwrap();
-    let perf_type = if let Some(perf_type) = *cache {
+    let perf_type = if let Some(perf_type) = PT_PERF_TYPE.get() {
         perf_type
     } else {
         let path = format!("{PT_EVENT_PATH}/type");
@@ -581,7 +583,7 @@ fn intel_pt_perf_type() -> Result<u32, Error> {
                 "Failed to parse Intel PT perf event type in {path}"
             ))
         })?;
-        *cache = Some(perf_type);
+        PT_PERF_TYPE.set(Some(perf_type));
         perf_type
     };
     Ok(perf_type)
@@ -786,19 +788,8 @@ mod test {
         let mut ips = pt.decode_with_image(&mut image, Some(&mut trace));
         let _ = dump_trace_to_file(&trace)
             .inspect_err(|e| println!("Failed to dump trace to file: {e}"));
-        // remove kernel ips
-        ips.retain(|&addr| addr < 0xff00_0000_0000_0000);
         ips.sort_unstable();
         ips.dedup();
         println!("Intel PT traces unique block ips: {ips:#x?}");
-        // TODO: it seems like some userspace traces are not decoded
-        // probably because of smth like this in the traces:
-        // PSB
-        // kernel stuff -> ERROR: not in memory image! sync to next PSB
-        // ...                          |
-        // userspace skipped stuff      |
-        // ...                          |
-        // PSB                      <----
-        // ...
     }
 }
