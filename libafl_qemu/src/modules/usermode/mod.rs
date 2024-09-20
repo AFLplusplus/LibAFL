@@ -1,8 +1,6 @@
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
 
-use std::fmt::Debug;
-
 #[cfg(not(cpu_target = "hexagon"))]
 pub use drcov::DrCovModule;
 

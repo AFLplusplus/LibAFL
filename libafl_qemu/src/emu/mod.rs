@@ -370,6 +370,7 @@ where
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(
         &mut self,
+        state: &mut S,
         input: &S::Input,
     ) -> Result<EmulatorDriverResult<CM, ED, ET, S, SM>, EmulatorDriverError> {
         loop {
@@ -380,7 +381,9 @@ where
             let mut exit_reason = self.run_qemu();
 
             // Handle QEMU exit
-            if let Some(exit_handler_result) = ED::post_qemu_exec(self, &mut exit_reason, input)? {
+            if let Some(exit_handler_result) =
+                ED::post_qemu_exec(self, state, &mut exit_reason, input)?
+            {
                 return Ok(exit_handler_result);
             }
         }

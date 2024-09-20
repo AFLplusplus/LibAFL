@@ -60,10 +60,10 @@ where
     /// Just before calling user's harness
     fn pre_harness_exec(
         emulator: &mut Emulator<CM, Self, ET, S, SM>,
-        input: &S::Input,
         state: &mut S,
+        input: &S::Input,
     ) {
-        emulator.modules.pre_exec_all(input, state);
+        emulator.modules.pre_exec_all(state, input);
     }
 
     /// Just after returning from user's harness
@@ -78,7 +78,7 @@ where
     {
         emulator
             .modules
-            .post_exec_all(input, observers, state, exit_kind);
+            .post_exec_all(state, input, observers, exit_kind);
     }
 
     /// Just before entering QEMU
@@ -88,6 +88,7 @@ where
     #[allow(clippy::type_complexity)]
     fn post_qemu_exec(
         _emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        _state: &mut S,
         exit_reason: &mut Result<EmulatorExitResult<CM, Self, ET, S, SM>, EmulatorExitError>,
         _input: &S::Input,
     ) -> Result<Option<EmulatorDriverResult<CM, Self, ET, S, SM>>, EmulatorDriverError> {
@@ -170,11 +171,11 @@ where
 
     fn pre_harness_exec(
         emulator: &mut Emulator<CM, Self, ET, S, SM>,
-        input: &S::Input,
         state: &mut S,
+        input: &S::Input,
     ) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.pre_exec_all(input, state);
+            emulator.modules.pre_exec_all(state, input);
         }
 
         let input_location = { emulator.driver.input_location.get().cloned() };
@@ -184,7 +185,7 @@ where
                 InputCommand::new(input_location.mem_chunk.clone(), input_location.cpu);
 
             input_command
-                .run(emulator, input, input_location.ret_register)
+                .run(emulator, state, input, input_location.ret_register)
                 .unwrap();
         }
     }
@@ -201,7 +202,7 @@ where
         if !emulator.driver.hooks_locked {
             emulator
                 .modules
-                .post_exec_all(input, observers, state, exit_kind);
+                .post_exec_all(state, input, observers, exit_kind);
         }
     }
 
@@ -209,6 +210,7 @@ where
 
     fn post_qemu_exec(
         emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        state: &mut S,
         exit_reason: &mut Result<EmulatorExitResult<CM, Self, ET, S, SM>, EmulatorExitError>,
         input: &S::Input,
     ) -> Result<Option<EmulatorDriverResult<CM, Self, ET, S, SM>>, EmulatorDriverError> {
@@ -259,7 +261,7 @@ where
             if emulator.driver.print_commands {
                 println!("Received command: {cmd:?}")
             }
-            cmd.run(emulator, input, ret_reg)
+            cmd.run(emulator, state, input, ret_reg)
         } else {
             Ok(Some(EmulatorDriverResult::ReturnToHarness(
                 exit_reason.clone(),

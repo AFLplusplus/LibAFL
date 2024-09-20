@@ -2,9 +2,9 @@ use std::{cell::UnsafeCell, cmp::max, fmt::Debug};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, HasMetadata};
+use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
-use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 pub use libafl_targets::{
     edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX,
     MAX_EDGES_FOUND,
@@ -431,7 +431,7 @@ where
     #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = PF;
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {

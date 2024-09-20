@@ -11,14 +11,13 @@ pub use libafl_targets::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(emulation_mode = "systemmode")]
+use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 #[cfg(emulation_mode = "usermode")]
 use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
 use crate::{
     emu::EmulatorModules,
-    modules::{
-        hash_me, AddressFilter, EmulatorModule, EmulatorModuleTuple, NopPageFilter,
-        StdAddressFilter, NOP_PAGE_FILTER,
-    },
+    modules::{hash_me, AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
     qemu::Hook,
 };
 
@@ -75,7 +74,7 @@ where
     #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -140,7 +139,7 @@ where
 
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -390,7 +389,7 @@ where
     #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {

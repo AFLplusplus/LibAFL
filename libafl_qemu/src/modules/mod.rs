@@ -58,17 +58,18 @@ where
     /// This call can be delayed to the point at which fuzzing is supposed to start.
     /// It is mostly used to avoid running hooks during VM initialization, either
     /// because it is useless or it would produce wrong results.
-    fn first_exec<ET>(&mut self, _state: &mut S, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
     /// Run before a new fuzzing run starts.
+    /// On the first run, it is executed after [`Self::first_exec`].
     fn pre_exec<ET>(
         &mut self,
-        _state: &mut S,
         _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
@@ -78,8 +79,8 @@ where
     /// Run after a fuzzing run ends.
     fn post_exec<OT, ET>(
         &mut self,
-        _state: &mut S,
         _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
@@ -116,17 +117,17 @@ where
     fn pre_exec_all<ET>(
         &mut self,
         emulator_modules: &mut EmulatorModules<ET, S>,
-        input: &S::Input,
         state: &mut S,
+        input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>;
 
     fn post_exec_all<OT, ET>(
         &mut self,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        state: &mut S,
         input: &S::Input,
         observers: &mut OT,
-        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -159,8 +160,8 @@ where
     fn pre_exec_all<ET>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
-        _input: &S::Input,
         _state: &mut S,
+        _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
@@ -169,9 +170,9 @@ where
     fn post_exec_all<OT, ET>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
-        _state: &mut S,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -205,37 +206,37 @@ where
     where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.first_exec(state, emulator_modules);
+        self.0.first_exec(emulator_modules, state);
         self.1.first_exec_all(emulator_modules, state);
     }
 
     fn pre_exec_all<ET>(
         &mut self,
         emulator_modules: &mut EmulatorModules<ET, S>,
-        input: &S::Input,
         state: &mut S,
+        input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.pre_exec(state, emulator_modules, input);
-        self.1.pre_exec_all(emulator_modules, input, state);
+        self.0.pre_exec(emulator_modules, state, input);
+        self.1.pre_exec_all(emulator_modules, state, input);
     }
 
     fn post_exec_all<OT, ET>(
         &mut self,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        state: &mut S,
         input: &S::Input,
         observers: &mut OT,
-        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
         ET: EmulatorModuleTuple<S>,
     {
         self.0
-            .post_exec(state, emulator_modules, input, observers, exit_kind);
+            .post_exec(emulator_modules, state, input, observers, exit_kind);
         self.1
-            .post_exec_all(emulator_modules, input, observers, state, exit_kind);
+            .post_exec_all(emulator_modules, state, input, observers, exit_kind);
     }
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {

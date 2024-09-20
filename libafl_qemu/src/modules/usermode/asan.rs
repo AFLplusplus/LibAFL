@@ -927,7 +927,7 @@ where
         }
     }
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -964,8 +964,8 @@ where
 
     fn pre_exec<ET>(
         &mut self,
-        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
@@ -978,8 +978,8 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
-        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
         exit_kind: &mut ExitKind,

@@ -13,7 +13,7 @@ use crate::{
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
     Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, StdEmulatorDriver,
-    StdEmulatorDriverBuilder, StdSnapshotManager,
+    StdSnapshotManager,
 };
 
 #[derive(Clone, Debug)]

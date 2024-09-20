@@ -136,11 +136,12 @@ macro_rules! define_std_command_manager {
 
                 fn run(&self,
                     emu: &mut Emulator<$name<S>, StdEmulatorDriver, ET, S, SM>,
+                    state: &mut S,
                     input: &S::Input,
                     ret_reg: Option<Regs>
                 ) -> Result<Option<EmulatorDriverResult<$name<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError> {
                     match self {
-                        $([<$name Commands>]::$command(cmd) => cmd.run(emu, input, ret_reg)),+
+                        $([<$name Commands>]::$command(cmd) => cmd.run(emu, state, input, ret_reg)),+
                     }
                 }
             }
@@ -232,6 +233,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
+        state: &mut S,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError>;
@@ -274,6 +276,7 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -297,6 +300,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
@@ -328,6 +332,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
@@ -367,6 +372,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -400,6 +406,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
+        state: &mut S,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<
@@ -439,8 +446,8 @@ where
         // Unleash hooks if locked
         if emu.driver_mut().unlock_hooks() {
             // Prepare hooks
-            emu.modules_mut().first_exec_all();
-            emu.modules_mut().pre_exec_all(input);
+            emu.modules_mut().first_exec_all(state);
+            emu.modules_mut().pre_exec_all(state, input);
         }
 
         // Auto page filtering if option is enabled
@@ -489,6 +496,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<
@@ -534,6 +542,7 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -596,6 +605,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -623,6 +633,7 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -649,6 +660,7 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {

@@ -10,11 +10,12 @@ use libafl_bolts::tuples::{Handle, Handled, MatchFirstType, MatchNameRef};
 use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
+#[cfg(emulation_mode = "systemmode")]
+use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     capstone,
     modules::{
-        AddressFilter, EmulatorModule, EmulatorModuleTuple, EmulatorModules, NopPageFilter,
-        StdAddressFilter, NOP_PAGE_FILTER,
+        AddressFilter, EmulatorModule, EmulatorModuleTuple, EmulatorModules, StdAddressFilter,
     },
     qemu::{ArchExtras, Hook},
     Qemu,
@@ -405,8 +406,8 @@ where
 
     fn pre_exec<ET>(
         &mut self,
-        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
@@ -419,8 +420,8 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
-        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
