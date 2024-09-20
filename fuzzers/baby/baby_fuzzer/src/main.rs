@@ -1,6 +1,11 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{path::PathBuf, ptr::write};
+use std::{
+    path::PathBuf,
+    ptr::write,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -9,8 +14,9 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    executors::{hooks::IntelPTHook, inprocess::GenericInProcessExecutor, ExitKind},
+    feedback_and,
+    feedbacks::{CrashFeedback, IntelPTFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
@@ -33,6 +39,8 @@ fn signals_set(idx: usize) {
 
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
+    let pt_trace = Arc::new(Mutex::new(Vec::new()));
+
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -61,10 +69,10 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("PT trace", SIGNALS_PTR, SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::new(&observer);
+    let mut feedback = feedback_and!(IntelPTFeedback::new(pt_trace.clone())); //MaxMapFeedback::new(&observer),
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -105,13 +113,19 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+    let mut pt_hook = IntelPTHook::new(pt_trace);
+
+    type PTInProcessExecutor<'a, H, OT, S> =
+        GenericInProcessExecutor<H, &'a mut H, (IntelPTHook, ()), OT, S>;
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
+    let mut executor = PTInProcessExecutor::with_timeout_generic(
+        tuple_list!(pt_hook),
         &mut harness,
         tuple_list!(observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        Duration::from_millis(5000),
     )
     .expect("Failed to create the Executor");
 

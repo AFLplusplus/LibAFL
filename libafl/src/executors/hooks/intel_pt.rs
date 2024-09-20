@@ -9,7 +9,6 @@ use std::{
     fs,
     fs::OpenOptions,
     io::Write,
-    marker::PhantomData,
     ops::Range,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
@@ -18,6 +17,7 @@ use std::{
     path::Path,
     process, ptr, slice,
     string::String,
+    sync::{Arc, Mutex},
     vec::Vec,
 };
 
@@ -94,21 +94,17 @@ pub struct IntelPT {
 }
 
 #[derive(Debug)]
-pub struct IntelPTHook<S> {
+pub struct IntelPTHook {
     pt: Option<IntelPT>,
-    phantom: PhantomData<S>,
+    trace: Arc<Mutex<Vec<u8>>>,
 }
 
-impl<S> Default for IntelPTHook<S> {
-    fn default() -> Self {
-        Self {
-            pt: None,
-            phantom: PhantomData,
-        }
+impl IntelPTHook {
+    pub fn new(trace: Arc<Mutex<Vec<u8>>>) -> Self {
+        Self { pt: None, trace }
     }
 }
-
-impl<S> ExecutorHook<S> for IntelPTHook<S>
+impl<S> ExecutorHook<S> for IntelPTHook
 where
     S: UsesInput + Serialize,
 {
@@ -120,6 +116,7 @@ where
 
     #[allow(clippy::cast_possible_wrap)]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        self.trace.lock().unwrap().clear();
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
@@ -141,15 +138,15 @@ where
                 );
             }
         }
-        let mut buff = Vec::new();
+        let mut buff = self.trace.lock().unwrap();
         let ips = self
             .pt
             .as_mut()
             .unwrap()
             .decode_with_image(&mut image, Some(&mut buff));
-        let s = serde_json::to_vec(&state).unwrap();
-        dump_corpus(&s).unwrap();
-        dump_trace_to_file(&buff).unwrap();
+        //let s = serde_json::to_vec(&state).unwrap();
+        //dump_corpus(&s).unwrap();
+        //dump_trace_to_file(&buff).unwrap();
         println!("IPs: {ips:x?}");
     }
 }

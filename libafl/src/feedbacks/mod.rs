@@ -54,6 +54,11 @@ pub mod new_hash_feedback;
 pub mod stdio;
 pub mod transferred;
 
+#[cfg(feature = "intel_pt")]
+pub mod intel_pt;
+#[cfg(feature = "intel_pt")]
+pub use intel_pt::*;
+
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.

@@ -28,10 +28,15 @@ pub mod value;
 
 /// List observer
 pub mod list;
+
+#[cfg(feature = "intel_pt")]
+mod intel_pt;
 use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use std::time::Instant;
 
+#[cfg(feature = "intel_pt")]
+pub use intel_pt::*;
 #[cfg(not(feature = "std"))]
 use libafl_bolts::current_time;
 use libafl_bolts::{tuples::MatchName, Named};
