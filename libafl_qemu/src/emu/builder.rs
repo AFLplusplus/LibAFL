@@ -13,7 +13,7 @@ use crate::{
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
     Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, StdEmulatorDriver,
-    StdSnapshotManager,
+    StdEmulatorDriverBuilder, StdSnapshotManager,
 };
 
 #[derive(Clone, Debug)]
@@ -66,7 +66,7 @@ where
             modules: tuple_list!(),
             command_manager: StdCommandManager::default(),
             snapshot_manager: StdSnapshotManager::default(),
-            driver: StdEmulatorDriver::default(),
+            driver: StdEmulatorDriver::builder().build(),
             qemu_builder: None,
             phantom: PhantomData,
         }

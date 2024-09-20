@@ -389,6 +389,7 @@ where
     T: CallTraceCollectorTuple + Debug,
 {
     type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -443,10 +444,12 @@ where
         &mut self.filter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { NOP_PAGE_FILTER.get_mut() }
     }

@@ -39,6 +39,8 @@ where
     S: UsesInput,
 {
     type ModuleAddressFilter: AddressFilter;
+
+    #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter: PageFilter;
 
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
@@ -90,7 +92,9 @@ where
     fn address_filter(&self) -> &Self::ModuleAddressFilter;
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter;
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter;
 }
 
@@ -105,11 +109,8 @@ where
     where
         ET: EmulatorModuleTuple<S>;
 
-    fn first_exec_all<ET>(
-        &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
-        state: &mut S,
-    ) where
+    fn first_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, state: &mut S)
+    where
         ET: EmulatorModuleTuple<S>;
 
     fn pre_exec_all<ET>(
@@ -133,6 +134,7 @@ where
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
 
+    #[cfg(emulation_mode = "systemmode")]
     fn allow_page_id_all(&mut self, page_id: GuestPhysAddr);
 }
 
@@ -179,6 +181,7 @@ where
 
     fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
 
+    #[cfg(emulation_mode = "systemmode")]
     fn allow_page_id_all(&mut self, _page_id: GuestPhysAddr) {}
 }
 
@@ -240,6 +243,7 @@ where
         self.1.allow_address_range_all(address_range)
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
         self.0.page_filter_mut().allow(page_id.clone());
         self.1.allow_page_id_all(page_id)
@@ -406,6 +410,5 @@ impl PageFilter for NopPageFilter {
     }
 }
 
-// static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
-//      UnsafeCell::new(NopAddressFilter);
+static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> = UnsafeCell::new(NopAddressFilter);
 static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);

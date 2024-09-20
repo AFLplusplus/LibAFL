@@ -668,7 +668,10 @@ impl Qemu {
                     QemuExitReason::Breakpoint(bp_addr)
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
+
+                #[cfg(emulation_mode = "systemmode")]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
+
                 _ => return Err(QemuExitError::UnknownKind),
             })
         }

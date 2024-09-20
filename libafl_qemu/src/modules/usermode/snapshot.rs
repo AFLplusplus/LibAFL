@@ -21,7 +21,10 @@ use crate::SYS_mmap2;
 use crate::SYS_newfstatat;
 use crate::{
     emu::EmulatorModules,
-    modules::{asan::AsanModule, EmulatorModule, EmulatorModuleTuple, Range},
+    modules::{
+        asan::AsanModule, EmulatorModule, EmulatorModuleTuple, NopAddressFilter, Range,
+        NOP_ADDRESS_FILTER,
+    },
     qemu::{Hook, SyscallHookResult},
     Qemu, SYS_brk, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
     SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
@@ -667,6 +670,8 @@ impl<S> EmulatorModule<S> for SnapshotModule
 where
     S: Unpin + UsesInput,
 {
+    type ModuleAddressFilter = NopAddressFilter;
+
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
@@ -702,6 +707,14 @@ where
         } else {
             self.reset(emulator_modules.qemu());
         }
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &NopAddressFilter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        unsafe { NOP_ADDRESS_FILTER.get_mut() }
     }
 }
 

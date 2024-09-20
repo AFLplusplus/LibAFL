@@ -72,6 +72,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -95,10 +96,12 @@ where
         &mut self.address_filter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { NOP_PAGE_FILTER.get_mut() }
     }
@@ -132,6 +135,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
@@ -157,10 +161,12 @@ where
         &mut self.address_filter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { NOP_PAGE_FILTER.get_mut() }
     }
@@ -381,6 +387,7 @@ where
     S: Unpin + UsesInput,
 {
     type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -402,10 +409,12 @@ where
         &mut self.address_filter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         &mut NopPageFilter
     }

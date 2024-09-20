@@ -6,7 +6,7 @@ use std::{
 use crate::Qemu;
 
 pub trait IsSnapshotManager: Clone + Debug {
-    fn init(&mut self, _qemu :Qemu) {}
+    fn init(&mut self, _qemu: Qemu) {}
 
     fn save(&mut self, qemu: Qemu) -> SnapshotId;
     fn restore(&mut self, qemu: Qemu, snapshot_id: &SnapshotId)

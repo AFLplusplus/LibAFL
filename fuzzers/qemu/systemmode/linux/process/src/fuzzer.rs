@@ -1,8 +1,8 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of linux
 
 use core::{ptr::addr_of_mut, time::Duration};
-use std::{env, path::PathBuf, process};
-use std::thread::sleep;
+use std::{env, path::PathBuf, process, thread::sleep};
+
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},

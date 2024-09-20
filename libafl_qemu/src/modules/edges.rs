@@ -2,9 +2,9 @@ use std::{cell::UnsafeCell, cmp::max, fmt::Debug};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, HasMetadata};
-use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
+use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 pub use libafl_targets::{
     edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX,
     MAX_EDGES_FOUND,
@@ -174,7 +174,6 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
             Hook::Empty,
         );
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
         unsafe {
             libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
                 hook_id.0,
@@ -404,6 +403,13 @@ where
     AF: AddressFilter,
     PF: PageFilter,
 {
+    #[cfg(emulation_mode = "usermode")]
+    #[must_use]
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
+        self.address_filter.allowed(&addr)
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr, page_id: Option<GuestPhysAddr>) -> bool {
         if let Some(page_id) = page_id {
@@ -422,6 +428,7 @@ where
     V: EdgeCoverageVariant<AF, PF> + 'static,
 {
     type ModuleAddressFilter = AF;
+    #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = PF;
 
     fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -451,10 +458,12 @@ where
         &mut self.address_filter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &self.page_filter
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         &mut self.page_filter
     }
@@ -477,7 +486,7 @@ where
     if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
         {
-            if !h.must_instrument(src, None) && !h.must_instrument(dest, None) {
+            if !h.must_instrument(src) && !h.must_instrument(dest) {
                 return None;
             }
         }
@@ -547,7 +556,7 @@ where
 {
     if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
-        if !h.must_instrument(src, None) && !h.must_instrument(dest, None) {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
 
@@ -605,7 +614,7 @@ where
     if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
         {
-            if !h.must_instrument(pc, None) {
+            if !h.must_instrument(pc) {
                 return None;
             }
         }

@@ -8,7 +8,7 @@ use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     observers::ObserversTuple,
 };
-use libafl_bolts::{bolts_prelude::CTRL_C_EXIT, os::unix_signals::Signal};
+use libafl_bolts::os::{unix_signals::Signal, CTRL_C_EXIT};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -53,13 +53,17 @@ where
 {
     /// Just before calling user's harness for the first time.
     /// Called only once
-    fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>) {
-        emulator.modules.first_exec_all();
+    fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
+        emulator.modules.first_exec_all(state);
     }
 
     /// Just before calling user's harness
-    fn pre_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
-        emulator.modules.pre_exec_all(input);
+    fn pre_harness_exec(
+        emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        input: &S::Input,
+        state: &mut S,
+    ) {
+        emulator.modules.pre_exec_all(input, state);
     }
 
     /// Just after returning from user's harness
@@ -67,11 +71,14 @@ where
         emulator: &mut Emulator<CM, Self, ET, S, SM>,
         input: &S::Input,
         observers: &mut OT,
+        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
     {
-        emulator.modules.post_exec_all(input, observers, exit_kind);
+        emulator
+            .modules
+            .post_exec_all(input, observers, state, exit_kind);
     }
 
     /// Just before entering QEMU
@@ -100,7 +107,7 @@ where
 {
 }
 
-#[derive(Clone, Debug, TypedBuilder)]
+#[derive(Clone, Debug, Default, TypedBuilder)]
 pub struct StdEmulatorDriver {
     #[builder(default = OnceCell::new())]
     snapshot_id: OnceCell<SnapshotId>,
@@ -136,6 +143,7 @@ impl StdEmulatorDriver {
         was_locked
     }
 
+    #[cfg(emulation_mode = "systemmode")]
     pub fn allow_page_on_start(&self) -> bool {
         self.allow_page_on_start
     }
@@ -154,15 +162,19 @@ where
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
-    fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>) {
+    fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.first_exec_all();
+            emulator.modules.first_exec_all(state);
         }
     }
 
-    fn pre_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, input: &S::Input) {
+    fn pre_harness_exec(
+        emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        input: &S::Input,
+        state: &mut S,
+    ) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.pre_exec_all(input);
+            emulator.modules.pre_exec_all(input, state);
         }
 
         let input_location = { emulator.driver.input_location.get().cloned() };
@@ -181,12 +193,15 @@ where
         emulator: &mut Emulator<CM, Self, ET, S, SM>,
         input: &S::Input,
         observers: &mut OT,
+        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
     {
         if !emulator.driver.hooks_locked {
-            emulator.modules.post_exec_all(input, observers, exit_kind);
+            emulator
+                .modules
+                .post_exec_all(input, observers, state, exit_kind);
         }
     }
 

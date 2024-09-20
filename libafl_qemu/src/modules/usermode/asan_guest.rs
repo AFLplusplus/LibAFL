@@ -14,10 +14,7 @@ use libafl_qemu_sys::{GuestAddr, MapInfo};
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
     emu::EmulatorModules,
-    modules::{
-        EmulatorModule, EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
-        QemuInstrumentationAddressRangeFilter,
-    },
+    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
     qemu::{Hook, MemAccessInfo, Qemu, QemuInitError},
     sys::TCGTemp,
 };
@@ -121,13 +118,13 @@ impl From<&MapInfo> for QemuAsanGuestMapping {
 }
 
 #[derive(Debug)]
-pub struct AsanGuestModule {
-    filter: QemuInstrumentationAddressRangeFilter,
+pub struct AsanGuestModule<F> {
+    filter: F,
     mappings: Vec<QemuAsanGuestMapping>,
 }
 
 #[cfg(any(cpu_target = "aarch64", cpu_target = "x86_64", feature = "clippy"))]
-impl AsanGuestModule {
+impl<F> AsanGuestModule<F> {
     const HIGH_SHADOW_START: GuestAddr = 0x02008fff7000;
     const HIGH_SHADOW_END: GuestAddr = 0x10007fff7fff;
     const LOW_SHADOW_START: GuestAddr = 0x00007fff8000;
@@ -140,21 +137,26 @@ impl AsanGuestModule {
     cpu_target = "mips",
     cpu_target = "ppc"
 ))]
-impl AsanGuestModule {
+impl<F> AsanGuestModule<F> {
     const HIGH_SHADOW_START: GuestAddr = 0x28000000;
     const HIGH_SHADOW_END: GuestAddr = 0x3fffffff;
     const LOW_SHADOW_START: GuestAddr = 0x20000000;
     const LOW_SHADOW_END: GuestAddr = 0x23ffffff;
 }
 
-impl AsanGuestModule {
+impl AsanGuestModule<StdAddressFilter> {
     #[must_use]
     pub fn default(emu: &Qemu, asan: String) -> Self {
-        Self::new(emu, asan, QemuInstrumentationAddressRangeFilter::None)
+        Self::new(emu, asan, StdAddressFilter::default())
     }
+}
 
+impl<F> AsanGuestModule<F>
+where
+    F: AddressFilter,
+{
     #[must_use]
-    pub fn new(emu: &Qemu, asan: String, filter: QemuInstrumentationAddressRangeFilter) -> Self {
+    pub fn new(emu: &Qemu, asan: String, filter: F) -> Self {
         for mapping in emu.mappings() {
             println!("mapping: {mapping:#?}");
         }
@@ -193,21 +195,11 @@ impl AsanGuestModule {
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(addr)
+        self.filter.allowed(&addr)
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for AsanGuestModule {
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        &self.filter
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        &mut self.filter
-    }
-}
-
-fn gen_readwrite_guest_asan<ET, S>(
+fn gen_readwrite_guest_asan<ET, F, S>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
@@ -215,10 +207,11 @@ fn gen_readwrite_guest_asan<ET, S>(
     info: MemAccessInfo,
 ) -> Option<u64>
 where
+    F: AddressFilter,
     S: Unpin + UsesInput,
     ET: EmulatorModuleTuple<S>,
 {
-    let h = emulator_modules.get_mut::<AsanGuestModule>().unwrap();
+    let h = emulator_modules.get_mut::<AsanGuestModule<F>>().unwrap();
     if !h.must_instrument(pc) {
         return None;
     }
@@ -269,17 +262,20 @@ fn guest_trace_error_n_asan<ET, S>(
     panic!("I really shouldn't be here either");
 }
 
-impl<S> EmulatorModule<S> for AsanGuestModule
+impl<F, S> EmulatorModule<S> for AsanGuestModule<F>
 where
+    F: AddressFilter,
     S: Unpin + UsesInput,
 {
+    type ModuleAddressFilter = F;
+
     fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
         emulator_modules.reads(
-            Hook::Function(gen_readwrite_guest_asan::<ET, S>),
+            Hook::Function(gen_readwrite_guest_asan::<ET, F, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
@@ -288,12 +284,20 @@ where
         );
 
         emulator_modules.writes(
-            Hook::Function(gen_readwrite_guest_asan::<ET, S>),
+            Hook::Function(gen_readwrite_guest_asan::<ET, F, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_asan::<ET, S>),
             Hook::Function(guest_trace_error_n_asan::<ET, S>),
         );
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &self.filter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        &mut self.filter
     }
 }

@@ -26,7 +26,7 @@ use crate::{
     get_exit_arch_regs,
     modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
-    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestPhysAddr, GuestReg, InputLocation,
+    Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
@@ -444,6 +444,7 @@ where
         }
 
         // Auto page filtering if option is enabled
+        #[cfg(emulation_mode = "systemmode")]
         if emu.driver_mut().allow_page_on_start() {
             let page_id = qemu.current_cpu().unwrap().current_paging_id().unwrap();
             emu.modules_mut().modules_mut().allow_page_id_all(page_id);

@@ -128,6 +128,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
+        ED: EmulatorDriver<CM, ET, S, SM>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
         S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
@@ -211,11 +212,13 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         if self.first_exec {
-            self.inner.exposed_executor_state_mut().first_exec();
+            self.inner.exposed_executor_state_mut().first_exec(state);
             self.first_exec = false;
         }
 
-        self.inner.exposed_executor_state_mut().pre_exec(input);
+        self.inner
+            .exposed_executor_state_mut()
+            .pre_exec(state, input);
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 
