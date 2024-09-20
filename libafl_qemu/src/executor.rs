@@ -84,7 +84,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
-    Z: HasObjective<Objective = OF, State = E::State> + ExecutionProcessor + HasScheduler,
+    Z: HasObjective<Objective = OF, State = E::State>,
 {
     if BREAK_ON_TMOUT {
         libafl_exit_request_timeout();
@@ -222,6 +222,7 @@ where
         self.inner.exposed_executor_state.post_exec(
             input,
             &mut *self.inner.inner.observers_mut(),
+            state,
             &mut exit_kind,
         );
 

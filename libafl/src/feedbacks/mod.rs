@@ -720,8 +720,9 @@ pub type FastAndFeedback<A, B, S> = CombinedFeedback<A, B, LogicFastAnd, S>;
 /// will call all feedbacks functions even if not necessary to conclude the result
 pub type EagerOrFeedback<A, B, S> = CombinedFeedback<A, B, LogicEagerOr, S>;
 
-/// Combine two feedbacks with an fast OR operation,
-/// might skip calling feedbacks functions if not necessary to conclude the result.
+/// Combine two feedbacks with an fast OR operation - fast.
+///
+/// This might skip calling feedbacks functions if not necessary to conclude the result.
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
 pub type FastOrFeedback<A, B, S> = CombinedFeedback<A, B, LogicFastOr, S>;
@@ -1141,6 +1142,8 @@ impl<T> FeedbackFactory<DiffExitKindFeedback, T> for DiffExitKindFeedback {
     }
 }
 
+/// A [`Feedback`] to track execution time.
+///
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.

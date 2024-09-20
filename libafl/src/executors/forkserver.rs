@@ -309,6 +309,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        coverage_map_size: Option<usize>,
         debug_output: bool,
     ) -> Result<Self, Error> {
         Self::with_kill_signal(
@@ -320,6 +321,7 @@ impl Forkserver {
             memlimit,
             is_persistent,
             is_deferred_frksrv,
+            coverage_map_size,
             debug_output,
             KILL_SIGNAL_DEFAULT,
         )
@@ -338,15 +340,20 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        coverage_map_size: Option<usize>,
         debug_output: bool,
         kill_signal: Signal,
     ) -> Result<Self, Error> {
+        let Some(coverage_map_size) = coverage_map_size else {
+            return Err(Error::unknown("Coverage map size unknown. Use coverage_map_size() to tell the forkserver about the map size."));
+        };
+
         if env::var("AFL_MAP_SIZE").is_err() {
             log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
         }
 
         if env::var("__AFL_SHM_ID").is_err() {
-            log::warn!("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer");
+            return Err(Error::unknown("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer".to_string()));
         }
 
         let mut st_pipe = Pipe::new().unwrap();
@@ -365,6 +372,8 @@ impl Forkserver {
             .stdin(Stdio::null())
             .stdout(stdout)
             .stderr(stderr);
+
+        command.env("AFL_MAP_SIZE", format!("{coverage_map_size}"));
 
         // Persistent, deferred forkserver
         if is_persistent {
@@ -531,6 +540,7 @@ impl Forkserver {
 }
 
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
+///
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<OT, S, SP>
@@ -812,6 +822,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
+                self.map_size,
                 self.debug_child,
                 self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
             )?,
@@ -1514,6 +1525,7 @@ mod tests {
         let executor = ForkserverExecutor::builder()
             .program(bin)
             .args(args)
+            .coverage_map_size(MAP_SIZE)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
             .build::<_, ()>(tuple_list!(edges_observer));

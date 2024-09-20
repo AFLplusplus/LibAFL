@@ -14,7 +14,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback, MinMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, MultipartInput},
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,

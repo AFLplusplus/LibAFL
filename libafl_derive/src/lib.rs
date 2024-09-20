@@ -70,7 +70,9 @@ pub fn libafl_serdeany_derive(input: TokenStream) -> TokenStream {
     })
 }
 
-/// Derive macro to implement `Display` for a struct where all fields implement `Display`.
+/// A derive macro to implement `Display`
+///
+/// Derive macro to implement [`core::fmt::Display`] for a struct where all fields implement `Display`.
 /// The result is the space separated concatenation of all fields' display.
 /// Order of declaration is preserved.
 /// Specifically handled cases:

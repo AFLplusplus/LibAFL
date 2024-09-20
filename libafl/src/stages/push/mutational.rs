@@ -29,7 +29,9 @@ use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
+
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
+///
 /// Mutational push stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
 /// The push version, in contrast to the normal stage, will return each testcase, instead of executing it.

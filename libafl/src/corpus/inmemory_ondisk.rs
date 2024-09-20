@@ -1,4 +1,5 @@
 //! The [`InMemoryOnDiskCorpus`] stores [`Testcase`]s to disk.
+//!
 //! Additionally, _all_ of them are kept in memory.
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.

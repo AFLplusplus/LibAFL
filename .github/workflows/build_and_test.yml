@@ -221,6 +221,15 @@ jobs:
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
+  md-links-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Markdown Link checks
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          config-file: '.github/workflows/md-config.json'
+
   fuzzers-preflight:
     runs-on: ubuntu-24.04
     steps:
@@ -245,6 +254,7 @@ jobs:
           - ./fuzzers/baby/baby_fuzzer_grimoire
           - ./fuzzers/baby/baby_fuzzer_gramatron
           - ./fuzzers/baby/baby_fuzzer
+          - ./fuzzers/baby/baby_fuzzer_custom_input
           - ./fuzzers/baby/baby_fuzzer_nautilus
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode

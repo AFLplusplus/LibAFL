@@ -15,7 +15,7 @@ use libafl::{
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::{QueueScheduler, Scheduler},
     stages::push::{PushStageSharedState, StdMutationalPushStage},

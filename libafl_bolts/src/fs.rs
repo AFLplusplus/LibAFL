@@ -29,6 +29,8 @@ pub fn get_unique_std_input_file() -> String {
     format!("{}_{}", INPUTFILE_STD, std::process::id())
 }
 
+/// Write a file atomically
+///
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.
 /// This way, on the majority of operating systems, the final file will never be incomplete or racey.

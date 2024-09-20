@@ -1,7 +1,7 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
 use alloc::{string::ToString, vec::Vec};
-use core::{fmt::Debug, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
@@ -15,11 +15,11 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{HasCurrentStage, StagesTuple},
+    stages::{HasCurrentStageId, StagesTuple},
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
-        HasSolutions, Stoppable, UsesState,
+        HasSolutions, State, Stoppable, UsesState,
     },
     Error, HasMetadata,
 };
@@ -242,8 +242,8 @@ where
     ) -> Result<(), Error> {
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
-            // log::info!("Starting another fuzz_loop");
             manager.maybe_report_progress(state, monitor_timeout)?;
+
             self.fuzz_one(stages, executor, state, manager)?;
         }
     }
@@ -769,7 +769,7 @@ where
         + HasTestcase
         + HasLastReportTime
         + HasCurrentCorpusId
-        + HasCurrentStage,
+        + HasCurrentStageId,
     ST: StagesTuple<E, EM, Self::State, Self>,
 {
     fn fuzz_one(
@@ -931,62 +931,49 @@ where
     }
 }
 
-#[cfg(test)]
-pub mod test {
-    use core::marker::PhantomData;
+/// A [`NopFuzzer`] that does nothing
+#[derive(Clone, Debug)]
+pub struct NopFuzzer<S> {
+    phantom: PhantomData<S>,
+}
 
-    use libafl_bolts::Error;
-
-    use crate::{
-        corpus::CorpusId,
-        events::{EventProcessor, ProgressReporter},
-        stages::{HasCurrentStage, StagesTuple},
-        state::{HasExecutions, HasLastReportTime, State, UsesState},
-        Fuzzer, HasMetadata,
-    };
-
-    #[derive(Clone, Debug)]
-    pub struct NopFuzzer<S> {
-        phantom: PhantomData<S>,
-    }
-
-    impl<S> NopFuzzer<S> {
-        #[must_use]
-        pub fn new() -> Self {
-            Self {
-                phantom: PhantomData,
-            }
+impl<S> NopFuzzer<S> {
+    /// Creates a new [`NopFuzzer`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
         }
     }
+}
 
-    impl<S> Default for NopFuzzer<S> {
-        fn default() -> Self {
-            Self::new()
-        }
+impl<S> Default for NopFuzzer<S> {
+    fn default() -> Self {
+        Self::new()
     }
+}
 
-    impl<S> UsesState for NopFuzzer<S>
-    where
-        S: State,
-    {
-        type State = S;
-    }
+impl<S> UsesState for NopFuzzer<S>
+where
+    S: State,
+{
+    type State = S;
+}
 
-    impl<ST, E, EM> Fuzzer<E, EM, ST> for NopFuzzer<E::State>
-    where
-        E: UsesState,
-        EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
-        ST: StagesTuple<E, EM, Self::State, Self>,
-        Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStage,
-    {
-        fn fuzz_one(
-            &mut self,
-            _stages: &mut ST,
-            _executor: &mut E,
-            _state: &mut EM::State,
-            _manager: &mut EM,
-        ) -> Result<CorpusId, Error> {
-            unimplemented!()
-        }
+impl<ST, E, EM> Fuzzer<E, EM, ST> for NopFuzzer<E::State>
+where
+    E: UsesState,
+    EM: ProgressReporter<State = Self::State> + EventProcessor<E, Self>,
+    ST: StagesTuple<E, EM, Self::State, Self>,
+    Self::State: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId,
+{
+    fn fuzz_one(
+        &mut self,
+        _stages: &mut ST,
+        _executor: &mut E,
+        _state: &mut EM::State,
+        _manager: &mut EM,
+    ) -> Result<CorpusId, Error> {
+        unimplemented!("NopFuzzer cannot fuzz");
     }
 }

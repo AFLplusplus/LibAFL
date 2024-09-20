@@ -34,7 +34,9 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
     current_time,
     tuples::{Handle, MatchNameRef},
@@ -68,7 +70,8 @@ pub mod multi_machine;
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {};
 
-/// A signal handler for catching ctrl-c.
+/// A signal handler for catching `ctrl-c`.
+///
 /// The purpose of this signal handler is solely for calling `exit()` with a specific exit code 100
 /// In this way, the restarting manager can tell that we really want to exit
 #[cfg(all(unix, feature = "std"))]
@@ -85,10 +88,7 @@ impl Handler for ShutdownSignalData {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        // println!("in handler! {}", std::process::id());
         unsafe {
-            // println!("Exiting from the handler....");
-
             #[cfg(unix)]
             libc::_exit(CTRL_C_EXIT);
 
@@ -116,7 +116,7 @@ use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 use crate::{
-    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStage, state::UsesState,
+    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStageId, state::UsesState,
 };
 
 /// The log event severity
@@ -545,7 +545,7 @@ where
 /// Restartable trait
 pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
-    /// You *must* ensure that [`HasCurrentStage::on_restart`] will be invoked in this method, by you
+    /// You *must* ensure that [`HasCurrentStageId::on_restart`] will be invoked in this method, by you
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {

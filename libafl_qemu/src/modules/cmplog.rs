@@ -74,7 +74,7 @@ where
     type ModuleAddressFilter = StdAddressFilter;
     type ModulePageFilter = NopPageFilter;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -136,7 +136,7 @@ where
 
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -383,7 +383,7 @@ where
     type ModuleAddressFilter = StdAddressFilter;
     type ModulePageFilter = NopPageFilter;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {

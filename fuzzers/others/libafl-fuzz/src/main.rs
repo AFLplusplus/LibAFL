@@ -25,7 +25,7 @@ use fuzzer::run_client;
 use libafl::{
     events::{CentralizedLauncher, EventConfig},
     monitors::MultiMonitor,
-    schedulers::powersched::PowerSchedule,
+    schedulers::powersched::BaseSchedule,
     Error,
 };
 use libafl_bolts::{
@@ -111,9 +111,7 @@ fn main() {
 /// The Configuration
 struct Opt {
     executable: PathBuf,
-
-    #[arg(value_parser = validate_harness_input_stdin)]
-    harness_input_type: Option<&'static str>,
+    target_args: Vec<String>,
 
     // NOTE: afl-fuzz does not accept multiple input directories
     #[arg(short = 'i')]
@@ -128,7 +126,7 @@ struct Opt {
     rng_seed: Option<u64>,
     /// power schedules compute a seed's performance score: explore(default), fast, exploit, seek, rare, mmopt, coe, lin
     #[arg(short = 'p')]
-    power_schedule: Option<PowerSchedule>,
+    power_schedule: Option<BaseSchedule>,
     /// enable `CmpLog` by specifying a binary compiled for it.
     #[arg(short = 'c')]
     cmplog: Option<String>,
@@ -256,13 +254,6 @@ struct Opt {
     crash_mode: bool,
     #[clap(skip)]
     non_instrumented_mode: bool,
-}
-
-fn validate_harness_input_stdin(s: &str) -> Result<&'static str, String> {
-    if s != "@@" {
-        return Err("Unknown harness input type. Use \"@@\" for file, omit for stdin ".to_string());
-    }
-    Ok(AFL_HARNESS_FILE_INPUT)
 }
 
 #[allow(dead_code)]

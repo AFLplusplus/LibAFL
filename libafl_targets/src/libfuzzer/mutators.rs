@@ -197,7 +197,9 @@ where
     }
 }
 
-/// A mutator which invokes a libFuzzer-like custom mutator or crossover. The `CROSSOVER` constant
+/// A mutator which invokes a libFuzzer-like custom mutator or crossover.
+///
+/// The `CROSSOVER` constant
 /// controls whether this mutator invokes `LLVMFuzzerCustomMutate` and `LLVMFuzzerCustomCrossover`.
 /// You should avoid using crossover-like mutators with custom mutators as this may lead to the
 /// injection of some input portions to another in ways which violate structure.

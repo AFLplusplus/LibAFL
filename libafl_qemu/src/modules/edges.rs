@@ -174,6 +174,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
             Hook::Empty,
         );
 
+    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
         unsafe {
             libafl_qemu_sys::libafl_qemu_block_hook_set_jit(
                 hook_id.0,
@@ -423,7 +424,7 @@ where
     type ModuleAddressFilter = AF;
     type ModulePageFilter = PF;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {

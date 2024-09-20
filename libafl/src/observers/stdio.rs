@@ -1,3 +1,5 @@
+//! Observers for `stdout` and `stderr`
+//!
 //! The [`StdOutObserver`] and [`StdErrObserver`] observers look at the stdout of a program
 //! The executor must explicitly support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].

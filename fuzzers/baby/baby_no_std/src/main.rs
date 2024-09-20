@@ -19,7 +19,7 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
@@ -33,6 +33,7 @@ use static_alloc::Bump;
 #[global_allocator]
 static A: Bump<[u8; 512 * 1024 * 1024]> = Bump::uninit();
 
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     #[cfg(unix)]

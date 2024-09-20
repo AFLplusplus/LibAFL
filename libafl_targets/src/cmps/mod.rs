@@ -80,12 +80,13 @@ pub struct CmpLogHeader {
 // VALS
 
 /// The AFL++ `cmp_operands` struct
-#[derive(Default, Debug, Clone, Copy)]
-#[repr(C, packed)]
+///
 /// Comparison operands, represented as either two (left and right of comparison) u64 values or
 /// two (left and right of comparison) u128 values, split into two u64 values. If the left and
 /// right values are smaller than u64, they can be sign or zero extended to 64 bits, as the actual
 /// comparison size is determined by the `hits` field of the associated `AFLppCmpLogHeader`.
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C, packed)]
 pub struct AFLppCmpLogOperands {
     v0: u64,
     v0_128: u64,

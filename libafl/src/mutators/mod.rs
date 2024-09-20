@@ -1,4 +1,6 @@
-//! [`Mutator`]`s` mutate input during fuzzing. These can be used standalone or in combination with other mutators to explore the input space more effectively.
+//! [`Mutator`]`s` mutate input during fuzzing.
+//!
+//! These can be used standalone or in combination with other mutators to explore the input space more effectively.
 //! You can read more about mutators in the [libAFL book](https://aflplus.plus/libafl-book/core_concepts/mutator.html)
 pub mod scheduled;
 use core::fmt;
@@ -9,6 +11,8 @@ pub use mutations::*;
 pub mod token_mutations;
 use serde::{Deserialize, Serialize};
 pub use token_mutations::*;
+pub mod havoc_mutations;
+pub use havoc_mutations::*;
 pub mod encoded_mutations;
 pub use encoded_mutations::*;
 pub mod mopt_mutator;
@@ -17,6 +21,8 @@ pub mod gramatron;
 pub use gramatron::*;
 pub mod grimoire;
 pub use grimoire::*;
+pub mod mapping;
+pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 

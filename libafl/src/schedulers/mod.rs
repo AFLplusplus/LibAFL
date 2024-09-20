@@ -270,5 +270,6 @@ impl<S> Default for RandScheduler<S> {
 }
 
 /// A [`StdScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s.
+///
 /// The current `Std` is a [`RandScheduler`], although this may change in the future, if another [`Scheduler`] delivers better results.
 pub type StdScheduler<S> = RandScheduler<S>;
