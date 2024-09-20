@@ -16,6 +16,7 @@ use z3::{ast::Bool, Config, Context, Optimize};
 use crate::{
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
+    inputs::UsesInput,
     executors::{Executor, HasObservers},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
@@ -41,7 +42,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State> + RemovableScheduler, // schedulers that has on_remove/on_replace only!
+        CS: Scheduler<E::Input, E::State> + RemovableScheduler<E::Input, E::State>, // schedulers that has on_remove/on_replace only!
         EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>;
 }
@@ -57,13 +58,13 @@ pub struct MapCorpusMinimizer<C, E, O, T, TS> {
 
 /// Standard corpus minimizer, which weights inputs by length and time.
 pub type StdCorpusMinimizer<C, E, O, T> =
-    MapCorpusMinimizer<C, E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
+    MapCorpusMinimizer<C, E, O, T, LenTimeMulTestcaseScore<<E as UsesInput>::Input, <E as UsesState>::State>>;
 
 impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
-    TS: TestcaseScore<E::State>,
+    TS: TestcaseScore<E::Input, E::State>,
     C: Named,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
@@ -83,7 +84,7 @@ where
     C: AsRef<O>,
     E::State: HasMetadata + HasCorpus + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<E::State>,
+    TS: TestcaseScore<E::Input, E::State>,
 {
     #[allow(clippy::too_many_lines)]
     fn minimize<CS, EM, Z>(
@@ -95,7 +96,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<State = E::State> + RemovableScheduler,
+        CS: Scheduler<E::Input, E::State> + RemovableScheduler<E::Input, E::State>,
         EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,
     {
