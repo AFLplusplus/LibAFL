@@ -412,4 +412,5 @@ impl PageFilter for NopPageFilter {
 }
 
 static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> = UnsafeCell::new(NopAddressFilter);
+#[cfg(emulation_mode = "systemmode")]
 static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);
