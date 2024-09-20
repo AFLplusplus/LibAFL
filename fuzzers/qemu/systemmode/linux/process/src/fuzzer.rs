@@ -2,7 +2,7 @@
 
 use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
-
+use std::thread::sleep;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
@@ -50,8 +50,8 @@ pub fn fuzz() {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
     };
     // Hardcoded parameters
-    let timeout = Duration::from_secs(120);
-    let broker_port = 1337;
+    let timeout = Duration::from_secs(99999999);
+    let broker_port = 1338;
     let cores = Cores::from_cmdline("1").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
@@ -72,6 +72,14 @@ pub fn fuzz() {
             .qemu_cli(args)
             .modules(modules)
             .build()?;
+
+        println!("Process {} is ready.", process::id());
+
+        // loop {
+        //     sleep(Duration::from_secs(1));
+        // }
+
+        // process::abort();
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);

@@ -549,6 +549,11 @@ impl Qemu {
         let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
         argv.push(ptr::null()); // argv is always null terminated.
 
+        #[cfg(emulation_mode = "systemmode")]
+        unsafe {
+            libafl_qemu_sys::syx_snapshot_init(true);
+        }
+
         unsafe {
             libafl_qemu_init(argc, argv.as_ptr() as *mut *mut i8);
         }
@@ -556,7 +561,6 @@ impl Qemu {
         #[cfg(emulation_mode = "systemmode")]
         unsafe {
             libc::atexit(qemu_cleanup_atexit);
-            libafl_qemu_sys::syx_snapshot_init(true);
         }
 
         Ok(Qemu { _private: () })
