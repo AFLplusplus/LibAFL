@@ -14,7 +14,7 @@ use crate::{
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     schedulers::{AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler},
-    state::{HasCorpus, State, UsesState},
+    state::{HasCorpus, State},
     Error, HasMetadata,
 };
 
@@ -277,13 +277,6 @@ pub struct PowerQueueScheduler<C, I, O, S> {
     map_observer_handle: Handle<C>,
     last_hash: usize,
     phantom: PhantomData<(I, O, S)>,
-}
-
-impl<C, I, O, S> UsesState for PowerQueueScheduler<C, I, O, S>
-where
-    S: State,
-{
-    type State = S;
 }
 
 impl<C, I, O, S> RemovableScheduler<I, S> for PowerQueueScheduler<C, I, O, S>

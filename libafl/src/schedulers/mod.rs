@@ -38,7 +38,7 @@ use crate::{
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     random_corpus_id,
-    state::{HasCorpus, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand, State},
     Error, HasMetadata,
 };
 
@@ -206,13 +206,6 @@ where
 #[derive(Debug, Clone)]
 pub struct RandScheduler<S> {
     phantom: PhantomData<S>,
-}
-
-impl<S> UsesState for RandScheduler<S>
-where
-    S: State + HasTestcase,
-{
-    type State = S;
 }
 
 impl<I, S> Scheduler<I, S> for RandScheduler<S>
