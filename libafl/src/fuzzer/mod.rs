@@ -6,6 +6,8 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use libafl_bolts::current_time;
 use serde::{de::DeserializeOwned, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
@@ -23,8 +25,6 @@ use crate::{
     },
     Error, HasMetadata,
 };
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
