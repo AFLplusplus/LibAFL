@@ -24,7 +24,7 @@ use crate::{
     Error, HasMetadata,
 };
 #[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
+use crate::monitors::PerfFeature;
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
