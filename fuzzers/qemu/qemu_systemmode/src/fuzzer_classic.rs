@@ -36,9 +36,9 @@ use libafl_qemu::{
     modules::edges::{
         edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    Emulator, GuestPhysAddr, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause,
+    Regs,
 };
-use libafl_qemu_sys::GuestPhysAddr;
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
