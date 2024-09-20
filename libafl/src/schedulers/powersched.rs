@@ -307,12 +307,14 @@ where
     }
 }
 
-impl<C, I, O, S> AflScheduler<C, I, O, S> for PowerQueueScheduler<C, I, O, S>
+impl<C, I, O, S> AflScheduler<I, O, S> for PowerQueueScheduler<C, I, O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
     C: AsRef<O>,
 {
+    type MapObserverRef = C;
+
     fn last_hash(&self) -> usize {
         self.last_hash
     }
@@ -345,7 +347,7 @@ where
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
-        <Self as AflScheduler<C, I, O, S>>::on_add_metadata(self, state, id)
+        <Self as AflScheduler<I, O, S>>::on_add_metadata(self, state, id)
     }
 
     fn on_evaluation<OT>(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error>
@@ -386,7 +388,7 @@ where
         state: &mut S,
         next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
-        <Self as AflScheduler<C, I, O, S>>::on_next_metadata(self, state, next_id)?;
+        <Self as AflScheduler<I, O, S>>::on_next_metadata(self, state, next_id)?;
 
         *state.corpus_mut().current_mut() = next_id;
         Ok(())

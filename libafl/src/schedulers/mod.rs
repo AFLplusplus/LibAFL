@@ -70,12 +70,14 @@ where
 }
 
 /// Defines the common metadata operations for the AFL-style schedulers
-pub trait AflScheduler<C, I, O, S>
+pub trait AflScheduler<I, O, S>
 where
     S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
-    C: AsRef<O>,
 {
+    /// The type of [`MapObserver`] that this scheduler will use as reference
+    type MapObserverRef: AsRef<O>;
+
     /// Return the last hash
     fn last_hash(&self) -> usize;
 
@@ -83,7 +85,7 @@ where
     fn set_last_hash(&mut self, value: usize);
 
     /// Get the observer map observer name
-    fn map_observer_handle(&self) -> &Handle<C>;
+    fn map_observer_handle(&self) -> &Handle<Self::MapObserverRef>;
 
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add_metadata(&self, state: &mut S, id: CorpusId) -> Result<(), Error> {

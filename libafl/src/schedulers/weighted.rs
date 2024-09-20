@@ -289,7 +289,7 @@ where
     }
 }
 
-impl<C, I, F, O, S> AflScheduler<C, I, O, S> for WeightedScheduler<C, F, I, O, S>
+impl<C, I, F, O, S> AflScheduler<I, O, S> for WeightedScheduler<C, F, I, O, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
@@ -297,6 +297,8 @@ where
     S: HasCorpus + HasMetadata + HasTestcase + HasRand + State,
     C: AsRef<O> + Named,
 {
+    type MapObserverRef = C;
+
     fn last_hash(&self) -> usize {
         self.last_hash
     }
