@@ -392,20 +392,24 @@ fn parse_stub(
 }
 
 #[rustversion::nightly]
+#[allow(unused)]
 pub fn maybe_generate_stub_bindings(
     cpu_target: &str,
     emulation_mode: &str,
     stub_bindings_file: &Path,
     bindings_file: &Path,
 ) {
-    if env::var("LIBAFL_QEMU_GEN_STUBS").is_ok() && cpu_target == "x86_64" && emulation_mode == "usermode" {
+    if env::var("LIBAFL_QEMU_GEN_STUBS").is_ok()
+        && cpu_target == "x86_64"
+        && emulation_mode == "usermode"
+    {
         let current_rustc_version =
             rustc_version::version().expect("Could not get current rustc version");
 
         // We only try to store the stub if the current rustc version is strictly bigger than the one used to generate
         // the versioned stub or the qemu hash differs.
         // let (try_generate, force_regeneration, stub_content) =
-            // parse_stub(stub_bindings_file, &current_rustc_version);
+        // parse_stub(stub_bindings_file, &current_rustc_version);
 
         let header = format!("/* {current_rustc_version} */");
 
