@@ -65,9 +65,10 @@ pub fn fuzz() {
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| unsafe {
-            emulator.run(input).unwrap().try_into().unwrap()
-        };
+        let mut harness =
+            |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
+                emulator.run(state, input).unwrap().try_into().unwrap()
+            };
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {

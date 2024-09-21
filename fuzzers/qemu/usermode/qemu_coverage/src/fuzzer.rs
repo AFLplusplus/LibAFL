@@ -175,18 +175,19 @@ pub fn fuzz() {
         }
     };
 
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
-        let target = input.target_bytes();
-        let mut buf = target.as_slice();
-        let mut len = buf.len();
-        if len > MAX_INPUT_SIZE {
-            buf = &buf[0..MAX_INPUT_SIZE];
-            len = MAX_INPUT_SIZE;
-        }
-        let len = len as GuestReg;
-        reset(buf, len).unwrap();
-        ExitKind::Ok
-    };
+    let mut harness =
+        |_emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            let target = input.target_bytes();
+            let mut buf = target.as_slice();
+            let mut len = buf.len();
+            if len > MAX_INPUT_SIZE {
+                buf = &buf[0..MAX_INPUT_SIZE];
+                len = MAX_INPUT_SIZE;
+            }
+            let len = len as GuestReg;
+            reset(buf, len).unwrap();
+            ExitKind::Ok
+        };
 
     let mut run_client =
         |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, core_id| {

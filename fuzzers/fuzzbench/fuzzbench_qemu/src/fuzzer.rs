@@ -326,35 +326,36 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
-        let target = input.target_bytes();
-        let mut buf = target.as_slice();
-        let mut len = buf.len();
-        if len > MAX_INPUT_SIZE {
-            buf = &buf[0..MAX_INPUT_SIZE];
-            len = MAX_INPUT_SIZE;
-        }
-
-        unsafe {
-            qemu.write_mem(input_addr, buf);
-
-            qemu.write_reg(Regs::Rdi, input_addr).unwrap();
-            qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
-            qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
-            qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
-
-            match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {}
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
-                }
-                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                _ => panic!("Unexpected QEMU exit."),
+    let mut harness =
+        |_emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            let target = input.target_bytes();
+            let mut buf = target.as_slice();
+            let mut len = buf.len();
+            if len > MAX_INPUT_SIZE {
+                buf = &buf[0..MAX_INPUT_SIZE];
+                len = MAX_INPUT_SIZE;
             }
-        }
 
-        ExitKind::Ok
-    };
+            unsafe {
+                qemu.write_mem(input_addr, buf);
+
+                qemu.write_reg(Regs::Rdi, input_addr).unwrap();
+                qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
+                qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+                qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
+
+                match qemu.run() {
+                    Ok(QemuExitReason::Breakpoint(_)) => {}
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                        Signal::SigInterrupt,
+                    ))) => process::exit(0),
+                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
+                    _ => panic!("Unexpected QEMU exit."),
+                }
+            }
+
+            ExitKind::Ok
+        };
 
     let modules = tuple_list!(
         EdgeCoverageModule::default(),

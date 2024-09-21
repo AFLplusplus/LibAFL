@@ -136,52 +136,53 @@ pub fn fuzz() {
         let snap = qemu.create_fast_snapshot(true);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
-            let target = input.target_bytes();
-            let mut buf = target.as_slice();
-            let len = buf.len();
-            unsafe {
-                if len > MAX_INPUT_SIZE {
-                    buf = &buf[0..MAX_INPUT_SIZE];
-                    // len = MAX_INPUT_SIZE;
+        let mut harness =
+            |emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+                let target = input.target_bytes();
+                let mut buf = target.as_slice();
+                let len = buf.len();
+                unsafe {
+                    if len > MAX_INPUT_SIZE {
+                        buf = &buf[0..MAX_INPUT_SIZE];
+                        // len = MAX_INPUT_SIZE;
+                    }
+
+                    qemu.write_phys_mem(input_addr, buf);
+
+                    match emulator.qemu().run() {
+                        Ok(QemuExitReason::Breakpoint(_)) => {}
+                        Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                            Signal::SigInterrupt,
+                        ))) => process::exit(CTRL_C_EXIT),
+                        Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
+                        _ => panic!("Unexpected QEMU exit."),
+                    }
+
+                    // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
+                    let mut pcs = (0..qemu.num_cpus())
+                        .map(|i| qemu.cpu_from_index(i))
+                        .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });
+                    let ret = match pcs
+                        .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
+                    {
+                        Some(_) => ExitKind::Ok,
+                        None => ExitKind::Crash,
+                    };
+
+                    // OPTION 1: restore only the CPU state (registers et. al)
+                    // for (i, s) in saved_cpu_states.iter().enumerate() {
+                    //     emu.cpu_from_index(i).restore_state(s);
+                    // }
+
+                    // OPTION 2: restore a slow vanilla QEMU snapshot
+                    // emu.load_snapshot("start", true);
+
+                    // OPTION 3: restore a fast devices+mem snapshot
+                    qemu.restore_fast_snapshot(snap);
+
+                    ret
                 }
-
-                qemu.write_phys_mem(input_addr, buf);
-
-                match emulator.qemu().run() {
-                    Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
-                        Signal::SigInterrupt,
-                    ))) => process::exit(CTRL_C_EXIT),
-                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                    _ => panic!("Unexpected QEMU exit."),
-                }
-
-                // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
-                let mut pcs = (0..qemu.num_cpus())
-                    .map(|i| qemu.cpu_from_index(i))
-                    .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });
-                let ret = match pcs
-                    .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
-                {
-                    Some(_) => ExitKind::Ok,
-                    None => ExitKind::Crash,
-                };
-
-                // OPTION 1: restore only the CPU state (registers et. al)
-                // for (i, s) in saved_cpu_states.iter().enumerate() {
-                //     emu.cpu_from_index(i).restore_state(s);
-                // }
-
-                // OPTION 2: restore a slow vanilla QEMU snapshot
-                // emu.load_snapshot("start", true);
-
-                // OPTION 3: restore a fast devices+mem snapshot
-                qemu.restore_fast_snapshot(snap);
-
-                ret
-            }
-        };
+            };
 
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
