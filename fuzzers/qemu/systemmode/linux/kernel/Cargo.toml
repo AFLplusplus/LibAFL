@@ -1,7 +1,10 @@
 [package]
 name = "qemu_linux_kernel"
 version = "0.13.2"
-authors = [ "Romain Malmain <rmalmain@pm.me>", "Dongjia Zhang <tokazerkje@outlook.com>" ]
+authors = [
+  "Romain Malmain <rmalmain@pm.me>",
+  "Dongjia Zhang <tokazerkje@outlook.com>",
+]
 edition = "2021"
 
 [features]
