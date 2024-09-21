@@ -425,12 +425,12 @@ where
 
     /// First exec of Emulator, called before calling to user harness the first time
     pub fn first_exec(&mut self, state: &mut S) {
-        ED::first_harness_exec(self, state)
+        ED::first_harness_exec(self, state);
     }
 
     /// Pre exec of Emulator, called before calling to user harness
     pub fn pre_exec(&mut self, state: &mut S, input: &S::Input) {
-        ED::pre_harness_exec(self, state, input)
+        ED::pre_harness_exec(self, state, input);
     }
 
     /// Post exec of Emulator, called before calling to user harness
@@ -443,7 +443,7 @@ where
     ) where
         OT: ObserversTuple<S>,
     {
-        ED::post_harness_exec(self, input, observers, state, exit_kind)
+        ED::post_harness_exec(self, input, observers, state, exit_kind);
     }
 }
 

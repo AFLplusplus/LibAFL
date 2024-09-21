@@ -109,6 +109,7 @@ where
 }
 
 #[derive(Clone, Debug, Default, TypedBuilder)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct StdEmulatorDriver {
     #[builder(default = OnceCell::new())]
     snapshot_id: OnceCell<SnapshotId>,
@@ -259,7 +260,7 @@ where
 
         if let Some(cmd) = command {
             if emulator.driver.print_commands {
-                println!("Received command: {cmd:?}")
+                println!("Received command: {cmd:?}");
             }
             cmd.run(emulator, state, input, ret_reg)
         } else {

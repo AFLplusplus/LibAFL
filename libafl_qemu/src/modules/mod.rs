@@ -241,7 +241,7 @@ where
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
         self.0.address_filter_mut().allow(address_range.clone());
-        self.1.allow_address_range_all(address_range)
+        self.1.allow_address_range_all(address_range);
     }
 
     #[cfg(emulation_mode = "systemmode")]
@@ -304,24 +304,16 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct StdAddressFilter {
     // ideally, we should use a tree
     allowed_addresses: Vec<Range<GuestAddr>>,
 }
 
-impl Default for StdAddressFilter {
-    fn default() -> Self {
-        Self {
-            allowed_addresses: Vec::new(),
-        }
-    }
-}
-
 impl AddressFilter for StdAddressFilter {
     fn allow(&mut self, address_range: Range<GuestAddr>) {
         self.allowed_addresses.push(address_range);
-        Qemu::get().unwrap().flush_jit()
+        Qemu::get().unwrap().flush_jit();
     }
 
     fn allowed(&self, addr: &GuestAddr) -> bool {
@@ -355,7 +347,7 @@ impl Default for StdPageFilter {
 impl PageFilter for StdPageFilter {
     fn allow(&mut self, page_id: GuestPhysAddr) {
         self.allowed_pages.insert(page_id);
-        Qemu::get().unwrap().flush_jit()
+        Qemu::get().unwrap().flush_jit();
     }
 
     fn allowed(&self, paging_id: &GuestPhysAddr) -> bool {

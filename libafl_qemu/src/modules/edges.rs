@@ -295,6 +295,7 @@ impl Default
 }
 
 impl EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant> {
+    #[must_use]
     pub fn builder(
     ) -> EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant> {
         EdgeCoverageModuleBuilder::default()
@@ -358,6 +359,7 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         )
     }
 
+    #[must_use]
     pub fn hitcounts(self, use_hitcounts: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
@@ -368,6 +370,7 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         )
     }
 
+    #[must_use]
     pub fn jit(self, use_jit: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
@@ -389,9 +392,9 @@ impl<AF, PF, V> EdgeCoverageModule<AF, PF, V> {
         use_jit: bool,
     ) -> Self {
         Self {
+            variant,
             address_filter,
             page_filter,
-            variant,
             use_hitcounts,
             use_jit,
         }
@@ -437,16 +440,14 @@ where
     {
         if self.use_hitcounts {
             if self.use_jit {
-                self.variant.jit_hitcount(emulator_modules)
+                self.variant.jit_hitcount(emulator_modules);
             } else {
-                self.variant.fn_hitcount(emulator_modules)
+                self.variant.fn_hitcount(emulator_modules);
             }
+        } else if self.use_jit {
+            self.variant.jit_no_hitcount(emulator_modules);
         } else {
-            if self.use_jit {
-                self.variant.jit_no_hitcount(emulator_modules)
-            } else {
-                self.variant.fn_no_hitcount(emulator_modules)
-            }
+            self.variant.fn_no_hitcount(emulator_modules);
         }
     }
 
@@ -573,7 +574,7 @@ where
         }
     }
 
-    let id = hash_me(src as u64) ^ hash_me(dest as u64);
+    let id = hash_me(src) ^ hash_me(dest);
     let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
 
     unsafe {
@@ -631,7 +632,7 @@ where
         }
     }
 
-    let id = hash_me(pc as u64);
+    let id = hash_me(pc);
     let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
 
     unsafe {

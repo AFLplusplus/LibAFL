@@ -65,7 +65,7 @@ pub enum QemuExitReason {
     /// Breakpoint triggered. Contains the address of the trigger
     Breakpoint(GuestAddr),
 
-    /// Synchronous exit: The guest triggered a backdoor and should return to LibAFL.
+    /// Synchronous exit: The guest triggered a backdoor and should return to `LibAFL`.
     SyncExit,
 
     /// Timeout, and it has been requested to be handled by the harness.

@@ -664,27 +664,28 @@ where
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
-        if self.expected_value != self.received_value {
+        if self.expected_value == self.received_value {
+            Ok(None)
+        } else {
             Err(EmulatorDriverError::CommandError(
                 CommandError::TestDifference(self.received_value, self.expected_value),
             ))
-        } else {
-            println!("Test succeeded");
-            Ok(None)
         }
     }
 }
 
 impl TestCommand {
+    #[must_use]
     pub fn new(received_value: GuestReg, expected_value: GuestReg) -> Self {
         Self {
-            received_value,
             expected_value,
+            received_value,
         }
     }
 }
 
 impl LqprintfCommand {
+    #[must_use]
     pub fn new(content: String) -> Self {
         Self { content }
     }
@@ -698,6 +699,7 @@ impl VersionCommand {
 }
 
 impl AddressAllowCommand {
+    #[must_use]
     pub fn new(address_range: Range<GuestAddr>) -> Self {
         Self { address_range }
     }
