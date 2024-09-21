@@ -398,31 +398,29 @@ pub fn maybe_generate_stub_bindings(
     stub_bindings_file: &Path,
     bindings_file: &Path,
 ) {
-    if env::var("CARGO_CFG_DOC").is_ok() && cpu_target == "x86_64" && emulation_mode == "usermode" {
+    if env::var("LIBAFL_QEMU_GEN_STUBS").is_ok() && cpu_target == "x86_64" && emulation_mode == "usermode" {
         let current_rustc_version =
             rustc_version::version().expect("Could not get current rustc version");
 
         // We only try to store the stub if the current rustc version is strictly bigger than the one used to generate
         // the versioned stub or the qemu hash differs.
-        let (try_generate, force_regeneration, stub_content) =
-            parse_stub(stub_bindings_file, &current_rustc_version);
+        // let (try_generate, force_regeneration, stub_content) =
+            // parse_stub(stub_bindings_file, &current_rustc_version);
 
         let header = format!("/* {current_rustc_version} */");
 
-        if try_generate {
-            store_generated_content_if_different(
-                stub_bindings_file,
-                fs::read(bindings_file)
-                    .expect("Could not read generated bindings file")
-                    .as_slice(),
-                stub_content,
-                vec![
-                    header.as_str(),
-                    format!("/* qemu git hash: {QEMU_REVISION} */").as_str(),
-                ],
-                force_regeneration,
-            );
-        }
+        store_generated_content_if_different(
+            stub_bindings_file,
+            fs::read(bindings_file)
+                .expect("Could not read generated bindings file")
+                .as_slice(),
+            None,
+            vec![
+                header.as_str(),
+                format!("/* qemu git hash: {QEMU_REVISION} */").as_str(),
+            ],
+            false,
+        );
     } else if env::var("CARGO_CFG_DOC").is_ok() {
         println!("cargo:warning=Bindings regeneration has been skipped. Please rerun with x86_64 with usermode to trigger the bindings regeneration.");
     }
