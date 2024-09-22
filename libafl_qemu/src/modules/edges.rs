@@ -574,7 +574,7 @@ where
         }
     }
 
-    let id = hash_me(src) ^ hash_me(dest);
+    let id = hash_me(src as u64) ^ hash_me(dest);
     let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
 
     unsafe {
@@ -632,7 +632,7 @@ where
         }
     }
 
-    let id = hash_me(pc);
+    let id = hash_me(pc as u64);
     let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
 
     unsafe {

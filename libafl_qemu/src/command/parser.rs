@@ -296,7 +296,8 @@ where
             res
         };
 
-        let mem_chunk = QemuMemoryChunk::virt(buf_addr, total_size as u64, cpu);
+        let mem_chunk =
+            QemuMemoryChunk::virt(buf_addr as GuestVirtAddr, total_size as GuestReg, cpu);
         mem_chunk.read(qemu, str_copy.as_slice_mut());
 
         let c_str: &CStr = CStr::from_bytes_with_nul(str_copy.as_slice()).unwrap();
