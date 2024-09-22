@@ -6,18 +6,15 @@ You can find here all the example fuzzers built on top of LibAFL.
 They are sorted by fuzzer types:
 
 - `baby`: Minimal fuzzers demonstrating a specific feature.
+- `binary-only`: Fuzzers for binary-only targets.
 - `forkserver`: Fuzzers using a forkserver-style executor.
-- `frida`: Fuzzers using [Frida](../libafl_frida).
+- `full-system`: Fuzzers for full-system targets (kernels, firmwares, etc...).
 - `fuzzbench`: Fuzzbench fuzzers.
-- `libpng`: Fuzzers targeting libpng.
-- `nyx`: Fuzzers based on [Nyx](../libafl_nyx).
-- `others`: Various fuzzers, with no specific categories.
-- `qemu`: Fuzzers using [Qemu](../libafl_qemu).
-- `stb`: Fuzzers targeting stb.
+- `inprocess`: In-process fuzzers, whn they don't fit another more specific type.
 
 ## Paper Artifacts
 
-Multiple papers based on LibAFL have been published alongside artifacts.
+Multiple papers based on LibAFL have been published and include artifacts.
 Here is a list of LibAFL artifacts:
 
 - Fuzzbench implementation: https://github.com/AFLplusplus/libafl_fuzzbench
