@@ -542,6 +542,7 @@ pub extern "C" fn trace_edge_single(_: *const (), id: u64) {
     }
 }
 
+#[allow(clippy::unnecessary_cast)]
 pub fn gen_hashed_edge_ids<AF, ET, PF, S, V>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
@@ -600,6 +601,7 @@ pub extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
     }
 }
 
+#[allow(clippy::unnecessary_cast)]
 pub fn gen_hashed_block_ids<AF, ET, PF, S, V>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
