@@ -222,7 +222,7 @@ where
                 let modules = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     {
-                        tuple_list!(EdgeCoverageModuleBuilder::default(), CmpLogModule::default(),)
+                        tuple_list!(EdgeCoverageModuleBuilder::default().build(), CmpLogModule::default(),)
                     }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
                     {
