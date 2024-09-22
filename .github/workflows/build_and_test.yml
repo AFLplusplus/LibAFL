@@ -281,8 +281,8 @@ jobs:
           - ./fuzzers/forkserver/libafl-fuzz
 
           # Full-system
-          - ./fuzzers/nyx/nyx_libxml2_standalone
-          - ./fuzzers/nyx/nyx_libxml2_parallel
+          - ./fuzzers/full-system/nyx_libxml2_standalone
+          - ./fuzzers/full-system/nyx_libxml2_parallel
 
           # Fuzzbench
           - ./fuzzers/fuzzbench/fuzzbench
