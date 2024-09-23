@@ -77,7 +77,7 @@ pub fn main() {
     let testcase = Testcase::new(BytesInput::new(b"aaaa".to_vec()));
     //self.feedback_mut().append_metadata(state, &mut testcase)?;
     let idx = state.corpus_mut().add(testcase).unwrap();
-    scheduler.on_add(&mut state, idx).unwrap();
+    <QueueScheduler as Scheduler<BytesInput, _>>::on_add(&mut scheduler, &mut state, idx).unwrap();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let fuzzer = StdFuzzer::new(scheduler, feedback, objective);
