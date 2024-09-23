@@ -40,7 +40,7 @@ use libafl_bolts::{
 use libafl_qemu::modules::CmpLogModule;
 pub use libafl_qemu::qemu::Qemu;
 use libafl_qemu::{
-    modules::{edges, edges::EdgeCoverageModuleBuilder},
+    modules::{edges, edges::StdEdgeCoverageModule},
     Emulator, QemuExecutor,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
@@ -229,7 +229,7 @@ where
                     }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
                     {
-                        tuple_list!(EdgeCoverageModuleBuilder::default().build())
+                        tuple_list!(StdEdgeCoverageModule::builder().build())
                     }
                 };
 
@@ -345,7 +345,7 @@ where
                     }
                 }
             } else {
-                let modules = tuple_list!(EdgeCoverageModuleBuilder::default().build());
+                let modules = tuple_list!(StdEdgeCoverageModule::builder().build());
 
                 let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
                                    _state: &mut _,
