@@ -1,6 +1,7 @@
 // TODO: docs
 #![allow(missing_docs)]
 
+use alloc::borrow::Cow;
 use std::{
     borrow::ToOwned,
     cell::Cell,
@@ -289,35 +290,35 @@ impl IntelPT {
 
         let head_wrap = wrap_aux_pointer(head);
         let tail_wrap = wrap_aux_pointer(tail);
-        // This buffer is used for convenience to copy the traces when the pointers wrap and the
-        // data is not contiguous in memory
-        // TODO initializing a useless vec at each decode, not great for performance, check if the
-        // compiler is smart enough?
-        let mut wrap_buffer = vec![];
 
-        let data = if head_wrap >= tail_wrap {
+        // TODO: Cow clones the borrowed data on `as_mut()`, we could just mut the borrowed data
+        // BUT, should the decoder mutate the data in the first place?
+        // maybe just a libipt/libipt-rs oversight ?
+        let mut data = if head_wrap >= tail_wrap {
             unsafe {
                 let ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
-                slice::from_raw_parts_mut(ptr, len)
+                Cow::from(slice::from_raw_parts(ptr, len))
             }
         } else {
+            // Head pointer wrapped, the trace is split
             unsafe {
-                let first_ptr = unsafe { self.perf_aux_buffer.add(tail as usize) } as *mut u8;
+                let first_ptr = self.perf_aux_buffer.add(tail as usize) as *mut u8;
                 let first_len = PERF_AUX_BUFFER_SIZE - tail_wrap as usize;
-                let second_ptr = unsafe { self.perf_aux_buffer } as *mut u8;
+                let second_ptr = self.perf_aux_buffer as *mut u8;
                 let second_len = head_wrap as usize;
-                wrap_buffer = [
-                    slice::from_raw_parts(first_ptr, first_len),
-                    slice::from_raw_parts(second_ptr, second_len),
-                ]
-                .concat();
-                wrap_buffer.as_mut_slice()
+                Cow::from(
+                    [
+                        slice::from_raw_parts(first_ptr, first_len),
+                        slice::from_raw_parts(second_ptr, second_len),
+                    ]
+                    .concat(),
+                )
             }
         };
 
         println!("Intel PT: decoding {len} bytes");
         if let Some(copy_buffer) = copy_buffer {
-            copy_buffer.extend_from_slice(data);
+            copy_buffer.extend_from_slice(&data);
         }
 
         smp_rmb(); // TODO double check impl
@@ -326,7 +327,7 @@ impl IntelPT {
         // apparently the rust library doesn't have the context parameter for the image.set_callback
         // also, under the hood looks like it is passing the callback itself as context to the C fn 🤔
         // TODO remove unwrap()
-        let mut config = ConfigBuilder::new(data.as_mut()).unwrap();
+        let mut config = ConfigBuilder::new(data.to_mut()).unwrap();
         if let Some(cpu) = current_cpu() {
             config.cpu(cpu);
         }
@@ -713,6 +714,12 @@ mod test {
     assert_eq_size!(usize, u64);
 
     // TODO check that stuff in PtConfig corresponds to /sys/bus/event_source/devices/intel_pt/format/
+    #[test]
+    fn intel_pt_pt_config_format() {
+        // let noretcomp = PtConfig::builder().with_noretcomp(true).build();
+
+        // PT_EVENT_PATH
+    }
 
     /// To run this test ensure that the executable has the required capabilities.
     /// This can be achieved with the following command:

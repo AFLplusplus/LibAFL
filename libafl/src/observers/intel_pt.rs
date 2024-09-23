@@ -1,3 +1,6 @@
+// TODO: docs
+#![allow(missing_docs)]
+
 use alloc::borrow::Cow;
 use std::{
     sync::{Arc, Mutex},
@@ -10,7 +13,7 @@ use crate::{inputs::UsesInput, observers::Observer};
 
 #[derive(Debug)]
 pub struct IntelPTObserver {
-    trace: Arc<Mutex<Vec<u8>>>,
+    _trace: Arc<Mutex<Vec<u8>>>,
 }
 
 impl Named for IntelPTObserver {

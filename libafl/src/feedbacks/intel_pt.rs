@@ -1,3 +1,6 @@
+// TODO: docs
+#![allow(missing_docs)]
+
 use alloc::borrow::Cow;
 use std::{
     sync::{Arc, Mutex},
