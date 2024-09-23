@@ -78,7 +78,7 @@ windows_alias = "unsupported"
 [tasks.fuzzer_unix]
 command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 args = [
-  "${PROJECT_DIR}/../../libpng/libfuzzer_libpng/harness.cc",
+  "${PROJECT_DIR}/../../inprocess/libfuzzer_libpng/harness.cc",
   "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a",
   "-I",
   "${PROJECT_DIR}/libpng-1.6.37/",
