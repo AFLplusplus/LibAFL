@@ -417,9 +417,9 @@ pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 
 impl<CS, EM, OT, PS, Z> UsesState for PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: UsesState,
+    Z: UsesState,
 {
-    type State = CS::State;
+    type State = Z::State;
 }
 
 impl<CS, EM, OT, PS, Z> Named for PushStageAdapter<CS, EM, OT, PS, Z> {
@@ -431,7 +431,7 @@ impl<CS, EM, OT, PS, Z> Named for PushStageAdapter<CS, EM, OT, PS, Z> {
 
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: Scheduler,
+    CS: Scheduler<Z::Input, Z::State>,
     Self::State: HasExecutions
         + HasRand
         + HasCorpus
@@ -446,7 +446,7 @@ where
         + ProgressReporter<State = Self::State>,
     OT: ObserversTuple<Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
-    Z: ExecutesInput<E, EM, State = Self::State>
+    Z: ExecutesInput<E, EM>
         + ExecutionProcessor
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -455,7 +455,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut CS::State,
+        state: &mut Z::State,
         event_mgr: &mut EM,
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
