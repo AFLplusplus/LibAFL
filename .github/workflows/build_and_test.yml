@@ -273,29 +273,27 @@ jobs:
           - ./fuzzers/binary-only/frida_executable_libpng
           - ./fuzzers/binary-only/frida_gdiplus
           - ./fuzzers/binary-only/frida_libpng
+          - ./fuzzers/binary-only/fuzzbench_qemu
           - ./fuzzers/binary-only/tinyinst_simple
 
           # Forkserver
           - ./fuzzers/forkserver/forkserver_simple
           - ./fuzzers/forkserver/forkserver_libafl_cc
+          - ./fuzzers/forkserver/fuzzbench_fork_qemu
+          - ./fuzzers/forkserver/fuzzbench_forkserver
+          - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
           - ./fuzzers/forkserver/libafl-fuzz
 
           # Full-system
           - ./fuzzers/full-system/nyx_libxml2_standalone
           - ./fuzzers/full-system/nyx_libxml2_parallel
 
-          # Fuzzbench
-          - ./fuzzers/fuzzbench/fuzzbench
-          - ./fuzzers/fuzzbench/fuzzbench_qemu
-          - ./fuzzers/fuzzbench/fuzzbench_fork_qemu
-          - ./fuzzers/fuzzbench/fuzzbench_text
-          - ./fuzzers/fuzzbench/fuzzbench_ctx
-          - ./fuzzers/fuzzbench/fuzzbench_forkserver_cmplog
-          - ./fuzzers/fuzzbench/fuzzbench_forkserver
-
           # In-process
           - ./fuzzers/inprocess/cargo_fuzz
           # - ./fuzzers/inprocess/dynamic_analysis
+          - ./fuzzers/inprocess/fuzzbench
+          - ./fuzzers/inprocess/fuzzbench_text
+          - ./fuzzers/inprocess/fuzzbench_ctx
           - ./fuzzers/inprocess/libafl_atheris
           - ./fuzzers/inprocess/libfuzzer_libmozjpeg
           - ./fuzzers/inprocess/libfuzzer_libpng
