@@ -223,7 +223,7 @@ where
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     {
                         tuple_list!(
-                            StdEdgeCoverageModuleBuilder::builder().build(),
+                            StdEdgeCoverageModule::builder().build(),
                             CmpLogModule::default(),
                         )
                     }
