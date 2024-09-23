@@ -1309,6 +1309,9 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         shmem_provider: &'a mut SP,
     ) -> ForkserverExecutorBuilder<'a, SP> {
         ForkserverExecutorBuilder {
+            // Set the new provider
+            shmem_provider: Some(shmem_provider),
+            // Copy all other values from the old Builder
             program: self.program,
             arguments: self.arguments,
             envs: self.envs,
@@ -1319,14 +1322,13 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             is_deferred_frksrv: self.is_deferred_frksrv,
             autotokens: self.autotokens,
             input_filename: self.input_filename,
-            shmem_provider: Some(shmem_provider),
             map_size: self.map_size,
-            max_input_size: MAX_INPUT_SIZE_DEFAULT,
-            min_input_size: MIN_INPUT_SIZE_DEFAULT,
-            kill_signal: None,
-            timeout: None,
-            asan_obs: None,
-            crash_exitcode: None,
+            max_input_size: self.max_input_size,
+            min_input_size: self.min_input_size,
+            kill_signal: self.kill_signal,
+            timeout: self.timeout,
+            asan_obs: self.asan_obs,
+            crash_exitcode: self.crash_exitcode,
         }
     }
 }

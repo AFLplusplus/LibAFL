@@ -11,6 +11,7 @@ use libafl_bolts::Named;
 use crate::{
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
+    inputs::Input,
     mutators::Mutator,
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{mutational::MutatedTransform, MutationalStage, RetryCountRestartHelper, Stage},
@@ -49,9 +50,10 @@ impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = Self::State>,
-    F: TestcaseScore<Self::State>,
+    F: TestcaseScore<I, Self::State>,
+    I: Input,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
+    Self::State: HasCorpus<Input = I> + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
     Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<E::Input, Self::State> + Clone,
 {
@@ -82,11 +84,11 @@ impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M,
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = Self::State>,
-    F: TestcaseScore<Self::State>,
+    F: TestcaseScore<I, Self::State>,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
+    Self::State: HasCorpus<Input = I> + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
     Z: Evaluator<E, EM, State = Self::State>,
-    I: MutatedTransform<Self::Input, Self::State> + Clone,
+    I: MutatedTransform<Self::Input, Self::State> + Clone + Input,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -111,12 +113,13 @@ where
     }
 }
 
-impl<E, F, EM, M, Z> PowerMutationalStage<E, F, EM, E::Input, M, Z>
+impl<E, F, EM, I, M, Z> PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = <Self as UsesState>::State>,
-    F: TestcaseScore<<Self as UsesState>::State>,
-    M: Mutator<E::Input, <Self as UsesState>::State>,
+    F: TestcaseScore<I, <Self as UsesState>::State>,
+    I: Input,
+    M: Mutator<I, <Self as UsesState>::State>,
     <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, State = <Self as UsesState>::State>,
 {

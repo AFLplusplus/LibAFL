@@ -209,8 +209,10 @@ impl<T> MappedInput for Option<T>
 where
     T: MappedInput,
 {
-    type Type<'a> = Option<T::Type<'a>>
-        where T: 'a;
+    type Type<'a>
+        = Option<T::Type<'a>>
+    where
+        T: 'a;
 }
 
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
@@ -263,7 +265,10 @@ impl<'a> HasMutatorBytes for MutVecInput<'a> {
 }
 
 impl<'a> MappedInput for MutVecInput<'a> {
-    type Type<'b> = MutVecInput<'b> where Self: 'b;
+    type Type<'b>
+        = MutVecInput<'b>
+    where
+        Self: 'b;
 }
 
 /// Defines the input type shared across traits of the type.

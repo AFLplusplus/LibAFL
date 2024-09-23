@@ -15,7 +15,7 @@ use libafl::{
     inputs::UsesInput,
     mutators::Tokens,
     observers::MapObserver,
-    schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles, Scheduler},
+    schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     Error, HasMetadata, HasNamedMetadata, HasScheduler, SerdeAny,
@@ -240,7 +240,7 @@ where
         + HasTestcase,
     O: MapObserver,
     C: AsRef<O> + Named,
-    <Z as HasScheduler>::Scheduler: Scheduler + HasQueueCycles,
+    <Z as HasScheduler>::Scheduler: HasQueueCycles,
 {
     fn perform(
         &mut self,

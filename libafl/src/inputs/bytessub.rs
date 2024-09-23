@@ -203,7 +203,10 @@ where
 }
 
 impl<'a, I> MappedInput for BytesSubInput<'a, I> {
-    type Type<'b> = BytesSubInput<'b, I> where Self: 'b;
+    type Type<'b>
+        = BytesSubInput<'b, I>
+    where
+        Self: 'b;
 }
 
 #[cfg(test)]
