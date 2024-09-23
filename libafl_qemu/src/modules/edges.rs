@@ -296,6 +296,8 @@ pub type StdEdgeCoverageChildModuleBuilder =
     EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant>;
 
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageChildVariant {
+    const DO_SIDE_EFFECTS: bool = false;
+
     fn fn_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         AF: AddressFilter,
@@ -488,6 +490,8 @@ where
     S: Unpin + UsesInput + HasMetadata,
     V: EdgeCoverageVariant<AF, PF> + 'static,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool = V::DO_SIDE_EFFECTS;
+    
     type ModuleAddressFilter = AF;
     #[cfg(emulation_mode = "systemmode")]
     type ModulePageFilter = PF;
