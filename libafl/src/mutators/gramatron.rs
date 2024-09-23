@@ -105,9 +105,10 @@ impl GramatronIdxMapMetadata {
 #[derive(Default, Debug)]
 pub struct GramatronSpliceMutator;
 
-impl<S> Mutator<S::Input, S> for GramatronSpliceMutator
+impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata + HasTestcase,
+    S: HasRand + HasCorpus + HasMetadata + HasTestcase,
+    S::Corpus: Corpus<Input = GramatronInput>
 {
     fn mutate(
         &mut self,

@@ -31,7 +31,7 @@ pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, Error};
+use crate::Error;
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -85,7 +85,10 @@ macro_rules! random_corpus_id_with_disabled {
 }
 
 /// Corpus with all current [`Testcase`]s, or solutions
-pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
+pub trait Corpus: Sized {
+    /// The type of input contained in this corpus
+    type Input;
+
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -171,7 +174,10 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error>;
 
     /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
-    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error> {
+    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error> 
+    where 
+        Self::Input: Clone
+    {
         let mut testcase = self.get(id)?.borrow_mut();
         Ok(testcase.load_input(self)?.clone())
     }

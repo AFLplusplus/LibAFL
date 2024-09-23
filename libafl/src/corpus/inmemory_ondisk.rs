@@ -24,7 +24,7 @@ use super::{
 };
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error, HasMetadata,
 };
 
@@ -52,10 +52,7 @@ fn try_create_new<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryOnDiskCorpus<I>
-where
-    I: Input,
 {
     inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
@@ -64,17 +61,12 @@ where
     locking: bool,
 }
 
-impl<I> UsesInput for InMemoryOnDiskCorpus<I>
-where
+impl<I> Corpus for InMemoryOnDiskCorpus<I>
+where 
     I: Input,
 {
     type Input = I;
-}
 
-impl<I> Corpus for InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -228,21 +220,19 @@ where
     fn testcase(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<core::cell::Ref<Testcase<<Self as Corpus>::Input>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<core::cell::RefMut<Testcase<<Self as Corpus>::Input>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
 
 impl<I> InMemoryOnDiskCorpus<I>
-where
-    I: Input,
 {
     /// Creates an [`InMemoryOnDiskCorpus`].
     ///
@@ -388,7 +378,10 @@ where
         }
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error> {
+    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error> 
+    where 
+        I: Input
+    {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             testcase.input().as_ref().unwrap().generate_name(Some(id))

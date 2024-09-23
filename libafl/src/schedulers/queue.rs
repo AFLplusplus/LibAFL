@@ -105,7 +105,7 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{QueueScheduler, Scheduler},
-        state::{HasCorpus, StdState},
+        state::{StdState, HasCorpus},
     };
 
     #[test]
