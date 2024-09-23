@@ -187,8 +187,12 @@ fn find_executable_in_path<P: AsRef<Path>>(executable: &P) -> Option<PathBuf> {
 }
 
 pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<PathBuf, Error> {
-    let is_library =
-        filename.contains('.') && filename.ends_with(".so") || filename.ends_with(".dylib");
+    let extension = Path::new(filename).extension();
+    let is_library = if let Some(extension) = extension {
+        extension.eq_ignore_ascii_case("so") || extension.eq_ignore_ascii_case("dylib")
+    } else {
+        false
+    };
 
     let permission = if is_library {
         S_IRUSR // user can read
@@ -230,7 +234,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
     Err(Error::unknown(format!("cannot find {filename}")))
 }
 
-fn check_file_found(file: &PathBuf, perm: u32) -> bool {
+fn check_file_found(file: &Path, perm: u32) -> bool {
     if !file.exists() {
         return false;
     }

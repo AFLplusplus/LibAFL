@@ -313,7 +313,7 @@ struct Opt {
     non_instrumented_mode: bool,
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct CmplogOpts {
     file_size: CmplogFileSize,
@@ -342,6 +342,7 @@ impl From<&str> for CmplogFileSize {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)] // we need to be compatible with Clap's value_parser
 fn parse_cmplog_args(s: &str) -> Result<CmplogOpts, String> {
     Ok(CmplogOpts {
         file_size: s.into(),
