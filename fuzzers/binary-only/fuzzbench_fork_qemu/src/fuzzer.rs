@@ -50,7 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     modules::{
         cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
-        edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+        edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     },
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
@@ -151,7 +151,7 @@ fn fuzz(
     let env: Vec<(String, String)> = env::vars().collect();
 
     let emulator_modules = tuple_list!(
-        EdgeCoverageChildModule::default(),
+        StdEdgeCoverageChildModule::builder().build(),
         CmpLogChildModule::default(),
     );
 
