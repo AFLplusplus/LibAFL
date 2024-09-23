@@ -282,15 +282,42 @@ impl IntelPT {
         let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
         let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
 
-        let head = wrap_aux_pointer(unsafe { aux_head.read_volatile() });
-        let tail = wrap_aux_pointer(unsafe { aux_tail.read_volatile() });
-        let data = unsafe { self.perf_aux_buffer.add(tail as usize) } as *mut u8;
+        let head = unsafe { aux_head.read_volatile() };
+        let tail = unsafe { aux_tail.read_volatile() };
+        debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail.");
         let len = (head - tail) as usize;
 
-        debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail");
+        let head_wrap = wrap_aux_pointer(head);
+        let tail_wrap = wrap_aux_pointer(tail);
+        // This buffer is used for convenience to copy the traces when the pointers wrap and the
+        // data is not contiguous in memory
+        // TODO initializing a useless vec at each decode, not great for performance, check if the
+        // compiler is smart enough?
+        let mut wrap_buffer = vec![];
+
+        let data = if head_wrap >= tail_wrap {
+            unsafe {
+                let ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
+                slice::from_raw_parts_mut(ptr, len)
+            }
+        } else {
+            unsafe {
+                let first_ptr = unsafe { self.perf_aux_buffer.add(tail as usize) } as *mut u8;
+                let first_len = PERF_AUX_BUFFER_SIZE - tail_wrap as usize;
+                let second_ptr = unsafe { self.perf_aux_buffer } as *mut u8;
+                let second_len = head_wrap as usize;
+                wrap_buffer = [
+                    slice::from_raw_parts(first_ptr, first_len),
+                    slice::from_raw_parts(second_ptr, second_len),
+                ]
+                .concat();
+                wrap_buffer.as_mut_slice()
+            }
+        };
+
         println!("Intel PT: decoding {len} bytes");
         if let Some(copy_buffer) = copy_buffer {
-            copy_buffer.extend_from_slice(unsafe { slice::from_raw_parts(data, len) });
+            copy_buffer.extend_from_slice(data);
         }
 
         smp_rmb(); // TODO double check impl
@@ -299,8 +326,7 @@ impl IntelPT {
         // apparently the rust library doesn't have the context parameter for the image.set_callback
         // also, under the hood looks like it is passing the callback itself as context to the C fn 🤔
         // TODO remove unwrap()
-        let mut config =
-            ConfigBuilder::new(unsafe { slice::from_raw_parts_mut(data, len) }).unwrap();
+        let mut config = ConfigBuilder::new(data.as_mut()).unwrap();
         if let Some(cpu) = current_cpu() {
             config.cpu(cpu);
         }
