@@ -84,6 +84,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
     }
 
     // check if the binary is an ELF file
+    #[cfg(target_os = "linux")]
     if mmap[0..4] != [0x7f, 0x45, 0x4c, 0x46] {
         return Err(Error::illegal_argument(format!(
             "Program '{}' is not an ELF binary",
@@ -91,7 +92,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         )));
     }
 
-    #[cfg(all(target_os = "macos", not(target_arch = "arm")))]
+    #[cfg(target_vendor = "apple")]
     {
         if (mmap[0] != 0xCF || mmap[1] != 0xFA || mmap[2] != 0xED)
             && (mmap[0] != 0xCA || mmap[1] != 0xFE || mmap[2] != 0xBA)

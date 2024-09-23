@@ -30,7 +30,7 @@
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
-    unused_results
+    //unused_results
 ))]
 #![cfg_attr(
     test,
@@ -42,7 +42,7 @@
         unused_import_braces,
         unused_qualifications,
         unused_must_use,
-        unused_results
+        //unused_results
     )
 )]
 #![cfg_attr(
