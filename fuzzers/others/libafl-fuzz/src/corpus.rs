@@ -82,11 +82,7 @@ fn parse_time_line(line: &str) -> Result<u64, Error> {
         .map_err(|_| Error::illegal_state("invalid stats file"))
 }
 
-pub fn check_autoresume(
-    fuzzer_dir: &Path,
-    intial_inputs: &PathBuf,
-    auto_resume: bool,
-) -> Result<Flock<File>, Error> {
+pub fn check_autoresume(fuzzer_dir: &Path, auto_resume: bool) -> Result<Flock<File>, Error> {
     if !fuzzer_dir.exists() {
         std::fs::create_dir(fuzzer_dir)?;
     }
@@ -129,11 +125,7 @@ pub fn check_autoresume(
             return Err(Error::illegal_state("The job output directory already exists and contains results! use AFL_AUTORESUME=true or provide \"-\" for -i "));
         }
     }
-    if auto_resume {
-        // TODO: once the queue stuff is implemented finish the rest of the function
-        // see afl-fuzz-init.c line 1898 onwards. Gotta copy and delete shit
-        // No usable test cases in './output/default/_resume'
-    } else {
+    if !auto_resume {
         let queue_dir = fuzzer_dir.join("queue");
         let hangs_dir = fuzzer_dir.join("hangs");
         let crashes_dir = fuzzer_dir.join("crashes");
@@ -141,24 +133,6 @@ pub fn check_autoresume(
         create_dir_if_not_exists(&crashes_dir).expect("should be able to create crashes dir");
         create_dir_if_not_exists(&hangs_dir).expect("should be able to create hangs dir");
         create_dir_if_not_exists(&queue_dir).expect("should be able to create queue dir");
-        // Copy all our seeds to queue
-        for file in std::fs::read_dir(intial_inputs)? {
-            let path = file?.path();
-            let cpy_res = std::fs::copy(
-                &path,
-                queue_dir.join(path.file_name().ok_or(Error::illegal_state(format!(
-                    "file {} in input directory does not have a filename",
-                    path.display()
-                )))?),
-            );
-            match cpy_res {
-                Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
-                    println!("skipping {} since it is not a regular file", path.display());
-                }
-                Err(e) => return Err(e.into()),
-                Ok(_) => {}
-            }
-        }
     }
     Ok(file)
 }
