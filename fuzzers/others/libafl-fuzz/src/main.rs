@@ -1,12 +1,69 @@
+#![forbid(unexpected_cfgs)]
+#![allow(incomplete_features)]
+#![warn(clippy::cargo)]
+#![allow(ambiguous_glob_reexports)]
+#![deny(clippy::cargo_common_metadata)]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![allow(clippy::unsafe_derive_deserialize)]
-#![allow(clippy::ptr_arg)]
-#![allow(clippy::unnecessary_wraps)]
-#![allow(clippy::module_name_repetitions)]
-#![allow(clippy::similar_names)]
-#![allow(clippy::too_many_lines)]
-#![allow(clippy::struct_excessive_bools)]
-#![allow(clippy::case_sensitive_file_extension_comparisons)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::type_repetition_in_bounds,
+    clippy::missing_errors_doc,
+    clippy::cast_possible_truncation,
+    clippy::used_underscore_binding,
+    clippy::ptr_as_ptr,
+    clippy::missing_panics_doc,
+    clippy::missing_docs_in_private_items,
+    clippy::module_name_repetitions,
+    clippy::ptr_cast_constness,
+    clippy::unsafe_derive_deserialize,
+    clippy::similar_names,
+    clippy::too_many_lines,
+    clippy::into_iter_without_iter, // broken
+)]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    //missing_docs,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        missing_debug_implementations,
+        trivial_casts,
+        trivial_numeric_casts,
+        unused_extern_crates,
+        unused_import_braces,
+        unused_qualifications,
+        unused_must_use,
+        unused_results
+    )
+)]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
 
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 mod afl_stats;

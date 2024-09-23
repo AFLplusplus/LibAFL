@@ -33,7 +33,7 @@ use libafl_bolts::{
     fs::get_unique_std_input_file,
     ownedref::OwnedRefMut,
     rands::StdRand,
-    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
@@ -76,7 +76,7 @@ where
     SP: ShMemProvider,
 {
     // Create the shared memory map for comms with the forkserver
-    let mut shmem_provider = StdShMemProvider::new().unwrap();
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
     let mut shmem = shmem_provider
         .new_shmem(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .unwrap();
@@ -424,9 +424,9 @@ where
 
 fn base_executor<'a>(
     opt: &'a Opt,
-    shmem_provider: &'a mut StdShMemProvider,
+    shmem_provider: &'a mut UnixShMemProvider,
     fuzzer_dir: &PathBuf,
-) -> Result<ForkserverExecutorBuilder<'a, StdShMemProvider>, Error> {
+) -> Result<ForkserverExecutorBuilder<'a, UnixShMemProvider>, Error> {
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
@@ -530,7 +530,7 @@ where
     <Z as UsesState>::State: HasLastReportTime + HasExecutions + HasMetadata,
 {
     if opt.bench_just_one {
-        fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;
+        _ = fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;
     } else {
         fuzzer.fuzz_loop(stages, executor, state, mgr)?;
     }

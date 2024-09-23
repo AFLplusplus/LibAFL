@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    os::{linux::fs::MetadataExt, unix::fs::PermissionsExt},
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
 
@@ -54,7 +54,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
     let metadata = bin_path.metadata()?;
     // AFL++ does not follow symlinks, BUT we do.
     let is_reg = bin_path.is_file();
-    let bin_size = metadata.st_size();
+    let bin_size = metadata.len();
     let is_executable = metadata.permissions().mode() & 0o111 != 0;
     if !is_reg || !is_executable || bin_size < 4 {
         return Err(Error::illegal_argument(format!(
@@ -198,7 +198,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
     // First we check if it is present in AFL_PATH
     if let Ok(afl_path) = std::env::var("AFL_PATH") {
         let file = PathBuf::from(afl_path).join(filename);
-        if check_file_found(&file, permission) {
+        if check_file_found(&file, permission.into()) {
             return Ok(file);
         }
     }
@@ -207,7 +207,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
     if let Some(same_dir_as) = same_dir_as {
         if let Some(parent_dir) = same_dir_as.parent() {
             let file = parent_dir.join(filename);
-            if check_file_found(&file, permission) {
+            if check_file_found(&file, permission.into()) {
                 return Ok(file);
             }
         }
@@ -215,7 +215,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
 
     // check sensible defaults
     let file = PathBuf::from(if is_library { AFL_PATH } else { BIN_PATH }).join(filename);
-    let found = check_file_found(&file, permission);
+    let found = check_file_found(&file, permission.into());
     if found {
         return Ok(file);
     }

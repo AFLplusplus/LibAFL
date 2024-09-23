@@ -137,7 +137,7 @@ pub fn check_autoresume(fuzzer_dir: &Path, auto_resume: bool) -> Result<Flock<Fi
     Ok(file)
 }
 
-pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
+pub fn create_dir_if_not_exists(path: &PathBuf) -> io::Result<()> {
     if path.is_file() {
         return Err(io::Error::new(
             // TODO: change this to ErrorKind::NotADirectory
@@ -159,7 +159,7 @@ pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
 }
 
 pub fn remove_main_node_file(output_dir: &PathBuf) -> Result<(), Error> {
-    for entry in std::fs::read_dir(output_dir)?.filter_map(std::result::Result::ok) {
+    for entry in std::fs::read_dir(output_dir)?.filter_map(Result::ok) {
         let path = entry.path();
         if path.is_dir() && path.join("is_main_node").exists() {
             std::fs::remove_file(path.join("is_main_node"))?;

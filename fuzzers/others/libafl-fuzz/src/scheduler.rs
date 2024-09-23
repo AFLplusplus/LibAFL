@@ -3,14 +3,11 @@ use std::marker::PhantomData;
 use libafl::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::{Input, UsesInput},
-    observers::{CanTrack, ObserversTuple},
-    schedulers::{
-        HasQueueCycles, MinimizerScheduler, RemovableScheduler, Scheduler, TestcaseScore,
-    },
+    schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::{HasCorpus, HasRand, State},
     Error, HasMetadata,
 };
-use libafl_bolts::{serdeany::SerdeAny, tuples::MatchName, AsIter, HasRefCnt};
+use libafl_bolts::tuples::MatchName;
 
 pub enum SupportedSchedulers<W, Q> {
     Queue(Q, PhantomData<W>),
