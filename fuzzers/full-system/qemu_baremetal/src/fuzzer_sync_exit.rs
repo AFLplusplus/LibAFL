@@ -54,7 +54,7 @@ pub fn fuzz() {
         let args: Vec<String> = env::args().collect();
 
         // Choose modules to use
-        let modules = tuple_list!(EdgeCoverageModule::default());
+        let modules = tuple_list!(StdEdgeCoverageModule::builder.build());
 
         let emu = Emulator::builder()
             .qemu_cli(args)

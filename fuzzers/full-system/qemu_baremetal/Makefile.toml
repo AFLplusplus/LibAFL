@@ -114,20 +114,20 @@ else
 fi
 '''
 
-[tasks.build_classic]
+[tasks.build_low_level]
 command = "cargo"
 args = [
   "make",
   "-e",
-  "FEATURE=classic",
+  "FEATURE=low_level",
   "-e",
   "TARGET_DEFINE=TARGET_CLASSIC",
   "build_fuzzer",
 ]
 
-[tasks.test_classic]
+[tasks.test_low_level]
 command = "cargo"
-args = ["make", "-e", "FEATURE=classic", "test_fuzzer"]
+args = ["make", "-e", "FEATURE=low_level", "test_fuzzer"]
 
 [tasks.build_breakpoint]
 command = "cargo"
@@ -159,12 +159,12 @@ args = [
 command = "cargo"
 args = ["make", "-e", "FEATURE=sync_exit", "test_fuzzer"]
 
-[tasks.classic]
+[tasks.low_level]
 command = "cargo"
 args = [
   "make",
   "-e",
-  "FEATURE=classic",
+  "FEATURE=low_level",
   "-e",
   "TARGET_DEFINE=TARGET_CLASSIC",
   "run_fuzzer",
@@ -194,14 +194,14 @@ args = [
 
 [tasks.test]
 clear = true
-run_task = { name = ["test_classic", "test_breakpoint", "test_sync_exit"] }
+run_task = { name = ["test_low_level", "test_breakpoint", "test_sync_exit"] }
 
 [tasks.build]
 clear = true
-run_task = { name = ["build_classic", "build_breakpoint", "build_sync_exit"] }
+run_task = { name = ["build_low_level", "build_breakpoint", "build_sync_exit"] }
 
 [tasks.run]
-alias = "classic"
+alias = "low_level"
 
 [tasks.clean]
 clear = true

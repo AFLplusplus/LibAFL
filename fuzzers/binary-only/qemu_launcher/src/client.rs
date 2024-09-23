@@ -16,8 +16,8 @@ use libafl_qemu::{
         asan::{init_qemu_with_asan, AsanModule},
         asan_guest::{init_qemu_with_asan_guest, AsanGuestModule},
         cmplog::CmpLogModule,
-        edges::EdgeCoverageModule,
-        QemuInstrumentationAddressRangeFilter,
+        edges::StdEdgeCoverageModule,
+        StdAddressFilter,
     },
     ArchExtras, GuestAddr, Qemu,
 };
@@ -68,7 +68,7 @@ impl<'a> Client<'a> {
     }
 
     #[allow(clippy::similar_names)] // elf != self
-    fn coverage_filter(&self, qemu: &Qemu) -> Result<QemuInstrumentationAddressRangeFilter, Error> {
+    fn coverage_filter(&self, qemu: &Qemu) -> Result<StdAddressFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
@@ -79,7 +79,7 @@ impl<'a> Client<'a> {
                     end: x.end.into(),
                 })
                 .collect::<Vec<Range<GuestAddr>>>();
-            Ok(QemuInstrumentationAddressRangeFilter::AllowList(rules))
+            Ok(StdAddressFilter::allow_list(rules))
         } else if let Some(excludes) = &self.options.exclude {
             #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
             let rules = excludes
@@ -89,16 +89,14 @@ impl<'a> Client<'a> {
                     end: x.end.into(),
                 })
                 .collect::<Vec<Range<GuestAddr>>>();
-            Ok(QemuInstrumentationAddressRangeFilter::DenyList(rules))
+            Ok(StdAddressFilter::deny_list(rules))
         } else {
             let mut elf_buffer = Vec::new();
             let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
             let range = elf
                 .get_section(".text", qemu.load_addr())
                 .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
-            Ok(QemuInstrumentationAddressRangeFilter::AllowList(vec![
-                range,
-            ]))
+            Ok(StdAddressFilter::allow_list(vec![range]))
         }
     }
 
@@ -167,7 +165,9 @@ impl<'a> Client<'a> {
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let edge_coverage_module = EdgeCoverageModule::new(self.coverage_filter(&qemu)?);
+        let edge_coverage_module = StdEdgeCoverageModule::builder()
+            .address_filter(self.coverage_filter(&qemu)?)
+            .build();
 
         let instance = Instance::builder()
             .options(self.options)

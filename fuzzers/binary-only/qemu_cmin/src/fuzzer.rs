@@ -28,7 +28,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::edges::{EdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    modules::edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
     ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
     QemuExitReason, QemuForkExecutor, QemuShutdownCause, Regs,
 };
@@ -218,7 +218,7 @@ pub fn fuzz() -> Result<(), Error> {
         ExitKind::Ok
     };
 
-    let modules = tuple_list!(EdgeCoverageChildModule::default(),);
+    let modules = tuple_list!(StdEdgeCoverageChildModule::builder().build());
 
     let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 

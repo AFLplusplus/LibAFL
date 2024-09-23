@@ -34,11 +34,11 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::edges::{
-        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+        edges_map_mut_ptr, EdgeCoverageModule, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE,
+        MAX_EDGES_FOUND,
     },
     GuestPhysAddr, GuestReg, QemuMemoryChunk,
 };
-
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -90,7 +90,7 @@ pub fn fuzz() {
         // Initialize QEMU Emulator
         let emu = Emulator::builder()
             .qemu_cli(args)
-            .add_module(EdgeCoverageModule::default())
+            .add_module(StdEdgeCoverageModule::builder().build())
             .build()
             .unwrap();
 

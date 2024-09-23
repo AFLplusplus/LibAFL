@@ -1,10 +1,11 @@
-# Qemu systemmode with launcher
+# Qemu baremetal with launcher
 
 This folder contains an example fuzzer for the qemu systemmode, using LLMP for fast multi-process fuzzing and crash detection.
+The target is a simpel baremetal arm target.
 
 It comes in three flavours (can be set through features):
 
--`classic`: The low-level way to interact with QEMU.
+-`low_level`: The low-level way to interact with QEMU.
 -`breakpoint`: Interaction with QEMU using the command system, leveraging breakpoints.
 -`sync_exit`: Interaction with QEMU using the command system, leveraging sync exits.
 
@@ -36,7 +37,7 @@ It is also possible to run the fuzzer with the other features:
 cargo make <feature>
 ```
 
-With feature being `classic`, `breakpoint` or `sync_exit`.
+With feature being `low_level`, `breakpoint` or `sync_exit`.
 
 This will build the desired fuzzer (src/fuzzer_<feature>.rs) and a small example binary based on FreeRTOS, which can run under a qemu emulation target.
 Since the instrumentation is based on snapshots, QEMU needs a virtual drive (even if it is unused...).

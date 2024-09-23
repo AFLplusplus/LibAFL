@@ -9,11 +9,11 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["std", "classic"]
+default = ["std", "low_level"]
 std = []
 
-classic = [
-] # The classic way to interact with LibAFL QEMU, with direct calls to QEMU's functions
+low_level = [
+] # The low-level way to interact with LibAFL QEMU, with direct calls to QEMU's functions
 breakpoint = [] # Uses the command system, with breakpoints
 sync_exit = [] # Uses the command system, with sync exit.
 

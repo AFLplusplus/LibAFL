@@ -240,13 +240,13 @@ where
     }
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
-        self.0.address_filter_mut().allow(address_range.clone());
+        self.0.address_filter_mut().register(address_range.clone());
         self.1.allow_address_range_all(address_range);
     }
 
     #[cfg(emulation_mode = "systemmode")]
     fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
-        self.0.page_filter_mut().allow(page_id.clone());
+        self.0.page_filter_mut().register(page_id.clone());
         self.1.allow_page_id_all(page_id)
     }
 }
@@ -262,12 +262,10 @@ impl<T> AddressFilter for FilterList<T>
 where
     T: AddressFilter,
 {
-    fn allow(&mut self, address_range: Range<GuestAddr>) {
+    fn register(&mut self, address_range: Range<GuestAddr>) {
         match self {
-            FilterList::AllowList(allow_list) => allow_list.allow(address_range),
-            FilterList::DenyList(_deny_list) => {
-                todo!()
-            }
+            FilterList::AllowList(allow_list) => allow_list.register(address_range),
+            FilterList::DenyList(deny_list) => deny_list.register(address_range),
             FilterList::None => {}
         }
     }
@@ -285,12 +283,10 @@ impl<T> PageFilter for FilterList<T>
 where
     T: PageFilter,
 {
-    fn allow(&mut self, page_id: GuestPhysAddr) {
+    fn register(&mut self, page_id: GuestPhysAddr) {
         match self {
-            FilterList::AllowList(allow_list) => allow_list.allow(page_id),
-            FilterList::DenyList(_deny_list) => {
-                todo!()
-            }
+            FilterList::AllowList(allow_list) => allow_list.register(page_id),
+            FilterList::DenyList(deny_list) => deny_list.register(page_id),
             FilterList::None => {}
         }
     }
@@ -305,23 +301,53 @@ where
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct StdAddressFilter {
+pub struct AddressFilterVec {
     // ideally, we should use a tree
-    allowed_addresses: Vec<Range<GuestAddr>>,
+    registered_addresses: Vec<Range<GuestAddr>>,
+}
+#[derive(Clone, Debug)]
+pub struct StdAddressFilter(FilterList<AddressFilterVec>);
+
+impl Default for StdAddressFilter {
+    fn default() -> Self {
+        Self(FilterList::None)
+    }
 }
 
-impl AddressFilter for StdAddressFilter {
-    fn allow(&mut self, address_range: Range<GuestAddr>) {
-        self.allowed_addresses.push(address_range);
+impl StdAddressFilter {
+    pub fn allow_list(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
+        StdAddressFilter(FilterList::AllowList(AddressFilterVec::new(
+            registered_addresses,
+        )))
+    }
+
+    pub fn deny_list(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
+        StdAddressFilter(FilterList::DenyList(AddressFilterVec::new(
+            registered_addresses,
+        )))
+    }
+}
+
+impl AddressFilterVec {
+    pub fn new(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
+        Self {
+            registered_addresses,
+        }
+    }
+}
+
+impl AddressFilter for AddressFilterVec {
+    fn register(&mut self, address_range: Range<GuestAddr>) {
+        self.registered_addresses.push(address_range);
         Qemu::get().unwrap().flush_jit();
     }
 
     fn allowed(&self, addr: &GuestAddr) -> bool {
-        if self.allowed_addresses.is_empty() {
+        if self.registered_addresses.is_empty() {
             return true;
         }
 
-        for addr_range in &self.allowed_addresses {
+        for addr_range in &self.registered_addresses {
             if addr_range.contains(addr) {
                 return true;
             }
@@ -331,22 +357,46 @@ impl AddressFilter for StdAddressFilter {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct StdPageFilter {
-    allowed_pages: HashSet<GuestPhysAddr>,
+impl AddressFilter for StdAddressFilter {
+    fn register(&mut self, address_range: Range<GuestAddr>) {
+        self.0.register(address_range);
+    }
+
+    fn allowed(&self, address: &GuestAddr) -> bool {
+        self.0.allowed(address)
+    }
 }
 
-impl Default for StdPageFilter {
+#[derive(Clone, Debug)]
+pub struct PageFilterVec {
+    registered_pages: HashSet<GuestPhysAddr>,
+}
+
+#[cfg(emulation_mode = "systemmode")]
+#[derive(Clone, Debug)]
+pub struct StdPageFilter(FilterList<PageFilterVec>);
+
+#[cfg(emulation_mode = "usermode")]
+pub type StdPageFilter = NopPageFilter;
+
+impl Default for PageFilterVec {
     fn default() -> Self {
         Self {
-            allowed_pages: HashSet::new(),
+            registered_pages: HashSet::new(),
         }
     }
 }
 
-impl PageFilter for StdPageFilter {
-    fn allow(&mut self, page_id: GuestPhysAddr) {
-        self.allowed_pages.insert(page_id);
+#[cfg(emulation_mode = "systemmode")]
+impl Default for StdPageFilter {
+    fn default() -> Self {
+        Self(FilterList::None)
+    }
+}
+
+impl PageFilter for PageFilterVec {
+    fn register(&mut self, page_id: GuestPhysAddr) {
+        self.registered_pages.insert(page_id);
         Qemu::get().unwrap().flush_jit();
     }
 
@@ -355,7 +405,18 @@ impl PageFilter for StdPageFilter {
         //     return true;
         // }
 
-        self.allowed_pages.contains(paging_id)
+        self.registered_pages.contains(paging_id)
+    }
+}
+
+#[cfg(emulation_mode = "systemmode")]
+impl PageFilter for StdPageFilter {
+    fn register(&mut self, page_id: GuestPhysAddr) {
+        self.0.register(page_id);
+    }
+
+    fn allowed(&self, page_id: &GuestPhysAddr) -> bool {
+        self.0.allowed(page_id)
     }
 }
 
@@ -372,7 +433,7 @@ pub fn hash_me(mut x: u64) -> u64 {
 }
 
 pub trait AddressFilter: 'static + Debug {
-    fn allow(&mut self, address_range: Range<GuestAddr>);
+    fn register(&mut self, address_range: Range<GuestAddr>);
 
     fn allowed(&self, address: &GuestAddr) -> bool;
 }
@@ -380,7 +441,7 @@ pub trait AddressFilter: 'static + Debug {
 #[derive(Debug)]
 pub struct NopAddressFilter;
 impl AddressFilter for NopAddressFilter {
-    fn allow(&mut self, _address: Range<GuestAddr>) {}
+    fn register(&mut self, _address: Range<GuestAddr>) {}
 
     fn allowed(&self, _address: &GuestAddr) -> bool {
         true
@@ -388,15 +449,15 @@ impl AddressFilter for NopAddressFilter {
 }
 
 pub trait PageFilter: 'static + Debug {
-    fn allow(&mut self, page_id: GuestPhysAddr);
+    fn register(&mut self, page_id: GuestPhysAddr);
 
     fn allowed(&self, page_id: &GuestPhysAddr) -> bool;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct NopPageFilter;
 impl PageFilter for NopPageFilter {
-    fn allow(&mut self, _page_id: GuestPhysAddr) {}
+    fn register(&mut self, _page_id: GuestPhysAddr) {}
 
     fn allowed(&self, _page_id: &GuestPhysAddr) -> bool {
         true

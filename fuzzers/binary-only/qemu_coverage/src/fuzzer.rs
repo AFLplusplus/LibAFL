@@ -27,7 +27,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::{drcov::DrCovModule, QemuInstrumentationAddressRangeFilter},
+    modules::{drcov::DrCovModule, StdAddressFilter},
     ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
     QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
@@ -234,7 +234,7 @@ pub fn fuzz() {
             cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
             let emulator_modules = tuple_list!(DrCovModule::new(
-                QemuInstrumentationAddressRangeFilter::None,
+                StdAddressFilter::default(),
                 cov_path,
                 false,
             ));

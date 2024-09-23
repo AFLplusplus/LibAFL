@@ -34,7 +34,7 @@ use libafl_qemu::{
     elf::EasyElf,
     executor::QemuExecutor,
     modules::edges::{
-        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+        edges_map_mut_ptr, StdEdgeCoverageModuleBuilder, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
     Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
@@ -104,7 +104,7 @@ pub fn fuzz() {
             .build()
             .expect("Failed to initialized QEMU");
 
-        let emulator_modules = tuple_list!(EdgeCoverageModule::default());
+        let emulator_modules = tuple_list!(StdEdgeCoverageModuleBuilder::default().build());
 
         let emulator = Emulator::empty()
             .qemu(qemu)

@@ -42,6 +42,12 @@ impl QemuEdgesMapMetadata {
     }
 }
 
+/// Standard edge coverage module, adapted to most use cases
+pub type StdEdgeCoverageModule = StdEdgeCoverageFullModule;
+
+/// Standard edge coverage module builder, adapted to most use cases
+pub type StdEdgeCoverageModuleBuilder = StdEdgeCoverageFullModuleBuilder;
+
 pub type CollidingEdgeCoverageModule<AF, PF> = EdgeCoverageModule<AF, PF, EdgeCoverageChildVariant>;
 
 pub trait EdgeCoverageVariant<AF, PF>: 'static + Debug {
@@ -90,6 +96,12 @@ pub trait EdgeCoverageVariant<AF, PF>: 'static + Debug {
 
 #[derive(Debug)]
 pub struct EdgeCoverageFullVariant;
+
+pub type StdEdgeCoverageFullModule =
+    EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>;
+pub type StdEdgeCoverageFullModuleBuilder =
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>;
+
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
     fn jit_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
@@ -156,8 +168,33 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
     }
 }
 
+impl Default for StdEdgeCoverageFullModuleBuilder {
+    fn default() -> Self {
+        Self {
+            variant: EdgeCoverageFullVariant,
+            address_filter: StdAddressFilter::default(),
+            page_filter: StdPageFilter::default(),
+            use_hitcounts: true,
+            use_jit: true,
+        }
+    }
+}
+
+impl StdEdgeCoverageFullModule {
+    #[must_use]
+    pub fn builder() -> StdEdgeCoverageFullModuleBuilder {
+        EdgeCoverageModuleBuilder::default()
+    }
+}
+
 #[derive(Debug)]
 pub struct EdgeCoverageClassicVariant;
+
+pub type StdEdgeCoverageClassicModule =
+    EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant>;
+pub type StdEdgeCoverageClassicModuleBuilder =
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant>;
+
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
     const DO_SIDE_EFFECTS: bool = false;
 
@@ -232,8 +269,32 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
     }
 }
 
+impl Default for StdEdgeCoverageClassicModuleBuilder {
+    fn default() -> Self {
+        Self {
+            variant: EdgeCoverageClassicVariant,
+            address_filter: StdAddressFilter::default(),
+            page_filter: StdPageFilter::default(),
+            use_hitcounts: true,
+            use_jit: true,
+        }
+    }
+}
+
+impl StdEdgeCoverageClassicModule {
+    #[must_use]
+    pub fn builder() -> StdEdgeCoverageClassicModuleBuilder {
+        EdgeCoverageModuleBuilder::default()
+    }
+}
+
 #[derive(Debug)]
 pub struct EdgeCoverageChildVariant;
+pub type StdEdgeCoverageChildModule =
+    EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant>;
+pub type StdEdgeCoverageChildModuleBuilder =
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant>;
+
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageChildVariant {
     fn fn_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
@@ -262,6 +323,25 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageChildVariant {
     }
 }
 
+impl Default for StdEdgeCoverageChildModuleBuilder {
+    fn default() -> Self {
+        Self {
+            variant: EdgeCoverageChildVariant,
+            address_filter: StdAddressFilter::default(),
+            page_filter: StdPageFilter::default(),
+            use_hitcounts: true,
+            use_jit: true,
+        }
+    }
+}
+
+impl StdEdgeCoverageChildModule {
+    #[must_use]
+    pub fn builder() -> StdEdgeCoverageClassicModuleBuilder {
+        EdgeCoverageModuleBuilder::default()
+    }
+}
+
 #[derive(Debug)]
 pub struct EdgeCoverageModuleBuilder<AF, PF, V> {
     variant: V,
@@ -278,28 +358,6 @@ pub struct EdgeCoverageModule<AF, PF, V> {
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
-}
-
-impl Default
-    for EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>
-{
-    fn default() -> Self {
-        Self {
-            variant: EdgeCoverageFullVariant,
-            address_filter: StdAddressFilter::default(),
-            page_filter: StdPageFilter::default(),
-            use_hitcounts: true,
-            use_jit: true,
-        }
-    }
-}
-
-impl EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant> {
-    #[must_use]
-    pub fn builder(
-    ) -> EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant> {
-        EdgeCoverageModuleBuilder::default()
-    }
 }
 
 impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {

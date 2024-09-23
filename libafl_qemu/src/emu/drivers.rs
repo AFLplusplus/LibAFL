@@ -119,7 +119,8 @@ pub struct StdEmulatorDriver {
     hooks_locked: bool,
     #[builder(default = true)]
     allow_page_on_start: bool,
-    #[builder(default = true)]
+    #[cfg(feature = "x86_64")]
+    #[builder(default = false)]
     process_only: bool,
     #[builder(default = false)]
     print_commands: bool,
@@ -150,6 +151,7 @@ impl StdEmulatorDriver {
         self.allow_page_on_start
     }
 
+    #[cfg(feature = "x86_64")]
     pub fn is_process_only(&self) -> bool {
         self.process_only
     }

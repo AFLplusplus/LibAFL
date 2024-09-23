@@ -12,6 +12,8 @@ use libafl::{
 };
 use libafl_bolts::AsSlice;
 use libafl_qemu_sys::GuestAddr;
+#[cfg(emulation_mode = "systemmode")]
+use libafl_qemu_sys::GuestPhysAddr;
 use libc::c_uint;
 use num_enum::TryFromPrimitive;
 use paste::paste;
@@ -457,10 +459,11 @@ where
             emu.modules_mut().modules_mut().allow_page_id_all(page_id);
         }
 
+        #[cfg(feature = "x86_64")]
         if emu.driver_mut().is_process_only() {
             emu.modules_mut()
                 .modules_mut()
-                .allow_address_range_all(0..0x0000_7fff_ffff_ffff);
+                .allow_address_range_all(crate::PROCESS_ADDRESS_RANGE);
         }
 
         // Make sure JIT cache is empty just before starting
@@ -578,6 +581,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {

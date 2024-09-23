@@ -148,8 +148,9 @@ impl<'a, M: Monitor> Instance<'a, M> {
         state.add_metadata(tokens);
 
         let harness = Harness::new(self.qemu)?;
-        let mut harness =
-            |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| harness.run(input);
+        let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                           _state: &mut _,
+                           input: &BytesInput| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
-#[cfg(all(target_os = "linux", feature = "classic"))]
-mod fuzzer_classic;
+#[cfg(all(target_os = "linux", feature = "low_level"))]
+mod fuzzer_low_level;
 
 #[cfg(all(target_os = "linux", feature = "breakpoint"))]
 mod fuzzer_breakpoint;
@@ -10,8 +10,8 @@ mod fuzzer_sync_exit;
 
 #[cfg(target_os = "linux")]
 pub fn main() {
-    #[cfg(feature = "classic")]
-    fuzzer_classic::fuzz();
+    #[cfg(feature = "low_level")]
+    fuzzer_low_level::fuzz();
 
     #[cfg(feature = "breakpoint")]
     fuzzer_breakpoint::fuzz();
