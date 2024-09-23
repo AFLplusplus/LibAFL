@@ -5,33 +5,27 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase},
+    inputs::Input,
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
-    state::{HasCorpus, State, UsesState},
+    state::{HasCorpus, State},
     Error,
 };
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueScheduler<S> {
+pub struct QueueScheduler<I, S> {
     queue_cycles: u64,
     runs_in_current_cycle: u64,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> UsesState for QueueScheduler<S>
-where
-    S: State,
-{
-    type State = S;
-}
+impl<I, S> RemovableScheduler<I, S> for QueueScheduler<I, S> where I: Input {}
 
-impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase + State {}
-
-impl<S> Scheduler for QueueScheduler<S>
+impl<I, S> Scheduler<I, S> for QueueScheduler<I, S>
 where
     S: HasCorpus + HasTestcase + State,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
         state
@@ -44,7 +38,7 @@ where
     }
 
     /// Gets the next entry in the queue
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented."
@@ -69,7 +63,7 @@ where
     }
 }
 
-impl<S> QueueScheduler<S> {
+impl<I, S> QueueScheduler<I, S> {
     /// Creates a new `QueueScheduler`
     #[must_use]
     pub fn new() -> Self {
@@ -81,16 +75,13 @@ impl<S> QueueScheduler<S> {
     }
 }
 
-impl<S> Default for QueueScheduler<S> {
+impl<I, S> Default for QueueScheduler<I, S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> HasQueueCycles for QueueScheduler<S>
-where
-    S: HasCorpus + HasTestcase + State,
-{
+impl<I, S> HasQueueCycles for QueueScheduler<I, S> {
     fn queue_cycles(&self) -> u64 {
         self.queue_cycles
     }
@@ -115,7 +106,7 @@ mod tests {
     #[test]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
-        let mut scheduler = QueueScheduler::new();
+        let mut scheduler: QueueScheduler<BytesInput, _> = QueueScheduler::new();
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();

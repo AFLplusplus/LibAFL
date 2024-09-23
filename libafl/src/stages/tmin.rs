@@ -57,7 +57,7 @@ where
         + HasFeedback
         + ExecutesInput<E, EM>
         + ExecutionProcessor,
-    Z::Scheduler: RemovableScheduler<State = Self::State>,
+    Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -239,7 +239,7 @@ where
 impl<E, EM, F, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
     Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
-    Z::Scheduler: RemovableScheduler,
+    Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
     E: HasObservers<State = Self::State>,
     <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = Self::State>,
@@ -301,7 +301,7 @@ impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
     for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
     Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
-    Z::Scheduler: RemovableScheduler,
+    Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
     E: HasObservers<State = Self::State>,
     <E as UsesObservers>::Observers: Serialize,
     EM: EventFirer<State = Self::State>,
