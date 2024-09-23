@@ -29,12 +29,9 @@ use libafl_bolts::{
 };
 #[cfg(not(feature = "simple_interface"))]
 use {
-    libafl::{
-        inputs::MutVecInput,
-        mutators::{
-            havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
-            mapping::{ToMappedInputFunctionMappingMutatorMapper, ToOptionMappingMutatorMapper},
-        },
+    libafl::mutators::{
+        havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
+        mapping::{ToMappedInputFunctionMappingMutatorMapper, ToOptionMappingMutatorMapper},
     },
     libafl_bolts::tuples::Map,
 };
@@ -140,15 +137,13 @@ pub fn main() {
     #[cfg(feature = "simple_interface")]
     let (mapped_mutators, optional_mapped_mutators) = {
         // Creating mutators that will operate on input.byte_array
-        let mapped_mutators = mapped_havoc_mutations(
-            CustomInput::byte_array_mut,
-            CustomInput::byte_array_optional,
-        );
+        let mapped_mutators =
+            mapped_havoc_mutations(CustomInput::byte_array_mut, CustomInput::byte_array);
 
         // Creating mutators that will operate on input.optional_byte_array
         let optional_mapped_mutators = optional_mapped_havoc_mutations(
             CustomInput::optional_byte_array_mut,
-            CustomInput::optional_byte_array_optional,
+            CustomInput::optional_byte_array,
         );
         (mapped_mutators, optional_mapped_mutators)
     };
@@ -156,23 +151,16 @@ pub fn main() {
     #[cfg(not(feature = "simple_interface"))]
     let (mapped_mutators, optional_mapped_mutators) = {
         // Creating mutators that will operate on input.byte_array
-        // For now, due to a limitation in lifetime management (see the MappedInput trait),
-        // the types have to be partially specified
         let mapped_mutators = havoc_mutations_no_crossover()
-            .merge(havoc_crossover_with_corpus_mapper(
-                &CustomInput::byte_array_optional,
-            ))
-            .map(ToMappedInputFunctionMappingMutatorMapper::<
-                _,
-                MutVecInput<'_>,
-            >::new(CustomInput::byte_array_mut));
+            .merge(havoc_crossover_with_corpus_mapper(CustomInput::byte_array))
+            .map(ToMappedInputFunctionMappingMutatorMapper::new(
+                CustomInput::byte_array_mut,
+            ));
 
         // Creating mutators that will operate on input.optional_byte_array
-        // For now, due to a limitation in lifetime management (see the MappedInput trait),
-        // the types have to be partially specified
         let optional_mapped_mutators = havoc_mutations_no_crossover()
             .merge(havoc_crossover_with_corpus_mapper(
-                &CustomInput::optional_byte_array_optional,
+                CustomInput::optional_byte_array,
             ))
             .map(ToOptionMappingMutatorMapper)
             .map(ToMappedInputFunctionMappingMutatorMapper::new(
