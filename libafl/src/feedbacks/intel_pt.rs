@@ -16,7 +16,7 @@ use crate::{
 pub struct IntelPTFeedback {
     trace: Arc<Mutex<Vec<u8>>>,
     past_traces: Vec<Vec<u8>>,
-    avg_score: u128,
+    avg_score: f64,
 }
 
 impl IntelPTFeedback {
@@ -24,7 +24,7 @@ impl IntelPTFeedback {
         Self {
             trace,
             past_traces: vec![],
-            avg_score: 0,
+            avg_score: 0.0,
         }
     }
 }
@@ -51,13 +51,13 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
+        let trace = self.trace.lock().unwrap();
         if self.past_traces.is_empty() {
+            self.past_traces.push(trace.clone());
             return Ok(true);
         }
 
-        let trace = self.trace.lock().unwrap();
-
-        let mut tot_score = 0u128;
+        let mut tot_score = 0;
         for pt in &self.past_traces {
             let diff = capture_diff_slices(Algorithm::Myers, &trace, &pt);
             let score = diff
@@ -69,16 +69,16 @@ where
                     DiffOp::Replace { new_len, .. } => *new_len,
                 })
                 .sum::<usize>();
-            tot_score += score as u128;
+            tot_score += score;
         }
 
-        let weighted_score = tot_score / self.past_traces.len() as u128;
+        let weighted_score = tot_score as f64 / self.past_traces.len() as f64;
 
         self.past_traces.push(trace.clone());
-        let n = self.past_traces.len() as u128;
-        self.avg_score = self.avg_score * (n - 1) / n + weighted_score / n;
+        let n = self.past_traces.len() as f64;
+        self.avg_score = (self.avg_score * (n - 1.0) + weighted_score) / n;
 
-        if weighted_score > self.avg_score * 2 {
+        if n > 200.0 && weighted_score > self.avg_score * 2.0 {
             Ok(true)
         } else {
             Ok(false)

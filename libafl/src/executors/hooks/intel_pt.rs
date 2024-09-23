@@ -144,8 +144,8 @@ where
             .as_mut()
             .unwrap()
             .decode_with_image(&mut image, Some(&mut buff));
-        //let s = serde_json::to_vec(&state).unwrap();
-        //dump_corpus(&s).unwrap();
+        let s = serde_json::to_vec(&state).unwrap();
+        dump_corpus(&s).unwrap();
         //dump_trace_to_file(&buff).unwrap();
         println!("IPs: {ips:x?}");
     }
@@ -669,7 +669,7 @@ fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
 }
 
 fn dump_corpus(buff: &[u8]) -> Result<(), Error> {
-    let trace_path = unsafe { format!("./corpus/{FILE_NUM:06}.json") };
+    let trace_path = "./corpus.json";
     fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
     let mut file = OpenOptions::new()
         .create(true)
