@@ -530,7 +530,7 @@ where
     <Z as UsesState>::State: HasLastReportTime + HasExecutions + HasMetadata,
 {
     if opt.bench_just_one {
-        _ = fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;
+        fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;
     } else {
         fuzzer.fuzz_loop(stages, executor, state, mgr)?;
     }
