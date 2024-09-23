@@ -689,6 +689,7 @@ fn dump_corpus(buff: &[u8]) -> Result<(), Error> {
 mod test {
     use std::{arch::asm, process};
 
+    use arbitrary_int::Number;
     use nix::{
         sys::{
             signal::{kill, raise, Signal},
@@ -713,12 +714,51 @@ mod test {
     // Only 64-bit systems are supported, ensure we can use usize and u64 interchangeably
     assert_eq_size!(usize, u64);
 
-    // TODO check that stuff in PtConfig corresponds to /sys/bus/event_source/devices/intel_pt/format/
     #[test]
-    fn intel_pt_pt_config_format() {
-        // let noretcomp = PtConfig::builder().with_noretcomp(true).build();
+    fn intel_pt_pt_config_noretcomp_format() {
+        let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
+        let path = format!("{PT_EVENT_PATH}/format/noretcomp");
+        let s = fs::read_to_string(&path).expect("Failed to read Intel PT config noretcomp format");
+        assert!(
+            s.starts_with("config:"),
+            "Unexpected Intel PT config noretcomp format"
+        );
+        let bit = s["config:".len()..]
+            .trim()
+            .parse::<u32>()
+            .expect("Failed to parse Intel PT config noretcomp format");
+        assert_eq!(
+            ptconfig_noretcomp,
+            0b1 << bit,
+            "Unexpected Intel PT config noretcomp format"
+        );
+    }
 
-        // PT_EVENT_PATH
+    #[test]
+    fn intel_pt_pt_config_psb_period_format() {
+        let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
+        let path = format!("{PT_EVENT_PATH}/format/psb_period");
+        let s =
+            fs::read_to_string(&path).expect("Failed to read Intel PT config psb_period format");
+        assert!(
+            s.starts_with("config:"),
+            "Unexpected Intel PT config psb_period format"
+        );
+        let from = s["config:".len().."config:".len() + 2]
+            .parse::<u32>()
+            .expect("Failed to parse Intel PT config psb_period format");
+        let to = s["config:".len() + 3..]
+            .trim()
+            .parse::<u32>()
+            .expect("Failed to parse Intel PT config psb_period format");
+        let mut format = 0;
+        for bit in from..=to {
+            format |= 0b1 << bit;
+        }
+        assert_eq!(
+            ptconfig_psb_period, format,
+            "Unexpected Intel PT config psb_period format"
+        );
     }
 
     /// To run this test ensure that the executable has the required capabilities.
