@@ -7,7 +7,6 @@
 #![allow(clippy::too_many_lines)]
 #![allow(clippy::struct_excessive_bools)]
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
-
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 mod afl_stats;
 mod env_parser;
@@ -240,8 +239,9 @@ struct Opt {
     /// use binary-only instrumentation (QEMU mode)
     #[arg(short = 'Q')]
     qemu_mode: bool,
+    /// use VM fuzzing (NYX mode - standalone mode)
     #[cfg(target_os = "linux")]
-    #[clap(skip)]
+    #[arg(short = 'X')]
     nyx_mode: bool,
     /// use unicorn-based instrumentation (Unicorn mode)
     #[arg(short = 'U')]
