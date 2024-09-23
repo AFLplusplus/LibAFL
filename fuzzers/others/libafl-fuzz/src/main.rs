@@ -77,7 +77,7 @@ fn main() {
         .main_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
             println!("run primary client on core {}", core_id.0);
             let fuzzer_dir = opt.output_dir.join("fuzzer_main");
-            check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
+            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
             let res = run_client(state, mgr, &fuzzer_dir, core_id, &opt, true);
             let _ = remove_main_node_file(&fuzzer_dir);
             res
@@ -87,7 +87,7 @@ fn main() {
             let fuzzer_dir = opt
                 .output_dir
                 .join(format!("fuzzer_secondary_{}", core_id.0));
-            check_autoresume(&fuzzer_dir, &opt.input_dir, opt.auto_resume).unwrap();
+            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
             run_client(state, mgr, &fuzzer_dir, core_id, &opt, false)
         })
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
