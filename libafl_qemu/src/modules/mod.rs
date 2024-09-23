@@ -315,12 +315,14 @@ impl Default for StdAddressFilter {
 }
 
 impl StdAddressFilter {
+    #[must_use]
     pub fn allow_list(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
         StdAddressFilter(FilterList::AllowList(AddressFilterVec::new(
             registered_addresses,
         )))
     }
 
+    #[must_use]
     pub fn deny_list(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
         StdAddressFilter(FilterList::DenyList(AddressFilterVec::new(
             registered_addresses,
@@ -329,6 +331,7 @@ impl StdAddressFilter {
 }
 
 impl AddressFilterVec {
+    #[must_use]
     pub fn new(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
         Self {
             registered_addresses,

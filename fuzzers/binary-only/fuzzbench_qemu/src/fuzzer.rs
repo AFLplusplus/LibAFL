@@ -51,7 +51,7 @@ use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
     modules::edges::{
-        edges_map_mut_ptr, EdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
     Emulator,
     GuestReg,
@@ -358,7 +358,7 @@ fn fuzz(
         };
 
     let modules = tuple_list!(
-        EdgeCoverageModule::default(),
+        StdEdgeCoverageModule::builder().build(),
         CmpLogModule::default(),
         // QemuAsanHelper::default(asan),
         //QemuSnapshotHelper::new()
