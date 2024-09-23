@@ -34,8 +34,7 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::edges::{
-        edges_map_mut_ptr, EdgeCoverageModule, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE,
-        MAX_EDGES_FOUND,
+        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
     GuestPhysAddr, GuestReg, QemuMemoryChunk,
 };

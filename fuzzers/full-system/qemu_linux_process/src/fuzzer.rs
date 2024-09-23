@@ -36,8 +36,7 @@ use libafl_qemu::{
     modules::{
         cmplog::CmpLogObserver,
         edges::{
-            edges_map_mut_ptr, EdgeCoverageClassicVariant, EdgeCoverageModule, EDGES_MAP_SIZE_MAX,
-            MAX_EDGES_FOUND,
+            edges_map_mut_ptr, StdEdgeCoverageClassicModule, EDGES_MAP_SIZE_MAX, MAX_EDGES_FOUND,
         },
         CmpLogModule,
     },
@@ -62,9 +61,7 @@ pub fn fuzz() {
 
         // Choose modules to use
         let modules = tuple_list!(
-            EdgeCoverageModule::builder()
-                .variant(EdgeCoverageClassicVariant)
-                .build(),
+            StdEdgeCoverageClassicModule::builder().build(),
             CmpLogModule::default(),
         );
 
