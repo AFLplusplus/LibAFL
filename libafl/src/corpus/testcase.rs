@@ -282,7 +282,7 @@ impl<I> Testcase<I> {
         }
     }
 
-    /// Create a new Testcase instance given an [`Input`] and a `filename`
+    /// Create a new Testcase instance given an [`input`] and a `filename`
     #[inline]
     pub fn with_filename(input: I, filename: String) -> Self {
         Self {
@@ -307,7 +307,7 @@ impl<I> Testcase<I> {
         }
     }
 
-    /// Create a new Testcase instance given an [`Input`] and the number of executions
+    /// Create a new Testcase instance given an [`input`] and the number of executions
     #[inline]
     pub fn with_executions(input: I, executions: u64) -> Self {
         Self {
