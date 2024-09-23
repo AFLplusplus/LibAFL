@@ -7,17 +7,16 @@ use core::{
 };
 
 use hashbrown::HashMap;
-use libafl_bolts::{rands::Rand, HasLen, HasRefCnt};
+use libafl_bolts::{rands::Rand, tuples::MatchName, HasLen, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
+use super::IndexesLenTimeMinimizerScheduler;
 use crate::{
     corpus::{Corpus, CorpusId},
-    feedbacks::MapIndexesMetadata,
-    inputs::Input,
-    observers::{CanTrack, ObserversTuple},
+    observers::CanTrack,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
-        LenTimeMulTestcaseScore, Scheduler,
+        Scheduler,
     },
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
@@ -105,17 +104,17 @@ impl TopAccountingMetadata {
 
 /// A minimizer scheduler using coverage accounting
 #[derive(Debug)]
-pub struct CoverageAccountingScheduler<'a, CS, I, O, S> {
+pub struct CoverageAccountingScheduler<'a, CS, O> {
     accounting_map: &'a [u32],
     skip_non_favored_prob: f64,
-    inner: MinimizerScheduler<CS, LenTimeMulTestcaseScore<I, S>, I, MapIndexesMetadata, O, S>,
+    inner: IndexesLenTimeMinimizerScheduler<CS, O>,
 }
 
-impl<'a, CS, I, O, S> Scheduler<I, S> for CoverageAccountingScheduler<'a, CS, I, O, S>
+impl<'a, CS, I, O, S> Scheduler<I, S> for CoverageAccountingScheduler<'a, CS, O>
 where
     CS: Scheduler<I, S>,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand + Debug,
-    I: HasLen + Input,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
+    I: HasLen,
     O: CanTrack,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -125,7 +124,7 @@ where
 
     fn on_evaluation<OT>(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: MatchName,
     {
         self.inner.on_evaluation(state, input, observers)
     }
@@ -169,17 +168,17 @@ where
     }
 }
 
-impl<'a, CS, I, O, S> CoverageAccountingScheduler<'a, CS, I, O, S>
+impl<'a, CS, O> CoverageAccountingScheduler<'a, CS, O>
 where
-    CS: Scheduler<I, S>,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand + Debug,
-    I: HasLen + Input,
     O: CanTrack,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_accounting_score(&self, state: &mut S, id: CorpusId) -> Result<(), Error> {
+    pub fn update_accounting_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
+    where
+        S: HasCorpus + HasMetadata,
+    {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
         {
@@ -264,7 +263,10 @@ where
 
     /// Cull the `Corpus`
     #[allow(clippy::unused_self)]
-    pub fn accounting_cull(&self, state: &S) -> Result<(), Error> {
+    pub fn accounting_cull<S>(&self, state: &S) -> Result<(), Error>
+    where
+        S: HasCorpus + HasMetadata,
+    {
         let Some(top_rated) = state.metadata_map().get::<TopAccountingMetadata>() else {
             return Ok(());
         };
@@ -285,7 +287,10 @@ where
     /// and has a default probability to skip non-faved Testcases of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     ///
     /// Provide the observer responsible for determining new indexes.
-    pub fn new(observer: &O, state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self {
+    pub fn new<S>(observer: &O, state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self
+    where
+        S: HasMetadata,
+    {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
@@ -307,13 +312,16 @@ where
     /// and has a non-default probability to skip non-faved Testcases using (`skip_non_favored_prob`).
     ///
     /// Provide the observer responsible for determining new indexes.
-    pub fn with_skip_prob(
+    pub fn with_skip_prob<S>(
         observer: &O,
         state: &mut S,
         base: CS,
         skip_non_favored_prob: f64,
         accounting_map: &'a [u32],
-    ) -> Self {
+    ) -> Self
+    where
+        S: HasMetadata,
+    {
         match state.metadata_map().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {

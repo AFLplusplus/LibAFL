@@ -143,4 +143,4 @@ where
 
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, I, M, Z> =
-    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, I, M, Z>;
+    PowerMutationalStage<E, CorpusPowerTestcaseScore, EM, I, M, Z>;

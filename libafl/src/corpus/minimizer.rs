@@ -17,7 +17,6 @@ use crate::{
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
-    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
@@ -57,13 +56,7 @@ pub struct MapCorpusMinimizer<C, E, O, T, TS> {
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<C, E, O, T> = MapCorpusMinimizer<
-    C,
-    E,
-    O,
-    T,
-    LenTimeMulTestcaseScore<<E as UsesInput>::Input, <E as UsesState>::State>,
->;
+pub type StdCorpusMinimizer<C, E, O, T> = MapCorpusMinimizer<C, E, O, T, LenTimeMulTestcaseScore>;
 
 impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
