@@ -50,6 +50,15 @@ where
     fn next(&mut self, _state: &mut S) -> Result<CorpusId, Error> {
         unimplemented!("Not suitable for actual scheduling.");
     }
+
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
+    }
 }
 
 impl<I, S> MergeScheduler<I, S> {

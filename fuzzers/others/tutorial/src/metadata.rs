@@ -34,8 +34,8 @@ where
     }
 }
 
-pub type PacketLenMinimizerScheduler<CS, O, S> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, PacketData, MapIndexesMetadata, O, S>;
+pub type PacketLenMinimizerScheduler<CS, S> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {
