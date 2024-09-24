@@ -3,16 +3,18 @@
 //! This module exposes the low-level QEMU library through [`Qemu`].
 //! To access higher-level features of QEMU, it is recommended to use [`crate::Emulator`] instead.
 
-use core::fmt;
-use std::{
+use core::{
     cmp::{Ordering, PartialOrd},
+    fmt,
+    ptr::{self, addr_of_mut},
+};
+use std::{
     ffi::{c_void, CString},
     fmt::{Display, Formatter},
     intrinsics::{copy_nonoverlapping, transmute},
     mem::MaybeUninit,
     ops::Range,
     pin::Pin,
-    ptr,
 };
 
 use libafl_bolts::os::unix_signals::Signal;
@@ -141,9 +143,7 @@ pub struct QemuMemoryChunk {
 }
 
 #[allow(clippy::vec_box)]
-static GDB_COMMANDS: LazyLock<Mutex<Vec<Box<FatPtr>>>> = LazyLock::new(|| {
-    Mutex::new(Vec::new())
-});
+static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
 
 unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
     unsafe {
@@ -770,16 +770,16 @@ impl Qemu {
         id.remove(invalidate_block)
     }
 
+    // # Safety
+    // Calling this multiple times concurrently will access static variables and is unsafe.
     #[allow(clippy::type_complexity)]
-    pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
-        unsafe {
-            let fat: Box<FatPtr> = Box::new(transmute::<
-                Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
-                FatPtr,
-            >(callback));
-            libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
-            (*GDB_COMMANDS).lock().push(fat);
-        }
+    pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
+        let fat: Box<FatPtr> = Box::new(transmute::<
+            Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
+            FatPtr,
+        >(callback));
+        libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
+        (*addr_of_mut!(GDB_COMMANDS)).push(fat);
     }
 
     pub fn gdb_reply(&self, output: &str) {

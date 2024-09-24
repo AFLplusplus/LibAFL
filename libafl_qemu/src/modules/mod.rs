@@ -1,5 +1,5 @@
-use core::{ptr::addr_of, ptr::addr_of_mut, fmt::Debug, ops::Range};
-use std::{cell::UnsafeCell, hash::BuildHasher};
+use core::{cell::UnsafeCell, hash::BuildHasher, ptr::addr_of};
+use core::{fmt::Debug, ops::Range, ptr::addr_of_mut};
 
 use hashbrown::HashSet;
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
@@ -321,7 +321,7 @@ impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for () {
     }
 
     fn filter_mut(&mut self) -> &mut QemuInstrumentationPagingFilter {
-        unsafe { EMPTY_PAGING_FILTER.get_mut() }
+        unsafe { (*addr_of_mut!(EMPTY_PAGING_FILTER)).get_mut() }
     }
 }
 
