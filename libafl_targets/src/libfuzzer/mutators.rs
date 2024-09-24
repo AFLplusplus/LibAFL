@@ -384,7 +384,7 @@ where
     SM: ScheduledMutator<BytesInput, MT, S> + 'static,
     MT: MutatorsTuple<BytesInput, S> + 'static,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
-    S::Corpus: Corpus<Input = BytesInput>
+    S::Corpus: Corpus<Input = BytesInput>,
 {
     fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
         let mutator = self.mutator.deref().borrow();

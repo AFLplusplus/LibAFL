@@ -52,11 +52,15 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
     E: UsesState<State = Self::State>,
     TE: Executor<EM, Z> + HasObservers,
-    TE::State:
-        HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput> + HasNamedMetadata + HasCurrentTestcase,
+    TE::State: HasExecutions
+        + HasCorpus
+        + HasMetadata
+        + UsesInput<Input = BytesInput>
+        + HasNamedMetadata
+        + HasCurrentTestcase,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
-    <Self::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>,//delete me
+    <Self::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>, //delete me
 {
     #[inline]
     fn perform(
