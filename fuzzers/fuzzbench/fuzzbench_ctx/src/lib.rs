@@ -310,7 +310,7 @@ fn fuzz(
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
         &mut state,
-        havoc_mutations().merge(tokens_mutations()),
+        havoc_mutations::<BytesInput>().merge(tokens_mutations()),
         7,
         5,
     )?;
