@@ -194,16 +194,17 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
         false
     };
 
+    #[allow(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
     let permission = if is_library {
-        S_IRUSR // user can read
+        u32::from(S_IRUSR) // user can read
     } else {
-        S_IXUSR // user can exec
+        u32::from(S_IXUSR) // user can exec
     };
 
     // First we check if it is present in AFL_PATH
     if let Ok(afl_path) = std::env::var("AFL_PATH") {
         let file = PathBuf::from(afl_path).join(filename);
-        if check_file_found(&file, permission.into()) {
+        if check_file_found(&file, permission) {
             return Ok(file);
         }
     }
@@ -212,7 +213,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
     if let Some(same_dir_as) = same_dir_as {
         if let Some(parent_dir) = same_dir_as.parent() {
             let file = parent_dir.join(filename);
-            if check_file_found(&file, permission.into()) {
+            if check_file_found(&file, permission) {
                 return Ok(file);
             }
         }
@@ -220,7 +221,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
 
     // check sensible defaults
     let file = PathBuf::from(if is_library { AFL_PATH } else { BIN_PATH }).join(filename);
-    let found = check_file_found(&file, permission.into());
+    let found = check_file_found(&file, permission);
     if found {
         return Ok(file);
     }
