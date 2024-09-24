@@ -15,8 +15,7 @@ pub struct NopCorpus<I> {
     phantom: PhantomData<I>,
 }
 
-impl<I> Corpus for NopCorpus<I>
-{
+impl<I> Corpus for NopCorpus<I> {
     type Input = I;
     /// Returns the number of all enabled entries
     #[inline]
@@ -132,8 +131,7 @@ impl<I> Corpus for NopCorpus<I>
     }
 }
 
-impl<I> NopCorpus<I>
-{
+impl<I> NopCorpus<I> {
     /// Creates a new [`NopCorpus`].
     #[must_use]
     pub fn new() -> Self {

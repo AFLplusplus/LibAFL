@@ -28,11 +28,12 @@ use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(windows)]
 use crate::state::State;
 use crate::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     Error, HasObjective,
 };
 /// The inmem executor's handlers.
@@ -236,6 +237,8 @@ where
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.

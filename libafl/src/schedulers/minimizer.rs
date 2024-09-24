@@ -78,9 +78,11 @@ pub struct MinimizerScheduler<CS, F, M, S> {
     phantom: PhantomData<(F, M, S)>,
 }
 
-impl<CS, F, M, O, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S> for MinimizerScheduler<CS, F, M, O>
+impl<CS, F, M, O, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S>
+    for MinimizerScheduler<CS, F, M, O>
 where
-    CS: RemovableScheduler<<S::Corpus as Corpus>::Input, S> + Scheduler<<S::Corpus as Corpus>::Input, S>,
+    CS: RemovableScheduler<<S::Corpus as Corpus>::Input, S>
+        + Scheduler<<S::Corpus as Corpus>::Input, S>,
     F: TestcaseScore<S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus + HasMetadata + HasRand,
@@ -199,7 +201,12 @@ where
     }
 
     /// An input has been evaluated
-    fn on_evaluation<OT>(&mut self, state: &mut S, input: &<S::Corpus as Corpus>::Input, observers: &OT) -> Result<(), Error>
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
     where
         OT: MatchName,
     {
@@ -245,7 +252,7 @@ where
     pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         F: TestcaseScore<S>,
-        S: HasCorpus+ HasMetadata,
+        S: HasCorpus + HasMetadata,
     {
         // Create a new top rated meta if not existing
         if state.metadata_map().get::<TopRatedsMetadata>().is_none() {

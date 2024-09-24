@@ -14,8 +14,7 @@ use crate::{
 /// Keep track of the stored `Testcase` and the siblings ids (insertion order)
 #[cfg(not(feature = "corpus_btreemap"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestcaseStorageItem<I>
-{
+pub struct TestcaseStorageItem<I> {
     /// The stored testcase
     pub testcase: RefCell<Testcase<I>>,
     /// Previously inserted id
@@ -26,8 +25,7 @@ pub struct TestcaseStorageItem<I>
 
 /// The map type in which testcases are stored (disable the feature `corpus_btreemap` to use a `HashMap` instead of `BTreeMap`)
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct TestcaseStorageMap<I>
-{
+pub struct TestcaseStorageMap<I> {
     #[cfg(not(feature = "corpus_btreemap"))]
     /// A map of `CorpusId` to `TestcaseStorageItem`
     pub map: hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>,
@@ -44,8 +42,7 @@ pub struct TestcaseStorageMap<I>
     last_id: Option<CorpusId>,
 }
 
-impl<I> TestcaseStorageMap<I>
-{
+impl<I> TestcaseStorageMap<I> {
     /// Insert a key in the keys set
     fn insert_key(&mut self, id: CorpusId) {
         if let Err(idx) = self.keys.binary_search(&id) {
@@ -226,8 +223,7 @@ impl<I> TestcaseStorageMap<I>
 }
 /// Storage map for the testcases (used in `Corpus` implementations) with an incremental index
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct TestcaseStorage<I>
-{
+pub struct TestcaseStorage<I> {
     /// The map in which enabled testcases are stored
     pub enabled: TestcaseStorageMap<I>,
     /// The map in which disabled testcases are stored
@@ -236,8 +232,7 @@ pub struct TestcaseStorage<I>
     progressive_id: usize,
 }
 
-impl<I> TestcaseStorage<I>
-{
+impl<I> TestcaseStorage<I> {
     /// Insert a testcase assigning a `CorpusId` to it
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self._insert(testcase, false)
@@ -314,14 +309,12 @@ impl<I> TestcaseStorage<I>
 
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct InMemoryCorpus<I>
-{
+pub struct InMemoryCorpus<I> {
     storage: TestcaseStorage<I>,
     current: Option<CorpusId>,
 }
 
-impl<I> Corpus for InMemoryCorpus<I>
-{
+impl<I> Corpus for InMemoryCorpus<I> {
     type Input = I;
 
     /// Returns the number of all enabled entries
@@ -461,8 +454,7 @@ impl<I> Corpus for InMemoryCorpus<I>
     }
 }
 
-impl<I> HasTestcase for InMemoryCorpus<I>
-{
+impl<I> HasTestcase for InMemoryCorpus<I> {
     fn testcase(
         &self,
         id: CorpusId,
@@ -478,8 +470,7 @@ impl<I> HasTestcase for InMemoryCorpus<I>
     }
 }
 
-impl<I> InMemoryCorpus<I>
-{
+impl<I> InMemoryCorpus<I> {
     /// Creates a new [`InMemoryCorpus`], keeping all [`Testcase`]`s` in memory.
     /// This is the simplest and fastest option, however test progress will be lost on exit or on OOM.
     #[must_use]

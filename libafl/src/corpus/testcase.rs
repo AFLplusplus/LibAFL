@@ -15,14 +15,17 @@ use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
-use crate::{corpus::CorpusId, Error, HasMetadata, state::HasCorpus};
+use crate::{corpus::CorpusId, state::HasCorpus, Error, HasMetadata};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
 pub trait HasTestcase: HasCorpus {
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
 
     /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.

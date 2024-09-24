@@ -86,8 +86,8 @@ pub trait HasCorpus {
 
 // Reflexivity
 impl<C> HasCorpus for C
-where 
-    C: Corpus
+where
+    C: Corpus,
 {
     type Corpus = Self;
 
@@ -510,18 +510,20 @@ impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
 }
 
 /// Has information about the current [`Testcase`] we are fuzzing
-pub trait HasCurrentTestcase: HasCorpus
-{
+pub trait HasCurrentTestcase: HasCorpus {
     /// Gets the current [`Testcase`] we are fuzzing
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase(&self) -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    fn current_testcase(&self)
+        -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
     //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
 
     /// Gets the current [`Testcase`] we are fuzzing (mut)
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    fn current_testcase_mut(
+        &self,
+    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
     //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
 
     /// Gets a cloned representation of the current [`Testcase`].
@@ -539,7 +541,9 @@ where
     T: HasCorpus + HasCurrentCorpusId,
     <Self::Corpus as Corpus>::Input: Clone,
 {
-    fn current_testcase(&self) -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    fn current_testcase(
+        &self,
+    ) -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::key_not_found(
                 "We are not currently processing a testcase",
@@ -549,7 +553,9 @@ where
         Ok(self.corpus().get(corpus_id)?.borrow())
     }
 
-    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    fn current_testcase_mut(
+        &self,
+    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "We are not currently processing a testcase",

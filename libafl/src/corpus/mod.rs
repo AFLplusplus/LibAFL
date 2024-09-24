@@ -174,9 +174,9 @@ pub trait Corpus: Sized {
     fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error>;
 
     /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
-    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error> 
-    where 
-        Self::Input: Clone
+    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error>
+    where
+        Self::Input: Clone,
     {
         let mut testcase = self.get(id)?.borrow_mut();
         Ok(testcase.load_input(self)?.clone())

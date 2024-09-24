@@ -324,7 +324,12 @@ where
         Ok(())
     }
 
-    fn on_evaluation<OT>(&mut self, state: &mut S, _input: &<S::Corpus as Corpus>::Input, observers: &OT) -> Result<(), Error>
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut S,
+        _input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
     where
         OT: MatchName,
     {

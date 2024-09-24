@@ -237,7 +237,6 @@ where
         + HasExecutions
         + HasNamedMetadata
         + Stoppable
-        + HasTestcase,
     O: MapObserver,
     C: AsRef<O> + Named,
     <Z as HasScheduler>::Scheduler: HasQueueCycles,

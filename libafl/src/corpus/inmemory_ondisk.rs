@@ -52,8 +52,7 @@ fn try_create_new<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct InMemoryOnDiskCorpus<I>
-{
+pub struct InMemoryOnDiskCorpus<I> {
     inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
@@ -62,7 +61,7 @@ pub struct InMemoryOnDiskCorpus<I>
 }
 
 impl<I> Corpus for InMemoryOnDiskCorpus<I>
-where 
+where
     I: Input,
 {
     type Input = I;
@@ -232,8 +231,7 @@ where
     }
 }
 
-impl<I> InMemoryOnDiskCorpus<I>
-{
+impl<I> InMemoryOnDiskCorpus<I> {
     /// Creates an [`InMemoryOnDiskCorpus`].
     ///
     /// This corpus stores all testcases to disk, and keeps all of them in memory, as well.
@@ -378,9 +376,9 @@ impl<I> InMemoryOnDiskCorpus<I>
         }
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error> 
-    where 
-        I: Input
+    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error>
+    where
+        I: Input,
     {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)

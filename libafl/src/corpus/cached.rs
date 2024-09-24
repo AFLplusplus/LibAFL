@@ -20,16 +20,14 @@ use crate::{
 /// The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-pub struct CachedOnDiskCorpus<I>
-{
+pub struct CachedOnDiskCorpus<I> {
     inner: InMemoryOnDiskCorpus<I>,
     cached_indexes: RefCell<VecDeque<CorpusId>>,
     cache_max_len: usize,
 }
 
-
 impl<I> CachedOnDiskCorpus<I>
-where 
+where
     I: Input,
 {
     fn cache_testcase<'a>(
@@ -190,16 +188,12 @@ where
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<I>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<core::cell::RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
 
-impl<I> CachedOnDiskCorpus<I>
-{
+impl<I> CachedOnDiskCorpus<I> {
     /// Creates the [`CachedOnDiskCorpus`].
     ///
     /// This corpus stores (and reads) all testcases to/from disk

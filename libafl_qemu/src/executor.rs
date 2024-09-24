@@ -12,6 +12,7 @@ use libafl::{
     events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
 };
 use libafl::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::inprocess::InProcessExecutorHandlerData,
@@ -131,6 +132,8 @@ where
         OF: Feedback<S>,
         S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
         Z: HasObjective<Objective = OF, State = S> + HasScheduler<State = S> + ExecutionProcessor,
+        S::Solutions: Corpus<Input = S::Input>, //delete me
+        <S::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let mut inner = StatefulInProcessExecutor::with_timeout(
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,

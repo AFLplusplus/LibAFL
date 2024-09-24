@@ -63,8 +63,9 @@ where
     T: Copy + Hash + Eq,
     TS: TestcaseScore<E::State>,
 {
+    /// Do the minimization
     #[allow(clippy::too_many_lines)]
-    fn minimize<CS, EM, Z>(
+    pub fn minimize<CS, EM, Z>(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,

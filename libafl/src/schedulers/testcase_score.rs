@@ -66,7 +66,10 @@ where
         clippy::cast_sign_loss,
         clippy::cast_lossless
     )]
-    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
@@ -280,7 +283,10 @@ where
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 

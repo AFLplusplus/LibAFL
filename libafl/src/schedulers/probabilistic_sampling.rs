@@ -209,7 +209,10 @@ mod tests {
     where
         S: HasCorpus,
     {
-        fn compute(_state: &S, _: &mut Testcase<<S::Corpus as Corpus>::Input>) -> Result<f64, Error> {
+        fn compute(
+            _state: &S,
+            _: &mut Testcase<<S::Corpus as Corpus>::Input>,
+        ) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

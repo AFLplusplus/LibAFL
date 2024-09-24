@@ -371,6 +371,7 @@ where
     MT: MutatorsTuple<BytesInput, S> + 'static,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
     SM: ScheduledMutator<BytesInput, MT, S> + 'static,
+    S::Corpus: Corpus<Input = BytesInput>,
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
@@ -383,6 +384,7 @@ where
     SM: ScheduledMutator<BytesInput, MT, S> + 'static,
     MT: MutatorsTuple<BytesInput, S> + 'static,
     S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
+    S::Corpus: Corpus<Input = BytesInput>
 {
     fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
         let mutator = self.mutator.deref().borrow();
