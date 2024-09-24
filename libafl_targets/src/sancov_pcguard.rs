@@ -187,7 +187,7 @@ unsafe fn update_ngram(pos: usize) -> usize {
     #[cfg(feature = "sancov_ngram4")]
     {
         let prev_array_4 = &mut *core::ptr::addr_of_mut!(PREV_ARRAY_4);
-        prev_array_4 = prev_array_4.rotate_elements_right::<1>();
+        *prev_array_4 = prev_array_4.rotate_elements_right::<1>();
         prev_array_4.shl_assign(SHR_4);
         prev_array_4.as_mut_array()[0] = pos as u32;
         reduced = prev_array_4.reduce_xor() as usize;
@@ -195,7 +195,7 @@ unsafe fn update_ngram(pos: usize) -> usize {
     #[cfg(feature = "sancov_ngram8")]
     {
         let prev_array_8 = &mut *core::ptr::addr_of_mut!(PREV_ARRAY_8);
-        prev_array_8 = prev_array_8.rotate_elements_right::<1>();
+        *prev_array_8 = prev_array_8.rotate_elements_right::<1>();
         prev_array_8.shl_assign(SHR_8);
         prev_array_8.as_mut_array()[0] = pos as u32;
         reduced = prev_array_8.reduce_xor() as usize;
