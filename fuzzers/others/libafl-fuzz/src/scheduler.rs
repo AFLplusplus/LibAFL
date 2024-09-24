@@ -2,27 +2,23 @@ use std::marker::PhantomData;
 
 use libafl::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::{Input, UsesInput},
-    observers::{CanTrack, ObserversTuple},
-    schedulers::{
-        HasQueueCycles, MinimizerScheduler, RemovableScheduler, Scheduler, TestcaseScore,
-    },
-    state::{HasCorpus, HasRand, State},
+    inputs::Input,
+    schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
+    state::HasCorpus,
     Error, HasMetadata,
 };
-use libafl_bolts::{serdeany::SerdeAny, tuples::MatchName, AsIter, HasRefCnt};
+use libafl_bolts::tuples::MatchName;
 
-pub enum SupportedSchedulers<W, Q> {
+pub enum SupportedSchedulers<Q, W> {
     Queue(Q, PhantomData<W>),
     Weighted(W, PhantomData<Q>),
 }
 
-impl<W, Q, I, S> RemovableScheduler<I, S> for SupportedSchedulers<W, Q>
+impl<I, Q, S, W> RemovableScheduler<I, S> for SupportedSchedulers<Q, W>
 where
-    I: Input,
     Q: Scheduler<I, S> + RemovableScheduler<I, S>,
     W: Scheduler<I, S> + RemovableScheduler<I, S>,
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus<Input = I> + HasRand + State,
+    S: HasCorpus + HasTestcase,
 {
     fn on_remove(
         &mut self,
@@ -44,12 +40,12 @@ where
     }
 }
 
-impl<W, Q, I, S> Scheduler<I, S> for SupportedSchedulers<W, Q>
+impl<I, Q, S, W> Scheduler<I, S> for SupportedSchedulers<Q, W>
 where
     I: Input,
     Q: Scheduler<I, S>,
     W: Scheduler<I, S>,
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus<Input = I> + HasRand + State,
+    S: HasCorpus + HasTestcase,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         match self {
@@ -103,7 +99,7 @@ where
     }
 }
 
-impl<W, Q> HasQueueCycles for SupportedSchedulers<W, Q>
+impl<Q, W> HasQueueCycles for SupportedSchedulers<Q, W>
 where
     Q: HasQueueCycles,
     W: HasQueueCycles,
