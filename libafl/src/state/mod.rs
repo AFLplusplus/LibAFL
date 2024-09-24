@@ -260,7 +260,7 @@ pub struct StdState<I, C, R, SC> {
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
     #[cfg(feature = "std")]
-    /// Remaining initial inputs to load, if any
+    /// symlinks we have already traversed when loading `remaining_initial_files`
     dont_reenter: Option<Vec<PathBuf>>,
     #[cfg(feature = "std")]
     /// If inputs have been processed for multicore loading
@@ -798,6 +798,28 @@ where
         Ok(())
     }
 
+    /// Recursively walk supplied corpus directories
+    pub fn walk_initial_inputs<F>(
+        &mut self,
+        in_dirs: &[PathBuf],
+        mut closure: F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(&PathBuf) -> Result<(), Error>,
+    {
+        self.canonicalize_input_dirs(in_dirs)?;
+        loop {
+            match self.next_file() {
+                Ok(path) => {
+                    closure(&path)?;
+                }
+                Err(Error::IteratorEnd(_, _)) => break,
+                Err(e) => return Err(e),
+            }
+        }
+        self.reset_initial_files_state();
+        Ok(())
+    }
     /// Loads all intial inputs, even if they are not considered `interesting`.
     /// This is rarely the right method, use `load_initial_inputs`,
     /// and potentially fix your `Feedback`, instead.

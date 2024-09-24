@@ -1,5 +1,4 @@
-use core::{fmt::Debug, ops::Range};
-use std::{cell::UnsafeCell, hash::BuildHasher};
+use core::{cell::UnsafeCell, fmt::Debug, hash::BuildHasher, ops::Range, ptr::addr_of_mut};
 
 use hashbrown::HashSet;
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
@@ -48,7 +47,7 @@ where
     {
     }
 
-    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
+    fn first_exec<ET>(&mut self, _state: &mut S, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -56,9 +55,9 @@ where
 
     fn pre_exec<ET>(
         &mut self,
+        _state: &mut S,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
-        _state: &mut S,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
@@ -66,10 +65,10 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
+        _state: &mut S,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _input: &S::Input,
         _observers: &mut OT,
-        _state: &mut S,
         _exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -178,7 +177,7 @@ where
     where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.first_exec(emulator_modules, state);
+        self.0.first_exec(state, emulator_modules);
         self.1.first_exec_all(emulator_modules, state);
     }
 
@@ -190,7 +189,7 @@ where
     ) where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.pre_exec(emulator_modules, input, state);
+        self.0.pre_exec(state, emulator_modules, input);
         self.1.pre_exec_all(emulator_modules, input, state);
     }
 
@@ -206,7 +205,7 @@ where
         ET: EmulatorModuleTuple<S>,
     {
         self.0
-            .post_exec(emulator_modules, input, observers, state, exit_kind);
+            .post_exec(state, emulator_modules, input, observers, exit_kind);
         self.1
             .post_exec_all(emulator_modules, input, observers, state, exit_kind);
     }
@@ -311,7 +310,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for () {
     }
 
     fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        unsafe { EMPTY_ADDRESS_FILTER.get_mut() }
+        unsafe { (*addr_of_mut!(EMPTY_ADDRESS_FILTER)).get_mut() }
     }
 }
 
@@ -321,7 +320,7 @@ impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for () {
     }
 
     fn filter_mut(&mut self) -> &mut QemuInstrumentationPagingFilter {
-        unsafe { EMPTY_PAGING_FILTER.get_mut() }
+        unsafe { (*addr_of_mut!(EMPTY_PAGING_FILTER)).get_mut() }
     }
 }
 

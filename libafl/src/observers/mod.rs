@@ -446,7 +446,7 @@ where
 #[cfg(test)]
 mod tests {
 
-    use core::ptr::addr_of_mut;
+    use core::ptr::{addr_of, addr_of_mut};
 
     use libafl_bolts::{
         ownedref::OwnedMutSlice,
@@ -461,9 +461,10 @@ mod tests {
     #[test]
     fn test_observer_serde() {
         let obv = tuple_list!(TimeObserver::new("time"), unsafe {
+            let len = (*addr_of!(MAP)).len();
             StdMapObserver::from_ownedref(
                 "map",
-                OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP) as *mut u32, MAP.len()),
+                OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP) as *mut u32, len),
             )
         });
         let vec = postcard::to_allocvec(&obv).unwrap();

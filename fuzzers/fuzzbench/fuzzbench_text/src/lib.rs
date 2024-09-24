@@ -30,7 +30,7 @@ use libafl::{
             GrimoireExtensionMutator, GrimoireRandomDeleteMutator,
             GrimoireRecursiveReplacementMutator, GrimoireStringReplacementMutator,
         },
-        scheduled::havoc_mutations,
+        havoc_mutations,
         token_mutations::I2SRandReplace,
         tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
@@ -380,7 +380,7 @@ fn fuzz_binary(
         StdWeightedScheduler::with_schedule(
             &mut state,
             &edges_observer,
-            Some(PowerSchedule::EXPLORE),
+            Some(PowerSchedule::explore()),
         ),
     );
 
@@ -605,7 +605,7 @@ fn fuzz_text(
         StdWeightedScheduler::with_schedule(
             &mut state,
             &edges_observer,
-            Some(PowerSchedule::EXPLORE),
+            Some(PowerSchedule::explore()),
         ),
     );
 

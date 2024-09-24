@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    os::{linux::fs::MetadataExt, unix::fs::PermissionsExt},
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
 
@@ -54,7 +54,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
     let metadata = bin_path.metadata()?;
     // AFL++ does not follow symlinks, BUT we do.
     let is_reg = bin_path.is_file();
-    let bin_size = metadata.st_size();
+    let bin_size = metadata.len();
     let is_executable = metadata.permissions().mode() & 0o111 != 0;
     if !is_reg || !is_executable || bin_size < 4 {
         return Err(Error::illegal_argument(format!(
@@ -84,6 +84,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
     }
 
     // check if the binary is an ELF file
+    #[cfg(target_os = "linux")]
     if mmap[0..4] != [0x7f, 0x45, 0x4c, 0x46] {
         return Err(Error::illegal_argument(format!(
             "Program '{}' is not an ELF binary",
@@ -91,7 +92,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         )));
     }
 
-    #[cfg(all(target_os = "macos", not(target_arch = "arm")))]
+    #[cfg(target_vendor = "apple")]
     {
         if (mmap[0] != 0xCF || mmap[1] != 0xFA || mmap[2] != 0xED)
             && (mmap[0] != 0xCA || mmap[1] != 0xFE || mmap[2] != 0xBA)
@@ -186,13 +187,18 @@ fn find_executable_in_path<P: AsRef<Path>>(executable: &P) -> Option<PathBuf> {
 }
 
 pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<PathBuf, Error> {
-    let is_library =
-        filename.contains('.') && filename.ends_with(".so") || filename.ends_with(".dylib");
-
-    let permission = if is_library {
-        S_IRUSR // user can read
+    let extension = Path::new(filename).extension();
+    let is_library = if let Some(extension) = extension {
+        extension.eq_ignore_ascii_case("so") || extension.eq_ignore_ascii_case("dylib")
     } else {
-        S_IXUSR // user can exec
+        false
+    };
+
+    #[allow(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
+    let permission = if is_library {
+        u32::from(S_IRUSR) // user can read
+    } else {
+        u32::from(S_IXUSR) // user can exec
     };
 
     // First we check if it is present in AFL_PATH
@@ -229,7 +235,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
     Err(Error::unknown(format!("cannot find {filename}")))
 }
 
-fn check_file_found(file: &PathBuf, perm: u32) -> bool {
+fn check_file_found(file: &Path, perm: u32) -> bool {
     if !file.exists() {
         return false;
     }

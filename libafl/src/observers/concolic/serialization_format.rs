@@ -242,7 +242,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
     /// Create a `MessageFileWriter` from the given [`Write`].
     pub fn from_writer(mut writer: W) -> io::Result<Self> {
         let writer_start_position = writer.stream_position()?;
-        // write dummy trace length
+        // write preliminary trace length
         writer.write_all(&0_u64.to_le_bytes())?;
         Ok(Self {
             id_counter: 1,
