@@ -541,7 +541,7 @@ impl Default for FullBacktraceCollector {
 
 impl FullBacktraceCollector {
     pub fn new() -> Self {
-        unsafe { *(&mut *addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
+        unsafe { (*addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
         Self {}
     }
 

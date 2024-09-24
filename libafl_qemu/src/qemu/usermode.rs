@@ -340,7 +340,7 @@ pub mod pybind {
 
         fn set_syscall_hook(&self, hook: PyObject) {
             unsafe {
-                *(&mut *core::ptr::addr_of_mut!(PY_SYSCALL_HOOK)) = Some(hook);
+                (*core::ptr::addr_of_mut!(PY_SYSCALL_HOOK)) = Some(hook);
             }
             self.qemu
                 .hooks()
