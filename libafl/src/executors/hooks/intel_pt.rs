@@ -63,6 +63,7 @@ enum KvmPTMode {
 /// Perf event config for `IntelPT`
 ///
 /// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
+// TODO: move to c2rust-bitfields crate already in use
 #[bitfield(u64, default = 0)]
 struct PtConfig {
     /// Disable call return address compression. AKA DisRETC in Intel SDM
@@ -113,16 +114,19 @@ where
         assert!(self.pt.is_none(), "Intel PT was already set up");
         let pid = process::id();
         self.pt = Some(IntelPT::try_new(pid as i32).unwrap());
+        println!("Init hook");
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.trace.lock().unwrap().clear();
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
+        println!("Pre exec hook");
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn post_exec(&mut self, state: &mut S, _input: &S::Input) {
+        println!("Post exec hook");
         self.pt.as_mut().unwrap().disable_tracing().unwrap();
         let mut image = Image::new(Some("test_trace_pid")).unwrap();
         // TODO optimize, move  this stuff
@@ -140,15 +144,16 @@ where
             }
         }
         let mut buff = self.trace.lock().unwrap();
-        let ips = self
-            .pt
-            .as_mut()
-            .unwrap()
-            .decode_with_image(&mut image, Some(&mut buff));
+        // let ips = self
+        //     .pt
+        //     .as_mut()
+        //     .unwrap()
+        //     .decode_with_image(&mut image, Some(&mut buff));
         let s = serde_json::to_vec(&state).unwrap();
         dump_corpus(&s).unwrap();
-        //dump_trace_to_file(&buff).unwrap();
-        println!("IPs: {ips:x?}");
+        dump_trace_to_file(&buff).unwrap();
+        // println!("IPs: {ips:x?}");
+        println!("Post exec hook");
     }
 }
 
@@ -614,6 +619,7 @@ fn intel_pt_perf_type() -> Result<u32, Error> {
 }
 
 fn intel_pt_nr_addr_filters() -> Result<u32, Error> {
+    // TODO: this can be cached
     let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
     let s = fs::read_to_string(&path).map_err(|e| {
         Error::os_error(
