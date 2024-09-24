@@ -1,4 +1,9 @@
-use std::{borrow::Cow, marker::PhantomData, path::PathBuf, time::Duration};
+use std::{
+    borrow::Cow,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
@@ -33,7 +38,7 @@ use libafl_bolts::{
     fs::get_unique_std_input_file,
     ownedref::OwnedRefMut,
     rands::StdRand,
-    shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
@@ -66,7 +71,7 @@ pub fn run_client<EMH, SP>(
         LibaflFuzzState,
         SP,
     >,
-    fuzzer_dir: &PathBuf,
+    fuzzer_dir: &Path,
     core_id: CoreId,
     opt: &Opt,
     is_main_node: bool,
@@ -76,7 +81,7 @@ where
     SP: ShMemProvider,
 {
     // Create the shared memory map for comms with the forkserver
-    let mut shmem_provider = StdShMemProvider::new().unwrap();
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
     let mut shmem = shmem_provider
         .new_shmem(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
         .unwrap();
@@ -109,7 +114,7 @@ where
     // Create a AFLStatsStage;
     let afl_stats_stage = AflStatsStage::new(
         opt,
-        fuzzer_dir.clone(),
+        fuzzer_dir.to_path_buf(),
         &edges_observer,
         user_token_count,
         !opt.no_autodict,
@@ -130,7 +135,7 @@ where
         feedback_or!(
             map_feedback,
             TimeFeedback::new(&time_observer),
-            CustomFilepathToTestcaseFeedback::new(set_corpus_filepath, fuzzer_dir.clone())
+            CustomFilepathToTestcaseFeedback::new(set_corpus_filepath, fuzzer_dir.to_path_buf())
         ),
         opt,
     );
@@ -153,7 +158,7 @@ where
             ),
             MaxMapFeedback::with_name("edges_objective", &edges_observer)
         ),
-        CustomFilepathToTestcaseFeedback::new(set_solution_filepath, fuzzer_dir.clone()),
+        CustomFilepathToTestcaseFeedback::new(set_solution_filepath, fuzzer_dir.to_path_buf()),
         PersitentRecordFeedback::new(opt.persistent_record),
     );
 
@@ -163,7 +168,7 @@ where
             StdRand::with_seed(opt.rng_seed.unwrap_or(current_nanos())),
             // TODO: configure testcache size
             CachedOnDiskCorpus::<BytesInput>::new(fuzzer_dir.join("queue"), 1000).unwrap(),
-            OnDiskCorpus::<BytesInput>::new(fuzzer_dir.clone()).unwrap(),
+            OnDiskCorpus::<BytesInput>::new(fuzzer_dir).unwrap(),
             &mut feedback,
             &mut objective,
         )
@@ -234,22 +239,55 @@ where
     }
 
     // Create the base Executor
-    let mut executor = base_executor(opt, &mut shmem_provider, fuzzer_dir)?;
+    let mut executor_builder = base_executor_builder(opt, &mut shmem_provider, fuzzer_dir);
     // Set a custom exit code to be interpreted as a Crash if configured.
     if let Some(crash_exitcode) = opt.crash_exitcode {
-        executor = executor.crash_exitcode(crash_exitcode);
+        executor_builder = executor_builder.crash_exitcode(crash_exitcode);
     }
 
     // Enable autodict if configured
     if !opt.no_autodict {
-        executor = executor.autotokens(&mut tokens);
+        executor_builder = executor_builder.autotokens(&mut tokens);
     };
 
     // Finalize and build our Executor
-    let mut executor = executor
+    let mut executor = executor_builder
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
+    let queue_dir = fuzzer_dir.join("queue");
+    if opt.auto_resume {
+        // TODO - see afl-fuzz-init.c line 1898 onwards
+    } else {
+        // If we aren't auto resuming, copy all the files to our queue directory.
+        let mut id = 0;
+        state.walk_initial_inputs(&[opt.input_dir.clone()], |path: &PathBuf| {
+            let mut filename = path
+                .file_name()
+                .ok_or(Error::illegal_state(format!(
+                    "file {} in input directory does not have a filename",
+                    path.display()
+                )))?
+                .to_str()
+                .ok_or(Error::illegal_state(format!(
+                    "file {} in input directory does not have a legal filename",
+                    path.display()
+                )))?
+                .to_string();
+            filename = format!("id:{id:0>6},time:0,execs:0,orig:{filename}");
+            let cpy_res = std::fs::copy(path, queue_dir.join(filename));
+            match cpy_res {
+                Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
+                    println!("skipping {} since it is not a regular file", path.display());
+                }
+                Err(e) => return Err(e.into()),
+                Ok(_) => {
+                    id += 1;
+                }
+            }
+            Ok(())
+        })?;
+    }
     // Load our seeds.
     if state.must_load_initial_inputs() {
         state
@@ -257,7 +295,7 @@ where
                 &mut fuzzer,
                 &mut executor,
                 &mut restarting_mgr,
-                &[fuzzer_dir.join("queue")],
+                &[queue_dir],
                 &core_id,
                 opt.cores.as_ref().expect("invariant; should never occur"),
             )
@@ -321,7 +359,7 @@ where
 
         // Create the CmpLog executor.
         // Cmplog has 25% execution overhead so we give it double the timeout
-        let cmplog_executor = base_executor(opt, &mut shmem_provider, fuzzer_dir)?
+        let cmplog_executor = base_executor_builder(opt, &mut shmem_provider, fuzzer_dir)
             .timeout(Duration::from_millis(opt.hang_timeout * 2))
             .program(cmplog_executable_path)
             .build(tuple_list!(cmplog_observer))
@@ -389,11 +427,11 @@ where
     // TODO: serialize state when exiting.
 }
 
-fn base_executor<'a>(
+fn base_executor_builder<'a>(
     opt: &'a Opt,
-    shmem_provider: &'a mut StdShMemProvider,
-    fuzzer_dir: &PathBuf,
-) -> Result<ForkserverExecutorBuilder<'a, StdShMemProvider>, Error> {
+    shmem_provider: &'a mut UnixShMemProvider,
+    fuzzer_dir: &Path,
+) -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
@@ -436,7 +474,7 @@ fn base_executor<'a>(
                 .expect("to find afl-qemu-trace"),
         );
     }
-    Ok(executor)
+    executor
 }
 
 pub fn fuzzer_target_mode(opt: &Opt) -> Cow<'static, str> {

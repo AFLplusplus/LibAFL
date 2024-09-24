@@ -8,6 +8,7 @@ use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{rands::Rand, serdeany::SerdeAny, tuples::MatchName, AsIter, HasRefCnt};
 use serde::{Deserialize, Serialize};
 
+use super::HasQueueCycles;
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
@@ -357,7 +358,14 @@ where
         Ok(())
     }
 }
-
+impl<CS, F, M, O> HasQueueCycles for MinimizerScheduler<CS, F, M, O>
+where
+    CS: HasQueueCycles,
+{
+    fn queue_cycles(&self) -> u64 {
+        self.base.queue_cycles()
+    }
+}
 impl<CS, F, M, O> MinimizerScheduler<CS, F, M, O>
 where
     O: CanTrack,
