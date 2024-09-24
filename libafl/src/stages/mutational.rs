@@ -88,7 +88,7 @@ where
     Z: Evaluator<E, EM, State = Self::State>,
     Self::State: HasCorpus + HasCurrentTestcase,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
-    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>,//delete me
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
