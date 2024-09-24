@@ -3,38 +3,41 @@ use std::marker::PhantomData;
 use libafl::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
     inputs::{Input, UsesInput},
-    observers::{CanTrack, ObserversTuple},
+    observers::CanTrack,
     schedulers::{
         HasQueueCycles, MinimizerScheduler, RemovableScheduler, Scheduler, TestcaseScore,
     },
     state::{HasCorpus, HasRand, State},
     Error, HasMetadata,
 };
-use libafl_bolts::{serdeany::SerdeAny, AsIter, HasRefCnt};
+use libafl_bolts::{serdeany::SerdeAny, tuples::MatchName, AsIter, HasRefCnt};
 
-pub enum SupportedSchedulers<CS, F, I, M, O, S, Q> {
-    Queue(Q, PhantomData<(CS, F, I, M, O, S, Q)>),
+pub enum SupportedSchedulers<CS, F, M, O, Q> {
+    Queue(Q, PhantomData<(CS, F, M, O, Q)>),
     Weighted(
-        MinimizerScheduler<CS, F, I, M, O, S>,
-        PhantomData<(CS, F, I, M, O, S, Q)>,
+        MinimizerScheduler<CS, F, M, O>,
+        PhantomData<(CS, F, M, O, Q)>,
     ),
 }
 
-impl<CS, F, I, M, O, S, Q> RemovableScheduler<I, S> for SupportedSchedulers<CS, F, I, M, O, S, Q>
+impl<CS, F, M, O, S, Q> RemovableScheduler<<S::Corpus as Corpus>::Input, S>
+    for SupportedSchedulers<CS, F, M, O, Q>
 where
-    CS: Scheduler<I, S> + RemovableScheduler<I, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, S>
+        + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
+    <S::Corpus as Corpus>::Input: Input,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     O: CanTrack,
-    Q: Scheduler<I, S> + RemovableScheduler<I, S>,
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus<Input = I> + HasRand + State,
+    Q: Scheduler<<S::Corpus as Corpus>::Input, S>
+        + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+    S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
 {
     fn on_remove(
         &mut self,
         state: &mut S,
         id: CorpusId,
-        testcase: &Option<Testcase<I>>,
+        testcase: &Option<Testcase<<S::Corpus as Corpus>::Input>>,
     ) -> Result<(), Error> {
         match self {
             Self::Queue(queue, _) => queue.on_remove(state, id, testcase),
@@ -42,7 +45,12 @@ where
         }
     }
 
-    fn on_replace(&mut self, state: &mut S, id: CorpusId, prev: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &mut self,
+        state: &mut S,
+        id: CorpusId,
+        prev: &Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<(), Error> {
         match self {
             Self::Queue(queue, _) => queue.on_replace(state, id, prev),
             Self::Weighted(weighted, _) => weighted.on_replace(state, id, prev),
@@ -50,15 +58,16 @@ where
     }
 }
 
-impl<CS, F, I, M, O, S, Q> Scheduler<I, S> for SupportedSchedulers<CS, F, I, M, O, S, Q>
+impl<CS, F, M, O, S, Q> Scheduler<<S::Corpus as Corpus>::Input, S>
+    for SupportedSchedulers<CS, F, M, O, Q>
 where
-    CS: Scheduler<I, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
+    <S::Corpus as Corpus>::Input: Input,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     O: CanTrack,
-    Q: Scheduler<I, S>,
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus<Input = I> + HasRand + State,
+    Q: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         match self {
@@ -90,9 +99,14 @@ where
             Self::Weighted(weighted, _) => weighted.next(state),
         }
     }
-    fn on_evaluation<OTB>(&mut self, state: &mut S, input: &I, observers: &OTB) -> Result<(), Error>
+    fn on_evaluation<OTB>(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+        observers: &OTB,
+    ) -> Result<(), Error>
     where
-        OTB: ObserversTuple<S>,
+        OTB: MatchName,
     {
         match self {
             Self::Queue(queue, _) => queue.on_evaluation(state, input, observers),
@@ -112,16 +126,12 @@ where
     }
 }
 
-impl<CS, F, I, M, O, S, Q> HasQueueCycles for SupportedSchedulers<CS, F, I, M, O, S, Q>
+impl<CS, F, M, O, Q> HasQueueCycles for SupportedSchedulers<CS, F, M, O, Q>
 where
-    CS: Scheduler<I, S> + HasQueueCycles,
-    F: TestcaseScore<I, S>,
-    I: Input,
+    CS: HasQueueCycles,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-
     O: CanTrack,
-    Q: Scheduler<I, S> + HasQueueCycles,
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus<Input = I> + HasRand + State,
+    Q: HasQueueCycles,
 {
     fn queue_cycles(&self) -> u64 {
         match self {

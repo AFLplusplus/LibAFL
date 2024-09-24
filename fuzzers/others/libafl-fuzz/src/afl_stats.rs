@@ -9,7 +9,7 @@ use std::{
 };
 
 use libafl::{
-    corpus::{Corpus, HasCurrentCorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
+    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
     executors::HasObservers,
     inputs::UsesInput,
@@ -236,10 +236,11 @@ where
         + HasStartTime
         + HasExecutions
         + HasNamedMetadata
-        + Stoppable
+        + Stoppable,
     O: MapObserver,
     C: AsRef<O> + Named,
     <Z as HasScheduler>::Scheduler: HasQueueCycles,
+    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
 {
     fn perform(
         &mut self,
