@@ -60,9 +60,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
     /// Generate a name for this input
     fn generate_name(&self, id: Option<CorpusId>) -> String;
-
-    /// An hook executed if the input is stored as `Testcase`
-    fn wrapped_as_testcase(&mut self) {}
 }
 
 /// An input for the target
@@ -89,9 +86,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
     /// Generate a name for this input, the user is responsible for making each name of testcase unique.
     fn generate_name(&self, id: Option<CorpusId>) -> String;
-
-    /// An hook executed if the input is stored as `Testcase`
-    fn wrapped_as_testcase(&mut self) {}
 }
 
 /// Convert between two input types with a state

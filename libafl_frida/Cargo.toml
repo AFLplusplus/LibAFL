@@ -104,6 +104,8 @@ document-features = { version = "0.2", optional = true } # Document all features
 [target.'cfg(windows)'.dependencies]
 winsafe = { version = "0.0.21", features = ["kernel"] }
 
+[target.'cfg(target_vendor="apple")'.dependencies]
+mach-sys = { version = "0.5.4" }
 
 [dev-dependencies]
 serial_test = { version = "3", default-features = false, features = [

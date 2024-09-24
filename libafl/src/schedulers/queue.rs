@@ -1,29 +1,26 @@
 //! The queue corpus scheduler implements an AFL-like queue mechanism
 
 use alloc::borrow::ToOwned;
-use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
-    inputs::Input,
+    corpus::{Corpus, CorpusId},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
-    state::{HasCorpus, State},
+    state::HasCorpus,
     Error,
 };
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueScheduler<I, S> {
+pub struct QueueScheduler {
     queue_cycles: u64,
     runs_in_current_cycle: u64,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S> RemovableScheduler<I, S> for QueueScheduler<I, S> where I: Input {}
+impl<I, S> RemovableScheduler<I, S> for QueueScheduler {}
 
-impl<I, S> Scheduler<I, S> for QueueScheduler<I, S>
+impl<I, S> Scheduler<I, S> for QueueScheduler
 where
-    S: HasCorpus + HasTestcase + State,
+    S: HasCorpus,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
@@ -57,31 +54,39 @@ where
             if self.runs_in_current_cycle >= state.corpus().count() as u64 {
                 self.queue_cycles += 1;
             }
-            self.set_current_scheduled(state, Some(id))?;
+            <Self as Scheduler<I, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
         }
     }
+
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
+    }
 }
 
-impl<I, S> QueueScheduler<I, S> {
+impl QueueScheduler {
     /// Creates a new `QueueScheduler`
     #[must_use]
     pub fn new() -> Self {
         Self {
             runs_in_current_cycle: 0,
             queue_cycles: 0,
-            phantom: PhantomData,
         }
     }
 }
 
-impl<I, S> Default for QueueScheduler<I, S> {
+impl Default for QueueScheduler {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<I, S> HasQueueCycles for QueueScheduler<I, S> {
+impl HasQueueCycles for QueueScheduler {
     fn queue_cycles(&self) -> u64 {
         self.queue_cycles
     }
@@ -106,7 +111,7 @@ mod tests {
     #[test]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
-        let mut scheduler: QueueScheduler<BytesInput, _> = QueueScheduler::new();
+        let mut scheduler: QueueScheduler = QueueScheduler::new();
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
@@ -122,7 +127,8 @@ mod tests {
 
         let mut state = StdState::new(rand, q, objective_q, &mut feedback, &mut objective).unwrap();
 
-        let next_id = scheduler.next(&mut state).unwrap();
+        let next_id =
+            <QueueScheduler as Scheduler<BytesInput, _>>::next(&mut scheduler, &mut state).unwrap();
         let filename = state
             .corpus()
             .get(next_id)

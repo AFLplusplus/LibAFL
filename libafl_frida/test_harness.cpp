@@ -4,7 +4,8 @@
 
 #ifdef _MSC_VER
   #include <windows.h>
-
+  #include <winnt.h>
+  #include <winternl.h>
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD ul_reason_for_call,
                       LPVOID lpReserved) {
   (void)hModule;
@@ -36,9 +37,6 @@ EXTERN int heap_uaf_write(const uint8_t *_data, size_t _size) {
   array[5] = 1;
   return 0;
 }
-
-#include <winnt.h>
-#include <winternl.h>
 
 static volatile bool stop = false;
 

@@ -992,7 +992,7 @@ impl SimpleFdLogger {
         // The passed-in `fd` has to be a legal file descriptor to log to.
         // We also access a shared variable here.
         unsafe {
-            LIBAFL_RAWFD_LOGGER.set_fd(log_fd);
+            (*ptr::addr_of_mut!(LIBAFL_RAWFD_LOGGER)).set_fd(log_fd);
             log::set_logger(&*ptr::addr_of!(LIBAFL_RAWFD_LOGGER))?;
         }
         Ok(())

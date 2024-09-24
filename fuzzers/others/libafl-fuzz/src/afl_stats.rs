@@ -4,7 +4,7 @@ use std::{
     fmt::Display,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process,
 };
 
@@ -444,7 +444,7 @@ where
         }
     }
 
-    fn create_plot_data_file(fuzzer_dir: &PathBuf) -> Result<(), Error> {
+    fn create_plot_data_file(fuzzer_dir: &Path) -> Result<(), Error> {
         let path = fuzzer_dir.join("plot_data");
         if path.exists() {
             // check if it contains any data
@@ -458,10 +458,10 @@ where
         Ok(())
     }
 
-    fn create_fuzzer_stats_file(fuzzer_dir: &PathBuf) -> Result<(), Error> {
+    fn create_fuzzer_stats_file(fuzzer_dir: &Path) -> Result<(), Error> {
         let path = fuzzer_dir.join("fuzzer_stats");
         if !path.exists() {
-            OpenOptions::new().append(true).create(true).open(path)?;
+            _ = OpenOptions::new().append(true).create(true).open(path)?;
         }
         Ok(())
     }
@@ -470,7 +470,7 @@ where
         let tmp_file = self.fuzzer_dir.join(".fuzzer_stats_tmp");
         let stats_file = self.fuzzer_dir.join("fuzzer_stats");
         std::fs::write(&tmp_file, stats.to_string())?;
-        std::fs::copy(&tmp_file, &stats_file)?;
+        _ = std::fs::copy(&tmp_file, &stats_file)?;
         std::fs::remove_file(tmp_file)?;
         Ok(())
     }

@@ -102,7 +102,7 @@ where
         if self.should_run() {
             self.record.push_back(input.clone());
             if self.record.len() == self.record_size {
-                self.record.pop_front();
+                drop(self.record.pop_front());
             }
         }
         Ok(false)

@@ -3,17 +3,15 @@
 //! chose the next corpus entry manually
 
 use alloc::borrow::ToOwned;
-use core::marker::PhantomData;
 
 use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use super::RemovableScheduler;
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
-    inputs::Input,
+    corpus::{Corpus, CorpusId},
     schedulers::Scheduler,
-    state::{HasCorpus, State},
+    state::HasCorpus,
     Error, HasMetadata,
 };
 
@@ -31,33 +29,35 @@ impl_serdeany!(TuneableSchedulerMetadata);
 /// Walk the corpus in a queue-like fashion
 /// With the specific `set_next` method, we can chose the next corpus entry manually
 #[derive(Debug, Clone)]
-pub struct TuneableScheduler<I, S> {
-    phantom: PhantomData<(I, S)>,
-}
+pub struct TuneableScheduler {}
 
-impl<I, S> TuneableScheduler<I, S>
-where
-    S: HasMetadata + HasCorpus,
-{
+impl TuneableScheduler {
     /// Creates a new `TuneableScheduler`
     #[must_use]
-    pub fn new(state: &mut S) -> Self {
+    pub fn new<S>(state: &mut S) -> Self
+    where
+        S: HasMetadata,
+    {
         if !state.has_metadata::<TuneableSchedulerMetadata>() {
             state.add_metadata(TuneableSchedulerMetadata::default());
         }
-        Self {
-            phantom: PhantomData,
-        }
+        Self {}
     }
 
-    fn metadata_mut(state: &mut S) -> &mut TuneableSchedulerMetadata {
+    fn metadata_mut<S>(state: &mut S) -> &mut TuneableSchedulerMetadata
+    where
+        S: HasMetadata,
+    {
         state
             .metadata_map_mut()
             .get_mut::<TuneableSchedulerMetadata>()
             .unwrap()
     }
 
-    fn metadata(state: &S) -> &TuneableSchedulerMetadata {
+    fn metadata<S>(state: &S) -> &TuneableSchedulerMetadata
+    where
+        S: HasMetadata,
+    {
         state
             .metadata_map()
             .get::<TuneableSchedulerMetadata>()
@@ -65,23 +65,35 @@ where
     }
 
     /// Sets the next corpus id to be used
-    pub fn set_next(state: &mut S, next: CorpusId) {
+    pub fn set_next<S>(state: &mut S, next: CorpusId)
+    where
+        S: HasMetadata,
+    {
         Self::metadata_mut(state).next = Some(next);
     }
 
     /// Gets the next set corpus id
-    pub fn get_next(state: &S) -> Option<CorpusId> {
+    pub fn get_next<S>(state: &S) -> Option<CorpusId>
+    where
+        S: HasMetadata,
+    {
         Self::metadata(state).next
     }
 
     /// Resets this to a queue scheduler
-    pub fn reset(state: &mut S) {
+    pub fn reset<S>(state: &mut S)
+    where
+        S: HasMetadata,
+    {
         let metadata = Self::metadata_mut(state);
         metadata.next = None;
     }
 
     /// Gets the current corpus entry id
-    pub fn get_current(state: &S) -> CorpusId {
+    pub fn get_current<S>(state: &S) -> CorpusId
+    where
+        S: HasCorpus,
+    {
         state
             .corpus()
             .current()
@@ -89,11 +101,11 @@ where
     }
 }
 
-impl<I, S> RemovableScheduler<I, S> for TuneableScheduler<I, S> where I: Input {}
+impl<I, S> RemovableScheduler<I, S> for TuneableScheduler {}
 
-impl<I, S> Scheduler<I, S> for TuneableScheduler<I, S>
+impl<I, S> Scheduler<I, S> for TuneableScheduler
 where
-    S: HasCorpus + HasMetadata + HasTestcase + State,
+    S: HasCorpus + HasMetadata,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
@@ -123,7 +135,15 @@ where
         } else {
             state.corpus().first().unwrap()
         };
-        self.set_current_scheduled(state, Some(id))?;
+        <Self as Scheduler<I, S>>::set_current_scheduled(self, state, Some(id))?;
         Ok(id)
+    }
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
     }
 }

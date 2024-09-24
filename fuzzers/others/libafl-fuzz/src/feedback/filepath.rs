@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fmt::{Debug, Formatter},
     marker::PhantomData,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use libafl::{
@@ -26,7 +26,7 @@ pub struct CustomFilepathToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &PathBuf) -> Result<(), Error>,
+    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
 {
     /// Closure that returns the filename.
     func: F,
@@ -39,7 +39,7 @@ impl<F, I, S> CustomFilepathToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &PathBuf) -> Result<(), Error>,
+    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
 {
     /// Create a new [`CustomFilepathToTestcaseFeedback`].
     pub fn new(func: F, out_dir: PathBuf) -> Self {
@@ -56,7 +56,7 @@ impl<F, I, S, T> FeedbackFactory<CustomFilepathToTestcaseFeedback<F, I, S>, T>
 where
     I: Input,
     S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &PathBuf) -> Result<(), Error> + Clone,
+    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error> + Clone,
 {
     fn create_feedback(&self, _ctx: &T) -> CustomFilepathToTestcaseFeedback<F, I, S> {
         Self {
@@ -71,7 +71,7 @@ impl<F, I, S> Named for CustomFilepathToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &PathBuf) -> Result<(), Error>,
+    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
 {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("CustomFilepathToTestcaseFeedback");
@@ -83,7 +83,7 @@ impl<F, I, S> Debug for CustomFilepathToTestcaseFeedback<F, I, S>
 where
     I: Input,
     S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &PathBuf) -> Result<(), Error>,
+    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CustomFilepathToTestcaseFeedback")
@@ -94,7 +94,7 @@ where
 impl<F, I, S> Feedback<S> for CustomFilepathToTestcaseFeedback<F, I, S>
 where
     S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<S::Input>, &PathBuf) -> Result<(), Error>,
+    F: FnMut(&mut S, &mut Testcase<S::Input>, &Path) -> Result<(), Error>,
     I: Input,
 {
     #[allow(clippy::wrong_self_convention)]

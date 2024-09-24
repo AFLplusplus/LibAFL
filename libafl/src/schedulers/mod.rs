@@ -29,24 +29,20 @@ pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 pub mod tuneable;
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Handle, MatchNameRef},
+    tuples::{Handle, MatchName, MatchNameRef},
 };
 pub use tuneable::*;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::Input,
-    observers::{MapObserver, ObserversTuple},
+    observers::MapObserver,
     random_corpus_id,
-    state::{HasCorpus, HasRand, State},
+    state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.
-pub trait RemovableScheduler<I, S>
-where
-    I: Input,
-{
+pub trait RemovableScheduler<I, S> {
     /// Removed the given entry from the corpus at the given index
     /// When you remove testcases, make sure that that testcase is not currently fuzzed one!
     fn on_remove(
@@ -69,14 +65,96 @@ where
     }
 }
 
-/// Defines the common metadata operations for the AFL-style schedulers
-pub trait AflScheduler<I, O, S>
+/// Called when a [`Testcase`] is evaluated
+pub fn on_add_metadata_default<CS, S>(
+    scheduler: &mut CS,
+    state: &mut S,
+    id: CorpusId,
+) -> Result<(), Error>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
-    O: MapObserver,
+    CS: AflScheduler,
+    S: HasTestcase + HasCorpus,
 {
+    let current_id = *state.corpus().current();
+
+    let mut depth = match current_id {
+        Some(parent_idx) => state
+            .testcase(parent_idx)?
+            .metadata::<SchedulerTestcaseMetadata>()?
+            .depth(),
+        None => 0,
+    };
+
+    // TODO increase perf_score when finding new things like in AFL
+    // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
+
+    // Attach a `SchedulerTestcaseMetadata` to the queue entry.
+    depth += 1;
+    let mut testcase = state.testcase_mut(id)?;
+    testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
+        depth,
+        scheduler.last_hash(),
+    ));
+    testcase.set_parent_id_optional(current_id);
+    Ok(())
+}
+
+/// Called when a [`Testcase`] is evaluated
+pub fn on_evaluation_metadata_default<CS, O, OT, S>(
+    scheduler: &mut CS,
+    state: &mut S,
+    observers: &OT,
+) -> Result<(), Error>
+where
+    CS: AflScheduler,
+    CS::MapObserverRef: AsRef<O>,
+    S: HasMetadata,
+    O: MapObserver,
+    OT: MatchName,
+{
+    let observer = observers
+        .get(scheduler.map_observer_handle())
+        .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+        .as_ref();
+
+    let mut hash = observer.hash_simple() as usize;
+
+    let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
+
+    hash %= psmeta.n_fuzz().len();
+    // Update the path frequency
+    psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
+
+    scheduler.set_last_hash(hash);
+
+    Ok(())
+}
+
+/// Called when choosing the next [`Testcase`]
+pub fn on_next_metadata_default<S>(state: &mut S) -> Result<(), Error>
+where
+    S: HasCorpus + HasTestcase,
+{
+    let current_id = *state.corpus().current();
+
+    if let Some(id) = current_id {
+        let mut testcase = state.testcase_mut(id)?;
+        let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
+
+        if tcmeta.handicap() >= 4 {
+            tcmeta.set_handicap(tcmeta.handicap() - 4);
+        } else if tcmeta.handicap() > 0 {
+            tcmeta.set_handicap(tcmeta.handicap() - 1);
+        }
+    }
+
+    Ok(())
+}
+
+/// Defines the common metadata operations for the AFL-style schedulers
+pub trait AflScheduler {
     /// The type of [`MapObserver`] that this scheduler will use as reference
-    type MapObserverRef: AsRef<O>;
+    type MapObserverRef;
 
     /// Return the last hash
     fn last_hash(&self) -> usize;
@@ -86,78 +164,6 @@ where
 
     /// Get the observer map observer name
     fn map_observer_handle(&self) -> &Handle<Self::MapObserverRef>;
-
-    /// Called when a [`Testcase`] is added to the corpus
-    fn on_add_metadata(&self, state: &mut S, id: CorpusId) -> Result<(), Error> {
-        let current_id = *state.corpus().current();
-
-        let mut depth = match current_id {
-            Some(parent_idx) => state
-                .testcase(parent_idx)?
-                .metadata::<SchedulerTestcaseMetadata>()?
-                .depth(),
-            None => 0,
-        };
-
-        // TODO increase perf_score when finding new things like in AFL
-        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
-
-        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
-        depth += 1;
-        let mut testcase = state.testcase_mut(id)?;
-        testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
-            depth,
-            self.last_hash(),
-        ));
-        testcase.set_parent_id_optional(current_id);
-        Ok(())
-    }
-
-    /// Called when a [`Testcase`] is evaluated
-    fn on_evaluation_metadata<OT>(
-        &mut self,
-        state: &mut S,
-        _input: &I,
-        observers: &OT,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-    {
-        let observer = observers
-            .get(self.map_observer_handle())
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-            .as_ref();
-
-        let mut hash = observer.hash_simple() as usize;
-
-        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-
-        hash %= psmeta.n_fuzz().len();
-        // Update the path frequency
-        psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
-
-        self.set_last_hash(hash);
-
-        Ok(())
-    }
-
-    /// Called when choosing the next [`Testcase`]
-    fn on_next_metadata(&mut self, state: &mut S, _next_id: Option<CorpusId>) -> Result<(), Error> {
-        let current_id = *state.corpus().current();
-
-        if let Some(id) = current_id {
-            let mut testcase = state.testcase_mut(id)?;
-            let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
-
-            if tcmeta.handicap() >= 4 {
-                tcmeta.set_handicap(tcmeta.handicap() - 4);
-            } else if tcmeta.handicap() > 0 {
-                tcmeta.set_handicap(tcmeta.handicap() - 1);
-            }
-        }
-
-        Ok(())
-    }
 }
 
 /// Trait for Schedulers which track queue cycles
@@ -168,10 +174,7 @@ pub trait HasQueueCycles {
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler<I, S>
-where
-    S: HasCorpus,
-{
+pub trait Scheduler<I, S> {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, _state: &mut S, _id: CorpusId) -> Result<(), Error>;
     // Add parent_id here if it has no inner
@@ -184,7 +187,7 @@ where
         _observers: &OT,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: MatchName,
     {
         Ok(())
     }
@@ -198,10 +201,10 @@ where
         &mut self,
         state: &mut S,
         next_id: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        *state.corpus_mut().current_mut() = next_id;
-        Ok(())
-    }
+    ) -> Result<(), Error>;
+
+    //    *state.corpus_mut().current_mut() = next_id;
+    //    Ok(())
 }
 
 /// Feed the fuzzer simply with a random testcase on request
@@ -212,7 +215,7 @@ pub struct RandScheduler<S> {
 
 impl<I, S> Scheduler<I, S> for RandScheduler<S>
 where
-    S: HasCorpus + HasRand + HasTestcase + State,
+    S: HasCorpus + HasRand + HasTestcase,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
@@ -238,6 +241,15 @@ where
             <Self as Scheduler<I, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
         }
+    }
+
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
     }
 }
 

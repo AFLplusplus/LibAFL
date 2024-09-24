@@ -71,14 +71,14 @@ impl HasLen for CmplogBytes {
 /// Compare values collected during a run
 #[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
 pub enum CmpValues {
-    /// Two u8 values
-    U8((u8, u8)),
-    /// Two u16 values
-    U16((u16, u16)),
-    /// Two u32 values
-    U32((u32, u32)),
-    /// Two u64 values
-    U64((u64, u64)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U8((u8, u8, bool)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U16((u16, u16, bool)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U32((u32, u32, bool)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U64((u64, u64, bool)),
     /// Two vecs of u8 values/byte
     Bytes((CmplogBytes, CmplogBytes)),
 }
@@ -95,11 +95,11 @@ impl CmpValues {
 
     /// Converts the value to a u64 tuple
     #[must_use]
-    pub fn to_u64_tuple(&self) -> Option<(u64, u64)> {
+    pub fn to_u64_tuple(&self) -> Option<(u64, u64, bool)> {
         match self {
-            CmpValues::U8(t) => Some((u64::from(t.0), u64::from(t.1))),
-            CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1))),
-            CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1))),
+            CmpValues::U8(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
+            CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
+            CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
             CmpValues::U64(t) => Some(*t),
             CmpValues::Bytes(_) => None,
         }

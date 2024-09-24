@@ -1,6 +1,14 @@
 [package]
 name = "libafl-fuzz"
 version = "0.13.2"
+description = "Reimplementation of afl-fuzz on top of LibAFL"
+documentation = "https://docs.rs/libafl"
+authors = ["Aarnav Bos <aarnavbos@gmail.com>"]
+readme = "./README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "testing", "security"]
+repository = "https://github.com/AFLplusplus/LibAFL/"
+categories = ["development-tools::testing"]
 edition = "2021"
 
 [dependencies]

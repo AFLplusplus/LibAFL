@@ -65,6 +65,8 @@ pub static SHR_4: Ngram4 = Ngram4::from_array([1, 1, 1, 1]);
 #[rustversion::nightly]
 pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 
+static mut PC_TABLES: Vec<&'static [PcTableEntry]> = Vec::new();
+
 use alloc::vec::Vec;
 #[cfg(any(
     feature = "sancov_ngram4",
@@ -184,17 +186,19 @@ unsafe fn update_ngram(pos: usize) -> usize {
     let mut reduced = pos;
     #[cfg(feature = "sancov_ngram4")]
     {
-        PREV_ARRAY_4 = PREV_ARRAY_4.rotate_elements_right::<1>();
-        PREV_ARRAY_4.shl_assign(SHR_4);
-        PREV_ARRAY_4.as_mut_array()[0] = pos as u32;
-        reduced = PREV_ARRAY_4.reduce_xor() as usize;
+        let prev_array_4 = &mut *core::ptr::addr_of_mut!(PREV_ARRAY_4);
+        *prev_array_4 = prev_array_4.rotate_elements_right::<1>();
+        prev_array_4.shl_assign(SHR_4);
+        prev_array_4.as_mut_array()[0] = pos as u32;
+        reduced = prev_array_4.reduce_xor() as usize;
     }
     #[cfg(feature = "sancov_ngram8")]
     {
-        PREV_ARRAY_8 = PREV_ARRAY_8.rotate_elements_right::<1>();
-        PREV_ARRAY_8.shl_assign(SHR_8);
-        PREV_ARRAY_8.as_mut_array()[0] = pos as u32;
-        reduced = PREV_ARRAY_8.reduce_xor() as usize;
+        let prev_array_8 = &mut *core::ptr::addr_of_mut!(PREV_ARRAY_8);
+        *prev_array_8 = prev_array_8.rotate_elements_right::<1>();
+        prev_array_8.shl_assign(SHR_8);
+        prev_array_8.as_mut_array()[0] = pos as u32;
+        reduced = prev_array_8.reduce_xor() as usize;
     }
     reduced %= EDGES_MAP_SIZE_IN_USE;
     reduced
@@ -269,7 +273,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
     #[cfg(feature = "pointer_maps")]
     if EDGES_MAP_PTR.is_null() {
-        EDGES_MAP_PTR = EDGES_MAP.as_mut_ptr();
+        EDGES_MAP_PTR = core::ptr::addr_of_mut!(EDGES_MAP) as *mut u8;
     }
 
     if start == stop || *start != 0 {
@@ -292,8 +296,6 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
     }
 }
 
-static mut PC_TABLES: Vec<&'static [PcTableEntry]> = Vec::new();
-
 #[no_mangle]
 unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *const usize) {
     // "The Unsafe Code Guidelines also notably defines that usize and isize are respectively compatible with uintptr_t and intptr_t defined in C."
@@ -312,7 +314,8 @@ unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *c
         "Unaligned PC Table - start: {pcs_beg:x?} end: {pcs_end:x?}"
     );
 
-    PC_TABLES.push(slice::from_raw_parts(pcs_beg as *const PcTableEntry, len));
+    let pc_tables = &mut *core::ptr::addr_of_mut!(PC_TABLES);
+    pc_tables.push(slice::from_raw_parts(pcs_beg as *const PcTableEntry, len));
 }
 
 /// An entry to the `sanitizer_cov` `pc_table`
@@ -338,8 +341,11 @@ impl PcTableEntry {
 }
 
 /// Returns an iterator over the PC tables. If no tables were registered, this will be empty.
-pub fn sanitizer_cov_pc_table() -> impl Iterator<Item = &'static [PcTableEntry]> {
+pub fn sanitizer_cov_pc_table<'a>() -> impl Iterator<Item = &'a [PcTableEntry]> {
     // SAFETY: Once PCS_BEG and PCS_END have been initialized, will not be written to again. So
     // there's no TOCTOU issue.
-    unsafe { PC_TABLES.iter().copied() }
+    unsafe {
+        let pc_tables = &*core::ptr::addr_of!(PC_TABLES);
+        pc_tables.iter().copied()
+    }
 }

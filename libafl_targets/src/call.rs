@@ -1,4 +1,4 @@
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ptr::addr_of_mut};
 
 use hashbrown::HashMap;
 use libafl::{
@@ -12,9 +12,11 @@ pub static mut FUNCTION_LIST: Lazy<HashMap<usize, usize>> = Lazy::new(HashMap::n
 #[no_mangle]
 /// The runtime code inserted at every callinst invokation (if you used the function-logging.cc)
 /// # Safety
-/// unsafe because it touches pub static mut
+/// unsafe because it touches the pub static mut `FUNCTION_LIST`.
+/// May not be called concurrently.
 pub unsafe extern "C" fn __libafl_target_call_hook(id: usize) {
-    *FUNCTION_LIST.entry(id).or_insert(0) += 1;
+    let function_list = &mut *addr_of_mut!(FUNCTION_LIST);
+    *function_list.entry(id).or_insert(0) += 1;
 }
 
 /// The empty struct to clear the `FUNCTION_LIST` before the execution
@@ -41,7 +43,13 @@ where
 
     fn pre_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) {
         // clear it before the execution
-        unsafe { FUNCTION_LIST.clear() }
+        // # Safety
+        // This typically happens while no other execution happens.
+        // In theory there is a race, but we can ignore it _for this use case_.
+        unsafe {
+            let function_list = &mut *addr_of_mut!(FUNCTION_LIST);
+            function_list.clear();
+        }
     }
 
     fn post_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) {}
