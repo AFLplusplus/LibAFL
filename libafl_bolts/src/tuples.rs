@@ -2,7 +2,7 @@
 
 #[cfg(feature = "alloc")]
 use alloc::{
-    borrow::{Cow, ToOwned},
+    borrow::Cow,
     vec::Vec,
 };
 #[cfg(feature = "alloc")]
