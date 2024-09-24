@@ -47,6 +47,7 @@ typedef PACKED(struct CmpLogHeaderExtended {
 typedef struct CmpLogInstruction {
   uint64_t v0;
   uint64_t v1;
+  uint8_t  v0_is_const;
 } CmpLogInstruction;
 
 typedef PACKED(struct CmpLogInstructionExtended {
@@ -106,7 +107,8 @@ extern uint8_t libafl_cmplog_enabled;
 // cmplog_routines_checked_extended
 
 static inline void cmplog_instructions_checked(uintptr_t k, uint8_t shape,
-                                               uint64_t arg1, uint64_t arg2) {
+                                               uint64_t arg1, uint64_t arg2,
+                                               uint8_t arg1_is_const) {
   if (!libafl_cmplog_enabled) { return; }
   libafl_cmplog_enabled = false;
 
@@ -126,6 +128,7 @@ static inline void cmplog_instructions_checked(uintptr_t k, uint8_t shape,
   hits &= CMPLOG_MAP_H - 1;
   libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
   libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v0_is_const = arg1_is_const;
   libafl_cmplog_enabled = true;
 }
 
