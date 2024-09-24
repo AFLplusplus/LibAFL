@@ -955,7 +955,7 @@ mod tests {
     #[test]
     fn test_event_serde() {
         let obv = unsafe {
-            let len = addr_of!(MAP).len();
+            let len = (*addr_of!(MAP)).len();
             StdMapObserver::from_mut_ptr("test", addr_of_mut!(MAP) as *mut u32, len)
         };
         let map = tuple_list!(obv);

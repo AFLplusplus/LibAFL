@@ -1,6 +1,6 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
-use core::ptr::addr_of_mut;
+use core::ptr::{addr_of, addr_of_mut};
 
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut};
 
@@ -14,7 +14,7 @@ pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
 /// You are responsible for ensuring there is no multi-mutability!
 #[must_use]
 pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
-    let counter_maps = *addr_of!(COUNTERS_MAPS);
+    let counter_maps = &*addr_of!(COUNTERS_MAPS);
     counter_maps
         .iter()
         .map(|counters| {
@@ -48,6 +48,8 @@ pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut 
                 return;
             }
         }
+
+        let counter_maps = &mut *addr_of_mut!(COUNTERS_MAPS);
         // we didn't overlap; keep going
         counter_maps.push(OwnedMutSlice::from_raw_parts_mut(
             start,
@@ -330,7 +332,7 @@ mod observers {
 
         fn as_iter(&'it self) -> Self::IntoIter {
             unsafe {
-                let counters_maps = *addr_of!(COUNTERS_MAPS);
+                let counters_maps = &*addr_of!(COUNTERS_MAPS);
                 counters_maps.iter().flatten()
             }
         }
@@ -342,8 +344,8 @@ mod observers {
 
         fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
             unsafe {
-                let counters_maps = *addr_of_mut!(COUNTERS_MAPS);
-                COUNTERS_MAPS.iter_mut().flatten()
+                let counters_maps = &mut *addr_of_mut!(COUNTERS_MAPS);
+                counters_maps.iter_mut().flatten()
             }
         }
     }
