@@ -958,8 +958,10 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
-        let hooks = (*addr_of_mut!(PY_GENERIC_HOOKS));
-        let obj = unsafe { &hooks[idx as usize].1 };
+        let obj = unsafe {
+            let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+            &hooks[idx as usize].1
+        };
         Python::with_gil(|py| {
             obj.call0(py).expect("Error in the hook");
         });
@@ -1035,7 +1037,7 @@ pub mod pybind {
 
         fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
-                let hooks = (*addr_of_mut!(PY_GENERIC_HOOKS));
+                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
                 let idx = hooks.len();
                 hooks.push((addr, hook));
                 self.qemu.hooks().add_instruction_hooks(
@@ -1049,7 +1051,7 @@ pub mod pybind {
 
         fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
             unsafe {
-                let hooks = (*addr_of_mut!(PY_GENERIC_HOOKS));
+                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
                 hooks.retain(|(a, _)| *a != addr);
             }
             self.qemu.hooks().remove_instruction_hooks_at(addr, true)

@@ -1,10 +1,4 @@
-use core::{
-    cell::UnsafeCell,
-    fmt::Debug,
-    hash::BuildHasher,
-    ops::Range,
-    ptr::{addr_of, addr_of_mut},
-};
+use core::{cell::UnsafeCell, fmt::Debug, hash::BuildHasher, ops::Range, ptr::addr_of_mut};
 
 use hashbrown::HashSet;
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
