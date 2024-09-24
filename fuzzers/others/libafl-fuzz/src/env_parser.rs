@@ -38,8 +38,7 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
         opt.no_autodict = parse_bool(&res)?;
     }
     if let Ok(res) = std::env::var("AFL_MAP_SIZE") {
-        let map_size = res.parse()?;
-        validate_map_size(map_size)?;
+        let map_size = validate_map_size(res.parse()?)?;
         opt.map_size = Some(map_size);
     };
     if let Ok(res) = std::env::var("AFL_IGNORE_TIMEOUT") {
@@ -131,7 +130,7 @@ fn parse_target_env(s: &str) -> Result<Option<HashMap<String, String>>, Error> {
     let env_regex = regex::Regex::new(r"([^\s=]+)\s*=\s*([^\s]+)").unwrap();
     let mut target_env = HashMap::new();
     for vars in env_regex.captures_iter(s) {
-        target_env.insert(
+        _ = target_env.insert(
             vars.get(1)
                 .ok_or(Error::illegal_argument("invalid AFL_TARGET_ENV format"))?
                 .as_str()

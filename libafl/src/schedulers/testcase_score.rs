@@ -1,6 +1,5 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
 use alloc::string::{String, ToString};
-use core::marker::PhantomData;
 
 use libafl_bolts::{HasLen, HasRefCnt};
 
@@ -16,28 +15,23 @@ use crate::{
 };
 
 /// Compute the favor factor of a [`Testcase`]. Higher is better.
-pub trait TestcaseScore<S>
-where
-    S: HasMetadata + HasCorpus,
-{
+pub trait TestcaseScore<I, S> {
     /// Computes the favor factor of a [`Testcase`]. Higher is better.
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error>;
+    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error>;
 }
 
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
 #[derive(Debug, Clone)]
-pub struct LenTimeMulTestcaseScore<S> {
-    phantom: PhantomData<S>,
-}
+pub struct LenTimeMulTestcaseScore {}
 
-impl<S> TestcaseScore<S> for LenTimeMulTestcaseScore<S>
+impl<I, S> TestcaseScore<I, S> for LenTimeMulTestcaseScore
 where
-    S: HasCorpus + HasMetadata,
-    S::Input: HasLen,
+    S: HasCorpus<Input = I>,
+    I: HasLen,
 {
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64
             * entry.load_len(state.corpus())? as f64)
@@ -52,11 +46,9 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 /// The power assigned to each corpus entry
 /// This result is used for power scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusPowerTestcaseScore<S> {
-    phantom: PhantomData<S>,
-}
+pub struct CorpusPowerTestcaseScore {}
 
-impl<S> TestcaseScore<S> for CorpusPowerTestcaseScore<S>
+impl<I, S> TestcaseScore<I, S> for CorpusPowerTestcaseScore
 where
     S: HasCorpus + HasMetadata,
 {
@@ -67,7 +59,7 @@ where
         clippy::cast_sign_loss,
         clippy::cast_lossless
     )]
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
@@ -273,17 +265,15 @@ where
 /// The weight for each corpus entry
 /// This result is used for corpus scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusWeightTestcaseScore<S> {
-    phantom: PhantomData<S>,
-}
+pub struct CorpusWeightTestcaseScore {}
 
-impl<S> TestcaseScore<S> for CorpusWeightTestcaseScore<S>
+impl<I, S> TestcaseScore<I, S> for CorpusWeightTestcaseScore
 where
     S: HasCorpus + HasMetadata,
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    fn compute(state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 

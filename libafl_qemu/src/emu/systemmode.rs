@@ -1,7 +1,12 @@
 use std::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl::inputs::UsesInput;
+
+use libafl::{
+    inputs::{HasTargetBytes, UsesInput},
+    state::{HasExecutions, State},
+};
+
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{

@@ -22,7 +22,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        havoc_mutations::havoc_mutations,
+        scheduled::{tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},

@@ -7,6 +7,7 @@
     feature = "sancov_ctx"
 ))]
 use alloc::borrow::Cow;
+use core::ptr::addr_of_mut;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
@@ -157,7 +158,7 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
             assert!(!EDGES_MAP_PTR.is_null());
             EDGES_MAP_PTR
         } else {
-            EDGES_MAP.as_mut_ptr()
+            addr_of_mut!(EDGES_MAP) as *mut u8
         }
     }
 }
