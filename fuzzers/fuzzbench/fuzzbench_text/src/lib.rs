@@ -367,7 +367,7 @@ fn fuzz_binary(
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
         &mut state,
-        havoc_mutations::<BytesInput>().merge(tokens_mutations()),
+        havoc_mutations().merge(tokens_mutations()),
         7,
         5,
     )?;
@@ -579,7 +579,7 @@ fn fuzz_text(
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(
         &mut state,
-        havoc_mutations::<BytesInput>().merge(tokens_mutations()),
+        havoc_mutations().merge(tokens_mutations()),
         7,
         5,
     )?;

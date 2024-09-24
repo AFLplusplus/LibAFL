@@ -27,6 +27,9 @@ rustc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
+  "multipart_inputs",
+  "nautilus",
+  "unicode",
   "std",
   "derive",
   "llmp_compression",

@@ -1025,18 +1025,19 @@ impl BytesSwapMutator {
 
 /// Crossover insert mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct CrossoverInsertMutator<I> {
-    phantom: PhantomData<I>,
-}
+pub struct CrossoverInsertMutator;
 
-impl<I: HasMutatorBytes> CrossoverInsertMutator<I> {
-    pub(crate) fn crossover_insert(
+impl CrossoverInsertMutator {
+    pub(crate) fn crossover_insert<I>(
         input: &mut I,
         size: usize,
         target: usize,
         range: Range<usize>,
         other: &[u8],
-    ) -> MutationResult {
+    ) -> MutationResult
+    where
+        I: HasMutatorBytes,
+    {
         input.resize(size + range.len(), 0);
         unsafe {
             buffer_self_copy(
@@ -1054,7 +1055,7 @@ impl<I: HasMutatorBytes> CrossoverInsertMutator<I> {
     }
 }
 
-impl<I, S> Mutator<I, S> for CrossoverInsertMutator<I>
+impl<I, S> Mutator<I, S> for CrossoverInsertMutator
 where
     S: HasCorpus + HasRand + HasMaxSize,
     <S::Corpus as Corpus>::Input: HasMutatorBytes,
@@ -1101,36 +1102,35 @@ where
     }
 }
 
-impl<I> Named for CrossoverInsertMutator<I> {
+impl Named for CrossoverInsertMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverInsertMutator");
         &NAME
     }
 }
 
-impl<I> CrossoverInsertMutator<I> {
+impl CrossoverInsertMutator {
     /// Creates a new [`CrossoverInsertMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self {}
     }
 }
 
 /// Crossover replace mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct CrossoverReplaceMutator<I> {
-    phantom: PhantomData<I>,
-}
+pub struct CrossoverReplaceMutator;
 
-impl<I: HasMutatorBytes> CrossoverReplaceMutator<I> {
-    pub(crate) fn crossover_replace(
+impl CrossoverReplaceMutator {
+    pub(crate) fn crossover_replace<I>(
         input: &mut I,
         target: usize,
         range: Range<usize>,
         other: &[u8],
-    ) -> MutationResult {
+    ) -> MutationResult
+    where
+        I: HasMutatorBytes,
+    {
         unsafe {
             buffer_copy(input.bytes_mut(), other, range.start, target, range.len());
         }
@@ -1138,7 +1138,7 @@ impl<I: HasMutatorBytes> CrossoverReplaceMutator<I> {
     }
 }
 
-impl<I, S> Mutator<I, S> for CrossoverReplaceMutator<I>
+impl<I, S> Mutator<I, S> for CrossoverReplaceMutator
 where
     S: HasCorpus + HasRand,
     <S::Corpus as Corpus>::Input: HasMutatorBytes,
@@ -1178,20 +1178,18 @@ where
     }
 }
 
-impl<I> Named for CrossoverReplaceMutator<I> {
+impl Named for CrossoverReplaceMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverReplaceMutator");
         &NAME
     }
 }
 
-impl<I> CrossoverReplaceMutator<I> {
+impl CrossoverReplaceMutator {
     /// Creates a new [`CrossoverReplaceMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self {}
     }
 }
 

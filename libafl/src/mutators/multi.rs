@@ -114,7 +114,7 @@ impl_default_multipart!(
     I2SRandReplace,
 );
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator<I>
+impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator
 where
     S: HasCorpus + HasMaxSize + HasRand,
     I: Input + HasMutatorBytes,
@@ -225,7 +225,7 @@ where
     }
 }
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator<I>
+impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator
 where
     S: HasCorpus + HasMaxSize + HasRand,
     I: Input + HasMutatorBytes,
