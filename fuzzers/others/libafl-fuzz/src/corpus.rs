@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fs::File,
     io::{self, BufRead, BufReader},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use libafl::{
@@ -39,10 +39,12 @@ pub fn generate_base_filename(state: &mut LibaflFuzzState) -> String {
     name
 }
 
+// The function needs to be compatible with CustomFilepathToTestcaseFeedback
+#[allow(clippy::unnecessary_wraps)]
 pub fn set_corpus_filepath(
     state: &mut LibaflFuzzState,
     testcase: &mut Testcase<BytesInput>,
-    _fuzzer_dir: &PathBuf,
+    _fuzzer_dir: &Path,
 ) -> Result<(), Error> {
     let mut name = generate_base_filename(state);
     if testcase.hit_feedbacks().contains(&Cow::Borrowed("edges")) {
@@ -53,10 +55,12 @@ pub fn set_corpus_filepath(
     Ok(())
 }
 
+// The function needs to be compatible with CustomFilepathToTestcaseFeedback
+#[allow(clippy::unnecessary_wraps)]
 pub fn set_solution_filepath(
     state: &mut LibaflFuzzState,
     testcase: &mut Testcase<BytesInput>,
-    output_dir: &PathBuf,
+    output_dir: &Path,
 ) -> Result<(), Error> {
     // sig:0SIGNAL
     // TODO: verify if 0 time if objective found during seed loading
@@ -137,7 +141,7 @@ pub fn check_autoresume(fuzzer_dir: &Path, auto_resume: bool) -> Result<Flock<Fi
     Ok(file)
 }
 
-pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
+pub fn create_dir_if_not_exists(path: &Path) -> io::Result<()> {
     if path.is_file() {
         return Err(io::Error::new(
             // TODO: change this to ErrorKind::NotADirectory
@@ -158,8 +162,8 @@ pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
     }
 }
 
-pub fn remove_main_node_file(output_dir: &PathBuf) -> Result<(), Error> {
-    for entry in std::fs::read_dir(output_dir)?.filter_map(std::result::Result::ok) {
+pub fn remove_main_node_file(output_dir: &Path) -> Result<(), Error> {
+    for entry in std::fs::read_dir(output_dir)?.filter_map(Result::ok) {
         let path = entry.path();
         if path.is_dir() && path.join("is_main_node").exists() {
             std::fs::remove_file(path.join("is_main_node"))?;

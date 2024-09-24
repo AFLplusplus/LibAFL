@@ -12,7 +12,7 @@ FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
-AFL_VERSION = "598a3c6b5e24bd33e84b914e145810d39f88adf6"
+AFL_VERSION = "8b35dd49be5f846e945f6d6a9414623d195a99cb"
 AFL_DIR = { value = "${PROJECT_DIR}/AFLplusplus" }
 AFL_CC_PATH = { value = "${AFL_DIR}/afl-clang-fast" }
 CC = { value = "clang" }
