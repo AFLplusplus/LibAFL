@@ -1,10 +1,7 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
 #[cfg(feature = "alloc")]
-use alloc::{
-    borrow::Cow,
-    vec::Vec,
-};
+use alloc::{borrow::Cow, vec::Vec};
 #[cfg(feature = "alloc")]
 use core::ops::{Deref, DerefMut};
 use core::{
