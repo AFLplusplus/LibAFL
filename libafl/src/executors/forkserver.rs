@@ -1058,14 +1058,15 @@ where
         if let Some(max_size) = self.map_size {
             if actual_map_size as usize > max_size {
                 return Err(Error::illegal_state(format!(
-                    "Target map size is {actual_map_size} but the allocated map size is {max_size}. \
-                    Increase the initial size of the forkserver map (coverage_map_size) to at least that size."
+                    "The target map size is {actual_map_size} but the allocated map size is {max_size}. \
+                    Increase the initial size of the forkserver map to at least that size using the forkserver builder's `coverage_map_size`."
             )));
             }
         } else {
-            log::warn!(
-                "Target requested coverage map size of {actual_map_size} but not map is set"
-            );
+            return Err(Error::illegal_state(format!(
+                "The target map size is {actual_map_size} but we did not create a coverage map before launching the target! \
+                Set an initial forkserver map to at least that size using the forkserver builder's `coverage_map_size`."
+            )));
         }
 
         // we'll use this later when we truncate the observer
