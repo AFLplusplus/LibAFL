@@ -1,4 +1,4 @@
-use core::{fmt::Debug, ops::Range};
+use core::{ptr::addr_of, ptr::addr_of_mut, fmt::Debug, ops::Range};
 use std::{cell::UnsafeCell, hash::BuildHasher};
 
 use hashbrown::HashSet;
@@ -311,7 +311,7 @@ impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for () {
     }
 
     fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        unsafe { EMPTY_ADDRESS_FILTER.get_mut() }
+        unsafe { (*addr_of_mut!(EMPTY_ADDRESS_FILTER)).get_mut() }
     }
 }
 

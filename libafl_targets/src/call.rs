@@ -12,8 +12,10 @@ pub static mut FUNCTION_LIST: Lazy<HashMap<usize, usize>> = Lazy::new(HashMap::n
 #[no_mangle]
 /// The runtime code inserted at every callinst invokation (if you used the function-logging.cc)
 /// # Safety
-/// unsafe because it touches pub static mut
+/// unsafe because it touches the pub static mut `FUNCTION_LIST`.
+/// May not be called concurrently.
 pub unsafe extern "C" fn __libafl_target_call_hook(id: usize) {
+    let function_list = *addr_of_mut!(FUNCTION_LIST);
     *FUNCTION_LIST.entry(id).or_insert(0) += 1;
 }
 
@@ -41,7 +43,13 @@ where
 
     fn pre_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) {
         // clear it before the execution
-        unsafe { FUNCTION_LIST.clear() }
+        // # Safety
+        // This typically happens while no other execution happens.
+        // In theory there is a race, but we can ignore it _for this use case_.
+        unsafe {
+            let function_list = *addr_of_mut!(FUNCTION_LIST);
+            function_list.clear()
+        }
     }
 
     fn post_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) {}

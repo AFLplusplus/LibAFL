@@ -58,7 +58,7 @@ where
 
 impl BreakpointId {
     pub fn new() -> Self {
-        static mut BREAKPOINT_ID_COUNTER: OnceLock<AtomicU64> = OnceLock::new();
+        static BREAKPOINT_ID_COUNTER: OnceLock<AtomicU64> = OnceLock::new();
 
         let counter = unsafe { BREAKPOINT_ID_COUNTER.get_or_init(|| AtomicU64::new(0)) };
 

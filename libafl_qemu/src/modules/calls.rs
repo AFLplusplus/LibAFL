@@ -541,13 +541,13 @@ impl Default for FullBacktraceCollector {
 
 impl FullBacktraceCollector {
     pub fn new() -> Self {
-        unsafe { CALLSTACKS = Some(ThreadLocal::new()) };
+        unsafe { *(&mut *addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
         Self {}
     }
 
     pub fn reset(&mut self) {
         unsafe {
-            for tls in CALLSTACKS.as_mut().unwrap().iter_mut() {
+            for tls in (*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
             }
         }
@@ -555,7 +555,7 @@ impl FullBacktraceCollector {
 
     pub fn backtrace() -> Option<&'static [GuestAddr]> {
         unsafe {
-            if let Some(c) = CALLSTACKS.as_mut() {
+            if let Some(c) = (*addr_of_mut!(CALLSTACKS)).as_mut() {
                 Some(&*c.get_or_default().get())
             } else {
                 None
@@ -578,7 +578,7 @@ impl CallTraceCollector for FullBacktraceCollector {
     {
         // TODO handle Thumb
         unsafe {
-            (*CALLSTACKS.as_mut().unwrap().get_or_default().get()).push(pc + call_len as GuestAddr);
+            (*(*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().get_or_default().get()).push(pc + call_len as GuestAddr);
         }
     }
 
@@ -594,7 +594,7 @@ impl CallTraceCollector for FullBacktraceCollector {
         S: Unpin + UsesInput,
     {
         unsafe {
-            let v = &mut *CALLSTACKS.as_mut().unwrap().get_or_default().get();
+            let v = &mut *(*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().get_or_default().get();
             if !v.is_empty() {
                 // if *v.last().unwrap() == ret_addr {
                 //    v.pop();
