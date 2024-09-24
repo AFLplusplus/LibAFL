@@ -60,6 +60,7 @@ impl LogMutationMetadata {
 
 /// A [`Mutator`] that composes multiple mutations into one.
 pub trait ComposedByMutations {
+    /// The mutations of this
     type Mutations;
     /// Get the mutations
     fn mutations(&self) -> &Self::Mutations;
