@@ -517,7 +517,7 @@ where
         msgs: &mut Vec<MultiMachineMsg<'a, I>>,
     ) -> Result<(), Error> {
         log::debug!("Checking for new events from other nodes...");
-        let mut nb_received = 0usize;
+        // let mut nb_received = 0usize;
 
         // Our (potential) parent could have something for us
         if let Some(parent) = &mut self.parent {
@@ -535,7 +535,7 @@ where
                         log::debug!("Received event from parent");
                         // The parent has something for us, we store it
                         msgs.push(msg);
-                        nb_received += 1;
+                        // nb_received += 1;
                     }
 
                     Ok(None) => {
@@ -581,7 +581,7 @@ where
                         // The parent has something for us, we store it
                         log::debug!("Received event from child!");
                         msgs.push(msg);
-                        nb_received += 1;
+                        // nb_received += 1;
                     }
 
                     Ok(None) => {
