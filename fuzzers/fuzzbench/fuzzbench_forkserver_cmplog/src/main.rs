@@ -18,8 +18,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
-        StdMOptMutator, Tokens,
+        havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations, StdMOptMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -309,7 +308,7 @@ fn fuzz(
         StdWeightedScheduler::with_schedule(
             &mut state,
             &edges_observer,
-            Some(PowerSchedule::EXPLORE),
+            Some(PowerSchedule::explore()),
         ),
     );
 

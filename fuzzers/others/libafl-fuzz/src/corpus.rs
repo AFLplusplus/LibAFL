@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     fs::File,
     io::{self, BufRead, BufReader},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use libafl::{
@@ -39,10 +39,12 @@ pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> Stri
     name
 }
 
+// The function needs to be compatible with CustomFilepathToTestcaseFeedback
+#[allow(clippy::unnecessary_wraps)]
 pub fn set_corpus_filepath(
     state: &mut LibaflFuzzState,
     testcase: &mut Testcase<BytesInput>,
-    _fuzzer_dir: &PathBuf,
+    _fuzzer_dir: &Path,
 ) -> Result<(), Error> {
     let id = state.corpus().peek_free_id();
     let mut name = generate_base_filename(state, id);
@@ -54,10 +56,12 @@ pub fn set_corpus_filepath(
     Ok(())
 }
 
+// The function needs to be compatible with CustomFilepathToTestcaseFeedback
+#[allow(clippy::unnecessary_wraps)]
 pub fn set_solution_filepath(
     state: &mut LibaflFuzzState,
     testcase: &mut Testcase<BytesInput>,
-    output_dir: &PathBuf,
+    output_dir: &Path,
 ) -> Result<(), Error> {
     // sig:0SIGNAL
     // TODO: verify if 0 time if objective found during seed loading
@@ -84,11 +88,7 @@ fn parse_time_line(line: &str) -> Result<u64, Error> {
         .map_err(|_| Error::illegal_state("invalid stats file"))
 }
 
-pub fn check_autoresume(
-    fuzzer_dir: &Path,
-    intial_inputs: &PathBuf,
-    auto_resume: bool,
-) -> Result<Flock<File>, Error> {
+pub fn check_autoresume(fuzzer_dir: &Path, auto_resume: bool) -> Result<Flock<File>, Error> {
     if !fuzzer_dir.exists() {
         std::fs::create_dir(fuzzer_dir)?;
     }
@@ -131,11 +131,7 @@ pub fn check_autoresume(
             return Err(Error::illegal_state("The job output directory already exists and contains results! use AFL_AUTORESUME=true or provide \"-\" for -i "));
         }
     }
-    if auto_resume {
-        // TODO: once the queue stuff is implemented finish the rest of the function
-        // see afl-fuzz-init.c line 1898 onwards. Gotta copy and delete shit
-        // No usable test cases in './output/default/_resume'
-    } else {
+    if !auto_resume {
         let queue_dir = fuzzer_dir.join("queue");
         let hangs_dir = fuzzer_dir.join("hangs");
         let crashes_dir = fuzzer_dir.join("crashes");
@@ -143,29 +139,11 @@ pub fn check_autoresume(
         create_dir_if_not_exists(&crashes_dir).expect("should be able to create crashes dir");
         create_dir_if_not_exists(&hangs_dir).expect("should be able to create hangs dir");
         create_dir_if_not_exists(&queue_dir).expect("should be able to create queue dir");
-        // Copy all our seeds to queue
-        for file in std::fs::read_dir(intial_inputs)? {
-            let path = file?.path();
-            let cpy_res = std::fs::copy(
-                &path,
-                queue_dir.join(path.file_name().ok_or(Error::illegal_state(format!(
-                    "file {} in input directory does not have a filename",
-                    path.display()
-                )))?),
-            );
-            match cpy_res {
-                Err(e) if e.kind() == io::ErrorKind::InvalidInput => {
-                    println!("skipping {} since it is not a regular file", path.display());
-                }
-                Err(e) => return Err(e.into()),
-                Ok(_) => {}
-            }
-        }
     }
     Ok(file)
 }
 
-pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
+pub fn create_dir_if_not_exists(path: &Path) -> io::Result<()> {
     if path.is_file() {
         return Err(io::Error::new(
             // TODO: change this to ErrorKind::NotADirectory
@@ -186,8 +164,8 @@ pub fn create_dir_if_not_exists(path: &PathBuf) -> std::io::Result<()> {
     }
 }
 
-pub fn remove_main_node_file(output_dir: &PathBuf) -> Result<(), Error> {
-    for entry in std::fs::read_dir(output_dir)?.filter_map(std::result::Result::ok) {
+pub fn remove_main_node_file(output_dir: &Path) -> Result<(), Error> {
+    for entry in std::fs::read_dir(output_dir)?.filter_map(Result::ok) {
         let path = entry.path();
         if path.is_dir() && path.join("is_main_node").exists() {
             std::fs::remove_file(path.join("is_main_node"))?;

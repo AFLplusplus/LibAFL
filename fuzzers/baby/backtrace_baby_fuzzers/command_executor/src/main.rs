@@ -17,7 +17,7 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,

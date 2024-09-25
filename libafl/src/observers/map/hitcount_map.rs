@@ -1,6 +1,12 @@
 //! Hitcount map observer is for implementing AFL's hit count bucket
 use alloc::{borrow::Cow, vec::Vec};
-use core::{fmt::Debug, hash::Hash, mem::size_of, slice};
+use core::{
+    fmt::Debug,
+    hash::Hash,
+    mem::size_of,
+    ptr::{addr_of, addr_of_mut},
+    slice,
+};
 
 use libafl_bolts::{AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 use serde::{Deserialize, Serialize};
@@ -35,17 +41,19 @@ static mut COUNT_CLASS_LOOKUP_16: Vec<u16> = vec![];
 ///
 /// # Safety
 ///
-/// Calling this from multiple threads may be racey and hence leak 65k mem
+/// Calling this from multiple threads may be racey and hence leak 65k mem or even create a broken lookup vec.
 fn init_count_class_16() {
     unsafe {
-        if !COUNT_CLASS_LOOKUP_16.is_empty() {
+        let count_class_lookup_16 = &mut *addr_of_mut!(COUNT_CLASS_LOOKUP_16);
+
+        if !count_class_lookup_16.is_empty() {
             return;
         }
 
-        COUNT_CLASS_LOOKUP_16 = vec![0; 65536];
+        *count_class_lookup_16 = vec![0; 65536];
         for i in 0..256 {
             for j in 0..256 {
-                COUNT_CLASS_LOOKUP_16[(i << 8) + j] =
+                count_class_lookup_16[(i << 8) + j] =
                     (u16::from(COUNT_CLASS_LOOKUP[i]) << 8) | u16::from(COUNT_CLASS_LOOKUP[j]);
             }
         }
@@ -117,7 +125,7 @@ where
         #[allow(clippy::unused_enumerate_index)]
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
-                *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
+                *item = *(*addr_of!(COUNT_CLASS_LOOKUP_16)).get_unchecked(*item as usize);
             }
         }
 

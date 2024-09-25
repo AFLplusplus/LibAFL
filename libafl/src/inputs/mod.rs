@@ -60,9 +60,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
     /// Generate a name for this input
     fn generate_name(&self, id: Option<CorpusId>) -> String;
-
-    /// An hook executed if the input is stored as `Testcase`
-    fn wrapped_as_testcase(&mut self) {}
 }
 
 /// An input for the target
@@ -89,9 +86,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
     /// Generate a name for this input, the user is responsible for making each name of testcase unique.
     fn generate_name(&self, id: Option<CorpusId>) -> String;
-
-    /// An hook executed if the input is stored as `Testcase`
-    fn wrapped_as_testcase(&mut self) {}
 }
 
 /// Convert between two input types with a state
@@ -195,6 +189,26 @@ pub trait HasMutatorBytes: HasLen {
     }
 }
 
+/// Mapping types to themselves, used to ensure lifetime consistency for mapped mutators.
+///
+/// Specifically, this is for [`Input`] types that are owned wrappers around a reference. The lifetime of the associated type should be the same as the reference.
+pub trait MappedInput {
+    /// The type for which this trait is implemented
+    type Type<'a>
+    where
+        Self: 'a;
+}
+
+impl<T> MappedInput for Option<T>
+where
+    T: MappedInput,
+{
+    type Type<'a>
+        = Option<T::Type<'a>>
+    where
+        T: 'a;
+}
+
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
 #[derive(Debug)]
 pub struct MutVecInput<'a>(&'a mut Vec<u8>);
@@ -242,6 +256,13 @@ impl<'a> HasMutatorBytes for MutVecInput<'a> {
     {
         self.0.drain(range)
     }
+}
+
+impl<'a> MappedInput for MutVecInput<'a> {
+    type Type<'b>
+        = MutVecInput<'b>
+    where
+        Self: 'b;
 }
 
 /// Defines the input type shared across traits of the type.
