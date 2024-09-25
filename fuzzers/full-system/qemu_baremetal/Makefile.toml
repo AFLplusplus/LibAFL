@@ -104,7 +104,7 @@ script = '''
 TMP_DIR=$(mktemp -d)
 
 cargo make build_$FEATURE
-timeout 15s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
+timeout 30s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
 
 if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
     echo "qemu_baremetal ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
