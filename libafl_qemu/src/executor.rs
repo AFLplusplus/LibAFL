@@ -6,6 +6,8 @@ use core::{
 };
 #[cfg(emulation_mode = "usermode")]
 use std::ptr;
+#[cfg(emulation_mode = "systemmode")]
+use std::sync::atomic::AtomicBool;
 
 #[cfg(feature = "fork")]
 use libafl::{
@@ -70,8 +72,11 @@ pub unsafe fn inproc_qemu_crash_handler(
 }
 
 #[cfg(emulation_mode = "systemmode")]
-pub(crate) static mut BREAK_ON_TMOUT: bool = false;
+pub(crate) static mut BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
 
+/// # Safety
+/// Can call through the `unix_signal_handler::inproc_timeout_handler`.
+/// Calling this method multiple times concurrently can lead to race conditions.
 #[cfg(emulation_mode = "systemmode")]
 pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     signal: Signal,
@@ -85,7 +90,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    if BREAK_ON_TMOUT {
+    if *BREAK_ON_TMOUT {
         qemu_system_debug_request();
     } else {
         libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
@@ -175,8 +180,10 @@ where
 
     #[cfg(emulation_mode = "systemmode")]
     pub fn break_on_timeout(&mut self) {
+        // # Safety
+        // Atomic bool writes are safe.
         unsafe {
-            BREAK_ON_TMOUT = true;
+            BREAK_ON_TMOUT.store(true, Ordering::Release);
         }
     }
 

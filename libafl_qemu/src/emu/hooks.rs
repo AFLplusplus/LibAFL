@@ -650,7 +650,9 @@ where
         }
     }
 
-    pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
+    /// # Safety
+    /// Will dereference the hook as [`FatPtr`].
+    pub unsafe fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
             self.backdoor_hooks
@@ -778,16 +780,20 @@ where
         }
     }
 
+    /// # Safety
+    /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
+    pub unsafe fn syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
         unsafe {
             self.qemu_hooks
                 .add_pre_syscall_hook(transmute(hook), func_pre_syscall_hook_wrapper::<ET, S>)
         }
     }
 
+    /// # Safety
+    /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
+    pub unsafe fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
 
@@ -828,8 +834,10 @@ where
         }
     }
 
+    /// # Safety
+    /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
+    pub unsafe fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
         unsafe {
             self.qemu_hooks
                 .add_post_syscall_hook(transmute(hook), func_post_syscall_hook_wrapper::<ET, S>)
@@ -868,13 +876,17 @@ where
         }
     }
 
+    /// # Safety
+    /// Will dereference the hook as ptr.
     pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
         self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
         self.crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
     }
-
-    pub fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
+ 
+    /// # Safety
+    /// Will dereference the hook as [`FatPtr`].
+    pub unsafe fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
         unsafe {
             self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
             self.crash_hooks.push(HookRepr::Closure(transmute(hook)));
@@ -1119,6 +1131,8 @@ where
     }
 
     pub fn first_exec_all(&mut self, state: &mut S) {
+        // # Safety
+        // We assume that the emulator was initialized correctly
         unsafe {
             self.modules_mut()
                 .first_exec_all(Self::emulator_modules_mut_unchecked(), state);
@@ -1126,6 +1140,8 @@ where
     }
 
     pub fn pre_exec_all(&mut self, input: &S::Input, state: &mut S) {
+        // # Safety
+        // We assume that the emulator was initialized correctly
         unsafe {
             self.modules_mut()
                 .pre_exec_all(Self::emulator_modules_mut_unchecked(), input, state);

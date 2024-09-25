@@ -33,7 +33,9 @@ const LLVM_VERSION_MAX: i32 = 33;
 static mut CARGO_RPATH: Option<Vec<String>> = None;
 static CARGO_RPATH_SEPARATOR: &str = "|";
 
-pub fn cargo_add_rpath(rpath: &str) {
+/// # Safety
+/// Will get a mutable borrow to `CARGO_RPATH`. May only be called once at a time
+pub unsafe fn cargo_add_rpath(rpath: &str) {
     unsafe {
         if let Some(rpaths) = &mut *addr_of_mut!(CARGO_RPATH) {
             rpaths.push(rpath.to_string());
@@ -43,7 +45,9 @@ pub fn cargo_add_rpath(rpath: &str) {
     }
 }
 
-pub fn cargo_propagate_rpath() {
+/// # Safety
+/// Will get a mutable borrow to `CARGO_RPATH`. May only be called once at a time
+pub unsafe fn cargo_propagate_rpath() {
     unsafe {
         if let Some(cargo_cmds) = &mut *addr_of_mut!(CARGO_RPATH) {
             let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);

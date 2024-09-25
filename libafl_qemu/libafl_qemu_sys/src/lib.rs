@@ -171,7 +171,9 @@ pub fn make_plugin_meminfo(oi: MemOpIdx, rw: qemu_plugin_mem_rw) -> qemu_plugin_
 
 // from include/hw/core/cpu.h
 
+/// # Safety
+/// Will dereference the `cpu` pointer.
 #[cfg(target_os = "linux")]
-pub fn cpu_env(cpu: *mut CPUState) -> *mut CPUArchState {
+pub unsafe fn cpu_env(cpu: *mut CPUState) -> *mut CPUArchState {
     unsafe { cpu.add(1) as *mut CPUArchState }
 }

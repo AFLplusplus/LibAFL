@@ -256,6 +256,8 @@ impl TimerStruct {
     #[cfg(all(unix, not(target_os = "linux")))]
     /// Set up timer
     pub fn set_timer(&mut self) {
+        // # Safety
+        // Safe because the variables are all alive at this time and don't contain pointers.
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
         }
@@ -312,6 +314,8 @@ impl TimerStruct {
     #[cfg(all(unix, not(target_os = "linux")))]
     /// Disalarm timer
     pub fn unset_timer(&mut self) {
+        // # Safety
+        // No user-provided values.
         unsafe {
             let mut itimerval_zero: Itimerval = core::mem::zeroed();
             setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
@@ -357,7 +361,9 @@ impl TimerStruct {
 
     #[cfg(windows)]
     /// Disalarm
-    pub fn unset_timer(&mut self) {
+    pub unsafe fn unset_timer(&mut self) {
+        // # Safety
+        // The value accesses are guarded by a critical section.
         unsafe {
             let data = addr_of_mut!(GLOBAL_STATE);
 

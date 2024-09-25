@@ -359,7 +359,11 @@ impl Allocator {
         }
     }
 
-    fn unpoison(start: usize, size: usize) {
+    /// Unpoison an area in memory
+    /// 
+    /// # Safety
+    /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
+    unsafe fn unpoison(start: usize, size: usize) {
         unsafe {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
@@ -372,8 +376,11 @@ impl Allocator {
         }
     }
 
-    /// Poisonn an area in memory
-    pub fn poison(start: usize, size: usize) {
+    /// Poison an area in memory
+    /// 
+    /// # Safety
+    /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
+    pub unsafe fn poison(start: usize, size: usize) {
         unsafe {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0x0);
 

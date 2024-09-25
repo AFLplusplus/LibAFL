@@ -60,6 +60,8 @@ pub use __ddg_area_ptr as DDG_MAP_PTR;
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 pub fn autotokens() -> Result<Tokens, Error> {
+    // # Safety
+    // All values are checked before dereferencing.
     unsafe {
         if __token_start.is_null() || __token_stop.is_null() {
             Ok(Tokens::default())

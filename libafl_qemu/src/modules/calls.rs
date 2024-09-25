@@ -540,12 +540,17 @@ impl Default for FullBacktraceCollector {
 }
 
 impl FullBacktraceCollector {
-    pub fn new() -> Self {
+    /// # Safety
+    /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
+    pub unsafe fn new() -> Self {
+        // TODO: Why don't we use std::thread_local here?
         unsafe { (*addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
         Self {}
     }
 
-    pub fn reset(&mut self) {
+    /// # Safety
+    /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
+    pub unsafe fn reset(&mut self) {
         unsafe {
             for tls in (*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
@@ -553,7 +558,9 @@ impl FullBacktraceCollector {
         }
     }
 
-    pub fn backtrace() -> Option<&'static [GuestAddr]> {
+    /// # Safety
+    /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
+    pub unsafe fn backtrace() -> Option<&'static [GuestAddr]> {
         unsafe {
             if let Some(c) = (*addr_of_mut!(CALLSTACKS)).as_mut() {
                 Some(&*c.get_or_default().get())
