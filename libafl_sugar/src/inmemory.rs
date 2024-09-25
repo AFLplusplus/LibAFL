@@ -2,7 +2,7 @@
 //! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
 use core::fmt::{self, Debug, Formatter};
-use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{fs, net::SocketAddr, num::NonZero, path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
@@ -229,7 +229,7 @@ where
             if state.must_load_initial_inputs() {
                 if self.input_dirs.is_empty() {
                     // Generator of printable bytearrays of max size 32
-                    let mut generator = RandBytesGenerator::new(32);
+                    let mut generator = RandBytesGenerator::new(NonZero::new(32).unwrap());
 
                     // Generate 8 initial inputs
                     state
