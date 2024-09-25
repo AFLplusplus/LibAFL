@@ -11,7 +11,7 @@ Assume we want to sample from the following distribution: `p(0)=0.5, p(1)=0.3, p
 use libafl_bolts::rands::{StdRand, loaded_dice::LoadedDiceSampler};
 fn main() {
     let mut rand = StdRand::new();
-    let mut sampler = LoadedDiceSampler::new(&[0.5, 0.3, 0.1, 0.1]);
+    let mut sampler = LoadedDiceSampler::new(&[0.5, 0.3, 0.1, 0.1]).unwrap();
     let iter: usize = 100;
     for i in (0..iter) {
         println!("{}", sampler.sample(&mut rand));

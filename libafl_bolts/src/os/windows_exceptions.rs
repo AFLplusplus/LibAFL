@@ -422,9 +422,13 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 79] = [
 ];
 
 #[cfg(feature = "alloc")]
-pub trait Handler {
+pub trait ExceptionHandler {
     /// Handle an exception
-    fn handle(
+    ///
+    /// # Safety
+    /// This is generally not safe to call. It should only be called through the signal it was registered for.
+    /// Signal handling is hard, don't mess with it :).
+    unsafe fn handle(
         &mut self,
         exception_code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,

@@ -172,7 +172,7 @@ where
 {
     /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
     ///
-    /// To skip the 0 `max_size` check, create this using [`Self::nonzero`] instead.
+    /// To skip the 0 `max_size` check, create this using [`Self::from_nonzero`] instead.
     pub fn new(max_size: usize) -> Result<Self, Error> {
         let Some(max_size) = NonZero::new(max_size) else {
             return Err(Error::illegal_argument("The max_size may not be 0."));

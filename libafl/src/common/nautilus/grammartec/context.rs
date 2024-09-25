@@ -263,7 +263,8 @@ impl Context {
             .iter()
             .take_while(move |r| self.rules_to_min_size[*r] <= max_len)
             .filter(move |r| {
-                self.rules_to_num_options[*r] > 1 || rand.below(100) <= p_include_short_rules
+                self.rules_to_num_options[*r] > 1
+                    || rand.below(NonZero::new(100).unwrap()) <= p_include_short_rules
             })
     }
 
