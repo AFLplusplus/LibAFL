@@ -32,7 +32,7 @@ use crate::{
     inputs::{Input, NopInput},
 };
 
-const MAX_NB_RECEIVED_AT_ONCE: usize = 10;
+// const MAX_NB_RECEIVED_AT_ONCE: usize = 100;
 
 #[bitflags(default = SendToParent | SendToChildren)]
 #[repr(u8)]
@@ -394,7 +394,9 @@ where
 
         // 1. Read msg size
         let mut node_msg_len: [u8; 4] = [0; 4];
+        log::debug!("Receiving msg len...");
         stream.read_exact(&mut node_msg_len).await?;
+        log::debug!("msg len received.");
         let node_msg_len = u32::from_le_bytes(node_msg_len) as usize;
 
         // 2. Read msg
@@ -404,7 +406,9 @@ where
         unsafe {
             node_msg.set_len(node_msg_len);
         }
+        log::debug!("Receiving msg...");
         stream.read_exact(node_msg.as_mut_slice()).await?;
+        log::debug!("msg received.");
         let node_msg = node_msg.into_boxed_slice();
 
         Ok(Some(MultiMachineMsg::from_llmp_msg(node_msg)))
@@ -420,16 +424,19 @@ where
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
 
         // 0. Write the dummy byte
-        log::debug!("Sending dummy byte");
+        log::debug!("Sending dummy byte...");
         stream.write_all(&[DUMMY_BYTE]).await?;
+        log::debug!("dummy byte sent.");
 
         // 1. Write msg size
-        log::debug!("Sending msg len");
+        log::debug!("Sending msg len...");
         stream.write_all(&msg_len).await?;
+        log::debug!("msg len sent.");
 
         // 2. Write msg
-        log::debug!("Sending msg");
+        log::debug!("Sending msg...");
         stream.write_all(serialized_msg).await?;
+        log::debug!("msg sent.");
 
         Ok(())
     }
@@ -483,11 +490,11 @@ where
         {
             let mut ids_to_remove: Vec<NodeId> = Vec::new();
             for (child_id, child_stream) in &mut self.children {
-                log::debug!("Sending to child...");
-                if (Self::write_msg(child_stream, msg).await).is_err() {
+                log::debug!("Sending to child {child_id:?}...");
+                if let Err(err) = Self::write_msg(child_stream, msg).await {
                     // most likely the child disconnected. drop the connection later on and continue.
                     log::debug!(
-                        "The child disconnected. We won't try to communicate with it again."
+                        "The child disconnected. We won't try to communicate with it again. Error: {err:?}"
                     );
                     ids_to_remove.push(*child_id);
                 }
@@ -516,9 +523,11 @@ where
         if let Some(parent) = &mut self.parent {
             loop {
                 // Exit if received a lot of inputs at once.
-                if nb_received > MAX_NB_RECEIVED_AT_ONCE {
-                    return Ok(());
-                }
+                // TODO: this causes problems in some cases, it could freeze all fuzzer instances.
+                // if nb_received > MAX_NB_RECEIVED_AT_ONCE {
+                //     log::debug!("hitting MAX_NB_RECEIVED_AT_ONCE limit...");
+                //     return Ok(());
+                // }
 
                 log::debug!("Receiving from parent...");
                 match Self::read_msg(parent).await {
@@ -566,7 +575,7 @@ where
                     return Ok(());
                 }
 
-                log::debug!("Receiving from child {:?}...", child_id);
+                log::debug!("Receiving from child {child_id:?}...");
                 match Self::read_msg(child_stream).await {
                     Ok(Some(msg)) => {
                         // The parent has something for us, we store it
@@ -584,7 +593,7 @@ where
                     Err(Error::OsError(e, _, _)) => {
                         // most likely the parent disconnected. drop the connection
                         log::error!(
-                            "The parent disconnected. We won't try to communicate with it again."
+                            "The child disconnected. We won't try to communicate with it again."
                         );
                         log::error!("Error: {e:?}");
                         ids_to_remove.push(*child_id);
