@@ -209,9 +209,12 @@ where
             return Ok(MutationResult::Skipped);
         };
 
+        // # Safety
+        // The input.codes() len should never be close to an usize, so adding 1 will always result in a non-zero value.
+        // Worst case, we will get a wrong int value as return, not too bad.
         let off = state
             .rand_mut()
-            .below(NonZero::new(size.saturating_add(1)).unwrap());
+            .below(unsafe { NonZero::new(size + 1).unwrap_unchecked() });
         let mut len = 1 + state.rand_mut().below(nonzero_size);
 
         if size + len > max_size {
@@ -322,6 +325,7 @@ where
         };
 
         let other_size = {
+            // new scope to make the borrow checker happy
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.codes().len()
         };
@@ -337,9 +341,11 @@ where
         let max_size = state.max_size();
         let from = state.rand_mut().below(non_zero_other_size);
         let to = state.rand_mut().below(non_zero_size);
+        // # Safety
+        // from is smaller than other_size, other_size is larger than 2, so the subtraction is larger than 0.
         let mut len = 1 + state
             .rand_mut()
-            .below(NonZero::new(other_size - from).expect("Length too small"));
+            .below(unsafe { NonZero::new(other_size - from).unwrap_unchecked() });
 
         if size + len > max_size {
             if max_size > size {
@@ -398,6 +404,7 @@ where
         }
 
         let other_size = {
+            // new scope to make the borrow checker happy
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.codes().len()
         };
@@ -412,15 +419,16 @@ where
 
         let from = state.rand_mut().below(non_zero_other_size);
 
-        let Some(non_zero_max_len) = NonZero::new(min(other_size - from, size)) else {
+        let Some(non_zero_min_len) = NonZero::new(min(other_size - from, size)) else {
             return Ok(MutationResult::Skipped);
         };
 
-        let len = state.rand_mut().below(non_zero_max_len);
-        let to = state.rand_mut().below(
-            NonZero::new(size - len)
-                .expect("Zero value for `to` field in EncodedCorssoverReplaceMutator."),
-        );
+        let len = state.rand_mut().below(non_zero_min_len);
+        // # Safety
+        // size is non-zero, len is below min(size, ...), so the subtraction will always be positive.
+        let to = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size - len).unwrap_unchecked() });
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.

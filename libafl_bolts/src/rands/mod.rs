@@ -92,7 +92,7 @@ where
 #[inline]
 #[must_use]
 pub fn fast_bound(rand: u64, n: NonZeroUsize) -> usize {
-    let mul = u128::from(rand).wrapping_mul(u128::from(u64::try_from(usize::from(n)).unwrap()));
+    let mul = u128::from(rand).wrapping_mul(u128::from(n.get() as u64));
     (mul >> 64) as usize
 }
 
@@ -134,8 +134,11 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     #[inline]
     fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
+        // # Safety
+        // We check that the upper_bound_incl <= lower_bound_incl above (alas only in debug), so the below is fine.
+        // Even if we encounter a 0 in release here, the worst-case scenario should be an invalid return value.
         lower_bound_incl
-            + self.below(NonZero::new(upper_bound_incl - lower_bound_incl + 1).unwrap())
+            + self.below(unsafe { NonZero::new(upper_bound_incl - lower_bound_incl + 1).unwrap_unchecked() })
     }
 
     /// Convenient variant of [`choose`].
@@ -170,7 +173,9 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         // Continue until the iterator is exhausted
         loop {
             if lower > 1 {
-                let ix = self.below(NonZero::new(lower + consumed).unwrap());
+                // # Safety
+                // lower is > 1, we don't consume more than usize elements, so this should always be non-0.
+                let ix = self.below(unsafe { NonZero::new(lower + consumed).unwrap_unchecked() } );
                 let skip = if ix < lower {
                     result = iter.nth(ix);
                     lower - (ix + 1)

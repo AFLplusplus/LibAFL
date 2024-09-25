@@ -42,9 +42,12 @@ where
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
         if !input.terminals().is_empty() {
+            // # Safety
+            // We can assume that the count of terminals + 1 will never wrap around (otherwise it will break somewhere else).
+            // So len + 1 is always non-zero.
             let size = state
                 .rand_mut()
-                .below(NonZero::new(input.terminals().len() + 1).unwrap());
+                .below(unsafe { NonZero::new(input.terminals().len() + 1).unwrap_unchecked() });
             input.terminals_mut().truncate(size);
         }
         if self.generator.append_generated_terminals(input, state) > 0 {
