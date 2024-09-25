@@ -73,9 +73,7 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: NonZeroUsize) -> Range<usize> {
     let len = 1 + state.rand_mut().below(max_len);
     // sample from [1..upper + len]
-    let upper_len_minus1 = if let Some(ulm1) = NonZero::new(upper + len - 1) {
-        ulm1
-    } else {
+    let Some(upper_len_minus1) = NonZero::new(upper + len - 1) else {
         return 0..0;
     };
     let mut offset2 = 1 + state.rand_mut().below(upper_len_minus1);
@@ -837,9 +835,7 @@ where
         let max_insert_len = min(size - target, state.max_size() - size);
         let max_insert_len = min(16, max_insert_len);
 
-        let max_insert_len = if let Some(mil) = NonZero::new(max_insert_len) {
-            mil
-        } else {
+        let Some(max_insert_len) = NonZero::new(max_insert_len) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -1144,9 +1140,7 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        let nonzero_size = if let Some(size) = NonZero::new(size) {
-            size
-        } else {
+        let Some(nonzero_size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 

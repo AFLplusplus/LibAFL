@@ -205,9 +205,7 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.codes().len();
-        let nonzero_size = if let Some(nonzero_size) = NonZero::new(size) {
-            nonzero_size
-        } else {
+        let Some(nonzero_size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -265,9 +263,7 @@ pub struct EncodedCopyMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
-        let size = if let Some(size) = NonZero::new(size) {
-            size
-        } else {
+        let Some(size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -321,9 +317,7 @@ where
             }
         }
 
-        let non_zero_size = if let Some(size) = NonZero::new(size) {
-            size
-        } else {
+        let Some(non_zero_size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -336,9 +330,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let non_zero_other_size = if let Some(other_size) = NonZero::new(other_size) {
-            other_size
-        } else {
+        let Some(non_zero_other_size) = NonZero::new(other_size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -414,20 +406,15 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let non_zero_other_size = if let Some(other_size) = NonZero::new(other_size) {
-            other_size
-        } else {
+        let Some(non_zero_other_size) = NonZero::new(other_size) else {
             return Ok(MutationResult::Skipped);
         };
 
         let from = state.rand_mut().below(non_zero_other_size);
 
-        let non_zero_max_len =
-            if let Some(non_zero_max_len) = NonZero::new(min(other_size - from, size)) {
-                non_zero_max_len
-            } else {
-                return Ok(MutationResult::Skipped);
-            };
+        let Some(non_zero_max_len) = NonZero::new(min(other_size - from, size)) else {
+            return Ok(MutationResult::Skipped);
+        };
 
         let len = state.rand_mut().below(non_zero_max_len);
         let to = state.rand_mut().below(

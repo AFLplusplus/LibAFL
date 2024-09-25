@@ -376,9 +376,7 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        let nonzero_size = if let Some(nonzero_size) = NonZero::new(size) {
-            nonzero_size
-        } else {
+        let Some(nonzero_size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -439,9 +437,7 @@ where
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        let size = if let Some(size) = NonZero::new(size) {
-            size
-        } else {
+        let Some(size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -453,9 +449,7 @@ where
             meta.list.len()
         };
 
-        let cmps_len = if let Some(cmps_len) = NonZero::new(cmps_len) {
-            cmps_len
-        } else {
+        let Some(cmps_len) = NonZero::new(cmps_len) else {
             return Ok(MutationResult::Skipped);
         };
 

@@ -371,9 +371,7 @@ where
             self.gap_indices.push(i);
         }
 
-        let gap_indeces_len = if let Some(gap_indices_len) = NonZero::new(self.gap_indices.len()) {
-            gap_indices_len
-        } else {
+        let Some(gap_indeces_len) = NonZero::new(self.gap_indices.len()) else {
             return Err(Error::illegal_state(
                 "Gap indices may not be empty in grimoire mutator!",
             ));

@@ -116,9 +116,7 @@ where
         state: &mut S,
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
-        let terminals_len = if let Some(terminals_len) = NonZero::new(input.terminals().len()) {
-            terminals_len
-        } else {
+        let Some(terminals_len) = NonZero::new(input.terminals().len()) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -220,12 +218,9 @@ where
         let chosen = *state.rand_mut().choose(&self.states).unwrap();
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
-        let non_zero_chosen_nums_minus_one =
-            if let Some(non_zero_chose_nums_minus_one) = NonZero::new(chosen_nums - 1) {
-                non_zero_chose_nums_minus_one
-            } else {
-                return Ok(MutationResult::Skipped);
-            };
+        let Some(non_zero_chosen_nums_minus_one) = NonZero::new(chosen_nums - 1) else {
+            return Ok(MutationResult::Skipped);
+        };
 
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut first = state.rand_mut().below(non_zero_chosen_nums_minus_one) as i64;
