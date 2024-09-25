@@ -49,6 +49,7 @@ noinline void libafl_qemu_internal_error(void) {
   _libafl_sync_exit_call0(LIBAFL_QEMU_COMMAND_INTERNAL_ERROR);
 }
 
+#ifdef STDIO_SUPPORT
 noinline void lqprintf(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
@@ -64,6 +65,7 @@ noinline void lqprintf(const char *fmt, ...) {
   _libafl_sync_exit_call2(LIBAFL_QEMU_COMMAND_LQPRINTF,
                           (libafl_word)_lqprintf_buffer, res);
 }
+#endif
 
 noinline void libafl_qemu_test(void) {
   _libafl_sync_exit_call1(LIBAFL_QEMU_COMMAND_TEST, LIBAFL_QEMU_TEST_VALUE);

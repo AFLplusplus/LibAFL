@@ -2,13 +2,15 @@
   #include "libafl_qemu.h"
 #endif
 
+#ifndef TARGET_SYNC_EXIT
 int __attribute__((noinline)) BREAKPOINT() {
   for (;;) {}
 }
+#endif
 
 int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
 #ifdef TARGET_SYNC_EXIT
-  LIBAFL_QEMU_START_PHYS((unsigned int)Data, Size);
+  libafl_qemu_start_phys((void*) Data, Size);
 #endif
   if (Data[3] == 0) {
     while (1) {}
@@ -27,9 +29,10 @@ int LLVMFuzzerTestOneInput(unsigned int *Data, unsigned int Size) {
     }
   }
 #ifdef TARGET_SYNC_EXIT
-  LIBAFL_QEMU_END(LIBAFL_QEMU_END_OK);
-#endif
+  libafl_qemu_end(LIBAFL_QEMU_END_OK);
+#else
   return BREAKPOINT();
+#endif
 }
 unsigned int FUZZ_INPUT[] = {
     101, 201, 700, 230, 860, 234, 980, 200, 340, 678, 230, 134, 900,

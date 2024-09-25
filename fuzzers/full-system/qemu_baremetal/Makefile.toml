@@ -104,7 +104,7 @@ script = '''
 TMP_DIR=$(mktemp -d)
 
 cargo make build_$FEATURE
-timeout 10s ${TARGET_DIR}/${PROFILE_DIR}/qemu_baremetal | tee $TMP_DIR/fuzz.log 2>&1 || true
+timeout 10s ${TARGET_DIR}/${PROFILE_DIR}/qemu_baremetal -icount shift=auto,align=off,sleep=off -machine mps2-an385 -monitor null -kernel ${TARGET_DIR}/example.elf -serial null -nographic -snapshot -drive if=none,format=qcow2,file=${TARGET_DIR}/dummy.qcow2 -S | tee $TMP_DIR/fuzz.log 2>&1 || true
 
 if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
     echo "qemu_baremetal ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"

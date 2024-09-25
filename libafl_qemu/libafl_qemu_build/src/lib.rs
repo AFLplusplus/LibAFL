@@ -1,8 +1,8 @@
 #![forbid(unexpected_cfgs)]
 #![allow(clippy::missing_panics_doc)]
 
-#[rustversion::nightly]
-use std::io::{BufRead, BufReader};
+// #[rustversion::nightly]
+// use std::io::{BufRead, BufReader};
 use std::{
     collections::hash_map,
     env, fs,
@@ -14,10 +14,10 @@ use std::{
     ptr::addr_of_mut,
 };
 
-#[rustversion::nightly]
-use regex::Regex;
-#[rustversion::nightly]
-use rustc_version::Version;
+//#[rustversion::nightly]
+//use regex::Regex;
+//#[rustversion::nightly]
+//use rustc_version::Version;
 use which::which;
 
 mod bindings;
@@ -318,78 +318,78 @@ pub fn store_generated_content_if_different(
     }
 }
 
-#[rustversion::nightly]
-fn parse_stub(
-    stub_bindings_file: &Path,
-    current_rustc_version: &Version,
-) -> (bool, bool, Option<Vec<u8>>) {
-    let semver_re = Regex::new(r"/\* (.*) \*/").unwrap();
-    let qemu_hash_re = Regex::new(r"/\* qemu git hash: (.*) \*/").unwrap();
-
-    if let Ok(stub_file) = File::open(stub_bindings_file) {
-        let mut stub_rdr = BufReader::new(stub_file);
-
-        let mut first_line = String::new(); // rustc version
-        let mut second_line = String::new(); // qemu hash
-        let mut stub_content = Vec::<u8>::new();
-
-        assert!(
-            stub_rdr
-                .read_line(&mut first_line)
-                .expect("Could not read first line")
-                > 0,
-            "Error while reading first line."
-        );
-
-        assert!(
-            stub_rdr
-                .read_line(&mut second_line)
-                .expect("Could not read second line")
-                > 0,
-            "Error while reading second line."
-        );
-
-        if let Some((_, [version_str])) = semver_re
-            .captures_iter(&first_line)
-            .next()
-            .map(|caps| caps.extract())
-        {
-            // The first line matches the regex
-
-            if let Some((_, [qemu_hash_str])) = qemu_hash_re
-                .captures_iter(&second_line)
-                .next()
-                .map(|caps| caps.extract())
-            {
-                // The second line matches the regex
-
-                if let Ok(version) = Version::parse(version_str) {
-                    // The first line contains a version
-
-                    stub_rdr
-                        .read_to_end(&mut stub_content)
-                        .expect("could not read stub content");
-
-                    return (
-                        (current_rustc_version > &version) || (qemu_hash_str != QEMU_REVISION),
-                        false,
-                        Some(stub_content),
-                    );
-                }
-            }
-        }
-
-        stub_rdr.seek(SeekFrom::Start(0)).unwrap();
-        stub_rdr
-            .read_to_end(&mut stub_content)
-            .expect("could not read stub content");
-
-        (true, true, Some(stub_content))
-    } else {
-        // No stub file stored
-        (true, true, None)
-    }
-}
+//#[rustversion::nightly]
+//fn parse_stub(
+//    stub_bindings_file: &Path,
+//    current_rustc_version: &Version,
+//) -> (bool, bool, Option<Vec<u8>>) {
+//    let semver_re = Regex::new(r"/\* (.*) \*/").unwrap();
+//    let qemu_hash_re = Regex::new(r"/\* qemu git hash: (.*) \*/").unwrap();
+//
+//    if let Ok(stub_file) = File::open(stub_bindings_file) {
+//        let mut stub_rdr = BufReader::new(stub_file);
+//
+//        let mut first_line = String::new(); // rustc version
+//        let mut second_line = String::new(); // qemu hash
+//        let mut stub_content = Vec::<u8>::new();
+//
+//        assert!(
+//            stub_rdr
+//                .read_line(&mut first_line)
+//                .expect("Could not read first line")
+//                > 0,
+//            "Error while reading first line."
+//        );
+//
+//        assert!(
+//            stub_rdr
+//                .read_line(&mut second_line)
+//                .expect("Could not read second line")
+//                > 0,
+//            "Error while reading second line."
+//        );
+//
+//        if let Some((_, [version_str])) = semver_re
+//            .captures_iter(&first_line)
+//            .next()
+//            .map(|caps| caps.extract())
+//        {
+//            // The first line matches the regex
+//
+//            if let Some((_, [qemu_hash_str])) = qemu_hash_re
+//                .captures_iter(&second_line)
+//                .next()
+//                .map(|caps| caps.extract())
+//            {
+//                // The second line matches the regex
+//
+//                if let Ok(version) = Version::parse(version_str) {
+//                    // The first line contains a version
+//
+//                    stub_rdr
+//                        .read_to_end(&mut stub_content)
+//                        .expect("could not read stub content");
+//
+//                    return (
+//                        (current_rustc_version > &version) || (qemu_hash_str != QEMU_REVISION),
+//                        false,
+//                        Some(stub_content),
+//                    );
+//                }
+//            }
+//        }
+//
+//        stub_rdr.seek(SeekFrom::Start(0)).unwrap();
+//        stub_rdr
+//            .read_to_end(&mut stub_content)
+//            .expect("could not read stub content");
+//
+//        (true, true, Some(stub_content))
+//    } else {
+//        // No stub file stored
+//        (true, true, None)
+//    }
+//}
 
 #[rustversion::nightly]
 #[allow(unused)]

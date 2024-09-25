@@ -22,7 +22,6 @@ use libafl::{
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
-    os::unix_signals::{Signal, CTRL_C_EXIT},
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},

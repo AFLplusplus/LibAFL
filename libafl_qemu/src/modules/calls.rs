@@ -452,7 +452,7 @@ where
 
     #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { NOP_PAGE_FILTER.get_mut() }
+        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 

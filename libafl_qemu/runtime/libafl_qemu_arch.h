@@ -9,21 +9,22 @@
  *
  * Each architecture should define:
  *  - [type] libafl_word: native word on the target architecture (often the size of a register)
+ *  - [macro] define STDIO_SUPPORT: if defined, more commands will be supported.
  *  - [macro] LIBAFL_CALLING_CONVENTION: the calling convention to follow for the architecture. it should be the same as the one use in libafl qemu.
  *  - [function] snprintf: the standard POSIX snprintf definition.
  *  - [function] va_{start,arg,end}: standard functions to handle variadic functions
  */
 
 // Target Specific imports / definitions
-#ifdef _WIN32
-  // Windows
-  #include <stdint.h>
-  #include <intsafe.h>
+#if defined(_WIN32)
+    // Windows
+    #include <stdint.h>
+    #include <intsafe.h>
 
-  typedef UINT64 libafl_word;
-  #define LIBAFL_CALLING_CONVENTION __fastcall
-
-#else
+    typedef UINT64 libafl_word;
+    #define LIBAFL_CALLING_CONVENTION __fastcall
+    #define STDIO_SUPPORT
+#elif defined(__linux__)
     // Linux
     #ifdef __KERNEL__
       // Linux kernel
@@ -55,6 +56,24 @@
         typedef uint32_t libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
+    #endif
+
+    #define STDIO_SUPPORT
+#else
+    // Other
+    #include <stdint.h>
+    #include <stdarg.h>
+
+    #define noinline __attribute__((noinline))
+
+    #if defined(__x86_64__) || defined(__aarch64__)
+      typedef uint64_t libafl_word;
+      #define LIBAFL_CALLING_CONVENTION __attribute__(())
+    #endif
+
+    #ifdef __arm__
+      typedef uint32_t libafl_word;
+      #define LIBAFL_CALLING_CONVENTION __attribute__(())
     #endif
 #endif
 #endif
