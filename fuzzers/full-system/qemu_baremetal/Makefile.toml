@@ -113,6 +113,7 @@ else
     echo "qemu_baremetal ${FEATURE}: Objective found."
 fi
 '''
+dependencies = ["target"]
 
 [tasks.build_low_level]
 command = "cargo"
@@ -127,7 +128,14 @@ args = [
 
 [tasks.test_low_level]
 command = "cargo"
-args = ["make", "-e", "FEATURE=low_level", "test_fuzzer"]
+args = [
+  "make",
+  "-e",
+  "FEATURE=low_level",
+  "-e",
+  "TARGET_DEFINE=TARGET_CLASSIC",
+  "test_fuzzer"
+]
 
 [tasks.build_breakpoint]
 command = "cargo"
@@ -142,7 +150,14 @@ args = [
 
 [tasks.test_breakpoint]
 command = "cargo"
-args = ["make", "-e", "FEATURE=breakpoint", "test_fuzzer"]
+args = [
+  "make",
+  "-e",
+  "FEATURE=breakpoint",
+  "-e",
+  "TARGET_DEFINE=TARGET_BREAKPOINT",
+  "test_fuzzer"
+]
 
 [tasks.build_sync_exit]
 command = "cargo"
@@ -157,7 +172,14 @@ args = [
 
 [tasks.test_sync_exit]
 command = "cargo"
-args = ["make", "-e", "FEATURE=sync_exit", "test_fuzzer"]
+args = [
+  "make",
+  "-e",
+  "FEATURE=sync_exit",
+  "-e",
+  "TARGET_DEFINE=TARGET_SYNC_EXIT",
+  "test_fuzzer"
+]
 
 [tasks.low_level]
 command = "cargo"
