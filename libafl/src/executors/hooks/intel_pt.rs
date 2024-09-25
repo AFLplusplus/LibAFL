@@ -307,7 +307,7 @@ impl IntelPT {
         } else {
             // Head pointer wrapped, the trace is split
             unsafe {
-                let first_ptr = self.perf_aux_buffer.add(tail as usize) as *mut u8;
+                let first_ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
                 let first_len = PERF_AUX_BUFFER_SIZE - tail_wrap as usize;
                 let second_ptr = self.perf_aux_buffer as *mut u8;
                 let second_len = head_wrap as usize;
