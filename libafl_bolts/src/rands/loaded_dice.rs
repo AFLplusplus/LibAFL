@@ -54,7 +54,6 @@ pub struct LoadedDiceSampler {
 
 impl LoadedDiceSampler {
     /// Create a new [`LoadedDiceSampler`] with the given probabilities
-    #[must_use]
     pub fn new(probs: &[f64]) -> Result<Self, Error> {
         if probs.is_empty() {
             return Err(Error::illegal_argument(
@@ -124,7 +123,7 @@ mod tests {
         let base = (0..len).map(|_| rng.next_float()).collect::<Vec<_>>();
         let sum: f64 = base.iter().sum();
         let base = base.iter().map(|v| v / sum).collect::<Vec<_>>();
-        let mut sampler = LoadedDiceSampler::new(&base);
+        let mut sampler = LoadedDiceSampler::new(&base).unwrap();
         let mut res: Vec<usize> = vec![0; len];
         let iter: usize = 1000000;
         for _ in 0..iter {

@@ -74,11 +74,7 @@ where
     // create iterator
     let mut iter = from.into_iter();
 
-    let len = if let Some(len) = NonZero::new(iter.len()) {
-        len
-    } else {
-        return None;
-    };
+    let len = NonZero::new(iter.len())?;
 
     // pick a random, valid index
     let index = fast_bound(rand, len);
@@ -535,6 +531,8 @@ impl XkcdRand {
 
 #[cfg(test)]
 mod tests {
+    use core::num::NonZero;
+
     use crate::rands::{
         Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
         Xoshiro256PlusPlusRand,
@@ -542,8 +540,8 @@ mod tests {
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(100) < 100);
-        assert_eq!(rand.below(1), 0);
+        assert!(rand.below(NonZero::new(100).unwrap()) < 100);
+        assert_eq!(rand.below(NonZero::new(1).unwrap()), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }
