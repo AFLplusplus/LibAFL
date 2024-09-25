@@ -1,5 +1,85 @@
 // build.rs
 #![forbid(unexpected_cfgs)]
+#![allow(deprecated)]
+use {
+    anyhow::{anyhow, Result},
+    bindgen::CargoCallbacks,
+    reqwest::blocking::get,
+    std::{env, io::Cursor, path::Path},
+    tar::Archive,
+    xz2::read::XzDecoder,
+};
+
+fn extract() -> Result<()> {
+    let url = "https://github.com/frida/frida/releases/download/16.2.1/frida-gumjs-devkit-16.2.1-linux-x86_64.tar.xz";
+    let response = get(url)?;
+    let mut content = Cursor::new(response.bytes()?);
+    let xz = XzDecoder::new(&mut content);
+    let mut archive = Archive::new(xz);
+    let out_dir = env::var("OUT_DIR")?;
+    let dest_path = Path::new(&out_dir);
+
+    let mut found_header = false;
+    let mut found_lib = false;
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+        println!("path: {:?}", path);
+        if let Some(filename) = path.file_name() {
+            if let Some(name) = filename.to_str() {
+                match name {
+                    "frida-gumjs.h" => {
+                        println!("Extracting header file: {}", name);
+                        let full_name = dest_path.join(path);
+                        entry.unpack(full_name.as_path())?;
+                        found_header = true;
+                    }
+                    "libfrida-gumjs.a" => {
+                        println!("Extracting header file: {}", name);
+                        let full_name = dest_path.join(path);
+                        entry.unpack(full_name.as_path())?;
+                        found_lib = true;
+                    }
+                    _ => continue,
+                }
+            }
+        }
+    }
+
+    if found_header && found_lib {
+        Ok(())
+    } else {
+        Err(anyhow!("Failed to find header in devkit"))
+    }
+}
+
+fn bindings() -> Result<()> {
+    let out_dir = env::var("OUT_DIR")?;
+    let dest_path = Path::new(&out_dir);
+    let header = dest_path.join("frida-gumjs.h");
+    let bindings = bindgen::Builder::default()
+        .header(
+            header
+                .to_str()
+                .ok_or(anyhow!("Failed to convert header path"))?,
+        )
+        .generate_comments(true)
+        .generate_inline_functions(true)
+        .parse_callbacks(Box::new(CargoCallbacks::new()))
+        .generate()
+        .expect("Unable to generate bindings");
+
+    bindings
+        .write_to_file(dest_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
+
+    println!("cargo:rustc-link-search=native={out_dir:}");
+    println!("cargo:rustc-link-lib=static=frida-gumjs");
+    /* The GumJS devkit includes v8 (for supported platforms), which is implemented in C++. */
+    println!("cargo:rustc-link-lib=dylib=stdc++");
+    Ok(())
+}
 
 fn main() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
@@ -77,4 +157,7 @@ fn main() {
             .status()
             .expect("Failed to link test_harness");
     }
+
+    extract().unwrap();
+    bindings().unwrap();
 }

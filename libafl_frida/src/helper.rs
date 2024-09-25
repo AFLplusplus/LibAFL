@@ -29,6 +29,7 @@ use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
+use crate::script::Script;
 use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 /// The Runtime trait
@@ -149,6 +150,15 @@ impl FridaInstrumentationHelperBuilder {
     /// Create a new [`FridaInstrumentationHelperBuilder`]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Load a script
+    ///
+    /// See [`Script::new`] for details
+    #[must_use]
+    pub fn load_script(self, path: &str) -> Self {
+        Script::load(path).unwrap();
+        self
     }
 
     /// Enable or disable the [`Stalker`](https://frida.re/docs/stalker/)
@@ -429,6 +439,7 @@ where
             .map(PathBuf::from)
             .collect::<Vec<_>>();
         FridaInstrumentationHelper::builder()
+            .load_script("/tmp/script.js")
             .enable_stalker(options.cmplog || options.asan || !options.disable_coverage)
             .disable_excludes(options.disable_excludes)
             .instrument_module_if(move |module| pathlist_contains_module(&harness, module))
