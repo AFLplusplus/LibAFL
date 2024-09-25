@@ -571,9 +571,9 @@ where
         for (child_id, child_stream) in &mut self.children {
             loop {
                 // Exit if received a lot of inputs at once.
-                if nb_received > MAX_NB_RECEIVED_AT_ONCE {
-                    return Ok(());
-                }
+                // if nb_received > MAX_NB_RECEIVED_AT_ONCE {
+                //    return Ok(());
+                //}
 
                 log::debug!("Receiving from child {child_id:?}...");
                 match Self::read_msg(child_stream).await {
