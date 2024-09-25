@@ -1,6 +1,9 @@
 //! Mutator definitions for [`MultipartInput`]s. See [`crate::inputs::multi`] for details.
 
-use core::cmp::{min, Ordering};
+use core::{
+    cmp::{min, Ordering},
+    num::NonZero,
+};
 
 use libafl_bolts::{rands::Rand, Error};
 
@@ -41,8 +44,8 @@ where
         state: &mut S,
         input: &mut MultipartInput<I>,
     ) -> Result<MutationResult, Error> {
-        let Some(parts_len) = input.parts().len() else {
-            Ok(MutationResult::Skipped)
+        let Some(parts_len) = NonZero::new(input.parts().len()) else {
+            return Ok(MutationResult::Skipped);
         };
         let selected = state.rand_mut().below(parts_len);
         let mutated = input.part_mut(selected).unwrap();
@@ -208,10 +211,8 @@ where
                 .unwrap();
             drop(other_testcase);
             let size = part.bytes().len();
-            let nonzero_size = NonZero::new(size) else {
-                return Err(Error::illegal_state(
-                    "part.bytes() is empty in CrossoverInsertMutator",
-                ));
+            let Some(nonzero_size) = NonZero::new(size) else {
+                return Ok(MutationResult::Skipped);
             };
 
             let target = state.rand_mut().below(nonzero_size);
@@ -219,7 +220,9 @@ where
             // other_size is larger than 0, checked above.
             // size is larger than 0.
             // target is smaller than size -> the subtraction is larger than 0.
-            let range = rand_range(state, other_size, min(other_size, size - target));
+            let range = rand_range(state, other_size, unsafe {
+                NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+            });
 
             let other_testcase = state.corpus().get(id)?.borrow_mut();
             // No need to load the input again, it'll still be cached.
@@ -280,8 +283,17 @@ where
                     .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
-                    let target = state.rand_mut().below(size);
-                    let range = rand_range(state, other_size, min(other_size, size - target));
+                    let Some(nonzero_size) = NonZero::new(size) else {
+                        return Ok(MutationResult::Skipped);
+                    };
+
+                    let target = state.rand_mut().below(nonzero_size);
+                    // # Safety
+                    // other_size is checked above.
+                    // size is larger than than target and larger than 1. The subtraction result will always be positive.
+                    let range = rand_range(state, other_size, unsafe {
+                        NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+                    });
 
                     let [part, chosen] = match part_idx.cmp(&choice) {
                         Ordering::Less => input.parts_mut([part_idx, choice]),
@@ -321,9 +333,17 @@ where
                 .unwrap();
             drop(other_testcase);
             let size = part.bytes().len();
+            let Some(nonzero_size) = NonZero::new(size) else {
+                return Ok(MutationResult::Skipped);
+            };
 
-            let target = state.rand_mut().below(size);
-            let range = rand_range(state, other_size, min(other_size, size - target));
+            let target = state.rand_mut().below(nonzero_size);
+            // # Safety
+            // other_size is checked above.
+            // size is larger than than target and larger than 1. The subtraction result will always be positive.
+            let range = rand_range(state, other_size, unsafe {
+                NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+            });
 
             let other_testcase = state.corpus().get(id)?.borrow_mut();
             // No need to load the input again, it'll still be cached.
