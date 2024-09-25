@@ -89,7 +89,7 @@ pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     }
     m.add_submodule(&mmapm)?;
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     m.add_class::<sys::MapInfo>()?;
 
     #[cfg(feature = "usermode")]
