@@ -6,6 +6,7 @@ use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    num::NonZeroUsize,
 };
 
 use libafl_bolts::{
@@ -525,7 +526,7 @@ where
     pub fn new(
         state: &mut S,
         mutations: MT,
-        max_stack_pow: usize,
+        max_stack_pow: NonZeroUsize,
         swarm_num: usize,
     ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {

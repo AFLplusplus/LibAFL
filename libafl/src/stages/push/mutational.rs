@@ -5,6 +5,7 @@ use alloc::rc::Rc;
 use core::{
     cell::{Cell, RefCell},
     fmt::Debug,
+    num::NonZero,
 };
 
 use libafl_bolts::rands::Rand;

@@ -1,6 +1,6 @@
 //! Gramatron generator
 use alloc::{string::String, vec::Vec};
-use core::marker::PhantomData;
+use core::{marker::PhantomData, num::NonZero};
 
 use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
@@ -76,13 +76,21 @@ where
                 .last()
                 .map_or(self.automaton.init_state, |last| {
                     let triggers = &self.automaton.pda[last.state];
-                    let idx = state.rand_mut().below(triggers.len());
+                    let idx = state.rand_mut().below(
+                        NonZero::new(triggers.len())
+                            .expect("Triggers are empty in append_generated_terminals!"),
+                    );
                     triggers[idx].dest
                 });
 
         while current_state != final_state {
             let triggers = &self.automaton.pda[current_state];
-            let idx = state.rand_mut().below(triggers.len());
+            let idx =
+                state
+                    .rand_mut()
+                    .below(NonZero::new(triggers.len()).expect(
+                        "Automation.pda triggers are empty in append_generated_terminals!",
+                    ));
             let trigger = &triggers[idx];
             input
                 .terminals_mut()

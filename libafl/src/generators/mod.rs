@@ -1,7 +1,10 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
 use alloc::vec::Vec;
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    num::{NonZero, NonZeroUsize},
+};
 
 use libafl_bolts::rands::Rand;
 
@@ -92,7 +95,7 @@ pub struct RandBytesGenerator<S>
 where
     S: HasRand,
 {
-    max_size: usize,
+    max_size: NonZeroUsize,
     phantom: PhantomData<S>,
 }
 
@@ -106,7 +109,7 @@ where
             size = 1;
         }
         let random_bytes: Vec<u8> = (0..size)
-            .map(|_| state.rand_mut().below(256) as u8)
+            .map(|_| state.rand_mut().below(NonZero::new(256).unwrap()) as u8)
             .collect();
         Ok(BytesInput::new(random_bytes))
     }
@@ -118,7 +121,7 @@ where
 {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(max_size: usize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,
@@ -132,7 +135,7 @@ pub struct RandPrintablesGenerator<S>
 where
     S: HasRand,
 {
-    max_size: usize,
+    max_size: NonZeroUsize,
     phantom: PhantomData<S>,
 }
 
@@ -159,7 +162,7 @@ where
 {
     /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
     #[must_use]
-    pub fn new(max_size: usize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,

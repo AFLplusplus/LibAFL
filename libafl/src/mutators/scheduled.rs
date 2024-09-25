@@ -4,6 +4,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    num::{NonZero, NonZeroUsize},
     ops::{Deref, DerefMut},
 };
 
@@ -106,7 +107,7 @@ where
 {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: usize,
+    max_stack_pow: NonZeroUsize,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -176,8 +177,13 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(self.mutations.len() != 0);
-        state.rand_mut().below(self.mutations.len()).into()
+        debug_assert_ne!(self.mutations.len(), 0);
+        // # Safety
+        // We check for empty mutations
+        state
+            .rand_mut()
+            .below(unsafe { NonZero::new(self.mutations.len()).unwrap_unchecked() })
+            .into()
     }
 }
 
@@ -194,13 +200,13 @@ where
                 mutations.names().join(", ")
             )),
             mutations,
-            max_stack_pow: 7,
+            max_stack_pow: NonZero::new(7).unwrap(),
             phantom: PhantomData,
         }
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: NonZeroUsize) -> Self {
         StdScheduledMutator {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
@@ -311,13 +317,18 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(6))
+        1 << (1 + state.rand_mut().below(NonZero::new(6).unwrap()))
     }
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(MT::LEN != 0);
-        state.rand_mut().below(MT::LEN).into()
+        // # Safety
+        // In debug we check the length. Worst case we end up with an illegal MutationId and fail later.
+        state
+            .rand_mut()
+            .below(unsafe { NonZero::new(MT::LEN).unwrap_unchecked() })
+            .into()
     }
 
     fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {

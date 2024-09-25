@@ -4,7 +4,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{cmp::max, num::NonZero};
 
-use crossterm::terminal;
 use hashbrown::HashMap;
 use libafl_bolts::{
     rands::{choose, Rand},
@@ -229,7 +228,7 @@ where
             };
 
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut first = state.rand_mut().below(non_zero_chosen_nums) as i64;
+        let mut first = state.rand_mut().below(non_zero_chosen_nums_minus_one) as i64;
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut second = state
             .rand_mut()

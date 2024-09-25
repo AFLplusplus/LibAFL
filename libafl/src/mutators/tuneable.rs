@@ -7,6 +7,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::{self, Debug},
     marker::PhantomData,
+    num::{NonZero, NonZeroUsize},
 };
 
 use libafl_bolts::{
