@@ -18,7 +18,7 @@ use std::{
     path::Path,
     process, ptr, slice,
     string::String,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
     vec::Vec,
 };
 
@@ -52,6 +52,15 @@ thread_local! {
     // Cannot use `LazyCell` for this since `libafl_bolts::Error` is not `Clone`.
     static PT_PERF_TYPE: Cell<Option<u32>> = Cell::new(None);
 }
+
+static PT_NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
+    let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
+    let s = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read Intel PT number of address filters from {path}"))?;
+    s.trim()
+        .parse::<u32>()
+        .map_err(|_| format!("Failed to parse Intel PT number of address filters in {path}"))
+});
 
 #[derive(TryFromPrimitive, Debug)]
 #[repr(i32)]
@@ -446,7 +455,7 @@ impl IntelPT {
             reasons.push(e.to_string());
         }
 
-        if let Err(e) = intel_pt_nr_addr_filters() {
+        if let Err(e) = &*PT_NR_ADDR_FILTERS {
             reasons.push(e.to_string());
         }
 
@@ -613,22 +622,6 @@ fn intel_pt_perf_type() -> Result<u32, Error> {
         perf_type
     };
     Ok(perf_type)
-}
-
-fn intel_pt_nr_addr_filters() -> Result<u32, Error> {
-    // TODO: this can be cached
-    let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
-    let s = fs::read_to_string(&path).map_err(|e| {
-        Error::os_error(
-            e,
-            format!("Failed to read Intel PT number of address filters from {path}"),
-        )
-    })?;
-    s.trim().parse::<u32>().map_err(|_| {
-        Error::unsupported(format!(
-            "Failed to parse Intel PT number of address filters in {path}"
-        ))
-    })
 }
 
 #[inline]
