@@ -24,6 +24,7 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 + `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./libafl_qemu)
 + `TinyInst`, in [libafl_tinyinst](./libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
 
+## Why LibAFL ?
 LibAFL gives you many of the benefits of an off-the-shelf fuzzer, while being completely customizable.
 Some highlight features currently include:
 - `fast`: We do everything we can at compile time, keeping runtime overhead minimal. Users reach 120k execs/sec in frida-mode on a phone (using all cores).
