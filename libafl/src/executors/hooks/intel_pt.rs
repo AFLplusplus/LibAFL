@@ -114,46 +114,43 @@ where
         assert!(self.pt.is_none(), "Intel PT was already set up");
         let pid = process::id();
         self.pt = Some(IntelPT::try_new(pid as i32).unwrap());
-        println!("Init hook");
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.trace.lock().unwrap().clear();
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
-        println!("Pre exec hook");
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn post_exec(&mut self, state: &mut S, _input: &S::Input) {
-        println!("Post exec hook");
         self.pt.as_mut().unwrap().disable_tracing().unwrap();
         let mut image = Image::new(Some("test_trace_pid")).unwrap();
         // TODO optimize, move  this stuff
-        let pid = process::id();
-        let maps = get_process_maps(pid as i32).unwrap();
-        for map in maps {
-            if map.is_exec() && map.filename().is_some() {
-                let _ = image.add_file(
-                    map.filename().unwrap().to_str().unwrap(),
-                    map.offset as u64,
-                    map.size() as u64,
-                    None,
-                    map.start() as u64,
-                );
-            }
-        }
+        // let pid = process::id();
+        // let maps = get_process_maps(pid as i32).unwrap();
+        // for map in maps {
+        //     if map.is_exec() && map.filename().is_some() {
+        //         let _ = image.add_file(
+        //             map.filename().unwrap().to_str().unwrap(),
+        //             map.offset as u64,
+        //             map.size() as u64,
+        //             None,
+        //             map.start() as u64,
+        //         );
+        //     }
+        // }
         let mut buff = self.trace.lock().unwrap();
-        // let ips = self
-        //     .pt
-        //     .as_mut()
-        //     .unwrap()
-        //     .decode_with_image(&mut image, Some(&mut buff));
-        let s = serde_json::to_vec(&state).unwrap();
-        dump_corpus(&s).unwrap();
-        dump_trace_to_file(&buff).unwrap();
+        let ips = self
+            .pt
+            .as_mut()
+            .unwrap()
+            .decode_with_image(&mut image, Some(&mut buff));
+        // let s = serde_json::to_vec(&state).unwrap();
+        // dump_corpus(&s).unwrap();
+        // dump_trace_to_file(&buff).unwrap();
         // println!("IPs: {ips:x?}");
-        println!("Post exec hook");
+        // println!("Post exec hook");
     }
 }
 
@@ -321,89 +318,89 @@ impl IntelPT {
             }
         };
 
-        println!("Intel PT: decoding {len} bytes");
-        if let Some(copy_buffer) = copy_buffer {
-            copy_buffer.extend_from_slice(&data);
-        }
-
         smp_rmb(); // TODO double check impl
+
+        // println!("Intel PT: decoding {len} bytes");
+        if let Some(b) = copy_buffer {
+            b.extend_from_slice(&data);
+        }
 
         // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;??
         // apparently the rust library doesn't have the context parameter for the image.set_callback
         // also, under the hood looks like it is passing the callback itself as context to the C fn 🤔
         // TODO remove unwrap()
-        let mut config = ConfigBuilder::new(data.to_mut()).unwrap();
-        if let Some(cpu) = current_cpu() {
-            config.cpu(cpu);
-        }
-        let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
-        if let Some(i) = image {
-            decoder.set_image(Some(i)).expect("Failed to set image");
-        }
-        if let Some(rm) = read_memory {
-            decoder
-                .image()
-                .unwrap()
-                .set_callback(Some(rm))
-                .expect("Failed to set get memory callback");
-        }
-        // TODO rewrite decently
-        // TODO consider dropping libipt-rs and using sys, or bindgen ourselves
-        let mut status;
-        loop {
-            status = match decoder.sync_forward() {
-                Ok(s) => s,
-                Err(e) => {
-                    println!("pterror in sync {e:?}");
-                    break;
-                }
-            };
-
-            loop {
-                if loop {
-                    if !status.event_pending() {
-                        break Ok(());
-                    }
-                    match decoder.event() {
-                        Ok((_, s)) => {
-                            // TODO maybe we care about some events?
-                            status = s;
-                        }
-                        Err(e) => {
-                            println!("pterror in event {e:?}");
-                            break Err(e);
-                        }
-                    };
-                }
-                .is_err()
-                {
-                    break;
-                }
-
-                let block = decoder.next();
-                match block {
-                    Err((b, e)) => {
-                        // libipt-rs library ignores the fact that
-                        // Even in case of errors, we may have succeeded in decoding some instructions.
-                        // https://github.com/intel/libipt/blob/4a06fdffae39dadef91ae18247add91029ff43c0/ptxed/src/ptxed.c#L1954
-                        // Using my fork that fixes this atm
-                        println!("pterror in packet next {e:?}");
-                        println!("err block ip: 0x{:x?}", b.ip());
-                        ips.push(b.ip());
-                        // status = Status::from_bits(e.code() as u32).unwrap();
-                        break;
-                    }
-                    Ok((b, s)) => {
-                        status = s;
-                        ips.push(b.ip());
-
-                        if status.eos() {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        // let mut config = ConfigBuilder::new(data.to_mut()).unwrap();
+        // if let Some(cpu) = current_cpu() {
+        //     config.cpu(cpu);
+        // }
+        // let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
+        // if let Some(i) = image {
+        //     decoder.set_image(Some(i)).expect("Failed to set image");
+        // }
+        // if let Some(rm) = read_memory {
+        //     decoder
+        //         .image()
+        //         .unwrap()
+        //         .set_callback(Some(rm))
+        //         .expect("Failed to set get memory callback");
+        // }
+        // // TODO rewrite decently
+        // // TODO consider dropping libipt-rs and using sys, or bindgen ourselves
+        // let mut status;
+        // loop {
+        //     status = match decoder.sync_forward() {
+        //         Ok(s) => s,
+        //         Err(e) => {
+        //             // println!("pterror in sync {e:?}");
+        //             break;
+        //         }
+        //     };
+        //
+        //     loop {
+        //         if loop {
+        //             if !status.event_pending() {
+        //                 break Ok(());
+        //             }
+        //             match decoder.event() {
+        //                 Ok((_, s)) => {
+        //                     // TODO maybe we care about some events?
+        //                     status = s;
+        //                 }
+        //                 Err(e) => {
+        //                     // println!("pterror in event {e:?}");
+        //                     break Err(e);
+        //                 }
+        //             };
+        //         }
+        //         .is_err()
+        //         {
+        //             break;
+        //         }
+        //
+        //         let block = decoder.next();
+        //         match block {
+        //             Err((b, e)) => {
+        //                 // libipt-rs library ignores the fact that
+        //                 // Even in case of errors, we may have succeeded in decoding some instructions.
+        //                 // https://github.com/intel/libipt/blob/4a06fdffae39dadef91ae18247add91029ff43c0/ptxed/src/ptxed.c#L1954
+        //                 // Using my fork that fixes this atm
+        //                 // println!("pterror in packet next {e:?}");
+        //                 // println!("err block ip: 0x{:x?}", b.ip());
+        //                 ips.push(b.ip());
+        //                 // status = Status::from_bits(e.code() as u32).unwrap();
+        //                 break;
+        //             }
+        //             Ok((b, s)) => {
+        //                 status = s;
+        //                 ips.push(b.ip());
+        //
+        //                 if status.eos() {
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         unsafe { aux_tail.write_volatile(head) };
 

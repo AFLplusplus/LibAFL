@@ -3,6 +3,7 @@
 
 use alloc::borrow::Cow;
 use std::{
+    cmp::min,
     sync::{Arc, Mutex},
     vec::Vec,
 };
@@ -20,6 +21,7 @@ pub struct IntelPTFeedback {
     trace: Arc<Mutex<Vec<u8>>>,
     past_traces: Vec<Vec<u8>>,
     avg_score: f64,
+    execution_number: usize,
 }
 
 impl IntelPTFeedback {
@@ -28,6 +30,7 @@ impl IntelPTFeedback {
             trace,
             past_traces: vec![],
             avg_score: 0.0,
+            execution_number: 0,
         }
     }
 }
@@ -54,13 +57,14 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
+        self.execution_number += 1;
         let trace = self.trace.lock().unwrap();
         if self.past_traces.is_empty() {
             self.past_traces.push(trace.clone());
             return Ok(true);
         }
 
-        let mut tot_score = 0;
+        let mut min_score = usize::MAX;
         for pt in &self.past_traces {
             let diff = capture_diff_slices(Algorithm::Myers, &trace, &pt);
             let score = diff
@@ -72,16 +76,14 @@ where
                     DiffOp::Replace { new_len, .. } => *new_len,
                 })
                 .sum::<usize>();
-            tot_score += score;
+            min_score = min(min_score, score);
         }
 
-        let weighted_score = tot_score as f64 / self.past_traces.len() as f64;
+        let n = self.execution_number as f64;
+        self.avg_score = (self.avg_score * (n - 1.0) + min_score as f64) / n;
 
-        self.past_traces.push(trace.clone());
-        let n = self.past_traces.len() as f64;
-        self.avg_score = (self.avg_score * (n - 1.0) + weighted_score) / n;
-
-        if n > 200.0 && weighted_score > self.avg_score * 2.0 {
+        if n > 50.0 && min_score as f64 > self.avg_score * 1.05 {
+            self.past_traces.push(trace.clone());
             Ok(true)
         } else {
             Ok(false)

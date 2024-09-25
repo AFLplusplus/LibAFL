@@ -15,13 +15,11 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{hooks::IntelPTHook, inprocess::GenericInProcessExecutor, ExitKind},
-    feedback_and,
-    feedbacks::{CrashFeedback, IntelPTFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, IntelPTFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
-    observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -68,11 +66,8 @@ pub fn main() {
         ExitKind::Ok
     };
 
-    // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("PT trace", SIGNALS_PTR, SIGNALS.len()) };
-
     // Feedback to rate the interestingness of an input
-    let mut feedback = feedback_and!(IntelPTFeedback::new(pt_trace.clone())); //MaxMapFeedback::new(&observer),
+    let mut feedback = IntelPTFeedback::new(pt_trace.clone());
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -121,7 +116,7 @@ pub fn main() {
     let mut executor = PTInProcessExecutor::with_timeout_generic(
         tuple_list!(pt_hook),
         &mut harness,
-        tuple_list!(observer),
+        tuple_list!(),
         &mut fuzzer,
         &mut state,
         &mut mgr,
