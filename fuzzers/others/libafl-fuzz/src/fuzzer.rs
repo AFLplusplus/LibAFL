@@ -252,7 +252,7 @@ where
 
     // Finalize and build our Executor
     let mut executor = executor_builder
-        .build(tuple_list!(time_observer, edges_observer))
+        .build_dynamic_map(edges_observer, tuple_list!(time_observer))
         .unwrap();
 
     let queue_dir = fuzzer_dir.join("queue");
