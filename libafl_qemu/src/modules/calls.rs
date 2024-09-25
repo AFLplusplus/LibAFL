@@ -1,4 +1,4 @@
-use core::{cell::UnsafeCell, fmt::Debug};
+use core::{cell::UnsafeCell, fmt::Debug, ptr::addr_of_mut};
 
 use capstone::prelude::*;
 use libafl::{
@@ -412,8 +412,12 @@ where
         );
     }
 
-    fn pre_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, input: &S::Input)
-    where
+    fn pre_exec<ET>(
+        &mut self,
+        _state: &mut S,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        input: &S::Input,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         self.collectors
@@ -424,6 +428,7 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
+        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
         input: &S::Input,
         observers: &mut OT,
@@ -536,13 +541,13 @@ impl Default for FullBacktraceCollector {
 
 impl FullBacktraceCollector {
     pub fn new() -> Self {
-        unsafe { CALLSTACKS = Some(ThreadLocal::new()) };
+        unsafe { (*addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
         Self {}
     }
 
     pub fn reset(&mut self) {
         unsafe {
-            for tls in CALLSTACKS.as_mut().unwrap().iter_mut() {
+            for tls in (*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
             }
         }
@@ -550,7 +555,7 @@ impl FullBacktraceCollector {
 
     pub fn backtrace() -> Option<&'static [GuestAddr]> {
         unsafe {
-            if let Some(c) = CALLSTACKS.as_mut() {
+            if let Some(c) = (*addr_of_mut!(CALLSTACKS)).as_mut() {
                 Some(&*c.get_or_default().get())
             } else {
                 None
@@ -573,7 +578,12 @@ impl CallTraceCollector for FullBacktraceCollector {
     {
         // TODO handle Thumb
         unsafe {
-            (*CALLSTACKS.as_mut().unwrap().get_or_default().get()).push(pc + call_len as GuestAddr);
+            (*(*addr_of_mut!(CALLSTACKS))
+                .as_mut()
+                .unwrap()
+                .get_or_default()
+                .get())
+            .push(pc + call_len as GuestAddr);
         }
     }
 
@@ -589,7 +599,11 @@ impl CallTraceCollector for FullBacktraceCollector {
         S: Unpin + UsesInput,
     {
         unsafe {
-            let v = &mut *CALLSTACKS.as_mut().unwrap().get_or_default().get();
+            let v = &mut *(*addr_of_mut!(CALLSTACKS))
+                .as_mut()
+                .unwrap()
+                .get_or_default()
+                .get();
             if !v.is_empty() {
                 // if *v.last().unwrap() == ret_addr {
                 //    v.pop();

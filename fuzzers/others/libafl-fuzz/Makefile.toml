@@ -12,7 +12,7 @@ FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
-AFL_VERSION = "598a3c6b5e24bd33e84b914e145810d39f88adf6"
+AFL_VERSION = "8b35dd49be5f846e945f6d6a9414623d195a99cb"
 AFL_DIR = { value = "${PROJECT_DIR}/AFLplusplus" }
 AFL_CC_PATH = { value = "${AFL_DIR}/afl-clang-fast" }
 CC = { value = "clang" }
@@ -110,7 +110,7 @@ script = '''
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
 AFL_CORES=1 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
-test -n "$( ls -A ./test/output-cmplog/fuzzer_main/crashes/)" || {
+test -n "$( ls ./test/output-cmplog/fuzzer_main/crashes/id:0000* 2>/dev/null )" || {
 	echo "No crashes found"
 	exit 1
 }

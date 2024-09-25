@@ -15,8 +15,8 @@ use libafl::{
     inputs::BytesInput,
     monitors::Monitor,
     mutators::{
-        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens,
+        havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
+        StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{
@@ -127,7 +127,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler = IndexesLenTimeMinimizerScheduler::new(
             &edges_observer,
-            PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST),
+            PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()),
         );
 
         let observers = tuple_list!(edges_observer, time_observer);

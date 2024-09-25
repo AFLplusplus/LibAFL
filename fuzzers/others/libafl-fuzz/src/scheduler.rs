@@ -2,45 +2,29 @@ use std::marker::PhantomData;
 
 use libafl::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::UsesInput,
-    observers::{CanTrack, ObserversTuple},
-    schedulers::{
-        HasQueueCycles, MinimizerScheduler, RemovableScheduler, Scheduler, TestcaseScore,
-    },
-    state::{HasCorpus, HasRand, State, UsesState},
+    inputs::Input,
+    schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
+    state::HasCorpus,
     Error, HasMetadata,
 };
-use libafl_bolts::{serdeany::SerdeAny, AsIter, HasRefCnt};
+use libafl_bolts::tuples::MatchName;
 
-pub enum SupportedSchedulers<S, Q, CS, F, M, O> {
-    Queue(Q, PhantomData<(S, Q, CS, F, M, O)>),
-    Weighted(
-        MinimizerScheduler<CS, F, M, O>,
-        PhantomData<(S, Q, CS, F, M, O)>,
-    ),
+pub enum SupportedSchedulers<Q, W> {
+    Queue(Q, PhantomData<W>),
+    Weighted(W, PhantomData<Q>),
 }
 
-impl<S, Q, CS, F, M, O> UsesState for SupportedSchedulers<S, Q, CS, F, M, O>
+impl<I, Q, S, W> RemovableScheduler<I, S> for SupportedSchedulers<Q, W>
 where
-    S: State + HasRand + HasCorpus + HasMetadata + HasTestcase,
-{
-    type State = S;
-}
-
-impl<S, Q, CS, F, M, O> RemovableScheduler for SupportedSchedulers<S, Q, CS, F, M, O>
-where
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
-    Q: Scheduler<State = S> + RemovableScheduler,
-    CS: RemovableScheduler<State = S>,
-    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    O: CanTrack,
-    F: TestcaseScore<S>,
+    Q: Scheduler<I, S> + RemovableScheduler<I, S>,
+    W: Scheduler<I, S> + RemovableScheduler<I, S>,
+    S: HasCorpus + HasTestcase,
 {
     fn on_remove(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         id: CorpusId,
-        testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         match self {
             Self::Queue(queue, _) => queue.on_remove(state, id, testcase),
@@ -48,12 +32,7 @@ where
         }
     }
 
-    fn on_replace(
-        &mut self,
-        state: &mut Self::State,
-        id: CorpusId,
-        prev: &Testcase<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+    fn on_replace(&mut self, state: &mut S, id: CorpusId, prev: &Testcase<I>) -> Result<(), Error> {
         match self {
             Self::Queue(queue, _) => queue.on_replace(state, id, prev),
             Self::Weighted(weighted, _) => weighted.on_replace(state, id, prev),
@@ -61,16 +40,14 @@ where
     }
 }
 
-impl<S, Q, CS, F, M, O> Scheduler for SupportedSchedulers<S, Q, CS, F, M, O>
+impl<I, Q, S, W> Scheduler<I, S> for SupportedSchedulers<Q, W>
 where
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
-    Q: Scheduler<State = S>,
-    CS: Scheduler<State = S>,
-    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    O: CanTrack,
-    F: TestcaseScore<S>,
+    I: Input,
+    Q: Scheduler<I, S>,
+    W: Scheduler<I, S>,
+    S: HasCorpus + HasTestcase,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         match self {
             // We need to manually set the depth
             // since we want to avoid implementing `AflScheduler` for `QueueScheduler`
@@ -94,20 +71,15 @@ where
     }
 
     /// Gets the next entry in the queue
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         match self {
             Self::Queue(queue, _) => queue.next(state),
             Self::Weighted(weighted, _) => weighted.next(state),
         }
     }
-    fn on_evaluation<OTB>(
-        &mut self,
-        state: &mut Self::State,
-        input: &<Self::State as UsesInput>::Input,
-        observers: &OTB,
-    ) -> Result<(), Error>
+    fn on_evaluation<OTB>(&mut self, state: &mut S, input: &I, observers: &OTB) -> Result<(), Error>
     where
-        OTB: ObserversTuple<Self::State>,
+        OTB: MatchName,
     {
         match self {
             Self::Queue(queue, _) => queue.on_evaluation(state, input, observers),
@@ -117,7 +89,7 @@ where
 
     fn set_current_scheduled(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         next_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         match self {
@@ -127,19 +99,15 @@ where
     }
 }
 
-impl<S, Q, CS, F, M, O> HasQueueCycles for SupportedSchedulers<S, Q, CS, F, M, O>
+impl<Q, W> HasQueueCycles for SupportedSchedulers<Q, W>
 where
-    S: UsesInput + HasTestcase + HasMetadata + HasCorpus + HasRand + State,
-    Q: Scheduler<State = S> + HasQueueCycles,
-    CS: Scheduler<State = S> + HasQueueCycles,
-    O: CanTrack,
-    M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    F: TestcaseScore<S>,
+    Q: HasQueueCycles,
+    W: HasQueueCycles,
 {
     fn queue_cycles(&self) -> u64 {
         match self {
             Self::Queue(queue, _) => queue.queue_cycles(),
-            Self::Weighted(weighted, _) => weighted.base().queue_cycles(),
+            Self::Weighted(weighted, _) => weighted.queue_cycles(),
         }
     }
 }

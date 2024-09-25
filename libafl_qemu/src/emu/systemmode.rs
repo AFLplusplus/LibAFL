@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use hashbrown::HashMap;
 use libafl::{
     inputs::{HasTargetBytes, UsesInput},
-    prelude::{HasExecutions, State},
+    state::{HasExecutions, State},
 };
 use libafl_qemu_sys::GuestPhysAddr;
 

@@ -4,46 +4,40 @@ use hashbrown::HashMap;
 use libafl::{
     corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapNoveltiesMetadata,
-    inputs::UsesInput,
+    inputs::Input,
     schedulers::{RemovableScheduler, Scheduler},
-    state::{HasCorpus, State, UsesState},
+    state::{HasCorpus, State},
     Error, HasMetadata,
 };
 
 #[derive(Clone, Debug)]
-pub struct MergeScheduler<S> {
+pub struct MergeScheduler<I, S> {
     mapping: HashMap<usize, CorpusId>,
     all: BTreeSet<CorpusId>,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> UsesState for MergeScheduler<S>
+impl<I, S> RemovableScheduler<I, S> for MergeScheduler<I, S>
 where
-    S: State,
-{
-    type State = S;
-}
-
-impl<S> RemovableScheduler for MergeScheduler<S>
-where
+    I: Input,
     S: State + HasCorpus,
 {
     fn on_remove(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         id: CorpusId,
-        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         self.all.remove(&id);
         Ok(())
     }
 }
 
-impl<S> Scheduler for MergeScheduler<S>
+impl<I, S> Scheduler<I, S> for MergeScheduler<I, S>
 where
     S: State + HasCorpus,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.all.insert(id);
         let testcase = state.corpus().get(id)?.borrow();
         let meta = testcase.metadata::<MapNoveltiesMetadata>()?;
@@ -53,12 +47,21 @@ where
         Ok(())
     }
 
-    fn next(&mut self, _state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, _state: &mut S) -> Result<CorpusId, Error> {
         unimplemented!("Not suitable for actual scheduling.");
+    }
+
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
     }
 }
 
-impl<S> MergeScheduler<S> {
+impl<I, S> MergeScheduler<I, S> {
     pub fn new() -> Self {
         Self {
             mapping: HashMap::default(),
