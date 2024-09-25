@@ -6,9 +6,9 @@ use std::{
 };
 
 use libafl::{
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     inputs::BytesInput,
-    state::{HasCorpus, HasExecutions, HasStartTime},
+    state::{HasCorpus, HasExecutions, HasSolutions, HasStartTime},
     Error,
 };
 use libafl_bolts::current_time;
@@ -19,9 +19,9 @@ use nix::{
 
 use crate::{fuzzer::LibaflFuzzState, OUTPUT_GRACE};
 
-pub fn generate_base_filename(state: &mut LibaflFuzzState) -> String {
+pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> String {
+    let id = id.0;
     let is_seed = state.must_load_initial_inputs();
-    let id = state.corpus().peek_free_id().0;
     let name = if is_seed {
         // TODO set orig filename
         format!("id:{id:0>6},time:0,execs:0,orig:TODO",)
@@ -44,7 +44,8 @@ pub fn set_corpus_filepath(
     testcase: &mut Testcase<BytesInput>,
     _fuzzer_dir: &PathBuf,
 ) -> Result<(), Error> {
-    let mut name = generate_base_filename(state);
+    let id = state.corpus().peek_free_id();
+    let mut name = generate_base_filename(state, id);
     if testcase.hit_feedbacks().contains(&Cow::Borrowed("edges")) {
         name = format!("{name},+cov");
     }
@@ -60,7 +61,8 @@ pub fn set_solution_filepath(
 ) -> Result<(), Error> {
     // sig:0SIGNAL
     // TODO: verify if 0 time if objective found during seed loading
-    let mut filename = generate_base_filename(state);
+    let id = state.solutions().peek_free_id();
+    let mut filename = generate_base_filename(state, id);
     let mut dir = "crashes";
     if testcase
         .hit_objectives()
