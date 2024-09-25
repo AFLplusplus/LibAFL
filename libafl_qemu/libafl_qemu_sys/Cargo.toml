@@ -54,14 +54,14 @@ paranoid_debug = [
 ] # Will perform as many checks as possible. The target will be greatly slowed down.
 
 [dependencies]
-paste = "1"
-num_enum = "0.7"
-libc = "0.2"
-strum = "0.26"
-strum_macros = "0.26"
-pyo3 = { version = "0.22", optional = true }
+paste = "1.0.15"
+num_enum = "0.7.3"
+libc = "0.2.159"
+strum = "0.26.3"
+strum_macros = "0.26.4"
+pyo3 = { version = "0.22.3", optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.13.2" }
-pyo3-build-config = { version = "0.22", optional = true }
-rustversion = "1.0"
+pyo3-build-config = { version = "0.22.3", optional = true }
+rustversion = "1.0.17"
