@@ -455,8 +455,9 @@ where
         // Auto page filtering if option is enabled
         #[cfg(emulation_mode = "systemmode")]
         if emu.driver_mut().allow_page_on_start() {
-            let page_id = qemu.current_cpu().unwrap().current_paging_id().unwrap();
-            emu.modules_mut().modules_mut().allow_page_id_all(page_id);
+            if let Some(page_id) = qemu.current_cpu().unwrap().current_paging_id() {
+                emu.modules_mut().modules_mut().allow_page_id_all(page_id);
+            }
         }
 
         #[cfg(feature = "x86_64")]

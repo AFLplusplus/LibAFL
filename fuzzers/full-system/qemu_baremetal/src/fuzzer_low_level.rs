@@ -150,15 +150,18 @@ pub fn fuzz() {
                     qemu.write_phys_mem(input_addr, buf);
 
                     match emulator.qemu().run() {
-                        Ok(QemuExitReason::Breakpoint(_)) => {}
-                        Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
-                            Signal::SigInterrupt,
-                        ))) => process::exit(CTRL_C_EXIT),
+                        Ok(QemuExitReason::Breakpoint(_)) => {} // continue execution, nothing to do there.
+                        Ok(QemuExitReason::Timeout) => return ExitKind::Timeout, // timeout, propagate
+                        Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
+                            // will take care of cleanly stopping the fuzzer.
+                            signal.handle()
+                        }
+
                         Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                        _ => panic!("Unexpected QEMU exit."),
+                        e => panic!("Unexpected QEMU exit: {e:?}."),
                     }
 
-                    // If the execution stops at any point other then the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
+                    // If the execution stops at any point other than the designated breakpoint (e.g. a breakpoint on a panic method) we consider it a crash
                     let mut pcs = (0..qemu.num_cpus())
                         .map(|i| qemu.cpu_from_index(i))
                         .map(|cpu| -> Result<u32, QemuRWError> { cpu.read_reg(Regs::Pc) });

@@ -77,7 +77,7 @@ args = [
 dependencies = ["image"]
 
 [tasks.run_fuzzer]
-command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode"
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_baremetal"
 args = [
   "-icount",
   "shift=auto,align=off,sleep=off",
@@ -107,10 +107,10 @@ cargo make build_$FEATURE
 timeout 15s cargo make ${FEATURE} | tee $TMP_DIR/fuzz.log 2>&1 || true
 
 if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
-    echo "qemu_systemmode ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
+    echo "qemu_baremetal ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
     exit 1
 else
-    echo "qemu_systemmode ${FEATURE}: Objective found."
+    echo "qemu_baremetal ${FEATURE}: Objective found."
 fi
 '''
 

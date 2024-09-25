@@ -117,7 +117,7 @@ pub struct StdEmulatorDriver {
     input_location: OnceCell<InputLocation>,
     #[builder(default = true)]
     hooks_locked: bool,
-    #[builder(default = true)]
+    #[builder(default = false)]
     allow_page_on_start: bool,
     #[cfg(feature = "x86_64")]
     #[builder(default = false)]
@@ -249,9 +249,7 @@ where
                 _ => panic!("Unhandled QEMU shutdown cause: {shutdown_cause:?}."),
             },
             EmulatorExitResult::Timeout => {
-                return Ok(Some(EmulatorDriverResult::ReturnToHarness(
-                    EmulatorExitResult::Timeout,
-                )))
+                return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Timeout)))
             }
             EmulatorExitResult::Breakpoint(bp) => (bp.trigger(qemu), None),
             EmulatorExitResult::SyncExit(sync_backdoor) => {
