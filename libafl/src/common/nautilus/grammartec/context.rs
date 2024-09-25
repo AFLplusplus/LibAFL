@@ -1,4 +1,5 @@
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
+use core::num::NonZero;
 
 use hashbrown::HashMap;
 use libafl_bolts::rands::{Rand, RomuDuoJrRand};

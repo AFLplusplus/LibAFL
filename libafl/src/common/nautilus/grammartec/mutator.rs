@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::mem;
+use core::{mem, num::NonZero};
 
 use hashbrown::HashSet;
 use libafl_bolts::{rands::Rand, Error};
@@ -193,7 +193,6 @@ impl Mutator {
             return Err(Error::illegal_argument("Empty tree in mut_random"));
         };
         let n = NodeId::from(rand.below(tree_size));
-        let n = NodeId::from(rand.below(tree.size()));
         let nterm = tree.get_rule(n, ctx).nonterm();
         if ctx.check_if_nterm_has_multiple_possiblities(&nterm) {
             let len = ctx.get_random_len_for_nt(&nterm);

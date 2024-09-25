@@ -2,7 +2,10 @@ use alloc::vec::Vec;
 use std::fmt;
 
 use hashbrown::HashMap;
-use libafl_bolts::rands::{loaded_dice::LoadedDiceSampler, Rand};
+use libafl_bolts::{
+    rands::{loaded_dice::LoadedDiceSampler, Rand},
+    Error,
+};
 
 use crate::common::nautilus::grammartec::{
     context::Context,
