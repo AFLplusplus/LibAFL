@@ -16,7 +16,7 @@ use crate::{Qemu, QemuInitError};
 
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Debug, strum_macros::Display, Clone)]
 #[strum(prefix = "-accel ", serialize_all = "lowercase")]
 pub enum Accelerator {
@@ -100,20 +100,20 @@ pub enum Monitor {
 
 /// Set the directory for the BIOS, VGA BIOS and keymaps.
 /// Corresponds to the `-L` option of QEMU.
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Debug, Clone)]
 pub struct Bios {
     path: PathBuf,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Display for Bios {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "-L {}", self.path.to_str().unwrap())
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl<R: AsRef<Path>> From<R> for Bios {
     fn from(path: R) -> Self {
         Self {
@@ -122,20 +122,20 @@ impl<R: AsRef<Path>> From<R> for Bios {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Debug, Clone)]
 pub struct Kernel {
     path: PathBuf,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Display for Kernel {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "-kernel {}", self.path.to_str().unwrap())
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl<R: AsRef<Path>> From<R> for Kernel {
     fn from(path: R) -> Self {
         Self {
@@ -281,20 +281,20 @@ impl From<bool> for VgaPci {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 #[derive(Debug, Clone)]
 pub struct Program {
     path: PathBuf,
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.path.to_str().unwrap())
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl<R: AsRef<Path>> From<R> for Program {
     fn from(path: R) -> Self {
         Self {
@@ -314,15 +314,15 @@ impl<R: AsRef<Path>> From<R> for Program {
     its visibility is pub(crate)"))]
 #[getset(get = "pub")]
 pub struct QemuConfig {
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option))]
     accelerator: Option<Accelerator>,
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option, into))]
     bios: Option<Bios>,
     #[builder(default, setter(into))]
     drives: Vec<Drive>,
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option, into))]
     kernel: Option<Kernel>,
     #[builder(default, setter(strip_option, into))]
@@ -345,7 +345,7 @@ pub struct QemuConfig {
     vga_pci: Option<VgaPci>,
     #[builder(default, setter(strip_option, into))]
     start_cpu: Option<StartCPU>,
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     #[builder(setter(into))]
     program: Program,
 } // Adding something here? Please leave Program as the last field
@@ -380,7 +380,7 @@ mod test {
     use super::*;
 
     #[test]
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     fn usermode() {
         let program = "/bin/pwd";
         let qemu = Qemu::builder().program("/bin/pwd").build().unwrap();
@@ -398,7 +398,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn accelerator_kvm_to_string() {
         let accel = Accelerator::Kvm;
         assert_eq!(accel.to_string(), "-accel kvm");

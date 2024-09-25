@@ -5,7 +5,7 @@ use std::{
 };
 
 use enum_map::{Enum, EnumMap};
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use hashbrown::HashSet;
 use libafl::{
     executors::ExitKind,
@@ -16,7 +16,7 @@ use libc::c_uint;
 use num_enum::TryFromPrimitive;
 use paste::paste;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use crate::modules::QemuInstrumentationPagingFilter;
 use crate::{
     command::parser::{
@@ -223,7 +223,7 @@ where
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError>;
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub type PagingFilterCommand = FilterCommand<QemuInstrumentationPagingFilter>;
 
 pub type AddressRangeFilterCommand = FilterCommand<QemuInstrumentationAddressRangeFilter>;
@@ -298,7 +298,7 @@ where
             .set_snapshot_id(snapshot_id)
             .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         {
             let emulator_modules = emu.modules_mut().modules_mut();
 
@@ -517,7 +517,7 @@ pub struct FilterCommand<T> {
     filter: T,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for PagingFilterCommand
 where
     ET: StdInstrumentationFilter + Unpin,
@@ -634,7 +634,7 @@ impl Display for AddressRangeFilterCommand {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Display for PagingFilterCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Addr range filter: {:?}", self.filter,)

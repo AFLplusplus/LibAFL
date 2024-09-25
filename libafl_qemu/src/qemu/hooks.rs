@@ -4,7 +4,7 @@
 use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
 use libafl::{executors::hooks::inprocess::inprocess_get_state, inputs::UsesInput};
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use libafl_qemu_sys::libafl_dump_core_hook;
 use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize};
 #[cfg(feature = "python")]
@@ -365,7 +365,7 @@ create_hook_id!(Backdoor, libafl_qemu_remove_backdoor_hook, true);
 create_wrapper!(backdoor, (cpu: CPUArchStatePtr, pc: GuestAddr));
 
 // Pre-syscall hook wrappers
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 create_hook_types!(
     PreSyscall,
     fn(
@@ -409,9 +409,9 @@ create_hook_types!(
         GuestAddr,
     ) -> SyscallHookResult
 );
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 create_hook_id!(PreSyscall, libafl_qemu_remove_pre_syscall_hook, false);
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 create_wrapper!(
     pre_syscall,
     (
@@ -429,7 +429,7 @@ create_wrapper!(
 );
 
 // Post-syscall hook wrappers
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 create_hook_types!(
     PostSyscall,
     fn(
@@ -476,9 +476,9 @@ create_hook_types!(
         GuestAddr,
     ) -> GuestAddr
 );
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 create_hook_id!(PostSyscall, libafl_qemu_remove_post_syscall_hook, false);
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 create_wrapper!(
     post_syscall,
     (
@@ -711,7 +711,7 @@ create_exec_wrapper!(cmp, (id: u64, v0: u32, v1: u32), 2, 4, CmpHookId);
 create_exec_wrapper!(cmp, (id: u64, v0: u64, v1: u64), 3, 4, CmpHookId);
 
 // Crash hook wrappers
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub type CrashHookClosure<ET, S> = Box<dyn FnMut(&mut EmulatorModules<ET, S>, i32)>;
 
 /// The thin wrapper around QEMU hooks.
@@ -955,7 +955,7 @@ impl QemuHooks {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl QemuHooks {
     #[allow(clippy::type_complexity)]
     pub fn add_pre_syscall_hook<T: Into<HookData>>(

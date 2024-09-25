@@ -1,19 +1,19 @@
 #![allow(clippy::missing_transmute_annotations)]
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use std::ptr::addr_of_mut;
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use crate::qemu::{
     closure_post_syscall_hook_wrapper, closure_pre_syscall_hook_wrapper,
     func_post_syscall_hook_wrapper, func_pre_syscall_hook_wrapper, PostSyscallHook,
     PostSyscallHookId, PreSyscallHook, PreSyscallHookId, SyscallHookResult,
 };
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use crate::qemu::{
     CrashHookClosure, PostSyscallHookClosure, PostSyscallHookFn, PreSyscallHookClosure,
     PreSyscallHookFn,
@@ -68,10 +68,10 @@ macro_rules! hook_to_repr {
 
 static mut EMULATOR_TOOLS: *mut () = ptr::null_mut();
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub extern "C" fn crash_hook_wrapper<ET, S>(target_sig: i32)
 where
     ET: EmulatorModuleTuple<S>,
@@ -128,13 +128,13 @@ where
 
     new_thread_hooks: Vec<Pin<Box<(NewThreadHookId, FatPtr)>>>,
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     pre_syscall_hooks: Vec<Pin<Box<(PreSyscallHookId, FatPtr)>>>,
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     post_syscall_hooks: Vec<Pin<Box<(PostSyscallHookId, FatPtr)>>>,
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     crash_hooks: Vec<HookRepr>,
 
     phantom: PhantomData<(ET, S)>,
@@ -161,13 +161,13 @@ where
 
             new_thread_hooks: Vec::new(),
 
-            #[cfg(emulation_mode = "usermode")]
+            #[cfg(feature = "usermode")]
             pre_syscall_hooks: Vec::new(),
 
-            #[cfg(emulation_mode = "usermode")]
+            #[cfg(feature = "usermode")]
             post_syscall_hooks: Vec::new(),
 
-            #[cfg(emulation_mode = "usermode")]
+            #[cfg(feature = "usermode")]
             crash_hooks: Vec::new(),
         }
     }
@@ -759,7 +759,7 @@ where
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl<ET, S> EmulatorHooks<ET, S>
 where
     ET: EmulatorModuleTuple<S>,
@@ -1190,7 +1190,7 @@ where
 }
 
 /// Usermode-only high-level functions
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl<ET, S> EmulatorModules<ET, S>
 where
     ET: EmulatorModuleTuple<S>,
