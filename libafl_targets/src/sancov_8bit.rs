@@ -1,6 +1,6 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
-use core::ptr::addr_of_mut;
+use core::ptr::{addr_of, addr_of_mut};
 
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut};
 
@@ -14,7 +14,8 @@ pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
 /// You are responsible for ensuring there is no multi-mutability!
 #[must_use]
 pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
-    COUNTERS_MAPS
+    let counter_maps = &*addr_of!(COUNTERS_MAPS);
+    counter_maps
         .iter()
         .map(|counters| {
             OwnedMutSlice::from_raw_parts_mut(
@@ -31,7 +32,8 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
-        for existing in &mut *addr_of_mut!(COUNTERS_MAPS) {
+        let counter_maps = &mut *addr_of_mut!(COUNTERS_MAPS);
+        for existing in counter_maps {
             let range = existing.as_slice_mut().as_mut_ptr()
                 ..=existing
                     .as_slice_mut()
@@ -46,8 +48,10 @@ pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut 
                 return;
             }
         }
+
+        let counter_maps = &mut *addr_of_mut!(COUNTERS_MAPS);
         // we didn't overlap; keep going
-        COUNTERS_MAPS.push(OwnedMutSlice::from_raw_parts_mut(
+        counter_maps.push(OwnedMutSlice::from_raw_parts_mut(
             start,
             stop.offset_from(start) as usize,
         ));
@@ -327,7 +331,10 @@ mod observers {
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn as_iter(&'it self) -> Self::IntoIter {
-            unsafe { COUNTERS_MAPS.iter().flatten() }
+            unsafe {
+                let counters_maps = &*addr_of!(COUNTERS_MAPS);
+                counters_maps.iter().flatten()
+            }
         }
     }
 
@@ -336,7 +343,10 @@ mod observers {
         type IntoIterMut = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
-            unsafe { COUNTERS_MAPS.iter_mut().flatten() }
+            unsafe {
+                let counters_maps = &mut *addr_of_mut!(COUNTERS_MAPS);
+                counters_maps.iter_mut().flatten()
+            }
         }
     }
 
