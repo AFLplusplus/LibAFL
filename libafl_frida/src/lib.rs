@@ -523,7 +523,8 @@ mod tests {
                 );
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-                let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1));
+                let mut stages =
+                    tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1).unwrap());
 
                 log::info!("Starting fuzzing!");
                 fuzzer

@@ -206,8 +206,15 @@ where
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: NonZeroUsize) -> Self {
-        StdScheduledMutator {
+    ///
+    /// # Errors
+    /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
+    #[inline]
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Result<Self, Error> {
+        let Some(max_stack_pow) = NonZero::new(max_stack_pow) else {
+            return Err(Error::illegal_argument("Max stack pow may not be 0."));
+        };
+        Ok(Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
                 mutations.names().join(", ")
@@ -215,7 +222,7 @@ where
             mutations,
             max_stack_pow,
             phantom: PhantomData,
-        }
+        })
     }
 }
 
