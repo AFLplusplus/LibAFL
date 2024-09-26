@@ -12,6 +12,6 @@ if ! command -v linkspector > /dev/null; then
   exit 1
 fi
 
-linkspector check -c "${LIBAFL_DIR}/.github/workflows/.linkspector.yml" || exit 1
+linkspector check -c "${LIBAFL_DIR}/.github/.linkspector.yml" || exit 1
 
 echo "[*] Done :)"
