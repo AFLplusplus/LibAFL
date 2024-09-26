@@ -582,7 +582,6 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator<I>: Sized {
     /// Get the stdout

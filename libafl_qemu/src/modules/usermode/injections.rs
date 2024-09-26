@@ -12,7 +12,7 @@
  */
 
 use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
-
+use std::ptr::addr_of_mut;
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
 use libafl_qemu_sys::GuestAddr;
@@ -339,7 +339,7 @@ where
     }
 
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        unsafe { NOP_ADDRESS_FILTER.get_mut() }
+        unsafe { addr_of_mut!(NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
