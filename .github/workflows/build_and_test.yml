@@ -222,14 +222,15 @@ jobs:
         run: ./scripts/fmt_all.sh check
 
   check-md-links:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install linkspector
+        shell: bash
+        run: sudo apt-get install -y npm && npm install -g @umbrelladocs/linkspector
       - name: Run linkspector
-        uses: umbrelladocs/action-linkspector@v1
-        with:
-          fail_on_error: 'true'
-          # config_file: '.github/workflows/.linkspector.yml'
+        shell: bash
+        run: linkspector check -c .github/workflows/.linkspector.yml
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
