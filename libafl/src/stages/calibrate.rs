@@ -207,7 +207,7 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &exit_kind)?;
 
-            if self.track_stability {
+            if self.track_stability && exit_kind != ExitKind::Timeout {
                 let map = &executor.observers()[&self.map_observer_handle]
                     .as_ref()
                     .to_vec();
