@@ -1,5 +1,7 @@
 #[cfg(emulation_mode = "usermode")]
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
+#[cfg(emulation_mode = "systemmode")]
+use std::ptr::addr_of_mut;
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, HasMetadata};
 use libafl_qemu_sys::GuestAddr;
