@@ -293,7 +293,7 @@ fn fuzz(
     println!("Let's fuzz :)");
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(
+    let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
         7,
