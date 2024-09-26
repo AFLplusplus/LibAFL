@@ -288,13 +288,15 @@ jobs:
           - ./fuzzers/full-system/nyx_libxml2_standalone
           - ./fuzzers/full-system/nyx_libxml2_parallel
 
+          # Grammar-aware
+          - ./fuzzers/grammar-aware/nautilus_sync
+
           # In-process
           - ./fuzzers/inprocess/cargo_fuzz
           # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
           - ./fuzzers/inprocess/fuzzbench_ctx
-          - ./fuzzers/inprocess/libafl_atheris
           - ./fuzzers/inprocess/libfuzzer_libmozjpeg
           - ./fuzzers/inprocess/libfuzzer_libpng
           - ./fuzzers/inprocess/libfuzzer_libpng_launcher
@@ -307,11 +309,13 @@ jobs:
           - ./fuzzers/inprocess/libfuzzer_stb_image
           # - ./fuzzers/inprocess/libfuzzer_stb_image_concolic
           # - ./fuzzers/inprocess/libfuzzer_windows_asan
-          - ./fuzzers/inprocess/nautilus_sync
           - ./fuzzers/inprocess/push_harness
           - ./fuzzers/inprocess/push_stage_harness
           # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
           - ./fuzzers/inprocess/tutorial
+
+          # Others
+          - ./fuzzers/others/libafl_atheris
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

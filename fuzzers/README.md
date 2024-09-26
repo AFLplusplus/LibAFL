@@ -10,7 +10,9 @@ They are sorted by fuzzer types:
 - `forkserver`: Fuzzers using a forkserver-style executor.
 - `full-system`: Fuzzers for full-system targets (kernels, firmwares, etc...).
 - `fuzzbench`: Fuzzbench fuzzers.
+- `grammar-aware`: Grammar-aware fuzzers.
 - `inprocess`: In-process fuzzers, whn they don't fit another more specific type.
+- `others`: Fuzzers for specific / specialized things, that do not go in a specific category.
 
 ## Paper Artifacts
 
