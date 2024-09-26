@@ -13,7 +13,7 @@ feel free to add an AST-based input for structured fuzzing, and more.
 - `multi platform`: LibAFL was confirmed to work on *Windows*, *MacOS*, *Linux*, and *Android* on *x86_64* and *aarch64*. `LibAFL` can be built in `no_std` mode to inject LibAFL into obscure targets like embedded devices and hypervisors.
 - `bring your own target`: We support binary-only modes, like Frida-Mode, as well as multiple compilation passes for sourced-based instrumentation. Of course it's easy to add custom instrumentation backends.
 
-## Why LibAFL ?
+## Core concepts
 
 LibAFL is fast, multi-platform, no_std compatible, and scales over cores and machines. It offers a main crate that provide building blocks for custom fuzzers, [libafl](./libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./libafl_cc). It offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
 + `SanitizerCoverage`, in [libafl_targets](./libafl_targets)
@@ -56,7 +56,7 @@ cargo make run
 ```
 You can run each example fuzzer with this following command, as long as the fuzzer directory has `Makefile.toml` file. The best-tested fuzzer is [`./fuzzers/inprocess/libfuzzer_libpng`](./fuzzers/inprocess/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
 
-### Ressources 
+### Resources 
 - [Installation guide](./docs/src/getting_started/setup.md)
 - [Online API documentation](https://docs.rs/libafl/)
 - The LibAFL book (WIP) [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
