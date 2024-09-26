@@ -14,8 +14,7 @@ use rangemap::RangeMap;
 use crate::{
     modules::{
         calls::FullBacktraceCollector, snapshot::SnapshotModule, EmulatorModule,
-        EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
-        QemuInstrumentationAddressRangeFilter,
+        EmulatorModuleTuple,
     },
     qemu::{MemAccessInfo, QemuInitError},
     sys::TCGTemp,
@@ -154,6 +153,7 @@ use object::{Object, ObjectSection};
 
 use crate::{
     emu::EmulatorModules,
+    modules::{AddressFilter, StdAddressFilter},
     qemu::{Hook, QemuHooks, SyscallHookResult},
 };
 
@@ -745,23 +745,19 @@ pub struct AsanModule {
     detect_leaks: bool,
     empty: bool,
     rt: Pin<Box<AsanGiovese>>,
-    filter: QemuInstrumentationAddressRangeFilter,
+    filter: StdAddressFilter,
 }
 
 impl AsanModule {
     #[must_use]
     pub fn default(rt: Pin<Box<AsanGiovese>>) -> Self {
-        Self::new(
-            rt,
-            QemuInstrumentationAddressRangeFilter::None,
-            QemuAsanOptions::Snapshot,
-        )
+        Self::new(rt, StdAddressFilter::default(), QemuAsanOptions::Snapshot)
     }
 
     #[must_use]
     pub fn new(
         mut rt: Pin<Box<AsanGiovese>>,
-        filter: QemuInstrumentationAddressRangeFilter,
+        filter: StdAddressFilter,
         options: QemuAsanOptions,
     ) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_qemu_with_asan(...) instead of just Qemu::init(...)");
@@ -784,7 +780,7 @@ impl AsanModule {
     #[must_use]
     pub fn with_error_callback(
         mut rt: Pin<Box<AsanGiovese>>,
-        filter: QemuInstrumentationAddressRangeFilter,
+        filter: StdAddressFilter,
         error_callback: AsanErrorCallback,
         options: QemuAsanOptions,
     ) -> Self {
@@ -811,7 +807,7 @@ impl AsanModule {
     #[must_use]
     pub unsafe fn with_asan_report(
         rt: Pin<Box<AsanGiovese>>,
-        filter: QemuInstrumentationAddressRangeFilter,
+        filter: StdAddressFilter,
         options: QemuAsanOptions,
     ) -> Self {
         Self::with_error_callback(
@@ -824,7 +820,7 @@ impl AsanModule {
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(addr)
+        self.filter.allowed(&addr)
     }
 
     #[must_use]
@@ -926,20 +922,11 @@ impl AsanModule {
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for AsanModule {
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        &self.filter
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        &mut self.filter
-    }
-}
-
 impl<S> EmulatorModule<S> for AsanModule
 where
     S: Unpin + UsesInput,
 {
+    type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -953,7 +940,7 @@ where
         }
     }
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -990,8 +977,8 @@ where
 
     fn pre_exec<ET>(
         &mut self,
-        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
@@ -1004,8 +991,8 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
-        _state: &mut S,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
         exit_kind: &mut ExitKind,
@@ -1016,6 +1003,14 @@ where
         if self.reset(emulator_modules.qemu()) == AsanRollback::HasLeaks {
             *exit_kind = ExitKind::Crash;
         }
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &self.filter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        &mut self.filter
     }
 }
 

@@ -29,7 +29,7 @@ pub mod unix_signal_handler {
         data: *mut InProcessExecutorHandlerData,
     );
 
-    /// A handler that does nothing.
+    // A handler that does nothing.
     /*pub fn nop_handler(
         _signal: Signal,
         _info: &mut siginfo_t,
