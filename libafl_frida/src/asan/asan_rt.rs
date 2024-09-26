@@ -282,7 +282,7 @@ impl AsanRuntime {
     }
 
     /// Make sure the specified memory is poisoned
-    pub fn poison(&mut self, address: usize, size: usize) {
+    pub unsafe fn poison(&mut self, address: usize, size: usize) {
         Allocator::poison(self.allocator.map_to_shadow(address), size);
     }
 

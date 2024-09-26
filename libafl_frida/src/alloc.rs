@@ -324,7 +324,7 @@ impl Allocator {
                 continue;
             }
             // First poison the memory.
-            Self::poison(map_to_shadow!(self, address), allocation.size);
+            unsafe { Self::poison(map_to_shadow!(self, address), allocation.size); }
 
             // Reset the allocaiton metadata object
             allocation.size = 0;
@@ -452,7 +452,7 @@ impl Allocator {
         }
 
         if unpoison {
-            Self::unpoison(shadow_mapping_start, end - start);
+            unsafe { Self::unpoison(shadow_mapping_start, end - start); }
         }
 
         (shadow_mapping_start, (end - start) / 8 + 1)

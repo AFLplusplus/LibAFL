@@ -477,7 +477,9 @@ pub fn build(
             .expect("Could not convert to str");
         println!("cargo:rustc-link-search=native={qemu_build_dir_str}");
         println!("cargo:rustc-link-lib=dylib={output_lib_link}");
-        cargo_add_rpath(qemu_build_dir_str);
+        // # Safety
+        // We call this from a single thread.
+        unsafe { cargo_add_rpath(qemu_build_dir_str); }
     } else {
         let mut cmd = vec![];
         for arg in linkinfo["cmd"].members() {

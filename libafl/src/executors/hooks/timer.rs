@@ -313,7 +313,7 @@ impl TimerStruct {
 
     #[cfg(all(unix, not(target_os = "linux")))]
     /// Disalarm timer
-    pub fn unset_timer(&mut self) {
+    pub unsafe fn unset_timer(&mut self) {
         // # Safety
         // No user-provided values.
         unsafe {
@@ -325,7 +325,7 @@ impl TimerStruct {
     /// Disalarm timer
     #[cfg(target_os = "linux")]
     #[allow(unused_variables)]
-    pub fn unset_timer(&mut self) {
+    pub unsafe fn unset_timer(&mut self) {
         if self.batch_mode {
             unsafe {
                 let elapsed = current_time().saturating_sub(self.tmout_start_time);

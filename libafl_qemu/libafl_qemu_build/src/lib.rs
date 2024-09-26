@@ -93,7 +93,9 @@ pub fn build_with_bindings(
     // Write the final bindings
     fs::write(bindings_file, bind.to_string()).expect("Unable to write file");
 
-    cargo_propagate_rpath();
+    // # Safety
+    // We call this from a single thread.
+    unsafe { cargo_propagate_rpath(); }
 }
 
 // For bindgen, the llvm version must be >= of the rust llvm version
