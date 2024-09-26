@@ -133,7 +133,11 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     /// Gets a value below the given bound (inclusive)
     #[inline]
     fn below_incl(&mut self, upper_bound_incl: usize) -> usize {
-        self.below(upper_bound_incl + 1)
+        let Some(upper_bound) = NonZero::new(upper_bound_incl.wrapping_add(1)) else {
+            // The max value + 1 wrapped around to 0. We just do a "normal" random.
+            return self.next() as usize;
+        };
+        self.below(upper_bound)
     }
 
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)

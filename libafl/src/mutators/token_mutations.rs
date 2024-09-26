@@ -633,20 +633,16 @@ where
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes().len();
-        if size == 0 {
+        let Some(size) = NonZero::new(input.bytes().len()) else {
             return Ok(MutationResult::Skipped);
-        }
+        };
+        let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
+            return Ok(MutationResult::Skipped);
+        };
+        log::trace!("meta: {:x?}", meta);
 
-        let cmps_len = {
-            let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
-                return Ok(MutationResult::Skipped);
-            };
-            log::trace!("meta: {:x?}", meta);
-            if meta.list.is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.list.len()
+        let Some(cmps_len) = NonZero::new(meta.list.len()) else {
+            return Ok(MutationResult::Skipped);
         };
         let idx = state.rand_mut().below(cmps_len);
 
