@@ -621,7 +621,7 @@ where
 
 impl<I, S> Mutator<I, S> for I2SRandReplaceBinonly
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
     #[allow(clippy::too_many_lines)]
