@@ -372,7 +372,8 @@ fn fuzz_binary(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> = StdPowerMutationalStage::new(mutator);
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+        StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
