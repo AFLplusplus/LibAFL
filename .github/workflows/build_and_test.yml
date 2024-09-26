@@ -236,7 +236,7 @@ jobs:
       #   uses: umbrelladocs/action-linkspector@v1
       #   with:
       #     fail_on_error: 'true'
-      #     config_file: '.github/workflows/.linkspector.yml'
+      #     config_file: '.github/.linkspector.yml'
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
