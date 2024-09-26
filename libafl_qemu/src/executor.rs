@@ -374,6 +374,7 @@ impl<'a, CM, ED, EM, ET, H, OF, OT, S, SM, SP, Z> Executor<EM, Z>
     for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
     CM: CommandManager<ED, ET, S, SM>,
+    ED: EmulatorDriver<CM, ET, S, SM>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     ET: EmulatorModuleTuple<S>,
     H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind,
@@ -390,15 +391,16 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.inner.exposed_executor_state.first_exec_all();
+        self.inner.exposed_executor_state.first_exec(state);
 
-        self.inner.exposed_executor_state.pre_exec_all(input);
+        self.inner.exposed_executor_state.pre_exec(state, input);
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 
-        self.inner.exposed_executor_state.post_exec_all(
+        self.inner.exposed_executor_state.post_exec(
             input,
             &mut *self.inner.inner.observers_mut(),
+            state,
             &mut exit_kind,
         );
 

@@ -55,11 +55,7 @@ args = [
   "./${FUZZER_NAME}",
   "--",
   "--libafl-in",
-<<<<<<< HEAD:fuzzers/fuzzbench/fuzzbench_qemu/Makefile.toml
-  "./corpus",
-=======
   "../../inprocess/libfuzzer_libpng/corpus",
->>>>>>> main:fuzzers/binary-only/fuzzbench_qemu/Makefile.toml
   "--libafl-out",
   "./out",
   "./${FUZZER_NAME}",
