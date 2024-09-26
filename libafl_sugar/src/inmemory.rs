@@ -2,7 +2,7 @@
 //! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
 use core::fmt::{self, Debug, Formatter};
-use std::{fs, net::SocketAddr, num::NonZero, path::PathBuf, time::Duration};
+use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},

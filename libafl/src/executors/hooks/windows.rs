@@ -118,7 +118,8 @@ pub mod windows_exception_handler {
     use std::panic;
 
     use libafl_bolts::os::windows_exceptions::{
-        ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
+        ExceptionCode, ExceptionHandler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE,
+        EXCEPTION_POINTERS,
     };
     use windows::Win32::System::Threading::{
         EnterCriticalSection, ExitProcess, LeaveCriticalSection, CRITICAL_SECTION,

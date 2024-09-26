@@ -3,6 +3,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{Ordering, Reverse},
+    num::NonZero,
     ops::Range,
 };
 
@@ -87,7 +88,7 @@ fn choose_start<R: Rand>(
         options_len => {
             // # Safety
             // options.len() is checked above.
-            options_len_squared =
+            let options_len_squared =
                 unsafe { NonZero::new(options_len * options_len).unwrap_unchecked() };
             // bias towards longer strings
             options.sort_by_cached_key(|(_, entries)| entries.count_ones());
@@ -141,7 +142,7 @@ fn choose_category_range<R: Rand>(
 ) -> (Range<usize>, &'static [(u32, u32)]) {
     let chars = string.char_indices().collect::<Vec<_>>();
     let chars_len = NonZero::new(chars.len()).expect("Got empty string in choose_category_range");
-    let idx = rand.below(NonZero::new(chars_len));
+    let idx = rand.below(chars_len);
     let c = chars[idx].1;
 
     // figure out the categories for this char
@@ -376,6 +377,9 @@ where
             );
 
             let options = subcategory.1 as usize - subcategory.0 as usize + 1;
+            let Some(options) = NonZero::new(options) else {
+                return Ok(MutationResult::Skipped);
+            };
             let char_gen = |state: &mut S| loop {
                 let selected = state.rand_mut().below(options);
                 if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
@@ -473,7 +477,7 @@ where
             return Ok(MutationResult::Skipped);
         };
 
-        let tokens_len = NonZero::new(meta.tokens().len()) else {
+        let Some(tokens_len) = NonZero::new(meta.tokens().len()) else {
             return Ok(MutationResult::Skipped);
         };
 
