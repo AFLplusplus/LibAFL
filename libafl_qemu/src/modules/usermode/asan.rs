@@ -478,10 +478,10 @@ impl AsanGiovese {
         }
     }
 
-    /// # Safety
-    /// Will access the global [`FullBacktraceCollector`].
-    /// Calling this function concurrently might be racey.
-    pub unsafe fn alloc_insert(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+    pub fn alloc_insert(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        // # Safety
+        // Will access the global [`FullBacktraceCollector`].
+        // Calling this function concurrently might be racey.
         let backtrace = FullBacktraceCollector::backtrace()
             .map(|r| {
                 let mut v = r.to_vec();
@@ -506,10 +506,10 @@ impl AsanGiovese {
         }
     }
 
-    /// # Safety
-    /// Will access the global [`FullBacktraceCollector`].
-    /// Calling this function concurrently might be racey.
-    pub unsafe fn alloc_free(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+    pub fn alloc_free(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+        // # Safety
+        // Will access the global [`FullBacktraceCollector`].
+        // Calling this function concurrently might be racey.
         let mut chunk = None;
         self.alloc_map_mut(addr, |interval, item| {
             chunk = Some(*interval);

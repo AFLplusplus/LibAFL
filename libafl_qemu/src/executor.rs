@@ -9,8 +9,6 @@ use std::ptr;
 #[cfg(emulation_mode = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[cfg(not(emulation_mode = "systemmode"))]
-use libafl::inputs::UsesInput;
 #[cfg(feature = "fork")]
 use libafl::{
     events::EventManager, executors::InProcessForkExecutor, inputs::UsesInput,
@@ -157,10 +155,14 @@ where
                 }
             };
 
-            inner
-                .exposed_executor_state_mut()
-                .modules_mut()
-                .crash_closure(Box::new(handler));
+            // # Safety
+            // We assume our crash handlers to be safe/quit after execution.
+            unsafe {
+                inner
+                    .exposed_executor_state_mut()
+                    .modules_mut()
+                    .crash_closure(Box::new(handler));
+            }
         }
 
         #[cfg(emulation_mode = "systemmode")]

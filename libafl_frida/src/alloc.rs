@@ -324,7 +324,9 @@ impl Allocator {
                 continue;
             }
             // First poison the memory.
-            unsafe { Self::poison(map_to_shadow!(self, address), allocation.size); }
+            unsafe {
+                Self::poison(map_to_shadow!(self, address), allocation.size);
+            }
 
             // Reset the allocaiton metadata object
             allocation.size = 0;
@@ -360,7 +362,7 @@ impl Allocator {
     }
 
     /// Unpoison an area in memory
-    /// 
+    ///
     /// # Safety
     /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
     unsafe fn unpoison(start: usize, size: usize) {
@@ -377,7 +379,7 @@ impl Allocator {
     }
 
     /// Poison an area in memory
-    /// 
+    ///
     /// # Safety
     /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
     pub unsafe fn poison(start: usize, size: usize) {
@@ -452,7 +454,9 @@ impl Allocator {
         }
 
         if unpoison {
-            unsafe { Self::unpoison(shadow_mapping_start, end - start); }
+            unsafe {
+                Self::unpoison(shadow_mapping_start, end - start);
+            }
         }
 
         (shadow_mapping_start, (end - start) / 8 + 1)
@@ -640,6 +644,8 @@ impl Allocator {
             size = 0;
         }
     }
+
+    /// Unpoisons all memory
     #[cfg(not(target_vendor = "apple"))]
     pub fn unpoison_all_existing_memory(&mut self) {
         RangeDetails::enumerate_with_prot(

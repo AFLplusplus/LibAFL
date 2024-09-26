@@ -782,23 +782,20 @@ where
         }
     }
 
-    /// # Safety
-    /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub unsafe fn syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
+    pub fn syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
+        // # Safety
+        // Will dereference the hook as [`FatPtr`].
         unsafe {
             self.qemu_hooks
                 .add_pre_syscall_hook(transmute(hook), func_pre_syscall_hook_wrapper::<ET, S>)
         }
     }
 
-    /// # Safety
-    /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub unsafe fn syscalls_closure(
-        &mut self,
-        hook: PreSyscallHookClosure<ET, S>,
-    ) -> PreSyscallHookId {
+    pub fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
+        // # Safety
+        // Will dereference the hook as [`FatPtr`].
         unsafe {
             let fat: FatPtr = transmute(hook);
 
@@ -839,13 +836,10 @@ where
         }
     }
 
-    /// # Safety
-    /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub unsafe fn after_syscalls_function(
-        &mut self,
-        hook: PostSyscallHookFn<ET, S>,
-    ) -> PostSyscallHookId {
+    pub fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
+        // # Safety
+        // Will dereference the hook as [`FatPtr`]. This should be ok.
         unsafe {
             self.qemu_hooks
                 .add_post_syscall_hook(transmute(hook), func_post_syscall_hook_wrapper::<ET, S>)
@@ -884,17 +878,17 @@ where
         }
     }
 
-    /// # Safety
-    /// Will dereference the hook as ptr.
     pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
+        // # Safety
+        // Will cast the valid hook to a ptr.
         self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
         self.crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
     }
 
-    /// # Safety
-    /// Will dereference the hook as [`FatPtr`].
-    pub unsafe fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
+    pub fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
+        // # Safety
+        // Will cast the hook to a [`FatPtr`].
         unsafe {
             self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
             self.crash_hooks.push(HookRepr::Closure(transmute(hook)));
