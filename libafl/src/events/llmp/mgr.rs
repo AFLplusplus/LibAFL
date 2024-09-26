@@ -1,5 +1,5 @@
-//! An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
-//! using low-level message passing, [`llmp`].
+//! An [`crate::events::EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
+//! using low-level message passing, [`libafl_bolts::llmp`].
 
 #[cfg(feature = "std")]
 use alloc::string::ToString;
