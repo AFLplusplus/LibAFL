@@ -11,8 +11,8 @@
  *
  */
 
-use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
-use std::ptr::addr_of_mut;
+use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path, ptr::addr_of_mut};
+
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
 use libafl_qemu_sys::GuestAddr;

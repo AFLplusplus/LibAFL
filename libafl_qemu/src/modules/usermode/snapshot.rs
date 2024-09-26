@@ -1,5 +1,5 @@
-use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
-use std::ptr::addr_of_mut;
+use std::{cell::UnsafeCell, mem::MaybeUninit, ptr::addr_of_mut, sync::Mutex};
+
 use hashbrown::{HashMap, HashSet};
 use libafl::inputs::UsesInput;
 use libafl_qemu_sys::{GuestAddr, MmapPerms};

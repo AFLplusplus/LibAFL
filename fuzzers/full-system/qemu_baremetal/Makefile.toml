@@ -134,7 +134,7 @@ args = [
   "FEATURE=low_level",
   "-e",
   "TARGET_DEFINE=TARGET_CLASSIC",
-  "test_fuzzer"
+  "test_fuzzer",
 ]
 
 [tasks.build_breakpoint]
@@ -156,7 +156,7 @@ args = [
   "FEATURE=breakpoint",
   "-e",
   "TARGET_DEFINE=TARGET_BREAKPOINT",
-  "test_fuzzer"
+  "test_fuzzer",
 ]
 
 [tasks.build_sync_exit]
@@ -178,7 +178,7 @@ args = [
   "FEATURE=sync_exit",
   "-e",
   "TARGET_DEFINE=TARGET_SYNC_EXIT",
-  "test_fuzzer"
+  "test_fuzzer",
 ]
 
 [tasks.low_level]

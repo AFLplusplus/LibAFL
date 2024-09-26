@@ -8,7 +8,7 @@ cd "${LIBAFL_DIR}" || exit 1
 if [ "$1" = "check" ]; then
   cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- -c --verbose || exit 1
 else
-  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- --verbose
+  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- --verbose || exit 1
 fi
 
 if command -v black > /dev/null; then
@@ -23,9 +23,11 @@ else
   echo "Warning: python black not found. Formatting skipped for python."
 fi
 
-if command -v taplo > /dev/null; then
-  echo "[*] Formatting TOML files"
-  taplo format
+if [ "$1" != "check" ]; then
+  if command -v taplo > /dev/null; then
+    echo "[*] Formatting TOML files"
+    taplo format
+  fi
 fi
 
 echo "[*] Done :)"
