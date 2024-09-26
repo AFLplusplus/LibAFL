@@ -1,3 +1,5 @@
+#![allow(clippy::used_underscore_items)]
+
 //! The allocator hooks for address sanitizer.
 use std::ffi::c_void;
 
