@@ -121,7 +121,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut mgr = SimpleEventManager::new(mon);
 
-    let minimizer = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
+    let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,
         CrashFeedback::new(),
