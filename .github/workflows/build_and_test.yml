@@ -221,14 +221,14 @@ jobs:
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
-  md-links-check:
+  check-md-links:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Run Markdown Link checks
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
+      - name: Run linkspector
+        uses: umbrelladocs/action-linkspector@v1
         with:
-          config-file: '.github/workflows/md-config.json'
+          config_file: '.github/workflows/.linkspector.yml'
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
