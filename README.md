@@ -4,19 +4,7 @@
 
 Advanced Fuzzing Library - Slot your own fuzzers together and extend their features using Rust.
 
-LibAFL is written and maintained by
-
- * [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
- * [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
- * [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
- * [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
- * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
- * [Romain Malmain](https://github.com/rmalmain) <rmalmain@pm.me>
-
-## Overview
-
 LibAFL is a collection of reusable pieces of fuzzers, written in Rust. It is fast, multi-platform, no_std compatible, and scales over cores and machines. It offers a main crate that provide building blocks for custom fuzzers, [libafl](./libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./libafl_cc). 
-
 
 LibAFL offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
 + `SanitizerCoverage`, in [libafl_targets](./libafl_targets)
@@ -24,7 +12,9 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 + `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./libafl_qemu)
 + `TinyInst`, in [libafl_tinyinst](./libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
 
+
 ## Why LibAFL ?
+
 LibAFL gives you many of the benefits of an off-the-shelf fuzzer, while being completely customizable.
 Some highlight features currently include:
 - `fast`: We do everything we can at compile time, keeping runtime overhead minimal. Users reach 120k execs/sec in frida-mode on a phone (using all cores).
@@ -81,7 +71,17 @@ You can run each example fuzzer with this following command, as long as the fuzz
 - [A LibAFL Introductory Workshop](https://www.atredis.com/blog/2023/12/4/a-libafl-introductory-workshop), by [Jordan Whitehead](https://github.com/jordan9001)
 
 
-## Contributing
+## Contributors
+
+LibAFL is written and maintained by
+
+ * [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
+ * [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
+ * [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
+ * [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
+ * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
+ * [Romain Malmain](https://github.com/rmalmain) <rmalmain@pm.me>
+
 Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for the contributing guideline.
 
 ## Cite
