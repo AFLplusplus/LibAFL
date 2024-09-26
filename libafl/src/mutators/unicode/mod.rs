@@ -68,9 +68,8 @@ fn choose_start<R: Rand>(
     bytes: &[u8],
     meta: &UnicodeIdentificationMetadata,
 ) -> Option<(usize, usize)> {
-    let Some(bytes_len) = NonZero::new(bytes.len()) else {
-        return None;
-    };
+    let bytes_len = NonZero::new(bytes.len())?;
+
     let idx = rand.below(bytes_len);
     let mut options = Vec::new();
     for (start, range) in meta.ranges() {

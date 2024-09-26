@@ -532,7 +532,9 @@ unsafe extern "C" fn handle_signal(_signum: i32) {
 /// # Safety
 /// Exception handlers are usually ugly, handle with care!
 #[cfg(feature = "alloc")]
-pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(handler: *mut T) -> Result<(), Error> {
+pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
+    handler: *mut T,
+) -> Result<(), Error> {
     let exceptions = (*handler).exceptions();
     let mut catch_assertions = false;
     for exception_code in exceptions {
