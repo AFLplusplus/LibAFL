@@ -69,7 +69,13 @@
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
-use std::{io, io::ErrorKind, path::PathBuf, str::from_utf8};
+use std::{
+    fs::read_to_string,
+    io,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+    str::from_utf8,
+};
 
 use clap::Parser;
 use regex::RegexSet;
@@ -79,9 +85,24 @@ use which::which;
 
 const REF_LLVM_VERSION: u32 = 18;
 
+fn is_workspace_toml(path: &Path) -> bool {
+    for line in read_to_string(path).unwrap().lines() {
+        if line.eq("[workspace]") {
+            return true;
+        }
+    }
+
+    false
+}
+
 async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
     // Make sure we parse the correct file
     assert_eq!(path.file_name().unwrap().to_str().unwrap(), "Cargo.toml");
+
+    if is_workspace_toml(path.as_path()) {
+        println!("[*] Skipping {}...", path.as_path().display());
+        return Ok(());
+    }
 
     let task_str = if is_check { "Checking" } else { "Formatting" };
 
