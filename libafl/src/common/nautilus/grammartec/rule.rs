@@ -166,11 +166,11 @@ impl Rule {
         nterms: &[String],
         script: PyObject,
     ) -> Self {
-        return Self::Script(ScriptRule {
+        Self::Script(ScriptRule {
             nonterm: ctx.aquire_nt_id(nonterm),
             nonterms: nterms.iter().map(|s| ctx.aquire_nt_id(s)).collect(),
             script,
-        });
+        })
     }
 
     pub fn from_regex(ctx: &mut Context, nonterm: &str, regex: &str) -> Self {
@@ -260,7 +260,7 @@ impl Rule {
             // RegExp Changed from (\{[^}\\]+\})|((?:[^{\\]|\\\{|\\\}|\\\\)+) because of problems with \\ (\\ was not matched and therefore thrown away)
         });
 
-        return tokenizer
+        tokenizer
             .captures_iter(format)
             .map(|cap| {
                 if let Some(sub) = cap.get(1) {
@@ -276,7 +276,7 @@ impl Rule {
                     unreachable!()
                 }
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
     }
 
     #[must_use]

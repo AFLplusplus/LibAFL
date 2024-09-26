@@ -63,12 +63,12 @@ impl Context {
 
     #[must_use]
     pub fn get_nt(&self, r: &RuleIdOrCustom) -> NTermId {
-        return self.get_rule(r.id()).nonterm();
+        self.get_rule(r.id()).nonterm()
     }
 
     #[must_use]
     pub fn get_num_children(&self, r: &RuleIdOrCustom) -> usize {
-        return self.get_rule(r.id()).number_of_nonterms();
+        self.get_rule(r.id()).number_of_nonterms()
     }
 
     pub fn add_rule(&mut self, nt: &str, format: &[u8]) -> RuleId {
@@ -115,10 +115,10 @@ impl Context {
 
     #[must_use]
     pub fn nt_id(&self, nt: &str) -> NTermId {
-        return *self
+        *self
             .names_to_nt_id
             .get(nt)
-            .expect(&("no such nonterminal: ".to_owned() + nt));
+            .expect(&("no such nonterminal: ".to_owned() + nt))
     }
 
     #[must_use]

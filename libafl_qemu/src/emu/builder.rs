@@ -66,7 +66,7 @@ where
             modules: tuple_list!(),
             command_manager: StdCommandManager::default(),
             snapshot_manager: StdSnapshotManager::default(),
-            driver: StdEmulatorDriver::default(),
+            driver: StdEmulatorDriver::builder().build(),
             qemu_builder: None,
             phantom: PhantomData,
         }
@@ -84,7 +84,7 @@ where
             modules: (),
             command_manager: StdCommandManager::default(),
             snapshot_manager: FastSnapshotManager::default(),
-            driver: StdEmulatorDriver::default(),
+            driver: StdEmulatorDriver::builder().build(),
             qemu_builder: None,
             phantom: PhantomData,
         }

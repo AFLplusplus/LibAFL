@@ -271,7 +271,6 @@ where
 }
 
 /// signal hooks and `panic_hooks` for the child process
-
 pub mod child_signal_handlers {
     use alloc::boxed::Box;
     use core::ptr::addr_of_mut;
