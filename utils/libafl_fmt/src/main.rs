@@ -70,7 +70,8 @@
 #![allow(clippy::borrow_deref_ref)]
 
 use std::{
-    fs, io,
+    fs::read_to_string,
+    io,
     io::ErrorKind,
     path::{Path, PathBuf},
     str::from_utf8,
@@ -84,9 +85,9 @@ use which::which;
 
 const REF_LLVM_VERSION: u32 = 18;
 
-fn is_workspace(path: &Path) -> bool {
-    for line in fs::read_to_string(path).unwrap().lines() {
-        if line == "[workspace]" {
+fn is_workspace_toml(path: &Path) -> bool {
+    for line in read_to_string(path).unwrap().lines() {
+        if line.eq("[workspace]") {
             return true;
         }
     }
@@ -94,7 +95,7 @@ fn is_workspace(path: &Path) -> bool {
     false
 }
 
-async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
+async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
     // Make sure we parse the correct file
     assert_eq!(
         cargo_file_path.file_name().unwrap().to_str().unwrap(),
@@ -103,6 +104,11 @@ async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) 
 
     // exit early if the cargo file is a workspace file
     if is_workspace(cargo_file_path.as_path()) {
+        return Ok(());
+    }
+
+    if is_workspace_toml(path.as_path()) {
+        println!("[*] Skipping {}...", path.as_path().display());
         return Ok(());
     }
 

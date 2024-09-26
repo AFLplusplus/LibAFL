@@ -1,12 +1,7 @@
 use std::fmt::Debug;
 
 use hashbrown::HashMap;
-
-use libafl::{
-    inputs::{HasTargetBytes, UsesInput},
-    state::{HasExecutions, State},
-};
-
+use libafl::inputs::UsesInput;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
@@ -82,6 +77,12 @@ impl FastSnapshotManager {
 #[derive(Debug, Clone)]
 pub struct QemuSnapshotManager {
     is_sync: bool,
+}
+
+impl Default for QemuSnapshotManager {
+    fn default() -> Self {
+        QemuSnapshotManager::new(true)
+    }
 }
 
 impl QemuSnapshotManager {

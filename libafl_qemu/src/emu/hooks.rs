@@ -1122,18 +1122,18 @@ where
         }
     }
 
-    pub fn pre_exec_all(&mut self, input: &S::Input, state: &mut S) {
+    pub fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) {
         unsafe {
             self.modules_mut()
-                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input, state);
+                .pre_exec_all(Self::emulator_modules_mut_unchecked(), state, input);
         }
     }
 
     pub fn post_exec_all<OT>(
         &mut self,
+        state: &mut S,
         input: &S::Input,
         observers: &mut OT,
-        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
         OT: ObserversTuple<S>,
@@ -1141,9 +1141,9 @@ where
         unsafe {
             self.modules_mut().post_exec_all(
                 Self::emulator_modules_mut_unchecked(),
+                state,
                 input,
                 observers,
-                state,
                 exit_kind,
             );
         }

@@ -23,4 +23,11 @@ else
   echo "Warning: python black not found. Formatting skipped for python."
 fi
 
+if [ "$1" != "check" ]; then
+  if command -v taplo > /dev/null; then
+    echo "[*] Formatting TOML files"
+    taplo format
+  fi
+fi
+
 echo "[*] Done :)"

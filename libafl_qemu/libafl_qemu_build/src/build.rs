@@ -11,7 +11,7 @@ use crate::cargo_add_rpath;
 
 pub const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-pub const QEMU_REVISION: &str = "f58a6859f3124a59f1d2298708e293c5fff9588a";
+pub const QEMU_REVISION: &str = "d6637939526f453c69f4c6bfe4635feb5dc5c0be";
 
 #[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {
@@ -90,8 +90,11 @@ fn configure_qemu(
         .arg(format!("--cxx={}", linker_interceptor_plus_plus.display()))
         .arg("--as-shared-lib")
         .arg(format!("--target-list={cpu_target}-{target_suffix}"))
+        .arg("--disable-bsd-user")
         // .arg("--disable-capstone")
-        .arg("--disable-bsd-user");
+        .arg("--disable-docs")
+        .arg("--disable-tests")
+        .arg("--disable-tools");
 
     if cfg!(feature = "paranoid_debug") {
         cmd.arg("--enable-debug")
@@ -137,13 +140,14 @@ fn configure_qemu(
         .arg("--disable-gio")
         .arg("--disable-glusterfs")
         .arg("--disable-gnutls")
-        .arg("--disable-gtk")
-        .arg("--disable-guest-agent")
-        .arg("--disable-guest-agent-msi")
+        // .arg("--disable-gtk")
+        // .arg("--disable-guest-agent")
+        // .arg("--disable-guest-agent-msi")
         .arg("--disable-hvf")
         .arg("--disable-iconv")
         .arg("--disable-jack")
         .arg("--disable-keyring")
+        // .arg("--disable-kvm")
         .arg("--disable-libdaxctl")
         .arg("--disable-libiscsi")
         .arg("--disable-libnfs")
@@ -213,8 +217,7 @@ fn configure_qemu(
         .arg("--disable-xen")
         .arg("--disable-xen-pci-passthrough")
         .arg("--disable-xkbcommon")
-        .arg("--disable-zstd")
-        .arg("--disable-tests");
+        .arg("--disable-zstd");
     }
 
     cmd
