@@ -345,7 +345,7 @@ impl AsanRuntime {
         log::info!("registering thread with stack {stack_start:x}:{stack_end:x}");
     }
 
-    /// Get the maximum stack size for the current stack
+    // /// Get the maximum stack size for the current stack
     // #[must_use]
     // #[cfg(target_vendor = "apple")]
     // fn max_stack_size() -> usize {

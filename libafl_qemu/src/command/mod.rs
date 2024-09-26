@@ -2,33 +2,31 @@ use std::{
     fmt,
     fmt::{Debug, Display, Formatter},
     marker::PhantomData,
+    ops::Range,
 };
 
 use enum_map::{Enum, EnumMap};
-#[cfg(emulation_mode = "systemmode")]
-use hashbrown::HashSet;
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
 use libafl_bolts::AsSlice;
+use libafl_qemu_sys::GuestAddr;
+#[cfg(emulation_mode = "systemmode")]
+use libafl_qemu_sys::GuestPhysAddr;
 use libc::c_uint;
 use num_enum::TryFromPrimitive;
 use paste::paste;
 
-#[cfg(emulation_mode = "systemmode")]
-use crate::modules::QemuInstrumentationPagingFilter;
 use crate::{
     command::parser::{
         EndCommandParser, InputPhysCommandParser, InputVirtCommandParser, LoadCommandParser,
-        NativeCommandParser, SaveCommandParser, StartPhysCommandParser, StartVirtCommandParser,
-        VaddrFilterAllowRangeCommandParser, VersionCommandParser,
+        LqprintfCommandParser, NativeCommandParser, SaveCommandParser, StartPhysCommandParser,
+        StartVirtCommandParser, TestCommandParser, VaddrFilterAllowRangeCommandParser,
+        VersionCommandParser,
     },
     get_exit_arch_regs,
-    modules::{
-        EmulatorModuleTuple, HasInstrumentationFilter, QemuInstrumentationAddressRangeFilter,
-        StdInstrumentationFilter,
-    },
+    modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
     Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
@@ -56,40 +54,56 @@ macro_rules! define_std_command_manager {
     ($name:ident, [$($command:ty),+], [$($native_command_parser:ty),+]) => {
         paste! {
             pub struct $name<S> {
+                has_started: bool,
                 phantom: PhantomData<S>,
             }
 
             impl<S> Clone for $name<S> {
                 fn clone(&self) -> Self {
                     Self {
-                        phantom: PhantomData
+                        has_started: self.has_started,
+                        phantom: PhantomData,
                     }
                 }
             }
 
             impl<S> Debug for $name<S> {
                 fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-                    write!(f, stringify!($name))
+                    write!(f, "{} (has started? {:?})", stringify!($name), self.has_started)
                 }
             }
 
             impl<S> Default for $name<S> {
                 fn default() -> Self {
                     Self {
-                        phantom: PhantomData
+                        has_started: false,
+                        phantom: PhantomData,
                     }
+                }
+            }
+
+            impl<S> $name<S> {
+                fn start(&mut self) -> bool {
+                    let tmp = self.has_started;
+                    self.has_started = true;
+                    tmp
+                }
+
+                fn has_started(&self) -> bool {
+                    self.has_started
                 }
             }
 
             impl<ET, S, SM> CommandManager<StdEmulatorDriver, ET, S, SM> for $name<S>
             where
-                ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+                ET: EmulatorModuleTuple<S>,
                 S: UsesInput + Unpin,
                 S::Input: HasTargetBytes,
                 SM: IsSnapshotManager,
             {
                 type Commands = [<$name Commands>];
 
+                #[deny(unreachable_patterns)]
                 fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError> {
                     let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
                     let cmd_id = qemu.read_reg::<Regs, GuestReg>(arch_regs_map[ExitArgs::Cmd])? as c_uint;
@@ -111,7 +125,7 @@ macro_rules! define_std_command_manager {
 
             impl<ET, S, SM> IsCommand<$name<S>, StdEmulatorDriver, ET, S, SM> for [<$name Commands>]
             where
-                ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+                ET: EmulatorModuleTuple<S>,
                 S: UsesInput + Unpin,
                 S::Input: HasTargetBytes,
                 SM: IsSnapshotManager,
@@ -124,12 +138,12 @@ macro_rules! define_std_command_manager {
 
                 fn run(&self,
                     emu: &mut Emulator<$name<S>, StdEmulatorDriver, ET, S, SM>,
-                    driver: &mut StdEmulatorDriver,
+                    state: &mut S,
                     input: &S::Input,
                     ret_reg: Option<Regs>
                 ) -> Result<Option<EmulatorDriverResult<$name<S>, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError> {
                     match self {
-                        $([<$name Commands>]::$command(cmd) => cmd.run(emu, driver, input, ret_reg)),+
+                        $([<$name Commands>]::$command(cmd) => cmd.run(emu, state, input, ret_reg)),+
                     }
                 }
             }
@@ -176,7 +190,9 @@ define_std_command_manager!(
         LoadCommand,
         EndCommand,
         VersionCommand,
-        AddressRangeFilterCommand
+        AddressAllowCommand,
+        LqprintfCommand,
+        TestCommand
     ],
     [
         StartPhysCommandParser,
@@ -187,7 +203,9 @@ define_std_command_manager!(
         LoadCommandParser,
         EndCommandParser,
         VersionCommandParser,
-        VaddrFilterAllowRangeCommandParser
+        VaddrFilterAllowRangeCommandParser,
+        LqprintfCommandParser,
+        TestCommandParser
     ]
 );
 
@@ -217,22 +235,20 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
-        driver: &mut ED,
+        state: &mut S,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError>;
 }
-
-#[cfg(emulation_mode = "systemmode")]
-pub type PagingFilterCommand = FilterCommand<QemuInstrumentationPagingFilter>;
-
-pub type AddressRangeFilterCommand = FilterCommand<QemuInstrumentationAddressRangeFilter>;
 
 #[derive(Debug, Clone)]
 pub enum CommandError {
     UnknownCommand(GuestReg),
     RWError(QemuRWError),
     VersionDifference(u64),
+    TestDifference(GuestReg, GuestReg), // received, expected
+    StartedTwice,
+    EndBeforeStart,
 }
 
 impl From<QemuRWError> for CommandError {
@@ -262,7 +278,7 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -274,7 +290,7 @@ where
 pub struct SaveCommand;
 impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for SaveCommand
 where
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput + Unpin,
     SM: IsSnapshotManager,
@@ -286,7 +302,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
@@ -294,26 +310,9 @@ where
         let qemu = emu.qemu();
         let snapshot_id = emu.snapshot_manager_mut().save(qemu);
 
-        driver
+        emu.driver_mut()
             .set_snapshot_id(snapshot_id)
             .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
-
-        #[cfg(emulation_mode = "systemmode")]
-        {
-            let emulator_modules = emu.modules_mut().modules_mut();
-
-            let mut allowed_paging_ids = HashSet::new();
-
-            let current_paging_id = qemu.current_cpu().unwrap().current_paging_id().unwrap();
-            allowed_paging_ids.insert(current_paging_id);
-
-            let paging_filter =
-                HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(
-                    emulator_modules,
-                );
-
-            *paging_filter = QemuInstrumentationPagingFilter::AllowList(allowed_paging_ids);
-        }
 
         Ok(None)
     }
@@ -335,14 +334,15 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
     {
         let qemu = emu.qemu();
 
-        let snapshot_id = driver
+        let snapshot_id = emu
+            .driver_mut()
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
@@ -374,7 +374,7 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
+        _state: &mut S,
         input: &S::Input,
         ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -394,11 +394,10 @@ where
 pub struct StartCommand {
     input_location: QemuMemoryChunk,
 }
-
-impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for StartCommand
+impl<ET, S, SM> IsCommand<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for StartCommand
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -408,20 +407,32 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
+        emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
+        state: &mut S,
         input: &S::Input,
         ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
-    {
+    ) -> Result<
+        Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        if emu.command_manager_mut().start() {
+            return Err(EmulatorDriverError::CommandError(
+                CommandError::StartedTwice,
+            ));
+        }
+
         let qemu = emu.qemu();
+
+        // Snapshot VM
         let snapshot_id = emu.snapshot_manager_mut().save(qemu);
 
-        driver
+        // Set snapshot ID to restore to after fuzzing ends
+        emu.driver_mut()
             .set_snapshot_id(snapshot_id)
             .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
 
-        driver
+        // Save input location for next runs
+        emu.driver_mut()
             .set_input_location(InputLocation::new(
                 self.input_location.clone(),
                 qemu.current_cpu().unwrap(),
@@ -429,13 +440,42 @@ where
             ))
             .unwrap();
 
+        // Write input to input location
         let ret_value = self
             .input_location
             .write(qemu, input.target_bytes().as_slice());
 
+        // Unleash hooks if locked
+        if emu.driver_mut().unlock_hooks() {
+            // Prepare hooks
+            emu.modules_mut().first_exec_all(state);
+            emu.modules_mut().pre_exec_all(state, input);
+        }
+
+        // Auto page filtering if option is enabled
+        #[cfg(emulation_mode = "systemmode")]
+        if emu.driver_mut().allow_page_on_start() {
+            if let Some(page_id) = qemu.current_cpu().unwrap().current_paging_id() {
+                emu.modules_mut().modules_mut().allow_page_id_all(page_id);
+            }
+        }
+
+        #[cfg(feature = "x86_64")]
+        if emu.driver_mut().is_process_only() {
+            emu.modules_mut()
+                .modules_mut()
+                .allow_address_range_all(crate::PROCESS_ADDRESS_RANGE);
+        }
+
+        // Make sure JIT cache is empty just before starting
+        qemu.flush_jit();
+
+        // Set input size in return register if there is any
         if let Some(reg) = ret_reg {
             qemu.write_reg(reg, ret_value).unwrap();
         }
+
+        log::info!("Fuzzing starts");
 
         Ok(None)
     }
@@ -446,10 +486,11 @@ pub struct EndCommand {
     exit_kind: Option<ExitKind>,
 }
 
-impl<CM, ET, S, SM> IsCommand<CM, StdEmulatorDriver, ET, S, SM> for EndCommand
+impl<ET, S, SM> IsCommand<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM> for EndCommand
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
     fn usable_at_runtime(&self) -> bool {
@@ -458,15 +499,24 @@ where
 
     fn run(
         &self,
-        emu: &mut Emulator<CM, StdEmulatorDriver, ET, S, SM>,
-        driver: &mut StdEmulatorDriver,
+        emu: &mut Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
-    ) -> Result<Option<EmulatorDriverResult<CM, StdEmulatorDriver, ET, S, SM>>, EmulatorDriverError>
-    {
+    ) -> Result<
+        Option<EmulatorDriverResult<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
         let qemu = emu.qemu();
 
-        let snapshot_id = driver
+        if !emu.command_manager_mut().has_started() {
+            return Err(EmulatorDriverError::CommandError(
+                CommandError::EndBeforeStart,
+            ));
+        }
+
+        let snapshot_id = emu
+            .driver_mut()
             .snapshot_id()
             .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
@@ -496,7 +546,7 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
@@ -512,15 +562,16 @@ where
     }
 }
 
+#[cfg(emulation_mode = "systemmode")]
 #[derive(Debug, Clone)]
-pub struct FilterCommand<T> {
-    filter: T,
+pub struct PageAllowCommand {
+    page_id: GuestPhysAddr,
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for PagingFilterCommand
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for PageAllowCommand
 where
-    ET: StdInstrumentationFilter + Unpin,
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput + Unpin,
 {
@@ -531,25 +582,54 @@ where
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
-        let qemu_modules = emu.modules_mut().modules_mut();
-
-        let paging_filter =
-            HasInstrumentationFilter::<QemuInstrumentationPagingFilter>::filter_mut(qemu_modules);
-
-        *paging_filter = self.filter.clone();
-
+        emu.modules_mut()
+            .modules_mut()
+            .allow_page_id_all(self.page_id.clone());
         Ok(None)
     }
 }
 
-impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for AddressRangeFilterCommand
+#[derive(Debug, Clone)]
+pub struct AddressAllowCommand {
+    address_range: Range<GuestAddr>,
+}
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for AddressAllowCommand
 where
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
+    S: UsesInput + Unpin,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
+        emu.modules_mut()
+            .modules_mut()
+            .allow_address_range_all(self.address_range.clone());
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LqprintfCommand {
+    content: String,
+}
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for LqprintfCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
 {
     fn usable_at_runtime(&self) -> bool {
         true
@@ -558,20 +638,61 @@ where
     fn run(
         &self,
         _emu: &mut Emulator<CM, ED, ET, S, SM>,
-        _driver: &mut ED,
+        _state: &mut S,
         _input: &S::Input,
         _ret_reg: Option<Regs>,
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
-        let qemu_modules = &mut ();
-
-        let addr_range_filter =
-            HasInstrumentationFilter::<QemuInstrumentationAddressRangeFilter>::filter_mut(
-                qemu_modules,
-            );
-
-        *addr_range_filter = self.filter.clone();
-
+        print!("LQPRINTF: {}", self.content);
         Ok(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TestCommand {
+    expected_value: GuestReg,
+    received_value: GuestReg,
+}
+impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for TestCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        _emu: &mut Emulator<CM, ED, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
+        if self.expected_value == self.received_value {
+            Ok(None)
+        } else {
+            Err(EmulatorDriverError::CommandError(
+                CommandError::TestDifference(self.received_value, self.expected_value),
+            ))
+        }
+    }
+}
+
+impl TestCommand {
+    #[must_use]
+    pub fn new(received_value: GuestReg, expected_value: GuestReg) -> Self {
+        Self {
+            expected_value,
+            received_value,
+        }
+    }
+}
+
+impl LqprintfCommand {
+    #[must_use]
+    pub fn new(content: String) -> Self {
+        Self { content }
     }
 }
 
@@ -582,9 +703,10 @@ impl VersionCommand {
     }
 }
 
-impl<T> FilterCommand<T> {
-    pub fn new(filter: T) -> Self {
-        Self { filter }
+impl AddressAllowCommand {
+    #[must_use]
+    pub fn new(address_range: Range<GuestAddr>) -> Self {
+        Self { address_range }
     }
 }
 
@@ -628,16 +750,16 @@ impl Display for VersionCommand {
     }
 }
 
-impl Display for AddressRangeFilterCommand {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Addr range filter: {:?}", self.filter,)
+impl Display for AddressAllowCommand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Addr range allow: {:?}", self.address_range)
     }
 }
 
 #[cfg(emulation_mode = "systemmode")]
-impl Display for PagingFilterCommand {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Addr range filter: {:?}", self.filter,)
+impl Display for PageAllowCommand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Allowed page: {:?}", self.page_id)
     }
 }
 

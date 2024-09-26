@@ -1,3 +1,6 @@
+#[cfg(emulation_mode = "systemmode")]
+use std::ptr::addr_of_mut;
+
 #[cfg(emulation_mode = "usermode")]
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
@@ -11,14 +14,13 @@ pub use libafl_targets::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(emulation_mode = "systemmode")]
+use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 #[cfg(emulation_mode = "usermode")]
 use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
 use crate::{
     emu::EmulatorModules,
-    modules::{
-        hash_me, EmulatorModule, EmulatorModuleTuple, HasInstrumentationFilter, IsFilter,
-        QemuInstrumentationAddressRangeFilter,
-    },
+    modules::{hash_me, AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
     qemu::Hook,
 };
 
@@ -46,34 +48,24 @@ libafl_bolts::impl_serdeany!(QemuCmpsMapMetadata);
 
 #[derive(Debug)]
 pub struct CmpLogModule {
-    filter: QemuInstrumentationAddressRangeFilter,
+    address_filter: StdAddressFilter,
 }
 
 impl CmpLogModule {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
-        Self { filter }
+    pub fn new(address_filter: StdAddressFilter) -> Self {
+        Self { address_filter }
     }
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(addr)
+        self.address_filter.allowed(&addr)
     }
 }
 
 impl Default for CmpLogModule {
     fn default() -> Self {
-        Self::new(QemuInstrumentationAddressRangeFilter::None)
-    }
-}
-
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for CmpLogModule {
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        &self.filter
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        &mut self.filter
+        Self::new(StdAddressFilter::default())
     }
 }
 
@@ -81,7 +73,11 @@ impl<S> EmulatorModule<S> for CmpLogModule
 where
     S: Unpin + UsesInput + HasMetadata,
 {
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(emulation_mode = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
+
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -93,28 +89,46 @@ where
             Hook::Raw(trace_cmp8_cmplog),
         );
     }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &self.address_filter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        &mut self.address_filter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter(&self) -> &Self::ModulePageFilter {
+        &NopPageFilter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
+    }
 }
 
 #[derive(Debug)]
 pub struct CmpLogChildModule {
-    filter: QemuInstrumentationAddressRangeFilter,
+    address_filter: StdAddressFilter,
 }
 
 impl CmpLogChildModule {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
-        Self { filter }
+    pub fn new(address_filter: StdAddressFilter) -> Self {
+        Self { address_filter }
     }
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(addr)
+        self.address_filter.allowed(&addr)
     }
 }
 
 impl Default for CmpLogChildModule {
     fn default() -> Self {
-        Self::new(QemuInstrumentationAddressRangeFilter::None)
+        Self::new(StdAddressFilter::default())
     }
 }
 
@@ -122,9 +136,13 @@ impl<S> EmulatorModule<S> for CmpLogChildModule
 where
     S: Unpin + UsesInput + HasMetadata,
 {
+    type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(emulation_mode = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
+
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -135,6 +153,24 @@ where
             Hook::Raw(trace_cmp4_cmplog),
             Hook::Raw(trace_cmp8_cmplog),
         );
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &self.address_filter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        &mut self.address_filter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter(&self) -> &Self::ModulePageFilter {
+        &NopPageFilter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
@@ -214,23 +250,23 @@ pub extern "C" fn trace_cmp8_cmplog(_: *const (), id: u64, v0: u64, v1: u64) {
 #[cfg(emulation_mode = "usermode")]
 #[derive(Debug)]
 pub struct CmpLogRoutinesModule {
-    filter: QemuInstrumentationAddressRangeFilter,
+    address_filter: StdAddressFilter,
     cs: Capstone,
 }
 
 #[cfg(emulation_mode = "usermode")]
 impl CmpLogRoutinesModule {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationAddressRangeFilter) -> Self {
+    pub fn new(address_filter: StdAddressFilter) -> Self {
         Self {
-            filter,
+            address_filter,
             cs: capstone().detail(true).build().unwrap(),
         }
     }
 
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(addr)
+        self.address_filter.allowed(&addr)
     }
 
     extern "C" fn on_call(k: u64, _pc: GuestAddr) {
@@ -348,22 +384,15 @@ impl CmpLogRoutinesModule {
 }
 
 #[cfg(emulation_mode = "usermode")]
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for CmpLogRoutinesModule {
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        &self.filter
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        &mut self.filter
-    }
-}
-
-#[cfg(emulation_mode = "usermode")]
 impl<S> EmulatorModule<S> for CmpLogRoutinesModule
 where
     S: Unpin + UsesInput,
 {
-    fn first_exec<ET>(&mut self, _state: &mut S, emulator_modules: &mut EmulatorModules<ET, S>)
+    type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(emulation_mode = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
+
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -372,5 +401,23 @@ where
             Hook::Empty,
             Hook::Empty,
         );
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &self.address_filter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        &mut self.address_filter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter(&self) -> &Self::ModulePageFilter {
+        &NopPageFilter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+        &mut NopPageFilter
     }
 }

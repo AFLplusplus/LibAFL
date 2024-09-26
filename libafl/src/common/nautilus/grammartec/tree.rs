@@ -258,11 +258,11 @@ impl Tree {
     ) -> TreeMutation<'a> {
         let old_size = self.subtree_size(n);
         let new_size = other.subtree_size(other_node);
-        return TreeMutation {
+        TreeMutation {
             prefix: self.slice(0.into(), n),
             repl: other.slice(other_node, other_node + new_size),
             postfix: self.slice(n + old_size, self.rules.len().into()),
-        };
+        }
     }
 
     fn calc_subtree_sizes_and_parents(&mut self, ctx: &Context) {
@@ -455,7 +455,7 @@ impl<'a> TreeLike for TreeMutation<'a> {
     }
 
     fn get_rule<'c>(&self, n: NodeId, ctx: &'c Context) -> &'c Rule {
-        return ctx.get_rule(self.get_rule_id(n));
+        ctx.get_rule(self.get_rule_id(n))
     }
     fn get_custom_rule_data(&self, n: NodeId) -> &[u8] {
         self.get_at(n).data()

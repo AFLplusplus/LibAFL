@@ -113,8 +113,9 @@ where
     }
 
     /// Run in the broker until all clients exit
+    // TODO: remove allow(clippy::needless_return) when clippy is fixed
     #[tokio::main(flavor = "current_thread")]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::needless_return)]
     pub async fn broker_loop(&mut self) -> Result<(), Error> {
         let (tx_bc, rx) = broadcast::channel(65536);
         let (tx, mut rx_mpsc) = mpsc::channel(65536);

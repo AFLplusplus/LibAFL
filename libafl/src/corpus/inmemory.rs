@@ -235,7 +235,7 @@ pub struct TestcaseStorage<I> {
 impl<I> TestcaseStorage<I> {
     /// Insert a testcase assigning a `CorpusId` to it
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self._insert(testcase, false)
+        self.insert_inner(testcase, false)
     }
 
     #[must_use]
@@ -246,12 +246,12 @@ impl<I> TestcaseStorage<I> {
 
     /// Insert a testcase assigning a `CorpusId` to it
     pub fn insert_disabled(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
-        self._insert(testcase, true)
+        self.insert_inner(testcase, true)
     }
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(not(feature = "corpus_btreemap"))]
-    fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
+    fn insert_inner(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let id = CorpusId::from(self.progressive_id);
         self.progressive_id += 1;
         let corpus = if is_disabled {
@@ -283,7 +283,7 @@ impl<I> TestcaseStorage<I> {
 
     /// Insert a testcase assigning a `CorpusId` to it
     #[cfg(feature = "corpus_btreemap")]
-    fn _insert(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
+    fn insert_inner(&mut self, testcase: RefCell<Testcase<I>>, is_disabled: bool) -> CorpusId {
         let id = CorpusId::from(self.progressive_id);
         self.progressive_id += 1;
         let corpus = if is_disabled {
