@@ -228,8 +228,8 @@ jobs:
       - name: Run linkspector
         uses: umbrelladocs/action-linkspector@v1
         with:
-          config_file: '.github/workflows/.linkspector.yml'
           fail_on_error: 'true'
+          # config_file: '.github/workflows/.linkspector.yml'
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
