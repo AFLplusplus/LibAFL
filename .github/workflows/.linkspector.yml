@@ -6,6 +6,7 @@ useGitIgnore: true
 ignorePatterns:
   - pattern: "^https://crates.io"
   - pattern: "^https://github.com/AFLplusplus/linux-qemu-image-builder"
+  - pattern: "https://www.romu-random.org/"
 
 aliveStatusCodes:
   - 0
