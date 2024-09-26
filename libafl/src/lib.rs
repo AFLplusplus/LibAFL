@@ -135,7 +135,10 @@ mod tests {
 
     #[cfg(miri)]
     use libafl_bolts::serdeany::RegistryBuilder;
-    use libafl_bolts::{rands::StdRand, tuples::tuple_list};
+    use libafl_bolts::{
+        rands::{RomuDuoJrRand, StdRand},
+        tuples::tuple_list,
+    };
 
     #[cfg(miri)]
     use crate::stages::ExecutionCountRestartHelperMetadata;
@@ -221,7 +224,15 @@ mod tests {
             InMemoryCorpus<BytesInput>,
             StdRand,
             InMemoryCorpus<BytesInput>,
-        > = postcard::from_bytes(state_serialized.as_slice()).unwrap();
+        > = postcard::from_bytes::<
+            StdState<
+                BytesInput,
+                InMemoryCorpus<BytesInput>,
+                RomuDuoJrRand,
+                InMemoryCorpus<BytesInput>,
+            >,
+        >(state_serialized.as_slice())
+        .unwrap();
         assert_eq!(state.corpus().count(), state_deserialized.corpus().count());
 
         let corpus_serialized = postcard::to_allocvec(state.corpus()).unwrap();

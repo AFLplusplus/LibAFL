@@ -9,6 +9,7 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::{
+    corpus::Corpus,
     executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
     state::{HasCorpus, HasSolutions},
 };
@@ -242,6 +243,8 @@ where
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
+    <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     /// the timeout handler
     #[inline]

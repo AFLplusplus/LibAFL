@@ -16,6 +16,7 @@ use crate::executors::hooks::inprocess::HasTimeout;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::hooks::inprocess::HasTimeout;
 use crate::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{
@@ -178,6 +179,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks,
@@ -205,6 +208,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -235,6 +240,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
