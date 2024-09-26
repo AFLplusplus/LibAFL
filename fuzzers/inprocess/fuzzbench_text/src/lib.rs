@@ -584,7 +584,8 @@ fn fuzz_text(
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+        StdPowerMutationalStage::new(mutator);
 
     let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
         tuple_list!(
