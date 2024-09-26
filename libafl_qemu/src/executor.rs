@@ -86,6 +86,8 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
+    <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+    <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     if BREAK_ON_TMOUT {
         libafl_exit_request_timeout();

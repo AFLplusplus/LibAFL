@@ -110,9 +110,7 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
 
     /// Create a weak version of the proxy, which will become unusable when the custom mutator
     /// is no longer permitted to be executed.
-    fn weak(
-        &self,
-    ) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
+    fn weak(&self) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
         let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {
             accessor: move |f: &mut dyn for<'b> FnMut(&'b mut S)| {
@@ -233,7 +231,7 @@ impl<S, SM> LLVMCustomMutator<S, SM, false> {
     pub unsafe fn mutate_unchecked(mutator: SM) -> Self {
         LLVMCustomMutator {
             mutator: Rc::new(RefCell::new(mutator)),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 }
@@ -267,8 +265,7 @@ impl<S, SM> LLVMCustomMutator<S, SM, true> {
     }
 }
 
-impl<S, SM, const CROSSOVER: bool> ComposedByMutations
-    for LLVMCustomMutator<S, SM, CROSSOVER>
+impl<S, SM, const CROSSOVER: bool> ComposedByMutations for LLVMCustomMutator<S, SM, CROSSOVER>
 where
     SM: ScheduledMutator<BytesInput, S>,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
