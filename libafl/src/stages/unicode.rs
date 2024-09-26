@@ -8,11 +8,11 @@ use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    common::HasMetadata,
     corpus::HasTestcase,
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, HasMutatorBytes, Input},
     stages::Stage,
     state::{HasCorpus, HasCurrentTestcase, State, UsesState},
-    HasMetadata,
 };
 
 /// Metadata which stores the list of pre-computed string-like ranges in the input
@@ -89,6 +89,24 @@ impl<S> UnicodeIdentificationStage<S> {
             phantom: PhantomData,
         }
     }
+    fn identify_unicode_in_current_testcase<I>(state: &mut S) -> Result<(), Error>
+    where
+        I: Input + HasMutatorBytes,
+        S: HasCurrentTestcase<I> + HasCorpus<Input = I>,
+    {
+        let mut tc = state.current_testcase_mut()?;
+        if tc.has_metadata::<UnicodeIdentificationMetadata>() {
+            return Ok(()); // skip recompute
+        }
+
+        let input = tc.load_input(state.corpus())?;
+
+        let bytes = input.bytes();
+        let metadata = extract_metadata(bytes);
+        tc.add_metadata(metadata);
+
+        Ok(())
+    }
 }
 
 impl<S> UsesState for UnicodeIdentificationStage<S>
@@ -112,18 +130,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let mut tc = state.current_testcase_mut()?;
-        if tc.has_metadata::<UnicodeIdentificationMetadata>() {
-            return Ok(()); // skip recompute
-        }
-
-        let input = tc.load_input(state.corpus())?;
-
-        let bytes = input.bytes();
-        let metadata = extract_metadata(bytes);
-        tc.add_metadata(metadata);
-
-        Ok(())
+        UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
     }
 
     #[inline]

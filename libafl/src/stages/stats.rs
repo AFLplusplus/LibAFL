@@ -62,6 +62,42 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
+        self.update_and_report_afl_stats(state, _manager)
+    }
+
+    #[inline]
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
+        Ok(())
+    }
+}
+
+impl<E, EM, Z> AflStatsStage<E, EM, Z> {
+    /// create a new instance of the [`AflStatsStage`]
+    #[must_use]
+    pub fn new(interval: Duration) -> Self {
+        Self {
+            stats_report_interval: interval,
+            ..Default::default()
+        }
+    }
+
+    fn update_and_report_afl_stats(
+        &mut self,
+        state: &mut <Self as UsesState>::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error>
+    where
+        E: UsesState,
+        EM: EventFirer<State = E::State>,
+        <Self as UsesState>::State: HasCorpus + HasImported,
+    {
         let Some(corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
@@ -123,29 +159,6 @@ where
         }
 
         Ok(())
-    }
-
-    #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
-        Ok(true)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
-        Ok(())
-    }
-}
-
-impl<E, EM, Z> AflStatsStage<E, EM, Z> {
-    /// create a new instance of the [`AflStatsStage`]
-    #[must_use]
-    pub fn new(interval: Duration) -> Self {
-        Self {
-            stats_report_interval: interval,
-            ..Default::default()
-        }
     }
 }
 

@@ -93,6 +93,44 @@ pub struct NewHashFeedback<O, S> {
     phantom: PhantomData<S>,
 }
 
+impl<O, S> NewHashFeedback<O, S>
+where
+    O: ObserverWithHashField + Named,
+    S: State + HasNamedMetadata,
+{
+    #[allow(clippy::wrong_self_convention)]
+    fn has_interesting_backtrace_hash_observation<OT>(
+        &mut self,
+        state: &mut S,
+        observers: &OT,
+    ) -> Result<bool, Error>
+    where
+        OT: ObserversTuple<S>,
+    {
+        let observer = observers
+            .get(&self.o_ref)
+            .expect("A NewHashFeedback needs a BacktraceObserver");
+
+        let backtrace_state = state
+            .named_metadata_map_mut()
+            .get_mut::<NewHashFeedbackMetadata>(&self.name)
+            .unwrap();
+
+        let res = match observer.hash() {
+            Some(hash) => backtrace_state.update_hash_set(hash)?,
+            None => {
+                // We get here if the hash was not updated, i.e the first run or if no crash happens
+                false
+            }
+        };
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
+    }
+}
+
 impl<O, S> Feedback<S> for NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named,
@@ -119,27 +157,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        let observer = observers
-            .get(&self.o_ref)
-            .expect("A NewHashFeedback needs a BacktraceObserver");
-
-        let backtrace_state = state
-            .named_metadata_map_mut()
-            .get_mut::<NewHashFeedbackMetadata>(&self.name)
-            .unwrap();
-
-        let res = match observer.hash() {
-            Some(hash) => backtrace_state.update_hash_set(hash)?,
-            None => {
-                // We get here if the hash was not updated, i.e the first run or if no crash happens
-                false
-            }
-        };
-        #[cfg(feature = "track_hit_feedbacks")]
-        {
-            self.last_result = Some(res);
-        }
-        Ok(res)
+        self.has_interesting_backtrace_hash_observation(state, observers)
     }
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
