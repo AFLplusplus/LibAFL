@@ -110,7 +110,6 @@ jobs:
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
-    needs: ubuntu
     steps:
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
