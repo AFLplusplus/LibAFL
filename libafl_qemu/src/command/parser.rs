@@ -1,21 +1,21 @@
-use std::sync::OnceLock;
+use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::{enum_map, EnumMap};
 use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
+use libafl_bolts::AsSliceMut;
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
 use crate::{
     command::{
-        bindings, CommandError, CommandManager, EndCommand, FilterCommand, InputCommand, IsCommand,
-        LoadCommand, NativeExitKind, SaveCommand, StartCommand, VersionCommand,
+        bindings, AddressAllowCommand, CommandError, CommandManager, EndCommand, InputCommand,
+        IsCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand,
+        StdCommandManager, TestCommand, VersionCommand,
     },
-    modules::{
-        EmulatorModuleTuple, QemuInstrumentationAddressRangeFilter, StdInstrumentationFilter,
-    },
+    modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
@@ -93,10 +93,11 @@ where
 
 pub struct StartPhysCommandParser;
 
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartPhysCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+    for StartPhysCommandParser
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -121,10 +122,11 @@ where
 
 pub struct StartVirtCommandParser;
 
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for StartVirtCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+    for StartVirtCommandParser
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
     S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
@@ -150,7 +152,7 @@ where
 pub struct SaveCommandParser;
 impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for SaveCommandParser
 where
-    ET: EmulatorModuleTuple<S> + StdInstrumentationFilter,
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
     S: UsesInput + Unpin,
     SM: IsSnapshotManager,
@@ -188,10 +190,12 @@ where
 
 pub struct EndCommandParser;
 
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for EndCommandParser
+impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+    for EndCommandParser
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
     SM: IsSnapshotManager,
 {
     type OutputCommand = EndCommand;
@@ -243,10 +247,11 @@ pub struct VaddrFilterAllowRangeCommandParser;
 impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM>
     for VaddrFilterAllowRangeCommandParser
 where
+    ET: EmulatorModuleTuple<S>,
     CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
+    S: UsesInput + Unpin,
 {
-    type OutputCommand = FilterCommand<QemuInstrumentationAddressRangeFilter>;
+    type OutputCommand = AddressAllowCommand;
 
     const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_VADDR_FILTER_ALLOW.0;
 
@@ -257,9 +262,70 @@ where
         let vaddr_start: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let vaddr_end: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
-        Ok(FilterCommand::new(
-            #[allow(clippy::single_range_in_vec_init)]
-            QemuInstrumentationAddressRangeFilter::AllowList(vec![vaddr_start..vaddr_end]),
+        Ok(AddressAllowCommand::new(vaddr_start..vaddr_end))
+    }
+}
+
+pub struct LqprintfCommandParser;
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for LqprintfCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
+{
+    type OutputCommand = LqprintfCommand;
+    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF.0;
+
+    #[allow(clippy::uninit_vec)]
+    fn parse(
+        qemu: Qemu,
+        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        let buf_addr: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let str_size: usize = qemu
+            .read_reg::<Regs, GuestAddr>(arch_regs_map[ExitArgs::Arg2])?
+            .try_into()
+            .unwrap(); // without null byte
+        let cpu = qemu.current_cpu().unwrap();
+
+        let total_size = str_size + 1;
+
+        let mut str_copy: Vec<u8> = unsafe {
+            let mut res = Vec::<u8>::with_capacity(total_size);
+            res.set_len(total_size);
+            res
+        };
+
+        let mem_chunk =
+            QemuMemoryChunk::virt(buf_addr as GuestVirtAddr, total_size as GuestReg, cpu);
+        mem_chunk.read(qemu, str_copy.as_slice_mut());
+
+        let c_str: &CStr = CStr::from_bytes_with_nul(str_copy.as_slice()).unwrap();
+
+        Ok(LqprintfCommand::new(c_str.to_str().unwrap().to_string()))
+    }
+}
+
+pub struct TestCommandParser;
+impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for TestCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    CM: CommandManager<ED, ET, S, SM>,
+    S: UsesInput + Unpin,
+{
+    type OutputCommand = TestCommand;
+    const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_TEST.0;
+
+    #[allow(clippy::cast_sign_loss)]
+    fn parse(
+        qemu: Qemu,
+        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        let received_value: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+
+        Ok(TestCommand::new(
+            received_value,
+            bindings::LIBAFL_QEMU_TEST_VALUE as GuestReg,
         ))
     }
 }

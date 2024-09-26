@@ -571,7 +571,7 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
     // We still need space for this msg (alloc_size).
     let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
-    let next = _llmp_next_msg_ptr(last_msg);
+    let next = llmp_next_msg_ptr(last_msg);
     let next_ptr = next as *const u8;
     if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
         Ok(next)
@@ -590,8 +590,8 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 /// Will dereference the `last_msg` ptr
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
-unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
-    /* DBG("_llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
+unsafe fn llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
+    /* DBG("llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
     (last_msg as *mut u8)
         .add(size_of::<LlmpMsg>())
         .add((*last_msg).buf_len_padded as usize) as *mut LlmpMsg
@@ -1243,7 +1243,7 @@ where
         (*ret).buf_len_padded = buf_len_padded as u64;
         (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
 
-        (*_llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
+        (*llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
         (*ret).tag = LLMP_TAG_UNINITIALIZED;
 
         self.has_unsent_message = true;
@@ -1494,7 +1494,7 @@ where
         (*page).size_used -= old_len_padded as usize;
         (*page).size_used += buf_len_padded;
 
-        (*_llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
+        (*llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
 
         Ok(())
     }

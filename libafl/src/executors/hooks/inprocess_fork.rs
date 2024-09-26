@@ -131,7 +131,6 @@ impl InProcessForkExecutorGlobalData {
 }
 
 /// a static variable storing the global state
-
 pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
     InProcessForkExecutorGlobalData {
         executor_ptr: null(),

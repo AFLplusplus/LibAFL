@@ -45,9 +45,16 @@ pub fn build() {
     let qemu_asan = cfg!(all(feature = "build_libqasan", not(feature = "hexagon")));
 
     let libafl_qemu_hdr_name = "libafl_qemu.h";
+    let libafl_qemu_arch_hdr_name = "libafl_qemu_arch.h";
+    let libafl_qemu_defs_hdr_name = "libafl_qemu_defs.h";
+    let libafl_qemu_impl_hdr_name = "libafl_qemu_impl.h";
 
     let libafl_runtime_dir = src_dir.join("runtime");
+
     let libafl_qemu_hdr = libafl_runtime_dir.join(libafl_qemu_hdr_name);
+    let libafl_qemu_arch_hdr = libafl_runtime_dir.join(libafl_qemu_arch_hdr_name);
+    let libafl_qemu_defs_hdr = libafl_runtime_dir.join(libafl_qemu_defs_hdr_name);
+    let libafl_qemu_impl_hdr = libafl_runtime_dir.join(libafl_qemu_impl_hdr_name);
 
     let libafl_runtime_testfile = out_dir.join("runtime_test.c");
     fs::write(&libafl_runtime_testfile, LIBAFL_QEMU_RUNTIME_TEST).expect("Could not write runtime test file");
@@ -118,6 +125,25 @@ pub fn build() {
         include_dir.join(libafl_qemu_hdr_name),
     )
     .expect("Could not copy libafl_qemu.h to out directory.");
+
+    fs::copy(
+
+        libafl_qemu_arch_hdr.clone(),
+        include_dir.join(libafl_qemu_arch_hdr_name),
+    )
+    .expect("Could not copy libafl_qemu_arch.h to out directory.");
+
+    fs::copy(
+        libafl_qemu_defs_hdr.clone(),
+        include_dir.join(libafl_qemu_defs_hdr_name),
+    )
+    .expect("Could not copy libafl_qemu_defs.h to out directory.");
+
+    fs::copy(
+        libafl_qemu_impl_hdr.clone(),
+        include_dir.join(libafl_qemu_impl_hdr_name),
+    )
+    .expect("Could not copy libafl_qemu_impl.h to out directory.");
 
     bindgen::Builder::default()
         .derive_debug(true)

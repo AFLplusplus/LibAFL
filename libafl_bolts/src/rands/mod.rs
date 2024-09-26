@@ -130,6 +130,12 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         fast_bound(self.next(), upper_bound_excl)
     }
 
+    /// Gets a value below the given bound (inclusive)
+    #[inline]
+    fn below_incl(&mut self, upper_bound_incl: usize) -> usize {
+        self.below(upper_bound_incl + 1)
+    }
+
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     #[inline]
     fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {

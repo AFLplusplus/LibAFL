@@ -139,9 +139,9 @@ impl<'a, M, MT, S> MutatorProxy<'a, M, MT, S> {
 struct WeakMutatorProxy<F, M, MT, S> {
     /// Function which will perform the access to the state.
     accessor: F,
+
     /// A weak reference to the mutator
     mutator: Weak<RefCell<M>>,
-    /// The stage index to provide to the mutator, when executed.
 
     /// The result of mutation, to be propagated to the mutational stage
     result: Rc<RefCell<Result<MutationResult, Error>>>,
