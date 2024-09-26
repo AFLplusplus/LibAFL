@@ -526,13 +526,18 @@ where
     pub fn new(
         state: &mut S,
         mutations: MT,
-        max_stack_pow: NonZeroUsize,
+        max_stack_pow: usize,
         swarm_num: usize,
     ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {
             let rand_seed = state.rand_mut().next();
             state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num, rand_seed)?);
         }
+        let Some(max_stack_pow) = NonZero::new(max_stack_pow) else {
+            return Err(Error::illegal_argument(
+                "Got 0 as value for max_stack_pow in StdMOptMutator.",
+            ));
+        };
         Ok(Self {
             name: Cow::from(format!("StdMOptMutator[{}]", mutations.names().join(","))),
             mode: MOptMode::Pilotfuzzing,
