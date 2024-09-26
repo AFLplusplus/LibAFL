@@ -6,10 +6,7 @@ use std::ptr;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    corpus::{
-        minimizer::{CorpusMinimizer, StdCorpusMinimizer},
-        Corpus, InMemoryCorpus, OnDiskCorpus,
-    },
+    corpus::{minimizer::StdCorpusMinimizer, Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventFirer, EventRestarter, LogSeverity},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
