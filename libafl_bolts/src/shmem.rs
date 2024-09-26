@@ -694,11 +694,13 @@ pub mod unix_shmem {
             /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete all `/dev/shm/libafl_*` after fuzzing
             pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
                 unsafe {
-                    let full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
+                    let mut full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
+                    // leave one byte space for the null byte.
+                    full_file_name.truncate(MAX_MMAP_FILENAME_LEN - 1);
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    filename_path
-                        .copy_from_slice(&full_file_name.as_bytes()[..MAX_MMAP_FILENAME_LEN]);
-                    filename_path[MAX_MMAP_FILENAME_LEN - 1] = 0; // Null terminate!
+                    filename_path[0..full_file_name.len()]
+                        .copy_from_slice(full_file_name.as_bytes());
+                    filename_path[full_file_name.len()] = 0; // Null terminate!
                     log::info!(
                         "{} Creating shmem {} {:#?}",
                         map_size,

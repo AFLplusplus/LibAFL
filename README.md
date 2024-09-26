@@ -54,7 +54,7 @@ Be sure to read their documentation (and source), this is *the natural way to ge
 ```sh
 cargo make run
 ```
-You can run each example fuzzer with this following command, as long as the fuzzer directory has `Makefile.toml` file. The best-tested fuzzer is [`./fuzzers/libpng/libfuzzer_libpng`](./fuzzers/libpng/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
+You can run each example fuzzer with this following command, as long as the fuzzer directory has `Makefile.toml` file. The best-tested fuzzer is [`./fuzzers/inprocess/libfuzzer_libpng`](./fuzzers/inprocess/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
 
 ### Ressources 
 - [Installation guide](./docs/src/getting_started/setup.md)
@@ -66,7 +66,6 @@ You can run each example fuzzer with this following command, as long as the fuzz
 - The Fuzzing101 [solutions](https://github.com/epi052/fuzzing-101-solutions) & series of [blog posts](https://epi052.gitlab.io/notes-to-self/blog/2021-11-01-fuzzing-101-with-libafl/) by [epi](https://github.com/epi052)
 - Blogpost on binary-only fuzzing lib libaf_qemu, [Hacking TMNF - Fuzzing the game server](https://blog.bricked.tech/posts/tmnf/part1/), by [RickdeJager](https://github.com/RickdeJager).
 - [A LibAFL Introductory Workshop](https://www.atredis.com/blog/2023/12/4/a-libafl-introductory-workshop), by [Jordan Whitehead](https://github.com/jordan9001)
-
 
 ## Contributors
 

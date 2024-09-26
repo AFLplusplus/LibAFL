@@ -1118,22 +1118,23 @@ where
         modules
     }
 
-    pub fn first_exec_all(&mut self) {
+    pub fn first_exec_all(&mut self, state: &mut S) {
         unsafe {
             self.modules_mut()
-                .first_exec_all(Self::emulator_modules_mut_unchecked());
+                .first_exec_all(Self::emulator_modules_mut_unchecked(), state);
         }
     }
 
-    pub fn pre_exec_all(&mut self, input: &S::Input) {
+    pub fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) {
         unsafe {
             self.modules_mut()
-                .pre_exec_all(Self::emulator_modules_mut_unchecked(), input);
+                .pre_exec_all(Self::emulator_modules_mut_unchecked(), state, input);
         }
     }
 
     pub fn post_exec_all<OT>(
         &mut self,
+        state: &mut S,
         input: &S::Input,
         observers: &mut OT,
         exit_kind: &mut ExitKind,
@@ -1143,6 +1144,7 @@ where
         unsafe {
             self.modules_mut().post_exec_all(
                 Self::emulator_modules_mut_unchecked(),
+                state,
                 input,
                 observers,
                 exit_kind,

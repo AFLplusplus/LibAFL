@@ -3,16 +3,18 @@
 //! This module exposes the low-level QEMU library through [`Qemu`].
 //! To access higher-level features of QEMU, it is recommended to use [`crate::Emulator`] instead.
 
-use core::fmt;
-use std::{
+use core::{
     cmp::{Ordering, PartialOrd},
+    fmt,
+    ptr::{self, addr_of_mut},
+};
+use std::{
     ffi::{c_void, CString},
     fmt::{Display, Formatter},
     intrinsics::{copy_nonoverlapping, transmute},
     mem::MaybeUninit,
     ops::Range,
     pin::Pin,
-    ptr,
 };
 
 use libafl_bolts::os::unix_signals::Signal;
@@ -59,9 +61,17 @@ pub enum QemuInitError {
 
 #[derive(Debug, Clone)]
 pub enum QemuExitReason {
-    End(QemuShutdownCause), // QEMU ended for some reason.
-    Breakpoint(GuestAddr),  // Breakpoint triggered. Contains the address of the trigger.
-    SyncExit, // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    /// QEMU ended for some internal reason
+    End(QemuShutdownCause),
+
+    /// Breakpoint triggered. Contains the address of the trigger
+    Breakpoint(GuestAddr),
+
+    /// Synchronous exit: The guest triggered a backdoor and should return to `LibAFL`.
+    SyncExit,
+
+    /// Timeout, and it has been requested to be handled by the harness.
+    Timeout,
 }
 
 #[derive(Debug, Clone)]
@@ -141,7 +151,7 @@ pub struct QemuMemoryChunk {
 }
 
 #[allow(clippy::vec_box)]
-static mut GDB_COMMANDS: Vec<Box<FatPtr>> = vec![];
+static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
 
 unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
     unsafe {
@@ -224,6 +234,7 @@ impl Display for QemuExitReason {
             QemuExitReason::End(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
             QemuExitReason::Breakpoint(bp) => write!(f, "Breakpoint: {bp}"),
             QemuExitReason::SyncExit => write!(f, "Sync Exit"),
+            QemuExitReason::Timeout => write!(f, "Timeout"),
         }
     }
 }
@@ -546,8 +557,8 @@ impl Qemu {
 
         #[cfg(emulation_mode = "systemmode")]
         unsafe {
-            libc::atexit(qemu_cleanup_atexit);
             libafl_qemu_sys::syx_snapshot_init(true);
+            libc::atexit(qemu_cleanup_atexit);
         }
 
         Ok(Qemu { _private: () })
@@ -655,6 +666,10 @@ impl Qemu {
                     QemuExitReason::Breakpoint(bp_addr)
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
+
+                #[cfg(emulation_mode = "systemmode")]
+                libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
+
                 _ => return Err(QemuExitError::UnknownKind),
             })
         }
@@ -768,16 +783,16 @@ impl Qemu {
         id.remove(invalidate_block)
     }
 
+    // # Safety
+    // Calling this multiple times concurrently will access static variables and is unsafe.
     #[allow(clippy::type_complexity)]
-    pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
-        unsafe {
-            let fat: Box<FatPtr> = Box::new(transmute::<
-                Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
-                FatPtr,
-            >(callback));
-            libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
-            GDB_COMMANDS.push(fat);
-        }
+    pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
+        let fat: Box<FatPtr> = Box::new(transmute::<
+            Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
+            FatPtr,
+        >(callback));
+        libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
+        (*addr_of_mut!(GDB_COMMANDS)).push(fat);
     }
 
     pub fn gdb_reply(&self, output: &str) {
@@ -912,7 +927,42 @@ impl QemuMemoryChunk {
         })
     }
 
+    /// Returns the number of bytes effectively read.
+    /// output will get chunked at `size` bytes.
+    pub fn read(&self, qemu: Qemu, output: &mut [u8]) -> GuestReg {
+        let max_len: usize = self.size.try_into().unwrap();
+
+        let output_sliced = if output.len() > max_len {
+            &mut output[0..max_len]
+        } else {
+            output
+        };
+
+        match self.addr {
+            GuestAddrKind::Physical(hwaddr) => unsafe {
+                #[cfg(emulation_mode = "usermode")]
+                {
+                    // For now the default behaviour is to fall back to virtual addresses
+                    qemu.read_mem(hwaddr.try_into().unwrap(), output_sliced);
+                }
+                #[cfg(emulation_mode = "systemmode")]
+                {
+                    qemu.read_phys_mem(hwaddr, output_sliced);
+                }
+            },
+            GuestAddrKind::Virtual(vaddr) => unsafe {
+                self.cpu
+                    .as_ref()
+                    .unwrap()
+                    .read_mem(vaddr.try_into().unwrap(), output_sliced);
+            },
+        };
+
+        output_sliced.len().try_into().unwrap()
+    }
+
     /// Returns the number of bytes effectively written.
+    /// Input will get chunked at `size` bytes.
     #[must_use]
     pub fn write(&self, qemu: Qemu, input: &[u8]) -> GuestReg {
         let max_len: usize = self.size.try_into().unwrap();
@@ -956,7 +1006,10 @@ pub mod pybind {
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
-        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
+        let obj = unsafe {
+            let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+            &hooks[idx as usize].1
+        };
         Python::with_gil(|py| {
             obj.call0(py).expect("Error in the hook");
         });
@@ -1032,8 +1085,9 @@ pub mod pybind {
 
         fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
-                let idx = PY_GENERIC_HOOKS.len();
-                PY_GENERIC_HOOKS.push((addr, hook));
+                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+                let idx = hooks.len();
+                hooks.push((addr, hook));
                 self.qemu.hooks().add_instruction_hooks(
                     idx as u64,
                     addr,
@@ -1045,7 +1099,8 @@ pub mod pybind {
 
         fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
             unsafe {
-                PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
+                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+                hooks.retain(|(a, _)| *a != addr);
             }
             self.qemu.hooks().remove_instruction_hooks_at(addr, true)
         }

@@ -79,9 +79,6 @@ pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
 
-pub mod pruning;
-pub use pruning::*;
-
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, Z>: UsesState
@@ -420,9 +417,9 @@ pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 
 impl<CS, EM, OT, PS, Z> UsesState for PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: UsesState,
+    Z: UsesState,
 {
-    type State = CS::State;
+    type State = Z::State;
 }
 
 impl<CS, EM, OT, PS, Z> Named for PushStageAdapter<CS, EM, OT, PS, Z> {
@@ -434,7 +431,7 @@ impl<CS, EM, OT, PS, Z> Named for PushStageAdapter<CS, EM, OT, PS, Z> {
 
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: Scheduler,
+    CS: Scheduler<Z::Input, Z::State>,
     Self::State: HasExecutions
         + HasRand
         + HasCorpus
@@ -449,7 +446,7 @@ where
         + ProgressReporter<State = Self::State>,
     OT: ObserversTuple<Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
-    Z: ExecutesInput<E, EM, State = Self::State>
+    Z: ExecutesInput<E, EM>
         + ExecutionProcessor
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
@@ -458,7 +455,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut CS::State,
+        state: &mut Z::State,
         event_mgr: &mut EM,
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
@@ -699,7 +696,7 @@ impl ExecutionCountRestartHelper {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use alloc::borrow::Cow;
     use core::marker::PhantomData;
 
@@ -710,15 +707,17 @@ pub mod test {
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
         stages::{RetryCountRestartHelper, Stage},
-        state::{test::test_std_state, HasCorpus, State, UsesState},
+        state::{HasCorpus, State, StdState, UsesState},
         HasMetadata,
     };
 
+    /// A stage that succeeds to resume
     #[derive(Debug)]
     pub struct ResumeSucceededStage<S> {
         phantom: PhantomData<S>,
     }
 
+    /// A progress state for testing
     #[derive(Serialize, Deserialize, Debug)]
     pub struct TestProgress {
         count: usize,
@@ -790,6 +789,7 @@ pub mod test {
         }
     }
 
+    /// Test to test retries in stages
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
         // # Safety
@@ -808,7 +808,7 @@ pub mod test {
             }
         }
 
-        let mut state = test_std_state();
+        let mut state = StdState::nop()?;
         let stage = StageWithOneTry;
 
         let corpus_id = state.corpus_mut().add(Testcase::new(NopInput {}))?;

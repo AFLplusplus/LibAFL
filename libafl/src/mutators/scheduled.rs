@@ -9,7 +9,7 @@ use core::{
 
 use libafl_bolts::{
     rands::Rand,
-    tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
+    tuples::{tuple_list, tuple_list_type, NamedTuple},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -18,14 +18,6 @@ use super::MutationId;
 use crate::{
     corpus::{Corpus, CorpusId},
     mutators::{
-        mutations::{
-            BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
-            ByteInterestingMutator, ByteNegMutator, ByteRandMutator, BytesCopyMutator,
-            BytesDeleteMutator, BytesExpandMutator, BytesInsertCopyMutator, BytesInsertMutator,
-            BytesRandInsertMutator, BytesRandSetMutator, BytesSetMutator, BytesSwapMutator,
-            CrossoverInsertMutator, CrossoverReplaceMutator, DwordAddMutator,
-            DwordInterestingMutator, QwordAddMutator, WordAddMutator, WordInterestingMutator,
-        },
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
@@ -221,117 +213,6 @@ where
     }
 }
 
-/// Tuple type of the mutations that compose the Havoc mutator without crossover mutations
-pub type HavocMutationsNoCrossoverType = tuple_list_type!(
-    BitFlipMutator,
-    ByteFlipMutator,
-    ByteIncMutator,
-    ByteDecMutator,
-    ByteNegMutator,
-    ByteRandMutator,
-    ByteAddMutator,
-    WordAddMutator,
-    DwordAddMutator,
-    QwordAddMutator,
-    ByteInterestingMutator,
-    WordInterestingMutator,
-    DwordInterestingMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesExpandMutator,
-    BytesInsertMutator,
-    BytesRandInsertMutator,
-    BytesSetMutator,
-    BytesRandSetMutator,
-    BytesCopyMutator,
-    BytesInsertCopyMutator,
-    BytesSwapMutator,
-);
-
-/// Tuple type of the mutations that compose the Havoc mutator's crossover mutations
-pub type HavocCrossoverType<I> =
-    tuple_list_type!(CrossoverInsertMutator<I>, CrossoverReplaceMutator<I>);
-
-/// Tuple type of the mutations that compose the Havoc mutator
-pub type HavocMutationsType<I> = tuple_list_type!(
-    BitFlipMutator,
-    ByteFlipMutator,
-    ByteIncMutator,
-    ByteDecMutator,
-    ByteNegMutator,
-    ByteRandMutator,
-    ByteAddMutator,
-    WordAddMutator,
-    DwordAddMutator,
-    QwordAddMutator,
-    ByteInterestingMutator,
-    WordInterestingMutator,
-    DwordInterestingMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesExpandMutator,
-    BytesInsertMutator,
-    BytesRandInsertMutator,
-    BytesSetMutator,
-    BytesRandSetMutator,
-    BytesCopyMutator,
-    BytesInsertCopyMutator,
-    BytesSwapMutator,
-    CrossoverInsertMutator<I>,
-    CrossoverReplaceMutator<I>,
-);
-
-/// Get the mutations that compose the Havoc mutator (only applied to single inputs)
-#[must_use]
-pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
-    tuple_list!(
-        BitFlipMutator::new(),
-        ByteFlipMutator::new(),
-        ByteIncMutator::new(),
-        ByteDecMutator::new(),
-        ByteNegMutator::new(),
-        ByteRandMutator::new(),
-        ByteAddMutator::new(),
-        WordAddMutator::new(),
-        DwordAddMutator::new(),
-        QwordAddMutator::new(),
-        ByteInterestingMutator::new(),
-        WordInterestingMutator::new(),
-        DwordInterestingMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesExpandMutator::new(),
-        BytesInsertMutator::new(),
-        BytesRandInsertMutator::new(),
-        BytesSetMutator::new(),
-        BytesRandSetMutator::new(),
-        BytesCopyMutator::new(),
-        BytesInsertCopyMutator::new(),
-        BytesSwapMutator::new(),
-    )
-}
-
-/// Get the mutations that compose the Havoc mutator's crossover strategy
-#[must_use]
-pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
-    tuple_list!(
-        CrossoverInsertMutator::new(),
-        CrossoverReplaceMutator::new(),
-    )
-}
-
-/// Get the mutations that compose the Havoc mutator
-#[must_use]
-pub fn havoc_mutations<I>() -> HavocMutationsType<I> {
-    havoc_mutations_no_crossover().merge(havoc_crossover())
-}
-
 /// Get the mutations that uses the Tokens metadata
 #[must_use]
 pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
@@ -482,9 +363,8 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
-            mutations::SpliceMutator,
-            scheduled::{havoc_mutations, StdScheduledMutator},
-            Mutator,
+            havoc_mutations::havoc_mutations, mutations::SpliceMutator,
+            scheduled::StdScheduledMutator, Mutator,
         },
         state::StdState,
     };

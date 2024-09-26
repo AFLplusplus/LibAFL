@@ -207,16 +207,16 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &exit_kind)?;
 
-            if self.track_stability {
+            if self.track_stability && exit_kind != ExitKind::Timeout {
                 let map = &executor.observers()[&self.map_observer_handle]
                     .as_ref()
                     .to_vec();
 
-                let history_map = &mut state
+                let map_state = state
                     .named_metadata_map_mut()
                     .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
-                    .unwrap()
-                    .history_map;
+                    .unwrap();
+                let history_map = &mut map_state.history_map;
 
                 if history_map.len() < map_first_len {
                     history_map.resize(map_first_len, O::Entry::default());
@@ -228,6 +228,10 @@ where
                     .enumerate()
                 {
                     if *first != *cur && *history != O::Entry::max_value() {
+                        // If we just hit a history map entry that was not covered before, but is now flagged as flaky,
+                        // we need to make sure the `num_covered_map_indexes` is kept in sync.
+                        map_state.num_covered_map_indexes +=
+                            usize::from(*history == O::Entry::default());
                         *history = O::Entry::max_value();
                         unstable_entries.push(idx);
                     };

@@ -1,37 +1,28 @@
 //! The queue corpus scheduler implements an AFL-like queue mechanism
 
 use alloc::borrow::ToOwned;
-use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
+    corpus::{Corpus, CorpusId},
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
-    state::{HasCorpus, State, UsesState},
+    state::HasCorpus,
     Error,
 };
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueScheduler<S> {
+pub struct QueueScheduler {
     queue_cycles: u64,
     runs_in_current_cycle: u64,
-    phantom: PhantomData<S>,
 }
 
-impl<S> UsesState for QueueScheduler<S>
-where
-    S: State,
-{
-    type State = S;
-}
+impl<I, S> RemovableScheduler<I, S> for QueueScheduler {}
 
-impl<S> RemovableScheduler for QueueScheduler<S> where S: HasCorpus + HasTestcase + State {}
-
-impl<S> Scheduler for QueueScheduler<S>
+impl<I, S> Scheduler<I, S> for QueueScheduler
 where
-    S: HasCorpus + HasTestcase + State,
+    S: HasCorpus,
 {
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
         state
@@ -44,7 +35,7 @@ where
     }
 
     /// Gets the next entry in the queue
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented."
@@ -63,34 +54,39 @@ where
             if self.runs_in_current_cycle >= state.corpus().count() as u64 {
                 self.queue_cycles += 1;
             }
-            self.set_current_scheduled(state, Some(id))?;
+            <Self as Scheduler<I, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
         }
     }
+
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
+    }
 }
 
-impl<S> QueueScheduler<S> {
+impl QueueScheduler {
     /// Creates a new `QueueScheduler`
     #[must_use]
     pub fn new() -> Self {
         Self {
             runs_in_current_cycle: 0,
             queue_cycles: 0,
-            phantom: PhantomData,
         }
     }
 }
 
-impl<S> Default for QueueScheduler<S> {
+impl Default for QueueScheduler {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> HasQueueCycles for QueueScheduler<S>
-where
-    S: HasCorpus + HasTestcase + State,
-{
+impl HasQueueCycles for QueueScheduler {
     fn queue_cycles(&self) -> u64 {
         self.queue_cycles
     }
@@ -115,7 +111,7 @@ mod tests {
     #[test]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
-        let mut scheduler = QueueScheduler::new();
+        let mut scheduler: QueueScheduler = QueueScheduler::new();
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();
@@ -131,7 +127,8 @@ mod tests {
 
         let mut state = StdState::new(rand, q, objective_q, &mut feedback, &mut objective).unwrap();
 
-        let next_id = scheduler.next(&mut state).unwrap();
+        let next_id =
+            <QueueScheduler as Scheduler<BytesInput, _>>::next(&mut scheduler, &mut state).unwrap();
         let filename = state
             .corpus()
             .get(next_id)

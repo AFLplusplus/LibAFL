@@ -11,7 +11,7 @@ use libafl_bolts::{
     HasLen,
 };
 
-use crate::inputs::HasMutatorBytes;
+use crate::inputs::{HasMutatorBytes, MappedInput};
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
@@ -200,6 +200,13 @@ where
     fn len(&self) -> usize {
         self.range.len()
     }
+}
+
+impl<'a, I> MappedInput for BytesSubInput<'a, I> {
+    type Type<'b>
+        = BytesSubInput<'b, I>
+    where
+        Self: 'b;
 }
 
 #[cfg(test)]

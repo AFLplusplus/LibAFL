@@ -31,12 +31,12 @@ use crate::monitors::ClientPerfMonitor;
 #[cfg(feature = "scalability_introspection")]
 use crate::monitors::ScalabilityMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::{Input, UsesInput},
+    inputs::{Input, NopInput, UsesInput},
     stages::{HasCurrentStageId, HasNestedStageStatus, StageId},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -260,7 +260,7 @@ pub struct StdState<I, C, R, SC> {
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
     #[cfg(feature = "std")]
-    /// Remaining initial inputs to load, if any
+    /// symlinks we have already traversed when loading `remaining_initial_files`
     dont_reenter: Option<Vec<PathBuf>>,
     #[cfg(feature = "std")]
     /// If inputs have been processed for multicore loading
@@ -798,6 +798,28 @@ where
         Ok(())
     }
 
+    /// Recursively walk supplied corpus directories
+    pub fn walk_initial_inputs<F>(
+        &mut self,
+        in_dirs: &[PathBuf],
+        mut closure: F,
+    ) -> Result<(), Error>
+    where
+        F: FnMut(&PathBuf) -> Result<(), Error>,
+    {
+        self.canonicalize_input_dirs(in_dirs)?;
+        loop {
+            match self.next_file() {
+                Ok(path) => {
+                    closure(&path)?;
+                }
+                Err(Error::IteratorEnd(_, _)) => break,
+                Err(e) => return Err(e),
+            }
+        }
+        self.reset_initial_files_state();
+        Ok(())
+    }
     /// Loads all intial inputs, even if they are not considered `interesting`.
     /// This is rarely the right method, use `load_initial_inputs`,
     /// and potentially fix your `Feedback`, instead.
@@ -1165,6 +1187,23 @@ where
     }
 }
 
+impl StdState<NopInput, InMemoryCorpus<NopInput>, StdRand, InMemoryCorpus<NopInput>> {
+    /// Create an empty [`StdState`] that has very minimal uses.
+    /// Potentially good for testing.
+    pub fn nop<I>() -> Result<StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>, Error>
+    where
+        I: Input,
+    {
+        StdState::new(
+            StdRand::with_seed(0),
+            InMemoryCorpus::<I>::new(),
+            InMemoryCorpus::new(),
+            &mut (),
+            &mut (),
+        )
+    }
+}
+
 #[cfg(feature = "introspection")]
 impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
@@ -1337,22 +1376,11 @@ impl<I> HasScalabilityMonitor for NopState<I> {
 }
 
 #[cfg(test)]
-pub mod test {
-    use libafl_bolts::rands::StdRand;
+mod test {
+    use crate::{inputs::BytesInput, state::StdState};
 
-    use super::StdState;
-    use crate::{corpus::InMemoryCorpus, inputs::Input};
-
-    #[must_use]
-    pub fn test_std_state<I: Input>() -> StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>
-    {
-        StdState::new(
-            StdRand::with_seed(0),
-            InMemoryCorpus::<I>::new(),
-            InMemoryCorpus::new(),
-            &mut (),
-            &mut (),
-        )
-        .expect("couldn't instantiate the test state")
+    #[test]
+    fn test_std_state() {
+        StdState::nop::<BytesInput>().expect("couldn't instantiate the test state");
     }
 }
