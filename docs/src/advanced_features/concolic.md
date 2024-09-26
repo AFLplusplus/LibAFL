@@ -184,4 +184,4 @@ It will attempt to solve all branches, like the original simple backend from Sym
 
 ### Example
 
-The example fuzzer shows how to use the [`ConcolicTracingStage` together with the `SimpleConcolicMutationalStage`](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers//libfuzzer_stb_image_concolic/fuzzer/src/main.rs#L222) to build a basic hybrid fuzzer.
+The example fuzzer shows how to use the [`ConcolicTracingStage` together with the `SimpleConcolicMutationalStage`](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/inprocess/libfuzzer_stb_image_concolic/fuzzer/src/main.rs#L222) to build a basic hybrid fuzzer.
