@@ -4,18 +4,7 @@
 
 Advanced Fuzzing Library - Slot your own fuzzers together and extend their features using Rust.
 
-LibAFL is a collection of reusable pieces of fuzzers, written in Rust. It is fast, multi-platform, no_std compatible, and scales over cores and machines. It offers a main crate that provide building blocks for custom fuzzers, [libafl](./libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./libafl_cc). 
-
-LibAFL offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
-+ `SanitizerCoverage`, in [libafl_targets](./libafl_targets)
-+ `Frida`, in [libafl_frida](./libafl_frida)
-+ `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./libafl_qemu)
-+ `TinyInst`, in [libafl_tinyinst](./libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
-
-
-## Why LibAFL ?
-
-LibAFL gives you many of the benefits of an off-the-shelf fuzzer, while being completely customizable.
+LibAFL is a collection of reusable pieces of fuzzers, written in Rust, it gives you many of the benefits of an off-the-shelf fuzzer, while being completely customizable.
 Some highlight features currently include:
 - `fast`: We do everything we can at compile time, keeping runtime overhead minimal. Users reach 120k execs/sec in frida-mode on a phone (using all cores).
 - `scalable`: `Low Level Message Passing`, `LLMP` for short, allows LibAFL to scale almost linearly over cores, and via TCP to multiple machines.
@@ -23,6 +12,14 @@ Some highlight features currently include:
 feel free to add an AST-based input for structured fuzzing, and more.
 - `multi platform`: LibAFL was confirmed to work on *Windows*, *MacOS*, *Linux*, and *Android* on *x86_64* and *aarch64*. `LibAFL` can be built in `no_std` mode to inject LibAFL into obscure targets like embedded devices and hypervisors.
 - `bring your own target`: We support binary-only modes, like Frida-Mode, as well as multiple compilation passes for sourced-based instrumentation. Of course it's easy to add custom instrumentation backends.
+
+## Why LibAFL ?
+
+LibAFL is fast, multi-platform, no_std compatible, and scales over cores and machines. It offers a main crate that provide building blocks for custom fuzzers, [libafl](./libafl), a library containing common code that can be used for targets instrumentation, [libafl_targets](./libafl_targets), and a library providing facilities to wrap compilers, [libafl_cc](./libafl_cc). It offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
++ `SanitizerCoverage`, in [libafl_targets](./libafl_targets)
++ `Frida`, in [libafl_frida](./libafl_frida)
++ `QEMU` user-mode and system mode, including hooks for emulation, in [libafl_qemu](./libafl_qemu)
++ `TinyInst`, in [libafl_tinyinst](./libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
 
 ## Building and installing
 
