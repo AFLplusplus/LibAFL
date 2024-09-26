@@ -4,7 +4,6 @@
 use alloc::borrow::Cow;
 use std::{
     borrow::ToOwned,
-    cell::Cell,
     convert::Into,
     ffi::CString,
     fs,
@@ -25,14 +24,14 @@ use std::{
 use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
-use libipt::{block::BlockDecoder, Asid, ConfigBuilder, Cpu, Image};
+use libipt::{Asid, Cpu, Image};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
-use proc_maps::get_process_maps;
+// use proc_maps::get_process_maps;
 use raw_cpuid::CpuId;
 use serde::Serialize;
 
@@ -48,15 +47,20 @@ const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
 const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
-thread_local! {
-    // Cannot use `LazyCell` for this since `libafl_bolts::Error` is not `Clone`.
-    static PT_PERF_TYPE: Cell<Option<u32>> = Cell::new(None);
-}
+static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
+    let path = format!("{PT_EVENT_PATH}/type");
+    let s = fs::read_to_string(&path)
+        .map_err(|_| format!("Failed to read Intel PT perf event type from {path}"))?;
+    s.trim()
+        .parse::<u32>()
+        .map_err(|_| format!("Failed to parse Intel PT perf event type in {path}"))
+});
 
-static PT_NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
+// TODO: when polishing the API move this to a caps module mimiking /sys/bus/event_source/devices/intel_pt/caps ?
+static NUM_OF_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
     let s = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read Intel PT number of address filters from {path}"))?;
+        .map_err(|_| format!("Failed to read Intel PT number of address filters from {path}"))?;
     s.trim()
         .parse::<u32>()
         .map_err(|_| format!("Failed to parse Intel PT number of address filters in {path}"))
@@ -132,7 +136,7 @@ where
     }
 
     #[allow(clippy::cast_possible_wrap)]
-    fn post_exec(&mut self, state: &mut S, _input: &S::Input) {
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.pt.as_mut().unwrap().disable_tracing().unwrap();
         let mut image = Image::new(Some("test_trace_pid")).unwrap();
         // TODO optimize, move  this stuff
@@ -150,7 +154,7 @@ where
         //     }
         // }
         let mut buff = self.trace.lock().unwrap();
-        let ips = self
+        let _ = self
             .pt
             .as_mut()
             .unwrap()
@@ -285,11 +289,11 @@ impl IntelPT {
 
     fn decode<F: Fn(&mut [u8], u64, Asid) -> i32>(
         &mut self,
-        read_memory: Option<F>,
-        image: Option<&mut Image>,
+        _read_memory: Option<F>,
+        _image: Option<&mut Image>,
         copy_buffer: Option<&mut Vec<u8>>,
     ) -> Vec<u64> {
-        let mut ips = Vec::new();
+        let ips = Vec::new();
 
         let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
         let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
@@ -305,7 +309,7 @@ impl IntelPT {
         // TODO: Cow clones the borrowed data on `as_mut()`, we could just mut the borrowed data
         // BUT, should the decoder mutate the data in the first place?
         // maybe just a libipt/libipt-rs oversight ?
-        let mut data = if head_wrap >= tail_wrap {
+        let data = if head_wrap >= tail_wrap {
             unsafe {
                 let ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
                 Cow::from(slice::from_raw_parts(ptr, len))
@@ -451,11 +455,11 @@ impl IntelPT {
             reasons.push("Failed to read CPU Extended Features".to_owned());
         }
 
-        if let Err(e) = intel_pt_perf_type() {
-            reasons.push(e.to_string());
+        if let Err(e) = &*PERF_EVENT_TYPE {
+            reasons.push(e.clone());
         }
 
-        if let Err(e) = &*PT_NR_ADDR_FILTERS {
+        if let Err(e) = &*NUM_OF_ADDR_FILTERS {
             reasons.push(e.to_string());
         }
 
@@ -588,7 +592,10 @@ fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     let mut attr: perf_event_attr = unsafe { core::mem::zeroed() };
     attr.size = size_of::<perf_event_attr>() as u32;
-    attr.type_ = intel_pt_perf_type()?;
+    attr.type_ = match &*PERF_EVENT_TYPE {
+        Ok(t) => Ok(*t),
+        Err(e) => Err(Error::unsupported(e.clone())),
+    }?;
     attr.set_disabled(1);
     //TODO parametrize?
     attr.set_exclude_kernel(1);
@@ -599,29 +606,6 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
         .raw_value;
 
     Ok(attr)
-}
-
-// TODO: reduce the scope of PT_PERF_TYPE to avoid misusage
-fn intel_pt_perf_type() -> Result<u32, Error> {
-    let perf_type = if let Some(perf_type) = PT_PERF_TYPE.get() {
-        perf_type
-    } else {
-        let path = format!("{PT_EVENT_PATH}/type");
-        let s = fs::read_to_string(&path).map_err(|e| {
-            Error::os_error(
-                e,
-                format!("Failed to read Intel PT perf event type from {path}"),
-            )
-        })?;
-        let perf_type = s.trim().parse::<u32>().map_err(|_| {
-            Error::unsupported(format!(
-                "Failed to parse Intel PT perf event type in {path}"
-            ))
-        })?;
-        PT_PERF_TYPE.set(Some(perf_type));
-        perf_type
-    };
-    Ok(perf_type)
 }
 
 #[inline]
@@ -665,21 +649,21 @@ fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
     Ok(())
 }
 
-fn dump_corpus(buff: &[u8]) -> Result<(), Error> {
-    let trace_path = "./corpus.json";
-    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(trace_path)
-        .expect("Failed to open trace output file");
-
-    file.write_all(buff)
-        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
-
-    Ok(())
-}
+// fn dump_corpus(buff: &[u8]) -> Result<(), Error> {
+//     let trace_path = "./corpus.json";
+//     fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
+//     let mut file = OpenOptions::new()
+//         .create(true)
+//         .truncate(true)
+//         .write(true)
+//         .open(trace_path)
+//         .expect("Failed to open trace output file");
+//
+//     file.write_all(buff)
+//         .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
+//
+//     Ok(())
+// }
 
 #[cfg(test)]
 mod test {
