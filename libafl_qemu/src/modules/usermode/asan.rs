@@ -478,7 +478,10 @@ impl AsanGiovese {
         }
     }
 
-    pub fn alloc_insert(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+    /// # Safety
+    /// Will access the global [`FullBacktraceCollector`].
+    /// Calling this function concurrently might be racey.
+    pub unsafe fn alloc_insert(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
         let backtrace = FullBacktraceCollector::backtrace()
             .map(|r| {
                 let mut v = r.to_vec();
@@ -503,7 +506,10 @@ impl AsanGiovese {
         }
     }
 
-    pub fn alloc_free(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+    /// # Safety
+    /// Will access the global [`FullBacktraceCollector`].
+    /// Calling this function concurrently might be racey.
+    pub unsafe fn alloc_free(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
         let mut chunk = None;
         self.alloc_map_mut(addr, |interval, item| {
             chunk = Some(*interval);
@@ -800,13 +806,20 @@ impl AsanModule {
         }
     }
 
+    /// # Safety
+    /// The ASasn error report accesses [`FullBacktraceCollector`]
     #[must_use]
-    pub fn with_asan_report(
+    pub unsafe fn with_asan_report(
         rt: Pin<Box<AsanGiovese>>,
         filter: QemuInstrumentationAddressRangeFilter,
         options: QemuAsanOptions,
     ) -> Self {
-        Self::with_error_callback(rt, filter, Box::new(asan_report), options)
+        Self::with_error_callback(
+            rt,
+            filter,
+            Box::new(|rt, qemu, pc, err| unsafe { asan_report(rt, qemu, pc, err) }),
+            options,
+        )
     }
 
     #[must_use]
@@ -1523,9 +1536,12 @@ mod addr2line_legacy {
     }
 }
 
+/// # Safety
+/// Will access the global [`FullBacktraceCollector`].
+/// Calling this function concurrently might be racey.
 #[allow(clippy::unnecessary_cast)]
 #[allow(clippy::too_many_lines)]
-pub fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: AsanError) {
+pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: AsanError) {
     let mut regions = HashMap::new();
     for region in qemu.mappings() {
         if let Some(path) = region.path() {

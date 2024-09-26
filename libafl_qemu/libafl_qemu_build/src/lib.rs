@@ -5,13 +5,12 @@
 use std::io::{BufRead, BufReader};
 use std::{
     collections::hash_map,
-    env, fs,
-    fs::File,
+    env, fs::{self, File},
     hash::Hasher,
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,
-    ptr::addr_of_mut,
+    sync::{LazyLock, Mutex},
 };
 
 #[rustversion::nightly]
@@ -30,29 +29,21 @@ use crate::build::QEMU_REVISION;
 
 const LLVM_VERSION_MAX: i32 = 33;
 
-static mut CARGO_RPATH: Option<Vec<String>> = None;
+static CARGO_RPATH: LazyLock<Mutex<Vec<String>>> = LazyLock::new(Mutex::default);
 static CARGO_RPATH_SEPARATOR: &str = "|";
 
-/// # Safety
-/// Will get a mutable borrow to `CARGO_RPATH`. May only be called once at a time
-pub unsafe fn cargo_add_rpath(rpath: &str) {
-    unsafe {
-        if let Some(rpaths) = &mut *addr_of_mut!(CARGO_RPATH) {
-            rpaths.push(rpath.to_string());
-        } else {
-            CARGO_RPATH = Some(vec![rpath.to_string()]);
-        }
-    }
+// Add to the list of `rpath`s.
+// Later, print the `cargo::rpath` using [`cargo_propagate_rpath`]
+pub fn cargo_add_rpath(rpath: &str) {
+    CARGO_RPATH.lock().unwrap().push(rpath.to_string());
 }
 
-/// # Safety
-/// Will get a mutable borrow to `CARGO_RPATH`. May only be called once at a time
-pub unsafe fn cargo_propagate_rpath() {
-    unsafe {
-        if let Some(cargo_cmds) = &mut *addr_of_mut!(CARGO_RPATH) {
-            let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);
-            println!("cargo:rpath={rpath}");
-        }
+// Print the `rpath`, set via [`cargo_add_rpath`] as `cargo::rpath`
+pub fn cargo_propagate_rpath() {
+    let cargo_cmds = CARGO_RPATH.lock().unwrap();
+    if !cargo_cmds.is_empty() {
+        let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);
+        println!("cargo:rpath={rpath}");
     }
 }
 
@@ -93,9 +84,7 @@ pub fn build_with_bindings(
     // Write the final bindings
     fs::write(bindings_file, bind.to_string()).expect("Unable to write file");
 
-    // # Safety
-    // We call this from a single thread.
-    unsafe { cargo_propagate_rpath(); }
+    cargo_propagate_rpath();
 }
 
 // For bindgen, the llvm version must be >= of the rust llvm version

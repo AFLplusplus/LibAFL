@@ -7,11 +7,14 @@ use core::{
 #[cfg(emulation_mode = "usermode")]
 use std::ptr;
 #[cfg(emulation_mode = "systemmode")]
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(not(emulation_mode = "systemmode"))]
+use libafl::inputs::UsesInput;
 #[cfg(feature = "fork")]
 use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
+    events::EventManager, executors::InProcessForkExecutor, inputs::UsesInput,
+    state::HasLastReportTime, HasMetadata,
 };
 use libafl::{
     events::{EventFirer, EventRestarter},
@@ -22,7 +25,6 @@ use libafl::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
@@ -72,7 +74,7 @@ pub unsafe fn inproc_qemu_crash_handler(
 }
 
 #[cfg(emulation_mode = "systemmode")]
-pub(crate) static mut BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
+pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
 
 /// # Safety
 /// Can call through the `unix_signal_handler::inproc_timeout_handler`.
@@ -90,7 +92,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    if *BREAK_ON_TMOUT {
+    if BREAK_ON_TMOUT.load(Ordering::Acquire) {
         qemu_system_debug_request();
     } else {
         libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
@@ -180,11 +182,7 @@ where
 
     #[cfg(emulation_mode = "systemmode")]
     pub fn break_on_timeout(&mut self) {
-        // # Safety
-        // Atomic bool writes are safe.
-        unsafe {
-            BREAK_ON_TMOUT.store(true, Ordering::Release);
-        }
+        BREAK_ON_TMOUT.store(true, Ordering::Release);
     }
 
     pub fn inner_mut(

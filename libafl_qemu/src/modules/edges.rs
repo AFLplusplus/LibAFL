@@ -620,9 +620,10 @@ pub unsafe extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
     }
 }
 
-pub extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
-    // # Safety
-    // Worst case we set the byte to 1 multiple times.
+/// # Safety
+/// Fine.
+/// Worst case we set the byte to 1 multiple times.
+pub unsafe extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
     unsafe {
         let ptr = EDGES_MAP_PTR.add(id as usize);
         *ptr = 1;

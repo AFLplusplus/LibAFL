@@ -691,7 +691,9 @@ where
         }
     }
 
-    pub fn backdoor(&mut self, hook: BackdoorHook<ET, S>) -> Option<BackdoorHookId> {
+    /// # Safety
+    /// This can call through to a potentialy unsafe `backtoor_function`
+    pub unsafe fn backdoor(&mut self, hook: BackdoorHook<ET, S>) -> Option<BackdoorHookId> {
         match hook {
             Hook::Function(f) => Some(self.backdoor_function(f)),
             Hook::Closure(c) => Some(self.backdoor_closure(c)),
@@ -793,7 +795,10 @@ where
     /// # Safety
     /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub unsafe fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
+    pub unsafe fn syscalls_closure(
+        &mut self,
+        hook: PreSyscallHookClosure<ET, S>,
+    ) -> PreSyscallHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
 
@@ -837,7 +842,10 @@ where
     /// # Safety
     /// Will dereference the hook as [`FatPtr`].
     #[allow(clippy::type_complexity)]
-    pub unsafe fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
+    pub unsafe fn after_syscalls_function(
+        &mut self,
+        hook: PostSyscallHookFn<ET, S>,
+    ) -> PostSyscallHookId {
         unsafe {
             self.qemu_hooks
                 .add_post_syscall_hook(transmute(hook), func_post_syscall_hook_wrapper::<ET, S>)
@@ -883,7 +891,7 @@ where
         self.crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
     }
- 
+
     /// # Safety
     /// Will dereference the hook as [`FatPtr`].
     pub unsafe fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
@@ -1056,7 +1064,9 @@ where
         )
     }
 
-    pub fn backdoor(&mut self, hook: BackdoorHook<ET, S>) -> Option<BackdoorHookId> {
+    /// # Safety
+    /// This will potentially call an unsafe backdoor hook
+    pub unsafe fn backdoor(&mut self, hook: BackdoorHook<ET, S>) -> Option<BackdoorHookId> {
         self.hooks.backdoor(hook)
     }
 
@@ -1064,7 +1074,9 @@ where
         self.hooks.backdoor_function(hook)
     }
 
-    pub fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
+    /// # Safety
+    /// Calls through to the potentially unsafe `backdoor_closure`
+    pub unsafe fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
         self.hooks.backdoor_closure(hook)
     }
 
@@ -1217,8 +1229,10 @@ where
         self.hooks.syscalls(hook)
     }
 
+    /// # Safety
+    /// Calls through to the, potentially unsafe, `syscalls_function`
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_function(
+    pub unsafe fn syscalls_function(
         &mut self,
         hook: fn(
             &mut EmulatorModules<ET, S>,
@@ -1237,8 +1251,10 @@ where
         self.hooks.syscalls_function(hook)
     }
 
+    /// # Safety
+    /// Calls through to the, potentially unsafe, `syscalls_closure`
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_closure(
+    pub unsafe fn syscalls_closure(
         &mut self,
         hook: Box<
             dyn for<'a> FnMut(
@@ -1264,8 +1280,10 @@ where
         self.hooks.after_syscalls(hook)
     }
 
+    /// # Safety
+    /// Calls through to the, potentially unsafe, `after_syscalls_function`
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls_function(
+    pub unsafe fn after_syscalls_function(
         &mut self,
         hook: fn(
             &mut EmulatorModules<ET, S>,
@@ -1312,7 +1330,9 @@ where
         self.hooks.crash_function(hook);
     }
 
-    pub fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
+    /// # Safety
+    /// Calls through to the, potentially unsafe, registered `crash_closure`
+    pub unsafe fn crash_closure(&mut self, hook: CrashHookClosure<ET, S>) {
         self.hooks.crash_closure(hook);
     }
 }
