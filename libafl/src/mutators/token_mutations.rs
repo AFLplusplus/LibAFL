@@ -622,7 +622,11 @@ where
     S: HasRand,
 {
     let sz_log = SZ.ilog2() as usize;
-    let res = state.rand_mut().below_incl(sz_log);
+    // # Safety
+    // We add 1 so this can never be 0.
+    // On 32 bit systems this could overflow in theory but this is highly unlikely.
+    let sz_log_inclusive = unsafe { NonZero::new(sz_log + 1).unwrap_unchecked() };
+    let res = state.rand_mut().below(sz_log_inclusive);
     2_usize.pow(res as u32)
 }
 
