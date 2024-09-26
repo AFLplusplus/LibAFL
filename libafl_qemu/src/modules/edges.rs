@@ -339,8 +339,8 @@ impl Default for StdEdgeCoverageChildModuleBuilder {
 
 impl StdEdgeCoverageChildModule {
     #[must_use]
-    pub fn builder() -> StdEdgeCoverageClassicModuleBuilder {
-        EdgeCoverageModuleBuilder::default()
+    pub fn builder() -> StdEdgeCoverageChildModuleBuilder {
+        EdgeCoverageModuleBuilder::default().jit(false)
     }
 }
 
