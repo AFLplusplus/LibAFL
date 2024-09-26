@@ -221,14 +221,22 @@ jobs:
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
-  md-links-check:
-    runs-on: ubuntu-24.04
+  check-md-links:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run Markdown Link checks
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
-        with:
-          config-file: '.github/workflows/md-config.json'
+      - name: Install linkspector
+        shell: bash
+        run: sudo apt-get install -y npm && npm install -g @umbrelladocs/linkspector
+      - name: Run linkspector
+        shell: bash
+        run: ./scripts/check_md_links.sh
+      # TODO: Use github action once it's fixed (https://github.com/UmbrellaDocs/action-linkspector/issues/20)
+      # - name: Run linkspector
+      #   uses: umbrelladocs/action-linkspector@v1
+      #   with:
+      #     fail_on_error: 'true'
+      #     config_file: '.github/.linkspector.yml'
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
