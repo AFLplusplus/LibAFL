@@ -309,6 +309,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        coverage_map_size: Option<usize>,
         debug_output: bool,
     ) -> Result<Self, Error> {
         Self::with_kill_signal(
@@ -320,6 +321,7 @@ impl Forkserver {
             memlimit,
             is_persistent,
             is_deferred_frksrv,
+            coverage_map_size,
             debug_output,
             KILL_SIGNAL_DEFAULT,
         )
@@ -338,15 +340,20 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        coverage_map_size: Option<usize>,
         debug_output: bool,
         kill_signal: Signal,
     ) -> Result<Self, Error> {
+        let Some(coverage_map_size) = coverage_map_size else {
+            return Err(Error::unknown("Coverage map size unknown. Use coverage_map_size() to tell the forkserver about the map size."));
+        };
+
         if env::var("AFL_MAP_SIZE").is_err() {
             log::warn!("AFL_MAP_SIZE not set. If it is unset, the forkserver may fail to start up");
         }
 
         if env::var("__AFL_SHM_ID").is_err() {
-            log::warn!("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer");
+            return Err(Error::unknown("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer".to_string()));
         }
 
         let mut st_pipe = Pipe::new().unwrap();
@@ -365,6 +372,8 @@ impl Forkserver {
             .stdin(Stdio::null())
             .stdout(stdout)
             .stderr(stderr);
+
+        command.env("AFL_MAP_SIZE", format!("{coverage_map_size}"));
 
         // Persistent, deferred forkserver
         if is_persistent {
@@ -924,6 +933,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
+                self.map_size,
                 self.debug_child,
                 self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
             )?,
@@ -1008,7 +1018,7 @@ where
                     "Failed to read map size from forkserver".to_string(),
                 ));
             }
-            self.set_map_size(fsrv_map_size);
+            self.set_map_size(fsrv_map_size)?;
         }
 
         if status & FS_NEW_OPT_SHDMEM_FUZZ != 0 {
@@ -1074,7 +1084,7 @@ where
     ) -> Result<(), Error> {
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
             let fsrv_map_size = fs_opt_get_mapsize(status);
-            self.set_map_size(fsrv_map_size);
+            self.set_map_size(fsrv_map_size)?;
         }
 
         // Only with SHMEM or AUTODICT we can send send_status back or it breaks!
@@ -1142,7 +1152,7 @@ where
     }
 
     #[allow(clippy::cast_sign_loss)]
-    fn set_map_size(&mut self, fsrv_map_size: i32) {
+    fn set_map_size(&mut self, fsrv_map_size: i32) -> Result<usize, Error> {
         // When 0, we assume that map_size was filled by the user or const
         /* TODO autofill map size from the observer
 
@@ -1150,16 +1160,30 @@ where
             self.map_size = Some(fsrv_map_size as usize);
         }
         */
-        let mut map_size = fsrv_map_size;
-        if map_size % 64 != 0 {
-            map_size = ((map_size + 63) >> 6) << 6;
+        let mut actual_map_size = fsrv_map_size;
+        if actual_map_size % 64 != 0 {
+            actual_map_size = ((actual_map_size + 63) >> 6) << 6;
         }
 
         // TODO set AFL_MAP_SIZE
-        assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
+        if let Some(max_size) = self.map_size {
+            if actual_map_size as usize > max_size {
+                return Err(Error::illegal_state(format!(
+                    "The target map size is {actual_map_size} but the allocated map size is {max_size}. \
+                    Increase the initial size of the forkserver map to at least that size using the forkserver builder's `coverage_map_size`."
+            )));
+            }
+        } else {
+            return Err(Error::illegal_state(format!(
+                "The target map size is {actual_map_size} but we did not create a coverage map before launching the target! \
+                Set an initial forkserver map to at least that size using the forkserver builder's `coverage_map_size`."
+            )));
+        }
 
         // we'll use this later when we truncate the observer
-        self.map_size = Some(map_size as usize);
+        self.map_size = Some(actual_map_size as usize);
+
+        Ok(actual_map_size as usize)
     }
 
     /// Use autodict?
@@ -1410,6 +1434,9 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         shmem_provider: &'a mut SP,
     ) -> ForkserverExecutorBuilder<'a, SP> {
         ForkserverExecutorBuilder {
+            // Set the new provider
+            shmem_provider: Some(shmem_provider),
+            // Copy all other values from the old Builder
             program: self.program,
             arguments: self.arguments,
             envs: self.envs,
@@ -1420,14 +1447,13 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             is_deferred_frksrv: self.is_deferred_frksrv,
             autotokens: self.autotokens,
             input_filename: self.input_filename,
-            shmem_provider: Some(shmem_provider),
             map_size: self.map_size,
-            max_input_size: MAX_INPUT_SIZE_DEFAULT,
-            min_input_size: MIN_INPUT_SIZE_DEFAULT,
-            kill_signal: None,
-            timeout: None,
-            asan_obs: None,
-            crash_exitcode: None,
+            max_input_size: self.max_input_size,
+            min_input_size: self.min_input_size,
+            kill_signal: self.kill_signal,
+            timeout: self.timeout,
+            asan_obs: self.asan_obs,
+            crash_exitcode: self.crash_exitcode,
         }
     }
 }
@@ -1534,6 +1560,7 @@ mod tests {
         let executor = ForkserverExecutor::builder()
             .program(bin)
             .args(args)
+            .coverage_map_size(MAP_SIZE)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
             .build::<_, ()>(tuple_list!(edges_observer));

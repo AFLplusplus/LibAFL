@@ -335,12 +335,14 @@ impl Error {
     {
         Error::Serialize(arg.into(), ErrorBacktrace::new())
     }
+
     #[cfg(feature = "gzip")]
     /// Compression error
     #[must_use]
     pub fn compression() -> Self {
         Error::Compression(ErrorBacktrace::new())
     }
+
     /// Optional val was supposed to be set, but isn't.
     #[must_use]
     pub fn empty_optional<S>(arg: S) -> Self
@@ -349,6 +351,7 @@ impl Error {
     {
         Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
     }
+
     /// Key not in Map
     #[must_use]
     pub fn key_not_found<S>(arg: S) -> Self
@@ -357,6 +360,7 @@ impl Error {
     {
         Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
     }
+
     /// No elements in the current item
     #[must_use]
     pub fn empty<S>(arg: S) -> Self
@@ -365,6 +369,7 @@ impl Error {
     {
         Error::Empty(arg.into(), ErrorBacktrace::new())
     }
+
     /// End of iteration
     #[must_use]
     pub fn iterator_end<S>(arg: S) -> Self
@@ -373,6 +378,7 @@ impl Error {
     {
         Error::IteratorEnd(arg.into(), ErrorBacktrace::new())
     }
+
     /// This is not supported (yet)
     #[must_use]
     pub fn not_implemented<S>(arg: S) -> Self
@@ -381,6 +387,7 @@ impl Error {
     {
         Error::NotImplemented(arg.into(), ErrorBacktrace::new())
     }
+
     /// You're holding it wrong
     #[must_use]
     pub fn illegal_state<S>(arg: S) -> Self
@@ -389,6 +396,7 @@ impl Error {
     {
         Error::IllegalState(arg.into(), ErrorBacktrace::new())
     }
+
     /// The argument passed to this method or function is not valid
     #[must_use]
     pub fn illegal_argument<S>(arg: S) -> Self
@@ -397,11 +405,13 @@ impl Error {
     {
         Error::IllegalArgument(arg.into(), ErrorBacktrace::new())
     }
+
     /// Shutting down, not really an error.
     #[must_use]
     pub fn shutting_down() -> Self {
         Error::ShuttingDown
     }
+
     /// This operation is not supported on the current architecture or platform
     #[must_use]
     pub fn unsupported<S>(arg: S) -> Self
@@ -410,6 +420,7 @@ impl Error {
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
+
     /// OS error with additional message
     #[cfg(feature = "std")]
     #[must_use]
@@ -419,6 +430,7 @@ impl Error {
     {
         Error::OsError(err, msg.into(), ErrorBacktrace::new())
     }
+
     /// OS error from [`io::Error::last_os_error`] with additional message
     #[cfg(feature = "std")]
     #[must_use]
@@ -432,6 +444,7 @@ impl Error {
             ErrorBacktrace::new(),
         )
     }
+
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -440,6 +453,7 @@ impl Error {
     {
         Error::Unknown(arg.into(), ErrorBacktrace::new())
     }
+
     /// Error with corpora
     #[must_use]
     pub fn invalid_corpus<S>(arg: S) -> Self
@@ -992,7 +1006,7 @@ impl SimpleFdLogger {
         // The passed-in `fd` has to be a legal file descriptor to log to.
         // We also access a shared variable here.
         unsafe {
-            LIBAFL_RAWFD_LOGGER.set_fd(log_fd);
+            (*ptr::addr_of_mut!(LIBAFL_RAWFD_LOGGER)).set_fd(log_fd);
             log::set_logger(&*ptr::addr_of!(LIBAFL_RAWFD_LOGGER))?;
         }
         Ok(())

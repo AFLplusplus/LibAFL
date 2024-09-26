@@ -17,7 +17,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        havoc_mutations::havoc_mutations,
+        scheduled::{tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
         I2SRandReplace,
     },
@@ -39,7 +40,7 @@ use libafl_bolts::{
 use libafl_qemu::modules::CmpLogModule;
 pub use libafl_qemu::qemu::Qemu;
 use libafl_qemu::{
-    modules::edges::{self, EdgeCoverageModule},
+    modules::{edges, edges::StdEdgeCoverageModule},
     Emulator, QemuExecutor,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
@@ -221,15 +222,20 @@ where
                 let modules = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     {
-                        tuple_list!(EdgeCoverageModule::default(), CmpLogModule::default(),)
+                        tuple_list!(
+                            StdEdgeCoverageModule::builder().build(),
+                            CmpLogModule::default(),
+                        )
                     }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
                     {
-                        tuple_list!(EdgeCoverageModule::default())
+                        tuple_list!(StdEdgeCoverageModule::builder().build())
                     }
                 };
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                                   _state: &mut _,
+                                   input: &BytesInput| {
                     let target = input.target_bytes();
                     let buf = target.as_slice();
                     harness_bytes(buf);
@@ -339,9 +345,11 @@ where
                     }
                 }
             } else {
-                let modules = tuple_list!(EdgeCoverageModule::default());
+                let modules = tuple_list!(StdEdgeCoverageModule::builder().build());
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                                   _state: &mut _,
+                                   input: &BytesInput| {
                     let target = input.target_bytes();
                     let buf = target.as_slice();
                     harness_bytes(buf);

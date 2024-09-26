@@ -206,7 +206,7 @@ jobs:
       - name: Run a maturin build
         run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
       - name: Run python test
-        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/qemu/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
+        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/binary-only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
 
   cargo-fmt:
     runs-on: ubuntu-24.04
@@ -221,14 +221,22 @@ jobs:
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
-  md-links-check:
-    runs-on: ubuntu-24.04
+  check-md-links:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run Markdown Link checks
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
-        with:
-          config-file: '.github/workflows/md-config.json'
+      - name: Install linkspector
+        shell: bash
+        run: sudo apt-get install -y npm && npm install -g @umbrelladocs/linkspector
+      - name: Run linkspector
+        shell: bash
+        run: ./scripts/check_md_links.sh
+      # TODO: Use github action once it's fixed (https://github.com/UmbrellaDocs/action-linkspector/issues/20)
+      # - name: Run linkspector
+      #   uses: umbrelladocs/action-linkspector@v1
+      #   with:
+      #     fail_on_error: 'true'
+      #     config_file: '.github/workflows/.linkspector.yml'
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
@@ -254,6 +262,7 @@ jobs:
           - ./fuzzers/baby/baby_fuzzer_grimoire
           - ./fuzzers/baby/baby_fuzzer_gramatron
           - ./fuzzers/baby/baby_fuzzer
+          - ./fuzzers/baby/baby_fuzzer_custom_input
           - ./fuzzers/baby/baby_fuzzer_nautilus
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode
@@ -268,55 +277,53 @@ jobs:
           - ./fuzzers/baby/backtrace_baby_fuzzers/command_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
 
+          # Binary-only
+          - ./fuzzers/binary-only/fuzzbench_fork_qemu
+          - ./fuzzers/binary-only/frida_executable_libpng
+          - ./fuzzers/binary-only/frida_gdiplus
+          - ./fuzzers/binary-only/frida_libpng
+          - ./fuzzers/binary-only/fuzzbench_qemu
+          - ./fuzzers/binary-only/tinyinst_simple
+
           # Forkserver
           - ./fuzzers/forkserver/forkserver_simple
           - ./fuzzers/forkserver/forkserver_libafl_cc
+          - ./fuzzers/forkserver/fuzzbench_forkserver
+          - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
+          - ./fuzzers/forkserver/libafl-fuzz
 
-          # Frida
-          - ./fuzzers/frida/frida_executable_libpng
-          - ./fuzzers/frida/frida_gdiplus
-          - ./fuzzers/frida/frida_libpng
+          # Full-system
+          - ./fuzzers/full-system/nyx_libxml2_standalone
+          - ./fuzzers/full-system/nyx_libxml2_parallel
 
-          # Fuzzbench
-          - ./fuzzers/fuzzbench/fuzzbench
-          - ./fuzzers/fuzzbench/fuzzbench_qemu
-          - ./fuzzers/fuzzbench/fuzzbench_fork_qemu
-          - ./fuzzers/fuzzbench/fuzzbench_text
-          - ./fuzzers/fuzzbench/fuzzbench_ctx
-          - ./fuzzers/fuzzbench/fuzzbench_forkserver_cmplog
-          - ./fuzzers/fuzzbench/fuzzbench_forkserver
+          # Grammar-aware
+          - ./fuzzers/grammar-aware/nautilus_sync
 
-          # LibPNG
-          - ./fuzzers/libpng/libfuzzer_libpng
-          - ./fuzzers/libpng/libfuzzer_libpng_launcher
-          - ./fuzzers/libpng/libfuzzer_libpng_accounting
-          - ./fuzzers/libpng/libfuzzer_libpng_centralized
-          - ./fuzzers/libpng/libfuzzer_libpng_cmin
-          - ./fuzzers/libpng/libfuzzer_libpng_norestart
-          # - ./fuzzers/libpng/libfuzzer_libpng_tcp_manager
-
-          # Nyx
-          - ./fuzzers/nyx/nyx_libxml2_standalone
-          - ./fuzzers/nyx/nyx_libxml2_parallel
-
-          # Stb
-          - ./fuzzers/stb/libfuzzer_stb_image_sugar
-          - ./fuzzers/stb/libfuzzer_stb_image
-          # - ./fuzzers/stb/libfuzzer_stb_image_concolic
+          # In-process
+          - ./fuzzers/inprocess/cargo_fuzz
+          # - ./fuzzers/inprocess/dynamic_analysis
+          - ./fuzzers/inprocess/fuzzbench
+          - ./fuzzers/inprocess/fuzzbench_text
+          - ./fuzzers/inprocess/fuzzbench_ctx
+          - ./fuzzers/inprocess/libfuzzer_libmozjpeg
+          - ./fuzzers/inprocess/libfuzzer_libpng
+          - ./fuzzers/inprocess/libfuzzer_libpng_launcher
+          - ./fuzzers/inprocess/libfuzzer_libpng_accounting
+          - ./fuzzers/inprocess/libfuzzer_libpng_centralized
+          - ./fuzzers/inprocess/libfuzzer_libpng_cmin
+          - ./fuzzers/inprocess/libfuzzer_libpng_norestart
+          # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
+          - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
+          - ./fuzzers/inprocess/libfuzzer_stb_image
+          # - ./fuzzers/inprocess/libfuzzer_stb_image_concolic
+          # - ./fuzzers/inprocess/libfuzzer_windows_asan
+          - ./fuzzers/inprocess/push_harness
+          - ./fuzzers/inprocess/push_stage_harness
+          # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
+          - ./fuzzers/inprocess/tutorial
 
           # Others
-          - ./fuzzers/others/cargo_fuzz
-          # - ./fuzzers/others/dynamic_analysis
           - ./fuzzers/others/libafl_atheris
-          - ./fuzzers/others/libafl-fuzz
-          - ./fuzzers/others/libfuzzer_libmozjpeg
-          # - ./fuzzers/others/libfuzzer_windows_asan
-          - ./fuzzers/others/nautilus_sync
-          - ./fuzzers/others/push_harness
-          - ./fuzzers/others/push_stage_harness
-          # - ./fuzzers/others/sqlite_centralized_multi_machine
-          - ./fuzzers/others/tinyinst_simple
-          - ./fuzzers/others/tutorial
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -355,10 +362,15 @@ jobs:
       matrix:
         os: [ubuntu-24.04]
         fuzzer:
-          - ./fuzzers/qemu/qemu_cmin
-          - ./fuzzers/qemu/qemu_systemmode
-          - ./fuzzers/qemu/qemu_coverage
-          - ./fuzzers/qemu/qemu_launcher
+          # Binary only
+          - ./fuzzers/binary-only/qemu_cmin
+          - ./fuzzers/binary-only/qemu_coverage
+          - ./fuzzers/binary-only/qemu_launcher
+
+          # Full-system
+          - ./fuzzers/full-system/qemu_baremetal
+          # - ./fuzzers/full-system/qemu_linux_kernel
+          #- ./fuzzers/full-system/qemu_linux_process
 
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
@@ -425,8 +437,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/frida_libpng
-        run: cd fuzzers/frida/frida_libpng/ && cargo make test
+      - name: Build fuzzers/binary-only/frida_libpng
+        run: cd fuzzers/binary-only/frida_libpng/ && cargo make test
 
   windows-frida-libfuzzer-stb-image:
     runs-on: windows-latest
@@ -435,8 +447,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/stb/libfuzzer_stb_image
-        run: cd fuzzers/stb/libfuzzer_stb_image && cargo build --release
+      - name: Build fuzzers/inprocess/libfuzzer_stb_image
+        run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
 
   windows-frida-gdiplus:
     runs-on: windows-latest
@@ -445,8 +457,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/frida/frida_gdiplus
-        run: cd fuzzers/frida/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+      - name: Build fuzzers/binary-only/frida_gdiplus
+        run: cd fuzzers/binary-only/frida_gdiplus/ && cargo make test && cargo make test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
@@ -457,8 +469,8 @@ jobs:
         run: cargo install cxxbridge-cmd
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/others/tinyinst_simple
-        run: cd fuzzers/others/tinyinst_simple/ && cargo make test
+      - name: Build fuzzers/binary-only/tinyinst_simple
+        run: cd fuzzers/binary-only/tinyinst_simple/ && cargo make test
 
   windows-clippy:
     runs-on: windows-latest

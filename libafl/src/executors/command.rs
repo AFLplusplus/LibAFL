@@ -105,7 +105,7 @@ where
 
                 for (i, arg) in args.enumerate() {
                     if i == *argnum {
-                        debug_assert_eq!(arg, "DUMMY");
+                        debug_assert_eq!(arg, "PLACEHOLDER");
                         #[cfg(unix)]
                         cmd.arg(OsStr::from_bytes(input.target_bytes().as_slice()));
                         // There is an issue here that the chars on Windows are 16 bit wide.
@@ -396,7 +396,8 @@ impl CommandExecutorBuilder {
     pub fn arg_input_arg(&mut self) -> &mut Self {
         let argnum = self.args.len();
         self.input(InputLocation::Arg { argnum });
-        // self.arg("DUMMY");
+        // Placeholder arg that gets replaced with the input name later.
+        self.arg("PLACEHOLDER");
         self
     }
 
@@ -598,7 +599,6 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator<I>: Sized {
     /// Get the stdout

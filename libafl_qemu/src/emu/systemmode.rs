@@ -1,17 +1,13 @@
 use std::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl::{
-    inputs::{HasTargetBytes, UsesInput},
-    prelude::{HasExecutions, State},
-};
+use libafl::inputs::UsesInput;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    command::{CommandManager, StdCommandManager},
+    command::CommandManager,
     emu::{IsSnapshotManager, QemuSnapshotCheckResult},
-    DeviceSnapshotFilter, Emulator, EmulatorBuilder, Qemu, SnapshotId, SnapshotManagerError,
-    StdEmulatorDriver,
+    DeviceSnapshotFilter, Emulator, Qemu, SnapshotId, SnapshotManagerError,
 };
 
 #[derive(Debug, Clone)]
@@ -81,6 +77,12 @@ impl FastSnapshotManager {
 #[derive(Debug, Clone)]
 pub struct QemuSnapshotManager {
     is_sync: bool,
+}
+
+impl Default for QemuSnapshotManager {
+    fn default() -> Self {
+        QemuSnapshotManager::new(true)
+    }
 }
 
 impl QemuSnapshotManager {

@@ -11,7 +11,7 @@
  *
  */
 
-use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
+use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path, ptr::addr_of_mut};
 
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
@@ -23,7 +23,7 @@ use crate::SYS_execve;
 use crate::{
     elf::EasyElf,
     emu::EmulatorModules,
-    modules::{EmulatorModule, EmulatorModuleTuple},
+    modules::{EmulatorModule, EmulatorModuleTuple, NopAddressFilter, NOP_ADDRESS_FILTER},
     qemu::{ArchExtras, Hook, SyscallHookResult},
     CallingConvention, Qemu,
 };
@@ -260,6 +260,8 @@ impl<S> EmulatorModule<S> for InjectionModule
 where
     S: Unpin + UsesInput,
 {
+    type ModuleAddressFilter = NopAddressFilter;
+
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
@@ -267,7 +269,7 @@ where
         emulator_modules.syscalls(Hook::Function(syscall_hook::<ET, S>));
     }
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -330,6 +332,14 @@ where
                 }
             }
         }
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter {
+        &NopAddressFilter
+    }
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+        unsafe { addr_of_mut!(NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
