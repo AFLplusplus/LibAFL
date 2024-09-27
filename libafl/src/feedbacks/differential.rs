@@ -203,7 +203,7 @@ mod tests {
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
-        inputs::{BytesInput, UsesInput},
+        inputs::BytesInput,
         observers::Observer,
         state::{NopState, State, UsesState},
     };
@@ -221,7 +221,7 @@ mod tests {
             }
         }
     }
-    impl<S> Observer<S> for NopObserver where S: UsesInput {}
+    impl<I, S> Observer<I, S> for NopObserver {}
     impl PartialEq for NopObserver {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value

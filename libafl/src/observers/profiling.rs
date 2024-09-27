@@ -124,8 +124,7 @@ impl Named for ProfilingObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for ProfilingObserver
-{
+impl<I, S> Observer<I, S> for ProfilingObserver {
     fn post_exec(
         &mut self,
         _state: &mut S,

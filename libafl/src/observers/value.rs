@@ -9,27 +9,28 @@ use core::{
 };
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, Named, HasLen};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::Observer;
-use crate::{observers::{MapObserver, ObserverWithHashField}, Error};
+use crate::{
+    observers::{MapObserver, ObserverWithHashField},
+    Error,
+};
 
 /// A simple observer with a single value.
 ///
 /// The intent is that the value is something with interior mutability which the target could write to even though this
 /// observer has a reference to it. Use [`RefCellValueObserver`] if using a [`RefCell`] around the value.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ValueObserver<'a, T>
-{
+pub struct ValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
     /// The value.
     pub value: OwnedRef<'a, T>,
 }
 
-impl<'a, T> ValueObserver<'a, T>
-{
+impl<'a, T> ValueObserver<'a, T> {
     /// Creates a new [`ValueObserver`] with the given name.
     #[must_use]
     pub fn new(name: &'static str, value: OwnedRef<'a, T>) -> Self {
@@ -67,15 +68,13 @@ impl<'a, T> ValueObserver<'a, T>
 /// This *does not* reset the value inside the observer.
 impl<'a, I, S, T> Observer<I, S> for ValueObserver<'a, T> {}
 
-impl<'a, T> Named for ValueObserver<'a, T>
-{
+impl<'a, T> Named for ValueObserver<'a, T> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T: Hash> ObserverWithHashField for ValueObserver<'a, T>
-{
+impl<'a, T: Hash> ObserverWithHashField for ValueObserver<'a, T> {
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(self.value.as_ref()))
     }
@@ -150,8 +149,7 @@ impl<'a, T> Named for RefCellValueObserver<'a, T> {
     }
 }
 
-impl<'a, T> ObserverWithHashField for RefCellValueObserver<'a, T>
-{
+impl<'a, T> ObserverWithHashField for RefCellValueObserver<'a, T> {
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
     }
@@ -247,8 +245,7 @@ impl<'it, T: 'it> Iterator for RefCellValueObserverIterMut<'it, T> {
     }
 }
 
-impl<'a, A: Hash> Hash for RefCellValueObserver<'a, A>
-{
+impl<'a, A: Hash> Hash for RefCellValueObserver<'a, A> {
     /// Panics if the contained value is already mutably borrowed (calls
     /// [`RefCell::borrow`]).
     #[inline]
