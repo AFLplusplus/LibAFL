@@ -5,7 +5,7 @@ use alloc::{
     string::ToString,
     vec::Vec,
 };
-use core::{fmt::Debug, marker::PhantomData, ops::Deref, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
 use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, AsIter, Named};
@@ -98,7 +98,7 @@ where
     E: Executor<EM, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = Self::State>,
     O: MapObserver,
-    C: Deref<Target = O>,
+    C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry:
         Serialize + Deserialize<'de> + 'static + Default + Debug + Bounded,
     OT: ObserversTuple<Self::Input, Self::State>,
@@ -383,7 +383,7 @@ impl<C, E, O, OT> CalibrationStage<C, E, O, OT>
 where
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
-    C: Deref<Target = O>,
+    C: AsRef<O>,
     OT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     E: UsesState,
 {

@@ -238,7 +238,7 @@ where
         + HasNamedMetadata
         + Stoppable,
     O: MapObserver,
-    C: Deref<Target = O> + Named,
+    C: AsRef<O> + Named,
     <Z as HasScheduler>::Scheduler: HasQueueCycles,
     <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
 {
@@ -397,7 +397,7 @@ where
     EM: EventFirer<State = E::State>,
     Z: UsesState<State = E::State>,
     E::State: HasImported + HasCorpus + HasMetadata + HasExecutions,
-    C: Deref<Target = O> + Named,
+    C: AsRef<O> + Named,
     O: MapObserver,
 {
     /// create a new instance of the [`AflStatsStage`]

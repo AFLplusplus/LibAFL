@@ -4,7 +4,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     vec::Vec,
 };
-use core::{fmt::Debug, marker::PhantomData, ops::Deref};
+use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::{
     tuples::{Handle, Handled},
@@ -71,7 +71,7 @@ where
 impl<C, E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<C, EM, O, E::Observers, Z>
 where
     O: MapObserver,
-    C: CanTrack + Deref<Target = O> + Named,
+    C: CanTrack + AsRef<O> + Named,
     E: Executor<EM, Z, State = Self::State> + HasObservers,
     E::Observers: ObserversTuple<BytesInput, <Self as UsesState>::State>,
     EM::State:
@@ -344,7 +344,7 @@ impl<C, EM, O, OT, Z> GeneralizationStage<C, EM, O, OT, Z>
 where
     EM: UsesState,
     O: MapObserver,
-    C: CanTrack + Deref<Target = O> + Named,
+    C: CanTrack + AsRef<O> + Named,
     <Self as UsesState>::State:
         UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
     OT: ObserversTuple<BytesInput, <EM as UsesState>::State>,

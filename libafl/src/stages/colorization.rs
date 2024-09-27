@@ -8,7 +8,7 @@ use core::{
     cmp::Ordering,
     fmt::Debug,
     marker::PhantomData,
-    ops::{Deref, Range},
+    ops::Range,
 };
 
 use libafl_bolts::{
@@ -97,7 +97,7 @@ where
     E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     E::Input: HasMutatorBytes,
     O: MapObserver,
-    C: Deref<Target = O> + Named,
+    C: AsRef<O> + Named,
     Z: UsesState<State = Self::State>,
     <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>, //delete me
 {
@@ -171,7 +171,7 @@ impl<C, E, EM, O, Z> ColorizationStage<C, E, EM, O, Z>
 where
     EM: UsesState<State = <Self as UsesState>::State> + EventFirer,
     O: MapObserver,
-    C: Deref<Target = O> + Named,
+    C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
     E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     <E as UsesState>::State: HasCorpus + HasMetadata + HasRand,

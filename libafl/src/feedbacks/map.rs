@@ -407,7 +407,7 @@ where
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
-    C: CanTrack + Deref<Target = O> + Named,
+    C: CanTrack + AsRef<O> + Named,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -564,7 +564,7 @@ impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8
 where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     S: State + HasNamedMetadata,
-    C: CanTrack + Deref<Target = O> + Observer<S::Input, S>,
+    C: CanTrack + AsRef<O> + Observer<S::Input, S>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -689,7 +689,7 @@ impl<C, N, O, R, T> Named for MapFeedback<C, N, O, R, T> {
 impl<C, N, O, R, T> HasObserverHandle for MapFeedback<C, N, O, R, T>
 where
     O: Named,
-    C: Deref<Target = O>,
+    C: AsRef<O>,
 {
     type Observer = C;
 
@@ -715,7 +715,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    C: CanTrack + Deref<Target = O> + Named,
+    C: CanTrack + AsRef<O> + Named,
 {
     /// Create new `MapFeedback`
     #[must_use]

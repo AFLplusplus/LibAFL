@@ -1,7 +1,7 @@
 //! Schedule the access to the Corpus.
 
 use alloc::{borrow::ToOwned, string::ToString};
-use core::{marker::PhantomData, ops::Deref};
+use core::marker::PhantomData;
 
 pub mod testcase_score;
 pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
@@ -107,7 +107,7 @@ pub fn on_evaluation_metadata_default<CS, O, OT, S>(
 ) -> Result<(), Error>
 where
     CS: AflScheduler,
-    CS::MapObserverRef: Deref<Target = O>,
+    CS::MapObserverRef: AsRef<O>,
     S: HasMetadata,
     O: MapObserver,
     OT: MatchName,

@@ -730,7 +730,7 @@ where
     ) -> Result<ForkserverExecutor<(A, OT), S, SP>, Error>
     where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
-        A: Observer<S::Input, S> + DerefMut<Target = MO>,
+        A: Observer<S::Input, S> + AsMut<MO>,
         OT: ObserversTuple<S::Input, S> + Prepend<MO>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
