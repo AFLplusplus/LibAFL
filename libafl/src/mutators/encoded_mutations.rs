@@ -13,7 +13,7 @@ use libafl_bolts::{
 
 use crate::{
     corpus::Corpus,
-    inputs::{EncodedInput, UsesInput},
+    inputs::EncodedInput,
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
@@ -305,9 +305,10 @@ impl EncodedCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverInsertMutator;
 
-impl<S> Mutator<S::Input, S> for EncodedCrossoverInsertMutator
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator
 where
-    S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus + HasMaxSize,
+    S: HasRand + HasCorpus + HasMaxSize,
+    S::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
@@ -388,9 +389,10 @@ impl EncodedCrossoverInsertMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverReplaceMutator;
 
-impl<S> Mutator<S::Input, S> for EncodedCrossoverReplaceMutator
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator
 where
-    S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus,
+    S: HasRand + HasCorpus,
+    S::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();

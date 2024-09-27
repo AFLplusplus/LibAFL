@@ -100,8 +100,9 @@ where
     C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
+    E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions + HasCurrentTestcase,
     Z: Evaluator<E, EM, State = Self::State>,
+    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     #[allow(

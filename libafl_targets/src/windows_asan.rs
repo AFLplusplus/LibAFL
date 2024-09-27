@@ -1,10 +1,11 @@
 //! Setup asan death callbback
 
 use libafl::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     HasObjective,
 };
 
@@ -34,6 +35,8 @@ where
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
     Z: HasObjective<Objective = OF, State = E::State>,
+    <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+    <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, OF, Z>));
 }

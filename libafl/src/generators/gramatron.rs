@@ -34,10 +34,7 @@ pub struct Automaton {
 
 #[derive(Clone, Debug)]
 /// Generates random inputs from a grammar automaton
-pub struct GramatronGenerator<'a, S>
-where
-    S: HasRand,
-{
+pub struct GramatronGenerator<'a, S> {
     automaton: &'a Automaton,
     phantom: PhantomData<S>,
 }

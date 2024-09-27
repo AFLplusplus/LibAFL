@@ -63,7 +63,8 @@ where
 impl<I, S> MutatedTransform<I, S> for I
 where
     I: Input + Clone,
-    S: HasCorpus<Input = I>,
+    S: HasCorpus,
+    S::Corpus: Corpus<Input = I>,
 {
     type Post = ();
 
@@ -88,8 +89,9 @@ where
     M: Mutator<I, Self::State>,
     EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM, State = Self::State>,
-    Self::State: HasCorpus,
+    Self::State: HasCorpus + HasCurrentTestcase,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -174,8 +176,9 @@ where
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasNamedMetadata,
+    Z::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasNamedMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     /// The mutator, added to this stage
     #[inline]
@@ -219,8 +222,9 @@ where
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasMetadata + HasExecutions + HasNamedMetadata,
+    Z::State: HasCorpus + HasRand + HasMetadata + HasExecutions + HasNamedMetadata,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -345,8 +349,9 @@ where
     EM: UsesState<State = Self::State>,
     M: MultiMutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasNamedMetadata,
+    Z::State: HasCorpus + HasRand + HasNamedMetadata + HasCurrentTestcase,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
