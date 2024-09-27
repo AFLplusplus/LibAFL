@@ -225,7 +225,7 @@ pub mod macros {
     /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
-    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + Deref<Target = O> {
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
     ///     pub fn new(obs: &C) -> Self {
     ///         require_index_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")
@@ -288,7 +288,7 @@ pub mod macros {
     /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
-    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + Deref<Target = O> {
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
     ///     pub fn new(obs: &C) -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")
@@ -342,7 +342,7 @@ pub mod macros {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
-/// to instances of a second type, e.g. `C: Deref<Target = O>` or `A: AsMut<O>`. Map observer instances are
+/// to instances of a second type, e.g. `C: AsRef<O>` or `A: AsMut<O>`. Map observer instances are
 /// passed around in a way that may be potentially wrapped by e.g. [`ExplicitTracking`] as a way to
 /// encode metadata into the type. This is an unfortunate additional requirement that we can't get
 /// around without specialization.
