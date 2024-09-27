@@ -9,21 +9,18 @@ use core::{
 };
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, Named};
-use serde::{Deserialize, Serialize};
+use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, Named, HasLen};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use super::Observer;
-use crate::{inputs::UsesInput, observers::ObserverWithHashField, Error};
+use crate::{observers::{MapObserver, ObserverWithHashField}, Error};
 
 /// A simple observer with a single value.
 ///
 /// The intent is that the value is something with interior mutability which the target could write to even though this
 /// observer has a reference to it. Use [`RefCellValueObserver`] if using a [`RefCell`] around the value.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct ValueObserver<'a, T>
-where
-    T: Debug + Serialize,
 {
     /// The name of this observer.
     name: Cow<'static, str>,
@@ -32,8 +29,6 @@ where
 }
 
 impl<'a, T> ValueObserver<'a, T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`ValueObserver`] with the given name.
     #[must_use]
@@ -70,19 +65,9 @@ where
 }
 
 /// This *does not* reset the value inside the observer.
-impl<'a, S, T> Observer<S> for ValueObserver<'a, T>
-where
-    S: UsesInput,
-    T: Debug + Serialize + serde::de::DeserializeOwned,
-{
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        Ok(())
-    }
-}
+impl<'a, I, S, T> Observer<I, S> for ValueObserver<'a, T> {}
 
 impl<'a, T> Named for ValueObserver<'a, T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
@@ -90,8 +75,6 @@ where
 }
 
 impl<'a, T: Hash> ObserverWithHashField for ValueObserver<'a, T>
-where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(self.value.as_ref()))
@@ -100,7 +83,6 @@ where
 
 /// A simple observer with a single [`RefCell`]'d value.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned + serde::Serialize")]
 pub struct RefCellValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
@@ -160,14 +142,7 @@ impl<'a, T> RefCellValueObserver<'a, T> {
 }
 
 /// This *does not* reset the value inside the observer.
-impl<'a, S, T> Observer<S> for RefCellValueObserver<'a, T>
-where
-    S: UsesInput,
-{
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        Ok(())
-    }
-}
+impl<'a, I, S, T> Observer<I, S> for RefCellValueObserver<'a, T> {}
 
 impl<'a, T> Named for RefCellValueObserver<'a, T> {
     fn name(&self) -> &Cow<'static, str> {
@@ -176,8 +151,6 @@ impl<'a, T> Named for RefCellValueObserver<'a, T> {
 }
 
 impl<'a, T> ObserverWithHashField for RefCellValueObserver<'a, T>
-where
-    T: Hash,
 {
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
@@ -239,7 +212,7 @@ pub struct RefCellValueObserverIterMut<'it, T> {
     v: Option<RefMut<'it, [T]>>,
 }
 
-impl<'it, T: 'it, A: Debug + DerefMut<Target = [T]> + Serialize> AsIterMut<'it>
+impl<'it, T: 'it, A: DerefMut<Target = [T]> + Serialize> AsIterMut<'it>
     for RefCellValueObserver<'_, A>
 {
     type RefMut = RefMut<'it, T>;
@@ -274,25 +247,21 @@ impl<'it, T: 'it> Iterator for RefCellValueObserverIterMut<'it, T> {
     }
 }
 
-impl<'a, T: Hash, A> Hash for RefCellValueObserver<'a, A>
-where
-    T: Debug,
-    A: Debug + Deref<Target = [T]> + Serialize + serde::de::DeserializeOwned,
+impl<'a, A: Hash> Hash for RefCellValueObserver<'a, A>
 {
     /// Panics if the contained value is already mutably borrowed (calls
     /// [`RefCell::borrow`]).
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        (*self.get_ref()).hash(hasher);
+        self.get_ref().hash(hasher);
     }
 }
 
 /// Panics if the contained value is already mutably borrowed (calls
 /// [`RefCell::borrow`]).
-impl<T, A> libafl_bolts::HasLen for RefCellValueObserver<'_, A>
+impl<A> HasLen for RefCellValueObserver<'_, A>
 where
-    T: Debug,
-    A: Debug + Deref<Target = [T]> + Serialize + serde::de::DeserializeOwned,
+    A: HasLen,
 {
     /// Panics if the contained value is already mutably borrowed (calls
     /// [`RefCell::borrow`]).
@@ -307,32 +276,21 @@ where
     }
 }
 
-impl<T: Debug + Serialize + serde::de::DeserializeOwned> AsMut<Self>
-    for RefCellValueObserver<'_, T>
-{
-    fn as_mut(&mut self) -> &mut Self {
-        self
-    }
-}
-
-impl<T: Debug + Serialize + serde::de::DeserializeOwned> AsRef<Self>
-    for RefCellValueObserver<'_, T>
-{
+impl<T> AsRef<Self> for RefCellValueObserver<'_, T> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<T, A> crate::observers::MapObserver for RefCellValueObserver<'_, A>
+impl<T> AsMut<Self> for RefCellValueObserver<'_, T> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+impl<T, A> MapObserver for RefCellValueObserver<'_, A>
 where
-    T: Copy + Debug + Default + Eq + Hash + num_traits::bounds::Bounded + 'static,
-    A: Debug
-        + Default
-        + Deref<Target = [T]>
-        + DerefMut<Target = [T]>
-        + serde::de::DeserializeOwned
-        + Serialize
-        + 'static,
+    T: PartialEq + Copy + Hash + Default + DeserializeOwned + Serialize + Debug,
+    A: DerefMut<Target = [T]> + Hash + Serialize + DeserializeOwned + HasLen + Default,
 {
     type Entry = T;
 
@@ -385,7 +343,7 @@ where
     /// Panics if the contained value is already mutably borrowed (calls
     /// [`RefCell::borrow`]).
     fn to_vec(&self) -> Vec<Self::Entry> {
-        (*self.get_ref()).to_vec()
+        self.get_ref().to_vec()
     }
 
     /// Panics if the contained value is already mutably borrowed (calls
