@@ -48,7 +48,7 @@ where
     <E as UsesObservers>::Observers: Serialize,
     EM: UsesState<State = Self::State> + EventFirer,
     F: Feedback<Self::State>,
-    Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions,
+    Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions + HasCurrentTestcase,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + Hash + HasLen,
     IP: Clone + MutatedTransformPost<Self::State>,
     M: Mutator<Self::Input, Self::State>,
@@ -58,6 +58,7 @@ where
         + ExecutesInput<E, EM>
         + ExecutionProcessor,
     Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -246,10 +247,11 @@ where
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State:
+    Z::State:
         HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, // delete me
 {
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         self.restart_helper.should_restart(state, &self.name)
@@ -308,10 +310,16 @@ where
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State:
-        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
+    Z::State: HasMetadata
+        + HasExecutions
+        + HasSolutions
+        + HasCorpus
+        + HasMaxSize
+        + HasNamedMetadata
+        + HasCurrentTestcase,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, // delete me
 {
     /// The mutator, added to this stage
     #[inline]

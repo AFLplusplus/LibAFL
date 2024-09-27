@@ -49,8 +49,7 @@ pub type HavocMutationsNoCrossoverType = tuple_list_type!(
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator's crossover mutations
-pub type HavocCrossoverType<I> =
-    tuple_list_type!(CrossoverInsertMutator<I>, CrossoverReplaceMutator<I>);
+pub type HavocCrossoverType = tuple_list_type!(CrossoverInsertMutator, CrossoverReplaceMutator);
 
 /// Tuple type of the mutations that compose the Havoc mutator's crossover mutations for mapped input types
 pub type MappedHavocCrossoverType<F, O> = tuple_list_type!(
@@ -59,7 +58,7 @@ pub type MappedHavocCrossoverType<F, O> = tuple_list_type!(
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator
-pub type HavocMutationsType<I> = tuple_list_type!(
+pub type HavocMutationsType = tuple_list_type!(
     BitFlipMutator,
     ByteFlipMutator,
     ByteIncMutator,
@@ -85,8 +84,8 @@ pub type HavocMutationsType<I> = tuple_list_type!(
     BytesCopyMutator,
     BytesInsertCopyMutator,
     BytesSwapMutator,
-    CrossoverInsertMutator<I>,
-    CrossoverReplaceMutator<I>,
+    CrossoverInsertMutator,
+    CrossoverReplaceMutator,
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types
@@ -193,7 +192,7 @@ pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy
 #[must_use]
-pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
+pub fn havoc_crossover() -> HavocCrossoverType {
     tuple_list!(
         CrossoverInsertMutator::new(),
         CrossoverReplaceMutator::new(),
@@ -228,7 +227,7 @@ where
 
 /// Get the mutations that compose the Havoc mutator
 #[must_use]
-pub fn havoc_mutations<I>() -> HavocMutationsType<I> {
+pub fn havoc_mutations() -> HavocMutationsType {
     havoc_mutations_no_crossover().merge(havoc_crossover())
 }
 

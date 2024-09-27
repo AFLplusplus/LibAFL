@@ -417,12 +417,19 @@ where
 pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
+
+    /// Gets all the names
+    fn names(&self) -> Vec<Cow<'static, str>>;
 }
 
 #[cfg(feature = "alloc")]
 impl NamedTuple for () {
     fn name(&self, _index: usize) -> Option<&Cow<'static, str>> {
         None
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        Vec::new()
     }
 }
 
@@ -447,6 +454,13 @@ where
         } else {
             self.1.name(index - 1)
         }
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        let first = self.0.name().clone();
+        let mut last = self.1.names();
+        last.insert(0, first);
+        last
     }
 }
 
@@ -596,7 +610,6 @@ pub struct RefIndexable<RM, M>(RM, PhantomData<M>);
 impl<RM, M> From<RM> for RefIndexable<RM, M>
 where
     RM: Deref<Target = M>,
-    M: MatchName,
 {
     fn from(value: RM) -> Self {
         RefIndexable(value, PhantomData)
