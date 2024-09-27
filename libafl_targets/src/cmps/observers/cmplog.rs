@@ -7,7 +7,6 @@ use core::fmt::Debug;
 
 use libafl::{
     executors::ExitKind,
-    inputs::UsesInput,
     observers::{cmp::CmpValuesMetadata, CmpMap, CmpObserver, Observer},
     Error, HasMetadata,
 };
@@ -25,10 +24,10 @@ pub struct CmpLogObserver {
     name: Cow<'static, str>,
 }
 
-impl<'a, S> CmpObserver<'a, CmpLogMap, S, CmpValuesMetadata> for CmpLogObserver
-where
-    S: UsesInput + HasMetadata,
+// Is the only difference here between this and StdCmpObserver that CMPLOG_ENABLED = 1?? 
+impl<'a> CmpObserver for CmpLogObserver
 {
+    type Map = CmpLogMap;
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
@@ -46,12 +45,11 @@ where
     }
 }
 
-impl<'a, S> Observer<S> for CmpLogObserver
-where
-    S: UsesInput + HasMetadata,
-    Self: CmpObserver<'a, CmpLogMap, S, CmpValuesMetadata>,
+impl<'a, I, S> Observer<I, S> for CmpLogObserver
+where 
+    S: HasMetadata,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         unsafe {
             CMPLOG_ENABLED = 1;
@@ -62,7 +60,7 @@ where
     fn post_exec(
         &mut self,
         state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         unsafe {
@@ -70,7 +68,11 @@ where
         }
 
         if self.add_meta {
-            self.add_cmpvalues_meta(state);
+            let meta = state.metadata_or_insert_with(|| CmpValuesMetadata::new());
+    
+            let usable_count = self.usable_count();
+    
+            meta.add_from(usable_count, self.cmp_map_mut());
         }
 
         Ok(())

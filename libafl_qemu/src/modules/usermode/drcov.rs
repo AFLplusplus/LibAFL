@@ -116,7 +116,7 @@ where
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
         let lengths_opt = DRCOV_LENGTHS.lock().unwrap();

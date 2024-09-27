@@ -1,5 +1,4 @@
 //! The `CmpObserver` provides access to the logged values of CMP instructions
-
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
@@ -8,28 +7,10 @@ use core::{
 
 use c2rust_bitfields::BitfieldStruct;
 use hashbrown::HashMap;
-use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSlice, HasLen, Named};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use libafl_bolts::{ownedref::OwnedRefMut, AsSlice, HasLen, Named};
+use serde::{Deserialize, Serialize};
 
 use crate::{executors::ExitKind, observers::Observer, Error, HasMetadata};
-
-/// Generic metadata trait for use in a `CmpObserver`, which adds comparisons from a `CmpObserver`
-/// primarily intended for use with `AFLppCmpValuesMetadata` or `CmpValuesMetadata`
-pub trait CmpObserverMetadata<'a, CM> {
-    /// Extra data used by the metadata when adding information from a `CmpObserver`, for example
-    /// the `original` field in `AFLppCmpLogObserver`
-    type Data: 'a + Debug + Default + Serialize + DeserializeOwned;
-
-    /// Instantiate a new metadata instance. This is used by `CmpObserver` to create a new
-    /// metadata if one is missing and `add_meta` is specified. This will typically juse call
-    /// `new()`
-    fn new_metadata() -> Self;
-
-    /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
-    /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
-    /// `AFLppCmpLogObserver`.
-    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM);
-}
 
 /// A bytes string for cmplog with up to 32 elements.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -135,20 +116,14 @@ impl CmpValuesMetadata {
     pub fn new() -> Self {
         Self { list: vec![] }
     }
-}
 
-impl<'a, CM> CmpObserverMetadata<'a, CM> for CmpValuesMetadata
-where
-    CM: CmpMap,
-{
-    type Data = bool;
-
-    #[must_use]
-    fn new_metadata() -> Self {
-        Self::new()
-    }
-
-    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM) {
+    /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
+    /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
+    /// `AFLppCmpLogObserver`.
+    pub fn add_from<CM>(&mut self, usable_count: usize, cmp_map: &mut CM) 
+    where 
+        CM: CmpMap,
+    {
         self.list.clear();
         let count = usable_count;
         for i in 0..count {
@@ -244,20 +219,16 @@ pub trait CmpObserver {
 /// A standard [`CmpObserver`] observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "CM: serde::de::DeserializeOwned + Serialize")]
-pub struct StdCmpObserver<'a, CM, M>
-where
-    M: CmpObserverMetadata<'a, CM>,
+pub struct StdCmpObserver<'a, CM>
 {
     cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: Cow<'static, str>,
     add_meta: bool,
-    data: M::Data,
 }
 
-impl<'a, CM, M> CmpObserver for StdCmpObserver<'a, CM, M>
+impl<'a, CM> CmpObserver for StdCmpObserver<'a, CM>
 where
-    M: CmpObserverMetadata<'a, CM>,
     CM: HasLen,
 {
     type Map = CM;
@@ -279,9 +250,8 @@ where
     }
 }
 
-impl<'a, CM, I, S, M> Observer<I, S> for StdCmpObserver<'a, CM, M>
+impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
 where
-    M: CmpObserverMetadata<'a, CM> + SerdeAny,
     CM: Serialize + CmpMap + HasLen,
     S: HasMetadata,
 {
@@ -293,7 +263,7 @@ where
     fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         if self.add_meta {
             #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-            let meta = state.metadata_or_insert_with(|| M::new_metadata());
+            let meta = state.metadata_or_insert_with(|| CmpValuesMetadata::new());
 
             meta.add_from(self.usable_count(), self.cmp_map_mut());
         }
@@ -301,20 +271,16 @@ where
     }
 }
 
-impl<'a, CM, M> Named for StdCmpObserver<'a, CM, M>
-where
-    CM: Serialize,
-    M: CmpObserverMetadata<'a, CM>,
+impl<'a, CM> Named for StdCmpObserver<'a, CM>
 {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, CM, M> StdCmpObserver<'a, CM, M>
+impl<'a, CM> StdCmpObserver<'a, CM>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    M: CmpObserverMetadata<'a, CM>,
+    CM: CmpMap
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
@@ -324,25 +290,6 @@ where
             size: None,
             cmp_map: map,
             add_meta,
-            data: M::Data::default(),
-        }
-    }
-
-    /// Creates a new [`StdCmpObserver`] with the given name, map, and auxiliary data used to
-    /// populate metadata
-    #[must_use]
-    pub fn with_data(
-        name: &'static str,
-        cmp_map: OwnedRefMut<'a, CM>,
-        add_meta: bool,
-        data: M::Data,
-    ) -> Self {
-        Self {
-            name: Cow::from(name),
-            size: None,
-            cmp_map,
-            add_meta,
-            data,
         }
     }
 
@@ -359,42 +306,9 @@ where
             size: Some(size),
             cmp_map,
             add_meta,
-            data: M::Data::default(),
         }
-    }
-
-    /// Creates a new [`StdCmpObserver`] with the given name, map, auxiliary data, and
-    /// reference to variable size.
-    #[must_use]
-    pub fn with_size_data(
-        name: &'static str,
-        cmp_map: OwnedRefMut<'a, CM>,
-        add_meta: bool,
-        data: M::Data,
-        size: OwnedRefMut<'a, usize>,
-    ) -> Self {
-        Self {
-            name: Cow::from(name),
-            size: Some(size),
-            cmp_map,
-            add_meta,
-            data,
-        }
-    }
-
-    /// Handle the stored auxiliary data associated with the [`CmpObserverMetadata`]
-    pub fn data(&self) -> &M::Data {
-        &self.data
-    }
-
-    /// Mutably reference the stored auxiliary data associated with the [`CmpObserverMetadata`]
-    pub fn data_mut(&mut self) -> &mut M::Data {
-        &mut self.data
     }
 }
-
-/// A [`StdCmpObserver`] that optionally adds comparisons into a [`CmpValuesMetadata`]
-pub type StdCmpValuesObserver<'a, CM> = StdCmpObserver<'a, CM, CmpValuesMetadata>;
 
 /* From AFL++ cmplog.h
 

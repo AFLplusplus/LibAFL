@@ -62,6 +62,7 @@ pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// Value indicating if cmplog is enabled.
 #[no_mangle]
+#[allow(non_upper_case_globals)]
 pub static mut libafl_cmplog_enabled: u8 = 0;
 
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
@@ -423,6 +424,7 @@ impl CmpMap for CmpLogMap {
 /// The global `CmpLog` map for the current `LibAFL` run.
 #[no_mangle]
 #[allow(clippy::large_stack_arrays)]
+#[allow(non_upper_case_globals)]
 pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
     headers: [CmpLogHeader {
         hits: 0,
