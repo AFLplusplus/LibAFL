@@ -14,6 +14,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::Corpus,
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasMutatorBytes,
@@ -87,11 +88,12 @@ impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
     EM: UsesState<State = Self::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
+    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
     E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
     Z: UsesState<State = Self::State>,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>, //delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -165,9 +167,10 @@ where
     O: MapObserver,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
-    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
+    <E as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasMutatorBytes,
     Z: UsesState<State = <Self as UsesState>::State>,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>, //delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]

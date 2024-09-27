@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -9,7 +9,6 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process,
-    time::Duration,
 };
 
 use clap::{Arg, Command};
@@ -26,7 +25,7 @@ use libafl::{
         havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
         StdScheduledMutator, Tokens,
     },
-    observers::{CanTrack, ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
@@ -40,23 +39,35 @@ use libafl::{
 use libafl_bolts::{
     current_time,
     os::{dup2, unix_signals::Signal},
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice, AsSliceMut,
+    AsSlice,
 };
 use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
-    modules::{
-        cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
-        edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    // asan::{init_with_asan, QemuAsanHelper},
+    modules::cmplog::{CmpLogModule, CmpLogObserver},
+    modules::edges::{
+        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
     },
-    Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
-    QemuShutdownCause, Regs,
+    Emulator,
+    GuestReg,
+    //snapshot::QemuSnapshotHelper,
+    MmapPerms,
+    Qemu,
+    QemuExecutor,
+    QemuExitError,
+    QemuExitReason,
+    QemuShutdownCause,
+    Regs,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
+
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 /// The fuzzer main
 pub fn main() {
@@ -90,6 +101,12 @@ pub fn main() {
                 .long("libafl-logfile")
                 .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
+        )
+        .arg(
+            Arg::new("timeout")
+                .long("libafl-timeout")
+                .help("Timeout for each individual execution, in milliseconds")
+                .default_value("1000"),
         )
         .try_get_matches_from(filter_qemu_args())
     {
@@ -134,7 +151,16 @@ pub fn main() {
 
     let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap().to_string());
 
-    fuzz(out_dir, crashes, in_dir, tokens, logfile).expect("An error occurred while fuzzing");
+    let timeout = Duration::from_millis(
+        res.get_one::<String>("timeout")
+            .unwrap()
+            .to_string()
+            .parse()
+            .expect("Could not parse timeout in milliseconds"),
+    );
+
+    fuzz(out_dir, crashes, in_dir, tokens, logfile, timeout)
+        .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
@@ -144,23 +170,13 @@ fn fuzz(
     seed_dir: PathBuf,
     tokenfile: Option<PathBuf>,
     logfile: PathBuf,
+    timeout: Duration,
 ) -> Result<(), Error> {
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-
-    let emulator_modules = tuple_list!(
-        StdEdgeCoverageChildModule::builder().build(),
-        CmpLogChildModule::default(),
-    );
-
-    let emulator = Emulator::empty()
-        .qemu_cli(args)
-        .modules(emulator_modules)
-        .build()?;
-
-    let qemu = emulator.qemu();
+    let qemu = Qemu::init(&args).unwrap();
+    // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
@@ -191,7 +207,9 @@ fn fuzz(
     qemu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     qemu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = qemu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = qemu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
     println!("Placing input at {input_addr:#x}");
 
     let log = RefCell::new(
@@ -210,28 +228,15 @@ fn fuzz(
     let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = SimpleMonitor::with_user_monitor(|s| {
+    let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
         println!("{s}");
-        writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
+        writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
     let mut shmem_provider = StdShMemProvider::new()?;
-
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
-
-    let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
-    let cmplog = cmp_shmem.as_slice_mut();
-
-    // Beginning of a page should be properly aligned.
-    #[allow(clippy::cast_ptr_alignment)]
-    let cmplog_map_ptr = cmplog
-        .as_mut_ptr()
-        .cast::<libafl_qemu::modules::cmplog::CmpLogMap>();
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
@@ -249,9 +254,10 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
+        HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
-            edges.as_mut_ptr(),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+            addr_of_mut!(MAX_EDGES_FOUND),
         ))
         .track_indices()
     };
@@ -260,7 +266,7 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = unsafe { CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true) };
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
@@ -301,14 +307,15 @@ fn fuzz(
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(
+    let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
         7,
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+        StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
@@ -320,45 +327,55 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &BytesInput| {
-        let target = input.target_bytes();
-        let mut buf = target.as_slice();
-        let mut len = buf.len();
-        if len > 4096 {
-            buf = &buf[0..4096];
-            len = 4096;
-        }
-
-        unsafe {
-            qemu.write_mem(input_addr, buf);
-
-            qemu.write_reg(Regs::Rdi, input_addr).unwrap();
-            qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
-            qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
-            qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
-
-            match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {}
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
-                }
-                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                _ => panic!("Unexpected QEMU exit."),
+    let mut harness =
+        |_emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            let target = input.target_bytes();
+            let mut buf = target.as_slice();
+            let mut len = buf.len();
+            if len > MAX_INPUT_SIZE {
+                buf = &buf[0..MAX_INPUT_SIZE];
+                len = MAX_INPUT_SIZE;
             }
-        }
 
-        ExitKind::Ok
-    };
+            unsafe {
+                qemu.write_mem(input_addr, buf);
 
-    let executor = QemuForkExecutor::new(
+                qemu.write_reg(Regs::Rdi, input_addr).unwrap();
+                qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
+                qemu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+                qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
+
+                match qemu.run() {
+                    Ok(QemuExitReason::Breakpoint(_)) => {}
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                        Signal::SigInterrupt,
+                    ))) => process::exit(0),
+                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
+                    _ => panic!("Unexpected QEMU exit."),
+                }
+            }
+
+            ExitKind::Ok
+        };
+
+    let modules = tuple_list!(
+        StdEdgeCoverageModule::builder().build(),
+        CmpLogModule::default(),
+        // QemuAsanHelper::default(asan),
+        //QemuSnapshotHelper::new()
+    );
+
+    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
+
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
+    let executor = QemuExecutor::new(
         emulator,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        shmem_provider,
-        Duration::from_millis(5000),
+        timeout,
     )?;
 
     // Show the cmplog observer

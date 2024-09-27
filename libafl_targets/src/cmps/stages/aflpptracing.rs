@@ -2,6 +2,7 @@ use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 
 use libafl::{
+    corpus::Corpus,
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
@@ -51,10 +52,15 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
     E: UsesState<State = Self::State>,
     TE: Executor<EM, Z> + HasObservers,
-    Self::State:
-        HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput> + HasNamedMetadata,
+    TE::State: HasExecutions
+        + HasCorpus
+        + HasMetadata
+        + UsesInput<Input = BytesInput>
+        + HasNamedMetadata
+        + HasCurrentTestcase,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
+    <Self::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>, //delete me
 {
     #[inline]
     fn perform(

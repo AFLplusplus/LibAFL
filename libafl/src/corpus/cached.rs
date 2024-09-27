@@ -11,7 +11,7 @@ use crate::{
         inmemory_ondisk::InMemoryOnDiskCorpus, ondisk::OnDiskMetadataFormat, Corpus, CorpusId,
         HasTestcase, Testcase,
     },
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error,
 };
 
@@ -20,21 +20,10 @@ use crate::{
 /// The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct CachedOnDiskCorpus<I>
-where
-    I: Input,
-{
+pub struct CachedOnDiskCorpus<I> {
     inner: InMemoryOnDiskCorpus<I>,
     cached_indexes: RefCell<VecDeque<CorpusId>>,
     cache_max_len: usize,
-}
-
-impl<I> UsesInput for CachedOnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Input = I;
 }
 
 impl<I> CachedOnDiskCorpus<I>
@@ -71,6 +60,8 @@ impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
+    type Input = I;
+
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -193,22 +184,16 @@ impl<I> HasTestcase for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    fn testcase(&self, id: CorpusId) -> Result<core::cell::Ref<Testcase<Self::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<core::cell::Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<Self::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<core::cell::RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
 
-impl<I> CachedOnDiskCorpus<I>
-where
-    I: Input,
-{
+impl<I> CachedOnDiskCorpus<I> {
     /// Creates the [`CachedOnDiskCorpus`].
     ///
     /// This corpus stores (and reads) all testcases to/from disk
