@@ -325,7 +325,6 @@ impl TimerStruct {
         if self.batch_mode {
             unsafe {
                 let elapsed = current_time().saturating_sub(self.tmout_start_time);
-                let elapsed_since_signal = current_time().saturating_sub(self.tmout_start_time);
                 // elapsed may be > than tmout in case of received but ingored signal
                 if elapsed > self.exec_tmout
                     || self.exec_tmout.saturating_sub(elapsed) < self.avg_exec_time * self.avg_mul_k
@@ -338,8 +337,7 @@ impl TimerStruct {
                         self.executions = 0;
                     }
                     // readjust K
-                    if elapsed_since_signal > self.exec_tmout * self.avg_mul_k && self.avg_mul_k > 1
-                    {
+                    if elapsed > self.exec_tmout * self.avg_mul_k && self.avg_mul_k > 1 {
                         self.avg_mul_k -= 1;
                     }
                 } else {
