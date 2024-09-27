@@ -153,8 +153,8 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT>,
-        EM: EventFirer<State = E::State>;
+        E: Executor<EM, Self, State = Self::State> + HasObservers<Observers = OT>,
+        EM: EventFirer<State = Self::State>;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
@@ -386,7 +386,7 @@ where
     ) -> Result<ExecuteInputResult, Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         let mut res = ExecuteInputResult::None;
 
@@ -431,7 +431,7 @@ where
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
         let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
@@ -452,7 +452,7 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         // Now send off the event
         let observers_buf = match exec_res {
@@ -537,7 +537,7 @@ where
     ) -> Result<Option<CorpusId>, Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         match exec_res {
             ExecuteInputResult::None => {
@@ -588,7 +588,7 @@ where
 impl<CS, F, OF, OT, S> EvaluatorObservers<OT> for StdFuzzer<CS, F, OF, S>
 where
     CS: Scheduler<S::Input, S>,
-    OT: ObserversTuple<S> + Serialize + DeserializeOwned,
+    OT: ObserversTuple<S::Input, S> + Serialize + DeserializeOwned,
     F: Feedback<S>,
     OF: Feedback<S>,
     S: HasCorpus + HasSolutions + HasExecutions + State,
@@ -606,7 +606,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = S>,
+        E: Executor<EM, Self, State = S> + HasObservers<Observers = OT>,
         EM: EventFirer<State = S>,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -618,14 +618,14 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, OT, S> Evaluator<E, EM> for StdFuzzer<CS, F, OF, S>
+impl<CS, E, EM, F, OF, S> Evaluator<E, EM> for StdFuzzer<CS, F, OF, S>
 where
     CS: Scheduler<S::Input, S>,
-    E: HasObservers<State = S, Observers = OT> + Executor<EM, Self>,
+    E: HasObservers + Executor<EM, Self, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize + DeserializeOwned,
     EM: EventFirer<State = S>,
     F: Feedback<S>,
     OF: Feedback<S>,
-    OT: ObserversTuple<S> + Serialize + DeserializeOwned,
     S: HasCorpus + HasSolutions + HasExecutions + HasLastFoundTime + State,
     S::Corpus: Corpus<Input = S::Input>,    //delete me
     S::Solutions: Corpus<Input = S::Input>, //delete me
@@ -734,7 +734,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            manager.serialize_observers::<OT>(&*observers)?
+            manager.serialize_observers::<E::Observers>(&*observers)?
         };
         manager.fire(
             state,
@@ -860,7 +860,8 @@ where
         input: &<<Self as UsesState>::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, Self> + HasObservers<State = <Self as UsesState>::State>,
+        E: Executor<EM, Self, State = <Self as UsesState>::State> + HasObservers,
+        E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
         EM: UsesState<State = <Self as UsesState>::State>,
     {
         start_timer!(state);
@@ -902,7 +903,8 @@ where
     CS: Scheduler<S::Input, S>,
     F: Feedback<<Self as UsesState>::State>,
     OF: Feedback<<Self as UsesState>::State>,
-    E: Executor<EM, Self> + HasObservers<State = Self::State>,
+    E: Executor<EM, Self, State = S> + HasObservers,
+    E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     EM: UsesState<State = Self::State>,
     S: UsesInput + HasExecutions + HasCorpus + State,
 {

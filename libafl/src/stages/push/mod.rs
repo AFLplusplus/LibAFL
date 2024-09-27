@@ -38,7 +38,7 @@ pub struct PushStageSharedState<CS, EM, OT, Z>
 where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<Z::State>,
+    OT: ObserversTuple<Z::Input, Z::State>,
     Z::State: HasRand + HasCorpus,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
@@ -57,7 +57,7 @@ impl<CS, EM, OT, Z> PushStageSharedState<CS, EM, OT, Z>
 where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<Z::State>,
+    OT: ObserversTuple<Z::Input, Z::State>,
     Z::State: HasRand + HasCorpus,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
@@ -80,7 +80,7 @@ pub struct PushStageHelper<CS, EM, OT, Z>
 where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<Z::State>,
+    OT: ObserversTuple<Z::Input, Z::State>,
     Z::State: HasRand + HasCorpus,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
@@ -108,7 +108,7 @@ impl<CS, EM, OT, Z> PushStageHelper<CS, EM, OT, Z>
 where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<Z::State>,
+    OT: ObserversTuple<Z::Input, Z::State>,
     Z::State: HasRand + HasCorpus,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
@@ -176,7 +176,7 @@ where
     CS: Scheduler<Z::Input, Z::State>,
     Z::State: HasRand + HasExecutions + HasMetadata + HasCorpus + HasLastReportTime,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId + ProgressReporter,
-    OT: ObserversTuple<Z::State>,
+    OT: ObserversTuple<Z::Input, Z::State>,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
     /// Gets the [`PushStageHelper`]

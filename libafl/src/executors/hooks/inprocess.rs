@@ -34,7 +34,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::UsesInput,
     observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     Error, HasObjective,
 };
 /// The inmem executor's handlers.

@@ -21,7 +21,7 @@ pub mod unix_signal_handler {
         fuzzer::HasObjective,
         inputs::{Input, UsesInput},
         observers::ObserversTuple,
-        state::{HasCorpus, HasExecutions, HasSolutions},
+        state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     };
 
     pub(crate) type HandlerFuncPtr = unsafe fn(

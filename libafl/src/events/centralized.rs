@@ -324,7 +324,7 @@ where
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         const SERIALIZE_TIME_FACTOR: u32 = 4; // twice as much as the normal llmp em's value cuz it does this job twice.
         const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
@@ -370,8 +370,9 @@ impl<E, EM, EMH, S, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, 
 where
     EM: AdaptiveSerializer + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     EMH: EventManagerHooksTuple<EM::State>,
-    E: HasObservers<State = Self::State> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E::Observers:
+        ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     S: State,
     Self::State: HasExecutions + HasMetadata,
@@ -403,8 +404,9 @@ where
 
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
 where
-    E: HasObservers<State = Self::State> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E::Observers:
+        ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EM: AdaptiveSerializer + EventManager<E, Z>,
     EM::State: HasExecutions + HasMetadata + HasLastReportTime,
@@ -528,8 +530,9 @@ where
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
-        <E as UsesObservers>::Observers: Serialize,
+        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E::Observers:
+            ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<State = <Self as UsesState>::State>
@@ -577,7 +580,9 @@ where
         event: Event<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
+        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E::Observers:
+            ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a> + Serialize,
         Z: ExecutionProcessor<State = <Self as UsesState>::State>

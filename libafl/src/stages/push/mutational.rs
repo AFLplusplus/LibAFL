@@ -46,7 +46,7 @@ where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
     M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::State> + Serialize,
+    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
     Z::State: HasRand + HasCorpus + Clone + Debug,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
@@ -64,7 +64,7 @@ where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
     M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::State> + Serialize,
+    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
     Z::State: HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
@@ -85,7 +85,7 @@ where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::State> + Serialize,
+    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
     Z::State: HasCorpus + HasRand + HasExecutions + HasLastReportTime + HasMetadata + Clone + Debug,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
     <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
@@ -194,7 +194,7 @@ where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = Z::State>,
     M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::State> + Serialize,
+    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
     Z::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasLastReportTime + Clone + Debug,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
     <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
@@ -211,7 +211,7 @@ where
     CS: Scheduler<Z::Input, Z::State>,
     EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
     M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::State> + Serialize,
+    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
     Z::State: HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
 {
