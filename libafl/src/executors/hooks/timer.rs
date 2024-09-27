@@ -312,8 +312,8 @@ impl TimerStruct {
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
-    /// Disalarm timer
-    pub unsafe fn unset_timer(&mut self) {
+    /// Disable the timer
+    pub fn unset_timer(&mut self) {
         // # Safety
         // No user-provided values.
         unsafe {
@@ -322,10 +322,12 @@ impl TimerStruct {
         }
     }
 
-    /// Disalarm timer
+    /// Disable the timer
     #[cfg(target_os = "linux")]
     #[allow(unused_variables)]
-    pub unsafe fn unset_timer(&mut self) {
+    pub fn unset_timer(&mut self) {
+        // # Safety
+        // Just API calls, no user-provided inputs
         if self.batch_mode {
             unsafe {
                 let elapsed = current_time().saturating_sub(self.tmout_start_time);
@@ -360,8 +362,8 @@ impl TimerStruct {
     }
 
     #[cfg(windows)]
-    /// Disalarm
-    pub unsafe fn unset_timer(&mut self) {
+    /// Disable the timer
+    pub fn unset_timer(&mut self) {
         // # Safety
         // The value accesses are guarded by a critical section.
         unsafe {
