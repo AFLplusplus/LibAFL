@@ -176,31 +176,30 @@ where
     T: DifferentialObserver<OTA, OTB>,
 {
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
-        self.deref_mut().pre_observe_first(observers)
+        self.as_mut().pre_observe_first(observers)
     }
 
     fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
-        self.deref_mut().post_observe_first(observers)
+        self.as_mut().post_observe_first(observers)
     }
 
     fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
-        self.deref_mut().pre_observe_second(observers)
+        self.as_mut().pre_observe_second(observers)
     }
 
     fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
-        self.deref_mut().post_observe_second(observers)
+        self.as_mut().post_observe_second(observers)
     }
 }
 
-impl<T, const ITH: bool, const NTH: bool> Deref for ExplicitTracking<T, ITH, NTH> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
+impl<T, const ITH: bool, const NTH: bool> AsRef<T> for ExplicitTracking<T, ITH, NTH> {
+    fn as_ref(&self) -> &T {
         &self.0
     }
 }
 
-impl<T, const ITH: bool, const NTH: bool> DerefMut for ExplicitTracking<T, ITH, NTH> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+impl<T, const ITH: bool, const NTH: bool> AsMut<T> for ExplicitTracking<T, ITH, NTH> {
+    fn as_mut(&mut self) -> &mut T {
         &mut self.0
     }
 }

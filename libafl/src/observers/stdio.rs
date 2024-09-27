@@ -67,7 +67,7 @@ use crate::{observers::Observer, Error};
 ///     ) -> Result<bool, Error>
 ///     where
 ///         EM: EventFirer<State = S>,
-///         OT: ObserversTuple<S>,
+///         OT: ObserversTuple<S::Input, S>,
 ///     {
 ///         unsafe {
 ///             STDOUT = observers.get(&self.stdout_observer).unwrap().stdout.clone();

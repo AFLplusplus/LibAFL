@@ -2,7 +2,7 @@
 //! of your corpus.
 
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
-use core::{hash::Hash, marker::PhantomData, ops::Deref};
+use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
 use libafl_bolts::{
