@@ -6,10 +6,7 @@ use std::ptr;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    corpus::{
-        minimizer::{CorpusMinimizer, StdCorpusMinimizer},
-        Corpus, InMemoryCorpus, OnDiskCorpus,
-    },
+    corpus::{minimizer::StdCorpusMinimizer, Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventFirer, EventRestarter, LogSeverity},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -143,7 +140,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+        StdPowerMutationalStage::new(mutator);
 
     let mut stages = tuple_list!(calibration, power);
 

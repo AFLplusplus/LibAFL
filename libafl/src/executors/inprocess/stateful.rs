@@ -11,6 +11,7 @@ use core::{
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
 use crate::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
@@ -147,6 +148,8 @@ where
     H: FnMut(&mut ES, &mut S, &<S as UsesInput>::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
+    <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn new<EM, OF, Z>(
@@ -193,6 +196,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -234,6 +239,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -279,6 +286,8 @@ where
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
+    <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<EM, OF, Z>(
@@ -326,6 +335,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -363,6 +374,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,

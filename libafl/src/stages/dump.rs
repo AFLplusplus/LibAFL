@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId},
-    inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasRand, HasSolutions, UsesState},
     Error, HasMetadata,
@@ -46,11 +45,13 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Self::State as UsesInput>::Input, &Self::State) -> Vec<u8>,
+    CB: FnMut(&Self::Input, &Self::State) -> Vec<u8>,
     EM: UsesState,
     E: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
-    Self::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    EM::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
+    <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     fn perform(

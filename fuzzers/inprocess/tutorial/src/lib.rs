@@ -128,7 +128,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Setup a lain mutator with a mutational stage
     let mutator = LainMutator::new();
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power: StdPowerMutationalStage<_, _, PacketData, _, _> =
+        StdPowerMutationalStage::new(mutator);
 
     let mut stages = tuple_list!(calibration, power);
 

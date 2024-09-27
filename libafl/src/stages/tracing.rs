@@ -9,6 +9,7 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::Named;
 
 use crate::{
+    corpus::Corpus,
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
@@ -39,9 +40,10 @@ where
 impl<EM, TE, Z> TracingStage<EM, TE, Z>
 where
     TE: Executor<EM, Z> + HasObservers,
-    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    <TE as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata + HasCurrentTestcase,
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
+    <<TE as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = TE::Input>, // delete me
 {
     #[allow(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
@@ -84,9 +86,10 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
     E: UsesState<State = <Self as UsesState>::State>,
     TE: Executor<EM, Z> + HasObservers,
-    <Self as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    <TE as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
+    <<TE as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = TE::Input>, // delete me
 {
     #[inline]
     fn perform(
@@ -181,7 +184,9 @@ where
     EM: UsesState<State = <Self as UsesState>::State>,
     SOT: ObserversTuple<E::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
-    <Self as UsesState>::State: State + HasExecutions + HasCorpus + HasNamedMetadata + Debug,
+    <E as UsesState>::State:
+        State + HasExecutions + HasCorpus + HasNamedMetadata + Debug + HasCurrentTestcase,
+    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>, // delete me
 {
     #[inline]
     fn perform(

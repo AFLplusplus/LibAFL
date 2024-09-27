@@ -372,13 +372,9 @@ where
     CS: Scheduler<S::Input, S>,
     F: Feedback<S>,
     OF: Feedback<S>,
-    S: HasCorpus
-        + HasSolutions
-        + HasExecutions
-        + HasCorpus
-        + HasCurrentTestcase<S::Input>
-        + HasCurrentCorpusId
-        + State,
+    S: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasCurrentCorpusId + State,
+    S::Corpus: Corpus<Input = S::Input>,    //delete me
+    S::Solutions: Corpus<Input = S::Input>, //delete me
 {
     fn check_results<EM, OT>(
         &mut self,
@@ -535,7 +531,7 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &<Self::State as UsesInput>::Input,
+        input: &S::Input,
         exec_res: &ExecuteInputResult,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error>
@@ -596,6 +592,8 @@ where
     F: Feedback<S>,
     OF: Feedback<S>,
     S: HasCorpus + HasSolutions + HasExecutions + State,
+    S::Corpus: Corpus<Input = S::Input>,    //delete me
+    S::Solutions: Corpus<Input = S::Input>, //delete me
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -629,6 +627,8 @@ where
     OF: Feedback<S>,
     OT: ObserversTuple<S> + Serialize + DeserializeOwned,
     S: HasCorpus + HasSolutions + HasExecutions + HasLastFoundTime + State,
+    S::Corpus: Corpus<Input = S::Input>,    //delete me
+    S::Solutions: Corpus<Input = S::Input>, //delete me
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -765,8 +765,8 @@ where
     S: HasExecutions
         + HasMetadata
         + HasCorpus
-        + HasTestcase
         + HasLastReportTime
+        + HasTestcase
         + HasCurrentCorpusId
         + HasCurrentStageId
         + State,
