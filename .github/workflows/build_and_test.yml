@@ -255,20 +255,12 @@ jobs:
         os: [ ubuntu-24.04 ]
         fuzzer:
           # Baby
-          - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
-          - ./fuzzers/fuzz-anything/baby_no_std
           - ./fuzzers/baby/baby_fuzzer_swap_differential
-          - ./fuzzers/baby/structure-aware/baby_fuzzer_grimoire
-          - ./fuzzers/structure-aware/baby_fuzzer_gramatron
+          - ./fuzzers/baby/tutorial
           - ./fuzzers/baby/baby_fuzzer
-          - ./fuzzers/structure-aware/baby_fuzzer_custom_input
-          - ./fuzzers/structure-aware/baby_fuzzer_nautilus
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode
-          - ./fuzzers/structure-aware/baby_fuzzer_multi
-          - ./fuzzers/fuzz-anything/baby_fuzzer_wasm
           - ./fuzzers/baby/baby_fuzzer_minimizing
-          - ./fuzzers/structure-aware/baby_fuzzer_tokens
           - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
@@ -290,13 +282,20 @@ jobs:
           - ./fuzzers/forkserver/fuzzbench_forkserver
           - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
           - ./fuzzers/forkserver/libafl-fuzz
+          - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
 
           # Full-system
           - ./fuzzers/full-system/nyx_libxml2_standalone
           - ./fuzzers/full-system/nyx_libxml2_parallel
 
-          # Grammar-aware
+          # Structure-aware
           - ./fuzzers/structure-aware/nautilus_sync
+          - ./fuzzers/structure-aware/baby_fuzzer_grimoire
+          - ./fuzzers/structure-aware/baby_fuzzer_gramatron
+          - ./fuzzers/structure-aware/baby_fuzzer_tokens
+          - ./fuzzers/structure-aware/baby_fuzzer_multi
+          - ./fuzzers/structure-aware/baby_fuzzer_custom_input
+          - ./fuzzers/structure-aware/baby_fuzzer_nautilus
 
           # In-process
           - ./fuzzers/fuzz-anything/cargo_fuzz
@@ -316,13 +315,15 @@ jobs:
           - ./fuzzers/inprocess/libfuzzer_stb_image
           # - ./fuzzers/structure-aware/libfuzzer_stb_image_concolic
           # - ./fuzzers/inprocess/libfuzzer_windows_asan
+          # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
+
+          # Fuzz Anything
           - ./fuzzers/fuzz-anything/push_harness
           - ./fuzzers/fuzz-anything/push_stage_harness
-          # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
-          - ./fuzzers/baby/tutorial
-
-          # Others
           - ./fuzzers/fuzz-anything/libafl_atheris
+          - ./fuzzers/fuzz-anything/baby_no_std
+          - ./fuzzers/fuzz-anything/baby_fuzzer_wasm
+
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
