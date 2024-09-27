@@ -36,6 +36,7 @@ libafl_qemu_sys = { path = "../../../libafl_qemu/libafl_qemu_sys", features = [
   "arm",
   "systemmode",
 ] }
+libafl_targets = { path = "../../../libafl_targets", version = "0.13.2" }
 env_logger = "*"
 
 [build-dependencies]

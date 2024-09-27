@@ -33,11 +33,12 @@ use libafl_qemu::{
     elf::EasyElf,
     emu::Emulator,
     executor::QemuExecutor,
-    modules::edges::{
-        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
-    },
+    modules::edges::StdEdgeCoverageModule,
     GuestPhysAddr, GuestReg, QemuMemoryChunk,
 };
+
+use libafl_targets::{edges_map_mut_ptr, MAX_EDGES_FOUND, EDGES_MAP_DEFAULT_SIZE};
+
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -86,10 +87,29 @@ pub fn fuzz() {
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         let args: Vec<String> = env::args().collect();
 
+        // The wrapped harness function, calling out to the LLVM-style harness
+        let mut harness =
+            |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
+                emulator.run(state, input).unwrap().try_into().unwrap()
+            };
+
+        // Create an observation channel using the coverage map
+        let mut edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
+                addr_of_mut!(MAX_EDGES_FOUND),
+            ))
+            .track_indices()
+        };
+
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+
         // Initialize QEMU Emulator
         let emu = Emulator::builder()
             .qemu_cli(args)
-            .add_module(StdEdgeCoverageModule::builder().build())
+            .add_module(StdEdgeCoverageModule::builder().build(edges_observer.as_mut()))
             .build()
             .unwrap();
 
@@ -102,7 +122,7 @@ pub fn fuzz() {
                     unsafe { MAX_INPUT_SIZE } as GuestReg,
                     None,
                 ))
-                .into(),
+                    .into(),
                 true,
             ),
             true,
@@ -118,25 +138,6 @@ pub fn fuzz() {
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
-
-        // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness =
-            |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
-                emulator.run(state, input).unwrap().try_into().unwrap()
-            };
-
-        // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
-            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
-                "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
-                addr_of_mut!(MAX_EDGES_FOUND),
-            ))
-            .track_indices()
-        };
-
-        // Create an observation channel to keep track of the execution time
-        let time_observer = TimeObserver::new("time");
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR

@@ -12,11 +12,11 @@ use core::ptr::addr_of_mut;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
-use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX};
+use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_ALLOCATED_SIZE};
 
 /// The map for edges.
 #[no_mangle]
-pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE_MAX] = [0; EDGES_MAP_SIZE_MAX];
+pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
 /// The map for data dependency
@@ -73,7 +73,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
 /// The actual size we use for the map of edges.
 /// This is used for forkserver backend
 #[no_mangle]
-pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
+pub static mut __afl_map_size: usize = EDGES_MAP_DEFAULT_SIZE;
 
 #[cfg(any(
     feature = "sancov_pcguard_edges",
@@ -178,7 +178,7 @@ pub fn edges_max_num() -> usize {
         } else {
             #[cfg(feature = "pointer_maps")]
             {
-                EDGES_MAP_SIZE_MAX // the upper bound
+                EDGES_MAP_ALLOCATED_SIZE // the upper bound
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
