@@ -255,20 +255,20 @@ jobs:
         os: [ ubuntu-24.04 ]
         fuzzer:
           # Baby
-          - ./fuzzers/baby/baby_fuzzer_with_forkexecutor
-          - ./fuzzers/baby/baby_no_std
+          - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
+          - ./fuzzers/fuzz-anything/baby_no_std
           - ./fuzzers/baby/baby_fuzzer_swap_differential
-          - ./fuzzers/baby/baby_fuzzer_grimoire
-          - ./fuzzers/baby/baby_fuzzer_gramatron
+          - ./fuzzers/baby/structure-aware/baby_fuzzer_grimoire
+          - ./fuzzers/structure-aware/baby_fuzzer_gramatron
           - ./fuzzers/baby/baby_fuzzer
-          - ./fuzzers/baby/baby_fuzzer_custom_input
-          - ./fuzzers/baby/baby_fuzzer_nautilus
+          - ./fuzzers/structure-aware/baby_fuzzer_custom_input
+          - ./fuzzers/structure-aware/baby_fuzzer_nautilus
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode
-          - ./fuzzers/baby/baby_fuzzer_multi
-          - ./fuzzers/baby/baby_fuzzer_wasm
+          - ./fuzzers/structure-aware/baby_fuzzer_multi
+          - ./fuzzers/fuzz-anything/baby_fuzzer_wasm
           - ./fuzzers/baby/baby_fuzzer_minimizing
-          - ./fuzzers/baby/baby_fuzzer_tokens
+          - ./fuzzers/structure-aware/baby_fuzzer_tokens
           - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
@@ -296,10 +296,10 @@ jobs:
           - ./fuzzers/full-system/nyx_libxml2_parallel
 
           # Grammar-aware
-          - ./fuzzers/grammar-aware/nautilus_sync
+          - ./fuzzers/structure-aware/nautilus_sync
 
           # In-process
-          - ./fuzzers/inprocess/cargo_fuzz
+          - ./fuzzers/fuzz-anything/cargo_fuzz
           # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
@@ -314,15 +314,15 @@ jobs:
           # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
           - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
           - ./fuzzers/inprocess/libfuzzer_stb_image
-          # - ./fuzzers/inprocess/libfuzzer_stb_image_concolic
+          # - ./fuzzers/structure-aware/libfuzzer_stb_image_concolic
           # - ./fuzzers/inprocess/libfuzzer_windows_asan
-          - ./fuzzers/inprocess/push_harness
-          - ./fuzzers/inprocess/push_stage_harness
+          - ./fuzzers/fuzz-anything/push_harness
+          - ./fuzzers/fuzz-anything/push_stage_harness
           # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
-          - ./fuzzers/inprocess/tutorial
+          - ./fuzzers/baby/tutorial
 
           # Others
-          - ./fuzzers/others/libafl_atheris
+          - ./fuzzers/fuzz-anything/libafl_atheris
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -392,9 +392,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build aarch64-unknown-none
-        run: cd ./fuzzers/baby/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+        run: cd ./fuzzers/fuzz-anything/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
-        run: cd ./fuzzers/baby/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
+        run: cd ./fuzzers/fuzz-anything/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
       - name: no_std tests
         run: cd ./libafl && cargo test --no-default-features
 

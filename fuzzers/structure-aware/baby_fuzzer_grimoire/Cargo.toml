@@ -1,5 +1,5 @@
 [package]
-name = "baby_fuzzer_grimoire"
+name = "structure-aware/baby_fuzzer_grimoire"
 version = "0.13.2"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
