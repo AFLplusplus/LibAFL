@@ -372,7 +372,7 @@ pub struct EdgeCoverageModule<AF, PF, V> {
 }
 
 impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
-    pub fn new(
+    fn new(
         variant: V,
         address_filter: AF,
         page_filter: PF,
