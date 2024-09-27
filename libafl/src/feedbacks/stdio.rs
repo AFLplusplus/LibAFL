@@ -51,7 +51,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         Ok(false)
     }
@@ -66,7 +66,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         let observer = observers
@@ -146,7 +146,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         Ok(false)
     }
@@ -161,7 +161,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         let observer = observers

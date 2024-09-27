@@ -71,7 +71,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let res = state.metadata::<TransferringMetadata>()?.transferring;
         #[cfg(feature = "track_hit_feedbacks")]

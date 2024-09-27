@@ -149,7 +149,10 @@ impl<'a, T> Named for RefCellValueObserver<'a, T> {
     }
 }
 
-impl<'a, T> ObserverWithHashField for RefCellValueObserver<'a, T> {
+impl<'a, T> ObserverWithHashField for RefCellValueObserver<'a, T>
+where
+    T: Hash,
+{
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
     }

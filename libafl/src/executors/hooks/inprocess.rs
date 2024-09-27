@@ -32,6 +32,7 @@ use crate::{
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
+    observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
@@ -232,6 +233,7 @@ where
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,

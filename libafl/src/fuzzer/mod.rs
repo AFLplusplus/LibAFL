@@ -81,7 +81,7 @@ pub trait ExecutionProcessor: UsesState {
     ) -> Result<ExecuteInputResult, Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>;
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State>;
 
     /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
     #[allow(clippy::too_many_arguments)]
@@ -95,7 +95,7 @@ pub trait ExecutionProcessor: UsesState {
     ) -> Result<Option<CorpusId>, Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>;
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State>;
 
     /// serialize and send event via manager
     fn serialize_and_dispatch<EM, OT>(
@@ -109,7 +109,7 @@ pub trait ExecutionProcessor: UsesState {
     ) -> Result<(), Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State> + Serialize;
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize;
 
     /// send event via manager
     fn dispatch_event<EM>(
@@ -136,7 +136,7 @@ pub trait ExecutionProcessor: UsesState {
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State> + Serialize;
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize;
 }
 
 /// Evaluates an input modifying the state of the fuzzer
@@ -153,8 +153,8 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
-        EM: EventFirer<State = Self::State>;
+        E: Executor<EM, Self> + HasObservers<Observers = OT>,
+        EM: EventFirer<State = E::State>;
 }
 
 /// Evaluate an input modifying the state of the fuzzer

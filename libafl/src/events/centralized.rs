@@ -38,7 +38,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver, UsesObservers},
+    observers::{ObserversTuple, TimeObserver},
     state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
@@ -324,7 +324,7 @@ where
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
     {
         const SERIALIZE_TIME_FACTOR: u32 = 4; // twice as much as the normal llmp em's value cuz it does this job twice.
         const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;

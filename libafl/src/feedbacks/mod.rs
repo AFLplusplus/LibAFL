@@ -79,7 +79,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>;
+        OT: ObserversTuple<S::Input, S>;
 
     /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
     /// It also keeps track of introspection stats.
@@ -96,7 +96,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // Start a timer for this feedback
         let start_time = libafl_bolts::cpu::read_time_counter();
@@ -141,7 +141,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         Ok(())
@@ -247,7 +247,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         FL::is_pair_interesting(
             &mut self.first,
@@ -272,7 +272,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         FL::is_pair_interesting_introspection(
             &mut self.first,
@@ -294,7 +294,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         self.first
@@ -348,7 +348,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>;
+        OT: ObserversTuple<S::Input, S>;
 
     /// Get the result of the last `Self::is_interesting` run
     #[cfg(feature = "track_hit_feedbacks")]
@@ -378,7 +378,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>;
+        OT: ObserversTuple<S::Input, S>;
 }
 
 /// Factory for feedbacks which should be sensitive to an existing context, e.g. observer(s) from a
@@ -433,7 +433,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -473,7 +473,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -504,7 +504,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if a {
@@ -548,7 +548,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -582,7 +582,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -618,7 +618,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -649,7 +649,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if !a {
@@ -695,7 +695,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -774,7 +774,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         Ok(!self
             .first
@@ -790,7 +790,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         self.first
@@ -921,7 +921,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         Ok(false)
     }
@@ -954,7 +954,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let res = matches!(exit_kind, ExitKind::Crash);
         #[cfg(feature = "track_hit_feedbacks")]
@@ -1024,7 +1024,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let res = matches!(exit_kind, ExitKind::Timeout);
         #[cfg(feature = "track_hit_feedbacks")]
@@ -1095,7 +1095,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let res = matches!(exit_kind, ExitKind::Diff { .. });
         #[cfg(feature = "track_hit_feedbacks")]
@@ -1167,7 +1167,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // TODO Replace with match_name_type when stable
         Ok(false)
@@ -1183,7 +1183,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         let observer = observers.get(&self.observer_handle).unwrap();
@@ -1246,7 +1246,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         Ok((*self).into())
     }

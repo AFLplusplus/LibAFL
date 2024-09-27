@@ -120,7 +120,7 @@ where
         testcase: &mut Testcase<<S>::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         *testcase.filename_mut() = Some((self.func)(state, testcase)?);

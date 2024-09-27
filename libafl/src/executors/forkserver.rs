@@ -42,7 +42,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
-    observers::{MapObserver, Observer, ObserversTuple, UsesObservers},
+    observers::{MapObserver, Observer, ObserversTuple},
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -592,7 +592,7 @@ impl ForkserverExecutor<(), (), UnixShMemProvider> {
 
 impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
 where
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
     SP: ShMemProvider,
 {
@@ -664,7 +664,7 @@ where
     #[allow(clippy::pedantic)]
     pub fn build<OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, S, SP>, Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
@@ -729,8 +729,8 @@ where
     ) -> Result<ForkserverExecutor<(A, OT), S, SP>, Error>
     where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
-        A: Observer<S> + AsRef<MO> + AsMut<MO>,
-        OT: ObserversTuple<S> + Prepend<MO>,
+        A: Observer<S::Input, S> + AsRef<MO> + AsMut<MO>,
+        OT: ObserversTuple<S::Input, S> + Prepend<MO>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
@@ -1355,7 +1355,7 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, UnixShMemProvider> {
 
 impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
 where
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
@@ -1476,21 +1476,14 @@ where
     type State = S;
 }
 
-impl<OT, S, SP> UsesObservers for ForkserverExecutor<OT, S, SP>
+impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;
-}
 
-impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-{
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)

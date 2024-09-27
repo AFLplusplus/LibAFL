@@ -152,14 +152,14 @@ where
 impl<'a, T> Deref for VariableMapObserver<'a, T> {
     type Target = [T];
     fn deref(&self) -> &[T] {
-        let cnt = *self.size.ad_ref();
+        let cnt = *self.size.as_ref();
         &self.map[..cnt]
     }
 }
 
 impl<'a, T> DerefMut for VariableMapObserver<'a, T> {
     fn deref_mut(&mut self) -> &mut [T] {
-        let cnt = *self.size.ad_ref();
+        let cnt = *self.size.as_ref();
         &mut self.map[..cnt]
     }
 }

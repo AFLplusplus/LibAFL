@@ -105,8 +105,8 @@ impl<F, I, O1, O2, S, T> FeedbackFactory<DiffFeedback<F, I, O1, O2, S>, T>
 where
     F: FnMut(&O1, &O2) -> DiffResult + Clone,
     I: Input,
-    O1: Observer<S> + Named,
-    O2: Observer<S> + Named,
+    O1: Observer<S::Input, S> + Named,
+    O2: Observer<S::Input, S> + Named,
     S: HasMetadata + State<Input = I>,
 {
     fn create_feedback(&self, _ctx: &T) -> DiffFeedback<F, I, O1, O2, S> {
@@ -153,8 +153,8 @@ where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
     S: HasMetadata + State<Input = I>,
-    O1: Observer<S>,
-    O2: Observer<S>,
+    O1: Observer<S::Input, S>,
+    O2: Observer<S::Input, S>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -167,7 +167,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S> + MatchName,
+        OT: ObserversTuple<S::Input, S> + MatchName,
     {
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))

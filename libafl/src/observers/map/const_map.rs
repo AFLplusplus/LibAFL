@@ -31,7 +31,7 @@ where
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -179,18 +179,6 @@ where
         }
     }
 
-    /// Creates a new [`MapObserver`] with an owned map
-    #[must_use]
-    pub fn owned(name: &'static str, map: Vec<T>) -> Self {
-        assert!(map.len() >= N);
-        let initial = if map.is_empty() { T::default() } else { map[0] };
-        Self {
-            map: OwnedMutSlice::from(map),
-            name: Cow::from(name),
-            initial,
-        }
-    }
-
     /// Creates a new [`MapObserver`] from a raw pointer
     ///
     /// # Safety
@@ -200,6 +188,27 @@ where
             map: OwnedMutSlice::from_raw_parts_mut(map_ptr, N),
             name: Cow::from(name),
             initial: T::default(),
+        }
+    }
+}
+
+impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
+where
+    T: Default + Clone,
+{
+    /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
+    pub fn owned(name: &'static str, map: Vec<T>) -> Self {
+        assert!(map.len() >= N);
+        let initial = if map.is_empty() {
+            T::default()
+        } else {
+            map[0].clone()
+        };
+        Self {
+            map: OwnedMutSlice::from(map),
+            name: Cow::from(name),
+            initial,
         }
     }
 }

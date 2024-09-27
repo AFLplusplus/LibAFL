@@ -9,7 +9,7 @@ use core::{
     slice,
 };
 
-use libafl_bolts::{AsIterMut, AsSliceMut, HasLen, Named};
+use libafl_bolts::{AsIterMut, AsSliceMut, Named};
 use serde::{Deserialize, Serialize};
 
 use crate::{
