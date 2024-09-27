@@ -6,12 +6,12 @@ You can find a large amount of example fuzzers built on top of LibAFL.
 They are sorted by focus:
 
 - [`baby`](./baby/): Minimal fuzzers and fuzzers demonstrating specific features that don't fit anywhere else.
-- [`inprocess`](./inprocess/): Common In-process fuzzers. Most of the time, this is what you want.
 - [`binary_only`](./binary_only/): Fuzzers for binary-only targets.
 - [`forkserver`](./forkserver/): Fuzzers that use a forkserver-style executor.
 - [`full_system`](./full_system/): Fuzzers for full-system targets (kernels, firmwares, etc...).
-- [`structure_aware`](./structure_aware/): Grammar fuzzers, fuzzers for certain languages, fuzzers with custom inputs, and more.
 - [`fuzz-anything`](./fuzz_anything/): Fuzzers for advanced targets like WASM or python, and other fuzzers that can be used for anything.
+- [`inprocess`](./inprocess/): Common In-process fuzzers. Most of the time, this is what you want.
+- [`structure_aware`](./structure_aware/): Grammar fuzzers, fuzzers for certain languages, fuzzers with custom inputs, and more.
 
 (Some fuzzers may fit into multiple categories, in which case we sort them as it makes sense, for example `structure_aware > full_system > binary_only > the rest`)
 
