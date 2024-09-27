@@ -25,7 +25,7 @@ pub struct CmpLogObserver {
 }
 
 // Is the only difference here between this and StdCmpObserver that CMPLOG_ENABLED = 1?? 
-impl<'a> CmpObserver for CmpLogObserver
+impl CmpObserver for CmpLogObserver
 {
     type Map = CmpLogMap;
     /// Get the number of usable cmps (all by default)
@@ -45,7 +45,7 @@ impl<'a> CmpObserver for CmpLogObserver
     }
 }
 
-impl<'a, I, S> Observer<I, S> for CmpLogObserver
+impl<I, S> Observer<I, S> for CmpLogObserver
 where 
     S: HasMetadata,
 {
@@ -68,7 +68,7 @@ where
         }
 
         if self.add_meta {
-            let meta = state.metadata_or_insert_with(|| CmpValuesMetadata::new());
+            let meta = state.metadata_or_insert_with(CmpValuesMetadata::new);
     
             let usable_count = self.usable_count();
     

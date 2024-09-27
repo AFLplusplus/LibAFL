@@ -75,8 +75,7 @@ mod observers {
 
     use ahash::RandomState;
     use libafl::{
-        inputs::UsesInput,
-        observers::{DifferentialObserver, MapObserver, Observer, ObserversTuple},
+        observers::{DifferentialObserver, MapObserver, Observer},
         Error,
     };
     use libafl_bolts::{
@@ -128,20 +127,18 @@ mod observers {
         iter_idx: usize,
     }
 
-    impl<S> Observer<S> for CountersMultiMapObserver<false>
+    impl<I, S> Observer<I, S> for CountersMultiMapObserver<false>
     where
-        S: UsesInput,
         Self: MapObserver,
     {
         #[inline]
-        fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+        fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
             self.reset_map()
         }
     }
 
-    impl<S> Observer<S> for CountersMultiMapObserver<true>
+    impl<I, S> Observer<I, S> for CountersMultiMapObserver<true>
     where
-        S: UsesInput,
         Self: MapObserver,
     {
         // in differential mode, we are *not* responsible for resetting the map!
@@ -386,12 +383,7 @@ mod observers {
         }
     }
 
-    impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for CountersMultiMapObserver<true>
-    where
-        Self: MapObserver,
-        OTA: ObserversTuple<S>,
-        OTB: ObserversTuple<S>,
-        S: UsesInput,
+    impl<OTA, OTB> DifferentialObserver<OTA, OTB> for CountersMultiMapObserver<true>
     {
     }
 }

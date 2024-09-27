@@ -53,7 +53,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    observers::UsesObservers,
+    observers::ObserversTuple,
     state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
@@ -611,8 +611,8 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = S>,
-        <E as UsesObservers>::Observers: Serialize,
+        E: Executor<Self, Z, State = S> + HasObservers,
+        E::Observers: Serialize + ObserversTuple<S::Input, S>,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
     {
@@ -751,8 +751,8 @@ where
 
 impl<E, EMH, S, Z> EventProcessor<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
@@ -825,8 +825,8 @@ where
 
 impl<E, EMH, S, Z> EventManager<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
@@ -970,9 +970,9 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
-    <E as UsesObservers>::Observers: Serialize,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider + 'static,
@@ -990,8 +990,8 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,

@@ -3,11 +3,9 @@ use core::{ffi::c_void, fmt::Debug};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use libafl::{
-    events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::UsesInput,
-    observers::{Observer, ObserversTuple},
+    observers::Observer,
     state::State,
     Error,
 };
@@ -94,11 +92,9 @@ impl Named for OomObserver {
     }
 }
 
-impl<S> Observer<S> for OomObserver
-where
-    S: UsesInput,
+impl<I, S> Observer<I, S> for OomObserver
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         OOMED.store(false, Ordering::Relaxed);
         // must reset for platforms which do not offer malloc tracking
         MALLOC_SIZE.store(0, Ordering::Relaxed);
@@ -109,7 +105,7 @@ where
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         RUNNING.store(false, Ordering::Relaxed);
@@ -117,14 +113,14 @@ where
         Ok(())
     }
 
-    fn pre_exec_child(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec_child(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.pre_exec(state, input)
     }
 
     fn post_exec_child(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.post_exec(state, input, exit_kind)
@@ -161,9 +157,6 @@ where
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
     {
         Ok(Self::oomed())
     }

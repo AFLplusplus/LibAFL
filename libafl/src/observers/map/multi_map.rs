@@ -68,7 +68,7 @@ where
         for map in &self.maps {
             let slice = map.as_slice();
 
-            slice.hash(hasher)
+            slice.hash(hasher);
         }
     }
 }

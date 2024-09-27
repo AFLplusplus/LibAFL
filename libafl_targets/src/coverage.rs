@@ -197,8 +197,7 @@ mod swap {
     use core::fmt::Debug;
 
     use libafl::{
-        inputs::UsesInput,
-        observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
+        observers::{DifferentialObserver, Observer, StdMapObserver},
         Error,
     };
     use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, Named};
@@ -271,14 +270,10 @@ mod swap {
         }
     }
 
-    impl<'a, 'b, S> Observer<S> for DifferentialAFLMapSwapObserver<'a, 'b> where S: UsesInput {}
+    impl<'a, 'b, I, S> Observer<I, S> for DifferentialAFLMapSwapObserver<'a, 'b> {}
 
-    impl<'a, 'b, OTA, OTB, S> DifferentialObserver<OTA, OTB, S>
+    impl<'a, 'b, OTA, OTB> DifferentialObserver<OTA, OTB>
         for DifferentialAFLMapSwapObserver<'a, 'b>
-    where
-        OTA: ObserversTuple<S>,
-        OTB: ObserversTuple<S>,
-        S: UsesInput,
     {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
             let slice = self.first_map.as_slice_mut();

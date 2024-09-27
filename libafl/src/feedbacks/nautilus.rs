@@ -96,7 +96,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<NautilusInput, S>,
     {
         Ok(false)
     }
@@ -109,7 +109,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<NautilusInput, S>,
     {
         state.corpus().load_input_into(testcase)?;
         let input = testcase.input().as_ref().unwrap().clone();

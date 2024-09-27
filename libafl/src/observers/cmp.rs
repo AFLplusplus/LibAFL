@@ -262,7 +262,7 @@ where
     fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         if self.add_meta {
             #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-            let meta = state.metadata_or_insert_with(|| CmpValuesMetadata::new());
+            let meta = state.metadata_or_insert_with(CmpValuesMetadata::new);
 
             meta.add_from(self.usable_count(), self.cmp_map_mut());
         }
