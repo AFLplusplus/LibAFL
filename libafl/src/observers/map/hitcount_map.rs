@@ -9,12 +9,12 @@ use core::{
     slice,
 };
 
-use libafl_bolts::{AsIterMut, AsSliceMut, Named};
+use libafl_bolts::{AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    observers::{map::MapObserver, Observer},
+    observers::{map::MapObserver, DifferentialObserver, Observer},
     Error,
 };
 
@@ -157,6 +157,132 @@ impl<M> HitcountsMapObserver<M> {
     }
 }
 
+impl<M> HasLen for HitcountsMapObserver<M>
+where
+    M: HasLen,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.base.len()
+    }
+}
+
+impl<M> AsRef<Self> for HitcountsMapObserver<M> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<M> AsMut<Self> for HitcountsMapObserver<M> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
+impl<M> MapObserver for HitcountsMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+{
+    type Entry = u8;
+
+    #[inline]
+    fn initial(&self) -> u8 {
+        self.base.initial()
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.base.usable_count()
+    }
+
+    #[inline]
+    fn get(&self, idx: usize) -> u8 {
+        self.base.get(idx)
+    }
+
+    #[inline]
+    fn set(&mut self, idx: usize, val: u8) {
+        self.base.set(idx, val);
+    }
+
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        self.base.count_bytes()
+    }
+
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        self.base.reset_map()
+    }
+
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
+    }
+    fn to_vec(&self) -> Vec<u8> {
+        self.base.to_vec()
+    }
+
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        self.base.how_many_set(indexes)
+    }
+}
+
+impl<M> Truncate for HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + Truncate,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.base.truncate(new_len);
+    }
+}
+
+impl<'a, M> AsSlice<'a> for HitcountsMapObserver<M>
+where
+    M: AsSlice<'a>,
+{
+    type Entry = <M as AsSlice<'a>>::Entry;
+    type SliceRef = <M as AsSlice<'a>>::SliceRef;
+
+    #[inline]
+    fn as_slice(&'a self) -> Self::SliceRef {
+        self.base.as_slice()
+    }
+}
+
+impl<'a, M> AsSliceMut<'a> for HitcountsMapObserver<M>
+where
+    M: AsSliceMut<'a>,
+{
+    type SliceRefMut = <M as AsSliceMut<'a>>::SliceRefMut;
+    #[inline]
+    fn as_slice_mut(&'a mut self) -> Self::SliceRefMut {
+        self.base.as_slice_mut()
+    }
+}
+
+impl<M, OTA, OTB> DifferentialObserver<OTA, OTB> for HitcountsMapObserver<M>
+where
+    M: DifferentialObserver<OTA, OTB>,
+{
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.base.pre_observe_first(observers)
+    }
+
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.base.post_observe_first(observers)
+    }
+
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.base.pre_observe_second(observers)
+    }
+
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.base.post_observe_second(observers)
+    }
+}
+
 /// Map observer with hitcounts postprocessing
 /// Less optimized version for non-slice iterators.
 /// Slice-backed observers should use a [`HitcountsMapObserver`].
@@ -214,5 +340,107 @@ impl<M> HitcountsIterableMapObserver<M> {
     pub fn new(base: M) -> Self {
         init_count_class_16();
         Self { base }
+    }
+}
+
+impl<M> HasLen for HitcountsIterableMapObserver<M>
+where
+    M: HasLen,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.base.len()
+    }
+}
+
+impl<M> AsRef<Self> for HitcountsIterableMapObserver<M> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<M> AsMut<Self> for HitcountsIterableMapObserver<M> {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
+impl<M> MapObserver for HitcountsIterableMapObserver<M>
+where
+    M: MapObserver<Entry = u8>,
+{
+    type Entry = u8;
+
+    #[inline]
+    fn initial(&self) -> u8 {
+        self.base.initial()
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.base.usable_count()
+    }
+
+    #[inline]
+    fn get(&self, idx: usize) -> u8 {
+        self.base.get(idx)
+    }
+
+    #[inline]
+    fn set(&mut self, idx: usize, val: u8) {
+        self.base.set(idx, val);
+    }
+
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        self.base.count_bytes()
+    }
+
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        self.base.reset_map()
+    }
+
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
+    }
+    fn to_vec(&self) -> Vec<u8> {
+        self.base.to_vec()
+    }
+
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        self.base.how_many_set(indexes)
+    }
+}
+
+impl<M> Truncate for HitcountsIterableMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + Truncate,
+{
+    fn truncate(&mut self, new_len: usize) {
+        self.base.truncate(new_len);
+    }
+}
+
+impl<M, OTA, OTB> DifferentialObserver<OTA, OTB> for HitcountsIterableMapObserver<M>
+where
+    M: DifferentialObserver<OTA, OTB>,
+{
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.base.pre_observe_first(observers)
+    }
+
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.base.post_observe_first(observers)
+    }
+
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.base.pre_observe_second(observers)
+    }
+
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.base.post_observe_second(observers)
     }
 }
