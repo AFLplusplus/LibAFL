@@ -57,7 +57,7 @@ impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
-    C: AsRef<O> ,
+    C: AsRef<O>,
     E::State: HasMetadata + HasCorpus + HasExecutions,
     <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
     T: Copy + Hash + Eq,

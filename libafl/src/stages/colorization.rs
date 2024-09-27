@@ -4,12 +4,7 @@ use alloc::{
     collections::binary_heap::BinaryHeap,
     vec::Vec,
 };
-use core::{
-    cmp::Ordering,
-    fmt::Debug,
-    marker::PhantomData,
-    ops::Range,
-};
+use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
     rands::Rand,

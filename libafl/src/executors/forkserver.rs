@@ -4,7 +4,6 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ops::DerefMut,
     time::Duration,
 };
 use std::{
