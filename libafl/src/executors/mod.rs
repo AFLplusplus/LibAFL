@@ -106,6 +106,7 @@ libafl_bolts::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers {
+    /// The observer
     type Observers;
 
     /// Get the linked observers

@@ -3,7 +3,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
-    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
@@ -12,14 +11,11 @@ use hashbrown::HashMap;
 use libafl_bolts::{ownedref::OwnedRefMut, serdeany::SerdeAny, AsSlice, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{executors::ExitKind, inputs::UsesInput, observers::Observer, Error, HasMetadata};
+use crate::{executors::ExitKind, observers::Observer, Error, HasMetadata};
 
 /// Generic metadata trait for use in a `CmpObserver`, which adds comparisons from a `CmpObserver`
 /// primarily intended for use with `AFLppCmpValuesMetadata` or `CmpValuesMetadata`
-pub trait CmpObserverMetadata<'a, CM>: SerdeAny + Debug
-where
-    CM: CmpMap + Debug,
-{
+pub trait CmpObserverMetadata<'a, CM> {
     /// Extra data used by the metadata when adding information from a `CmpObserver`, for example
     /// the `original` field in `AFLppCmpLogObserver`
     type Data: 'a + Debug + Default + Serialize + DeserializeOwned;
@@ -32,7 +28,7 @@ where
     /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
     /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
     /// `AFLppCmpLogObserver`.
-    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM, cmp_observer_data: Self::Data);
+    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM);
 }
 
 /// A bytes string for cmplog with up to 32 elements.
@@ -152,7 +148,7 @@ where
         Self::new()
     }
 
-    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM, _: Self::Data) {
+    fn add_from(&mut self, usable_count: usize, cmp_map: &mut CM) {
         self.list.clear();
         let count = usable_count;
         for i in 0..count {
@@ -232,49 +228,24 @@ pub trait CmpMap: Debug {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<'a, CM, S, M>: Observer<S>
-where
-    CM: CmpMap,
-    S: UsesInput,
-    M: CmpObserverMetadata<'a, CM>,
-{
+pub trait CmpObserver {
+    /// The underlying map
+    type Map;
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize;
 
     /// Get the `CmpMap`
-    fn cmp_map(&self) -> &CM;
+    fn cmp_map(&self) -> &Self::Map;
 
-    /// Get the `CmpMap` (mutable)
-    fn cmp_map_mut(&mut self) -> &mut CM;
-
-    /// Get the observer data. By default, this is the default metadata aux data, which is `()`.
-    fn cmp_observer_data(&self) -> M::Data {
-        M::Data::default()
-    }
-
-    /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
-    /// This routine does a basic loop filtering because loop index cmps are not interesting.
-    fn add_cmpvalues_meta(&mut self, state: &mut S)
-    where
-        S: HasMetadata,
-    {
-        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = state.metadata_or_insert_with(|| M::new_metadata());
-
-        let usable_count = self.usable_count();
-        let cmp_observer_data = self.cmp_observer_data();
-
-        meta.add_from(usable_count, self.cmp_map_mut(), cmp_observer_data);
-    }
+    /// Get the mut `CmpMap`
+    fn cmp_map_mut(&mut self) -> &mut Self::Map;
 }
 
 /// A standard [`CmpObserver`] observer
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "CM: serde::de::DeserializeOwned")]
-pub struct StdCmpObserver<'a, CM, S, M>
+#[serde(bound = "CM: serde::de::DeserializeOwned + Serialize")]
+pub struct StdCmpObserver<'a, CM, M>
 where
-    CM: CmpMap + Serialize,
-    S: UsesInput + HasMetadata,
     M: CmpObserverMetadata<'a, CM>,
 {
     cmp_map: OwnedRefMut<'a, CM>,
@@ -282,15 +253,15 @@ where
     name: Cow<'static, str>,
     add_meta: bool,
     data: M::Data,
-    phantom: PhantomData<S>,
 }
 
-impl<'a, CM, S, M> CmpObserver<'a, CM, S, M> for StdCmpObserver<'a, CM, S, M>
+impl<'a, CM, M> CmpObserver for StdCmpObserver<'a, CM, M>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + Debug + HasMetadata,
     M: CmpObserverMetadata<'a, CM>,
+    CM: HasLen,
 {
+    type Map = CM;
+
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
@@ -299,47 +270,40 @@ where
         }
     }
 
-    fn cmp_map(&self) -> &CM {
+    fn cmp_map(&self) -> &Self::Map {
         self.cmp_map.as_ref()
     }
 
-    fn cmp_map_mut(&mut self) -> &mut CM {
+    fn cmp_map_mut(&mut self) -> &mut Self::Map {
         self.cmp_map.as_mut()
-    }
-
-    fn cmp_observer_data(&self) -> <M as CmpObserverMetadata<'a, CM>>::Data {
-        <M as CmpObserverMetadata<CM>>::Data::default()
     }
 }
 
-impl<'a, CM, S, M> Observer<S> for StdCmpObserver<'a, CM, S, M>
+impl<'a, CM, I, S, M> Observer<I, S> for StdCmpObserver<'a, CM, M>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + Debug + HasMetadata,
-    M: CmpObserverMetadata<'a, CM>,
+    M: CmpObserverMetadata<'a, CM> + SerdeAny,
+    CM: Serialize + CmpMap + HasLen,
+    S: HasMetadata,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        _input: &S::Input,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         if self.add_meta {
-            self.add_cmpvalues_meta(state);
+            #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
+            let meta = state.metadata_or_insert_with(|| M::new_metadata());
+
+            meta.add_from(self.usable_count(), self.cmp_map_mut());
         }
         Ok(())
     }
 }
 
-impl<'a, CM, S, M> Named for StdCmpObserver<'a, CM, S, M>
+impl<'a, CM, M> Named for StdCmpObserver<'a, CM, M>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + HasMetadata,
+    CM: Serialize,
     M: CmpObserverMetadata<'a, CM>,
 {
     fn name(&self) -> &Cow<'static, str> {
@@ -347,10 +311,9 @@ where
     }
 }
 
-impl<'a, CM, S, M> StdCmpObserver<'a, CM, S, M>
+impl<'a, CM, M> StdCmpObserver<'a, CM, M>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + HasMetadata,
     M: CmpObserverMetadata<'a, CM>,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
@@ -362,7 +325,6 @@ where
             cmp_map: map,
             add_meta,
             data: M::Data::default(),
-            phantom: PhantomData,
         }
     }
 
@@ -381,7 +343,6 @@ where
             cmp_map,
             add_meta,
             data,
-            phantom: PhantomData,
         }
     }
 
@@ -399,7 +360,6 @@ where
             cmp_map,
             add_meta,
             data: M::Data::default(),
-            phantom: PhantomData,
         }
     }
 
@@ -419,7 +379,6 @@ where
             cmp_map,
             add_meta,
             data,
-            phantom: PhantomData,
         }
     }
 
@@ -435,7 +394,7 @@ where
 }
 
 /// A [`StdCmpObserver`] that optionally adds comparisons into a [`CmpValuesMetadata`]
-pub type StdCmpValuesObserver<'a, CM, S> = StdCmpObserver<'a, CM, S, CmpValuesMetadata>;
+pub type StdCmpValuesObserver<'a, CM> = StdCmpObserver<'a, CM, CmpValuesMetadata>;
 
 /* From AFL++ cmplog.h
 
