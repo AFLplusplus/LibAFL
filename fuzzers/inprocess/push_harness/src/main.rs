@@ -44,7 +44,7 @@ fn input_generator() {
 
     // Create an observation channel using the signals map
     let observer =
-        unsafe { StdMapObserver::from_mut_ptr("signals", signals_ptr as _, signals_len) };
+        unsafe { StdMapObserver::from_mut_ptr("signals", addr_of_mut!(SIGNALS) as _, signals_len) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
