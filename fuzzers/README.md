@@ -2,7 +2,7 @@
 
 ## Example fuzzers
 
-You can find here all the example fuzzers built on top of LibAFL.
+You can find a large amount of example fuzzers built on top of LibAFL.
 They are sorted by focus:
 
 - `baby`: Minimal fuzzers and fuzzers demonstrating specific features that don't fit anywhere else.
@@ -16,11 +16,15 @@ They are sorted by focus:
 
 (Some fuzzers may fit into multiple categories, in which case we sort them as it makes sense, for example `structure_aware > full_system > binary_only > the rest`)
 
+## Fully-feature Fuzzers
+
 Some rather complete fuzzers worth looking at are:
 
-- [`fuzzbench`](./inprocess/fuzzbench/): Our fuzzer that competes in Fuzzbench
+- [`Libfuzzer_Libpng_Launcher`](./inprocess//): That's what most people want to use: our InProcess fuzzer with a lot of features like ASAn on some cores, multi threading (a better libfuzzer).
 - [`LibAFL-fuzz`](./forkserver/libafl-fuzz/): A reimplementation of afl-fuzz, the traditional forkserver fuzzer that tries to emulate the command line and behavior.
 - [`LibAFL-QEMU-Launcher`](./binary_only/qemu_launcher/): A full-featured QEMU-mode fuzzer that runs on multiple cores
+
+They may not be the best starting point for your own custom fuzzer, but they might be easy enough to just use.
 
 ## Paper Artifacts
 
