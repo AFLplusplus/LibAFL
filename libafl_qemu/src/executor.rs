@@ -15,6 +15,7 @@ use libafl::{
     state::HasLastReportTime, HasMetadata,
 };
 use libafl::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::inprocess::InProcessExecutorHandlerData,
@@ -26,6 +27,10 @@ use libafl::{
     observers::{ObserversTuple, UsesObservers},
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
+};
+#[cfg(feature = "fork")]
+use libafl::{
+    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
@@ -90,6 +95,8 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
+    <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+    <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     if BREAK_ON_TMOUT.load(Ordering::Acquire) {
         libafl_exit_request_timeout();
@@ -138,6 +145,8 @@ where
         OF: Feedback<S>,
         S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
         Z: HasObjective<Objective = OF, State = S> + HasScheduler<State = S> + ExecutionProcessor,
+        S::Solutions: Corpus<Input = S::Input>, //delete me
+        <S::Corpus as Corpus>::Input: Clone,    //delete me
     {
         let mut inner = StatefulInProcessExecutor::with_timeout(
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,

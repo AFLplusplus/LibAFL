@@ -7,6 +7,14 @@
     feature = "sancov_ctx"
 ))]
 use alloc::borrow::Cow;
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
+#[cfg(not(feature = "pointer_maps"))]
+use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
@@ -16,16 +24,19 @@ use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_
 
 /// The map for edges.
 #[no_mangle]
+#[allow(non_upper_case_globals)]
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE_MAX] = [0; EDGES_MAP_SIZE_MAX];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
 /// The map for data dependency
 #[no_mangle]
+#[allow(non_upper_case_globals)]
 pub static mut __ddg_area_ptr_local: [u8; DDG_MAP_SIZE] = [0; DDG_MAP_SIZE];
 pub use __ddg_area_ptr_local as DDG_MAP;
 
 /// The map for accounting mem writes.
 #[no_mangle]
+#[allow(non_upper_case_globals)]
 pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
 pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 
@@ -75,6 +86,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
 /// The actual size we use for the map of edges.
 /// This is used for forkserver backend
 #[no_mangle]
+#[allow(non_upper_case_globals)]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
 
 #[cfg(any(
@@ -184,7 +196,7 @@ pub fn edges_max_num() -> usize {
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
-                EDGES_MAP.len()
+                (*addr_of!(EDGES_MAP)).len()
             }
         }
     }

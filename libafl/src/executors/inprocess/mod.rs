@@ -168,6 +168,8 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
+    <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn new<EM, OF, Z>(
@@ -211,6 +213,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -250,6 +254,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             tuple_list!(),
@@ -275,6 +281,8 @@ where
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
+    <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<EM, OF, Z>(
@@ -320,6 +328,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -355,6 +365,8 @@ where
         OF: Feedback<S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
+        <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
+        <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,
@@ -431,7 +443,7 @@ where
 pub fn run_observers_and_save_state<E, EM, OF, Z>(
     executor: &mut E,
     state: &mut E::State,
-    input: &<E::State as UsesInput>::Input,
+    input: &E::Input,
     fuzzer: &mut Z,
     event_mgr: &mut EM,
     exitkind: ExitKind,
@@ -439,8 +451,9 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasExecutions + HasSolutions + HasCorpus,
+    E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     Z: HasObjective<Objective = OF, State = E::State>,
+    <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
     let mut observers = executor.observers_mut();
 
@@ -500,10 +513,11 @@ where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
-    E::State: HasExecutions + HasSolutions + HasCorpus,
+    E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     Z: HasObjective<Objective = OF, State = E::State>
         + HasScheduler<State = E::State>
         + ExecutionProcessor,
+    <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
     let data = addr_of_mut!(GLOBAL_STATE);
     let in_handler = (*data).set_in_handler(true);

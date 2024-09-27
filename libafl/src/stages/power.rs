@@ -9,6 +9,7 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::Named;
 
 use crate::{
+    corpus::Corpus,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -50,12 +51,14 @@ impl<E, F, EM, I, M, Z> MutationalStage<E, EM, I, M, Z> for PowerMutationalStage
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = Self::State>,
-    F: TestcaseScore<I, Self::State>,
+    F: TestcaseScore<Self::State>,
     I: Input,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus<Input = I> + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
+    E::State:
+        HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata + HasCurrentTestcase,
     Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<E::Input, Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     /// The mutator, added to this stage
     #[inline]
@@ -84,11 +87,13 @@ impl<E, F, EM, I, M, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, I, M,
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = Self::State>,
-    F: TestcaseScore<I, Self::State>,
+    F: TestcaseScore<Self::State>,
     M: Mutator<I, Self::State>,
-    Self::State: HasCorpus<Input = I> + HasMetadata + HasRand + HasExecutions + HasNamedMetadata,
+    E::State:
+        HasCorpus + HasMetadata + HasRand + HasExecutions + HasNamedMetadata + HasCurrentTestcase,
     Z: Evaluator<E, EM, State = Self::State>,
     I: MutatedTransform<Self::Input, Self::State> + Clone + Input,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -117,7 +122,7 @@ impl<E, F, EM, I, M, Z> PowerMutationalStage<E, F, EM, I, M, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     EM: UsesState<State = <Self as UsesState>::State>,
-    F: TestcaseScore<I, <Self as UsesState>::State>,
+    F: TestcaseScore<<Self as UsesState>::State>,
     I: Input,
     M: Mutator<I, <Self as UsesState>::State>,
     <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,

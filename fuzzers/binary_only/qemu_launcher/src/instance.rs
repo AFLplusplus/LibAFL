@@ -185,14 +185,15 @@ impl<'a, M: Monitor> Instance<'a, M> {
             )));
 
             // Setup a MOPT mutator
-            let mutator = StdMOptMutator::new(
+            let mutator = StdMOptMutator::new::<BytesInput, _>(
                 &mut state,
                 havoc_mutations().merge(tokens_mutations()),
                 7,
                 5,
             )?;
 
-            let power = StdPowerMutationalStage::new(mutator);
+            let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+                StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!
             let mut stages = tuple_list!(calibration, tracing, i2s, power);

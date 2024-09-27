@@ -73,9 +73,10 @@ where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
     E: Executor<EM, Z, State = Self::State> + HasObservers,
-    Self::State:
+    EM::State:
         UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus + HasNamedMetadata,
     EM: UsesState,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>, //delete me
     Z: UsesState<State = Self::State>,
 {
     #[inline]
