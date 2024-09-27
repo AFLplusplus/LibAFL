@@ -37,4 +37,4 @@ pub extern "C" fn external_current_millis() -> u64 {
 }
 ```
 
-See [./fuzzers/fuzz-anything/baby_no_std](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/fuzz-anything/baby_no_std) for an example.
+See [./fuzzers/fuzz_anything/baby_no_std](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/fuzz_anything/baby_no_std) for an example.
