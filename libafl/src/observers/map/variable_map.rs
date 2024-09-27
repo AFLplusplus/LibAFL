@@ -18,10 +18,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     inputs::UsesInput,
-    observers::{map::MapObserver, Observer},
+    observers::{map::MapObserver, Observer, VariableLengthMapObserver},
     Error,
 };
-use crate::observers::VariableLengthMapObserver;
 
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Debug)]
@@ -270,14 +269,14 @@ where
 impl<'a, T> VariableLengthMapObserver for VariableMapObserver<'a, T>
 where
     T: Bounded
-    + PartialEq
-    + Default
-    + Copy
-    + Hash
-    + 'static
-    + Serialize
-    + serde::de::DeserializeOwned
-    + Debug,
+        + PartialEq
+        + Default
+        + Copy
+        + Hash
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
 {
     fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
         self.map.as_mut()

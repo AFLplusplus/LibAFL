@@ -36,8 +36,7 @@ use libafl_qemu::{
     modules::edges::StdEdgeCoverageModule,
     GuestPhysAddr, GuestReg, QemuMemoryChunk,
 };
-
-use libafl_targets::{edges_map_mut_ptr, MAX_EDGES_FOUND, EDGES_MAP_DEFAULT_SIZE};
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 // use libafl_qemu::QemuSnapshotBuilder; // for normal qemu snapshot
 
@@ -122,7 +121,7 @@ pub fn fuzz() {
                     unsafe { MAX_INPUT_SIZE } as GuestReg,
                     None,
                 ))
-                    .into(),
+                .into(),
                 true,
             ),
             true,

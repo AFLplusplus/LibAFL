@@ -400,7 +400,6 @@ pub trait MapObserver:
 /// The "real" length of the underlying map could change at any point in time.
 /// Thus, the size of the map should be fetched each time it is used.
 pub trait VariableLengthMapObserver: MapObserver {
-
     /// A mutable slice reference to the map
     /// The length of the map gives the maximum allocatable size.
     fn map_slice_mut(&mut self) -> &mut [Self::Entry];

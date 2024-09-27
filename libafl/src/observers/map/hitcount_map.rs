@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     executors::ExitKind,
     inputs::UsesInput,
-    observers::{map::MapObserver, DifferentialObserver, Observer, ObserversTuple, VariableLengthMapObserver},
+    observers::{
+        map::MapObserver, DifferentialObserver, Observer, ObserversTuple, VariableLengthMapObserver,
+    },
     Error,
 };
 
@@ -226,7 +228,7 @@ where
 
 impl<M> VariableLengthMapObserver for HitcountsMapObserver<M>
 where
-    M: VariableLengthMapObserver + MapObserver<Entry = u8>
+    M: VariableLengthMapObserver + MapObserver<Entry = u8>,
 {
     fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
         self.base.map_slice_mut()

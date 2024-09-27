@@ -907,18 +907,20 @@ impl<T: Sized> OwnedMutPtr<T> {
     }
 
     /// Get a pointer to the inner object
+    #[must_use]
     pub fn as_ptr(&self) -> *const T {
         match self {
-            OwnedMutPtr::Ptr(ptr) => ptr.clone(),
-            OwnedMutPtr::Owned(owned) => &**owned
+            OwnedMutPtr::Ptr(ptr) => *ptr,
+            OwnedMutPtr::Owned(owned) => &**owned,
         }
     }
 
     /// Get a mutable pointer to the inner object
+    #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut T {
         match self {
-            OwnedMutPtr::Ptr(ptr) => ptr.clone(),
-            OwnedMutPtr::Owned(owned) => &mut **owned
+            OwnedMutPtr::Ptr(ptr) => *ptr,
+            OwnedMutPtr::Owned(owned) => &mut **owned,
         }
     }
 }

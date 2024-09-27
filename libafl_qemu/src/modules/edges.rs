@@ -1,13 +1,13 @@
-use std::{cell::UnsafeCell, cmp::max, fmt::Debug, ptr};
-use std::ptr::addr_of;
+use std::{cell::UnsafeCell, cmp::max, fmt::Debug, ptr, ptr::addr_of};
+
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{inputs::UsesInput, HasMetadata};
+use libafl::{inputs::UsesInput, observers::VariableLengthMapObserver, HasMetadata};
 use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
-use serde::{Deserialize, Serialize};
-use libafl::observers::VariableLengthMapObserver;
 use libafl_targets::EDGES_MAP;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     emu::EmulatorModules,
     modules::{
@@ -390,7 +390,7 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
 
     pub fn build<O>(self, map_observer: &mut O) -> EdgeCoverageModule<AF, PF, V>
     where
-        O: VariableLengthMapObserver
+        O: VariableLengthMapObserver,
     {
         let map_ptr = map_observer.map_slice_mut().as_mut_ptr() as *mut u8;
         let map_max_size = map_observer.map_slice_mut().len();
@@ -478,7 +478,6 @@ impl<AF, PF, V> EdgeCoverageModule<AF, PF, V> {
         use_hitcounts: bool,
         use_jit: bool,
     ) -> Self {
-
         Self {
             variant,
             address_filter,

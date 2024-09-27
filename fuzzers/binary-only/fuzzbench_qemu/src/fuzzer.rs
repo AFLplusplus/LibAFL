@@ -50,7 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::{StdEdgeCoverageModule},
+    modules::edges::StdEdgeCoverageModule,
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
@@ -345,9 +345,7 @@ fn fuzz(
 
                 match qemu.run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
-                        signal,
-                    ))) => {
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
                         signal.handle();
                     }
                     Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
