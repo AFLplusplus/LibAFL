@@ -120,8 +120,8 @@ impl CmpValuesMetadata {
     /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
     /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
     /// `AFLppCmpLogObserver`.
-    pub fn add_from<CM>(&mut self, usable_count: usize, cmp_map: &mut CM) 
-    where 
+    pub fn add_from<CM>(&mut self, usable_count: usize, cmp_map: &mut CM)
+    where
         CM: CmpMap,
     {
         self.list.clear();
@@ -219,8 +219,7 @@ pub trait CmpObserver {
 /// A standard [`CmpObserver`] observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "CM: serde::de::DeserializeOwned + Serialize")]
-pub struct StdCmpObserver<'a, CM>
-{
+pub struct StdCmpObserver<'a, CM> {
     cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: Cow<'static, str>,
@@ -271,8 +270,7 @@ where
     }
 }
 
-impl<'a, CM> Named for StdCmpObserver<'a, CM>
-{
+impl<'a, CM> Named for StdCmpObserver<'a, CM> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -280,7 +278,7 @@ impl<'a, CM> Named for StdCmpObserver<'a, CM>
 
 impl<'a, CM> StdCmpObserver<'a, CM>
 where
-    CM: CmpMap
+    CM: CmpMap,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]

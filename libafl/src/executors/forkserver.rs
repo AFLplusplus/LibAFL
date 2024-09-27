@@ -4,6 +4,7 @@ use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ops::DerefMut,
     time::Duration,
 };
 use std::{
@@ -729,7 +730,7 @@ where
     ) -> Result<ForkserverExecutor<(A, OT), S, SP>, Error>
     where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
-        A: Observer<S::Input, S> + AsRef<MO> + AsMut<MO>,
+        A: Observer<S::Input, S> + DerefMut<Target = MO>,
         OT: ObserversTuple<S::Input, S> + Prepend<MO>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,

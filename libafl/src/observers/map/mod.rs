@@ -12,6 +12,7 @@ use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
+    executors::ExitKind,
     observers::{DifferentialObserver, Observer},
     Error,
 };
@@ -130,6 +131,67 @@ impl<T, const ITH: bool, const NTH: bool> CanTrack for ExplicitTracking<T, ITH, 
     }
 }
 
+impl<T, const ITH: bool, const NTH: bool> Named for ExplicitTracking<T, ITH, NTH>
+where
+    T: Named,
+{
+    fn name(&self) -> &Cow<'static, str> {
+        self.0.name()
+    }
+}
+
+impl<S, I, T, const ITH: bool, const NTH: bool> Observer<I, S> for ExplicitTracking<T, ITH, NTH>
+where
+    T: Observer<I, S>,
+{
+    fn flush(&mut self) -> Result<(), Error> {
+        self.0.flush()
+    }
+
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.0.pre_exec(state, input)
+    }
+
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+        self.0.post_exec(state, input, exit_kind)
+    }
+
+    fn pre_exec_child(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.0.pre_exec_child(state, input)
+    }
+
+    fn post_exec_child(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.0.post_exec_child(state, input, exit_kind)
+    }
+}
+
+impl<T, OTA, OTB, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB>
+    for ExplicitTracking<T, ITH, NTH>
+where
+    T: DifferentialObserver<OTA, OTB>,
+{
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.deref_mut().pre_observe_first(observers)
+    }
+
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.deref_mut().post_observe_first(observers)
+    }
+
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.deref_mut().pre_observe_second(observers)
+    }
+
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.deref_mut().post_observe_second(observers)
+    }
+}
+
 impl<T, const ITH: bool, const NTH: bool> Deref for ExplicitTracking<T, ITH, NTH> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -163,7 +225,7 @@ pub mod macros {
     /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
-    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + Deref<Target = O> {
     ///     pub fn new(obs: &C) -> Self {
     ///         require_index_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")
@@ -226,7 +288,7 @@ pub mod macros {
     /// #     phantom: PhantomData<(C, O)>,
     /// # }
     /// #
-    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + AsRef<O> {
+    /// impl<C, O> MyCustomScheduler<C, O> where O: MapObserver, C: CanTrack + Deref<Target = O> {
     ///     pub fn new(obs: &C) -> Self {
     ///         require_novelties_tracking!("MyCustomScheduler", C);
     ///         todo!("Construct your type")
@@ -280,7 +342,7 @@ pub mod macros {
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
-/// to instances of a second type, e.g. `C: AsRef<O>` or `A: AsMut<O>`. Map observer instances are
+/// to instances of a second type, e.g. `C: Deref<Target = O>` or `A: AsMut<O>`. Map observer instances are
 /// passed around in a way that may be potentially wrapped by e.g. [`ExplicitTracking`] as a way to
 /// encode metadata into the type. This is an unfortunate additional requirement that we can't get
 /// around without specialization.

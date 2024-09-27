@@ -1,7 +1,7 @@
 //! The queue corpus scheduler for power schedules.
 
 use alloc::vec::Vec;
-use core::{marker::PhantomData, time::Duration};
+use core::{marker::PhantomData, ops::Deref, time::Duration};
 
 use libafl_bolts::{
     tuples::{Handle, Handled, MatchName},
@@ -329,7 +329,7 @@ impl<C, I, O, S> Scheduler<I, S> for PowerQueueScheduler<C, O>
 where
     S: HasCorpus + HasMetadata + HasTestcase + State,
     O: MapObserver,
-    C: AsRef<O>,
+    C: Deref<Target = O>,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -384,7 +384,7 @@ where
 impl<C, O> PowerQueueScheduler<C, O>
 where
     O: MapObserver,
-    C: AsRef<O> + Named,
+    C: Deref<Target = O> + Named,
 {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
