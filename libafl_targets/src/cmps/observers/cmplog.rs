@@ -24,9 +24,8 @@ pub struct CmpLogObserver {
     name: Cow<'static, str>,
 }
 
-// Is the only difference here between this and StdCmpObserver that CMPLOG_ENABLED = 1?? 
-impl CmpObserver for CmpLogObserver
-{
+// Is the only difference here between this and StdCmpObserver that CMPLOG_ENABLED = 1??
+impl CmpObserver for CmpLogObserver {
     type Map = CmpLogMap;
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -46,7 +45,7 @@ impl CmpObserver for CmpLogObserver
 }
 
 impl<I, S> Observer<I, S> for CmpLogObserver
-where 
+where
     S: HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -57,21 +56,16 @@ where
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        _input: &I,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
         }
 
         if self.add_meta {
             let meta = state.metadata_or_insert_with(CmpValuesMetadata::new);
-    
+
             let usable_count = self.usable_count();
-    
+
             meta.add_from(usable_count, self.cmp_map_mut());
         }
 

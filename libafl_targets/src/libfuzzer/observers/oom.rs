@@ -2,13 +2,7 @@ use alloc::borrow::Cow;
 use core::{ffi::c_void, fmt::Debug};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use libafl::{
-    executors::ExitKind,
-    feedbacks::Feedback,
-    observers::Observer,
-    state::State,
-    Error,
-};
+use libafl::{executors::ExitKind, feedbacks::Feedback, observers::Observer, state::State, Error};
 use libafl_bolts::Named;
 use libc::SIGABRT;
 use serde::{Deserialize, Serialize};
@@ -92,8 +86,7 @@ impl Named for OomObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for OomObserver
-{
+impl<I, S> Observer<I, S> for OomObserver {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         OOMED.store(false, Ordering::Relaxed);
         // must reset for platforms which do not offer malloc tracking
@@ -156,8 +149,7 @@ where
         _input: &S::Input,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    {
+    ) -> Result<bool, Error> {
         Ok(Self::oomed())
     }
 

@@ -448,7 +448,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<<S as UsesInput>::Input, S>,
     {
         let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
 
