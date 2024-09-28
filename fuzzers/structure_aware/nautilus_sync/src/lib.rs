@@ -202,7 +202,7 @@ pub extern "C" fn libafl_main() {
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.
         let args: Vec<String> = env::args().collect();
-        if libfuzzer_initialize(&args) == -1 {
+        if unsafe { libfuzzer_initialize(&args) } == -1 {
             println!("Warning: LLVMFuzzerInitialize failed with -1");
         }
 

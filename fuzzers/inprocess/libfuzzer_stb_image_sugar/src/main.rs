@@ -31,7 +31,7 @@ pub fn main() {
 fn fuzz(input_dirs: &[PathBuf], output_dir: PathBuf, cores: &Cores, broker_port: u16) {
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
-    if libfuzzer_initialize(&args) == -1 {
+    if unsafe { libfuzzer_initialize(&args) } == -1 {
         println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
@@ -40,7 +40,7 @@ fn fuzz(input_dirs: &[PathBuf], output_dir: PathBuf, cores: &Cores, broker_port:
         .output_dir(output_dir)
         .cores(cores)
         .broker_port(broker_port)
-        .harness(|buf| {
+        .harness(|buf| unsafe {
             libfuzzer_test_one_input(buf);
         })
         .build()

@@ -27,6 +27,9 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 }
 
 /// Initialize the sancov `8-bit-counters` - usually called by `llvm`.
+///
+/// # Safety
+/// Start and stop are being dereferenced.
 #[no_mangle]
 #[allow(clippy::cast_sign_loss)]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
