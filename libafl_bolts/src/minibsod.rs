@@ -1176,11 +1176,12 @@ mod tests {
 
     use std::{
         io::{stdout, BufWriter},
+        os::raw::c_void,
         sync::mpsc,
     };
 
     use windows::Win32::{
-        Foundation::{CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS},
+        Foundation::{CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE},
         System::{
             Diagnostics::Debug::{
                 GetThreadContext, CONTEXT, CONTEXT_FULL_AMD64, CONTEXT_FULL_ARM64, CONTEXT_FULL_X86,
@@ -1199,7 +1200,7 @@ mod tests {
         let t = std::thread::spawn(move || {
             let cur = unsafe { GetCurrentThread() };
             let proc = unsafe { GetCurrentProcess() };
-            let mut out = Default::default();
+            let mut out: HANDLE = Default::default();
             unsafe {
                 DuplicateHandle(
                     proc,
@@ -1212,11 +1213,12 @@ mod tests {
                 )
                 .unwrap()
             };
-            tx.send(out).unwrap();
+            tx.send(out.0 as i64).unwrap();
             evt_rx.recv().unwrap();
         });
 
         let thread = rx.recv().unwrap();
+        let thread = HANDLE(thread as *mut c_void);
         eprintln!("thread: {:?}", thread);
         unsafe { SuspendThread(thread) };
 

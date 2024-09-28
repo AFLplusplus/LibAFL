@@ -633,6 +633,8 @@ impl Allocator {
             size = 0;
         }
     }
+
+    /// Unpoison all the memory that is currently mapped with read permissions.
     #[cfg(not(target_vendor = "apple"))]
     pub fn unpoison_all_existing_memory(&mut self) {
         RangeDetails::enumerate_with_prot(
