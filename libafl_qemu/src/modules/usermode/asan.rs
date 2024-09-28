@@ -803,7 +803,7 @@ impl AsanModule {
     }
 
     /// # Safety
-    /// The ASasn error report accesses [`FullBacktraceCollector`]
+    /// The `ASan` error report accesses [`FullBacktraceCollector`]
     #[must_use]
     pub unsafe fn with_asan_report(
         rt: Pin<Box<AsanGiovese>>,
