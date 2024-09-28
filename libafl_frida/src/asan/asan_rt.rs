@@ -216,7 +216,11 @@ impl FridaRuntime for AsanRuntime {
 
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
-        self.poison(slice.as_ptr() as usize, slice.len());
+        // # Safety
+        // The ptr and length are correct.
+        unsafe {
+            self.poison(slice.as_ptr() as usize, slice.len());
+        }
         self.reset_allocations();
 
         Ok(())
@@ -282,7 +286,11 @@ impl AsanRuntime {
     }
 
     /// Make sure the specified memory is poisoned
-    pub fn poison(&mut self, address: usize, size: usize) {
+    ///
+    /// # Safety
+    /// The address needs to be a valid address, the size needs to be correct.
+    /// This will dereference at the address.
+    pub unsafe fn poison(&mut self, address: usize, size: usize) {
         Allocator::poison(self.allocator.map_to_shadow(address), size);
     }
 

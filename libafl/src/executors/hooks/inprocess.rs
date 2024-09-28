@@ -218,6 +218,8 @@ where
     #[allow(clippy::unused_self)]
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         // timeout stuff
+        // # Safety
+        // We're calling this only once per execution, in a single thread.
         #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().unset_timer();
     }
