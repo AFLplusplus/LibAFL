@@ -37,14 +37,7 @@ opt-level = 3
 debug = true
 
 [build-dependencies]
-vergen = { version = "9.0.1", features = [
-  "build",
-  "cargo",
-  "git",
-  "gitcl",
-  "rustc",
-  "si",
-] }
+vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
 
 [dependencies]
 clap = { version = "4.5.18", features = ["derive", "string"] }
