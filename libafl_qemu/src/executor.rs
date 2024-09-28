@@ -9,11 +9,6 @@ use std::ptr;
 #[cfg(emulation_mode = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[cfg(feature = "fork")]
-use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, inputs::UsesInput,
-    state::HasLastReportTime, HasMetadata,
-};
 use libafl::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -33,6 +28,11 @@ use libafl::{
     events::EventManager, events::EventManager, executors::InProcessForkExecutor,
     executors::InProcessForkExecutor, inputs::UsesInput, state::HasLastReportTime,
     state::HasLastReportTime, HasMetadata, HasMetadata,
+};
+#[cfg(feature = "fork")]
+use libafl::{
+    events::EventManager, executors::InProcessForkExecutor, inputs::UsesInput,
+    state::HasLastReportTime, HasMetadata,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;

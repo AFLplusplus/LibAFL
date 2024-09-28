@@ -139,7 +139,7 @@ where
 
 impl<S, OT> NyxExecutor<S, OT> {
     /// Convert `trace_bits` ptr into real trace map
-    /// 
+    ///
     /// # Safety
     /// Mutable borrow may only be used once at a time.
     pub unsafe fn trace_bits(self) -> &'static mut [u8] {

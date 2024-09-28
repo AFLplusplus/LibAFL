@@ -189,7 +189,9 @@ fn run_testcases(filenames: &[&str]) {
         let mut buffer = vec![];
         file.read_to_end(&mut buffer).expect("Buffer overflow");
 
-        libfuzzer_test_one_input(&buffer);
+        unsafe {
+            libfuzzer_test_one_input(&buffer);
+        }
     }
 }
 
