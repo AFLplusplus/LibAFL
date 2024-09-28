@@ -140,7 +140,9 @@ pub extern "C" fn libafl_main() {
         // The closure that we want to fuzz
         let mut harness = |input: &NautilusInput| {
             input.unparse(&context, &mut bytes);
-            libfuzzer_test_one_input(&bytes);
+            unsafe {
+                libfuzzer_test_one_input(&bytes);
+            }
             ExitKind::Ok
         };
 
