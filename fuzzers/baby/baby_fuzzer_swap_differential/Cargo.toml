@@ -34,9 +34,9 @@ libafl_targets = { path = "../../../libafl_targets", features = [
   "pointer_maps",
 ] }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
-mimalloc = { version = "*", default-features = false }
+mimalloc = { version = "0.1.43", default-features = false }
 
-libafl_cc = { path = "../../../libafl_cc/" }
+libafl_cc = { path = "../../../libafl_cc" }
 
 [[bin]]
 name = "fuzzer_sd"

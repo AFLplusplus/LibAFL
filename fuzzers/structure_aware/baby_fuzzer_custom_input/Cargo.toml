@@ -22,4 +22,4 @@ debug = true
 libafl = { path = "../../../libafl" }
 libafl_bolts = { path = "../../../libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
-serde = "*"
+serde = "1.0.210"
