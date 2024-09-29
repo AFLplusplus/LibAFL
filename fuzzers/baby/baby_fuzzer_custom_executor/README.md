@@ -1,6 +1,8 @@
-# Baby fuzzer
+# Baby fuzzer with Custom Executor
 
-This is a minimalistic example about how to create a libafl based fuzzer.
+This is a minimalistic example about how to create a LibAFL-based fuzzer.
+
+In contrast to the normal baby fuzzer, this uses a (very simple) custom executor.
 
 It runs on a single core until a crash occurs and then exits.
 
