@@ -3,8 +3,7 @@ use std::{borrow::Cow, marker::PhantomData, path::PathBuf, time::Duration};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{
-        CentralizedEventManager, EventManagerHooksTuple, EventProcessor,
-        LlmpRestartingEventManager, ProgressReporter,
+        CentralizedEventManager, EventProcessor, LlmpRestartingEventManager, ProgressReporter,
     },
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
@@ -15,7 +14,6 @@ use libafl::{
         scheduled::havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens,
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
-    prelude::{AdaptiveSerializer, HasEventManagerId, HasTestcase, UsesInput},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, QueueScheduler,
         StdWeightedScheduler,
@@ -25,8 +23,8 @@ use libafl::{
         StagesTuple, StdMutationalStage, StdPowerMutationalStage, SyncFromDiskStage,
     },
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasRand, HasStartTime,
-        State, StdState, UsesState,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
+        UsesState,
     },
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
@@ -38,7 +36,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut, HasLen,
+    AsSliceMut,
 };
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
@@ -87,9 +85,15 @@ pub fn run_client(
     // Create an observation channel to keep track of edges hit.
     // If we are in Nyx Mode, we need to use a different map observer.
     let (nyx_helper, edges_observer) = if opt.nyx_mode {
+        // main node is the first core id in CentralizedLauncher
+        let cores = opt.cores.clone().expect("invariant; should never occur");
+        let main_node_core_id = match cores.ids.len() {
+            1 => None,
+            _ => Some(cores.ids.first().expect("invariant; should never occur").0),
+        };
         let nyx_settings = NyxSettings::builder()
             .cpu_id(core_id.0)
-            .parent_cpu_id(None)
+            .parent_cpu_id(main_node_core_id)
             .build();
         let nyx_helper = NyxHelper::new(opt.executable.clone(), nyx_settings).unwrap();
         let observer = unsafe {
@@ -271,8 +275,7 @@ pub fn run_client(
         let executor = executor
             .build(tuple_list!(time_observer, edges_observer))
             .unwrap();
-        let executor = SupportedExecutors::Forkserver(executor, PhantomData);
-        executor
+        SupportedExecutors::Forkserver(executor, PhantomData)
     };
 
     // Load our seeds.

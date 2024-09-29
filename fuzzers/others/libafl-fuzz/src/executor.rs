@@ -7,15 +7,12 @@ use std::{
 
 use libafl::{
     executors::{Executor, ExitKind},
-    prelude::{
-        ForkserverExecutor, HasObservers, HasTargetBytes, ObserversTuple, UsesInput, UsesObservers,
-        WithObservers,
-    },
+    prelude::{HasObservers, HasTargetBytes, ObserversTuple, UsesObservers},
     stages::HasCurrentStage,
     state::{HasExecutions, State, UsesState},
     Error,
 };
-use libafl_bolts::{shmem::ShMemProvider, tuples::RefIndexable};
+use libafl_bolts::tuples::RefIndexable;
 use memmap2::{Mmap, MmapOptions};
 use nix::libc::{S_IRUSR, S_IXUSR};
 

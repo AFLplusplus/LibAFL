@@ -62,7 +62,6 @@ fn main() {
     };
 
     create_dir_if_not_exists(&opt.output_dir).expect("could not create output directory");
-
     // TODO: we need to think about the fuzzer naming scheme since they can be configured in
     // different ways (ASAN/mutators) etc.... and how to autoresume appropriately.
     // Currently we do AFL style resume with hardcoded names.
