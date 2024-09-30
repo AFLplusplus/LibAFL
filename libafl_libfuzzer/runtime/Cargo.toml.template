@@ -71,7 +71,9 @@ log = { workspace = true, features = ["release_max_level_info"] }
 mimalloc = { workspace = true, default-features = false }
 num-traits = { workspace = true, default-features = true }
 rand = "0.8.5"
-serde = { workspace = true, default-features = true, features = ["derive"] }              # serialization lib
+serde = { workspace = true, default-features = true, features = [
+  "derive",
+] } # serialization lib
 hashbrown = { workspace = true, default-features = true }
 
 # for identifying if we can grimoire-ify
