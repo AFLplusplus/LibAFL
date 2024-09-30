@@ -1,4 +1,6 @@
-use std::{path::PathBuf, ptr::addr_of_mut, sync::Mutex};
+#[cfg(emulation_mode = "systemmode")]
+use std::ptr::addr_of_mut;
+use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
