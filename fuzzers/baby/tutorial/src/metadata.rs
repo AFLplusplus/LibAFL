@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use libafl::{
-    corpus::Testcase,
+    corpus::{Corpus, Testcase},
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata},
@@ -22,11 +22,14 @@ pub struct PacketLenMetadata {
 
 pub struct PacketLenTestcaseScore {}
 
-impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore
+impl<S> TestcaseScore<S> for PacketLenTestcaseScore
 where
-    S: HasCorpus<Input = PacketData> + HasMetadata,
+    S: HasMetadata + HasCorpus,
 {
-    fn compute(_state: &S, entry: &mut Testcase<PacketData>) -> Result<f64, Error> {
+    fn compute(
+        _state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         Ok(entry
             .metadata_map()
             .get::<PacketLenMetadata>()

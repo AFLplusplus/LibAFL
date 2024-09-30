@@ -162,7 +162,7 @@ impl Debug for NautilusSpliceMutator<'_> {
 
 impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus<Input = NautilusInput> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,

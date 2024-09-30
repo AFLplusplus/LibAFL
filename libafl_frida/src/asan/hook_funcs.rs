@@ -1237,8 +1237,10 @@ impl AsanRuntime {
         res
     }
 
+    /// # Safety
+    /// `addr` will get dereferenced.
     #[inline]
-    pub fn hook_munmap(
+    pub unsafe fn hook_munmap(
         &mut self,
         original: extern "C" fn(addr: *const c_void, length: usize) -> i32,
         addr: *const c_void,

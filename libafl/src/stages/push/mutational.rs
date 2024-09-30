@@ -21,7 +21,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, UsesState},
     Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
 };
 #[cfg(feature = "introspection")]
@@ -88,6 +88,7 @@ where
     OT: ObserversTuple<Z::State> + Serialize,
     Z::State: HasCorpus + HasRand + HasExecutions + HasLastReportTime + HasMetadata + Clone + Debug,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
+    <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
 {
     #[inline]
     fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, OT, Z> {
@@ -196,6 +197,7 @@ where
     OT: ObserversTuple<Z::State> + Serialize,
     Z::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasLastReportTime + Clone + Debug,
     Z: ExecutionProcessor + EvaluatorObservers<OT> + HasScheduler<Scheduler = CS>,
+    <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
 {
     type Item = Result<<Z::State as UsesInput>::Input, Error>;
 

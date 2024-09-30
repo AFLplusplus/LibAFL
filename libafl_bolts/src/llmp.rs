@@ -663,6 +663,8 @@ impl LlmpMsg {
     /// Gets the buffer from this message as slice, with the correct length.
     #[inline]
     pub fn try_as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
+        // # Safety
+        // Safe because we check if we're in a valid shmem region first.
         unsafe {
             if self.in_shmem(map) {
                 Ok(self.as_slice_unsafe())
@@ -1818,6 +1820,8 @@ where
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             Ok(match self.recv()? {
                 Some(msg) => Some((
@@ -1835,6 +1839,8 @@ where
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf_blocking_with_flags(&mut self) -> Result<(ClientId, Tag, Flags, &[u8]), Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
@@ -1849,6 +1855,8 @@ where
     /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(ClientId, Tag, &[u8]), Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
@@ -1953,6 +1961,8 @@ where
     /// Marks the containing page as `safe_to_unmap`.
     /// This indicates, that the page may safely be unmapped by the sender.
     pub fn mark_safe_to_unmap(&mut self) {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             (*self.page_mut()).receiver_joined();
         }
@@ -3028,6 +3038,9 @@ where
     #[cfg(any(unix, all(windows, feature = "std")))]
     #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
+        // Volatile read.
         unsafe { ptr::read_volatile(ptr::addr_of!(LLMP_SIGHANDLER_STATE.shutting_down)) }
     }
 
@@ -3091,6 +3104,8 @@ where
     /// Tell the broker to disconnect this client from it.
     #[cfg(feature = "std")]
     fn announce_client_exit(sender: &mut LlmpSender<SP>, client_id: u32) -> Result<(), Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             let msg = sender
                 .alloc_next(size_of::<LlmpClientExitInfo>())

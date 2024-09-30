@@ -140,7 +140,9 @@ pub extern "C" fn libafl_main() {
         // The closure that we want to fuzz
         let mut harness = |input: &NautilusInput| {
             input.unparse(&context, &mut bytes);
-            libfuzzer_test_one_input(&bytes);
+            unsafe {
+                libfuzzer_test_one_input(&bytes);
+            }
             ExitKind::Ok
         };
 
@@ -202,7 +204,7 @@ pub extern "C" fn libafl_main() {
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.
         let args: Vec<String> = env::args().collect();
-        if libfuzzer_initialize(&args) == -1 {
+        if unsafe { libfuzzer_initialize(&args) } == -1 {
             println!("Warning: LLVMFuzzerInitialize failed with -1");
         }
 

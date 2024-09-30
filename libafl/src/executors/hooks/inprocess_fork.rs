@@ -107,19 +107,21 @@ unsafe impl Sync for InProcessForkExecutorGlobalData {}
 unsafe impl Send for InProcessForkExecutorGlobalData {}
 
 impl InProcessForkExecutorGlobalData {
-    pub(crate) fn executor_mut<'a, E>(&self) -> &'a mut E {
+    /// # Safety
+    /// Only safe if not called twice and if the executor is not used from another borrow after this.
+    pub(crate) unsafe fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
-    pub(crate) fn state_mut<'a, S>(&self) -> &'a mut S {
+    /// # Safety
+    /// Only safe if not called twice and if the state is not used from another borrow after this.
+    pub(crate) unsafe fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
-    /*fn current_input<'a, I>(&self) -> &'a I {
-        unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
-    }*/
-
-    pub(crate) fn take_current_input<'a, I>(&mut self) -> &'a I {
+    /// # Safety
+    /// Only safe if not called concurrently.
+    pub(crate) unsafe fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = null();
         r

@@ -10,7 +10,7 @@ use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
     corpus::Corpus,
-    inputs::{HasMutatorBytes, UsesInput},
+    inputs::HasMutatorBytes,
     mutators::{MutationResult, Mutator},
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -1025,18 +1025,19 @@ impl BytesSwapMutator {
 
 /// Crossover insert mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct CrossoverInsertMutator<I> {
-    phantom: PhantomData<I>,
-}
+pub struct CrossoverInsertMutator;
 
-impl<I: HasMutatorBytes> CrossoverInsertMutator<I> {
-    pub(crate) fn crossover_insert(
+impl CrossoverInsertMutator {
+    pub(crate) fn crossover_insert<I>(
         input: &mut I,
         size: usize,
         target: usize,
         range: Range<usize>,
         other: &[u8],
-    ) -> MutationResult {
+    ) -> MutationResult
+    where
+        I: HasMutatorBytes,
+    {
         input.resize(size + range.len(), 0);
         unsafe {
             buffer_self_copy(
@@ -1054,10 +1055,10 @@ impl<I: HasMutatorBytes> CrossoverInsertMutator<I> {
     }
 }
 
-impl<I, S> Mutator<I, S> for CrossoverInsertMutator<I>
+impl<I, S> Mutator<I, S> for CrossoverInsertMutator
 where
     S: HasCorpus + HasRand + HasMaxSize,
-    S::Input: HasMutatorBytes,
+    <S::Corpus as Corpus>::Input: HasMutatorBytes,
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -1101,36 +1102,35 @@ where
     }
 }
 
-impl<I> Named for CrossoverInsertMutator<I> {
+impl Named for CrossoverInsertMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverInsertMutator");
         &NAME
     }
 }
 
-impl<I> CrossoverInsertMutator<I> {
+impl CrossoverInsertMutator {
     /// Creates a new [`CrossoverInsertMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self {}
     }
 }
 
 /// Crossover replace mutation for inputs with a bytes vector
 #[derive(Debug, Default)]
-pub struct CrossoverReplaceMutator<I> {
-    phantom: PhantomData<I>,
-}
+pub struct CrossoverReplaceMutator;
 
-impl<I: HasMutatorBytes> CrossoverReplaceMutator<I> {
-    pub(crate) fn crossover_replace(
+impl CrossoverReplaceMutator {
+    pub(crate) fn crossover_replace<I>(
         input: &mut I,
         target: usize,
         range: Range<usize>,
         other: &[u8],
-    ) -> MutationResult {
+    ) -> MutationResult
+    where
+        I: HasMutatorBytes,
+    {
         unsafe {
             buffer_copy(input.bytes_mut(), other, range.start, target, range.len());
         }
@@ -1138,10 +1138,10 @@ impl<I: HasMutatorBytes> CrossoverReplaceMutator<I> {
     }
 }
 
-impl<I, S> Mutator<I, S> for CrossoverReplaceMutator<I>
+impl<I, S> Mutator<I, S> for CrossoverReplaceMutator
 where
     S: HasCorpus + HasRand,
-    S::Input: HasMutatorBytes,
+    <S::Corpus as Corpus>::Input: HasMutatorBytes,
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -1178,20 +1178,18 @@ where
     }
 }
 
-impl<I> Named for CrossoverReplaceMutator<I> {
+impl Named for CrossoverReplaceMutator {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("CrossoverReplaceMutator");
         &NAME
     }
 }
 
-impl<I> CrossoverReplaceMutator<I> {
+impl CrossoverReplaceMutator {
     /// Creates a new [`CrossoverReplaceMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self {}
     }
 }
 
@@ -1244,11 +1242,11 @@ impl<F, O> MappedCrossoverInsertMutator<F, O> {
 
 impl<S, F, I, O> Mutator<I, S> for MappedCrossoverInsertMutator<F, O>
 where
-    S: HasCorpus + HasMaxSize + HasRand + UsesInput,
+    S: HasCorpus + HasMaxSize + HasRand,
     I: HasMutatorBytes,
     for<'a> O: IntoOptionBytes,
     for<'a> O::Type<'a>: IntoOptionBytes,
-    for<'a> F: Fn(&'a S::Input) -> <O as IntoOptionBytes>::Type<'a>,
+    for<'a> F: Fn(&'a <S::Corpus as Corpus>::Input) -> <O as IntoOptionBytes>::Type<'a>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1324,11 +1322,11 @@ impl<F, O> MappedCrossoverReplaceMutator<F, O> {
 
 impl<S, F, I, O> Mutator<I, S> for MappedCrossoverReplaceMutator<F, O>
 where
-    S: HasCorpus + HasMaxSize + HasRand + UsesInput,
+    S: HasCorpus + HasMaxSize + HasRand,
     I: HasMutatorBytes,
     O: IntoOptionBytes,
     for<'a> O::Type<'a>: IntoOptionBytes,
-    for<'a> F: Fn(&'a S::Input) -> <O as IntoOptionBytes>::Type<'a>,
+    for<'a> F: Fn(&'a <S::Corpus as Corpus>::Input) -> <O as IntoOptionBytes>::Type<'a>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1404,13 +1402,14 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 #[derive(Debug, Default)]
 pub struct SpliceMutator;
 
-impl<S> Mutator<S::Input, S> for SpliceMutator
+impl<I, S> Mutator<I, S> for SpliceMutator
 where
     S: HasCorpus + HasRand,
-    S::Input: HasMutatorBytes,
+    <S::Corpus as Corpus>::Input: HasMutatorBytes,
+    I: HasMutatorBytes,
 {
     #[allow(clippy::cast_sign_loss)]
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
         if let Some(cur) = state.corpus().current() {

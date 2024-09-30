@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use libafl::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::Input,
     schedulers::{HasQueueCycles, RemovableScheduler, Scheduler},
     state::HasCorpus,
     Error, HasMetadata,
@@ -14,17 +13,19 @@ pub enum SupportedSchedulers<Q, W> {
     Weighted(W, PhantomData<Q>),
 }
 
-impl<I, Q, S, W> RemovableScheduler<I, S> for SupportedSchedulers<Q, W>
+impl<Q, S, W> RemovableScheduler<<S::Corpus as Corpus>::Input, S> for SupportedSchedulers<Q, W>
 where
-    Q: Scheduler<I, S> + RemovableScheduler<I, S>,
-    W: Scheduler<I, S> + RemovableScheduler<I, S>,
+    Q: Scheduler<<S::Corpus as Corpus>::Input, S>
+        + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+    W: Scheduler<<S::Corpus as Corpus>::Input, S>
+        + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasTestcase,
 {
     fn on_remove(
         &mut self,
         state: &mut S,
         id: CorpusId,
-        testcase: &Option<Testcase<I>>,
+        testcase: &Option<Testcase<<S::Corpus as Corpus>::Input>>,
     ) -> Result<(), Error> {
         match self {
             Self::Queue(queue, _) => queue.on_remove(state, id, testcase),
@@ -32,7 +33,12 @@ where
         }
     }
 
-    fn on_replace(&mut self, state: &mut S, id: CorpusId, prev: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &mut self,
+        state: &mut S,
+        id: CorpusId,
+        prev: &Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<(), Error> {
         match self {
             Self::Queue(queue, _) => queue.on_replace(state, id, prev),
             Self::Weighted(weighted, _) => weighted.on_replace(state, id, prev),
@@ -40,11 +46,10 @@ where
     }
 }
 
-impl<I, Q, S, W> Scheduler<I, S> for SupportedSchedulers<Q, W>
+impl<Q, S, W> Scheduler<<S::Corpus as Corpus>::Input, S> for SupportedSchedulers<Q, W>
 where
-    I: Input,
-    Q: Scheduler<I, S>,
-    W: Scheduler<I, S>,
+    Q: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    W: Scheduler<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasTestcase,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -77,7 +82,12 @@ where
             Self::Weighted(weighted, _) => weighted.next(state),
         }
     }
-    fn on_evaluation<OTB>(&mut self, state: &mut S, input: &I, observers: &OTB) -> Result<(), Error>
+    fn on_evaluation<OTB>(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+        observers: &OTB,
+    ) -> Result<(), Error>
     where
         OTB: MatchName,
     {

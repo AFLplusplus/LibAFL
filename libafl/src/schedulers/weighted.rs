@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use super::powersched::PowerSchedule;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::Input,
     observers::MapObserver,
     random_corpus_id,
     schedulers::{
@@ -163,11 +162,10 @@ where
         clippy::cast_precision_loss,
         clippy::cast_lossless
     )]
-    pub fn create_alias_table<I, S>(&self, state: &mut S) -> Result<(), Error>
+    pub fn create_alias_table<S>(&self, state: &mut S) -> Result<(), Error>
     where
-        F: TestcaseScore<I, S>,
-        I: Input,
-        S: HasCorpus<Input = I> + HasMetadata,
+        F: TestcaseScore<S>,
+        S: HasCorpus + HasMetadata,
     {
         let n = state.corpus().count();
 
@@ -312,13 +310,12 @@ impl<C, F, O> HasQueueCycles for WeightedScheduler<C, F, O> {
     }
 }
 
-impl<C, F, I, O, S> Scheduler<I, S> for WeightedScheduler<C, F, O>
+impl<C, F, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for WeightedScheduler<C, F, O>
 where
     C: AsRef<O> + Named,
-    F: TestcaseScore<I, S>,
-    I: Input,
+    F: TestcaseScore<S>,
     O: MapObserver,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand + HasTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -327,7 +324,12 @@ where
         Ok(())
     }
 
-    fn on_evaluation<OT>(&mut self, state: &mut S, _input: &I, observers: &OT) -> Result<(), Error>
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut S,
+        _input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
     where
         OT: MatchName,
     {
