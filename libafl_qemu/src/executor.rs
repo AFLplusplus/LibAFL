@@ -26,7 +26,7 @@ use libafl::{
 };
 #[cfg(feature = "fork")]
 use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, inputs::UsesInput,
+    events::EventManager, executors::InProcessForkExecutor,
     state::HasLastReportTime, HasMetadata,
 };
 #[cfg(feature = "fork")]

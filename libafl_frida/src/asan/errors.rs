@@ -579,11 +579,9 @@ pub enum AsanErrorsObserver {
     Static,
 }
 
-impl<S> Observer<S> for AsanErrorsObserver
-where
-    S: UsesInput,
+impl<I, S> Observer<I, S> for AsanErrorsObserver
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         AsanErrors::get_mut_blocking().clear();
 
         Ok(())
@@ -666,7 +664,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let observer = observers
             .get(&self.observer_handle)
@@ -688,7 +686,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
