@@ -9,7 +9,7 @@ They are sorted by focus:
 - [`binary_only`](./binary_only/): Fuzzers for binary-only targets.
 - [`forkserver`](./forkserver/): Fuzzers that use a forkserver-style executor.
 - [`full_system`](./full_system/): Fuzzers for full-system targets (kernels, firmwares, etc...).
-- [`fuzz-anything`](./fuzz_anything/): Fuzzers for advanced targets like WASM or python, and other fuzzers that can be used for anything.
+- [`fuzz_anything`](./fuzz_anything/): Fuzzers for advanced targets like WASM or python, and other fuzzers that can be used for anything.
 - [`inprocess`](./inprocess/): Common In-process fuzzers. Most of the time, this is what you want.
 - [`structure_aware`](./structure_aware/): Grammar fuzzers, fuzzers for certain languages, fuzzers with custom inputs, and more.
 

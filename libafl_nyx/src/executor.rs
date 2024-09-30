@@ -138,8 +138,11 @@ where
 }
 
 impl<S, OT> NyxExecutor<S, OT> {
-    /// convert `trace_bits` ptr into real trace map
-    pub fn trace_bits(self) -> &'static mut [u8] {
+    /// Convert `trace_bits` ptr into real trace map
+    ///
+    /// # Safety
+    /// Mutable borrow may only be used once at a time.
+    pub unsafe fn trace_bits(self) -> &'static mut [u8] {
         unsafe {
             std::slice::from_raw_parts_mut(self.helper.bitmap_buffer, self.helper.bitmap_size)
         }

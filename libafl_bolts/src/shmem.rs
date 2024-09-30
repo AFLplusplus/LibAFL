@@ -693,6 +693,9 @@ pub mod unix_shmem {
             /// Create a new [`MmapShMem`]
             /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete all `/dev/shm/libafl_*` after fuzzing
             pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
                 unsafe {
                     let mut full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
                     // leave one byte space for the null byte.
@@ -765,6 +768,9 @@ pub mod unix_shmem {
 
             #[allow(clippy::unnecessary_wraps)]
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
                 unsafe {
                     /* map the shared memory segment to the address space of the process */
                     #[cfg(target_vendor = "apple")]

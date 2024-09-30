@@ -549,7 +549,7 @@ create_hook_types!(
     EdgeExec,
     fn(&mut EmulatorModules<ET, S>, Option<&mut S>, id: u64),
     Box<dyn for<'a> FnMut(&'a mut EmulatorModules<ET, S>, Option<&'a mut S>, u64)>,
-    extern "C" fn(*const (), id: u64)
+    unsafe extern "C" fn(*const (), id: u64)
 );
 create_hook_id!(Edge, libafl_qemu_remove_edge_hook, true);
 create_gen_wrapper!(edge, (src: GuestAddr, dest: GuestAddr), u64, 1, EdgeHookId);
@@ -748,7 +748,7 @@ impl QemuHooks {
         &self,
         data: T,
         addr: GuestAddr,
-        callback: extern "C" fn(T, GuestAddr),
+        callback: unsafe extern "C" fn(T, GuestAddr),
         invalidate_block: bool,
     ) -> InstructionHookId {
         unsafe {

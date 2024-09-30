@@ -269,7 +269,9 @@ impl CmpLogRoutinesModule {
         self.address_filter.allowed(&addr)
     }
 
-    extern "C" fn on_call(k: u64, _pc: GuestAddr) {
+    /// # Safety
+    /// Dereferences k as pointer eventually.
+    unsafe extern "C" fn on_call(k: u64, _pc: GuestAddr) {
         unsafe {
             if CMPLOG_ENABLED == 0 {
                 return;
