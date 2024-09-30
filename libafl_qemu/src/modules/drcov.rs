@@ -1,5 +1,5 @@
 use std::{path::PathBuf, sync::Mutex};
-
+use std::ptr::addr_of_mut;
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
 use libafl_qemu_sys::{GuestAddr, GuestUsize};
@@ -12,6 +12,9 @@ use crate::{
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple},
     qemu::Hook,
 };
+
+#[cfg(emulation_mode = "systemmode")]
+use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
 static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
@@ -77,6 +80,8 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = F;
+    #[cfg(emulation_mode = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
 
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
@@ -204,6 +209,16 @@ where
 
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
         &mut self.filter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter(&self) -> &Self::ModulePageFilter {
+        &NopPageFilter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
