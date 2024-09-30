@@ -1,9 +1,3 @@
-#[cfg(not(cpu_target = "hexagon"))]
-pub mod drcov;
-
-#[cfg(not(cpu_target = "hexagon"))]
-pub use drcov::DrCovModule;
-
 #[cfg(feature = "injections")]
 pub mod injections;
 #[cfg(feature = "injections")]
