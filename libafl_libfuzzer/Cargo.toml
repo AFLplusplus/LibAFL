@@ -43,7 +43,7 @@ libafl-libfuzzer-use-version = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
-document-features = { version = "0.2.10", optional = true }
+document-features = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 features = ["document-features"]

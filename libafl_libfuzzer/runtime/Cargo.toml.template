@@ -65,19 +65,19 @@ libafl_targets = { path = "../libafl_targets", features = [
   "sanitizer_interfaces",
 ] }
 
-ahash = { version = "0.8.11", default-features = false }
-libc = "0.2.159"
-log = { version = "0.4.22", features = ["release_max_level_info"] }
-mimalloc = { version = "0.1.43", default-features = false }
-num-traits = "0.2.19"
+ahash = { workspace = true, default-features = false }
+libc = { workspace = true }
+log = { workspace = true, features = ["release_max_level_info"] }
+mimalloc = { workspace = true, default-features = false }
+num-traits = { workspace = true, default-features = true }
 rand = "0.8.5"
-serde = { version = "1.0.210", features = ["derive"] }              # serialization lib
-hashbrown = "0.14.5"
+serde = { workspace = true, default-features = true, features = ["derive"] }              # serialization lib
+hashbrown = { workspace = true, default-features = true }
 
 # for identifying if we can grimoire-ify
 utf8-chars = "3.0.4"
 env_logger = "0.11.5"
 
 [build-dependencies]
-bindgen = "0.70.1"
-cc = { version = "1.1.21", features = ["parallel"] }
+bindgen = { workspace = true }
+cc = { workspace = true, features = ["parallel"] }
