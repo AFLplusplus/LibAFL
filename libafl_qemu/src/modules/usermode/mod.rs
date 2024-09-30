@@ -6,9 +6,7 @@ pub use injections::InjectionModule;
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod snapshot;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use snapshot::IntervalSnapshotFilter;
-#[cfg(not(cpu_target = "hexagon"))]
-pub use snapshot::SnapshotModule;
+pub use snapshot::{IntervalSnapshotFilter, SnapshotModule};
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod asan;
