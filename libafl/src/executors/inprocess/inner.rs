@@ -151,7 +151,7 @@ impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
 where
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S>,
-    S: HasCorpus + HasExecutions + HasSolutions,
+    S: HasCorpus + HasExecutions + HasSolutions + UsesInput,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<E, EM, OF, Z>(
