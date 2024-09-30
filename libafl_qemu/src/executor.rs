@@ -6,6 +6,8 @@ use core::{
 };
 #[cfg(emulation_mode = "usermode")]
 use std::ptr;
+#[cfg(emulation_mode = "systemmode")]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use libafl::{
     corpus::Corpus,
@@ -24,7 +26,8 @@ use libafl::{
 };
 #[cfg(feature = "fork")]
 use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
+    events::EventManager, executors::InProcessForkExecutor, inputs::UsesInput,
+    state::HasLastReportTime, HasMetadata,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
@@ -72,8 +75,11 @@ pub unsafe fn inproc_qemu_crash_handler(
 }
 
 #[cfg(emulation_mode = "systemmode")]
-pub(crate) static mut BREAK_ON_TMOUT: bool = false;
+pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
 
+/// # Safety
+/// Can call through the `unix_signal_handler::inproc_timeout_handler`.
+/// Calling this method multiple times concurrently can lead to race conditions.
 #[cfg(emulation_mode = "systemmode")]
 pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     signal: Signal,
@@ -89,7 +95,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
     <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
-    if BREAK_ON_TMOUT {
+    if BREAK_ON_TMOUT.load(Ordering::Acquire) {
         libafl_exit_request_timeout();
     } else {
         libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
@@ -157,10 +163,14 @@ where
                 }
             };
 
-            inner
-                .exposed_executor_state_mut()
-                .modules_mut()
-                .crash_closure(Box::new(handler));
+            // # Safety
+            // We assume our crash handlers to be safe/quit after execution.
+            unsafe {
+                inner
+                    .exposed_executor_state_mut()
+                    .modules_mut()
+                    .crash_closure(Box::new(handler));
+            }
         }
 
         #[cfg(emulation_mode = "systemmode")]
@@ -185,9 +195,7 @@ where
 
     #[cfg(emulation_mode = "systemmode")]
     pub fn break_on_timeout(&mut self) {
-        unsafe {
-            BREAK_ON_TMOUT = true;
-        }
+        BREAK_ON_TMOUT.store(true, Ordering::Release);
     }
 
     pub fn inner_mut(

@@ -21,9 +21,7 @@ use libafl::{
         havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
         StdScheduledMutator, Tokens,
     },
-    observers::{
-        CanTrack, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{CanTrack, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },

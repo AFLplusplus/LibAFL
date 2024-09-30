@@ -543,19 +543,19 @@ static mut CALLSTACKS: Option<ThreadLocal<UnsafeCell<Vec<GuestAddr>>>> = None;
 #[derive(Debug)]
 pub struct FullBacktraceCollector {}
 
-impl Default for FullBacktraceCollector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl FullBacktraceCollector {
-    pub fn new() -> Self {
+    /// # Safety
+    /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
+    pub unsafe fn new() -> Self {
         unsafe { (*addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
         Self {}
     }
 
     pub fn reset(&mut self) {
+        // # Safety
+        // This accesses the global [`CALLSTACKS`] variable.
+        // While it is racey, it might be fine if multiple clear the vecs concurrently.
+        // TODO: This should probably be rewritten in a safer way.
         unsafe {
             for tls in (*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
@@ -564,6 +564,9 @@ impl FullBacktraceCollector {
     }
 
     pub fn backtrace() -> Option<&'static [GuestAddr]> {
+        // # Safety
+        // This accesses the global [`CALLSTACKS`] variable.
+        // However, the actual variable access is behind a `ThreadLocal` class.
         unsafe {
             if let Some(c) = (*addr_of_mut!(CALLSTACKS)).as_mut() {
                 Some(&*c.get_or_default().get())

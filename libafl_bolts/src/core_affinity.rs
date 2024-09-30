@@ -310,6 +310,8 @@ mod linux {
     }
 
     fn new_cpu_set() -> cpu_set_t {
+        // # Safety
+        // Returning a new zeroed value that is allowed to be 0.
         unsafe { zeroed::<cpu_set_t>() }
     }
 
@@ -733,6 +735,8 @@ mod netbsd {
     }
 
     fn new_cpuset() -> *mut _cpuset {
+        // # Safety
+        // Simply creating new empty cpuset. No user-provided params.
         unsafe { _cpuset_create() }
     }
 }

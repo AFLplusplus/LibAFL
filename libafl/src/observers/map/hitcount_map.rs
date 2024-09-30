@@ -38,11 +38,11 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 static mut COUNT_CLASS_LOOKUP_16: Vec<u16> = vec![];
 
 /// Initialize the 16-byte hitcounts map
-///
-/// # Safety
-///
-/// Calling this from multiple threads may be racey and hence leak 65k mem or even create a broken lookup vec.
 fn init_count_class_16() {
+    // # Safety
+    //
+    // Calling this from multiple threads may be racey and hence leak 65k mem or even create a broken lookup vec.
+    // We can live with that.
     unsafe {
         let count_class_lookup_16 = &mut *addr_of_mut!(COUNT_CLASS_LOOKUP_16);
 
