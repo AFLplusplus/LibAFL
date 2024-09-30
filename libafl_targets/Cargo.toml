@@ -22,7 +22,6 @@ all-features = true
 
 [features]
 default = [
-  "libfuzzer",
   "std",
   "sanitizers_flags",
   "windows_asan",
