@@ -619,9 +619,9 @@ impl Allocator {
                 if info.is_submap != 0 {
                     depth += 1;
                     continue;
-                } else {
-                    break;
                 }
+
+                break;
             }
 
             if kr != KERN_SUCCESS {
