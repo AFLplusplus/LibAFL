@@ -1,5 +1,5 @@
-use std::{path::PathBuf, sync::Mutex};
-use std::ptr::addr_of_mut;
+use std::{path::PathBuf, ptr::addr_of_mut, sync::Mutex};
+
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
 use libafl_qemu_sys::{GuestAddr, GuestUsize};
@@ -7,14 +7,13 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
+#[cfg(emulation_mode = "systemmode")]
+use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     emu::EmulatorModules,
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple},
     qemu::Hook,
 };
-
-#[cfg(emulation_mode = "systemmode")]
-use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
 static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
@@ -39,9 +38,67 @@ impl DrCovMetadata {
 libafl_bolts::impl_serdeany!(DrCovMetadata);
 
 #[derive(Debug)]
+pub struct DrCovModuleBuilder<F> {
+    filter: Option<F>,
+    module_mapping: Option<RangeMap<usize, (u16, String)>>,
+    filename: Option<PathBuf>,
+    full_trace: Option<bool>,
+}
+
+impl<F> DrCovModuleBuilder<F>
+where
+    F: AddressFilter,
+{
+    pub fn build(self) -> DrCovModule<F> {
+        DrCovModule::new(
+            self.filter.unwrap(),
+            self.filename.unwrap(),
+            self.module_mapping,
+            self.full_trace.unwrap(),
+        )
+    }
+
+    pub fn filter<F2>(self, filter: F2) -> DrCovModuleBuilder<F2> {
+        DrCovModuleBuilder {
+            filter: Some(filter),
+            module_mapping: self.module_mapping,
+            filename: self.filename,
+            full_trace: self.full_trace,
+        }
+    }
+
+    pub fn module_mapping(self, module_mapping: RangeMap<usize, (u16, String)>) -> Self {
+        Self {
+            filter: self.filter,
+            module_mapping: Some(module_mapping),
+            filename: self.filename,
+            full_trace: self.full_trace,
+        }
+    }
+
+    pub fn filename(self, filename: PathBuf) -> Self {
+        Self {
+            filter: self.filter,
+            module_mapping: self.module_mapping,
+            filename: Some(filename),
+            full_trace: self.full_trace,
+        }
+    }
+
+    pub fn full_trace(self, full_trace: bool) -> Self {
+        Self {
+            filter: self.filter,
+            module_mapping: self.module_mapping,
+            filename: self.filename,
+            full_trace: Some(full_trace),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct DrCovModule<F> {
     filter: F,
-    module_mapping: RangeMap<usize, (u16, String)>,
+    module_mapping: Option<RangeMap<usize, (u16, String)>>,
     filename: PathBuf,
     full_trace: bool,
     drcov_len: usize,
@@ -51,9 +108,23 @@ impl<F> DrCovModule<F>
 where
     F: AddressFilter,
 {
+    pub fn builder() -> DrCovModuleBuilder<F> {
+        DrCovModuleBuilder {
+            filter: None,
+            module_mapping: None,
+            full_trace: None,
+            filename: None,
+        }
+    }
+
     #[must_use]
     #[allow(clippy::let_underscore_untyped)]
-    pub fn new(filter: F, filename: PathBuf, full_trace: bool) -> Self {
+    pub fn new(
+        filter: F,
+        filename: PathBuf,
+        module_mapping: Option<RangeMap<usize, (u16, String)>>,
+        full_trace: bool,
+    ) -> Self {
         if full_trace {
             let _ = DRCOV_IDS.lock().unwrap().insert(vec![]);
         }
@@ -61,7 +132,7 @@ where
         let _ = DRCOV_LENGTHS.lock().unwrap().insert(HashMap::new());
         Self {
             filter,
-            module_mapping: RangeMap::new(),
+            module_mapping,
             filename,
             full_trace,
             drcov_len: 0,
@@ -94,23 +165,45 @@ where
         );
     }
 
+    #[cfg(emulation_mode = "usermode")]
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
-        let qemu = emulator_modules.qemu();
+        if self.module_mapping.is_none() {
+            log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
 
-        for (i, (r, p)) in qemu
-            .mappings()
-            .filter_map(|m| {
-                m.path()
-                    .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                    .filter(|(_, p)| !p.is_empty())
-            })
-            .enumerate()
-        {
-            self.module_mapping.insert(r, (i as u16, p));
+            let qemu = emulator_modules.qemu();
+
+            let mut module_mapping: RangeMap<usize, (u16, String)> = RangeMap::new();
+
+            for (i, (r, p)) in qemu
+                .mappings()
+                .filter_map(|m| {
+                    m.path()
+                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                        .filter(|(_, p)| !p.is_empty())
+                })
+                .enumerate()
+            {
+                module_mapping.insert(r, (i as u16, p));
+            }
+
+            self.module_mapping = Some(module_mapping);
+        } else {
+            log::info!("Using user-provided module mapping for DrCov module.");
         }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+        assert!(
+            self.module_mapping.is_some(),
+            "DrCov should have a module mapping already set."
+        );
     }
 
     fn post_exec<OT, ET>(
@@ -132,13 +225,18 @@ where
                 for id in DRCOV_IDS.lock().unwrap().as_ref().unwrap() {
                     'pcs_full: for (pc, idm) in DRCOV_MAP.lock().unwrap().as_ref().unwrap() {
                         let mut module_found = false;
-                        for module in self.module_mapping.iter() {
-                            let (range, (_, _)) = module;
-                            if *pc >= range.start.try_into().unwrap()
-                                && *pc <= range.end.try_into().unwrap()
-                            {
-                                module_found = true;
-                                break;
+                        // # Safety
+                        //
+                        // Module mapping is already set. It's checked or filled when the module is first run.
+                        unsafe {
+                            for module in self.module_mapping.as_ref().unwrap_unchecked().iter() {
+                                let (range, (_, _)) = module;
+                                if *pc >= range.start.try_into().unwrap()
+                                    && *pc <= range.end.try_into().unwrap()
+                                {
+                                    module_found = true;
+                                    break;
+                                }
                             }
                         }
                         if !module_found {
@@ -160,9 +258,14 @@ where
                     }
                 }
 
-                DrCovWriter::new(&self.module_mapping)
-                    .write(&self.filename, &drcov_vec)
-                    .expect("Failed to write coverage file");
+                // # Safety
+                //
+                // Module mapping is already set. It's checked or filled when the module is first run.
+                unsafe {
+                    DrCovWriter::new(&self.module_mapping.as_ref().unwrap_unchecked())
+                        .write(&self.filename, &drcov_vec)
+                        .expect("Failed to write coverage file");
+                }
             }
             self.drcov_len = DRCOV_IDS.lock().unwrap().as_ref().unwrap().len();
         } else {
@@ -170,13 +273,18 @@ where
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
                 'pcs: for (pc, _) in DRCOV_MAP.lock().unwrap().as_ref().unwrap() {
                     let mut module_found = false;
-                    for module in self.module_mapping.iter() {
-                        let (range, (_, _)) = module;
-                        if *pc >= range.start.try_into().unwrap()
-                            && *pc <= range.end.try_into().unwrap()
-                        {
-                            module_found = true;
-                            break;
+                    // # Safety
+                    //
+                    // Module mapping is already set. It's checked or filled when the module is first run.
+                    unsafe {
+                        for module in self.module_mapping.as_ref().unwrap_unchecked().iter() {
+                            let (range, (_, _)) = module;
+                            if *pc >= range.start.try_into().unwrap()
+                                && *pc <= range.end.try_into().unwrap()
+                            {
+                                module_found = true;
+                                break;
+                            }
                         }
                     }
                     if !module_found {
@@ -195,9 +303,14 @@ where
                     }
                 }
 
-                DrCovWriter::new(&self.module_mapping)
-                    .write(&self.filename, &drcov_vec)
-                    .expect("Failed to write coverage file");
+                // # Safety
+                //
+                // Module mapping is already set. It's checked or filled when the module is first run.
+                unsafe {
+                    DrCovWriter::new(&self.module_mapping.as_ref().unwrap_unchecked())
+                        .write(&self.filename, &drcov_vec)
+                        .expect("Failed to write coverage file");
+                }
             }
             self.drcov_len = DRCOV_MAP.lock().unwrap().as_ref().unwrap().len();
         }
