@@ -459,31 +459,28 @@ unsafe fn internal_handle_exception(
         .iter()
         .position(|x| *x == exception_code)
         .unwrap();
-    match &EXCEPTION_HANDLERS[index] {
-        Some(handler_holder) => {
-            log::info!(
-                "{:?}: Handling exception {}",
-                std::process::id(),
-                exception_code
-            );
-            let handler = &mut **handler_holder.handler.get();
-            handler.handle(exception_code, exception_pointers);
-            EXCEPTION_CONTINUE_EXECUTION
-        }
-        None => {
-            log::info!(
-                "{:?}: No handler for exception {}",
-                std::process::id(),
-                exception_code
-            );
-            // Go to Default one
-            let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
-                .as_ref()
-                .unwrap();
-            let handler = &mut **handler_holder.handler.get();
-            handler.handle(exception_code, exception_pointers);
-            EXCEPTION_CONTINUE_SEARCH
-        }
+    if let Some(handler_holder) = &EXCEPTION_HANDLERS[index] {
+        log::info!(
+            "{:?}: Handling exception {}",
+            std::process::id(),
+            exception_code
+        );
+        let handler = &mut **handler_holder.handler.get();
+        handler.handle(exception_code, exception_pointers);
+        EXCEPTION_CONTINUE_EXECUTION
+    } else {
+        log::info!(
+            "{:?}: No handler for exception {}",
+            std::process::id(),
+            exception_code
+        );
+        // Go to Default one
+        let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
+            .as_ref()
+            .unwrap();
+        let handler = &mut **handler_holder.handler.get();
+        handler.handle(exception_code, exception_pointers);
+        EXCEPTION_CONTINUE_SEARCH
     }
 }
 
