@@ -1,9 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
+  "bindings/pylibafl",
   "libafl",
   "libafl_bolts",
   "libafl_cc",
+  "libafl_concolic/symcc_runtime",
+  "libafl_concolic/symcc_libafl",
   "libafl_derive",
   "libafl_frida",
   "libafl_libfuzzer",
@@ -31,7 +34,6 @@ default-members = [
 ]
 
 exclude = [
-  "bindings",
   "fuzzers",
   "utils/noaslr",
   "utils/gdb_qemu",
@@ -40,8 +42,6 @@ exclude = [
   "utils/multi_machine_generator",
   "scripts",
   # additional crates
-  "libafl_concolic/symcc_runtime",
-  "libafl_concolic/symcc_libafl",
   "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 
@@ -69,6 +69,7 @@ postcard = { version = "1.0.10", features = [
 ], default-features = false } # no_std compatible serde serialization format
 pyo3 = "0.22.3"
 pyo3-build-config = "0.22.3"
+pyo3-log = "0.11.0"
 rangemap = "1.5.1"
 regex = "1.10.6"
 rustversion = "1.0.17"
