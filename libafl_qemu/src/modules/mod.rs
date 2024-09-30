@@ -98,7 +98,6 @@ where
         qemu.flush_jit();
     }
 
-
     #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter;
     #[cfg(emulation_mode = "systemmode")]
