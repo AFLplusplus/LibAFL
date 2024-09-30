@@ -233,11 +233,11 @@ pub fn fuzz() {
             let core = core_id.0;
             cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
-            let emulator_modules = tuple_list!(DrCovModule::new(
-                StdAddressFilter::default(),
-                cov_path,
-                false,
-            ));
+            let emulator_modules = tuple_list!(DrCovModule::builder()
+                .filter(StdAddressFilter::default())
+                .filename(cov_path)
+                .full_trace(false)
+                .build());
 
             let emulator = Emulator::empty()
                 .qemu(qemu)
