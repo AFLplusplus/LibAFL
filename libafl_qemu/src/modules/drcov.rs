@@ -1,3 +1,5 @@
+#[cfg(emulation_mode = "systemmode")]
+use core::ptr::addr_of_mut;
 use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
@@ -7,6 +9,8 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
+#[cfg(emulation_mode = "systemmode")]
+use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     emu::EmulatorModules,
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple},
@@ -48,6 +52,7 @@ impl<F> DrCovModule<F>
 where
     F: AddressFilter,
 {
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(filter: F, filename: PathBuf, full_trace: bool) -> Self {
@@ -59,6 +64,29 @@ where
         Self {
             filter,
             module_mapping: RangeMap::new(),
+            filename,
+            full_trace,
+            drcov_len: 0,
+        }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    #[allow(clippy::let_underscore_untyped)]
+    pub fn new(
+        filter: F,
+        filename: PathBuf,
+        module_mapping: RangeMap<usize, (u16, String)>,
+        full_trace: bool,
+    ) -> Self {
+        if full_trace {
+            let _ = DRCOV_IDS.lock().unwrap().insert(vec![]);
+        }
+        let _ = DRCOV_MAP.lock().unwrap().insert(HashMap::new());
+        let _ = DRCOV_LENGTHS.lock().unwrap().insert(HashMap::new());
+        Self {
+            filter,
+            module_mapping,
             filename,
             full_trace,
             drcov_len: 0,
@@ -77,6 +105,8 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = F;
+    #[cfg(emulation_mode = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
 
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
@@ -88,13 +118,12 @@ where
             Hook::Function(exec_trace_block::<ET, F, S>),
         );
     }
-
+    #[cfg(emulation_mode = "usermode")]
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
         let qemu = emulator_modules.qemu();
-
         for (i, (r, p)) in qemu
             .mappings()
             .filter_map(|m| {
@@ -106,6 +135,13 @@ where
         {
             self.module_mapping.insert(r, (i as u16, p));
         }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
     }
 
     fn post_exec<OT, ET>(
@@ -204,6 +240,16 @@ where
 
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
         &mut self.filter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter(&self) -> &Self::ModulePageFilter {
+        &NopPageFilter
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
