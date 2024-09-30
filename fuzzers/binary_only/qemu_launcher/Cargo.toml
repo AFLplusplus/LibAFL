@@ -38,6 +38,7 @@ debug = true
 
 [build-dependencies]
 vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
+vergen-git2 = "1.0.1"
 
 [dependencies]
 clap = { version = "4.5.18", features = ["derive", "string"] }
