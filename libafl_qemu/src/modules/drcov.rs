@@ -69,6 +69,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn module_mapping(self, module_mapping: RangeMap<usize, (u16, String)>) -> Self {
         Self {
             filter: self.filter,
@@ -78,6 +79,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn filename(self, filename: PathBuf) -> Self {
         Self {
             filter: self.filter,
@@ -87,6 +89,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn full_trace(self, full_trace: bool) -> Self {
         Self {
             filter: self.filter,
@@ -110,6 +113,7 @@ impl<F> DrCovModule<F>
 where
     F: AddressFilter,
 {
+    #[must_use]
     pub fn builder() -> DrCovModuleBuilder<F> {
         DrCovModuleBuilder {
             filter: None,
@@ -264,7 +268,7 @@ where
                 //
                 // Module mapping is already set. It's checked or filled when the module is first run.
                 unsafe {
-                    DrCovWriter::new(&self.module_mapping.as_ref().unwrap_unchecked())
+                    DrCovWriter::new(self.module_mapping.as_ref().unwrap_unchecked())
                         .write(&self.filename, &drcov_vec)
                         .expect("Failed to write coverage file");
                 }
@@ -309,7 +313,7 @@ where
                 //
                 // Module mapping is already set. It's checked or filled when the module is first run.
                 unsafe {
-                    DrCovWriter::new(&self.module_mapping.as_ref().unwrap_unchecked())
+                    DrCovWriter::new(self.module_mapping.as_ref().unwrap_unchecked())
                         .write(&self.filename, &drcov_vec)
                         .expect("Failed to write coverage file");
                 }
