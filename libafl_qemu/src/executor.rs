@@ -26,8 +26,7 @@ use libafl::{
 };
 #[cfg(feature = "fork")]
 use libafl::{
-    events::EventManager, executors::InProcessForkExecutor,
-    state::HasLastReportTime, HasMetadata,
+    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
