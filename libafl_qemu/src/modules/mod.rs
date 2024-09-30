@@ -30,6 +30,11 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::CmpLogModule;
 
+#[cfg(not(cpu_target = "hexagon"))]
+pub mod drcov;
+#[cfg(not(cpu_target = "hexagon"))]
+pub use drcov::*;
+
 use crate::{emu::EmulatorModules, Qemu};
 
 /// A module for `libafl_qemu`.
