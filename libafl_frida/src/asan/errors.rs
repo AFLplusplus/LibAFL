@@ -17,7 +17,7 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::{Observer, ObserversTuple},
     state::State,
     Error, HasMetadata,
