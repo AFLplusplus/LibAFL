@@ -1083,7 +1083,9 @@ pub mod pybind {
             self.qemu.flush_jit();
         }
 
-        fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
+        /// # Safety
+        /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
+        unsafe fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
                 let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
                 let idx = hooks.len();
@@ -1097,7 +1099,9 @@ pub mod pybind {
             }
         }
 
-        fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
+        /// # Safety
+        /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
+        unsafe fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
             unsafe {
                 let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
                 hooks.retain(|(a, _)| *a != addr);

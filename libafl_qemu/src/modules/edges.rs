@@ -592,13 +592,17 @@ where
     }
 }
 
-pub extern "C" fn trace_edge_hitcount(_: *const (), id: u64) {
+// # Safety
+// Calling this concurrently for the same id is racey and may lose updates.
+pub unsafe extern "C" fn trace_edge_hitcount(_: *const (), id: u64) {
     unsafe {
         EDGES_MAP[id as usize] = EDGES_MAP[id as usize].wrapping_add(1);
     }
 }
 
 pub extern "C" fn trace_edge_single(_: *const (), id: u64) {
+    // # Safety
+    // Worst case we set the byte to 1 multiple times..
     unsafe {
         EDGES_MAP[id as usize] = 1;
     }
@@ -649,14 +653,19 @@ where
     Some(id)
 }
 
-pub extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
+/// # Safety
+/// Increases id at `EDGES_MAP_PTR` - potentially racey if called concurrently.
+pub unsafe extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
     unsafe {
         let ptr = EDGES_MAP_PTR.add(id as usize);
         *ptr = (*ptr).wrapping_add(1);
     }
 }
 
-pub extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
+/// # Safety
+/// Fine.
+/// Worst case we set the byte to 1 multiple times.
+pub unsafe extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
     unsafe {
         let ptr = EDGES_MAP_PTR.add(id as usize);
         *ptr = 1;
@@ -708,7 +717,9 @@ where
     Some(id)
 }
 
-pub extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
+/// # Safety
+/// Dereferences the global `PREV_LOC` variable. May not be called concurrently.
+pub unsafe extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
             let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
@@ -719,7 +730,9 @@ pub extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
     }
 }
 
-pub extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
+/// # Safety
+/// Dereferences the global `PREV_LOC` variable. May not be called concurrently.
+pub unsafe extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
             let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
