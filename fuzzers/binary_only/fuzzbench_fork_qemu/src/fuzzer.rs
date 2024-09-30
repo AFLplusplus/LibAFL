@@ -50,7 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     modules::{
         cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
-        edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+        edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_DEFAULT_SIZE},
     },
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
@@ -219,7 +219,7 @@ fn fuzz(
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
     let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
@@ -248,7 +248,7 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
         ))

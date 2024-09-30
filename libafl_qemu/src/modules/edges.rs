@@ -24,7 +24,7 @@ static mut LIBAFL_QEMU_EDGES_MAP_PTR: *mut u8 = ptr::null_mut();
 static mut LIBAFL_QEMU_EDGES_MAP_SIZE_PTR: *mut usize = ptr::null_mut();
 
 #[no_mangle]
-static mut LIBAFL_QEMU_EDGES_MAP_SIZE_MAX: usize = 0;
+static mut LIBAFL_QEMU_EDGES_MAP_ALLOCATED_SIZE: usize = 0;
 
 #[no_mangle]
 static mut LIBAFL_QEMU_EDGES_MAP_MASK_MAX: usize = 0;
@@ -403,7 +403,7 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
 
             LIBAFL_QEMU_EDGES_MAP_PTR = map_ptr;
             LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = size_ptr;
-            LIBAFL_QEMU_EDGES_MAP_SIZE_MAX = map_max_size;
+            LIBAFL_QEMU_EDGES_MAP_ALLOCATED_SIZE = map_max_size;
             LIBAFL_QEMU_EDGES_MAP_MASK_MAX = map_max_size - 1;
         }
 

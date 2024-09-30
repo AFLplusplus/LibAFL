@@ -127,11 +127,11 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// ```rust,ignore
 /// use libafl::observers::StdMapObserver;
-/// use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE_IN_USE};
+/// use libafl_targets::{EDGES_MAP, EDGES_MAP_DEFAULT_SIZE};
 ///
 /// #[cfg(not(feature = "pointer_maps"))]
 /// let observer = unsafe {
-///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_SIZE_IN_USE)
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_DEFAULT_SIZE)
 /// };
 /// ```
 ///

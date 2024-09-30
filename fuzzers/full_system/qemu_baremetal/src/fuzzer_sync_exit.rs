@@ -30,7 +30,7 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::edges::{
-        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
+        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND,
     },
 };
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
@@ -73,7 +73,7 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
                 addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()

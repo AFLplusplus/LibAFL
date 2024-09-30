@@ -233,13 +233,13 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
     {
         pos = update_ngram(pos);
-        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE_IN_USE);
+        // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
     }
 
     #[cfg(feature = "sancov_ctx")]
     {
         pos ^= __afl_prev_ctx as usize;
-        // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE_IN_USE);
+        // println!("Wrinting to {} {}", pos, EDGES_MAP_DEFAULT_SIZE);
     }
 
     #[cfg(feature = "pointer_maps")]
@@ -297,7 +297,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
         {
             let edges_map_len = (*addr_of!(EDGES_MAP)).len();
             MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
-            assert!((MAX_EDGES_FOUND <= edges_map_len), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_SIZE_IN_USE env to increase it at compile time.");
+            assert!((MAX_EDGES_FOUND <= edges_map_len), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time.");
         }
     }
 }

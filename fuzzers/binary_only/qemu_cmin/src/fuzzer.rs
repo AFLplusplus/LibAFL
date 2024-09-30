@@ -28,7 +28,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+    modules::edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_DEFAULT_SIZE},
     ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
     QemuExitReason, QemuForkExecutor, QemuShutdownCause, Regs,
 };
@@ -155,12 +155,12 @@ pub fn fuzz() -> Result<(), Error> {
         },
     };
 
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
     let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
         ))
