@@ -12,6 +12,8 @@ members = [
   "libafl_targets",
   "libafl_tinyinst",
   "libafl_qemu",
+  "libafl_qemu/libafl_qemu_build",
+  "libafl_qemu/libafl_qemu_sys",
   "libafl_sugar",
   "libafl_concolic/test/dump_constraints",
   "libafl_concolic/test/runtime_test",
@@ -40,8 +42,6 @@ exclude = [
   # additional crates
   "libafl_concolic/symcc_runtime",
   "libafl_concolic/symcc_libafl",
-  "libafl_qemu/libafl_qemu_build",
-  "libafl_qemu/libafl_qemu_sys",
   "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 

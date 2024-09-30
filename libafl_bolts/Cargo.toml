@@ -141,7 +141,7 @@ erased-serde = { version = "0.4.5", default-features = false, optional = true } 
 postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
 num_enum = { workspace = true, default-features = false }
 ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
-backtrace = { workspace = true, optional = true } # Used to get the stacktrace in StacktraceObserver
+backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.2.8" }
 serde_json = { workspace = true, optional = true, default-features = false, features = [
