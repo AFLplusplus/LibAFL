@@ -28,7 +28,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_DEFAULT_SIZE},
+    modules::edges::{StdEdgeCoverageChildModule, EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR},
     ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
     QemuExitReason, QemuForkExecutor, QemuShutdownCause, Regs,
 };

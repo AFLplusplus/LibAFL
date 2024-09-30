@@ -36,7 +36,8 @@ use libafl_qemu::{
     modules::{
         cmplog::CmpLogObserver,
         edges::{
-            edges_map_mut_ptr, StdEdgeCoverageClassicModule, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND,
+            edges_map_mut_ptr, StdEdgeCoverageClassicModule, EDGES_MAP_ALLOCATED_SIZE,
+            MAX_EDGES_FOUND,
         },
         CmpLogModule,
     },
