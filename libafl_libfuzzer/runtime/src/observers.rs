@@ -224,6 +224,7 @@ where
 impl<'it, M, O> AsIter<'it> for MappedEdgeMapObserver<M, O>
 where
     M: MapObserver + for<'a> AsIter<'a, Item = M::Entry>,
+    M::Entry: 'it,
     O: ValueObserver + 'it,
 {
     type Item = O::ValueType;

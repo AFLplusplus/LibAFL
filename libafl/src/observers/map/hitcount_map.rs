@@ -9,7 +9,7 @@ use core::{
     slice,
 };
 
-use libafl_bolts::{AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Truncate};
+use libafl_bolts::{AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -442,5 +442,18 @@ where
 
     fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
         self.base.post_observe_second(observers)
+    }
+}
+
+impl<'it, M> AsIter<'it> for HitcountsIterableMapObserver<M>
+where
+    M: AsIter<'it>,
+{
+    type Item = M::Item;
+    type Ref = M::Ref;
+    type IntoIter = M::IntoIter;
+
+    fn as_iter(&'it self) -> Self::IntoIter {
+        self.base.as_iter()
     }
 }
