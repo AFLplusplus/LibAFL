@@ -187,7 +187,7 @@ impl NyxExecutorBuilder {
 impl<S, OT> HasObservers for NyxExecutor<S, OT>
 where
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
     type Observers = OT;
 
