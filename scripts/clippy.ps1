@@ -45,7 +45,7 @@ $AllProjects = @(
     "utils/build_and_test_fuzzers",
     "utils/deexit",
     "utils/libafl_benches",
-    "utils/gramatron/construct_automata",
+    "utils/gramatron/construct_automata"
 )
 
 # Check if arguments were provided
