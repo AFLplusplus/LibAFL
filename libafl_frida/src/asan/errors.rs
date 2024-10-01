@@ -16,7 +16,7 @@ use libafl::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, StateInitializer},
     inputs::HasTargetBytes,
     observers::{Observer, ObserversTuple},
     state::State,

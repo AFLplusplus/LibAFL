@@ -7,7 +7,7 @@ use libafl::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, MinMapFeedback},
+    feedbacks::{Feedback, MinMapFeedback, StateInitializer},
     inputs::{BytesInput, Input},
     observers::ObserversTuple,
     state::State,
