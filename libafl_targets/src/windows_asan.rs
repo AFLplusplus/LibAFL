@@ -34,7 +34,7 @@ pub unsafe fn setup_asan_callback<E, EM, OF, Z>(_executor: &E, _event_mgr: &EM, 
 where
     E: Executor<EM, Z> + HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<E::State>,
+    OF: Feedback<EM, E::Input, E::Observers, E::State>,
     E::State: HasSolutions + HasCorpus + HasExecutions,
     E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     Z: HasObjective<Objective = OF, State = E::State>,
