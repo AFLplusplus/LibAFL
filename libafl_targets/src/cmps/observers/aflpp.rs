@@ -3,7 +3,6 @@ use core::fmt::Debug;
 
 use libafl::{
     executors::ExitKind,
-    inputs::UsesInput,
     observers::{
         cmp::{AFLppCmpValuesMetadata, CmpMap, CmpObserver, CmpValues},
         Observer,
@@ -95,7 +94,7 @@ impl<'a> CmpObserver for AFLppCmpLogObserver<'a> {
 
 impl<'a, I, S> Observer<I, S> for AFLppCmpLogObserver<'a>
 where
-    S: UsesInput + HasMetadata,
+    S: HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         #[cfg(feature = "cmplog_extended_instrumentation")]
