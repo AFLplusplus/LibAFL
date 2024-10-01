@@ -461,3 +461,15 @@ where
         self.base.as_iter()
     }
 }
+
+impl<'it, M> AsIterMut<'it> for HitcountsIterableMapObserver<M>
+where
+    M: AsIterMut<'it>,
+{
+    type RefMut = M::RefMut;
+    type IntoIterMut = M::IntoIterMut;
+
+    fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
+        self.base.as_iter_mut()
+    }
+}
