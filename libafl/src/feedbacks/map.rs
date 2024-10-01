@@ -679,7 +679,7 @@ fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
 
 impl<C, N, O, R> MapFeedback<C, N, O, R>
 where
-    C: CanTrack + Named,
+    C: CanTrack + Named + AsRef<O>,
 {
     /// Create new `MapFeedback`
     #[must_use]
