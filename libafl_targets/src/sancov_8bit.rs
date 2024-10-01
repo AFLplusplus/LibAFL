@@ -386,5 +386,5 @@ mod observers {
         }
     }
 
-    impl<OTA, OTB> DifferentialObserver<OTA, OTB> for CountersMultiMapObserver<true> {}
+    impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for CountersMultiMapObserver<true> {}
 }

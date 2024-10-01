@@ -170,10 +170,10 @@ where
     }
 }
 
-impl<T, OTA, OTB, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB>
+impl<T, OTA, OTB, I, S, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, I, S>
     for ExplicitTracking<T, ITH, NTH>
 where
-    T: DifferentialObserver<OTA, OTB>,
+    T: DifferentialObserver<OTA, OTB, I, S>,
 {
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         self.as_mut().pre_observe_first(observers)
@@ -755,4 +755,4 @@ where
     }
 }
 
-impl<'a, OTA, OTB, T> DifferentialObserver<OTA, OTB> for StdMapObserver<'a, T, true> {}
+impl<'a, OTA, OTB, I, S, T> DifferentialObserver<OTA, OTB, I, S> for StdMapObserver<'a, T, true> {}

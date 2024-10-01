@@ -262,9 +262,11 @@ where
     }
 }
 
-impl<M, OTA, OTB> DifferentialObserver<OTA, OTB> for HitcountsMapObserver<M>
+impl<M, OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for HitcountsMapObserver<M>
 where
-    M: DifferentialObserver<OTA, OTB>,
+    M: DifferentialObserver<OTA, OTB, I, S>
+        + MapObserver<Entry = u8>
+        + for<'a> AsSliceMut<'a, Entry = u8>,
 {
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         self.base.pre_observe_first(observers)
@@ -424,9 +426,11 @@ where
     }
 }
 
-impl<M, OTA, OTB> DifferentialObserver<OTA, OTB> for HitcountsIterableMapObserver<M>
+impl<M, OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for HitcountsIterableMapObserver<M>
 where
-    M: DifferentialObserver<OTA, OTB>,
+    M: DifferentialObserver<OTA, OTB, I, S>
+        + MapObserver<Entry = u8>
+        + for<'it> AsIterMut<'it, Item = u8>,
 {
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         self.base.pre_observe_first(observers)

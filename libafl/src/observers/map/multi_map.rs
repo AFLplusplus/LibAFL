@@ -267,4 +267,4 @@ where
     }
 }
 
-impl<'a, T, OTA, OTB> DifferentialObserver<OTA, OTB> for MultiMapObserver<'a, T, true> {}
+impl<'a, OTA, OTB, I, S, T> DifferentialObserver<OTA, OTB, I, S> for MultiMapObserver<'a, T, true> {}

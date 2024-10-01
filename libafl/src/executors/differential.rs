@@ -17,10 +17,11 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     inputs::UsesInput,
     observers::{DifferentialObserversTuple, ObserversTuple},
-    state::UsesState,
+    state::{HasCorpus, UsesState},
     Error,
 };
 
@@ -38,7 +39,7 @@ impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
     where
         A: UsesState + HasObservers<Observers = OTA>,
         B: UsesState<State = <Self as UsesState>::State> + HasObservers<Observers = OTB>,
-        DOT: DifferentialObserversTuple<OTA, OTB>,
+        DOT: DifferentialObserversTuple<OTA, OTB, A::Input, A::State>,
     {
         Self {
             primary,
@@ -71,7 +72,7 @@ where
         ObserversTuple<<<A as UsesState>::State as UsesInput>::Input, <A as UsesState>::State>,
     <B as HasObservers>::Observers:
         ObserversTuple<<<A as UsesState>::State as UsesInput>::Input, <A as UsesState>::State>,
-    DOT: DifferentialObserversTuple<A::Observers, B::Observers> + MatchName,
+    DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::Input, A::State> + MatchName,
     Z: UsesState<State = <Self as UsesState>::State>,
 {
     fn run_target(
@@ -128,6 +129,42 @@ pub struct ProxyObserversTuple<A, B, DOT> {
     primary: OwnedMutPtr<A>,
     secondary: OwnedMutPtr<B>,
     differential: DOT,
+}
+
+impl<A, B, DOT, I, S> ObserversTuple<I, S> for ProxyObserversTuple<A, B, DOT>
+where
+    A: ObserversTuple<I, S>,
+    B: ObserversTuple<I, S>,
+    DOT: DifferentialObserversTuple<A, B, I, S> + MatchName,
+    S: HasCorpus,
+    S::Corpus: Corpus<Input = I>,
+{
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.differential.pre_exec_all(state, input)
+    }
+
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.differential.post_exec_all(state, input, exit_kind)
+    }
+
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.differential.pre_exec_child_all(state, input)
+    }
+
+    fn post_exec_child_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.differential
+            .post_exec_child_all(state, input, exit_kind)
+    }
 }
 
 impl<A, B, DOT> Deref for ProxyObserversTuple<A, B, DOT> {
@@ -191,7 +228,7 @@ impl<A, B, DOT, OTA, OTB> HasObservers for DiffExecutor<A, B, DOT, OTA, OTB>
 where
     A: UsesState + HasObservers<Observers = OTA>,
     B: UsesState<State = <Self as UsesState>::State> + HasObservers<Observers = OTB>,
-    DOT: DifferentialObserversTuple<OTA, OTB> + MatchName,
+    DOT: DifferentialObserversTuple<OTA, OTB, A::Input, A::State> + MatchName,
     OTA: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     OTB: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
 {
