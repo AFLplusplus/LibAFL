@@ -13,7 +13,7 @@ use libafl::{
     state::State,
     Error, HasMetadata,
 };
-use libafl_bolts::{impl_serdeany, Named};
+use libafl_bolts::{impl_serdeany, tuples::MatchNameRef, Named};
 use libafl_targets::OomFeedback;
 use serde::{Deserialize, Serialize};
 
@@ -124,6 +124,7 @@ impl<S> StateInitializer<S> for LibfuzzerCrashCauseFeedback {}
 impl<EM, OT, S> Feedback<EM, BytesInput, OT, S> for LibfuzzerCrashCauseFeedback
 where
     S: State<Input = BytesInput>,
+    OT: MatchNameRef,
 {
     fn is_interesting(
         &mut self,

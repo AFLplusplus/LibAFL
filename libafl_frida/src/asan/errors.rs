@@ -653,6 +653,7 @@ impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for AsanErrorsFeedback<S>
 where
     S: State + Debug,
     S::Input: HasTargetBytes,
+    OT: MatchNameRef,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
