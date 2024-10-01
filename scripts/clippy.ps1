@@ -36,10 +36,16 @@ function Run-Clippy {
 
 # Define projects for Windows
 $AllProjects = @(
-    "libafl_frida",
+    "libafl_concolic/test/dump_constraints",
+    "libafl_concolic/test/runtime_test",
     "libafl_libfuzzer",
     "libafl_nyx",
+    "libafl_sugar",
     "libafl_tinyinst"
+    "utils/build_and_test_fuzzers",
+    "utils/deexit",
+    "utils/libafl_benches",
+    "utils/gramatron/construct_automata",
 )
 
 # Check if arguments were provided
@@ -52,9 +58,9 @@ else {
     $Projects = $args[0] -split ','
 }
 
-# First run it on all
+# First run it on all default members
 $env:RUST_BACKTRACE = "full"
-cargo +nightly clippy --all --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace `
+cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace `
     -D clippy::all `
     -D clippy::pedantic `
     -W clippy::similar_names `
