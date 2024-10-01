@@ -153,8 +153,6 @@ impl<'a> Client<'a> {
                 }
             });
 
-        let extra_tokens = injection_module.as_ref().map(|h| h.tokens.clone());
-
         qemu.entry_break(start_pc);
 
         let ret_addr: GuestAddr = qemu
@@ -169,7 +167,12 @@ impl<'a> Client<'a> {
             .address_filter(self.coverage_filter(&qemu)?)
             .build();
 
-        let instance = Instance::builder()
+        let extra_tokens = injection_module
+            .as_ref()
+            .map(|h| h.tokens.clone())
+            .unwrap_or_default();
+
+        let instance_builder = Instance::builder()
             .options(self.options)
             .qemu(&qemu)
             .mgr(mgr)
@@ -178,7 +181,7 @@ impl<'a> Client<'a> {
 
         if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(
                         edge_coverage_module,
                         CmpLogModule::default(),
@@ -188,7 +191,7 @@ impl<'a> Client<'a> {
                     state,
                 )
             } else {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(
                         edge_coverage_module,
                         CmpLogModule::default(),
@@ -199,7 +202,7 @@ impl<'a> Client<'a> {
             }
         } else if is_asan_guest && is_cmplog {
             if let Some(injection_module) = injection_module {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(
                         edge_coverage_module,
                         CmpLogModule::default(),
@@ -209,7 +212,7 @@ impl<'a> Client<'a> {
                     state,
                 )
             } else {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(
                         edge_coverage_module,
                         CmpLogModule::default(),
@@ -220,7 +223,7 @@ impl<'a> Client<'a> {
             }
         } else if is_asan {
             if let Some(injection_module) = injection_module {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(
                         edge_coverage_module,
                         AsanModule::default(asan.take().unwrap()),
@@ -229,7 +232,7 @@ impl<'a> Client<'a> {
                     state,
                 )
             } else {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(
                         edge_coverage_module,
                         AsanModule::default(asan.take().unwrap()),
@@ -242,10 +245,10 @@ impl<'a> Client<'a> {
                 edge_coverage_module,
                 AsanGuestModule::default(&qemu, asan_lib.take().unwrap())
             );
-            instance.build().run(modules, state)
+            instance_builder.build().run(modules, state)
         } else if is_cmplog {
             if let Some(injection_module) = injection_module {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(
                         edge_coverage_module,
                         CmpLogModule::default(),
@@ -254,17 +257,17 @@ impl<'a> Client<'a> {
                     state,
                 )
             } else {
-                instance.build().run(
+                instance_builder.build().run(
                     tuple_list!(edge_coverage_module, CmpLogModule::default()),
                     state,
                 )
             }
         } else if let Some(injection_module) = injection_module {
-            instance
+            instance_builder
                 .build()
                 .run(tuple_list!(edge_coverage_module, injection_module), state)
         } else {
-            instance
+            instance_builder
                 .build()
                 .run(tuple_list!(edge_coverage_module), state)
         }
