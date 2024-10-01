@@ -138,15 +138,13 @@ impl Named for OomFeedback {
     }
 }
 
-impl<S> Feedback<S> for OomFeedback
-where
-    S: State,
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for OomFeedback
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {

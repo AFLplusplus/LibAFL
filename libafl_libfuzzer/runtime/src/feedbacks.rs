@@ -43,11 +43,11 @@ impl Named for LibfuzzerKeepFeedback {
     }
 }
 
-impl<S> Feedback<S> for LibfuzzerKeepFeedback
+impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for LibfuzzerKeepFeedback
 where
     S: State,
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
@@ -119,21 +119,21 @@ impl LibfuzzerCrashCauseFeedback {
     }
 }
 
-impl<S> Feedback<S> for LibfuzzerCrashCauseFeedback
+impl<EM, OT, S> Feedback<EM, BytesInput, OT, S> for LibfuzzerCrashCauseFeedback
 where
     S: State<Input = BytesInput>,
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &BytesInput,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S::Input, S>,
+        OT: ObserversTuple<BytesInput, S>,
     {
         self.exit_kind = *exit_kind;
         Ok(false)
@@ -148,10 +148,10 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<S::Input>,
+        testcase: &mut Testcase<BytesInput>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S::Input, S>,
+        OT: ObserversTuple<BytesInput, S>,
     {
         match self.exit_kind {
             ExitKind::Crash | ExitKind::Oom if OomFeedback::oomed() => {

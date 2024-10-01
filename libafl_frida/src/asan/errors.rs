@@ -647,24 +647,20 @@ pub struct AsanErrorsFeedback<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> Feedback<S> for AsanErrorsFeedback<S>
+impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for AsanErrorsFeedback<S>
 where
     S: State + Debug,
     S::Input: HasTargetBytes,
 {
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S::Input, S>,
-    {
+    ) -> Result<bool, Error> {
         let observer = observers
             .get(&self.observer_handle)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
@@ -677,7 +673,7 @@ where
         }
     }
 
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,

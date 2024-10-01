@@ -59,7 +59,7 @@ where
     }
 }
 
-/// A [`DiffFeedback`] compares the content of two [`Observer`]s using the given compare function.
+/// A [`DiffFeedback`] compares the content of two observers using the given compare function.
 #[derive(Serialize, Deserialize)]
 pub struct DiffFeedback<C, O1, O2> {
     /// This feedback's name
