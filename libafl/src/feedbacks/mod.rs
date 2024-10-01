@@ -910,6 +910,8 @@ pub type DiffExitKindFeedback = ExitKindFeedback<GenericDiffLogic>;
 pub struct TimeFeedback {
     observer_handle: Handle<TimeObserver>,
 }
+impl<S> StateInitializer<S> for TimeFeedback {}
+
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TimeFeedback
 where
     OT: MatchName,

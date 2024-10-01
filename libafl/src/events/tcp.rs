@@ -614,7 +614,8 @@ where
         E: Executor<Self, Z, State = S> + HasObservers,
         E::Observers: Serialize + ObserversTuple<S::Input, S>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<Self, E::Observers, State = S>
+            + EvaluatorObservers<Self, E::Observers>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -645,9 +646,8 @@ where
                     {
                         state.scalability_monitor_mut().testcase_without_observers += 1;
                     }
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, false,
-                    )?
+                    fuzzer
+                        .evaluate_input_with_observers::<E>(state, executor, self, input, false)?
                 };
                 if let Some(item) = _res.1 {
                     *state.imported_mut() += 1;
@@ -756,7 +756,8 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    Z: EvaluatorObservers<Self, E::Observers, State = S>
+        + ExecutionProcessor<Self, E::Observers, State = S>,
 {
     fn process(
         &mut self,
@@ -830,7 +831,8 @@ where
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    Z: EvaluatorObservers<Self, E::Observers, State = S>
+        + ExecutionProcessor<Self, E::Observers, State = S>,
 {
 }
 
@@ -976,7 +978,8 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<TcpEventManager<EMH, S>, E::Observers, State = S>
+        + ExecutionProcessor<TcpEventManager<EMH, S>, E::Observers>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.tcp_mgr.process(fuzzer, state, executor)
@@ -996,7 +999,8 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<TcpEventManager<EMH, S>, E::Observers, State = S>
+        + ExecutionProcessor<TcpEventManager<EMH, S>, E::Observers>, //CE: CustomEvent<I>,
 {
 }
 

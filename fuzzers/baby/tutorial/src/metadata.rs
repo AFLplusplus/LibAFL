@@ -45,12 +45,12 @@ pub struct PacketLenFeedback {
     len: u64,
 }
 
-impl<S> Feedback<S> for PacketLenFeedback
+impl<EM, OT, S> Feedback<EM, PacketData, OT, S> for PacketLenFeedback
 where
     S: State<Input = PacketData>,
 {
     #[inline]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
@@ -67,7 +67,7 @@ where
     }
 
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
