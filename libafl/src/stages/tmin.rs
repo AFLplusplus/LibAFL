@@ -19,12 +19,12 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
     executors::{ExitKind, HasObservers},
+    feedbacks::StateInitializer,
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     observers::{MapObserver, ObserversTuple},
-    prelude::StateInitializer,
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
