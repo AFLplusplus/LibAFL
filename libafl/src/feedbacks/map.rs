@@ -25,9 +25,9 @@ use crate::{
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
+    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver},
-    state::UsesState,
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -401,7 +401,7 @@ where
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadata + UsesState,
+    S: HasNamedMetadata + UsesInput, // delete me
 {
     #[rustversion::nightly]
     default fn is_interesting(
@@ -541,7 +541,7 @@ where
     EM: EventFirer<State = S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadata + UsesState,
+    S: HasNamedMetadata,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
