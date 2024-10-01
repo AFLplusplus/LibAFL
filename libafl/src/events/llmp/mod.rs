@@ -293,7 +293,7 @@ where
         event: Event<DI>,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<State = S>,
+        E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
@@ -347,7 +347,7 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        E: Executor<EM, Z> + HasObservers<State = S>,
+        E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,

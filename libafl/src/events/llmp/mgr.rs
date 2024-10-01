@@ -39,7 +39,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver, UsesObservers},
+    observers::{ObserversTuple, TimeObserver},
     state::{HasExecutions, HasImported, HasLastReportTime, NopState, State, UsesState},
     Error, HasMetadata,
 };
@@ -403,8 +403,8 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = S>,
-        <E as UsesObservers>::Observers: Serialize,
+        E: Executor<Self, Z, State = S> + HasObservers,
+        E::Observers: ObserversTuple<S::Input, S> + Serialize,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
     {
@@ -553,7 +553,7 @@ where
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         const SERIALIZE_TIME_FACTOR: u32 = 2;
         const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
@@ -585,10 +585,10 @@ where
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
-    <E as UsesObservers>::Observers: Serialize,
     S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
 {
@@ -636,8 +636,8 @@ where
 
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,

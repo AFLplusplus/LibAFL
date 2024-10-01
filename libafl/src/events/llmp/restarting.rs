@@ -49,7 +49,7 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::UsesInput,
     monitors::Monitor,
-    observers::{ObserversTuple, TimeObserver, UsesObservers},
+    observers::{ObserversTuple, TimeObserver},
     state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
@@ -149,7 +149,7 @@ where
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         self.llmp_mgr.serialize_observers(observers)
     }
@@ -204,8 +204,8 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
@@ -228,8 +228,8 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,

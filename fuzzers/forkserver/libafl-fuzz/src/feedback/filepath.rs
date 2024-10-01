@@ -118,10 +118,10 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<<S>::Input>,
+        testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         (self.func)(state, testcase, &self.out_dir)?;

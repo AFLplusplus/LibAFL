@@ -103,7 +103,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.get(&self.observer_handle).unwrap();
@@ -130,7 +130,7 @@ where
         _testcase: &mut crate::corpus::Testcase<<S>::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         let history_set = state

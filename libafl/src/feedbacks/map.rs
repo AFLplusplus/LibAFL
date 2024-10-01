@@ -407,7 +407,7 @@ where
     R: Reducer<T>,
     S: State + HasNamedMetadata,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
-    C: CanTrack + AsRef<O> + Observer<S>,
+    C: CanTrack + AsRef<O> + Named,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -427,7 +427,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
         #[cfg(feature = "track_hit_feedbacks")]
@@ -448,7 +448,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<<S as UsesInput>::Input, S>,
     {
         let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
 
@@ -467,7 +467,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         EM: EventFirer<State = S>,
     {
         if let Some(novelties) = self.novelties.as_mut().map(core::mem::take) {
@@ -564,7 +564,7 @@ impl<C, O, S> Feedback<S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer, u8
 where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     S: State + HasNamedMetadata,
-    C: CanTrack + AsRef<O> + Observer<S>,
+    C: CanTrack + AsRef<O> + Observer<S::Input, S>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -578,7 +578,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
@@ -761,7 +761,7 @@ where
     ) -> bool
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         S: UsesInput + HasNamedMetadata,
     {
         let mut interesting = false;

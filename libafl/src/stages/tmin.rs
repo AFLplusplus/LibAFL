@@ -23,7 +23,7 @@ use crate::{
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple, UsesObservers},
+    observers::{MapObserver, ObserversTuple},
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
@@ -45,7 +45,7 @@ pub trait TMinMutationalStage<E, EM, F, IP, M, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F, E::Observers>
 where
     E: UsesState<State = Self::State> + HasObservers,
-    <E as UsesObservers>::Observers: Serialize,
+    E::Observers: ObserversTuple<Self::Input, Self::State> + Serialize,
     EM: UsesState<State = Self::State> + EventFirer,
     F: Feedback<Self::State>,
     Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions + HasCurrentTestcase,
@@ -241,8 +241,8 @@ impl<E, EM, F, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F
 where
     Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
-    E: HasObservers<State = Self::State>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + UsesState<State = Z::State>,
+    E::Observers: ObserversTuple<Self::Input, Self::State> + Serialize,
     EM: EventFirer<State = Self::State>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
@@ -304,8 +304,8 @@ impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
 where
     Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
-    E: HasObservers<State = Self::State>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + UsesState<State = Z::State>,
+    E::Observers: ObserversTuple<Self::Input, Self::State> + Serialize,
     EM: EventFirer<State = Self::State>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<Self::State>,
@@ -407,7 +407,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let obs = observers
             .get(self.observer_handle())
@@ -458,7 +458,7 @@ impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqual
 where
     M: MapObserver,
     C: AsRef<M> + Handled,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {

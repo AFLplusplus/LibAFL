@@ -57,7 +57,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         Ok(*self.keep.borrow())
     }
@@ -133,7 +133,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         self.exit_kind = *exit_kind;
         Ok(false)
@@ -151,7 +151,7 @@ where
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         match self.exit_kind {
             ExitKind::Crash | ExitKind::Oom if OomFeedback::oomed() => {

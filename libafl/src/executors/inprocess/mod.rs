@@ -31,7 +31,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
 };
@@ -65,7 +65,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     harness_fn: HB,
@@ -78,7 +78,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -94,21 +94,10 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     type State = S;
-}
-
-impl<H, HB, HT, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, HT, OT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
-    S: State,
-{
-    type Observers = OT;
 }
 
 impl<EM, H, HB, HT, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, HT, OT, S>
@@ -117,7 +106,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions,
     Z: UsesState<State = S>,
 {
@@ -149,9 +138,11 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
@@ -166,7 +157,7 @@ where
 impl<'a, H, OT, S> InProcessExecutor<'a, H, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
     <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
@@ -279,7 +270,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
     <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
@@ -421,7 +412,7 @@ where
     H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// the timeout handler
@@ -448,7 +439,8 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     event_mgr: &mut EM,
     exitkind: ExitKind,
 ) where
-    E: HasObservers,
+    E: Executor<EM, Z> + HasObservers,
+    E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
@@ -511,6 +503,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 pub unsafe fn generic_inproc_crash_handler<E, EM, OF, Z>()
 where
     E: Executor<EM, Z> + HasObservers,
+    E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,

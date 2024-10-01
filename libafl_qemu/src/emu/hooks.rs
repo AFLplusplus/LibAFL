@@ -1161,7 +1161,7 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         unsafe {
             self.modules_mut().post_exec_all(

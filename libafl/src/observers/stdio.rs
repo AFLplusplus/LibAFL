@@ -10,7 +10,7 @@ use std::vec::Vec;
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
+use crate::{observers::Observer, Error};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
@@ -67,7 +67,7 @@ use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
 ///     ) -> Result<bool, Error>
 ///     where
 ///         EM: EventFirer<State = S>,
-///         OT: ObserversTuple<S>,
+///         OT: ObserversTuple<S::Input, S>,
 ///     {
 ///         unsafe {
 ///             STDOUT = observers.get(&self.stdout_observer).unwrap().stdout.clone();
@@ -198,20 +198,13 @@ impl Named for StdOutObserver {
     }
 }
 
-impl<S> Observer<S> for StdOutObserver
-where
-    S: State,
-{
-    fn pre_exec_child(
-        &mut self,
-        _state: &mut S,
-        _input: &<S as UsesInput>::Input,
-    ) -> Result<(), Error> {
+impl<I, S> Observer<I, S> for StdOutObserver {
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.stdout = None;
         Ok(())
     }
 
-    fn pre_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.stdout = None;
         Ok(())
     }
@@ -252,20 +245,13 @@ impl Named for StdErrObserver {
     }
 }
 
-impl<S> Observer<S> for StdErrObserver
-where
-    S: State,
-{
-    fn pre_exec_child(
-        &mut self,
-        _state: &mut S,
-        _input: &<S as UsesInput>::Input,
-    ) -> Result<(), Error> {
+impl<I, S> Observer<I, S> for StdErrObserver {
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.stderr = None;
         Ok(())
     }
 
-    fn pre_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.stderr = None;
         Ok(())
     }
