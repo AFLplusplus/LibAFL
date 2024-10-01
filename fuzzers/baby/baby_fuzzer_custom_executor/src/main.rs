@@ -100,7 +100,8 @@ pub fn main() {
         CrashFeedback::new(),
         // We `and` the MaxMapFeedback to only end up with crashes that trigger new coverage.
         // We use the _fast variant to make sure it's not evaluated every time, even if the crash didn't trigger..
-        MaxMapFeedback::new(&observer)
+        // We have to give this one a name since it differs from the first map.
+        MaxMapFeedback::with_name("on_crash", &observer)
     );
 
     // create a State from scratch
