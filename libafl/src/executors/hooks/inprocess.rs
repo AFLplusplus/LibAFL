@@ -239,7 +239,7 @@ where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me

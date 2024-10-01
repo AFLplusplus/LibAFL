@@ -38,7 +38,7 @@ where
     OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: State + HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {
@@ -137,7 +137,7 @@ where
     HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     Z: HasObjective<Objective = OF, State = S>,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -179,7 +179,7 @@ where
     SP: ShMemProvider,
     Z: UsesState<State = S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: State + HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {
