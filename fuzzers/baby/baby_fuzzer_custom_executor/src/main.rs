@@ -1,6 +1,10 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{marker::PhantomData, path::PathBuf, ptr::write};
+use std::{
+    marker::PhantomData,
+    path::PathBuf,
+    ptr::{addr_of, write},
+};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -9,35 +13,36 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{Executor, ExitKind, WithObservers},
+    feedback_and_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{BytesInput, HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
-    observers::{self, StdMapObserver},
-    prelude::Executor,
+    observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
-    state::{State, StdState, UsesState},
+    state::{HasExecutions, State, StdState, UsesState},
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
+static SIGNALS_LEN: usize = unsafe { (*addr_of!(SIGNALS)).len() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-struct CustomExecutor<S> {
+struct CustomExecutor<S: State> {
     phantom: PhantomData<S>,
 }
 
-impl<S> CustomExecutor<S> {
-    pub fn new() -> Self {
+impl<S: State> CustomExecutor<S> {
+    pub fn new(_state: &S) -> Self {
         Self {
             phantom: PhantomData,
         }
@@ -51,17 +56,20 @@ impl<S: State> UsesState for CustomExecutor<S> {
 impl<EM, S, Z> Executor<EM, Z> for CustomExecutor<S>
 where
     EM: UsesState<State = S>,
-    S: State,
+    S: State + HasExecutions,
     Z: UsesState<State = S>,
     Self::Input: HasTargetBytes,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        _fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut EM,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, libafl::Error> {
+        // We need to keep track of the exec count.
+        *state.executions_mut() += 1;
+
         let target = input.target_bytes();
         let buf = target.as_slice();
         signals_set(0);
@@ -81,13 +89,19 @@ where
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = CrashFeedback::new();
+    let mut objective = feedback_and_fast!(
+        // Look for crashes.
+        CrashFeedback::new(),
+        // We `and` the MaxMapFeedback to only end up with crashes that trigger new coverage.
+        // We use the _fast variant to make sure it's not evaluated every time, even if the crash didn't trigger..
+        MaxMapFeedback::new(&observer)
+    );
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -126,9 +140,9 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = CustomExecutor::new();
+    let executor = CustomExecutor::new(&state);
 
-    let executor = executor.with_observers(tuple_list!(observer));
+    let mut executor = WithObservers::new(executor, tuple_list!(observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
