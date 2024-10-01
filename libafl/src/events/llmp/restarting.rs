@@ -210,8 +210,8 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<State = S>
-        + EvaluatorObservers<E::Observers>
+    Z: ExecutionProcessor<LlmpEventManager<EMH, S, SP>, E::Observers, State = S>
+        + EvaluatorObservers<LlmpEventManager<EMH, S, SP>, E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
@@ -234,8 +234,8 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<State = S>
-        + EvaluatorObservers<E::Observers>
+    Z: ExecutionProcessor<LlmpEventManager<EMH, S, SP>, E::Observers, State = S>
+        + EvaluatorObservers<LlmpEventManager<EMH, S, SP>, E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
 }

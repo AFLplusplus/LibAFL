@@ -406,7 +406,9 @@ where
         E: Executor<Self, Z, State = S> + HasObservers,
         E::Observers: ObserversTuple<S::Input, S> + Serialize,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
+        Z: ExecutionProcessor<Self, E::Observers, State = S>
+            + EvaluatorObservers<Self, E::Observers>
+            + Evaluator<E, Self>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -449,7 +451,7 @@ where
                         {
                             state.scalability_monitor_mut().testcase_without_observers += 1;
                         }
-                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                        fuzzer.evaluate_input_with_observers::<E>(
                             state, executor, self, input, false,
                         )?
                     };
@@ -590,7 +592,9 @@ where
     E: HasObservers + Executor<Self, Z, State = S>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
+    Z: ExecutionProcessor<Self, E::Observers, State = S>
+        + EvaluatorObservers<Self, E::Observers>
+        + Evaluator<E, Self>,
 {
     fn process(
         &mut self,
@@ -642,7 +646,9 @@ where
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers> + Evaluator<E, Self>,
+    Z: ExecutionProcessor<Self, E::Observers, State = S>
+        + EvaluatorObservers<Self, E::Observers>
+        + Evaluator<E, Self>,
 {
 }
 

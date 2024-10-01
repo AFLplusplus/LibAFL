@@ -509,7 +509,7 @@ where
     E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     Z: HasObjective<Objective = OF, State = E::State>
         + HasScheduler<State = E::State>
-        + ExecutionProcessor,
+        + ExecutionProcessor<EM, E::Observers>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
     let data = addr_of_mut!(GLOBAL_STATE);

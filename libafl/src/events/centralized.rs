@@ -377,8 +377,8 @@ where
     S: State,
     Self::State: HasExecutions + HasMetadata,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<State = Self::State>,
+    Z: EvaluatorObservers<Self, E::Observers, State = Self::State>
+        + ExecutionProcessor<Self, E::Observers, State = Self::State>,
 {
     fn process(
         &mut self,
@@ -413,8 +413,8 @@ where
     EMH: EventManagerHooksTuple<EM::State>,
     S: State,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<State = Self::State>,
+    Z: EvaluatorObservers<Self, E::Observers, State = Self::State>
+        + ExecutionProcessor<Self, E::Observers, State = Self::State>,
 {
 }
 
@@ -535,8 +535,8 @@ where
             ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = <Self as UsesState>::State>
-            + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<Self, E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<Self, E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
@@ -585,8 +585,8 @@ where
             ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a> + Serialize,
-        Z: ExecutionProcessor<State = <Self as UsesState>::State>
-            + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<Self, E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<Self, E::Observers>,
     {
         log::debug!("handle_in_main!");
 
@@ -641,7 +641,7 @@ where
                             process::id(),
                             event_name
                         );
-                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                        fuzzer.evaluate_input_with_observers::<E>(
                             state,
                             executor,
                             self,

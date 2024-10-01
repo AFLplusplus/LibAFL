@@ -47,7 +47,7 @@ where
 /// Holds an feedback
 pub trait HasFeedback: UsesState {
     /// The feedback type
-    type Feedback: Feedback<Self::State>;
+    type Feedback;
 
     /// The feedback
     fn feedback(&self) -> &Self::Feedback;
@@ -59,7 +59,7 @@ pub trait HasFeedback: UsesState {
 /// Holds an objective feedback
 pub trait HasObjective: UsesState {
     /// The type of the [`Feedback`] used to find objectives for this fuzzer
-    type Objective: Feedback<Self::State>;
+    type Objective;
 
     /// The objective feedback
     fn objective(&self) -> &Self::Objective;
@@ -69,9 +69,9 @@ pub trait HasObjective: UsesState {
 }
 
 /// Evaluates if an input is interesting using the feedback
-pub trait ExecutionProcessor: UsesState {
+pub trait ExecutionProcessor<EM, OT>: UsesState {
     /// Check the outcome of the execution, find if it is worth for corpus or objectives
-    fn check_results<EM, OT>(
+    fn check_results(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -85,7 +85,7 @@ pub trait ExecutionProcessor: UsesState {
 
     /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
     #[allow(clippy::too_many_arguments)]
-    fn process_execution<EM, OT>(
+    fn process_execution(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -98,7 +98,7 @@ pub trait ExecutionProcessor: UsesState {
         OT: ObserversTuple<<Self as UsesInput>::Input, Self::State>;
 
     /// serialize and send event via manager
-    fn serialize_and_dispatch<EM, OT>(
+    fn serialize_and_dispatch(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -112,7 +112,7 @@ pub trait ExecutionProcessor: UsesState {
         OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize;
 
     /// send event via manager
-    fn dispatch_event<EM>(
+    fn dispatch_event(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -125,7 +125,7 @@ pub trait ExecutionProcessor: UsesState {
         EM: EventFirer<State = Self::State>;
 
     /// Evaluate if a set of observation channels has an interesting state
-    fn evaluate_execution<EM, OT>(
+    fn evaluate_execution(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -140,11 +140,11 @@ pub trait ExecutionProcessor: UsesState {
 }
 
 /// Evaluates an input modifying the state of the fuzzer
-pub trait EvaluatorObservers<OT>: UsesState + Sized {
+pub trait EvaluatorObservers<EM, OT>: UsesState + Sized {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new
     /// [`crate::corpus::Testcase`] in the [`crate::corpus::Corpus`]
-    fn evaluate_input_with_observers<E, EM>(
+    fn evaluate_input_with_observers<E>(
         &mut self,
         state: &mut Self::State,
         executor: &mut E,
@@ -336,8 +336,6 @@ where
 impl<CS, F, OF, S> HasFeedback for StdFuzzer<CS, F, OF, S>
 where
     S: State,
-    F: Feedback<S>,
-    OF: Feedback<S>,
 {
     type Feedback = F;
 
@@ -353,8 +351,6 @@ where
 impl<CS, F, OF, S> HasObjective for StdFuzzer<CS, F, OF, S>
 where
     S: State,
-    F: Feedback<S>,
-    OF: Feedback<S>,
 {
     type Objective = OF;
 
@@ -367,16 +363,16 @@ where
     }
 }
 
-impl<CS, F, OF, S> ExecutionProcessor for StdFuzzer<CS, F, OF, S>
+impl<CS, EM, F, OF, OT, S> ExecutionProcessor<EM, OT> for StdFuzzer<CS, F, OF, S>
 where
     CS: Scheduler<S::Input, S>,
-    F: Feedback<S>,
-    OF: Feedback<S>,
+    F: Feedback<EM, S::Input, OT, S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: HasCorpus + HasSolutions + HasExecutions + HasCorpus + HasCurrentCorpusId + State,
     S::Corpus: Corpus<Input = S::Input>,    //delete me
     S::Solutions: Corpus<Input = S::Input>, //delete me
 {
-    fn check_results<EM, OT>(
+    fn check_results(
         &mut self,
         state: &mut S,
         manager: &mut EM,
@@ -420,7 +416,7 @@ where
         Ok(res)
     }
 
-    fn evaluate_execution<EM, OT>(
+    fn evaluate_execution(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -441,7 +437,7 @@ where
         Ok((exec_res, corpus_id))
     }
 
-    fn serialize_and_dispatch<EM, OT>(
+    fn serialize_and_dispatch(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -475,7 +471,7 @@ where
         Ok(())
     }
 
-    fn dispatch_event<EM>(
+    fn dispatch_event(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -527,7 +523,7 @@ where
     }
 
     /// Evaluate if a set of observation channels has an interesting state
-    fn process_execution<EM, OT>(
+    fn process_execution(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
@@ -585,19 +581,19 @@ where
     }
 }
 
-impl<CS, F, OF, OT, S> EvaluatorObservers<OT> for StdFuzzer<CS, F, OF, S>
+impl<CS, EM, F, OF, OT, S> EvaluatorObservers<EM, OT> for StdFuzzer<CS, F, OF, S>
 where
     CS: Scheduler<S::Input, S>,
     OT: ObserversTuple<S::Input, S> + Serialize + DeserializeOwned,
-    F: Feedback<S>,
-    OF: Feedback<S>,
+    F: Feedback<EM, S::Input, OT, S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: HasCorpus + HasSolutions + HasExecutions + State,
     S::Corpus: Corpus<Input = S::Input>,    //delete me
     S::Solutions: Corpus<Input = S::Input>, //delete me
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
-    fn evaluate_input_with_observers<E, EM>(
+    fn evaluate_input_with_observers<E>(
         &mut self,
         state: &mut S,
         executor: &mut E,
@@ -624,8 +620,8 @@ where
     E: HasObservers + Executor<EM, Self, State = S>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize + DeserializeOwned,
     EM: EventFirer<State = S>,
-    F: Feedback<S>,
-    OF: Feedback<S>,
+    F: Feedback<EM, S::Input, E::Observers, S>,
+    OF: Feedback<EM, S::Input, E::Observers, S>,
     S: HasCorpus + HasSolutions + HasExecutions + HasLastFoundTime + State,
     S::Corpus: Corpus<Input = S::Input>,    //delete me
     S::Solutions: Corpus<Input = S::Input>, //delete me
@@ -760,8 +756,6 @@ where
     CS: Scheduler<S::Input, S>,
     E: UsesState<State = S>,
     EM: ProgressReporter + EventProcessor<E, Self, State = S>,
-    F: Feedback<S>,
-    OF: Feedback<S>,
     S: HasExecutions
         + HasMetadata
         + HasCorpus
@@ -837,8 +831,6 @@ where
 impl<CS, F, OF, S> StdFuzzer<CS, F, OF, S>
 where
     CS: Scheduler<S::Input, S>,
-    F: Feedback<<Self as UsesState>::State>,
-    OF: Feedback<<Self as UsesState>::State>,
     S: UsesInput + HasExecutions + HasCorpus + State,
 {
     /// Create a new `StdFuzzer` with standard behavior.
@@ -901,8 +893,6 @@ where
 impl<CS, E, EM, F, OF, S> ExecutesInput<E, EM> for StdFuzzer<CS, F, OF, S>
 where
     CS: Scheduler<S::Input, S>,
-    F: Feedback<<Self as UsesState>::State>,
-    OF: Feedback<<Self as UsesState>::State>,
     E: Executor<EM, Self, State = S> + HasObservers,
     E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     EM: UsesState<State = Self::State>,

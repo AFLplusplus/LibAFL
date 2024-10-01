@@ -296,7 +296,7 @@ where
         E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<EM, E::Observers, State = S> + EvaluatorObservers<EM, E::Observers>,
     {
         match event {
             Event::NewTestcase {
@@ -308,7 +308,7 @@ where
                     return Ok(());
                 };
 
-                let res = fuzzer.evaluate_input_with_observers::<E, EM>(
+                let res = fuzzer.evaluate_input_with_observers::<E>(
                     state,
                     executor,
                     manager,
@@ -350,7 +350,7 @@ where
         E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<EM, E::Observers, State = S> + EvaluatorObservers<EM, E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
