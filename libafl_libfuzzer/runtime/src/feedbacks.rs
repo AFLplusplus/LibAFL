@@ -119,6 +119,8 @@ impl LibfuzzerCrashCauseFeedback {
     }
 }
 
+impl<S> StateInitializer<S> for LibfuzzerCrashCauseFeedback {}
+
 impl<EM, OT, S> Feedback<EM, BytesInput, OT, S> for LibfuzzerCrashCauseFeedback
 where
     S: State<Input = BytesInput>,
@@ -130,11 +132,7 @@ where
         _input: &BytesInput,
         _observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<BytesInput, S>,
-    {
+    ) -> Result<bool, Error> {
         self.exit_kind = *exit_kind;
         Ok(false)
     }
@@ -149,10 +147,7 @@ where
         _manager: &mut EM,
         _observers: &OT,
         testcase: &mut Testcase<BytesInput>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<BytesInput, S>,
-    {
+    ) -> Result<(), Error> {
         match self.exit_kind {
             ExitKind::Crash | ExitKind::Oom if OomFeedback::oomed() => {
                 self.set_filename("oom", testcase);

@@ -647,6 +647,8 @@ pub struct AsanErrorsFeedback<S> {
     phantom: PhantomData<S>,
 }
 
+impl<S> StateInitializer<S> for AsanErrorsFeedback<S> {}
+
 impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for AsanErrorsFeedback<S>
 where
     S: State + Debug,
@@ -679,10 +681,7 @@ where
         _manager: &mut EM,
         _observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S::Input, S>,
-    {
+    ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }

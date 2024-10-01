@@ -138,6 +138,8 @@ impl Named for OomFeedback {
     }
 }
 
+impl<S> StateInitializer<S> for OomFeedback {}
+
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for OomFeedback
 {
     fn is_interesting(
