@@ -52,7 +52,7 @@ pub trait DiffComparator<O1, O2> {
 
 impl<F, O1, O2> DiffComparator<O1, O2> for F
 where
-    F: FnMut(&O1, &O2) -> DiffResult,
+    F: Fn(&O1, &O2) -> DiffResult,
 {
     fn compare(&mut self, first: &O1, second: &O2) -> DiffResult {
         self(first, second)
@@ -217,32 +217,33 @@ mod tests {
         }
     }
 
+    fn comparator(o1: &DummyObserver, o2: &DummyObserver) -> DiffResult {
+        if o1 == o2 {
+            DiffResult::Equal
+        } else {
+            DiffResult::Diff
+        }
+    }
+
     fn test_diff(should_equal: bool) {
-        let mut nop_state = NopState::new();
+        let mut nop_state: NopState<BytesInput> = NopState::new();
 
         let o1 = DummyObserver::new("o1", true);
         let o2 = DummyObserver::new("o2", should_equal);
 
-        let mut diff_feedback = DiffFeedback::new("diff_feedback", &o1, &o2, |o1, o2| {
-            if o1 == o2 {
-                DiffResult::Equal
-            } else {
-                DiffResult::Diff
-            }
-        })
-        .unwrap();
+        let mut diff_feedback = DiffFeedback::new("diff_feedback", &o1, &o2, comparator).unwrap();
         let observers = tuple_list![o1, o2];
         assert_eq!(
             !should_equal,
-            diff_feedback
-                .is_interesting(
-                    &mut nop_state,
-                    &mut NopEventManager::default(),
-                    &BytesInput::new(vec![0]),
-                    &observers,
-                    &ExitKind::Ok
-                )
-                .unwrap()
+            DiffFeedback::<_, _, _>::is_interesting(
+                &mut diff_feedback,
+                &mut nop_state,
+                &mut NopEventManager::<NopState<BytesInput>>::default(),
+                &BytesInput::new(vec![0]),
+                &observers,
+                &ExitKind::Ok
+            )
+            .unwrap()
         );
     }
 
