@@ -6,7 +6,6 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
-    state::State,
     Error,
 };
 use libafl_bolts::Named;
