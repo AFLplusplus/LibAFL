@@ -1,0 +1,183 @@
+env_scripts = ['''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''', '''
+#!@duckscript
+runs_on_ci = get_env RUN_ON_CI
+
+if ${runs_on_ci}
+    cargo_target_dir = get_env CARGO_MAKE_CRATE_TARGET_DIRECTORY
+    set_env TARGET_DIR ${cargo_target_dir}
+end
+''']
+
+[env]
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+WORKING_DIR = "${CARGO_MAKE_WORKING_DIRECTORY}"
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+LIBAFL_QEMU_CLONE_DIR = { value = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge", condition = { env_not_set = [
+  "LIBAFL_QEMU_DIR",
+] } }
+
+LINUX_BUILDER_URL = "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
+LINUX_BUILDER_DIR = { value = "${TARGET_DIR}/linux_builder", condition = { env_not_set = [
+  "LINUX_BUILDER_DIR",
+] } }
+LINUX_BUILDER_OUT = "${LINUX_BUILDER_DIR}/output"
+
+[tasks.target_dir]
+condition = { files_not_exist = [
+  "${TARGET_DIR}",
+  "${TARGET_DIR}/runtime",
+  "${TARGET_DIR}/setup",
+] }
+script_runner = "@shell"
+script = '''
+mkdir -p ${TARGET_DIR}/runtime
+mkdir -p ${TARGET_DIR}/setup
+'''
+
+[tasks.linux_builder_dir]
+condition = { files_not_exist = ["${LINUX_BUILDER_DIR}"] }
+script_runner = "@shell"
+script = '''
+git clone ${LINUX_BUILDER_URL} ${LINUX_BUILDER_DIR}
+'''
+
+[tasks.target]
+dependencies = ["build", "linux_builder_dir"]
+script_runner = "@shell"
+script = '''
+git -C ${LINUX_BUILDER_DIR} pull
+
+# Copy setup & runtime fixed files
+cp -r ${WORKING_DIR}/setup/* ${LINUX_BUILDER_DIR}/setup/
+cp -r ${WORKING_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
+
+# Copy generated libafl qemu header files to setup
+cp ${TARGET_DIR}/${PROFILE_DIR}/include/* ${LINUX_BUILDER_DIR}/setup/
+
+${LINUX_BUILDER_DIR}/build.sh
+'''
+
+[tasks.target_update]
+dependencies = ["build", "linux_builder_dir"]
+script_runner = "@shell"
+script = '''
+git -C ${LINUX_BUILDER_DIR} pull
+
+# Copy setup & runtime fixed files
+cp -r ${WORKING_DIR}/setup/* ${LINUX_BUILDER_DIR}/setup/
+cp -r ${WORKING_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
+
+# Copy generated libafl qemu header files to setup
+cp ${TARGET_DIR}/${PROFILE_DIR}/include/* ${LINUX_BUILDER_DIR}/setup/
+
+${LINUX_BUILDER_DIR}/update.sh
+'''
+
+[tasks.build]
+dependencies = ["target_dir"]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}", "--target-dir", "${TARGET_DIR}"]
+
+[tasks.run]
+dependencies = ["build"]
+script_runner = "@shell"
+script = '''
+rm -rf "${WORKING_DIR}/corpus_gen"
+
+# Find the bios dir of LibAFL QEMU
+if [ ! -z "${LIBAFL_QEMU_DIR}" ]; then
+  LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu
+else
+  LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu
+fi
+
+${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel \
+  -accel tcg \
+  -m 4G \
+  -drive if=pflash,format=raw,readonly=on,file="${LINUX_BUILDER_OUT}/OVMF_CODE.fd" \
+  -drive if=pflash,format=raw,snapshot=off,file="${LINUX_BUILDER_OUT}/OVMF_VARS.fd" \
+  -blockdev filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage,driver=file \
+  -blockdev driver=qcow2,file=storage,node-name=disk \
+  -device virtio-scsi-pci,id=scsi0 \
+  -device scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1 \
+  -L "${LIBAFL_QEMU_BIOS_DIR}" \
+  -nographic \
+  -monitor null \
+  -serial null \
+  -snapshot
+'''
+
+[tasks.debug]
+dependencies = ["build"]
+command = "time"
+args = [
+  "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel",
+  "-accel",
+  "kvm",
+  "-m",
+  "4G",
+  "-drive",
+  "if=pflash,format=raw,readonly=on,file=${LINUX_BUILDER_OUT}/OVMF_CODE.fd",
+  "-drive",
+  "if=pflash,format=raw,snapshot=off,file=${LINUX_BUILDER_OUT}/OVMF_VARS.fd",
+  "-blockdev",
+  "filename=${LINUX_BUILDER_OUT}/linux.qcow2,node-name=storage,driver=file",
+  "-blockdev",
+  "driver=qcow2,file=storage,node-name=disk",
+  "-device",
+  "virtio-scsi-pci,id=scsi0",
+  "-device",
+  "scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1",
+  "-L",
+  "${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu",
+  "-snapshot",
+]
+
+[tasks.perf]
+command = "perf"
+args = [
+  "record",
+  "--call-graph",
+  "dwarf",
+  "${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel",
+  "-accel",
+  "tcg",
+  "-m",
+  "4G",
+  "-drive",
+  "if=pflash,format=raw,readonly=on,file=${LINUX_BUILDER_OUT}/OVMF_CODE.fd",
+  "-drive",
+  "if=pflash,format=raw,snapshot=off,file=${LINUX_BUILDER_OUT}/OVMF_VARS.fd",
+  "-blockdev",
+  "filename=${LINUX_BUILDER_OUT}/linux.qcow2,node-name=storage,driver=file",
+  "-blockdev",
+  "driver=qcow2,file=storage,node-name=disk",
+  "-device",
+  "virtio-scsi-pci,id=scsi0",
+  "-device",
+  "scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1",
+  "-L",
+  "${LIBAFL_QEMU_DIR}/build/qemu-bundle/usr/local/share/qemu",
+  "-snapshot",
+  # "-icount", "shift=auto,align=off,sleep=off",
+  # "-monitor", "null",
+  # "-serial", "null",
+  # "-nographic",
+]
+
+[tasks.clean]
+clear = true
+script_runner = "@shell"
+script = '''
+rm -rf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+cargo clean
+'''

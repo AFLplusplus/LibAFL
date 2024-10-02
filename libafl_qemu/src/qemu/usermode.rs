@@ -338,7 +338,9 @@ pub mod pybind {
             self.qemu.unmap(addr, size).map_err(PyValueError::new_err)
         }
 
-        fn set_syscall_hook(&self, hook: PyObject) {
+        /// # Safety
+        /// Accesses the global `PY_SYSCALL_HOOK` and may not be called concurrently.
+        unsafe fn set_syscall_hook(&self, hook: PyObject) {
             unsafe {
                 (*core::ptr::addr_of_mut!(PY_SYSCALL_HOOK)) = Some(hook);
             }

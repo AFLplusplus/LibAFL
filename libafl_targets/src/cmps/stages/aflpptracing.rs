@@ -2,6 +2,7 @@ use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 
 use libafl::{
+    corpus::Corpus,
     executors::{Executor, HasObservers},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
@@ -24,7 +25,7 @@ where
 {
     name: Cow<'static, str>,
     tracer_executor: TE,
-    cmplog_observer_handle: Handle<AFLppCmpLogObserver<'a, <Self as UsesState>::State>>,
+    cmplog_observer_handle: Handle<AFLppCmpLogObserver<'a>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -51,10 +52,16 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<'_, EM, TE, Z>
 where
     E: UsesState<State = Self::State>,
     TE: Executor<EM, Z> + HasObservers,
-    Self::State:
-        HasExecutions + HasCorpus + HasMetadata + UsesInput<Input = BytesInput> + HasNamedMetadata,
+    TE::State: HasExecutions
+        + HasCorpus
+        + HasMetadata
+        + UsesInput<Input = BytesInput>
+        + HasNamedMetadata
+        + HasCurrentTestcase,
+    TE::Observers: MatchNameRef + ObserversTuple<BytesInput, TE::State>,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
+    <Self::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>, //delete me
 {
     #[inline]
     fn perform(
@@ -141,10 +148,7 @@ where
     TE: UsesState,
 {
     /// With cmplog observer
-    pub fn new(
-        tracer_executor: TE,
-        observer_handle: Handle<AFLppCmpLogObserver<'a, TE::State>>,
-    ) -> Self {
+    pub fn new(tracer_executor: TE, observer_handle: Handle<AFLppCmpLogObserver<'a>>) -> Self {
         let observer_name = observer_handle.name().clone();
         Self {
             name: Cow::Owned(

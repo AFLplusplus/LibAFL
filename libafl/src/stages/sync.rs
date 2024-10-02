@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
+    corpus::{Corpus, CorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -249,14 +249,17 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata + HasTestcase,
+    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata,
     SP: ShMemProvider,
-    E: HasObservers<State = S> + Executor<EM, Z>,
+    E: HasObservers + Executor<EM, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    Z: EvaluatorObservers<EM, E::Observers, State = S>
+        + ExecutionProcessor<EM, E::Observers, State = S>,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,
+    S::Corpus: Corpus<Input = S::Input>, // delete me
 {
     #[inline]
     fn perform(

@@ -17,8 +17,9 @@ use crate::monitors::PerfFeature;
 #[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
 use crate::state::HasClientPerfMonitor;
 use crate::{
+    corpus::Corpus,
     executors::{Executor, HasObservers},
-    observers::concolic::ConcolicObserver,
+    observers::{concolic::ConcolicObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
     Error, HasMetadata, HasNamedMetadata,
@@ -62,8 +63,10 @@ where
     E: UsesState<State = Self::State>,
     EM: UsesState<State = Self::State>,
     TE: Executor<EM, Z> + HasObservers,
-    Self::State: HasExecutions + HasCorpus + HasNamedMetadata,
+    TE::Observers: ObserversTuple<TE::Input, <Self as UsesState>::State>,
+    TE::State: HasExecutions + HasCorpus + HasNamedMetadata + HasCurrentTestcase,
     Z: UsesState<State = Self::State>,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     fn perform(
@@ -395,7 +398,9 @@ where
     EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM>,
     Z::Input: HasMutatorBytes,
-    Self::State: State + HasExecutions + HasCorpus + HasMetadata + HasNamedMetadata,
+    Z::State:
+        State + HasExecutions + HasCorpus + HasMetadata + HasNamedMetadata + HasCurrentTestcase,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
 {
     #[inline]
     fn perform(

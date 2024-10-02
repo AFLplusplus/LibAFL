@@ -1,3 +1,5 @@
+#![allow(clippy::used_underscore_items)]
+
 //! The allocator hooks for address sanitizer.
 use std::ffi::c_void;
 
@@ -1235,8 +1237,10 @@ impl AsanRuntime {
         res
     }
 
+    /// # Safety
+    /// `addr` will get dereferenced.
     #[inline]
-    pub fn hook_munmap(
+    pub unsafe fn hook_munmap(
         &mut self,
         original: extern "C" fn(addr: *const c_void, length: usize) -> i32,
         addr: *const c_void,

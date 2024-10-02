@@ -210,6 +210,8 @@ where
                 .send_interesting_event_to_nodes(&mm_msg)
                 .await?;
 
+            log::debug!("msg sent.");
+
             Ok(())
         });
 

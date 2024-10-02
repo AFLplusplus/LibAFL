@@ -1,11 +1,10 @@
-use core::{cell::UnsafeCell, fmt::Debug, hash::BuildHasher, ops::Range, ptr::addr_of_mut};
+use core::{fmt::Debug, ops::Range};
+use std::cell::UnsafeCell;
 
 use hashbrown::HashSet;
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
-
-use crate::Qemu;
 
 #[cfg(emulation_mode = "usermode")]
 pub mod usermode;
@@ -15,6 +14,7 @@ pub use usermode::*;
 #[cfg(emulation_mode = "systemmode")]
 pub mod systemmode;
 #[cfg(emulation_mode = "systemmode")]
+#[allow(unused_imports)]
 pub use systemmode::*;
 
 pub mod edges;
@@ -30,7 +30,7 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::CmpLogModule;
 
-use crate::emu::EmulatorModules;
+use crate::{emu::EmulatorModules, Qemu};
 
 /// A module for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -38,42 +38,75 @@ pub trait EmulatorModule<S>: 'static + Debug
 where
     S: UsesInput,
 {
+    type ModuleAddressFilter: AddressFilter;
+
+    #[cfg(emulation_mode = "systemmode")]
+    type ModulePageFilter: PageFilter;
+
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
     /// Initialize the module, mostly used to install some hooks early.
+    /// This is always run when Emulator gets initialized, in any case.
+    /// Install here hooks that should be alive for the whole execution of the VM.
     fn init_module<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
-    fn first_exec<ET>(&mut self, _state: &mut S, _emulator_modules: &mut EmulatorModules<ET, S>)
+    /// Run once just before fuzzing starts.
+    /// This call can be delayed to the point at which fuzzing is supposed to start.
+    /// It is mostly used to avoid running hooks during VM initialization, either
+    /// because it is useless or it would produce wrong results.
+    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
+    /// Run before a new fuzzing run starts.
+    /// On the first run, it is executed after [`Self::first_exec`].
     fn pre_exec<ET>(
         &mut self,
-        _state: &mut S,
         _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
+    /// Run after a fuzzing run ends.
     fn post_exec<OT, ET>(
         &mut self,
-        _state: &mut S,
         _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
+    }
+
+    fn address_filter(&self) -> &Self::ModuleAddressFilter;
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
+    fn update_address_filter(&mut self, qemu: Qemu, filter: Self::ModuleAddressFilter) {
+        *self.address_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter(&self) -> &Self::ModulePageFilter;
+    #[cfg(emulation_mode = "systemmode")]
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter;
+    #[cfg(emulation_mode = "systemmode")]
+    fn update_page_filter(&mut self, qemu: Qemu, filter: Self::ModulePageFilter) {
+        *self.page_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
     }
 }
 
@@ -88,31 +121,33 @@ where
     where
         ET: EmulatorModuleTuple<S>;
 
-    fn first_exec_all<ET>(
-        &mut self,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
-        _state: &mut S,
-    ) where
+    fn first_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, state: &mut S)
+    where
         ET: EmulatorModuleTuple<S>;
 
     fn pre_exec_all<ET>(
         &mut self,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
-        _input: &S::Input,
-        _state: &mut S,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        state: &mut S,
+        input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>;
 
     fn post_exec_all<OT, ET>(
         &mut self,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
-        _input: &S::Input,
-        _observers: &mut OT,
-        _state: &mut S,
-        _exit_kind: &mut ExitKind,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        state: &mut S,
+        input: &S::Input,
+        observers: &mut OT,
+        exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>;
+
+    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr);
 }
 
 impl<S> EmulatorModuleTuple<S> for ()
@@ -136,8 +171,8 @@ where
     fn pre_exec_all<ET>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
-        _input: &S::Input,
         _state: &mut S,
+        _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
@@ -146,15 +181,20 @@ where
     fn post_exec_all<OT, ET>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
-        _state: &mut S,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
     }
+
+    fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn allow_page_id_all(&mut self, _page_id: GuestPhysAddr) {}
 }
 
 impl<Head, Tail, S> EmulatorModuleTuple<S> for (Head, Tail)
@@ -177,175 +217,268 @@ where
     where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.first_exec(state, emulator_modules);
+        self.0.first_exec(emulator_modules, state);
         self.1.first_exec_all(emulator_modules, state);
     }
 
     fn pre_exec_all<ET>(
         &mut self,
         emulator_modules: &mut EmulatorModules<ET, S>,
-        input: &S::Input,
         state: &mut S,
+        input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.pre_exec(state, emulator_modules, input);
-        self.1.pre_exec_all(emulator_modules, input, state);
+        self.0.pre_exec(emulator_modules, state, input);
+        self.1.pre_exec_all(emulator_modules, state, input);
     }
 
     fn post_exec_all<OT, ET>(
         &mut self,
         emulator_modules: &mut EmulatorModules<ET, S>,
+        state: &mut S,
         input: &S::Input,
         observers: &mut OT,
-        state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
         self.0
-            .post_exec(state, emulator_modules, input, observers, exit_kind);
+            .post_exec(emulator_modules, state, input, observers, exit_kind);
         self.1
-            .post_exec_all(emulator_modules, input, observers, state, exit_kind);
-    }
-}
-
-impl HasInstrumentationFilter<()> for () {
-    fn filter(&self) -> &() {
-        self
+            .post_exec_all(emulator_modules, state, input, observers, exit_kind);
     }
 
-    fn filter_mut(&mut self) -> &mut () {
-        self
-    }
-}
-
-impl<Head, F> HasInstrumentationFilter<F> for (Head, ())
-where
-    Head: HasInstrumentationFilter<F>,
-    F: IsFilter,
-{
-    fn filter(&self) -> &F {
-        self.0.filter()
+    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
+        self.0.address_filter_mut().register(address_range.clone());
+        self.1.allow_address_range_all(address_range);
     }
 
-    fn filter_mut(&mut self) -> &mut F {
-        self.0.filter_mut()
+    #[cfg(emulation_mode = "systemmode")]
+    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
+        self.0.page_filter_mut().register(page_id.clone());
+        self.1.allow_page_id_all(page_id)
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum QemuFilterList<T: IsFilter + Debug + Clone> {
+pub enum FilterList<T> {
     AllowList(T),
     DenyList(T),
     None,
 }
 
-impl<T> IsFilter for QemuFilterList<T>
+impl<T> AddressFilter for FilterList<T>
 where
-    T: IsFilter + Clone,
+    T: AddressFilter,
 {
-    type FilterParameter = T::FilterParameter;
-
-    fn allowed(&self, filter_parameter: Self::FilterParameter) -> bool {
+    fn register(&mut self, address_range: Range<GuestAddr>) {
         match self {
-            QemuFilterList::AllowList(allow_list) => allow_list.allowed(filter_parameter),
-            QemuFilterList::DenyList(deny_list) => !deny_list.allowed(filter_parameter),
-            QemuFilterList::None => true,
+            FilterList::AllowList(allow_list) => allow_list.register(address_range),
+            FilterList::DenyList(deny_list) => deny_list.register(address_range),
+            FilterList::None => {}
+        }
+    }
+
+    fn allowed(&self, address: &GuestAddr) -> bool {
+        match self {
+            FilterList::AllowList(allow_list) => allow_list.allowed(address),
+            FilterList::DenyList(deny_list) => !deny_list.allowed(address),
+            FilterList::None => true,
         }
     }
 }
 
-pub type QemuInstrumentationPagingFilter = QemuFilterList<HashSet<GuestPhysAddr>>;
-
-impl<H> IsFilter for HashSet<GuestPhysAddr, H>
+impl<T> PageFilter for FilterList<T>
 where
-    H: BuildHasher,
+    T: PageFilter,
 {
-    type FilterParameter = Option<GuestPhysAddr>;
+    fn register(&mut self, page_id: GuestPhysAddr) {
+        match self {
+            FilterList::AllowList(allow_list) => allow_list.register(page_id),
+            FilterList::DenyList(deny_list) => deny_list.register(page_id),
+            FilterList::None => {}
+        }
+    }
 
-    fn allowed(&self, paging_id: Self::FilterParameter) -> bool {
-        paging_id.is_some_and(|pid| self.contains(&pid))
+    fn allowed(&self, page: &GuestPhysAddr) -> bool {
+        match self {
+            FilterList::AllowList(allow_list) => allow_list.allowed(page),
+            FilterList::DenyList(deny_list) => !deny_list.allowed(page),
+            FilterList::None => true,
+        }
     }
 }
 
-pub type QemuInstrumentationAddressRangeFilter = QemuFilterList<Vec<Range<GuestAddr>>>;
+#[derive(Clone, Debug, Default)]
+pub struct AddressFilterVec {
+    // ideally, we should use a tree
+    registered_addresses: Vec<Range<GuestAddr>>,
+}
+#[derive(Clone, Debug)]
+pub struct StdAddressFilter(FilterList<AddressFilterVec>);
 
-impl IsFilter for Vec<Range<GuestAddr>> {
-    type FilterParameter = GuestAddr;
+impl Default for StdAddressFilter {
+    fn default() -> Self {
+        Self(FilterList::None)
+    }
+}
 
-    fn allowed(&self, addr: Self::FilterParameter) -> bool {
-        for rng in self {
-            if rng.contains(&addr) {
+impl StdAddressFilter {
+    #[must_use]
+    pub fn allow_list(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
+        StdAddressFilter(FilterList::AllowList(AddressFilterVec::new(
+            registered_addresses,
+        )))
+    }
+
+    #[must_use]
+    pub fn deny_list(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
+        StdAddressFilter(FilterList::DenyList(AddressFilterVec::new(
+            registered_addresses,
+        )))
+    }
+}
+
+impl AddressFilterVec {
+    #[must_use]
+    pub fn new(registered_addresses: Vec<Range<GuestAddr>>) -> Self {
+        Self {
+            registered_addresses,
+        }
+    }
+}
+
+impl AddressFilter for AddressFilterVec {
+    fn register(&mut self, address_range: Range<GuestAddr>) {
+        self.registered_addresses.push(address_range);
+        Qemu::get().unwrap().flush_jit();
+    }
+
+    fn allowed(&self, addr: &GuestAddr) -> bool {
+        if self.registered_addresses.is_empty() {
+            return true;
+        }
+
+        for addr_range in &self.registered_addresses {
+            if addr_range.contains(addr) {
                 return true;
             }
         }
+
         false
     }
 }
 
-pub trait HasInstrumentationFilter<F>
-where
-    F: IsFilter,
-{
-    fn filter(&self) -> &F;
+impl AddressFilter for StdAddressFilter {
+    fn register(&mut self, address_range: Range<GuestAddr>) {
+        self.0.register(address_range);
+    }
 
-    fn filter_mut(&mut self) -> &mut F;
-
-    fn update_filter(&mut self, filter: F, emu: &Qemu) {
-        *self.filter_mut() = filter;
-        emu.flush_jit();
+    fn allowed(&self, address: &GuestAddr) -> bool {
+        self.0.allowed(address)
     }
 }
 
-static mut EMPTY_ADDRESS_FILTER: UnsafeCell<QemuInstrumentationAddressRangeFilter> =
-    UnsafeCell::new(QemuFilterList::None);
-static mut EMPTY_PAGING_FILTER: UnsafeCell<QemuInstrumentationPagingFilter> =
-    UnsafeCell::new(QemuFilterList::None);
+#[derive(Clone, Debug)]
+pub struct PageFilterVec {
+    registered_pages: HashSet<GuestPhysAddr>,
+}
 
-impl HasInstrumentationFilter<QemuInstrumentationAddressRangeFilter> for () {
-    fn filter(&self) -> &QemuInstrumentationAddressRangeFilter {
-        &QemuFilterList::None
-    }
+#[cfg(emulation_mode = "systemmode")]
+#[derive(Clone, Debug)]
+pub struct StdPageFilter(FilterList<PageFilterVec>);
 
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationAddressRangeFilter {
-        unsafe { (*addr_of_mut!(EMPTY_ADDRESS_FILTER)).get_mut() }
+#[cfg(emulation_mode = "usermode")]
+pub type StdPageFilter = NopPageFilter;
+
+impl Default for PageFilterVec {
+    fn default() -> Self {
+        Self {
+            registered_pages: HashSet::new(),
+        }
     }
 }
 
-impl HasInstrumentationFilter<QemuInstrumentationPagingFilter> for () {
-    fn filter(&self) -> &QemuInstrumentationPagingFilter {
-        &QemuFilterList::None
-    }
-
-    fn filter_mut(&mut self) -> &mut QemuInstrumentationPagingFilter {
-        unsafe { (*addr_of_mut!(EMPTY_PAGING_FILTER)).get_mut() }
+#[cfg(emulation_mode = "systemmode")]
+impl Default for StdPageFilter {
+    fn default() -> Self {
+        Self(FilterList::None)
     }
 }
 
-pub trait IsFilter: Debug {
-    type FilterParameter;
+impl PageFilter for PageFilterVec {
+    fn register(&mut self, page_id: GuestPhysAddr) {
+        self.registered_pages.insert(page_id);
+        Qemu::get().unwrap().flush_jit();
+    }
 
-    fn allowed(&self, filter_parameter: Self::FilterParameter) -> bool;
+    fn allowed(&self, paging_id: &GuestPhysAddr) -> bool {
+        // if self.allowed_pages.is_empty() {
+        //     return true;
+        // }
+
+        self.registered_pages.contains(paging_id)
+    }
 }
 
-impl IsFilter for () {
-    type FilterParameter = ();
+#[cfg(emulation_mode = "systemmode")]
+impl PageFilter for StdPageFilter {
+    fn register(&mut self, page_id: GuestPhysAddr) {
+        self.0.register(page_id);
+    }
 
-    fn allowed(&self, _filter_parameter: Self::FilterParameter) -> bool {
+    fn allowed(&self, page_id: &GuestPhysAddr) -> bool {
+        self.0.allowed(page_id)
+    }
+}
+
+// adapted from https://xorshift.di.unimi.it/splitmix64.c
+#[must_use]
+pub fn hash_me(mut x: u64) -> u64 {
+    x = (x ^ (x.overflowing_shr(30).0))
+        .overflowing_mul(0xbf58476d1ce4e5b9)
+        .0;
+    x = (x ^ (x.overflowing_shr(27).0))
+        .overflowing_mul(0x94d049bb133111eb)
+        .0;
+    x ^ (x.overflowing_shr(31).0)
+}
+
+pub trait AddressFilter: 'static + Debug {
+    fn register(&mut self, address_range: Range<GuestAddr>);
+
+    fn allowed(&self, address: &GuestAddr) -> bool;
+}
+
+#[derive(Debug)]
+pub struct NopAddressFilter;
+impl AddressFilter for NopAddressFilter {
+    fn register(&mut self, _address: Range<GuestAddr>) {}
+
+    fn allowed(&self, _address: &GuestAddr) -> bool {
         true
     }
 }
 
-pub trait IsAddressFilter: IsFilter<FilterParameter = GuestAddr> {}
+pub trait PageFilter: 'static + Debug {
+    fn register(&mut self, page_id: GuestPhysAddr);
 
-impl IsAddressFilter for QemuInstrumentationAddressRangeFilter {}
-
-#[must_use]
-pub fn hash_me(mut x: u64) -> u64 {
-    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
-    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
-    x = (x.overflowing_shr(16).0 ^ x) ^ x;
-    x
+    fn allowed(&self, page_id: &GuestPhysAddr) -> bool;
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct NopPageFilter;
+impl PageFilter for NopPageFilter {
+    fn register(&mut self, _page_id: GuestPhysAddr) {}
+
+    fn allowed(&self, _page_id: &GuestPhysAddr) -> bool {
+        true
+    }
+}
+
+#[cfg(emulation_mode = "usermode")]
+static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> = UnsafeCell::new(NopAddressFilter);
+#[cfg(emulation_mode = "systemmode")]
+static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);
