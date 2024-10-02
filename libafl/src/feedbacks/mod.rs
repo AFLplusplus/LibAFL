@@ -935,7 +935,7 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {
     #[cfg(feature = "track_hit_feedbacks")]
-    // The previous run's result of `Self::is_interesting`
+    /// The previous run's result of [`Self::is_interesting`]
     last_result: Option<bool>,
 }
 

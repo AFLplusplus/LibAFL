@@ -1,0 +1,50 @@
+# Variables
+[env]
+FUZZER_NAME = 'fuzzer_custom_executor'
+PROJECT_DIR = { script = ["pwd"] }
+CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release" }
+PROFILE_DIR = { value = "release" }
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
+
+[tasks.build]
+alias = "fuzzer"
+
+[tasks.fuzzer]
+description = "Build the fuzzer"
+script = "cargo build --profile=${PROFILE}"
+
+[tasks.run]
+description = "Run the fuzzer"
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}"
+dependencies = ["fuzzer"]
+
+[tasks.test]
+description = "Run a short test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+timeout 30s ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME} | tee fuzz_stdout.log || true
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+'''
+dependencies = ["fuzzer"]
+
+# Clean up
+[tasks.clean]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+cargo clean
+'''
