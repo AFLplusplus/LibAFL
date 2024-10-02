@@ -1,9 +1,8 @@
 // TODO: docs
 #![allow(missing_docs)]
 
-use alloc::borrow::Cow;
 use std::{
-    borrow::ToOwned,
+    borrow::{Cow, ToOwned},
     convert::Into,
     ffi::CString,
     fs,
@@ -24,7 +23,10 @@ use std::{
 use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
-use libipt::{block::BlockDecoder, Asid, BlockFlags, ConfigBuilder, Cpu, Image, SectionCache};
+use libipt::{
+    block::BlockDecoder, insn::InsnDecoder, Asid, BlockFlags, ConfigBuilder, Cpu, Image,
+    SectionCache,
+};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
@@ -32,7 +34,6 @@ use perf_event_open_sys::{
     perf_event_open,
 };
 use proc_maps::get_process_maps;
-// use proc_maps::get_process_maps;
 use raw_cpuid::CpuId;
 use serde::Serialize;
 
@@ -84,7 +85,8 @@ enum KvmPTMode {
 /// Perf event config for `IntelPT`
 ///
 /// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
-// TODO: move to c2rust-bitfields crate already in use
+// TODO: move to c2rust-bitfields crate already in use ... tried and there is no doc, this looks way
+// better
 #[bitfield(u64, default = 0)]
 struct PtConfig {
     /// Disable call return address compression. AKA DisRETC in Intel SDM
@@ -121,15 +123,14 @@ pub struct IntelPT {
 pub struct IntelPTHook<'a> {
     pt: Option<(IntelPT, Image<'a>)>,
     //trace: Arc<Mutex<Vec<u8>>>,
-    // map: *mut u8,
-    // len: usize,
+    map: *mut u8,
+    len: usize,
 }
 
 impl<'a> IntelPTHook<'a> {
-    //pub fn new(map: *mut u8, len: usize) -> Self {
-    pub fn new() -> Self {
-        Self { pt: None }
-        //map, len }
+    pub fn new(map: *mut u8, len: usize) -> Self {
+        //pub fn new() -> Self {
+        Self { pt: None, map, len }
     }
 }
 impl<'a, S> ExecutorHook<S> for IntelPTHook<'a>
@@ -178,16 +179,19 @@ where
         pt.disable_tracing().unwrap();
         let mut buff = vec![];
         let ips = pt.decode_with_image(image, Some(&mut buff));
-        // let s = serde_json::to_vec(&state).unwrap();
-        // dump_corpus(&s).unwrap();
+        let s = serde_json::to_vec(&state).unwrap();
+        dump_corpus(&s).unwrap();
         dump_trace_to_file(&buff).unwrap();
-        // if unsafe{FILE_NUM > 5} {
-        //     panic!("ciao ciao");
-        // }
-        // println!("IPs: {ips:x?}");
-        // for ip in ips {
-        //     unsafe { *self.map.add(ip as usize % self.len) += 1 };
-        // }
+        unsafe {
+            FILE_NUM += 1;
+        }
+        //if unsafe{FILE_NUM > 5} {
+        //    panic!("ciao ciao");
+        //}
+        //println!("IPs: {ips:x?}");
+        for ip in ips {
+            unsafe { *self.map.add(ip as usize % self.len) += 1 };
+        }
         // unsafe{*self.map += 1;};
         // println!("Post exec hook");
     }
@@ -378,9 +382,10 @@ impl IntelPT {
         if let Some(cpu) = &*CURRENT_CPU {
             config.cpu(cpu.clone());
         }
-        let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
-        config.flags(flags);
-        let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
+        // let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
+        // config.flags(flags);
+        // let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
+        let mut decoder = InsnDecoder::new(&config.finish()).unwrap();
         if let Some(i) = image {
             decoder.set_image(Some(i)).expect("Failed to set image");
         }
@@ -426,16 +431,16 @@ impl IntelPT {
 
                 let block = decoder.next();
                 match block {
-                    Err((b, e)) => {
+                    Err(e) => {
                         // libipt-rs library ignores the fact that
                         // Even in case of errors, we may have succeeded in decoding some instructions.
                         // https://github.com/intel/libipt/blob/4a06fdffae39dadef91ae18247add91029ff43c0/ptxed/src/ptxed.c#L1954
                         // Using my fork that fixes this atm
                         // println!("pterror in packet next {e:?}");
                         // println!("err block ip: 0x{:x?}", b.ip());
-                        if skip < decoder.offset().expect("Failed to get decoder offset") {
-                            ips.push(b.ip());
-                        }
+                        //if skip < decoder.offset().expect("Failed to get decoder offset") {
+                        //    ips.push(b.ip());
+                        //}
                         // status = Status::from_bits(e.code() as u32).unwrap();
                         break;
                     }
@@ -685,9 +690,6 @@ fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
     file.write_all(buff)
         .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
 
-    unsafe {
-        FILE_NUM += 1;
-    }
     Ok(())
 }
 

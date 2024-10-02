@@ -42,18 +42,19 @@ fn signals_set(idx: usize) {
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // Check that IntelPT is available
+    // TODO: call availability if try_new fails in the lib?
     IntelPT::availability().expect("Intel PT check failed");
 
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        signals_set(0);
+        //signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             let _do_something = black_box(0);
-            signals_set(1);
+            //signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
-                signals_set(2);
+                //signals_set(2);
                 let _do_something = black_box(0);
                 if buf.len() > 2 && buf[2] == b'c' {
                     panic!("Artificial bug triggered =)");
@@ -109,8 +110,8 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
-    //let pt_hook = unsafe { IntelPTHook::new(SIGNALS_PTR, SIGNALS.len()) };
-    let pt_hook = IntelPTHook::new();
+    let pt_hook = unsafe { IntelPTHook::new(SIGNALS_PTR, SIGNALS.len()) };
+    //let pt_hook = IntelPTHook::new();
 
     type PTInProcessExecutor<'a, H, OT, S> =
         GenericInProcessExecutor<H, &'a mut H, (IntelPTHook<'a>, ()), OT, S>;
