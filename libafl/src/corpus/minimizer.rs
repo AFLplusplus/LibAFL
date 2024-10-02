@@ -38,7 +38,6 @@ pub type StdCorpusMinimizer<C, E, O, T> = MapCorpusMinimizer<C, E, O, T, LenTime
 
 impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
-    E: UsesState,
     E::State: HasCorpus + HasMetadata,
     TS: TestcaseScore<E::State>,
     C: Named,
@@ -55,7 +54,6 @@ where
 
 impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
-    E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
     E::State: HasMetadata + HasCorpus + HasExecutions,
