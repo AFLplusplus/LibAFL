@@ -11,6 +11,9 @@ function Run-Clippy {
     )
     Write-Host "Running Clippy on $dir"
     Push-Location $dir
+
+    $currentdir = $PWD.Path
+    Write-Host "Running Clippy in $currentdir"
     
     try {
         $env:RUST_BACKTRACE = "full"
@@ -74,6 +77,8 @@ cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -
     -A clippy::unseparated-literal-suffix `
     -A clippy::module-name-repetitions `
     -A clippy::unreadable-literal
+
+
 
 # Loop through each project and run Clippy
 foreach ($project in $Projects) {
