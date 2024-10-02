@@ -31,6 +31,8 @@ function Run-Clippy {
             -A clippy::unseparated-literal-suffix `
             -A clippy::module-name-repetitions `
             -A clippy::unreadable-literal
+
+        # Exit unsuccessfully on clippy error
         if (!$?) {
             exit 1
         }
@@ -81,6 +83,7 @@ cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -
     -A clippy::module-name-repetitions `
     -A clippy::unreadable-literal
 
+# Exit unsuccessfully on clippy error
 if (!$?) {
     exit 1
 }

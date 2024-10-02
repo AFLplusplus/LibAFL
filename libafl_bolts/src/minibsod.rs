@@ -1192,6 +1192,12 @@ mod tests {
 
     use crate::minibsod::dump_registers;
 
+    #[derive(Default)]
+    #[repr(align(16))]
+    struct Align16 {
+        pub ctx: CONTEXT,
+    }
+
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_dump_registers() {
@@ -1200,7 +1206,7 @@ mod tests {
         let t = std::thread::spawn(move || {
             let cur = unsafe { GetCurrentThread() };
             let proc = unsafe { GetCurrentProcess() };
-            let mut out: HANDLE = Default::default();
+            let mut out: HANDLE = HANDLE::default();
             unsafe {
                 DuplicateHandle(
                     proc,
@@ -1211,7 +1217,7 @@ mod tests {
                     true,
                     DUPLICATE_SAME_ACCESS,
                 )
-                .unwrap()
+                .unwrap();
             };
             tx.send(out.0 as i64).unwrap();
             evt_rx.recv().unwrap();
@@ -1219,14 +1225,8 @@ mod tests {
 
         let thread = rx.recv().unwrap();
         let thread = HANDLE(thread as *mut c_void);
-        eprintln!("thread: {:?}", thread);
+        eprintln!("thread: {thread:?}");
         unsafe { SuspendThread(thread) };
-
-        #[derive(Default)]
-        #[repr(align(16))]
-        struct Align16 {
-            pub ctx: CONTEXT,
-        }
 
         // https://stackoverflow.com/questions/56516445/getting-0x3e6-when-calling-getthreadcontext-for-debugged-thread
         let mut c = Align16::default();
