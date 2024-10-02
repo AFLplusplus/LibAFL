@@ -5,11 +5,9 @@ use std::borrow::Cow;
 use libafl::{
     alloc,
     corpus::Testcase,
-    events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback, StateInitializer},
     inputs::{BytesInput, Input},
-    observers::ObserversTuple,
     state::State,
     Error, HasMetadata,
 };
@@ -43,6 +41,8 @@ impl Named for LibfuzzerKeepFeedback {
     }
 }
 
+impl<S> StateInitializer<S> for LibfuzzerKeepFeedback {}
+
 impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for LibfuzzerKeepFeedback
 where
     S: State,
@@ -54,11 +54,7 @@ where
         _input: &S::Input,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S::Input, S>,
-    {
+    ) -> Result<bool, Error> {
         Ok(*self.keep.borrow())
     }
 
@@ -142,7 +138,7 @@ where
         Ok(false)
     }
 
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
@@ -179,4 +175,4 @@ where
     }
 }
 
-pub type ShrinkMapFeedback<C, O, T> = MinMapFeedback<C, MappedEdgeMapObserver<O, T>, usize>;
+pub type ShrinkMapFeedback<C, O, T> = MinMapFeedback<C, MappedEdgeMapObserver<O, T>>;
