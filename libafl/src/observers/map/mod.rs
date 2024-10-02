@@ -48,7 +48,7 @@ pub use owned_map::*;
 /// ```
 /// # use libafl::corpus::InMemoryCorpus;
 /// # use libafl::feedbacks::{Feedback, MapFeedbackMetadata};
-/// use libafl::feedbacks::MaxMapFeedback;
+/// use libafl::feedbacks::{MaxMapFeedback, StateInitializer};
 /// # use libafl::inputs::BytesInput;
 /// use libafl::observers::{StdMapObserver, CanTrack};
 /// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};

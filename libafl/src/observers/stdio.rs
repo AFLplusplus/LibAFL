@@ -27,7 +27,7 @@ use crate::{observers::Observer, Error};
 ///     corpus::{Corpus, InMemoryCorpus, Testcase},
 ///     events::{EventFirer, NopEventManager},
 ///     executors::{CommandExecutor, ExitKind},
-///     feedbacks::Feedback,
+///     feedbacks::{Feedback, StateInitializer},
 ///     inputs::{BytesInput, UsesInput},
 ///     mutators::{MutationResult, NopMutator},
 ///     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
@@ -53,21 +53,22 @@ use crate::{observers::Observer, Error};
 ///     stderr_observer: Handle<StdErrObserver>,
 /// }
 ///
-/// impl<S> Feedback<S> for ExportStdXObserver
+/// impl<S> StateInitializer<S> for ExportStdXObserver {}
+///
+///
+/// impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ExportStdXObserver
 /// where
-///     S: State
+///     S: State,
+///     OT: MatchNameRef
 /// {
-///     fn is_interesting<EM, OT>(
+///     fn is_interesting(
 ///         &mut self,
 ///         _state: &mut S,
 ///         _manager: &mut EM,
-///         _input: &<S>::Input,
+///         _input: &I,
 ///         observers: &OT,
 ///         _exit_kind: &ExitKind,
 ///     ) -> Result<bool, Error>
-///     where
-///         EM: EventFirer<State = S>,
-///         OT: ObserversTuple<S::Input, S>,
 ///     {
 ///         unsafe {
 ///             STDOUT = observers.get(&self.stdout_observer).unwrap().stdout.clone();

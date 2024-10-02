@@ -447,8 +447,8 @@ where
     OT: ObserversTuple<Self::Input, Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
     Z: ExecutesInput<E, EM>
-        + ExecutionProcessor
-        + EvaluatorObservers<OT>
+        + ExecutionProcessor<EM, OT>
+        + EvaluatorObservers<EM, OT>
         + HasScheduler<Scheduler = CS>,
 {
     fn perform(

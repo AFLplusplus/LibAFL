@@ -163,7 +163,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
@@ -193,7 +193,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -236,7 +236,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -301,7 +301,7 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
@@ -332,7 +332,7 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -371,7 +371,7 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me

@@ -31,7 +31,7 @@ pub mod windows_asan_handler {
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         Z: HasObjective<Objective = OF, State = E::State>,
@@ -184,7 +184,7 @@ pub mod windows_exception_handler {
     where
         E: HasObservers + Executor<EM, Z>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         Z: HasObjective<Objective = OF, State = E::State>,
@@ -248,7 +248,7 @@ pub mod windows_exception_handler {
         E: HasObservers + HasInProcessHooks<E::State> + Executor<EM, Z>,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -321,7 +321,7 @@ pub mod windows_exception_handler {
         E: Executor<EM, Z> + HasObservers,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me

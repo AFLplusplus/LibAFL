@@ -2,7 +2,12 @@ use alloc::borrow::Cow;
 use core::{ffi::c_void, fmt::Debug};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use libafl::{executors::ExitKind, feedbacks::Feedback, observers::Observer, state::State, Error};
+use libafl::{
+    executors::ExitKind,
+    feedbacks::{Feedback, StateInitializer},
+    observers::Observer,
+    Error,
+};
 use libafl_bolts::Named;
 use libc::SIGABRT;
 use serde::{Deserialize, Serialize};
@@ -138,15 +143,14 @@ impl Named for OomFeedback {
     }
 }
 
-impl<S> Feedback<S> for OomFeedback
-where
-    S: State,
-{
-    fn is_interesting<EM, OT>(
+impl<S> StateInitializer<S> for OomFeedback {}
+
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for OomFeedback {
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {

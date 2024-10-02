@@ -53,7 +53,7 @@ where
     OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {
@@ -190,7 +190,7 @@ where
     OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: State + HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {

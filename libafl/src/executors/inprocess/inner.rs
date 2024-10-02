@@ -170,7 +170,7 @@ where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -200,7 +200,7 @@ where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -233,7 +233,7 @@ where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me

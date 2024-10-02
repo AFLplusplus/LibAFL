@@ -89,7 +89,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     E: HasObservers + HasInProcessHooks<E::State> + Executor<EM, Z>,
     E::Observers: ObserversTuple<E::Input, E::State>,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<E::State>,
+    OF: Feedback<EM, E::Input, E::Observers, E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus,
     Z: HasObjective<Objective = OF, State = E::State>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -139,9 +139,11 @@ where
     where
         ED: EmulatorDriver<CM, ET, S, SM>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
-        Z: HasObjective<Objective = OF, State = S> + HasScheduler<State = S> + ExecutionProcessor,
+        Z: HasObjective<Objective = OF, State = S>
+            + HasScheduler<State = S>
+            + ExecutionProcessor<EM, OT>,
         S::Solutions: Corpus<Input = S::Input>, //delete me
         <S::Corpus as Corpus>::Input: Clone,    //delete me
     {
@@ -328,6 +330,7 @@ where
     S: State + HasSolutions,
     SP: ShMemProvider,
     Z: HasObjective<State = S>,
+    Z::Objective: Feedback<EM, S::Input, OT, S>,
 {
     pub fn new(
         emulator: Emulator<CM, ED, ET, S, SM>,
@@ -383,7 +386,7 @@ where
     OT: ObserversTuple<S::Input, S> + Debug,
     ET: EmulatorModuleTuple<S>,
     SP: ShMemProvider,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     Z: HasObjective<Objective = OF, State = S>,
 {
     fn run_target(

@@ -173,7 +173,7 @@ where
     where
         Self: Executor<EM, Z, State = S> + HasObservers,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
@@ -201,7 +201,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -242,7 +242,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -287,7 +287,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
@@ -316,7 +316,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -353,7 +353,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -442,7 +442,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<E::State>,
+    OF: Feedback<EM, E::Input, E::Observers, E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     Z: HasObjective<Objective = OF, State = E::State>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -505,11 +505,11 @@ where
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<E::State>,
+    OF: Feedback<EM, E::Input, E::Observers, E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     Z: HasObjective<Objective = OF, State = E::State>
         + HasScheduler<State = E::State>
-        + ExecutionProcessor,
+        + ExecutionProcessor<EM, E::Observers>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
     let data = addr_of_mut!(GLOBAL_STATE);
