@@ -11,6 +11,12 @@ Ideally, you use a `musl` variant since it does not require a functioning libc.
 So we can do the following:
 
 ```sh
+# Install the new toolchain
 rustup target add arm-unknown-linux-musleabi
-cargo build --target=arm-unknown-linux-musleabi -Zbuild-std --profile=release
+# Install the stdlib source (for some tier2/tier3 targets there are no prebuilts)
+rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+# Build for the target.
+cargo +nightly build --target=arm-unknown-linux-musleabi -Zbuild-std --profile=release
 ```
+
+Enjoy jumping like a little bunny.
