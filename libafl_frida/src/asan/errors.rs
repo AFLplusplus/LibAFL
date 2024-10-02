@@ -14,11 +14,10 @@ use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
 use libafl::{
     corpus::Testcase,
-    events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     inputs::HasTargetBytes,
-    observers::{Observer, ObserversTuple},
+    observers::Observer,
     state::State,
     Error, HasMetadata,
 };
