@@ -1,0 +1,14 @@
+[package]
+name = "libafl_qemu_loader"
+edition = "2021"
+version.workspace = true
+
+[build-dependencies]
+cc = "1"
+
+[dependencies]
+clap = { version = "4.5.19", features = ["derive"] }
+
+[profile.release]
+inherits = "release"
+debug = true

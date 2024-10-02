@@ -12,6 +12,7 @@ members = [
   "utils/build_and_test_fuzzers",
   "utils/deexit",
   "utils/libafl_benches",
+  "utils/libafl_qemu_jumper",
   "utils/gramatron/construct_automata",
 ]
 default-members = [
