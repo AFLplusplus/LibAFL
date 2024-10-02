@@ -1,6 +1,7 @@
 use std::{
     hint::black_box,
     path::PathBuf,
+    ptr::write,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -17,16 +18,26 @@ use libafl::{
         inprocess::GenericInProcessExecutor,
         ExitKind,
     },
-    feedbacks::{CrashFeedback, IntelPTFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
+    observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+
+/// Coverage map
+static mut SIGNALS: [u8; 1024] = [0; 1024];
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+
+/// Assign a signal to the signals map
+fn signals_set(idx: usize) {
+    unsafe { write(SIGNALS_PTR.add(idx), 1) };
+}
 
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
@@ -37,9 +48,12 @@ pub fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
+        signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             let _do_something = black_box(0);
+            signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
+                signals_set(2);
                 let _do_something = black_box(0);
                 if buf.len() > 2 && buf[2] == b'c' {
                     panic!("Artificial bug triggered =)");
@@ -49,11 +63,11 @@ pub fn main() {
         ExitKind::Ok
     };
 
-    // This will hold the Intel PT raw traces produced by the hook and evaluated by the feedback
-    let pt_trace = Arc::new(Mutex::new(Vec::new()));
+    // Create an observation channel using the signals map
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = IntelPTFeedback::new(pt_trace.clone());
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -94,16 +108,17 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // Intel PT hook that will handle the setup of Intel PT for each execution
-    let pt_hook = IntelPTHook::new(pt_trace);
+    // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
+    //let pt_hook = unsafe { IntelPTHook::new(SIGNALS_PTR, SIGNALS.len()) };
+    let pt_hook = IntelPTHook::new();
 
     type PTInProcessExecutor<'a, H, OT, S> =
-        GenericInProcessExecutor<H, &'a mut H, (IntelPTHook, ()), OT, S>;
+        GenericInProcessExecutor<H, &'a mut H, (IntelPTHook<'a>, ()), OT, S>;
     // Create the executor for an in-process function with just one observer
     let mut executor = PTInProcessExecutor::with_timeout_generic(
         tuple_list!(pt_hook),
         &mut harness,
-        tuple_list!(),
+        tuple_list!(observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,

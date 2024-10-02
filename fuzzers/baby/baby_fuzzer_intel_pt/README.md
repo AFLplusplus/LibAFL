@@ -8,7 +8,7 @@ The tested program is a simple Rust function without any instrumentation.
 For real fuzzing, you will want to add some sort to add coverage or other feedback.
 
 After building this example with `cargo build --release`, you need to give to the executable the necessary capabilities 
-with `sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ./target/release/baby_fuzzer`.
+with `sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ./target/release/baby_fuzzer_intel_pt`.
 
 You can run this example using `cargo run --release`, and you can enable the TUI feature by running
 `cargo run --release --features tui`.
