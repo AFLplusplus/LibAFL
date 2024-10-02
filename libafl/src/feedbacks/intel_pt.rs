@@ -41,11 +41,11 @@ impl Named for IntelPTFeedback {
     }
 }
 
-impl<S> Feedback<S> for IntelPTFeedback
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for IntelPTFeedback
 where
     S: State,
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
@@ -55,7 +55,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<I, S>,
     {
         self.execution_number += 1;
         let trace = self.trace.lock().unwrap();
