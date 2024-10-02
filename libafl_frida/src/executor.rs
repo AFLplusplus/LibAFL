@@ -16,7 +16,7 @@ use libafl::{
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::HasTargetBytes,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -34,7 +34,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     'b: 'a,
 {
     base: InProcessExecutor<'a, H, OT, S>,
@@ -53,7 +53,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: State,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
@@ -71,7 +71,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
     Z: UsesState<State = S>,
 {
@@ -121,20 +121,10 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> UsesObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
-    S: State,
-    S::Input: HasTargetBytes,
-{
-    type Observers = OT;
-}
-
 impl<'a, 'b, 'c, H, OT, RT, S> UsesState for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
     S::Input: HasTargetBytes,
 {
@@ -146,8 +136,9 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
+    type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.base.observers()
@@ -164,7 +155,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: State,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
@@ -241,7 +232,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: State + HasSolutions + HasCorpus + HasExecutions,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
     <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me

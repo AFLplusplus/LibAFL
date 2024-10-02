@@ -7,7 +7,7 @@ use std::{
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    observers::{ObserversTuple, StdOutObserver, UsesObservers},
+    observers::{ObserversTuple, StdOutObserver},
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -45,21 +45,13 @@ where
     type State = S;
 }
 
-impl<S, OT> UsesObservers for NyxExecutor<S, OT>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-{
-    type Observers = OT;
-}
-
 impl<EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<S, OT>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     Z: UsesState<State = S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
     fn run_target(
         &mut self,
@@ -195,8 +187,10 @@ impl NyxExecutorBuilder {
 impl<S, OT> HasObservers for NyxExecutor<S, OT>
 where
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
+    type Observers = OT;
+
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }

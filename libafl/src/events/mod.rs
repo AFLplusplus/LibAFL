@@ -437,7 +437,7 @@ pub trait EventFirer: UsesState {
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
     {
         Ok(Some(postcard::to_allocvec(observers)?))
     }
@@ -757,7 +757,7 @@ where
     #[inline]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
     {
         self.inner.serialize_observers(observers)
     }
@@ -893,7 +893,7 @@ pub trait AdaptiveSerializer {
         percentage_threshold: usize,
     ) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<S> + Serialize,
+        OT: ObserversTuple<S::Input, S> + Serialize,
         S: UsesInput,
     {
         match self.time_ref() {
