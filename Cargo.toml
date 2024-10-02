@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-  "bindings/pylibafl",
   "libafl",
   "libafl_bolts",
   "libafl_cc",
@@ -33,6 +32,7 @@ default-members = [
 ]
 
 exclude = [
+  "bindings",
   "fuzzers",
   "libafl_libfuzzer_runtime",
   "utils/noaslr",

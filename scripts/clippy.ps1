@@ -17,7 +17,7 @@ function Run-Clippy {
     
     try {
         $env:RUST_BACKTRACE = "full"
-        cargo +nightly clippy --all --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace `
+        cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace `
             -D clippy::all `
             -D clippy::pedantic `
             -W clippy::similar_names `
@@ -31,6 +31,9 @@ function Run-Clippy {
             -A clippy::unseparated-literal-suffix `
             -A clippy::module-name-repetitions `
             -A clippy::unreadable-literal
+        if (!$?) {
+            exit 1
+        }
     }
     finally {
         Pop-Location
@@ -78,7 +81,9 @@ cargo +nightly clippy --all-features --no-deps --tests --examples --benches -- -
     -A clippy::module-name-repetitions `
     -A clippy::unreadable-literal
 
-
+if (!$?) {
+    exit 1
+}
 
 # Loop through each project and run Clippy
 foreach ($project in $Projects) {
