@@ -27,8 +27,6 @@ rustc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
-  "tcp_manager",
-  "multi_machine",
   "std",
   "derive",
   "llmp_compression",

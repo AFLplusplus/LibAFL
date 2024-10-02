@@ -48,6 +48,8 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -58,13 +60,16 @@ use super::StdLlmpEventHook;
 use crate::events::multi_machine::NodeDescriptor;
 #[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
 use crate::events::multi_machine::TcpMultiMachineHooks;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::inputs::UsesInput;
 use crate::observers::TimeObserver;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::state::UsesState;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::{
+    corpus::Corpus,
+    events::{centralized::CentralizedEventManager, CentralizedLlmpHook},
+    inputs::Input,
+    state::HasCorpus,
+};
 #[cfg(feature = "std")]
 use crate::{
     events::{
@@ -175,7 +180,8 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
-        S: State + HasExecutions,
+        S: HasExecutions + Serialize + HasCorpus + DeserializeOwned,
+        <S::Corpus as Corpus>::Input: Input,
         CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
     {
         Self::launch_with_hooks(self, tuple_list!())
@@ -186,7 +192,7 @@ where
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
-        S: State + HasExecutions,
+        S: HasExecutions,
         CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
     {
         Self::launch_with_hooks(self, tuple_list!())
@@ -205,8 +211,9 @@ where
     #[allow(clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
-        S: State + HasExecutions,
-        EMH: EventManagerHooksTuple<S> + Clone + Copy,
+        S: HasCorpus + HasExecutions + DeserializeOwned + Serialize,
+        <S::Corpus as Corpus>::Input: Input,
+        EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S> + Clone + Copy,
         CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
     {
         if self.cores.ids.is_empty() {
@@ -341,8 +348,6 @@ where
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
-        S: State + HasExecutions,
-        EMH: EventManagerHooksTuple<S> + Clone + Copy,
         CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
     {
         use libafl_bolts::core_affinity;
@@ -576,16 +581,16 @@ where
     /// Launch a standard Centralized-based fuzzer
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
-        S: State,
-        S::Input: Send + Sync + 'static,
+        S: DeserializeOwned + HasCorpus + Serialize,
+        <S::Corpus as Corpus>::Input: Input + 'static + Send + Sync,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), SP>,
             CoreId,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), SP>,
             CoreId,
         ) -> Result<(), Error>,
     {
@@ -628,17 +633,15 @@ where
         secondary_inner_mgr_builder: EMB,
     ) -> Result<(), Error>
     where
-        S: State,
-        S::Input: Send + Sync + 'static,
-        CF: FnOnce(Option<S>, CentralizedEventManager<EM, (), S, SP>, CoreId) -> Result<(), Error>,
-        EM: UsesState<State = S>,
+        S: HasCorpus,
         EMB: FnOnce(&Self, CoreId) -> Result<(Option<S>, EM), Error>,
+        <S::Corpus as Corpus>::Input: Input + Send + Sync + 'static,
+        CF: FnOnce(Option<S>, CentralizedEventManager<EM, (), SP>, CoreId) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), S, SP>, // No broker_hooks for centralized EM
+            CentralizedEventManager<EM, (), SP>, // No broker_hooks for centralized EM
             CoreId,
         ) -> Result<(), Error>,
-        <<EM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
     {
         let mut main_inner_mgr_builder = Some(main_inner_mgr_builder);
         let mut secondary_inner_mgr_builder = Some(secondary_inner_mgr_builder);
@@ -717,7 +720,6 @@ where
                                 tuple_list!(),
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
-                                self.time_obs.clone(),
                             )?;
 
                             self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
@@ -735,7 +737,6 @@ where
                                 tuple_list!(),
                                 self.shmem_provider.clone(),
                                 self.centralized_broker_port,
-                                self.time_obs.clone(),
                             )?;
 
                             self.secondary_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
@@ -758,7 +759,7 @@ where
         } = unsafe {
             TcpMultiMachineHooks::builder()
                 .node_descriptor(self.multi_machine_node_descriptor.clone())
-                .build::<<<EM as UsesState>::State as UsesInput>::Input>()?
+                .build::<<S::Corpus as Corpus>::Input>()?
         };
 
         let mut brokers = Brokers::new();
@@ -773,7 +774,8 @@ where
             );
 
             #[cfg(not(feature = "multi_machine"))]
-            let centralized_hooks = tuple_list!(CentralizedLlmpHook::<S::Input>::new()?);
+            let centralized_hooks =
+                tuple_list!(CentralizedLlmpHook::<<S::Corpus as Corpus>::Input>::new()?);
 
             // TODO switch to false after solving the bug
             let mut broker = LlmpBroker::with_keep_pages_attach_to_tcp(
@@ -797,12 +799,13 @@ where
             log::info!("I am broker!!.");
 
             #[cfg(not(feature = "multi_machine"))]
-            let llmp_hook =
-                tuple_list!(StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?);
+            let llmp_hook = tuple_list!(StdLlmpEventHook::<<S::Corpus as Corpus>::Input, MT>::new(
+                self.monitor.clone()
+            )?);
 
             #[cfg(feature = "multi_machine")]
             let llmp_hook = tuple_list!(
-                StdLlmpEventHook::<S::Input, MT>::new(self.monitor.clone())?,
+                StdLlmpEventHook::<<S::Corpus as Corpus>::Input, MT>::new(self.monitor.clone())?,
                 multi_machine_sender_hook,
             );
 

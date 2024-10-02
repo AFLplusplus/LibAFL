@@ -103,7 +103,6 @@ impl CentralizedEventManagerBuilder {
         inner: EM,
         hooks: EMH,
         client: LlmpClient<SP>,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
         SP: ShMemProvider,
@@ -129,7 +128,6 @@ impl CentralizedEventManagerBuilder {
         hooks: EMH,
         shmem_provider: SP,
         port: u16,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
         SP: ShMemProvider,
@@ -154,7 +152,6 @@ impl CentralizedEventManagerBuilder {
         hooks: EMH,
         shmem_provider: SP,
         env_name: &str,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
         SP: ShMemProvider,
@@ -177,7 +174,6 @@ impl CentralizedEventManagerBuilder {
         hooks: EMH,
         shmem_provider: SP,
         description: &LlmpClientDescription,
-        time_obs: Option<Handle<TimeObserver>>,
     ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
         SP: ShMemProvider,
@@ -199,7 +195,7 @@ where
     S: HasCorpus,
     SP: ShMemProvider,
     EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input:,
+    <S::Corpus as Corpus>::Input: Input,
 {
     fn should_send(&self) -> bool {
         self.inner.should_send()
