@@ -14,7 +14,7 @@ use std::{
         raw::c_void,
     },
     path::Path,
-    process, ptr, slice,
+    ptr, slice,
     string::String,
     sync::LazyLock,
     vec::Vec,
@@ -25,14 +25,13 @@ use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libafl_bolts::ownedref::OwnedRefMut;
 use libc::__u64;
-use libipt::{insn::InsnDecoder, Asid, ConfigBuilder, Cpu, Image, SectionCache};
+use libipt::{insn::InsnDecoder, Asid, ConfigBuilder, Cpu, Image};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
-use proc_maps::get_process_maps;
 use raw_cpuid::CpuId;
 use serde::Serialize;
 
@@ -57,7 +56,7 @@ static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
         .map_err(|_| format!("Failed to parse Intel PT perf event type in {path}"))
 });
 
-// TODO: when polishing the API move this to a caps module mimiking /sys/bus/event_source/devices/intel_pt/caps ?
+// TODO: when polishing the API move this to a caps module mimicking /sys/bus/event_source/devices/intel_pt/caps ?
 static NUM_OF_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
     let s = fs::read_to_string(&path)
@@ -119,81 +118,86 @@ pub struct IntelPT {
     previous_decode_head: u64,
 }
 
-// #[derive(Debug)]
-pub struct IntelPTHook<'a> {
-    pt: Option<(IntelPT, Image<'a>)>,
-    //trace: Arc<Mutex<Vec<u8>>>,
+#[derive(Debug)]
+pub struct IntelPTHook {
+    pt: Option<IntelPT>,
     map: *mut u8,
     len: usize,
 }
 
-impl<'a> IntelPTHook<'a> {
+impl IntelPTHook {
     pub fn new(map: *mut u8, len: usize) -> Self {
-        //pub fn new() -> Self {
         Self { pt: None, map, len }
     }
 }
-impl<'a, S> ExecutorHook<S> for IntelPTHook<'a>
+impl<S> ExecutorHook<S> for IntelPTHook
 where
     S: UsesInput + Serialize,
 {
-    fn init<E: HasObservers>(&mut self, state: &mut S) {
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {
         assert!(self.pt.is_none(), "Intel PT was already set up");
-        let mut image_cache = SectionCache::new(Some("image_cache")).unwrap();
-        let mut image = Image::new(Some("image")).unwrap();
+        // let mut image_cache = SectionCache::new(Some("image_cache")).unwrap();
+        // let mut image = Image::new(Some("image")).unwrap();
+        //
+        // let maps = get_process_maps(pid as i32).unwrap();
+        // for map in maps {
+        //     if map.is_exec() && map.filename().is_some() {
+        //         if let Ok(isid) = image_cache.add_file(
+        //             map.filename().unwrap().to_str().unwrap(),
+        //             map.offset as u64,
+        //             map.size() as u64,
+        //             map.start() as u64,
+        //         ) {
+        //             let _ = image
+        //                 .add_cached(&mut image_cache, isid, Asid::default())
+        //                 .unwrap();
+        //             println!(
+        //                 "added cache {isid}: {} size: {}",
+        //                 map.filename().unwrap().to_str().unwrap(),
+        //                 map.size()
+        //             )
+        //         }
+        //     }
+        // }
 
-        let pid = process::id();
-        let maps = get_process_maps(pid as i32).unwrap();
-        for map in maps {
-            if map.is_exec() && map.filename().is_some() {
-                if let Ok(isid) = image_cache.add_file(
-                    map.filename().unwrap().to_str().unwrap(),
-                    map.offset as u64,
-                    map.size() as u64,
-                    map.start() as u64,
-                ) {
-                    let _ = image
-                        .add_cached(&mut image_cache, isid, Asid::default())
-                        .unwrap();
-                    println!(
-                        "added cache {isid}: {} size: {}",
-                        map.filename().unwrap().to_str().unwrap(),
-                        map.size()
-                    )
-                }
-            }
-        }
-
-        self.pt = Some((IntelPT::try_new(Some(pid as i32)).unwrap(), image));
+        self.pt = Some(IntelPT::try_new(None).unwrap());
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         //self.trace.lock().unwrap().clear();
-        self.pt.as_mut().unwrap().0.enable_tracing().unwrap();
+        self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn post_exec(&mut self, state: &mut S, _input: &S::Input) {
-        let (pt, image) = self.pt.as_mut().unwrap();
+        let pt = self.pt.as_mut().unwrap();
         pt.disable_tracing().unwrap();
-        let mut buff = vec![];
-        let ips = pt.decode_with_image(image, Some(&mut buff));
-        let s = serde_json::to_vec(&state).unwrap();
-        dump_corpus(&s).unwrap();
-        dump_trace_to_file(&buff).unwrap();
+
+        let read_mem = |buf: &mut [u8], addr: u64| {
+            let src = addr as *const u8;
+            let dst = buf.as_mut_ptr();
+            let size = buf.len();
+            unsafe {
+                ptr::copy_nonoverlapping(src, dst, size);
+            }
+        };
+
+        let ips = pt.decode_with_callback(read_mem, None);
+        if unsafe { FILE_NUM } % 1000 == 0 {
+            let s = serde_json::to_vec(&state).unwrap();
+            dump_corpus(&s).unwrap();
+        }
         unsafe {
             FILE_NUM += 1;
         }
-        //if unsafe{FILE_NUM > 5} {
+        // if unsafe{FILE_NUM > 500} {
         //    panic!("ciao ciao");
-        //}
+        // }
         //println!("IPs: {ips:x?}");
         for ip in ips {
             unsafe { *self.map.add(ip as usize % self.len) += 1 };
         }
-        // unsafe{*self.map += 1;};
-        // println!("Post exec hook");
     }
 }
 
@@ -220,7 +224,7 @@ impl IntelPT {
             }
         };
 
-        let perf_buffer = setup_perf_buffer(&fd).unwrap();
+        let perf_buffer = setup_perf_buffer(&fd)?;
 
         // the first perf_buff page is a metadata page
         let buff_metadata = perf_buffer.cast::<perf_event_mmap_page>();
@@ -237,8 +241,7 @@ impl IntelPT {
         }
 
         let perf_aux_buffer = unsafe {
-            setup_perf_aux_buffer(&fd, aux_size.read_volatile(), aux_offset.read_volatile())
-                .unwrap()
+            setup_perf_aux_buffer(&fd, aux_size.read_volatile(), aux_offset.read_volatile())?
         };
 
         let aux_head = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_head) };
@@ -349,7 +352,7 @@ impl IntelPT {
         let mut data = if head_wrap >= tail_wrap {
             unsafe {
                 let ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
-                OwnedRefMut::Ref(unsafe { slice::from_raw_parts_mut(ptr, len) })
+                OwnedRefMut::Ref(slice::from_raw_parts_mut(ptr, len))
             }
         } else {
             // Head pointer wrapped, the trace is split
@@ -402,7 +405,7 @@ impl IntelPT {
         loop {
             status = match decoder.sync_forward() {
                 Ok(s) => s,
-                Err(e) => {
+                Err(_) => {
                     // println!("pterror in sync {e:?}");
                     break;
                 }
@@ -431,7 +434,7 @@ impl IntelPT {
 
                 let block = decoder.next();
                 match block {
-                    Err(e) => {
+                    Err(_) => {
                         // libipt-rs library ignores the fact that
                         // Even in case of errors, we may have succeeded in decoding some instructions.
                         // https://github.com/intel/libipt/blob/4a06fdffae39dadef91ae18247add91029ff43c0/ptxed/src/ptxed.c#L1954
@@ -446,6 +449,7 @@ impl IntelPT {
                     }
                     Ok((b, s)) => {
                         status = s;
+
                         // TODO optimize this check and its equivalent up here?
                         if skip < decoder.offset().expect("Failed to get decoder offset") {
                             ips.push(b.ip());
@@ -459,19 +463,13 @@ impl IntelPT {
             }
         }
 
-        // unsafe{println!("---{FILE_NUM}---");};
-        // println!("offset: {}",decoder.offset().unwrap());
-
         // Advance the trace pointer up to the latest sync point, otherwise the next execution might
-        // not contain the PSB. Therefoere, traces are dirty and can contain previous exec data TODO
+        // not contain the PSB.
         decoder.sync_backward().expect("Failed to sync backward");
         let offset = decoder
             .sync_offset()
             .expect("Failed to get last sync offset");
-        unsafe { self.aux_tail.write_volatile(offset) }; //offset
-
-        // println!("Sync offset after sync back: {}", offset);
-
+        unsafe { self.aux_tail.write_volatile(offset) };
         self.previous_decode_head = head;
         ips
     }
@@ -818,7 +816,7 @@ mod test {
             // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
             println!("Intel PT is not available, skipping test. Reasons:");
             println!("{reason}");
-            return;
+            //return;
         }
 
         let pid = match unsafe { fork() } {
@@ -843,7 +841,7 @@ mod test {
             Err(e) => panic!("Fork failed {e}"),
         };
 
-        let mut pt = IntelPT::try_new(pid.as_raw()).expect("Failed to create IntelPT");
+        let mut pt = IntelPT::try_new(Some(pid.as_raw())).expect("Failed to create IntelPT");
         pt.enable_tracing().expect("Failed to enable tracing");
 
         waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");

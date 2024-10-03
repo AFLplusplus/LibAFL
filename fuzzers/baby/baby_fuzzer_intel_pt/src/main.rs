@@ -1,10 +1,4 @@
-use std::{
-    hint::black_box,
-    path::PathBuf,
-    ptr::write,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{hint::black_box, path::PathBuf, time::Duration};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -34,11 +28,6 @@ use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 static mut SIGNALS: [u8; 1024] = [0; 1024];
 static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
-/// Assign a signal to the signals map
-fn signals_set(idx: usize) {
-    unsafe { write(SIGNALS_PTR.add(idx), 1) };
-}
-
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // Check that IntelPT is available
@@ -49,12 +38,9 @@ pub fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        //signals_set(0);
         if !buf.is_empty() && buf[0] == b'a' {
             let _do_something = black_box(0);
-            //signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
-                //signals_set(2);
                 let _do_something = black_box(0);
                 if buf.len() > 2 && buf[2] == b'c' {
                     panic!("Artificial bug triggered =)");
@@ -114,7 +100,7 @@ pub fn main() {
     //let pt_hook = IntelPTHook::new();
 
     type PTInProcessExecutor<'a, H, OT, S> =
-        GenericInProcessExecutor<H, &'a mut H, (IntelPTHook<'a>, ()), OT, S>;
+        GenericInProcessExecutor<H, &'a mut H, (IntelPTHook, ()), OT, S>;
     // Create the executor for an in-process function with just one observer
     let mut executor = PTInProcessExecutor::with_timeout_generic(
         tuple_list!(pt_hook),
