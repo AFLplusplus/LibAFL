@@ -2,7 +2,7 @@
 #![allow(missing_docs)]
 
 use std::{
-    borrow::{Cow, ToOwned},
+    borrow::ToOwned,
     convert::Into,
     ffi::CString,
     fs,
@@ -16,17 +16,16 @@ use std::{
     path::Path,
     process, ptr, slice,
     string::String,
-    sync::{Arc, LazyLock, Mutex},
+    sync::LazyLock,
     vec::Vec,
 };
 
 use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
-use libipt::{
-    block::BlockDecoder, insn::InsnDecoder, Asid, BlockFlags, ConfigBuilder, Cpu, Image,
-    SectionCache,
-};
+use libafl_bolts::ownedref::OwnedRefMut;
+use libc::__u64;
+use libipt::{insn::InsnDecoder, Asid, ConfigBuilder, Cpu, Image, SectionCache};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
@@ -115,7 +114,8 @@ pub struct IntelPT {
     fd: OwnedFd,
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
-    buff_metadata: *mut perf_event_mmap_page,
+    aux_head: *mut __u64,
+    aux_tail: *mut __u64,
     previous_decode_head: u64,
 }
 
@@ -164,7 +164,7 @@ where
             }
         }
 
-        self.pt = Some((IntelPT::try_new(pid as i32).unwrap(), image));
+        self.pt = Some((IntelPT::try_new(Some(pid as i32)).unwrap(), image));
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -198,14 +198,15 @@ where
 }
 
 impl IntelPT {
-    pub(crate) fn try_new(pid: i32) -> Result<Self, Error> {
+    // TODO consider a builder for this
+    pub(crate) fn try_new(pid: Option<i32>) -> Result<Self, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         // TODO: take advantage of PTWRITE to better isolate target code?
 
         let fd = match unsafe {
             perf_event_open(
                 ptr::from_mut(&mut perf_event_attr),
-                pid,
+                pid.unwrap_or(0),
                 -1,
                 -1,
                 PERF_FLAG_FD_CLOEXEC.into(),
@@ -240,11 +241,15 @@ impl IntelPT {
                 .unwrap()
         };
 
+        let aux_head = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_head) };
+        let aux_tail = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_tail) };
+
         Ok(Self {
             fd,
             perf_buffer,
             perf_aux_buffer,
-            buff_metadata,
+            aux_head,
+            aux_tail,
             previous_decode_head: 0,
         })
     }
@@ -326,11 +331,8 @@ impl IntelPT {
     ) -> Vec<u64> {
         let mut ips = Vec::new();
 
-        let aux_head = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_head) };
-        let aux_tail = unsafe { ptr::addr_of_mut!((*self.buff_metadata).aux_tail) };
-
-        let head = unsafe { aux_head.read_volatile() };
-        let tail = unsafe { aux_tail.read_volatile() };
+        let head = unsafe { self.aux_head.read_volatile() };
+        let tail = unsafe { self.aux_tail.read_volatile() };
         debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail.");
         debug_assert!(
             self.previous_decode_head >= tail,
@@ -344,13 +346,10 @@ impl IntelPT {
 
         smp_rmb(); // TODO double check impl
 
-        // TODO: Cow clones the borrowed data on `as_mut()`, we could just mut the borrowed data
-        // BUT, should the decoder mutate the data in the first place?
-        // maybe just a libipt/libipt-rs oversight ?
         let mut data = if head_wrap >= tail_wrap {
             unsafe {
                 let ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
-                Cow::from(slice::from_raw_parts(ptr, len))
+                OwnedRefMut::Ref(unsafe { slice::from_raw_parts_mut(ptr, len) })
             }
         } else {
             // Head pointer wrapped, the trace is split
@@ -359,26 +358,27 @@ impl IntelPT {
                 let first_len = PERF_AUX_BUFFER_SIZE - tail_wrap as usize;
                 let second_ptr = self.perf_aux_buffer as *mut u8;
                 let second_len = head_wrap as usize;
-                Cow::from(
+                OwnedRefMut::Owned(
                     [
                         slice::from_raw_parts(first_ptr, first_len),
                         slice::from_raw_parts(second_ptr, second_len),
                     ]
-                    .concat(),
+                    .concat()
+                    .into_boxed_slice(),
                 )
             }
         };
 
         // println!("Intel PT: decoding {len} bytes");
         if let Some(b) = copy_buffer {
-            b.extend_from_slice(&data);
+            b.extend_from_slice(data.as_ref());
         }
 
         // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;??
         // apparently the rust library doesn't have the context parameter for the image.set_callback
         // also, under the hood looks like it is passing the callback itself as context to the C fn 🤔
         // TODO remove unwrap()
-        let mut config = ConfigBuilder::new(data.to_mut()).unwrap();
+        let mut config = ConfigBuilder::new(data.as_mut()).unwrap();
         if let Some(cpu) = &*CURRENT_CPU {
             config.cpu(cpu.clone());
         }
@@ -468,7 +468,7 @@ impl IntelPT {
         let offset = decoder
             .sync_offset()
             .expect("Failed to get last sync offset");
-        unsafe { aux_tail.write_volatile(offset) }; //offset
+        unsafe { self.aux_tail.write_volatile(offset) }; //offset
 
         // println!("Sync offset after sync back: {}", offset);
 
