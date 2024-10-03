@@ -1,6 +1,6 @@
 //! [`crate::mutators::Mutator`] collection equivalent to AFL++'s havoc mutations
 
-use libafl_bolts::tuples::{Map, Merge};
+use libafl_bolts::tuples::{Map, Merge, NamedTuple};
 use tuple_list::{tuple_list, tuple_list_type};
 
 use crate::mutators::{
@@ -270,4 +270,30 @@ where
         .map(ToMappedInputFunctionMappingMutatorMapper::new(
             current_input_mapper,
         ))
+}
+
+/// TODO
+pub trait HasHavocMutators {
+    /// TODO
+    fn havoc_mutators<MT: NamedTuple>() -> MT;
+}
+
+#[cfg(test)]
+mod tests {
+    use libafl_derive::HasHavocMutators;
+
+    use super::HasHavocMutators;
+    use crate::mutators::{StdScheduledMutator, Vec};
+
+    #[derive(HasHavocMutators)]
+    struct CustomInput {
+        vec: Vec<u8>,
+    }
+
+    #[test]
+    fn test_derive_has_havoc_mutators() {
+        let input = CustomInput { vec: vec![] };
+        let mutations = CustomInput::havoc_mutators();
+        let scheduler = StdScheduledMutator::new(mutations);
+    }
 }
