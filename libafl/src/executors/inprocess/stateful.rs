@@ -21,7 +21,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
@@ -50,7 +50,7 @@ where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     /// The harness function, being executed for each fuzzing loop execution
@@ -67,7 +67,7 @@ where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -83,21 +83,10 @@ where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     type State = S;
-}
-
-impl<H, HB, HT, OT, S, ES> UsesObservers for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
-where
-    H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
-    S: State,
-{
-    type Observers = OT;
 }
 
 impl<EM, H, HB, HT, OT, S, Z, ES> Executor<EM, Z>
@@ -107,7 +96,7 @@ where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions,
     Z: UsesState<State = S>,
 {
@@ -139,9 +128,10 @@ where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
+    type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
@@ -156,7 +146,7 @@ where
 impl<'a, H, OT, S, ES> StatefulInProcessExecutor<'a, H, OT, S, ES>
 where
     H: FnMut(&mut ES, &mut S, &<S as UsesInput>::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: HasExecutions + HasSolutions + HasCorpus + State,
     <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
@@ -173,7 +163,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
@@ -203,7 +193,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -246,7 +236,7 @@ where
     where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -275,7 +265,7 @@ where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     /// The executor state given to the harness
@@ -294,7 +284,7 @@ where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
     <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
@@ -311,7 +301,7 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
     {
@@ -342,7 +332,7 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -381,7 +371,7 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, S::Input, OT, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
@@ -430,7 +420,7 @@ where
     H: FnMut(&mut ES, &mut S, &<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions + HasSolutions + HasCorpus,
 {
     /// the timeout handler

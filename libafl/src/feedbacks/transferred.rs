@@ -9,17 +9,18 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
-    events::EventFirer, executors::ExitKind, feedbacks::Feedback, observers::ObserversTuple,
-    state::State, HasMetadata,
+    executors::ExitKind,
+    feedbacks::{Feedback, StateInitializer},
+    HasMetadata,
 };
+
 /// Constant name of the [`TransferringMetadata`].
 pub const TRANSFERRED_FEEDBACK_NAME: Cow<'static, str> =
     Cow::Borrowed("transferred_feedback_internal");
 
 /// Metadata which denotes whether we are currently transferring an input.
 ///
-/// Implementors of
-/// multi-node communication systems (like [`crate::events::LlmpEventManager`]) should wrap any
+/// Implementors of multi-node communication systems (like [`crate::events::LlmpEventManager`]) should wrap any
 /// [`crate::EvaluatorObservers::evaluate_input_with_observers`] or
 /// [`crate::ExecutionProcessor::process_execution`] calls with setting this metadata to true/false
 /// before and after.
@@ -52,27 +53,28 @@ impl Named for TransferredFeedback {
     }
 }
 
-impl<S> Feedback<S> for TransferredFeedback
+impl<S> StateInitializer<S> for TransferredFeedback
 where
-    S: HasMetadata + State,
+    S: HasMetadata,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_metadata(TransferringMetadata { transferring: true });
         Ok(())
     }
+}
 
-    fn is_interesting<EM, OT>(
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for TransferredFeedback
+where
+    S: HasMetadata,
+{
+    fn is_interesting(
         &mut self,
         state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         let res = state.metadata::<TransferringMetadata>()?.transferring;
         #[cfg(feature = "track_hit_feedbacks")]
         {
@@ -80,6 +82,7 @@ where
         }
         Ok(res)
     }
+
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         self.last_result.ok_or(premature_last_result_err())

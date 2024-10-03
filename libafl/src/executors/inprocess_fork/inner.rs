@@ -29,7 +29,7 @@ use crate::{
         ExitKind, HasObservers,
     },
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{State, UsesState},
     Error,
 };
@@ -37,7 +37,7 @@ use crate::{
 /// Inner state of GenericInProcessExecutor-like structures.
 pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
@@ -56,7 +56,7 @@ where
 
 impl<HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S> + Debug,
@@ -86,7 +86,7 @@ where
 
 impl<HT, OT, S, SP, EM, Z> UsesState for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
@@ -98,7 +98,7 @@ where
 
 impl<EM, HT, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: State + UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
@@ -194,7 +194,7 @@ impl<HT, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, 
 where
     HT: ExecutorHooksTuple<S>,
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     Z: UsesState<State = S>,
@@ -317,27 +317,17 @@ where
     }
 }
 
-impl<HT, OT, S, SP, EM, Z> UsesObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<HT, OT, S, SP, EM, Z> HasObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
     S: State,
+    OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
     type Observers = OT;
-}
 
-impl<HT, OT, S, SP, EM, Z> HasObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
-where
-    HT: ExecutorHooksTuple<S>,
-    S: State,
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)

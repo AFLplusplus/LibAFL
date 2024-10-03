@@ -3,7 +3,7 @@ use core::{marker::PhantomData, ptr, time::Duration};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -320,8 +320,10 @@ impl<S, SP, OT> HasObservers for TinyInstExecutor<S, SP, OT>
 where
     S: State,
     SP: ShMemProvider,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
+    type Observers = OT;
+
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
@@ -336,12 +338,4 @@ where
     SP: ShMemProvider,
 {
     type State = S;
-}
-impl<S, SP, OT> UsesObservers for TinyInstExecutor<S, SP, OT>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-{
-    type Observers = OT;
 }

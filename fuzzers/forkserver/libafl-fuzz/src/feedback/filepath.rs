@@ -1,18 +1,13 @@
 use std::{
     borrow::Cow,
-    fmt::{Debug, Formatter},
-    marker::PhantomData,
     path::{Path, PathBuf},
 };
 
 use libafl::{
-    corpus::Testcase,
-    events::EventFirer,
+    corpus::{Corpus, Testcase},
     executors::ExitKind,
-    feedbacks::{Feedback, FeedbackFactory},
-    inputs::Input,
-    observers::ObserversTuple,
-    state::State,
+    feedbacks::{Feedback, FeedbackFactory, StateInitializer},
+    state::HasCorpus,
 };
 use libafl_bolts::{Error, Named};
 use serde::{Deserialize, Serialize};
@@ -22,108 +17,68 @@ use serde::{Deserialize, Serialize};
 /// Note: If used as part of the `Objective` chain, then it will only apply to testcases which are
 /// `Objectives`, vice versa for `Feedback`.
 #[derive(Serialize, Deserialize)]
-pub struct CustomFilepathToTestcaseFeedback<F, I, S>
-where
-    I: Input,
-    S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
-{
+pub struct CustomFilepathToTestcaseFeedback<F> {
     /// Closure that returns the filename.
     func: F,
     /// The root output directory
     out_dir: PathBuf,
-    phantomm: PhantomData<(I, S)>,
 }
 
-impl<F, I, S> CustomFilepathToTestcaseFeedback<F, I, S>
-where
-    I: Input,
-    S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
-{
+impl<F> CustomFilepathToTestcaseFeedback<F> {
     /// Create a new [`CustomFilepathToTestcaseFeedback`].
     pub fn new(func: F, out_dir: PathBuf) -> Self {
-        Self {
-            func,
-            out_dir,
-            phantomm: PhantomData,
-        }
+        Self { func, out_dir }
     }
 }
 
-impl<F, I, S, T> FeedbackFactory<CustomFilepathToTestcaseFeedback<F, I, S>, T>
-    for CustomFilepathToTestcaseFeedback<F, I, S>
+impl<F, T> FeedbackFactory<CustomFilepathToTestcaseFeedback<F>, T>
+    for CustomFilepathToTestcaseFeedback<F>
 where
-    I: Input,
-    S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error> + Clone,
+    F: Clone,
 {
-    fn create_feedback(&self, _ctx: &T) -> CustomFilepathToTestcaseFeedback<F, I, S> {
+    fn create_feedback(&self, _ctx: &T) -> CustomFilepathToTestcaseFeedback<F> {
         Self {
             func: self.func.clone(),
-            phantomm: self.phantomm,
             out_dir: self.out_dir.clone(),
         }
     }
 }
 
-impl<F, I, S> Named for CustomFilepathToTestcaseFeedback<F, I, S>
-where
-    I: Input,
-    S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
-{
+impl<F> Named for CustomFilepathToTestcaseFeedback<F> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("CustomFilepathToTestcaseFeedback");
         &NAME
     }
 }
 
-impl<F, I, S> Debug for CustomFilepathToTestcaseFeedback<F, I, S>
-where
-    I: Input,
-    S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CustomFilepathToTestcaseFeedback")
-            .finish_non_exhaustive()
-    }
-}
+impl<F, S> StateInitializer<S> for CustomFilepathToTestcaseFeedback<F> {}
 
-impl<F, I, S> Feedback<S> for CustomFilepathToTestcaseFeedback<F, I, S>
+impl<F, EM, OT, S> Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>
+    for CustomFilepathToTestcaseFeedback<F>
 where
-    S: State<Input = I>,
-    F: FnMut(&mut S, &mut Testcase<S::Input>, &Path) -> Result<(), Error>,
-    I: Input,
+    S: HasCorpus,
+    F: FnMut(&mut S, &mut Testcase<<S::Corpus as Corpus>::Input>, &Path) -> Result<(), Error>,
 {
     #[allow(clippy::wrong_self_convention)]
     #[inline]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &I,
+        _input: &<S::Corpus as Corpus>::Input,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-    {
+    ) -> Result<bool, Error> {
         Ok(false)
     }
 
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<<S>::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
-    {
+        testcase: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<(), Error> {
         (self.func)(state, testcase, &self.out_dir)?;
         Ok(())
     }

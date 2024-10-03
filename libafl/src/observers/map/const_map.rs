@@ -5,16 +5,13 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
-    slice::{Iter, IterMut},
 };
 
 use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named};
-use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    inputs::UsesInput,
     observers::{map::MapObserver, Observer},
     Error,
 };
@@ -22,144 +19,53 @@ use crate::{
 /// Use a const size to speedup `Feedback::is_interesting` when the user can
 /// know the size of the map at compile time.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct ConstMapObserver<'a, T, const N: usize>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+pub struct ConstMapObserver<'a, T, const N: usize> {
     map: OwnedMutSlice<'a, T>,
     initial: T,
     name: Cow<'static, str>,
 }
 
-impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
+impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
 where
-    S: UsesInput,
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
 
-impl<'a, T, const N: usize> Named for ConstMapObserver<'a, T, N>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
-{
+impl<'a, T, const N: usize> Named for ConstMapObserver<'a, T, N> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T, const N: usize> HasLen for ConstMapObserver<'a, T, N>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
-{
+impl<'a, T, const N: usize> HasLen for ConstMapObserver<'a, T, N> {
     #[inline]
     fn len(&self) -> usize {
         N
     }
 }
 
-impl<'a, 'it, T, const N: usize> IntoIterator for &'it ConstMapObserver<'a, T, N>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-    type Item = <Iter<'it, T> as Iterator>::Item;
-    type IntoIter = Iter<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice()[..cnt].iter()
-    }
-}
-
-impl<'a, 'it, T, const N: usize> IntoIterator for &'it mut ConstMapObserver<'a, T, N>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-    type Item = <IterMut<'it, T> as Iterator>::Item;
-    type IntoIter = IterMut<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice_mut()[..cnt].iter_mut()
-    }
-}
-
-impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-    /// Returns an iterator over the map.
-    pub fn iter(&self) -> Iter<'_, T> {
-        <&Self as IntoIterator>::into_iter(self)
-    }
-
-    /// Returns a mutable iterator over the map.
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        <&mut Self as IntoIterator>::into_iter(self)
-    }
-}
-
 impl<'a, T, const N: usize> Hash for ConstMapObserver<'a, T, N>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+    T: Hash,
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.as_slice().hash(hasher);
+        self.map.as_slice().hash(hasher);
     }
 }
-impl<'a, T, const N: usize> AsRef<Self> for ConstMapObserver<'a, T, N>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+impl<'a, T, const N: usize> AsRef<Self> for ConstMapObserver<'a, T, N> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'a, T, const N: usize> AsMut<Self> for ConstMapObserver<'a, T, N>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+impl<'a, T, const N: usize> AsMut<Self> for ConstMapObserver<'a, T, N> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }
@@ -167,15 +73,7 @@ where
 
 impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug + 'static,
 {
     type Entry = T;
 
@@ -249,20 +147,14 @@ where
     }
 }
 
-impl<'a, T, const N: usize> Deref for ConstMapObserver<'a, T, N>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-{
+impl<'a, T, const N: usize> Deref for ConstMapObserver<'a, T, N> {
     type Target = [T];
     fn deref(&self) -> &[T] {
         &self.map
     }
 }
 
-impl<'a, T, const N: usize> DerefMut for ConstMapObserver<'a, T, N>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-{
+impl<'a, T, const N: usize> DerefMut for ConstMapObserver<'a, T, N> {
     fn deref_mut(&mut self) -> &mut [T] {
         &mut self.map
     }
@@ -270,7 +162,7 @@ where
 
 impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default,
 {
     /// Creates a new [`MapObserver`]
     ///
@@ -287,18 +179,6 @@ where
         }
     }
 
-    /// Creates a new [`MapObserver`] with an owned map
-    #[must_use]
-    pub fn owned(name: &'static str, map: Vec<T>) -> Self {
-        assert!(map.len() >= N);
-        let initial = if map.is_empty() { T::default() } else { map[0] };
-        Self {
-            map: OwnedMutSlice::from(map),
-            name: Cow::from(name),
-            initial,
-        }
-    }
-
     /// Creates a new [`MapObserver`] from a raw pointer
     ///
     /// # Safety
@@ -308,6 +188,27 @@ where
             map: OwnedMutSlice::from_raw_parts_mut(map_ptr, N),
             name: Cow::from(name),
             initial: T::default(),
+        }
+    }
+}
+
+impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
+where
+    T: Default + Clone,
+{
+    /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
+    pub fn owned(name: &'static str, map: Vec<T>) -> Self {
+        assert!(map.len() >= N);
+        let initial = if map.is_empty() {
+            T::default()
+        } else {
+            map[0].clone()
+        };
+        Self {
+            map: OwnedMutSlice::from(map),
+            name: Cow::from(name),
+            initial,
         }
     }
 }

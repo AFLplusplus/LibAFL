@@ -74,6 +74,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
+        E::Observers: ObserversTuple<E::Input, E::State>,
         CS: Scheduler<E::Input, E::State> + RemovableScheduler<E::Input, E::State>,
         EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,
