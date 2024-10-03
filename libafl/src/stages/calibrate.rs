@@ -18,6 +18,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
+    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
@@ -98,8 +99,9 @@ where
     EM: EventFirer<State = Self::State>,
     O: MapObserver,
     C: AsRef<O>,
-    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<Self::State>,
+    for<'de> <O as MapObserver>::Entry:
+        Serialize + Deserialize<'de> + 'static + Default + Debug + Bounded,
+    OT: ObserversTuple<Self::Input, Self::State>,
     E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions + HasCurrentTestcase,
     Z: Evaluator<E, EM, State = Self::State>,
     <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
@@ -382,7 +384,7 @@ where
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
     C: AsRef<O>,
-    OT: ObserversTuple<<Self as UsesState>::State>,
+    OT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     E: UsesState,
 {
     /// Create a new [`CalibrationStage`].

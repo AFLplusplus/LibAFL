@@ -21,6 +21,8 @@ use crate::{
         HasObservers,
     },
     inputs::UsesInput,
+    observers::ObserversTuple,
+    state::UsesState,
     Error,
 };
 
@@ -58,7 +60,8 @@ impl<S> InChildProcessHooks<S> {
     /// Create new [`InChildProcessHooks`].
     pub fn new<E>() -> Result<Self, Error>
     where
-        E: HasObservers,
+        E: HasObservers + UsesState,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     {
         #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {

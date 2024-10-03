@@ -40,6 +40,7 @@ where
 impl<EM, TE, Z> TracingStage<EM, TE, Z>
 where
     TE: Executor<EM, Z> + HasObservers,
+    TE::Observers: ObserversTuple<TE::Input, <Self as UsesState>::State>,
     <TE as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata + HasCurrentTestcase,
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
@@ -86,6 +87,7 @@ impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
     E: UsesState<State = <Self as UsesState>::State>,
     TE: Executor<EM, Z> + HasObservers,
+    TE::Observers: ObserversTuple<TE::Input, <Self as UsesState>::State>,
     <TE as UsesState>::State: HasExecutions + HasCorpus + HasNamedMetadata,
     EM: UsesState<State = <Self as UsesState>::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
@@ -181,8 +183,9 @@ where
 impl<E, EM, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, Z> for ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
+    E::Observers: ObserversTuple<E::Input, E::State>,
     EM: UsesState<State = <Self as UsesState>::State>,
-    SOT: ObserversTuple<E::State>,
+    SOT: ObserversTuple<E::Input, E::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
     <E as UsesState>::State:
         State + HasExecutions + HasCorpus + HasNamedMetadata + Debug + HasCurrentTestcase,
@@ -238,7 +241,7 @@ where
     E: Executor<EM, Z> + HasObservers,
     <Self as UsesState>::State: State + HasExecutions + HasCorpus,
     EM: UsesState<State = <Self as UsesState>::State>,
-    SOT: ObserversTuple<E::State>,
+    SOT: ObserversTuple<E::Input, E::State>,
     Z: UsesState<State = <Self as UsesState>::State>,
 {
     /// Creates a new default stage

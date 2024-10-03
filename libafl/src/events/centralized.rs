@@ -38,7 +38,7 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver, UsesObservers},
+    observers::{ObserversTuple, TimeObserver},
     state::{HasExecutions, HasLastReportTime, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
@@ -324,7 +324,7 @@ where
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         const SERIALIZE_TIME_FACTOR: u32 = 4; // twice as much as the normal llmp em's value cuz it does this job twice.
         const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
@@ -370,14 +370,15 @@ impl<E, EM, EMH, S, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, 
 where
     EM: AdaptiveSerializer + EventProcessor<E, Z> + EventFirer + HasEventManagerId,
     EMH: EventManagerHooksTuple<EM::State>,
-    E: HasObservers<State = Self::State> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E::Observers:
+        ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     S: State,
     Self::State: HasExecutions + HasMetadata,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<State = Self::State>,
+    Z: EvaluatorObservers<Self, E::Observers, State = Self::State>
+        + ExecutionProcessor<Self, E::Observers, State = Self::State>,
 {
     fn process(
         &mut self,
@@ -403,16 +404,17 @@ where
 
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
 where
-    E: HasObservers<State = Self::State> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E::Observers:
+        ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EM: AdaptiveSerializer + EventManager<E, Z>,
     EM::State: HasExecutions + HasMetadata + HasLastReportTime,
     EMH: EventManagerHooksTuple<EM::State>,
     S: State,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E::Observers, State = Self::State>
-        + ExecutionProcessor<State = Self::State>,
+    Z: EvaluatorObservers<Self, E::Observers, State = Self::State>
+        + ExecutionProcessor<Self, E::Observers, State = Self::State>,
 {
 }
 
@@ -528,12 +530,13 @@ where
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
-        <E as UsesObservers>::Observers: Serialize,
+        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E::Observers:
+            ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = <Self as UsesState>::State>
-            + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<Self, E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<Self, E::Observers>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
@@ -577,11 +580,13 @@ where
         event: Event<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = <Self as UsesState>::State>,
+        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E::Observers:
+            ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
         for<'a> E::Observers: Deserialize<'a> + Serialize,
-        Z: ExecutionProcessor<State = <Self as UsesState>::State>
-            + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<Self, E::Observers, State = <Self as UsesState>::State>
+            + EvaluatorObservers<Self, E::Observers>,
     {
         log::debug!("handle_in_main!");
 
@@ -595,7 +600,6 @@ where
                 corpus_size,
                 observers_buf,
                 time,
-                executions,
                 forward_id,
                 #[cfg(feature = "multi_machine")]
                 node_id,
@@ -636,7 +640,7 @@ where
                             process::id(),
                             event_name
                         );
-                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                        fuzzer.evaluate_input_with_observers::<E>(
                             state,
                             executor,
                             self,
@@ -653,7 +657,6 @@ where
                         corpus_size,
                         observers_buf,
                         time,
-                        executions,
                         forward_id,
                         #[cfg(feature = "multi_machine")]
                         node_id,

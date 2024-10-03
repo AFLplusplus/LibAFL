@@ -439,16 +439,16 @@ where
         + HasCurrentCorpusId
         + HasNamedMetadata
         + HasMetadata,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
+    E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers<Observers = OT>,
     EM: EventFirer<State = Self::State>
         + EventRestarter
         + HasEventManagerId
         + ProgressReporter<State = Self::State>,
-    OT: ObserversTuple<Self::State>,
+    OT: ObserversTuple<Self::Input, Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
     Z: ExecutesInput<E, EM>
-        + ExecutionProcessor
-        + EvaluatorObservers<OT>
+        + ExecutionProcessor<EM, OT>
+        + EvaluatorObservers<EM, OT>
         + HasScheduler<Scheduler = CS>,
 {
     fn perform(
