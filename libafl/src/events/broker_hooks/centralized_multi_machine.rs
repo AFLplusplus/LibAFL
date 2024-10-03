@@ -176,7 +176,8 @@ where
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
 
-        // Here, we suppose msg will never be written again and will always be available.
+        // # Safety
+        // Here, we suppose msg will *never* be written again and will always be available.
         // Thus, it is safe to handle this in a separate thread.
         let msg_lock = unsafe { NullLock::new((msg.as_ptr(), msg.len())) };
         // let flags = msg_flags.clone();

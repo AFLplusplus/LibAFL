@@ -394,6 +394,13 @@ where
             } => "todo",*/
         }
     }
+
+    pub fn is_new_testcase(&self) -> bool {
+        match self {
+            Event::NewTestcase { .. } => true,
+            _ => false,
+        }
+    }
 }
 
 /// [`EventFirer`] fires an event.
