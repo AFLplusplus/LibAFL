@@ -256,7 +256,7 @@ where
                         #[cfg(feature = "llmp_compression")]
                         match state_wr_lock.compressor().maybe_compress(msg.as_ref()) {
                             Some(comp_buf) => {
-                                Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_COMPRESSED, comp_buf))
+                                Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_COMPRESSED | LLMP_FLAG_FROM_MM, comp_buf))
                             }
                             None => Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg)),
                         }
