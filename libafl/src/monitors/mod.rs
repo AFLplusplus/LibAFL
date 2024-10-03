@@ -371,7 +371,7 @@ pub struct ClientStats {
 }
 
 impl ClientStats {
-    /// We got a new information about executions for this client, insert them.
+    /// We got new information about executions for this client, insert them.
     #[cfg(feature = "afl_exec_sec")]
     pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
         let diff = cur_time
@@ -399,7 +399,7 @@ impl ClientStats {
         self.executions = self.prev_state_executions + executions;
     }
 
-    /// We got a new information about corpus size for this client, insert them.
+    /// We got new information about corpus size for this client, insert them.
     pub fn update_corpus_size(&mut self, corpus_size: u64) {
         self.corpus_size = corpus_size;
         self.last_corpus_time = current_time();

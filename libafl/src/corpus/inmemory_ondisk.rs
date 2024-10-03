@@ -421,7 +421,6 @@ where
             let ondisk_meta = OnDiskMetadata {
                 metadata: testcase.metadata_map(),
                 exec_time: testcase.exec_time(),
-                executions: testcase.executions(),
             };
 
             let mut tmpfile = File::create(&tmpfile_path)?;

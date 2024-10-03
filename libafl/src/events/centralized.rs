@@ -585,7 +585,6 @@ where
                 corpus_size,
                 observers_buf,
                 time,
-                executions,
                 forward_id,
                 #[cfg(feature = "multi_machine")]
                 node_id,
@@ -643,7 +642,6 @@ where
                         corpus_size,
                         observers_buf,
                         time,
-                        executions,
                         forward_id,
                         #[cfg(feature = "multi_machine")]
                         node_id,

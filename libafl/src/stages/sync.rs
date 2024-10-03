@@ -336,7 +336,6 @@ where
                         corpus_size: 0, // TODO choose if sending 0 or the actual real value
                         client_config: EventConfig::AlwaysUnique,
                         time: current_time(),
-                        executions: 0,
                         forward_id: None,
                         #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                         node_id: None,
