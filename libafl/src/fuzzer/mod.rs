@@ -496,7 +496,6 @@ where
                             corpus_size: state.corpus().count(),
                             client_config: manager.configuration(),
                             time: current_time(),
-                            executions: *state.executions(),
                             forward_id: None,
                             #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                             node_id: None,
@@ -546,7 +545,7 @@ where
                 self.objective_mut().discard_metadata(state, input)?;
 
                 // Add the input to the main corpus
-                let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+                let mut testcase = Testcase::from(input.clone());
                 #[cfg(feature = "track_hit_feedbacks")]
                 self.feedback_mut()
                     .append_hit_feedbacks(testcase.hit_feedbacks_mut())?;
@@ -561,9 +560,8 @@ where
                 // Not interesting
                 self.feedback_mut().discard_metadata(state, input)?;
 
-                let executions = *state.executions();
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::with_executions(input.clone(), executions);
+                let mut testcase = Testcase::from(input.clone());
                 testcase.set_parent_id_optional(*state.corpus().current());
                 if let Ok(mut tc) = state.current_testcase_mut() {
                     tc.found_objective();
@@ -643,7 +641,7 @@ where
         state: &mut Self::State,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<CorpusId, Error> {
-        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        let mut testcase = Testcase::from(input.clone());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
         let id = state.corpus_mut().add_disabled(testcase)?;
@@ -662,7 +660,7 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
-        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        let mut testcase = Testcase::from(input.clone());
 
         // Maybe a solution
         #[cfg(not(feature = "introspection"))]
@@ -741,7 +739,6 @@ where
                 corpus_size: state.corpus().count(),
                 client_config: manager.configuration(),
                 time: current_time(),
-                executions: *state.executions(),
                 forward_id: None,
                 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                 node_id: None,

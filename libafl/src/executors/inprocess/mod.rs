@@ -460,7 +460,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 
     if interesting {
         let executions = *state.executions();
-        let mut new_testcase = Testcase::with_executions(input.clone(), executions);
+        let mut new_testcase = Testcase::from(input.clone());
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
 

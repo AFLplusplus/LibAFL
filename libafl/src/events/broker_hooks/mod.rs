@@ -113,8 +113,6 @@ where
         match &event {
             Event::NewTestcase {
                 corpus_size,
-                time,
-                executions,
                 forward_id,
                 ..
             } => {
@@ -127,12 +125,6 @@ where
                 monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
-                if id == client_id {
-                    // do not update executions for forwarded messages, otherwise we loose the total order
-                    // as a forwarded msg with a lower executions may arrive after a stats msg with an higher executions
-                    // this also means when you wrap this event manger with centralized EM, you will **NOT** get executions update with the new tc message
-                    client.update_executions(*executions, *time);
-                }
                 monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }

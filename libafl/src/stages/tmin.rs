@@ -190,7 +190,7 @@ where
             fuzzer
                 .feedback_mut()
                 .is_interesting(state, manager, &base, &*observers, &exit_kind)?;
-            let mut testcase = Testcase::with_executions(base, *state.executions());
+            let mut testcase = Testcase::from(base);
             fuzzer
                 .feedback_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
