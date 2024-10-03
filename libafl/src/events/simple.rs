@@ -252,10 +252,7 @@ where
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective {
-                objective_size,
-                ..
-            } => {
+            Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))

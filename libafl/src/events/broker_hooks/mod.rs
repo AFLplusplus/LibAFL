@@ -177,10 +177,7 @@ where
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective {
-                objective_size,
-                ..
-            } => {
+            Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
