@@ -306,7 +306,7 @@ where
     }
 }
 
-impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
+impl<'a, T: ?Sized> AsRef<T> for OwnedRefMut<'a, T> {
     #[must_use]
     fn as_ref(&self) -> &T {
         match self {
@@ -317,7 +317,7 @@ impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
     }
 }
 
-impl<'a, T: Sized> AsMut<T> for OwnedRefMut<'a, T> {
+impl<'a, T: ?Sized> AsMut<T> for OwnedRefMut<'a, T> {
     #[must_use]
     fn as_mut(&mut self) -> &mut T {
         match self {
