@@ -505,12 +505,10 @@ where
             }
             ExecuteInputResult::Solution => {
                 if manager.should_send() {
-                    let executions = *state.executions();
                     manager.fire(
                         state,
                         Event::Objective {
                             objective_size: state.solutions().count(),
-                            executions,
                             time: current_time(),
                         },
                     )?;
@@ -685,12 +683,10 @@ where
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
             let id = state.solutions_mut().add(testcase)?;
 
-            let executions = *state.executions();
             manager.fire(
                 state,
                 Event::Objective {
                     objective_size: state.solutions().count(),
-                    executions,
                     time: current_time(),
                 },
             )?;

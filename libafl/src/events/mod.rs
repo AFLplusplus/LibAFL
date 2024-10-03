@@ -325,8 +325,6 @@ where
     Objective {
         /// Objective corpus size
         objective_size: usize,
-        /// The total number of executions when this objective is found
-        executions: u64,
         /// The time when this event was created
         time: Duration,
     },

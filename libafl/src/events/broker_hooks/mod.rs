@@ -179,13 +179,11 @@ where
             }
             Event::Objective {
                 objective_size,
-                executions,
-                time,
+                ..
             } => {
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                client.update_executions(*executions, *time);
                 monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
