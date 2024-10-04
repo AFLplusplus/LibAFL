@@ -259,7 +259,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(32);
+                        let mut generator = RandBytesGenerator::new(32).unwrap();
 
                         // Generate 8 initial inputs
                         state
@@ -372,7 +372,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(32);
+                        let mut generator = RandBytesGenerator::new(32).unwrap();
 
                         // Generate 8 initial inputs
                         state

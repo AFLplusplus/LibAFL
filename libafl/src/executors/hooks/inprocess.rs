@@ -526,5 +526,7 @@ pub unsafe fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 /// Returns if we are executing in a crash/timeout handler
 #[must_use]
 pub fn inprocess_in_handler() -> bool {
+    // # Safety
+    // Safe because the state is set up and the handler is a single bool. Worst case we read an old value.
     unsafe { GLOBAL_STATE.in_handler }
 }

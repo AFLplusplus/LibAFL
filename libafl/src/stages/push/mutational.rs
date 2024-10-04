@@ -5,6 +5,7 @@ use alloc::rc::Rc;
 use core::{
     cell::{Cell, RefCell},
     fmt::Debug,
+    num::NonZero,
 };
 
 use libafl_bolts::rands::Rand;
@@ -71,7 +72,9 @@ where
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
     fn iterations(&self, state: &mut Z::State, _corpus_id: CorpusId) -> Result<usize, Error> {
-        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
+        Ok(1 + state
+            .rand_mut()
+            .below(NonZero::new(DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap()))
     }
 
     /// Sets the current corpus index

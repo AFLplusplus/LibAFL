@@ -97,7 +97,7 @@ use tuple_list::tuple_list;
 #[cfg(all(unix, not(miri)))]
 use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use crate::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
 #[cfg(all(windows, feature = "std"))]
 use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
 #[cfg(feature = "std")]
@@ -2187,8 +2187,8 @@ pub struct LlmpShutdownSignalHandler {
 }
 
 #[cfg(unix)]
-impl Handler for LlmpShutdownSignalHandler {
-    fn handle(
+impl SignalHandler for LlmpShutdownSignalHandler {
+    unsafe fn handle(
         &mut self,
         _signal: Signal,
         _info: &mut siginfo_t,

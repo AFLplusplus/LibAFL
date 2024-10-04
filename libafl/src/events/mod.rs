@@ -34,7 +34,7 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
@@ -80,9 +80,12 @@ pub struct ShutdownSignalData {}
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+///
+/// # Safety
+/// This will exit the program
 #[cfg(all(unix, feature = "std"))]
-impl Handler for ShutdownSignalData {
-    fn handle(
+impl SignalHandler for ShutdownSignalData {
+    unsafe fn handle(
         &mut self,
         _signal: Signal,
         _info: &mut siginfo_t,
