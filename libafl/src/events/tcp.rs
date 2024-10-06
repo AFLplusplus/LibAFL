@@ -53,7 +53,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    observers::UsesObservers,
+    observers::ObserversTuple,
     state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
@@ -321,8 +321,6 @@ where
         match &event {
             Event::NewTestcase {
                 corpus_size,
-                time,
-                executions,
                 forward_id,
                 ..
             } => {
@@ -334,7 +332,6 @@ where
                 monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
-                client.update_executions(*executions, *time);
                 monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
@@ -387,15 +384,10 @@ where
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective {
-                objective_size,
-                executions,
-                time,
-            } => {
+            Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                client.update_executions(*executions, *time);
                 monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -611,10 +603,11 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = S>,
-        <E as UsesObservers>::Observers: Serialize,
+        E: Executor<Self, Z, State = S> + HasObservers,
+        E::Observers: Serialize + ObserversTuple<S::Input, S>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<Self, E::Observers, State = S>
+            + EvaluatorObservers<Self, E::Observers>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -645,9 +638,8 @@ where
                     {
                         state.scalability_monitor_mut().testcase_without_observers += 1;
                     }
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, false,
-                    )?
+                    fuzzer
+                        .evaluate_input_with_observers::<E>(state, executor, self, input, false)?
                 };
                 if let Some(item) = _res.1 {
                     *state.imported_mut() += 1;
@@ -751,12 +743,13 @@ where
 
 impl<E, EMH, S, Z> EventProcessor<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    Z: EvaluatorObservers<Self, E::Observers, State = S>
+        + ExecutionProcessor<Self, E::Observers, State = S>,
 {
     fn process(
         &mut self,
@@ -825,12 +818,13 @@ where
 
 impl<E, EMH, S, Z> EventManager<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    Z: EvaluatorObservers<Self, E::Observers, State = S>
+        + ExecutionProcessor<Self, E::Observers, State = S>,
 {
 }
 
@@ -970,13 +964,14 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
-    <E as UsesObservers>::Observers: Serialize,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<TcpEventManager<EMH, S>, E::Observers, State = S>
+        + ExecutionProcessor<TcpEventManager<EMH, S>, E::Observers>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.tcp_mgr.process(fuzzer, state, executor)
@@ -990,13 +985,14 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
     S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<TcpEventManager<EMH, S>, E::Observers, State = S>
+        + ExecutionProcessor<TcpEventManager<EMH, S>, E::Observers>, //CE: CustomEvent<I>,
 {
 }
 

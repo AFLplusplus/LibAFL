@@ -10,7 +10,7 @@ use std::intrinsics::transmute;
 
 #[cfg(not(miri))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
 use libc::siginfo_t;
 
 use crate::{
@@ -21,6 +21,8 @@ use crate::{
         HasObservers,
     },
     inputs::UsesInput,
+    observers::ObserversTuple,
+    state::UsesState,
     Error,
 };
 
@@ -58,7 +60,8 @@ impl<S> InChildProcessHooks<S> {
     /// Create new [`InChildProcessHooks`].
     pub fn new<E>() -> Result<Self, Error>
     where
-        E: HasObservers,
+        E: HasObservers + UsesState,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     {
         #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {
@@ -142,8 +145,13 @@ pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData
         timeout_handler: null(),
     };
 
-impl Handler for InProcessForkExecutorGlobalData {
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
+impl SignalHandler for InProcessForkExecutorGlobalData {
+    unsafe fn handle(
+        &mut self,
+        signal: Signal,
+        info: &mut siginfo_t,
+        context: Option<&mut ucontext_t>,
+    ) {
         match signal {
             Signal::SigUser2 | Signal::SigAlarm => unsafe {
                 if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {

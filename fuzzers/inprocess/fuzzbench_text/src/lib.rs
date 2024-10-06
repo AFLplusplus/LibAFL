@@ -602,7 +602,8 @@ fn fuzz_text(
             GrimoireRandomDeleteMutator::new(),
         ),
         3,
-    );
+    )
+    .unwrap();
     let grimoire = StdMutationalStage::transforming(grimoire_mutator);
 
     // A minimization+queue policy to get testcasess from the corpus

@@ -5,7 +5,7 @@ pub mod unix_signal_handler {
     use core::{mem::transmute, ptr::addr_of_mut};
     use std::{io::Write, panic};
 
-    use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
+    use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
     use libc::siginfo_t;
 
     use crate::{
@@ -20,6 +20,7 @@ pub mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::{Input, UsesInput},
+        observers::ObserversTuple,
         state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     };
 
@@ -40,8 +41,10 @@ pub mod unix_signal_handler {
     }*/
 
     #[cfg(unix)]
-    impl Handler for InProcessExecutorHandlerData {
-        fn handle(
+    impl SignalHandler for InProcessExecutorHandlerData {
+        /// # Safety
+        /// This will access global state.
+        unsafe fn handle(
             &mut self,
             signal: Signal,
             info: &mut siginfo_t,
@@ -76,9 +79,10 @@ pub mod unix_signal_handler {
     /// invokes the `post_exec` hook on all observer in case of panic
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
-        E: HasObservers,
+        E: Executor<EM, Z> + HasObservers,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -125,9 +129,10 @@ pub mod unix_signal_handler {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers + HasInProcessHooks<E::State>,
+        E: Executor<EM, Z> + HasInProcessHooks<E::State> + HasObservers,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -183,8 +188,9 @@ pub mod unix_signal_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me

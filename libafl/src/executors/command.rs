@@ -28,7 +28,7 @@ use crate::executors::{Executor, ExitKind};
 use crate::{
     executors::HasObservers,
     inputs::{HasTargetBytes, UsesInput},
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
@@ -214,7 +214,7 @@ where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
     T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S>,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
     Z: UsesState<State = S>,
 {
     fn run_target(
@@ -290,20 +290,14 @@ where
     type State = S;
 }
 
-impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-{
-    type Observers = OT;
-}
-
 impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
 where
     S: State,
     T: Debug,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
+    type Observers = OT;
+
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
@@ -483,7 +477,7 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
-        OT: MatchName + ObserversTuple<S>,
+        OT: MatchName + ObserversTuple<S::Input, S>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
     {
