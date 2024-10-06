@@ -62,16 +62,16 @@ impl<'a> NautilusFeedback<'a> {
     }
 }
 
-impl<'a> Named for NautilusFeedback<'a> {
+impl Named for NautilusFeedback<'_> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("NautilusFeedback");
         &NAME
     }
 }
 
-impl<'a, S> StateInitializer<S> for NautilusFeedback<'a> {}
+impl<S> StateInitializer<S> for NautilusFeedback<'_> {}
 
-impl<'a, EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'a>
+impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'_>
 where
     S: HasMetadata + HasCorpus,
     S::Corpus: Corpus<Input = NautilusInput>,

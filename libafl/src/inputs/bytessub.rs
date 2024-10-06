@@ -96,7 +96,7 @@ where
     }
 }
 
-impl<'a, I> HasMutatorBytes for BytesSubInput<'a, I>
+impl<I> HasMutatorBytes for BytesSubInput<'_, I>
 where
     I: HasMutatorBytes,
 {
@@ -192,7 +192,7 @@ where
     }
 }
 
-impl<'a, I> HasLen for BytesSubInput<'a, I>
+impl<I> HasLen for BytesSubInput<'_, I>
 where
     I: HasMutatorBytes,
 {
@@ -202,7 +202,7 @@ where
     }
 }
 
-impl<'a, I> MappedInput for BytesSubInput<'a, I> {
+impl<I> MappedInput for BytesSubInput<'_, I> {
     type Type<'b>
         = BytesSubInput<'b, I>
     where

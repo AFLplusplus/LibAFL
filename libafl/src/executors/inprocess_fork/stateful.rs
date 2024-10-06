@@ -85,8 +85,8 @@ where
     phantom: PhantomData<ES>,
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> Debug
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<H, HT, OT, S, SP, ES, EM, Z> Debug
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S> + Debug,
@@ -113,8 +113,8 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> UsesState
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<H, HT, OT, S, SP, ES, EM, Z> UsesState
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S>,
@@ -127,8 +127,8 @@ where
     type State = S;
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z, ES, OF> Executor<EM, Z>
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<EM, H, HT, OT, S, SP, Z, ES, OF> Executor<EM, Z>
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S> + Debug,
@@ -225,8 +225,8 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> HasObservers
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<H, HT, OT, S, SP, ES, EM, Z> HasObservers
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple<S>,
