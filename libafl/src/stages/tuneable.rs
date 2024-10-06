@@ -1,7 +1,7 @@
 //! A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
 
 use alloc::string::{String, ToString};
-use core::{marker::PhantomData, time::Duration};
+use core::{marker::PhantomData, num::NonZero, time::Duration};
 
 use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
@@ -248,7 +248,9 @@ where
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
         Ok(
             // fall back to random
-            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
+            1 + state
+                .rand_mut()
+                .below(NonZero::new(DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap()),
         )
     }
 }

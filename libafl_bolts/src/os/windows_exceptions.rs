@@ -422,9 +422,13 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 79] = [
 ];
 
 #[cfg(feature = "alloc")]
-pub trait Handler {
+pub trait ExceptionHandler {
     /// Handle an exception
-    fn handle(
+    ///
+    /// # Safety
+    /// This is generally not safe to call. It should only be called through the signal it was registered for.
+    /// Signal handling is hard, don't mess with it :).
+    unsafe fn handle(
         &mut self,
         exception_code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
@@ -434,7 +438,7 @@ pub trait Handler {
 }
 
 struct HandlerHolder {
-    handler: UnsafeCell<*mut dyn Handler>,
+    handler: UnsafeCell<*mut dyn ExceptionHandler>,
 }
 
 pub const EXCEPTION_HANDLERS_SIZE: usize = 96;
@@ -525,7 +529,9 @@ unsafe extern "C" fn handle_signal(_signum: i32) {
 /// # Safety
 /// Exception handlers are usually ugly, handle with care!
 #[cfg(feature = "alloc")]
-pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> Result<(), Error> {
+pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
+    handler: *mut T,
+) -> Result<(), Error> {
     let exceptions = (*handler).exceptions();
     let mut catch_assertions = false;
     for exception_code in exceptions {
@@ -539,7 +545,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> 
         write_volatile(
             addr_of_mut!(EXCEPTION_HANDLERS[index]),
             Some(HandlerHolder {
-                handler: UnsafeCell::new(handler as *mut dyn Handler),
+                handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
             }),
         );
     }
@@ -547,7 +553,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> 
     write_volatile(
         addr_of_mut!(EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]),
         Some(HandlerHolder {
-            handler: UnsafeCell::new(handler as *mut dyn Handler),
+            handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
         }),
     );
     compiler_fence(Ordering::SeqCst);

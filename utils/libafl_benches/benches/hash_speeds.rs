@@ -1,6 +1,9 @@
 //! Compare the speed of rust hash implementations
 
-use std::hash::{BuildHasher, Hasher};
+use std::{
+    hash::{BuildHasher, Hasher},
+    num::NonZero,
+};
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use libafl_bolts::rands::{Rand, StdRand};
@@ -11,7 +14,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut rand = StdRand::with_seed(0);
     let mut bench_vec: Vec<u8> = vec![];
     for _ in 0..2 << 16 {
-        bench_vec.push(rand.below(256) as u8);
+        bench_vec.push(rand.below(NonZero::new(256).unwrap()) as u8);
     }
 
     c.bench_function("xxh3", |b| {

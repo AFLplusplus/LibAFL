@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::num::NonZero;
 
 use libafl_bolts::rands::Rand;
 use regex_syntax::hir::{Class, ClassBytesRange, ClassUnicodeRange, Hir, Literal};
@@ -22,10 +23,12 @@ impl RegexScript {
     }
 
     pub fn get_mod<R: Rand>(&mut self, rand: &mut R, val: usize) -> usize {
-        if self.remaining == 0 {
+        if self.remaining == 0 || val == 0 {
             0
         } else {
-            rand.below(val)
+            // # Safety
+            // This is checked above to be non-null.
+            rand.below(unsafe { NonZero::new(val).unwrap_unchecked() })
         }
     }
 
