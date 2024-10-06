@@ -109,7 +109,7 @@ where
 }
 
 #[allow(clippy::similar_names)]
-impl<'a, H> InMemoryBytesCoverageSugar<'a, H>
+impl<H> InMemoryBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {

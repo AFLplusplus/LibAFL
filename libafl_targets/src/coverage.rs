@@ -278,15 +278,15 @@ mod swap {
         }
     }
 
-    impl<'a, 'b> Named for DifferentialAFLMapSwapObserver<'a, 'b> {
+    impl Named for DifferentialAFLMapSwapObserver<'_, '_> {
         fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }
 
-    impl<'a, 'b, I, S> Observer<I, S> for DifferentialAFLMapSwapObserver<'a, 'b> {}
+    impl<I, S> Observer<I, S> for DifferentialAFLMapSwapObserver<'_, '_> {}
 
-    impl<'a, 'b, OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for DifferentialAFLMapSwapObserver<'a, 'b> {
+    impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for DifferentialAFLMapSwapObserver<'_, '_> {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
             let slice = self.first_map.as_slice_mut();
             unsafe {

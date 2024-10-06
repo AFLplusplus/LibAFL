@@ -104,7 +104,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, OF, Z>(
     }
 }
 
-impl<'a, CM, ED, ET, H, OT, S, SM> Debug for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
+impl<CM, ED, ET, H, OT, S, SM> Debug for QemuExecutor<'_, CM, ED, ET, H, OT, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S> + Debug,
@@ -207,8 +207,7 @@ where
     }
 }
 
-impl<'a, CM, ED, EM, ET, H, OT, S, SM, Z> Executor<EM, Z>
-    for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
+impl<CM, ED, EM, ET, H, OT, S, SM, Z> Executor<EM, Z> for QemuExecutor<'_, CM, ED, ET, H, OT, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     ED: EmulatorDriver<CM, ET, S, SM>,
@@ -248,7 +247,7 @@ where
     }
 }
 
-impl<'a, CM, ED, ET, H, OT, S, SM> UsesState for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
+impl<CM, ED, ET, H, OT, S, SM> UsesState for QemuExecutor<'_, CM, ED, ET, H, OT, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
@@ -259,7 +258,7 @@ where
     type State = S;
 }
 
-impl<'a, CM, ED, ET, H, OT, S, SM> HasObservers for QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
+impl<CM, ED, ET, H, OT, S, SM> HasObservers for QemuExecutor<'_, CM, ED, ET, H, OT, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     ET: EmulatorModuleTuple<S>,
@@ -296,8 +295,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> Debug
-    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
+impl<CM, ED, EM, ET, H, OT, S, SM, SP, Z> Debug
+    for QemuForkExecutor<'_, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
     CM: CommandManager<ED, ET, S, SM> + Debug,
     EM: UsesState<State = S>,
@@ -401,8 +400,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> UsesState
-    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
+impl<CM, ED, EM, ET, H, OT, S, SM, SP, Z> UsesState
+    for QemuForkExecutor<'_, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
     CM: CommandManager<ED, ET, S, SM>,
     EM: UsesState<State = S>,
@@ -417,8 +416,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> HasObservers
-    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
+impl<CM, ED, EM, ET, H, OT, S, SM, SP, Z> HasObservers
+    for QemuForkExecutor<'_, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
     CM: CommandManager<ED, ET, S, SM>,
     EM: UsesState<State = S>,

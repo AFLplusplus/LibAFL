@@ -76,7 +76,7 @@ pub struct ForkserverBytesCoverageSugar<'a> {
 }
 
 #[allow(clippy::similar_names)]
-impl<'a> ForkserverBytesCoverageSugar<'a> {
+impl ForkserverBytesCoverageSugar<'_> {
     /// Runs the fuzzer.
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {

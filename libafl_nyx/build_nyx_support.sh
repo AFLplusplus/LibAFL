@@ -1,4 +1,7 @@
 #!/bin/bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 echo "================================================="
 echo "           Nyx build script"
 echo "================================================="
@@ -40,7 +43,7 @@ test -e QEMU-Nyx/.git || { echo "[-] QEMU-Nyx not checked out, please install gi
 echo "[*] Checking QEMU-Nyx ..."
 if [ ! -f "QEMU-Nyx/x86_64-softmmu/qemu-system-x86_64" ]; then
     cd QEMU-Nyx/ || return
-    cp ../Makefile.libxdc ./libxdc/Makefile || exit 1
+    sed -i "s,git submodule update libxdc$,git submodule update libxdc \&\& cp ../Makefile.libxdc ./libxdc/Makefile || exit 1," compile_qemu_nyx.sh
     ./compile_qemu_nyx.sh lto || exit 1
     cd ..
 fi
