@@ -77,7 +77,8 @@ frida-gum-sys = { version = "0.13.7", features = [
   "event-sink",
   "invocation-listener",
 ] }
-frida-gum = { version = "0.13.7", features = [
+# TODO: remove '=' once frida-gum-sys if fixed
+frida-gum = { version = "=0.13.6", features = [
   "event-sink",
   "invocation-listener",
   "module-names",
