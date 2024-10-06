@@ -9,6 +9,7 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
+use super::NopAddressFilter;
 #[cfg(emulation_mode = "systemmode")]
 use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
@@ -109,12 +110,9 @@ pub struct DrCovModule<F> {
     drcov_len: usize,
 }
 
-impl<F> DrCovModule<F>
-where
-    F: AddressFilter,
-{
+impl DrCovModule<NopAddressFilter> {
     #[must_use]
-    pub fn builder() -> DrCovModuleBuilder<F> {
+    pub fn builder() -> DrCovModuleBuilder<NopAddressFilter> {
         DrCovModuleBuilder {
             filter: None,
             module_mapping: None,
@@ -122,7 +120,12 @@ where
             filename: None,
         }
     }
+}
 
+impl<F> DrCovModule<F>
+where
+    F: AddressFilter,
+{
     #[must_use]
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(
