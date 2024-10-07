@@ -238,14 +238,15 @@ pub type ErrorBacktrace = backtrace::Backtrace;
 
 #[cfg(not(feature = "errors_backtrace"))]
 #[derive(Debug, Default)]
-/// Empty struct to use when `errors_backtrace` is disabled
-pub struct ErrorBacktrace {}
+/// ZST to use when `errors_backtrace` is disabled
+pub struct ErrorBacktrace;
+
 #[cfg(not(feature = "errors_backtrace"))]
 impl ErrorBacktrace {
     /// Nop
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -632,9 +633,9 @@ impl From<SetLoggerError> for Error {
 }
 
 #[cfg(windows)]
-impl From<windows::core::Error> for Error {
+impl From<windows_result::Error> for Error {
     #[allow(unused_variables)]
-    fn from(err: windows::core::Error) -> Self {
+    fn from(err: windows_result::Error) -> Self {
         Self::unknown(format!("Windows API error: {err:?}"))
     }
 }

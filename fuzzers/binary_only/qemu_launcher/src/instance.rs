@@ -64,7 +64,8 @@ pub struct Instance<'a, M: Monitor> {
     qemu: &'a Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
-    extra_tokens: Option<Vec<String>>,
+    #[builder(default)]
+    extra_tokens: Vec<String>,
     #[builder(default=PhantomData)]
     phantom: PhantomData<M>,
 }
@@ -134,11 +135,9 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         let mut tokens = Tokens::new();
 
-        if let Some(extra_tokens) = &self.extra_tokens {
-            for token in extra_tokens {
-                let bytes = token.as_bytes().to_vec();
-                let _ = tokens.add_token(&bytes);
-            }
+        for token in &self.extra_tokens {
+            let bytes = token.as_bytes().to_vec();
+            let _ = tokens.add_token(&bytes);
         }
 
         if let Some(tokenfile) = &self.options.tokens {

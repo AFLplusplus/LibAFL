@@ -18,7 +18,7 @@ pub mod systemmode;
 pub use systemmode::*;
 
 pub mod edges;
-pub use edges::EdgeCoverageModule;
+pub use edges::*;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
@@ -29,6 +29,11 @@ pub use calls::CallTracerModule;
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::CmpLogModule;
+
+#[cfg(not(cpu_target = "hexagon"))]
+pub mod drcov;
+#[cfg(not(cpu_target = "hexagon"))]
+pub use drcov::*;
 
 use crate::{emu::EmulatorModules, Qemu};
 
@@ -85,18 +90,29 @@ where
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
     }
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter;
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
+    fn update_address_filter(&mut self, qemu: Qemu, filter: Self::ModuleAddressFilter) {
+        *self.address_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
+    }
 
     #[cfg(emulation_mode = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter;
     #[cfg(emulation_mode = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter;
+    #[cfg(emulation_mode = "systemmode")]
+    fn update_page_filter(&mut self, qemu: Qemu, filter: Self::ModulePageFilter) {
+        *self.page_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
+    }
 }
 
 pub trait EmulatorModuleTuple<S>:
@@ -130,7 +146,7 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>;
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
@@ -175,7 +191,7 @@ where
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
     }
@@ -230,7 +246,7 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
         self.0

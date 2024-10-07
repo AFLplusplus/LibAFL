@@ -23,5 +23,6 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl/", features = ["unicode"] }
-libafl_bolts = { path = "../../../libafl_bolts/" }
+libafl = { path = "../../../libafl", features = ["unicode"] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }

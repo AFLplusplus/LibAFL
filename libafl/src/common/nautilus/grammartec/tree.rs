@@ -434,7 +434,7 @@ impl<'a> TreeMutation<'a> {
     }
 }
 
-impl<'a> TreeLike for TreeMutation<'a> {
+impl TreeLike for TreeMutation<'_> {
     fn get_rule_id(&self, n: NodeId) -> RuleId {
         self.get_at(n).id()
     }

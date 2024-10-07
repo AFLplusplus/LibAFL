@@ -77,7 +77,7 @@ fn main() {
 
     /* ANCHOR: generator */
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(32).unwrap();
 
     // Generate 8 initial inputs
     state

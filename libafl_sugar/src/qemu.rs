@@ -86,7 +86,7 @@ where
     iterations: Option<u64>,
 }
 
-impl<'a, H> Debug for QemuBytesCoverageSugar<'a, H>
+impl<H> Debug for QemuBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
@@ -114,7 +114,7 @@ where
     }
 }
 
-impl<'a, H> QemuBytesCoverageSugar<'a, H>
+impl<H> QemuBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
@@ -253,7 +253,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(32);
+                        let mut generator = RandBytesGenerator::new(32).unwrap();
 
                         // Generate 8 initial inputs
                         state
@@ -367,7 +367,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(32);
+                        let mut generator = RandBytesGenerator::new(32).unwrap();
 
                         // Generate 8 initial inputs
                         state

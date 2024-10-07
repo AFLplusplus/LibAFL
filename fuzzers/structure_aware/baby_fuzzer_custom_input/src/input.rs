@@ -60,23 +60,25 @@ impl CustomInput {
 }
 
 /// A generator for [`CustomInput`] used in this example
-pub struct CustomInputGenerator {
-    pub max_len: usize,
+pub struct CustomInputGenerator<S: HasRand> {
+    pub bytes_generator: RandBytesGenerator<S>,
 }
 
-impl CustomInputGenerator {
+impl<S: HasRand> CustomInputGenerator<S> {
     /// Creates a new [`CustomInputGenerator`]
-    pub fn new(max_len: usize) -> Self {
-        Self { max_len }
+    pub fn new(max_len: usize) -> Result<Self, Error> {
+        Ok(Self {
+            bytes_generator: RandBytesGenerator::new(max_len)?,
+        })
     }
 }
 
-impl<S> Generator<CustomInput, S> for CustomInputGenerator
+impl<S> Generator<CustomInput, S> for CustomInputGenerator<S>
 where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<CustomInput, Error> {
-        let mut generator = RandBytesGenerator::new(self.max_len);
+        let generator = &mut self.bytes_generator;
 
         let byte_array = generator.generate(state).unwrap().target_bytes().into();
         let optional_byte_array = state
@@ -103,10 +105,10 @@ where
     S: HasRand,
 {
     /// Creates a new [`ToggleOptionalByteArrayMutator`]
-    pub fn new(length: usize) -> Self {
-        Self {
-            generator: RandBytesGenerator::new(length),
-        }
+    pub fn new(length: usize) -> Result<Self, Error> {
+        Ok(Self {
+            generator: RandBytesGenerator::new(length)?,
+        })
     }
 }
 

@@ -29,7 +29,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
@@ -61,13 +61,12 @@ where
     type State = S;
 }
 
-impl<HT, OT, S> UsesObservers for GenericInProcessExecutorInner<HT, OT, S>
+impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S>
 where
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     type Observers = OT;
-}
 
 impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S>
 where
@@ -150,7 +149,7 @@ where
 impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
 where
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: HasCorpus + HasExecutions + HasSolutions + UsesInput,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -163,8 +162,9 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -192,8 +192,9 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -224,8 +225,9 @@ where
     ) -> Result<Self, Error>
     where
         E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<S>,
+        OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
         Z: HasObjective<Objective = OF, State = S>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me

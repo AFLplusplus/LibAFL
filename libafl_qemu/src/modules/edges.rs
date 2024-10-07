@@ -366,6 +366,8 @@ pub struct EdgeCoverageModuleBuilder<AF, PF, V> {
 pub struct EdgeCoverageModule<AF, PF, V> {
     variant: V,
     address_filter: AF,
+    // we only use it in system mode at the moment.
+    #[cfg_attr(not(emulation_mode = "systemmode"), allow(dead_code))]
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,

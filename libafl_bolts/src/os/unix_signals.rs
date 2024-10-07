@@ -387,16 +387,25 @@ impl Display for Signal {
 
 /// A trait for `LibAFL` signal handling
 #[cfg(feature = "alloc")]
-pub trait Handler {
+pub trait SignalHandler {
     /// Handle a signal
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, _context: Option<&mut ucontext_t>);
+    ///
+    /// # Safety
+    /// This is generally not safe to call. It should only be called through the signal it was registered for.
+    /// Signal handling is hard, don't mess with it :).
+    unsafe fn handle(
+        &mut self,
+        signal: Signal,
+        info: &mut siginfo_t,
+        _context: Option<&mut ucontext_t>,
+    );
     /// Return a list of signals to handle
     fn signals(&self) -> Vec<Signal>;
 }
 
 #[cfg(feature = "alloc")]
 struct HandlerHolder {
-    handler: UnsafeCell<*mut dyn Handler>,
+    handler: UnsafeCell<*mut dyn SignalHandler>,
 }
 
 #[cfg(feature = "alloc")]
@@ -452,7 +461,9 @@ unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
 /// The handler pointer will be dereferenced, and the data the pointer points to may therefore not move.
 /// A lot can go south in signal handling. Be sure you know what you are doing.
 #[cfg(feature = "alloc")]
-pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: *mut T) -> Result<(), Error> {
+pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
+    handler: *mut T,
+) -> Result<(), Error> {
     // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
     if SIGNAL_STACK_PTR.is_null() {
         SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
@@ -478,7 +489,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: *mut T) -> Res
         write_volatile(
             addr_of_mut!(SIGNAL_HANDLERS[sig as usize]),
             Some(HandlerHolder {
-                handler: UnsafeCell::new(handler as *mut dyn Handler),
+                handler: UnsafeCell::new(handler as *mut dyn SignalHandler),
             }),
         );
 

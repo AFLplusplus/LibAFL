@@ -20,4 +20,5 @@ panic = "abort"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+log = { version = "0.4.22", features = ["release_max_level_info"] }
 symcc_runtime = { path = "../../../../libafl_concolic/symcc_runtime" }

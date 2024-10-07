@@ -23,7 +23,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -35,7 +35,7 @@ pub type StatefulInProcessForkExecutor<'a, H, OT, S, SP, ES, EM, Z> =
 impl<'a, H, OT, S, SP, ES, EM, Z> StatefulInProcessForkExecutor<'a, H, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     #[allow(clippy::too_many_arguments)]
@@ -79,8 +79,8 @@ where
     phantom: PhantomData<ES>,
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> Debug
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<H, HT, OT, S, SP, ES, EM, Z> Debug
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HT: Debug,
@@ -105,8 +105,8 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> UsesState
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<H, HT, OT, S, SP, ES, EM, Z> UsesState
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     S: State,
@@ -114,14 +114,14 @@ where
     type State = S;
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z, ES, OF> Executor<EM, Z>
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<EM, H, HT, OT, S, SP, Z, ES, OF> Executor<EM, Z>
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple<S>,
-    OF: Feedback<S>,
-    OT: ObserversTuple<S> + Debug,
+    OF: Feedback<EM, S::Input, OT, S>,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: State + HasExecutions,
     SP: ShMemProvider,
     Z: HasObjective<Objective = OF, State = S>,
@@ -162,7 +162,7 @@ impl<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
     /// Creates a new [`StatefulGenericInProcessForkExecutor`] with custom hooks
@@ -207,23 +207,15 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> UsesObservers
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
-where
-    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
-    S: State,
-{
-    type Observers = OT;
-}
-
 impl<'a, H, HT, OT, S, SP, ES, EM, Z> HasObservers
     for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
 {
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
