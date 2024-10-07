@@ -150,6 +150,8 @@ where
 }
 
 impl<T> VariableLengthMapObserver for VariableMapObserver<'_, T>
+where
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
     fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
         self.map.as_mut()

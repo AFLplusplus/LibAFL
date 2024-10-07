@@ -68,11 +68,6 @@ where
 {
     type Observers = OT;
 
-impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-{
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)

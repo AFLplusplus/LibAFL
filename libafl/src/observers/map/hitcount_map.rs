@@ -17,6 +17,7 @@ use crate::{
     observers::{map::MapObserver, DifferentialObserver, Observer},
     Error,
 };
+use crate::observers::VariableLengthMapObserver;
 
 /// Hitcounts class lookup
 static COUNT_CLASS_LOOKUP: [u8; 256] = [
