@@ -12,8 +12,8 @@ use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
     AsSlice, AsSliceMut, HasLen, Named,
 };
-use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
 use crate::{
     observers::{map::MapObserver, Observer, VariableLengthMapObserver},
     Error,
@@ -162,8 +162,7 @@ where
     }
 }
 
-impl<T> Deref for VariableMapObserver<'_, T>
-{
+impl<T> Deref for VariableMapObserver<'_, T> {
     type Target = [T];
     fn deref(&self) -> &[T] {
         let cnt = *self.size.as_ref();

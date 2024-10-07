@@ -14,10 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    observers::{map::MapObserver, DifferentialObserver, Observer},
+    observers::{map::MapObserver, DifferentialObserver, Observer, VariableLengthMapObserver},
     Error,
 };
-use crate::observers::VariableLengthMapObserver;
 
 /// Hitcounts class lookup
 static COUNT_CLASS_LOOKUP: [u8; 256] = [
