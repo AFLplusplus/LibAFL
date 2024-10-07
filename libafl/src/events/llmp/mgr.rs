@@ -598,7 +598,7 @@ where
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         let mut count = 0;
-        while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
+        while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert!(
                 tag != _LLMP_TAG_EVENT_TO_BROKER,
                 "EVENT_TO_BROKER parcel should not have arrived in the client!"
@@ -612,7 +612,7 @@ where
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]
-            let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+            let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
                 compressed = self.compressor.decompress(msg)?;
                 &compressed
             } else {
@@ -620,6 +620,10 @@ where
             };
             let event: Event<S::Input> = postcard::from_bytes(event_bytes)?;
             log::debug!("Received event in normal llmp {}", event.name_detailed());
+
+            if !event.is_new_testcase() && (flags & LLMP_FLAG_FROM_MM == LLMP_FLAG_FROM_MM) {
+                continue;
+            }
             self.handle_in_client(fuzzer, executor, state, client_id, event)?;
             count += 1;
         }
