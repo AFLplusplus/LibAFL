@@ -713,6 +713,8 @@ create_exec_wrapper!(cmp, (id: u64, v0: u64, v1: u64), 3, 4, CmpHookId);
 // Crash hook wrappers
 #[cfg(emulation_mode = "usermode")]
 pub type CrashHookClosure<ET, S> = Box<dyn FnMut(&mut EmulatorModules<ET, S>, i32)>;
+#[cfg(emulation_mode = "usermode")]
+pub type CrashHookFn<ET, S> = fn(&mut EmulatorModules<ET, S>, i32);
 
 /// The thin wrapper around QEMU hooks.
 /// It is considered unsafe to use it directly.
