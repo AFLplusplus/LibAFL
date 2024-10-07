@@ -26,7 +26,7 @@ libafl_qemu_sys = { path = "../../../../../libafl_qemu/libafl_qemu_sys", feature
   "systemmode",
   # "paranoid_debug"
 ] }
-env_logger = "*"
+env_logger = "0.11.5"
 
 [build-dependencies]
 libafl_qemu_build = { path = "../../../../../libafl_qemu/libafl_qemu_build" }

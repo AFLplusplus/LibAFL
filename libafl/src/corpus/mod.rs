@@ -222,7 +222,7 @@ where
     cur_back: Option<CorpusId>,
 }
 
-impl<'a, C> Iterator for CorpusIdIterator<'a, C>
+impl<C> Iterator for CorpusIdIterator<'_, C>
 where
     C: Corpus,
 {
@@ -238,7 +238,7 @@ where
     }
 }
 
-impl<'a, C> DoubleEndedIterator for CorpusIdIterator<'a, C>
+impl<C> DoubleEndedIterator for CorpusIdIterator<'_, C>
 where
     C: Corpus,
 {

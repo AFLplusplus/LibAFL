@@ -1,0 +1,11 @@
+{
+    "rust-analyzer.cargo.buildScripts.overrideCommand": [
+        "cargo",
+        "check",
+        "--message-format=json",
+    ],
+    "rust-analyzer.check.overrideCommand": [
+        "cargo",
+        "check",
+    ],
+}

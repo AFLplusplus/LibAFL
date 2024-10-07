@@ -1,4 +1,5 @@
-use vergen::EmitBuilder;
+use vergen::{BuildBuilder, CargoBuilder, Emitter, RustcBuilder, SysinfoBuilder};
+use vergen_git2::Git2Builder;
 
 #[macro_export]
 macro_rules! assert_unique_feature {
@@ -13,12 +14,23 @@ macro_rules! assert_unique_feature {
 }
 
 fn main() {
-    EmitBuilder::builder()
-        .all_build()
-        .all_cargo()
-        .all_git()
-        .all_rustc()
-        .all_sysinfo()
+    let build = BuildBuilder::all_build().unwrap();
+    let cargo = CargoBuilder::all_cargo().unwrap();
+    let git = Git2Builder::all_git().unwrap();
+    let rustc = RustcBuilder::all_rustc().unwrap();
+    let sysinfo = SysinfoBuilder::all_sysinfo().unwrap();
+
+    Emitter::default()
+        .add_instructions(&build)
+        .unwrap()
+        .add_instructions(&cargo)
+        .unwrap()
+        .add_instructions(&git)
+        .unwrap()
+        .add_instructions(&rustc)
+        .unwrap()
+        .add_instructions(&sysinfo)
+        .unwrap()
         .emit()
         .unwrap();
 

@@ -63,8 +63,8 @@ where
 }
 
 /// We do not use raw pointers, so no problem with thead-safety
-unsafe impl<'a, I: Input> Send for MultiMachineMsg<'a, I> {}
-unsafe impl<'a, I: Input> Sync for MultiMachineMsg<'a, I> {}
+unsafe impl<I: Input> Send for MultiMachineMsg<'_, I> {}
+unsafe impl<I: Input> Sync for MultiMachineMsg<'_, I> {}
 
 impl<'a, I> MultiMachineMsg<'a, I>
 where

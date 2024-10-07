@@ -404,7 +404,7 @@ where
     })
 }
 
-impl<'a> FridaInstrumentationHelper<'a, ()> {
+impl FridaInstrumentationHelper<'_, ()> {
     /// Create a builder to initialize a [`FridaInstrumentationHelper`].
     ///
     /// See the documentation of [`FridaInstrumentationHelperBuilder`]

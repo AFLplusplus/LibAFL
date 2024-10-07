@@ -414,7 +414,7 @@ pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool> {
     name: Cow<'static, str>,
 }
 
-impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T, false>
+impl<I, S, T> Observer<I, S> for StdMapObserver<'_, T, false>
 where
     Self: MapObserver,
 {
@@ -424,23 +424,23 @@ where
     }
 }
 
-impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T, true> {}
+impl<I, S, T> Observer<I, S> for StdMapObserver<'_, T, true> {}
 
-impl<'a, T, const DIFFERENTIAL: bool> Named for StdMapObserver<'a, T, DIFFERENTIAL> {
+impl<T, const DIFFERENTIAL: bool> Named for StdMapObserver<'_, T, DIFFERENTIAL> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'a, T, DIFFERENTIAL> {
+impl<T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'_, T, DIFFERENTIAL> {
     #[inline]
     fn len(&self) -> usize {
         self.map.as_slice().len()
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Hash for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<T, const DIFFERENTIAL: bool> Hash for StdMapObserver<'_, T, DIFFERENTIAL>
 where
     T: Hash,
 {
@@ -450,19 +450,19 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'a, T, DIFFERENTIAL> {
+impl<T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFFERENTIAL> {
+impl<T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'_, T, DIFFERENTIAL>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
@@ -537,20 +537,20 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'a, T, DIFFERENTIAL> {
+impl<T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn truncate(&mut self, new_len: usize) {
         self.map.truncate(new_len);
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Deref for StdMapObserver<'a, T, DIFFERENTIAL> {
+impl<T, const DIFFERENTIAL: bool> Deref for StdMapObserver<'_, T, DIFFERENTIAL> {
     type Target = [T];
     fn deref(&self) -> &[T] {
         &self.map
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> DerefMut for StdMapObserver<'a, T, DIFFERENTIAL> {
+impl<T, const DIFFERENTIAL: bool> DerefMut for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn deref_mut(&mut self) -> &mut [T] {
         &mut self.map
     }
@@ -755,4 +755,4 @@ where
     }
 }
 
-impl<'a, OTA, OTB, I, S, T> DifferentialObserver<OTA, OTB, I, S> for StdMapObserver<'a, T, true> {}
+impl<OTA, OTB, I, S, T> DifferentialObserver<OTA, OTB, I, S> for StdMapObserver<'_, T, true> {}

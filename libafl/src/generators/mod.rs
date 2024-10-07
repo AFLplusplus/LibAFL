@@ -61,7 +61,7 @@ impl<'a, I, S, G> GeneratorIter<'a, I, S, G> {
     }
 }
 
-impl<'a, I, S, G> Iterator for GeneratorIter<'a, I, S, G>
+impl<I, S, G> Iterator for GeneratorIter<'_, I, S, G>
 where
     G: Generator<I, S>,
 {

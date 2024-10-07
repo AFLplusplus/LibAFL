@@ -89,7 +89,7 @@ where
     iterations: Option<u64>,
 }
 
-impl<'a, H> Debug for QemuBytesCoverageSugar<'a, H>
+impl<H> Debug for QemuBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
@@ -117,7 +117,7 @@ where
     }
 }
 
-impl<'a, H> QemuBytesCoverageSugar<'a, H>
+impl<H> QemuBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
