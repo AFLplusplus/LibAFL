@@ -1297,7 +1297,7 @@ trait IntoOptionBytes {
         Self: 'a;
 }
 
-impl<'a> IntoOptionBytes for &'a [u8] {
+impl IntoOptionBytes for &[u8] {
     type Type<'b> = &'b [u8];
 
     fn into_option_bytes<'b>(self) -> Option<&'b [u8]>
@@ -1308,7 +1308,7 @@ impl<'a> IntoOptionBytes for &'a [u8] {
     }
 }
 
-impl<'a> IntoOptionBytes for Option<&'a [u8]> {
+impl IntoOptionBytes for Option<&[u8]> {
     type Type<'b> = Option<&'b [u8]>;
 
     fn into_option_bytes<'b>(self) -> Option<&'b [u8]>

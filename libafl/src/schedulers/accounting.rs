@@ -110,8 +110,7 @@ pub struct CoverageAccountingScheduler<'a, CS, O> {
     inner: IndexesLenTimeMinimizerScheduler<CS, O>,
 }
 
-impl<'a, CS, O, S> Scheduler<<S::Corpus as Corpus>::Input, S>
-    for CoverageAccountingScheduler<'a, CS, O>
+impl<CS, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for CoverageAccountingScheduler<'_, CS, O>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + HasRand,

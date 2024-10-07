@@ -228,38 +228,33 @@ pub(crate) fn frida_to_cs(
 /// Get the `base`, `idx`, `scale`, `disp` for each operand
 pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u8, i32)> {
     match operand {
-        Operand::RegDeref(base) => {
+        Operand::MemDeref { base } => {
             let base = writer_register(*base);
             Some((base, X86Register::None, 0, 0))
         }
-        Operand::RegDisp(base, disp) => {
+        Operand::Disp { base, disp } => {
             let base = writer_register(*base);
             Some((base, X86Register::None, 0, *disp))
         }
-        Operand::RegScale(base, scale) => {
-            let base = writer_register(*base);
-            Some((base, X86Register::None, *scale, 0))
-        }
-        Operand::RegIndexBase(base, index) => {
-            let base = writer_register(*base);
+        Operand::MemIndexScale { index, scale } => {
             let index = writer_register(*index);
-            Some((base, index, 0, 0))
+            Some((X86Register::None, index, *scale, 0))
         }
-        Operand::RegIndexBaseDisp(base, index, disp) => {
-            let base = writer_register(*base);
+        Operand::MemIndexScaleDisp { index, scale, disp } => {
             let index = writer_register(*index);
-            Some((base, index, 0, *disp))
+            Some((X86Register::None, index, *scale, *disp))
         }
-        Operand::RegScaleDisp(base, scale, disp) => {
-            let base = writer_register(*base);
-            Some((base, X86Register::None, *scale, *disp))
-        }
-        Operand::RegIndexBaseScale(base, index, scale) => {
+        Operand::MemBaseIndexScale { base, index, scale } => {
             let base = writer_register(*base);
             let index = writer_register(*index);
             Some((base, index, *scale, 0))
         }
-        Operand::RegIndexBaseScaleDisp(base, index, scale, disp) => {
+        Operand::MemBaseIndexScaleDisp {
+            base,
+            index,
+            scale,
+            disp,
+        } => {
             let base = writer_register(*base);
             let index = writer_register(*index);
             Some((base, index, *scale, *disp))
@@ -272,15 +267,15 @@ pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u
 /// Get the immediate value of the operand
 pub fn immediate_value(operand: &Operand) -> Option<i64> {
     match operand {
-        Operand::ImmediateI8(v) => Some(i64::from(*v)),
-        Operand::ImmediateU8(v) => Some(i64::from(*v)),
-        Operand::ImmediateI16(v) => Some(i64::from(*v)),
-        Operand::ImmediateI32(v) => Some(i64::from(*v)),
-        Operand::ImmediateU16(v) => Some(i64::from(*v)),
-        Operand::ImmediateU32(v) => Some(i64::from(*v)),
-        Operand::ImmediateI64(v) => Some(*v),
+        Operand::ImmediateI8 { imm } => Some(i64::from(*imm)),
+        Operand::ImmediateU8 { imm } => Some(i64::from(*imm)),
+        Operand::ImmediateI16 { imm } => Some(i64::from(*imm)),
+        Operand::ImmediateU16 { imm } => Some(i64::from(*imm)),
+        Operand::ImmediateI32 { imm } => Some(i64::from(*imm)),
+        Operand::ImmediateU32 { imm } => Some(i64::from(*imm)),
+        Operand::ImmediateI64 { imm } => Some(*imm),
         #[allow(clippy::cast_possible_wrap)]
-        Operand::ImmediateU64(v) => Some(*v as i64),
+        Operand::ImmediateU64 { imm } => Some(*imm as i64),
         _ => None,
     }
 }

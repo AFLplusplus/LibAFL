@@ -36,5 +36,5 @@ libafl_targets = { path = "../libafl_targets", version = "0.13.2", features = [
   "sancov_cmplog",
 ] }
 
-nix = { version = "0.29", features = ["fs"] }
-typed-builder = "0.18"
+nix = { workspace = true, default-features = true, features = ["fs"] }
+typed-builder = { workspace = true }

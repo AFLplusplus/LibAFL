@@ -157,7 +157,7 @@ pub mod windows_exception_handler {
 
     impl ExceptionHandler for InProcessExecutorHandlerData {
         /// # Safety
-        /// Will dereference EXCEPTION_POINTERS and access `GLOBAL_STATE`.
+        /// Will dereference `EXCEPTION_POINTERS` and access `GLOBAL_STATE`.
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         unsafe fn handle(
             &mut self,

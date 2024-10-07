@@ -26,7 +26,7 @@ pub struct ConstMapObserver<'a, T, const N: usize> {
     name: Cow<'static, str>,
 }
 
-impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
+impl<I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'_, T, N>
 where
     Self: MapObserver,
 {
@@ -36,21 +36,21 @@ where
     }
 }
 
-impl<'a, T, const N: usize> Named for ConstMapObserver<'a, T, N> {
+impl<T, const N: usize> Named for ConstMapObserver<'_, T, N> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T, const N: usize> HasLen for ConstMapObserver<'a, T, N> {
+impl<T, const N: usize> HasLen for ConstMapObserver<'_, T, N> {
     #[inline]
     fn len(&self) -> usize {
         N
     }
 }
 
-impl<'a, T, const N: usize> Hash for ConstMapObserver<'a, T, N>
+impl<T, const N: usize> Hash for ConstMapObserver<'_, T, N>
 where
     T: Hash,
 {
@@ -59,19 +59,19 @@ where
         self.map.as_slice().hash(hasher);
     }
 }
-impl<'a, T, const N: usize> AsRef<Self> for ConstMapObserver<'a, T, N> {
+impl<T, const N: usize> AsRef<Self> for ConstMapObserver<'_, T, N> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'a, T, const N: usize> AsMut<Self> for ConstMapObserver<'a, T, N> {
+impl<T, const N: usize> AsMut<Self> for ConstMapObserver<'_, T, N> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
+impl<T, const N: usize> MapObserver for ConstMapObserver<'_, T, N>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug + 'static,
 {
@@ -147,14 +147,14 @@ where
     }
 }
 
-impl<'a, T, const N: usize> Deref for ConstMapObserver<'a, T, N> {
+impl<T, const N: usize> Deref for ConstMapObserver<'_, T, N> {
     type Target = [T];
     fn deref(&self) -> &[T] {
         &self.map
     }
 }
 
-impl<'a, T, const N: usize> DerefMut for ConstMapObserver<'a, T, N> {
+impl<T, const N: usize> DerefMut for ConstMapObserver<'_, T, N> {
     fn deref_mut(&mut self) -> &mut [T] {
         &mut self.map
     }
@@ -192,7 +192,7 @@ where
     }
 }
 
-impl<'a, T, const N: usize> ConstMapObserver<'a, T, N>
+impl<T, const N: usize> ConstMapObserver<'_, T, N>
 where
     T: Default + Clone,
 {

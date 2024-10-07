@@ -845,9 +845,9 @@ where
 
         if Self::is_old_forkserver(version_status) {
             log::info!("Old fork server model is used by the target, this still works though.");
-            self.initialize_old_forkserver(version_status, &map, &mut forkserver)?;
+            self.initialize_old_forkserver(version_status, map.as_ref(), &mut forkserver)?;
         } else {
-            self.initialize_forkserver(version_status, &map, &mut forkserver)?;
+            self.initialize_forkserver(version_status, map.as_ref(), &mut forkserver)?;
         }
         Ok((forkserver, input_file, map))
     }
@@ -862,7 +862,7 @@ where
     fn initialize_forkserver(
         &mut self,
         status: i32,
-        map: &Option<SP::ShMem>,
+        map: Option<&SP::ShMem>,
         forkserver: &mut Forkserver,
     ) -> Result<(), Error> {
         let keep = status;
@@ -968,7 +968,7 @@ where
     fn initialize_old_forkserver(
         &mut self,
         status: i32,
-        map: &Option<SP::ShMem>,
+        map: Option<&SP::ShMem>,
         forkserver: &mut Forkserver,
     ) -> Result<(), Error> {
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
@@ -1347,7 +1347,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     }
 }
 
-impl<'a> Default for ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+impl Default for ForkserverExecutorBuilder<'_, UnixShMemProvider> {
     fn default() -> Self {
         Self::new()
     }

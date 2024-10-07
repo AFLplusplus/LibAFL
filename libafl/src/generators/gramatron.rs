@@ -39,7 +39,7 @@ pub struct GramatronGenerator<'a, S> {
     phantom: PhantomData<S>,
 }
 
-impl<'a, S> Generator<GramatronInput, S> for GramatronGenerator<'a, S>
+impl<S> Generator<GramatronInput, S> for GramatronGenerator<'_, S>
 where
     S: HasRand,
 {

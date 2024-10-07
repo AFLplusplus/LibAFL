@@ -23,16 +23,16 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl/", features = ["default", "nautilus"] }
-libafl_bolts = { path = "../../../libafl_bolts/" }
-libafl_targets = { path = "../../../libafl_targets/", features = [
+libafl = { path = "../../../libafl", features = ["default", "nautilus"] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_targets = { path = "../../../libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
 ] }
 # TODO Include it only when building cc
-libafl_cc = { path = "../../../libafl_cc/" }
-clap = { version = "4.5", features = ["derive"] }
-mimalloc = { version = "*", default-features = false }
+libafl_cc = { path = "../../../libafl_cc" }
+clap = { version = "4.5.18", features = ["derive"] }
+mimalloc = { version = "0.1.43", default-features = false }
 
 [lib]
 name = "nautilus_sync"

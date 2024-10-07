@@ -32,7 +32,7 @@ where
     generator: &'a GramatronGenerator<'a, S>,
 }
 
-impl<'a, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, S>
+impl<S> Mutator<GramatronInput, S> for GramatronRandomMutator<'_, S>
 where
     S: HasRand + HasMetadata,
 {
@@ -58,7 +58,7 @@ where
     }
 }
 
-impl<'a, S> Named for GramatronRandomMutator<'a, S>
+impl<S> Named for GramatronRandomMutator<'_, S>
 where
     S: HasRand + HasMetadata,
 {
