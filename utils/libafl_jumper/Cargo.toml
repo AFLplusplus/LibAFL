@@ -1,10 +1,10 @@
 [package]
-name = "libafl_qemu_jumper"
+name = "libafl_jumper"
 edition = "2021"
 version.workspace = true
 
 [features]
-default=["std"]
+default=[]
 std=[]
 
 [build-dependencies]
@@ -12,8 +12,3 @@ cc = "1"
 
 [dependencies]
 hex = { version = "0.4", default-features = false }
-
-[profile.release]
-inherits = "release"
-panic = "abort"
-debug = true
