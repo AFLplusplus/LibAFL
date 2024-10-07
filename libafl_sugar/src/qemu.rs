@@ -217,7 +217,7 @@ where
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     {
                         tuple_list!(
-                            StdEdgeCoverageModule::builder().build(),
+                            StdEdgeCoverageModule::builder().build(edges_observer.as_mut()),
                             CmpLogModule::default(),
                         )
                     }
