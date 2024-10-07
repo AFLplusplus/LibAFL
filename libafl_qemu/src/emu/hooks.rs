@@ -15,8 +15,8 @@ use crate::qemu::{
 };
 #[cfg(emulation_mode = "usermode")]
 use crate::qemu::{
-    CrashHookClosure, PostSyscallHookClosure, PostSyscallHookFn, PreSyscallHookClosure,
-    PreSyscallHookFn,
+    CrashHookClosure, CrashHookFn, PostSyscallHookClosure, PostSyscallHookFn,
+    PreSyscallHookClosure, PreSyscallHookFn,
 };
 use crate::{
     cpu_run_post_exec_hook_wrapper, cpu_run_pre_exec_hook_wrapper,
@@ -39,7 +39,7 @@ use crate::{
         ReadExecNHook, ReadGenHook, ReadHookId, TcgHookState, WriteExecHook, WriteExecNHook,
         WriteGenHook, WriteHookId,
     },
-    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, CrashHookFn, HookState, MemAccessInfo, Qemu,
+    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, Qemu,
 };
 
 macro_rules! get_raw_hook {
