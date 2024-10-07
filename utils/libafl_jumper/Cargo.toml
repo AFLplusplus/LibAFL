@@ -4,7 +4,7 @@ edition = "2021"
 version.workspace = true
 
 [features]
-default=[]
+default=["std"]
 std=[]
 
 [build-dependencies]
