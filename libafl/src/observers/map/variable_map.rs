@@ -153,8 +153,16 @@ impl<T> VariableLengthMapObserver for VariableMapObserver<'_, T>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
+    fn map_slice(&mut self) -> &[Self::Entry] {
+        self.map.as_ref()
+    }
+
     fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
         self.map.as_mut()
+    }
+
+    fn size(&mut self) -> &usize {
+        self.size.as_ref()
     }
 
     fn size_mut(&mut self) -> &mut usize {

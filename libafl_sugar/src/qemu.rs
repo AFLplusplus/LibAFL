@@ -217,13 +217,19 @@ where
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
                     {
                         tuple_list!(
-                            StdEdgeCoverageModule::builder().build(edges_observer.as_mut()),
+                            StdEdgeCoverageModule::builder()
+                                .map_observer(edges_observer.as_mut())
+                                .build()
+                                .unwrap(),
                             CmpLogModule::default(),
                         )
                     }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
                     {
-                        tuple_list!(StdEdgeCoverageModule::builder().build(edges_observer.as_mut()))
+                        tuple_list!(StdEdgeCoverageModule::builder()
+                            .map_observer(edges_observer.as_mut())
+                            .build()
+                            .unwrap())
                     }
                 };
 
@@ -339,8 +345,10 @@ where
                     }
                 }
             } else {
-                let modules =
-                    tuple_list!(StdEdgeCoverageModule::builder().build(edges_observer.as_mut()));
+                let modules = tuple_list!(StdEdgeCoverageModule::builder()
+                    .map_observer(edges_observer.as_mut())
+                    .build()
+                    .unwrap());
 
                 let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
                                    _state: &mut _,

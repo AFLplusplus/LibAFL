@@ -2,6 +2,7 @@ use std::{cell::UnsafeCell, cmp::max, fmt::Debug, ptr, ptr::addr_of};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{inputs::UsesInput, observers::VariableLengthMapObserver, HasMetadata};
+use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
@@ -185,6 +186,7 @@ impl Default for StdEdgeCoverageFullModuleBuilder {
             page_filter: StdPageFilter::default(),
             use_hitcounts: true,
             use_jit: true,
+            observer_registered: false,
         }
     }
 }
@@ -286,6 +288,7 @@ impl Default for StdEdgeCoverageClassicModuleBuilder {
             page_filter: StdPageFilter::default(),
             use_hitcounts: true,
             use_jit: true,
+            observer_registered: false,
         }
     }
 }
@@ -342,6 +345,7 @@ impl Default for StdEdgeCoverageChildModuleBuilder {
             page_filter: StdPageFilter::default(),
             use_hitcounts: true,
             use_jit: true,
+            observer_registered: false,
         }
     }
 }
@@ -360,6 +364,7 @@ pub struct EdgeCoverageModuleBuilder<AF, PF, V> {
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
+    observer_registered: bool,
 }
 
 #[derive(Debug)]
@@ -387,10 +392,28 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
             page_filter,
             use_hitcounts,
             use_jit,
+            observer_registered: false,
         }
     }
 
-    pub fn build<O>(self, map_observer: &mut O) -> EdgeCoverageModule<AF, PF, V>
+    pub fn build(self) -> Result<EdgeCoverageModule<AF, PF, V>, Error> {
+        if !self.observer_registered {
+            return Err(
+                Error::illegal_argument("No observer has been registered. Please call the `map_observer` method with the map observer used as argument.")
+            );
+        }
+
+        Ok(EdgeCoverageModule::new(
+            self.address_filter,
+            self.page_filter,
+            self.variant,
+            self.use_hitcounts,
+            self.use_jit,
+        ))
+    }
+
+    #[must_use]
+    pub fn map_observer<O>(mut self, map_observer: &mut O) -> Self
     where
         O: VariableLengthMapObserver,
     {
@@ -398,24 +421,15 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         let map_max_size = map_observer.map_slice_mut().len();
         let size_ptr = map_observer.as_mut().size_mut() as *mut usize;
 
-        // assert!(map_max_size.is_power_of_two());
-
         unsafe {
-            assert_eq!(*addr_of!(LIBAFL_QEMU_EDGES_MAP_PTR), ptr::null_mut());
-
             LIBAFL_QEMU_EDGES_MAP_PTR = map_ptr;
             LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = size_ptr;
             LIBAFL_QEMU_EDGES_MAP_ALLOCATED_SIZE = map_max_size;
             LIBAFL_QEMU_EDGES_MAP_MASK_MAX = map_max_size - 1;
         }
 
-        EdgeCoverageModule::new(
-            self.address_filter,
-            self.page_filter,
-            self.variant,
-            self.use_hitcounts,
-            self.use_jit,
-        )
+        self.observer_registered = true;
+        self
     }
 
     pub fn variant<V2>(self, variant: V2) -> EdgeCoverageModuleBuilder<AF, PF, V2> {

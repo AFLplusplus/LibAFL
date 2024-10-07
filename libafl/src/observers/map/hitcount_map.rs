@@ -234,8 +234,16 @@ impl<M> VariableLengthMapObserver for HitcountsMapObserver<M>
 where
     M: VariableLengthMapObserver + MapObserver<Entry = u8>,
 {
+    fn map_slice(&mut self) -> &[Self::Entry] {
+        self.base.map_slice()
+    }
+
     fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
         self.base.map_slice_mut()
+    }
+
+    fn size(&mut self) -> &usize {
+        self.base.size()
     }
 
     fn size_mut(&mut self) -> &mut usize {

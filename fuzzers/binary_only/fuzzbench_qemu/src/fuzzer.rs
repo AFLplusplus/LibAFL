@@ -358,7 +358,10 @@ fn fuzz(
         };
 
     let modules = tuple_list!(
-        StdEdgeCoverageModule::builder().build(edges_observer.as_mut()),
+        StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()
+            .unwrap(),
         CmpLogModule::default(),
         // QemuAsanHelper::default(asan),
         //QemuSnapshotHelper::new()
