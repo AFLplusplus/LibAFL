@@ -207,8 +207,8 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> HasObservers
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<H, HT, OT, S, SP, ES, EM, Z> HasObservers
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S>,
