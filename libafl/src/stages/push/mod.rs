@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// Send a monitor update all 15 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(5);
 
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]

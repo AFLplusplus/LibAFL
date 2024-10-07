@@ -22,7 +22,7 @@ use libafl_bolts::{
 };
 #[cfg(feature = "std")]
 use libafl_bolts::{
-    llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
+    llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse, LLMP_FLAG_FROM_MM},
     IP_LOCALHOST,
 };
 use serde::{Deserialize, Serialize};

@@ -415,7 +415,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         sdk_path = find_macos_sdk_libs();
         ldflags.push(&sdk_path);
     };
-
+    /*
     build_pass(
         bindir_path,
         out_dir,
@@ -426,9 +426,9 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         Some(&vec!["ddg-utils.cc"]),
         false,
     );
-
+    */
     for pass in &[
-        "function-logging.cc",
+        // "function-logging.cc",
         "cmplog-routines-pass.cc",
         "autotokens-pass.cc",
         "coverage-accounting-pass.cc",
@@ -446,7 +446,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
             false,
         );
     }
-
+    /*
     // Optional pass
     for pass in &["dump-cfg-pass.cc", "profiling.cc"] {
         build_pass(
@@ -460,7 +460,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
             true,
         );
     }
-
+    */
     cc::Build::new()
         .file(src_dir.join("no-link-rt.c"))
         .compile("no-link-rt");
