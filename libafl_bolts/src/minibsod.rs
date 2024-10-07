@@ -1206,7 +1206,7 @@ mod tests {
         let t = std::thread::spawn(move || {
             let cur = unsafe { GetCurrentThread() };
             let proc = unsafe { GetCurrentProcess() };
-            let mut out: HANDLE = HANDLE::default();
+            let mut out = HANDLE::default();
             unsafe {
                 DuplicateHandle(
                     proc,
