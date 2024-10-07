@@ -230,8 +230,7 @@ pub extern "C" fn libafl_main() {
                 NautilusSpliceMutator::new(&context),
             ),
             2,
-        )
-        .unwrap();
+        );
 
         if let Some(conv) = event_converter.take() {
             let mut stages = tuple_list!(

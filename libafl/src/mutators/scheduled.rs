@@ -12,6 +12,7 @@ use libafl_bolts::{
     tuples::{tuple_list, tuple_list_type, HasConstLen, NamedTuple},
     Named,
 };
+use nonzero_lit;
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
@@ -171,7 +172,7 @@ where
                 mutations.names().join(", ")
             )),
             mutations,
-            max_stack_pow: NonZero::new(7).unwrap(),
+            max_stack_pow: nonzero_lit::usize!(7),
         }
     }
 
@@ -180,10 +181,7 @@ where
     /// # Errors
     /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
     #[inline]
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Result<Self, Error> {
-        let Some(max_stack_pow) = NonZero::new(max_stack_pow) else {
-            return Err(Error::illegal_argument("Max stack pow may not be 0."));
-        };
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: NonZeroUsize) -> Result<Self, Error> {
         Ok(Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
@@ -266,7 +264,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(NonZero::new(6).unwrap()))
+        1 << (1 + state.rand_mut().below(nonzero_lit::usize!(7)))
     }
 
     /// Get the next mutation to apply

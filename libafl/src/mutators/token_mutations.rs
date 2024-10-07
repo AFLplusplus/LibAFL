@@ -323,9 +323,12 @@ where
         let token_idx = state.rand_mut().below(tokens_len);
 
         let size = input.bytes().len();
+        // # Safety
+        // it's capped by max_size. can't overflow into 0
+
         let off = state
             .rand_mut()
-            .below(NonZero::new(size.wrapping_add(1)).unwrap());
+            .below(unsafe { NonZero::new(size.wrapping_add(1)).unwrap_unchecked() });
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -376,7 +379,9 @@ where
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        let Some(nonzero_size) = NonZero::new(size) else {
+        let off = if let Some(nz) = NonZero::new(size) {
+            state.rand_mut().below(nz)
+        } else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -391,8 +396,6 @@ where
             }
         };
         let token_idx = state.rand_mut().below(tokens_len);
-
-        let off = state.rand_mut().below(nonzero_size);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];

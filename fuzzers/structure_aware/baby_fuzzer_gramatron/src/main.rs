@@ -156,8 +156,7 @@ pub fn main() {
             GramatronRecursionMutator::new()
         ),
         2,
-    )
-    .unwrap();
+    );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

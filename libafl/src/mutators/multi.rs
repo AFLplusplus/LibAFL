@@ -156,10 +156,10 @@ where
                     .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
-                    let Some(nonzero_size) = NonZero::new(size) else {
+                    let Some(nz) = NonZero::new(size) else {
                         return Ok(MutationResult::Skipped);
                     };
-                    let target = state.rand_mut().below(nonzero_size);
+                    let target = state.rand_mut().below(nz);
                     // # Safety
                     // size is nonzero here (checked above), target is smaller than size
                     // -> the subtraction result is greater than 0.
@@ -212,11 +212,11 @@ where
                 .unwrap();
             drop(other_testcase);
             let size = part.bytes().len();
-            let Some(nonzero_size) = NonZero::new(size) else {
+            let Some(nz) = NonZero::new(size) else {
                 return Ok(MutationResult::Skipped);
             };
 
-            let target = state.rand_mut().below(nonzero_size);
+            let target = state.rand_mut().below(nz);
             // # Safety
             // other_size is larger than 0, checked above.
             // size is larger than 0.
@@ -285,11 +285,11 @@ where
                     .map(|(id, part)| (id, part.bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
-                    let Some(nonzero_size) = NonZero::new(size) else {
+                    let Some(nz) = NonZero::new(size) else {
                         return Ok(MutationResult::Skipped);
                     };
 
-                    let target = state.rand_mut().below(nonzero_size);
+                    let target = state.rand_mut().below(nz);
                     // # Safety
                     // other_size is checked above.
                     // size is larger than than target and larger than 1. The subtraction result will always be positive.
@@ -335,11 +335,11 @@ where
                 .unwrap();
             drop(other_testcase);
             let size = part.bytes().len();
-            let Some(nonzero_size) = NonZero::new(size) else {
+            let Some(nz) = NonZero::new(size) else {
                 return Ok(MutationResult::Skipped);
             };
 
-            let target = state.rand_mut().below(nonzero_size);
+            let target = state.rand_mut().below(nz);
             // # Safety
             // other_size is checked above.
             // size is larger than than target and larger than 1. The subtraction result will always be positive.

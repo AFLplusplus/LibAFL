@@ -4,7 +4,7 @@ use alloc::{
     collections::binary_heap::BinaryHeap,
     vec::Vec,
 };
-use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, num::NonZero, ops::Range};
+use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
     rands::Rand,
@@ -363,11 +363,11 @@ where
             let c = match bytes[idx] {
                 0x41..=0x46 => {
                     // 'A' + 1 + rand('F' - 'A')
-                    0x41 + 1 + state.rand_mut().below(NonZero::new(5).unwrap()) as u8
+                    0x41 + 1 + state.rand_mut().below(nonzero_lit::usize!(5)) as u8
                 }
                 0x61..=0x66 => {
                     // 'a' + 1 + rand('f' - 'a')
-                    0x61 + 1 + state.rand_mut().below(NonZero::new(5).unwrap()) as u8
+                    0x61 + 1 + state.rand_mut().below(nonzero_lit::usize!(5)) as u8
                 }
                 0x30 => {
                     // '0' -> '1'
@@ -379,35 +379,35 @@ where
                 }
                 0x32..=0x39 => {
                     // '2' + 1 + rand('9' - '2')
-                    0x32 + 1 + state.rand_mut().below(NonZero::new(7).unwrap()) as u8
+                    0x32 + 1 + state.rand_mut().below(nonzero_lit::usize!(7)) as u8
                 }
                 0x47..=0x5a => {
                     // 'G' + 1 + rand('Z' - 'G')
-                    0x47 + 1 + state.rand_mut().below(NonZero::new(19).unwrap()) as u8
+                    0x47 + 1 + state.rand_mut().below(nonzero_lit::usize!(19)) as u8
                 }
                 0x67..=0x7a => {
                     // 'g' + 1 + rand('z' - 'g')
-                    0x67 + 1 + state.rand_mut().below(NonZero::new(19).unwrap()) as u8
+                    0x67 + 1 + state.rand_mut().below(nonzero_lit::usize!(19)) as u8
                 }
                 0x21..=0x2a => {
                     // '!' + 1 + rand('*' - '!');
-                    0x21 + 1 + state.rand_mut().below(NonZero::new(9).unwrap()) as u8
+                    0x21 + 1 + state.rand_mut().below(nonzero_lit::usize!(9)) as u8
                 }
                 0x2c..=0x2e => {
                     // ',' + 1 + rand('.' - ',')
-                    0x2c + 1 + state.rand_mut().below(NonZero::new(2).unwrap()) as u8
+                    0x2c + 1 + state.rand_mut().below(nonzero_lit::usize!(2)) as u8
                 }
                 0x3a..=0x40 => {
                     // ':' + 1 + rand('@' - ':')
-                    0x3a + 1 + state.rand_mut().below(NonZero::new(6).unwrap()) as u8
+                    0x3a + 1 + state.rand_mut().below(nonzero_lit::usize!(6)) as u8
                 }
                 0x5b..=0x60 => {
                     // '[' + 1 + rand('`' - '[')
-                    0x5b + 1 + state.rand_mut().below(NonZero::new(5).unwrap()) as u8
+                    0x5b + 1 + state.rand_mut().below(nonzero_lit::usize!(5)) as u8
                 }
                 0x7b..=0x7e => {
                     // '{' + 1 + rand('~' - '{')
-                    0x7b + 1 + state.rand_mut().below(NonZero::new(3).unwrap()) as u8
+                    0x7b + 1 + state.rand_mut().below(nonzero_lit::usize!(3)) as u8
                 }
                 0x2b => {
                     // '+' -> '/'
