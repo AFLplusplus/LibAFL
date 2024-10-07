@@ -16,6 +16,7 @@ use crate::{
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple},
     qemu::Hook,
 };
+use crate::modules::NopAddressFilter;
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
 static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
@@ -107,6 +108,18 @@ pub struct DrCovModule<F> {
     filename: PathBuf,
     full_trace: bool,
     drcov_len: usize,
+}
+impl DrCovModule<NopAddressFilter>
+{
+    #[must_use]
+    pub fn builder() -> DrCovModuleBuilder<NopAddressFilter> {
+        DrCovModuleBuilder {
+            filter: Some(NopAddressFilter),
+            module_mapping: None,
+            full_trace: None,
+            filename: None,
+        }
+    }
 }
 
 impl<F> DrCovModule<F>
