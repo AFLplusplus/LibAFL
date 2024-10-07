@@ -72,7 +72,7 @@ pub unsafe extern "C" fn libafl_jmp(target: *mut c_void) -> ! {
     #[cfg(target_arch = "mips")]
     asm!(
         "jr {target}",       // Jump register (MIPS)
-        // "nop",             // Optional delay slot (see notes below)
+        "nop",               // Delay slot
         target = in(reg) target,
         options(noreturn)
     );
