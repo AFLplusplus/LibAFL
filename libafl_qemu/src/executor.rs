@@ -26,10 +26,6 @@ use libafl::{
     Error, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "fork")]
-use libafl::{
-    events::EventManager, executors::InProcessForkExecutor, state::HasLastReportTime, HasMetadata,
-};
-#[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},

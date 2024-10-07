@@ -312,10 +312,10 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
-    let EDGES_MAP_DEFAULT_SIZE: usize = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
+    let edge_map_default_size: usize = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
         .map_or(Ok(65_536), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_DEFAULT_SIZE");
-    let EDGES_MAP_ALLOCATED_SIZE: usize = option_env!("LIBAFL_EDGES_MAP_ALLOCATED_SIZE")
+    let edge_map_allocated_size: usize = option_env!("LIBAFL_EDGES_MAP_ALLOCATED_SIZE")
         .map_or(Ok(2_621_440), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_DEFAULT_SIZE");
     cxxflags.push(format!("-DEDGES_MAP_DEFAULT_SIZE={EDGES_MAP_DEFAULT_SIZE}"));
@@ -348,9 +348,9 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         pub const CLANGXX_PATH: &str = {clangcpp:?};
 
         /// The default size of the edges map the fuzzer uses
-        pub const EDGES_MAP_DEFAULT_SIZE: usize = {EDGES_MAP_DEFAULT_SIZE};
+        pub const EDGES_MAP_DEFAULT_SIZE: usize = {edge_map_default_size};
         /// The real allocated size of the edges map
-        pub const EDGES_MAP_ALLOCATED_SIZE: usize = {EDGES_MAP_ALLOCATED_SIZE};
+        pub const EDGES_MAP_ALLOCATED_SIZE: usize = {edge_map_allocated_size};
 
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};
