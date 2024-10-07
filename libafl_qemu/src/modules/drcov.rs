@@ -13,10 +13,9 @@ use serde::{Deserialize, Serialize};
 use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     emu::EmulatorModules,
-    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple},
+    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, NopAddressFilter},
     qemu::Hook,
 };
-use crate::modules::NopAddressFilter;
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
 static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
@@ -109,8 +108,7 @@ pub struct DrCovModule<F> {
     full_trace: bool,
     drcov_len: usize,
 }
-impl DrCovModule<NopAddressFilter>
-{
+impl DrCovModule<NopAddressFilter> {
     #[must_use]
     pub fn builder() -> DrCovModuleBuilder<NopAddressFilter> {
         DrCovModuleBuilder {
