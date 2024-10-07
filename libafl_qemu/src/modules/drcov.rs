@@ -125,16 +125,6 @@ where
     F: AddressFilter,
 {
     #[must_use]
-    pub fn builder() -> DrCovModuleBuilder<F> {
-        DrCovModuleBuilder {
-            filter: None,
-            module_mapping: None,
-            full_trace: None,
-            filename: None,
-        }
-    }
-
-    #[must_use]
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(
         filter: F,
