@@ -279,7 +279,6 @@ where
 
         let mut mutated = MutationResult::Skipped;
 
-        let gen = generalised_meta.generalized_mut();
         // # Safety
         // gen.len() is positive.
         let rand_idx = fast_bound(rand_idx, unsafe {

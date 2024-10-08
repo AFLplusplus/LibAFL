@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
@@ -157,7 +158,7 @@ pub fn main() {
             NautilusSpliceMutator::new(&context),
             NautilusSpliceMutator::new(&context),
         ),
-        2,
+        NonZeroUsize::new(2).unwrap(),
     );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
