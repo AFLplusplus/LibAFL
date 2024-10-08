@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::ffi::CString;
 #[cfg(not(any(windows)))]
 use core::panic::PanicInfo;
-use core::{num::NonZero, ptr::write};
+use core::{num::NonZeroUsize, ptr::write};
 
 use libafl::{
     corpus::InMemoryCorpus,
