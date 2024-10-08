@@ -1,3 +1,4 @@
+use core::num::NonZero;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};
@@ -116,7 +117,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(NonZero::new(32));
 
     // Generate 8 initial inputs
     state

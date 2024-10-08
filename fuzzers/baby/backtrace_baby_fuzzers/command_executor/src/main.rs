@@ -1,3 +1,4 @@
+use core::num::NonZero;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
@@ -112,7 +113,7 @@ pub fn main() {
     let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());
 
     // Generate 8 initial inputs
     state

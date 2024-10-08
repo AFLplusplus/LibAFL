@@ -1,6 +1,7 @@
 /* ANCHOR: use */
 extern crate libafl;
 extern crate libafl_bolts;
+use core::num::NonZero;
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -105,7 +106,7 @@ fn main() {
     /* ANCHOR_END: executor_with_observer */
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(NonZero::new(32));
 
     // Generate 8 initial inputs
     state

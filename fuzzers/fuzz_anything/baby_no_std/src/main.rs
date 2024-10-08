@@ -8,7 +8,7 @@ extern crate alloc;
 use alloc::ffi::CString;
 #[cfg(not(any(windows)))]
 use core::panic::PanicInfo;
-use core::ptr::write;
+use core::{num::NonZero, ptr::write};
 
 use libafl::{
     corpus::InMemoryCorpus,
@@ -144,7 +144,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());
 
     // Generate 8 initial inputs
     state

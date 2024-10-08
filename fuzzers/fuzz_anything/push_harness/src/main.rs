@@ -1,5 +1,6 @@
 //! [`Klo-routines`](https://github.com/andreafioraldi/klo-routines/) based fuzzer.
 //! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
+use core::num::NonZero;
 use std::{path::PathBuf, ptr::addr_of_mut};
 
 use klo_routines::{yield_, KloRoutine};
@@ -93,7 +94,7 @@ fn input_generator() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());
 
     // Generate 8 initial inputs
     state
