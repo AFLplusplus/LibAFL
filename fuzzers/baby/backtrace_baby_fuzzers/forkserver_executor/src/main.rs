@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use core::num::NonZeroUsize;
+use std::path::PathBuf;
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
