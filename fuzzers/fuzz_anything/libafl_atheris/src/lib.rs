@@ -3,7 +3,7 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use core::time::Duration;
+use core::{num::NonZeroUsize, time::Duration};
 use std::{
     env,
     os::raw::{c_char, c_int},
