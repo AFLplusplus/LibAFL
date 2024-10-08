@@ -30,7 +30,6 @@ use libafl_bolts::{
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
-pub use time_tracker::TimeTrackingStageWrapper;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 pub use sync::*;
@@ -39,6 +38,7 @@ pub use tmin::{
 };
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
+pub use time_tracker::TimeTrackingStageWrapper;
 use tuple_list::NonEmptyTuple;
 #[cfg(feature = "unicode")]
 pub use unicode::*;
