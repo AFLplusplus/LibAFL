@@ -55,6 +55,7 @@ use libafl_qemu::{
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
 };
+use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -149,8 +150,25 @@ fn fuzz(
 
     let args: Vec<String> = env::args().collect();
 
+    let mut shmem_provider = StdShMemProvider::new()?;
+
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
+    let edges = edges_shmem.as_slice_mut();
+    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
+
+    // Create an observation channel using the coverage map
+    let mut edges_observer = unsafe {
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
+            "edges",
+            edges.as_mut_ptr(),
+        ))
+        .track_indices()
+    };
+
     let emulator_modules = tuple_list!(
-        StdEdgeCoverageChildModule::builder().build(),
+        StdEdgeCoverageChildModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()?,
         CmpLogChildModule::default(),
     );
 
@@ -217,12 +235,6 @@ fn fuzz(
         writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
     });
 
-    let mut shmem_provider = StdShMemProvider::new()?;
-
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
-
     let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
     let cmplog = cmp_shmem.as_slice_mut();
 
@@ -244,15 +256,6 @@ fn fuzz(
                 panic!("Failed to setup the restarter: {err}");
             }
         },
-    };
-
-    // Create an observation channel using the coverage map
-    let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
-            "edges",
-            edges.as_mut_ptr(),
-        ))
-        .track_indices()
     };
 
     // Create an observation channel to keep track of the execution time
