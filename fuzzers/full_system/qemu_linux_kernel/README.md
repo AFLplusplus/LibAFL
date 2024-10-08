@@ -2,6 +2,12 @@
 
 This folder contains an example linux kernel fuzzer using qemu systemmode.
 
+## Warning
+
+For now, only the fuzzer is public. We plan to release the auto-builder for linux
+images in the near future.
+If you wish to experiment now, you will need to build the linux image manually.
+
 ## Prerequisite
 
 TODO

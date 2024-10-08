@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    observers::{map::MapObserver, DifferentialObserver, Observer},
+    observers::{map::MapObserver, DifferentialObserver, Observer, VariableLengthMapObserver},
     Error,
 };
 
@@ -220,12 +220,34 @@ where
     fn hash_simple(&self) -> u64 {
         self.base.hash_simple()
     }
+
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
     }
 
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.base.how_many_set(indexes)
+    }
+}
+
+impl<M> VariableLengthMapObserver for HitcountsMapObserver<M>
+where
+    M: VariableLengthMapObserver + MapObserver<Entry = u8>,
+{
+    fn map_slice(&mut self) -> &[Self::Entry] {
+        self.base.map_slice()
+    }
+
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
+        self.base.map_slice_mut()
+    }
+
+    fn size(&mut self) -> &usize {
+        self.base.size()
+    }
+
+    fn size_mut(&mut self) -> &mut usize {
+        self.base.size_mut()
     }
 }
 

@@ -1,5 +1,5 @@
 use core::{fmt::Debug, num::NonZeroUsize, ptr::addr_of_mut};
-use std::{marker::PhantomData, process};
+use std::{marker::PhantomData, ops::Range, process};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -35,16 +35,16 @@ use libafl_bolts::{
     core_affinity::CoreId,
     ownedref::OwnedMutSlice,
     rands::StdRand,
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Merge, Prepend},
 };
 use libafl_qemu::{
+    elf::EasyElf,
     modules::{
-        cmplog::CmpLogObserver,
-        edges::{edges_map_mut_ptr, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND},
-        EmulatorModuleTuple,
+        cmplog::CmpLogObserver, EmulatorModuleTuple, StdAddressFilter, StdEdgeCoverageModule,
     },
-    Emulator, Qemu, QemuExecutor,
+    Emulator, GuestAddr, Qemu, QemuExecutor,
 };
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 use typed_builder::TypedBuilder;
 
 use crate::{harness::Harness, options::FuzzerOptions};
@@ -61,7 +61,7 @@ pub type ClientMgr<M> =
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
-    qemu: &'a Qemu,
+    qemu: Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
     #[builder(default)]
@@ -71,19 +71,59 @@ pub struct Instance<'a, M: Monitor> {
 }
 
 impl<'a, M: Monitor> Instance<'a, M> {
+    #[allow(clippy::similar_names)] // elf != self
+    fn coverage_filter(&self, qemu: Qemu) -> Result<StdAddressFilter, Error> {
+        /* Conversion is required on 32-bit targets, but not on 64-bit ones */
+        if let Some(includes) = &self.options.include {
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
+            let rules = includes
+                .iter()
+                .map(|x| Range {
+                    start: x.start.into(),
+                    end: x.end.into(),
+                })
+                .collect::<Vec<Range<GuestAddr>>>();
+            Ok(StdAddressFilter::allow_list(rules))
+        } else if let Some(excludes) = &self.options.exclude {
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
+            let rules = excludes
+                .iter()
+                .map(|x| Range {
+                    start: x.start.into(),
+                    end: x.end.into(),
+                })
+                .collect::<Vec<Range<GuestAddr>>>();
+            Ok(StdAddressFilter::deny_list(rules))
+        } else {
+            let mut elf_buffer = Vec::new();
+            let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
+            let range = elf
+                .get_section(".text", qemu.load_addr())
+                .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
+            Ok(StdAddressFilter::allow_list(vec![range]))
+        }
+    }
+
     pub fn run<ET>(&mut self, modules: ET, state: Option<ClientState>) -> Result<(), Error>
     where
         ET: EmulatorModuleTuple<ClientState> + Debug,
     {
         // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
+        let mut edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
                 addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()
         };
+
+        let edge_coverage_module = StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .address_filter(self.coverage_filter(self.qemu)?)
+            .build()?;
+
+        let modules = modules.prepend(edge_coverage_module);
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -154,10 +194,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let emulator = Emulator::empty()
-            .qemu(*self.qemu)
-            .modules(modules)
-            .build()?;
+        let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
 
         if self.options.is_cmplog_core(self.core_id) {
             // Create a QEMU in-process executor
