@@ -16,8 +16,8 @@ To build this statically linked with `musl` libc, we can do the following:
 apt-get install gcc-arm-linux-gnueabihf
 # Install the rust toolchain parts
 rustup target add arm-unknown-linux-musleabi
-# Build for the target.
-RUSTFLAGS='-C target-feature=+crt-static, -C link-self-contained=yes -C linker=arm-linux-gnueabi-gcc' cargo build --target=arm-unknown-linux-musleabi --release
+# Build for the target. The addresses in the linker script should not be used by your target binary.
+RUSTFLAGS="-C target-feature=+crt-static, -C link-self-contained=yes -C linker=arm-linux-gnueabi-gcc -C link-arg=T$(realpath linker_script.ld)" cargo build --target=arm-unknown-linux-musleabi --release
 ```
 
 ↪ Or do that for any other architecture, such as `x86_64-unknown-linux-musl`.
