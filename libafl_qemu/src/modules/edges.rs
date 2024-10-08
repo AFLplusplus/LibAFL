@@ -374,8 +374,19 @@ pub struct EdgeCoverageModule<AF, PF, V> {
     use_jit: bool,
 }
 
-impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V, true> {
+impl<AF, PF, V, const IS_INITIALIZED: bool> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
+    const _IS_INITIALIZED: () = {
+        assert!(
+            IS_INITIALIZED,
+            "The edge module builder must be first initialized with a call to `map_observer`."
+        );
+    };
+
     pub fn build(self) -> Result<EdgeCoverageModule<AF, PF, V>, Error> {
+        // Trick to make sure the const expr is actually evaluated at compile time.
+        // This makes the compiler crash if the edge builder is not initialized correctly.
+        let _ = Self::_IS_INITIALIZED;
+
         Ok(EdgeCoverageModule::new(
             self.address_filter,
             self.page_filter,
@@ -797,5 +808,44 @@ pub unsafe extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
             *entry = 1;
             *prev_loc.get() = id.overflowing_shr(1).0;
         });
+    }
+}
+
+#[cfg(any(test, doc))]
+mod tests {
+    use std::ptr::addr_of_mut;
+
+    use libafl::observers::{CanTrack, HitcountsMapObserver, VariableMapObserver};
+    use libafl_bolts::ownedref::OwnedMutSlice;
+    use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+
+    use crate::modules::StdEdgeCoverageModule;
+
+    /// The test is actually implemented as a doctest, since Rust does not
+    /// permit tests that must not compile by default...
+    ///
+    /// ```compile_fail
+    /// use libafl_qemu::modules::StdEdgeCoverageModule;
+    ///
+    /// StdEdgeCoverageModule::builder().build().unwrap();
+    /// ```
+    #[allow(unused)]
+    pub fn does_not_build() {}
+
+    #[test]
+    pub fn does_build() {
+        let mut edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
+                addr_of_mut!(MAX_EDGES_FOUND),
+            ))
+            .track_indices()
+        };
+
+        StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()
+            .unwrap();
     }
 }
