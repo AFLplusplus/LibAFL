@@ -27,6 +27,7 @@ use libafl_bolts::{
     tuples::{HasConstLen, IntoVec},
     Named,
 };
+pub use time_tracker::TimeTrackingStageWrapper;
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
@@ -38,7 +39,6 @@ pub use tmin::{
 };
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
-pub use time_tracker::TimeTrackingStageWrapper;
 use tuple_list::NonEmptyTuple;
 #[cfg(feature = "unicode")]
 pub use unicode::*;
@@ -60,13 +60,13 @@ use crate::{
 pub mod mutational;
 pub mod push;
 pub mod tmin;
-pub mod time_tracker;
 
 pub mod calibrate;
 pub mod colorization;
 #[cfg(all(feature = "std", unix))]
 pub mod concolic;
 #[cfg(feature = "std")]
+pub mod time_tracker;
 pub mod dump;
 pub mod generalization;
 pub mod generation;
