@@ -7,7 +7,6 @@ use libafl_bolts::{
 use tuple_list::{tuple_list, tuple_list_type};
 
 use crate::{
-    corpus::Corpus,
     inputs::MappedInput,
     mutators::{
         mapping::{
@@ -25,7 +24,6 @@ use crate::{
         },
         IntoOptionBytes,
     },
-    state::HasCorpus,
 };
 
 /// Tuple type of the mutations that compose the Havoc mutator without crossover mutations
@@ -71,171 +69,71 @@ pub type HavocMutationsType =
     merge_tuple_list_type!(HavocMutationsNoCrossoverType, HavocCrossoverType);
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types
-pub type MappedHavocMutationsType<S, II1, II2> = tuple_list_type!(
-    MappedInputFunctionMappingMutator<BitFlipMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<ByteFlipMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<ByteIncMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<ByteDecMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<ByteNegMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<ByteRandMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<ByteAddMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<WordAddMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<DwordAddMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<QwordAddMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<ByteInterestingMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<WordInterestingMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<DwordInterestingMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesDeleteMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesDeleteMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesDeleteMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesDeleteMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesExpandMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesInsertMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesRandInsertMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesSetMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesRandSetMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesCopyMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesInsertCopyMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<BytesSwapMutator, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<MappedCrossoverInsertMutator<S, II2>, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
-    MappedInputFunctionMappingMutator<MappedCrossoverReplaceMutator<S, II2>, <<S as HasCorpus>::Corpus as Corpus>::Input, II1>,
+pub type MappedHavocMutationsType<IO, II1, II2> = tuple_list_type!(
+    MappedInputFunctionMappingMutator<BitFlipMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<ByteFlipMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<ByteIncMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<ByteDecMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<ByteNegMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<ByteRandMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<ByteAddMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<WordAddMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<DwordAddMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<QwordAddMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<ByteInterestingMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<WordInterestingMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<DwordInterestingMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesDeleteMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesDeleteMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesDeleteMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesDeleteMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesExpandMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesInsertMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesRandInsertMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesSetMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesRandSetMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesCopyMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesInsertCopyMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<BytesSwapMutator, IO, II1>,
+    MappedInputFunctionMappingMutator<MappedCrossoverInsertMutator<IO, II2>, IO, II1>,
+    MappedInputFunctionMappingMutator<MappedCrossoverReplaceMutator<IO, II2>, IO, II1>,
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types, for optional byte array input parts
-pub type OptionMappedHavocMutationsType<S, II1, II2> = tuple_list_type!(
+pub type OptionMappedHavocMutationsType<IO, II1, II2> = tuple_list_type!(
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BitFlipMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<ByteFlipMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<ByteIncMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<ByteDecMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<ByteNegMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<ByteRandMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<ByteAddMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<WordAddMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<DwordAddMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<QwordAddMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<ByteInterestingMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<WordInterestingMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<DwordInterestingMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesExpandMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesInsertMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesRandInsertMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesSetMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesRandSetMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesCopyMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesInsertCopyMutator>, IO, II1>,
+    MappedInputFunctionMappingMutator<OptionMappingMutator<BytesSwapMutator>, IO, II1>,
     MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BitFlipMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
+        OptionMappingMutator<MappedCrossoverInsertMutator<IO, II2>>,
+        IO,
         II1,
     >,
     MappedInputFunctionMappingMutator<
-        OptionMappingMutator<ByteFlipMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<ByteIncMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<ByteDecMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<ByteNegMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<ByteRandMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<ByteAddMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<WordAddMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<DwordAddMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<QwordAddMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<ByteInterestingMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<WordInterestingMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<DwordInterestingMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesDeleteMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesDeleteMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesDeleteMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesDeleteMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesExpandMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesInsertMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesRandInsertMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesSetMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesRandSetMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesCopyMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesInsertCopyMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<BytesSwapMutator>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<MappedCrossoverInsertMutator<S, II2>>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
-        II1,
-    >,
-    MappedInputFunctionMappingMutator<
-        OptionMappingMutator<MappedCrossoverReplaceMutator<S, II2>>,
-        <<S as HasCorpus>::Corpus as Corpus>::Input,
+        OptionMappingMutator<MappedCrossoverReplaceMutator<IO, II2>>,
+        IO,
         II1,
     >
 );
@@ -282,12 +180,12 @@ pub fn havoc_crossover() -> HavocCrossoverType {
 }
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy with custom corpus extraction logic
-pub fn havoc_crossover_with_corpus_mapper<S, O>(
-    input_mapper: fn(&<<S as HasCorpus>::Corpus as Corpus>::Input) -> O::Type<'_>,
-) -> MappedHavocCrossoverType<S, O>
+#[must_use]
+pub fn havoc_crossover_with_corpus_mapper<IO, II>(
+    input_mapper: fn(&IO) -> II::Type<'_>,
+) -> MappedHavocCrossoverType<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
     tuple_list!(
         MappedCrossoverInsertMutator::new(input_mapper),
@@ -296,12 +194,12 @@ where
 }
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy with custom corpus extraction logic
-pub fn havoc_crossover_with_corpus_mapper_optional<S, O>(
-    input_mapper: fn(&<<S as HasCorpus>::Corpus as Corpus>::Input) -> O::Type<'_>,
-) -> MappedHavocCrossoverType<S, O>
+#[must_use]
+pub fn havoc_crossover_with_corpus_mapper_optional<IO, II>(
+    input_mapper: fn(&IO) -> II::Type<'_>,
+) -> MappedHavocCrossoverType<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
     tuple_list!(
         MappedCrossoverInsertMutator::new(input_mapper),
@@ -319,14 +217,12 @@ pub fn havoc_mutations() -> HavocMutationsType {
 ///
 /// Check the example fuzzer for details on how to use this.
 #[must_use]
-pub fn mapped_havoc_mutations<S, IO, II1, II2>(
+pub fn mapped_havoc_mutations<IO, II1, II2>(
     current_input_mapper: fn(&mut IO) -> II1::Type<'_>,
     input_from_corpus_mapper: fn(&IO) -> II2::Type<'_>,
-) -> MappedHavocMutationsType<S, II1, II2>
+) -> MappedHavocMutationsType<IO, II1, II2>
 where
-    for<'a> II1: MappedInput + 'a,
-    S::Corpus: Corpus<Input = IO>,
-    S: HasCorpus,
+    II1: MappedInput,
     II2: IntoOptionBytes,
 {
     havoc_mutations_no_crossover()
@@ -340,13 +236,12 @@ where
 ///
 /// Check the example fuzzer for details on how to use this.
 #[must_use]
-pub fn optional_mapped_havoc_mutations<S, II1, II2>(
-    current_input_mapper: fn(&mut <<S as HasCorpus>::Corpus as Corpus>::Input) -> II1::Type<'_>,
-    input_from_corpus_mapper: fn(&<<S as HasCorpus>::Corpus as Corpus>::Input) -> II2::Type<'_>,
-) -> OptionMappedHavocMutationsType<S, II1, II2>
+pub fn optional_mapped_havoc_mutations<IO, II1, II2>(
+    current_input_mapper: fn(&mut IO) -> II1::Type<'_>,
+    input_from_corpus_mapper: fn(&IO) -> II2::Type<'_>,
+) -> OptionMappedHavocMutationsType<IO, II1, II2>
 where
     II1: MappedInput,
-    S: HasCorpus,
     II2: IntoOptionBytes,
 {
     havoc_mutations_no_crossover()
@@ -372,7 +267,7 @@ mod tests {
         inputs::{Input, MutVecInput},
         mutators::{DefaultMutators, MutationResult, StdScheduledMutator, Vec},
         prelude::Mutator as _,
-        state::{HasCorpus, StdState},
+        state::StdState,
     };
 
     #[test]
@@ -390,14 +285,11 @@ mod tests {
                 &self.vec
             }
         }
-        impl<S> DefaultMutators<MappedHavocMutationsType<S, MutVecInput<'static>, &'static [u8]>>
+        impl DefaultMutators<MappedHavocMutationsType<Self, MutVecInput<'static>, &'static [u8]>>
             for CustomInput
-        where
-            S: HasCorpus,
-            S::Corpus: Corpus<Input = Self>,
         {
-            fn default_mutators() -> MappedHavocMutationsType<S, MutVecInput<'static>, &'static [u8]>
-            {
+            fn default_mutators(
+            ) -> MappedHavocMutationsType<Self, MutVecInput<'static>, &'static [u8]> {
                 mapped_havoc_mutations(Self::vec_mut, Self::vec)
             }
         }

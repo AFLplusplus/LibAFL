@@ -139,7 +139,7 @@ pub fn main() {
     #[cfg(feature = "simple_interface")]
     let (mapped_mutators, optional_mapped_mutators) = {
         // Creating mutators that will operate on input.byte_array
-        let mapped_mutators = mapped_havoc_mutations::<_, _, MutVecInput<'_>, &[u8]>(
+        let mapped_mutators = mapped_havoc_mutations::<CustomInput, MutVecInput<'_>, &[u8]>(
             CustomInput::byte_array_mut,
             CustomInput::byte_array,
         );

@@ -57,6 +57,7 @@ pub struct FunctionMappingMutator<M, F> {
 
 impl<M, F> FunctionMappingMutator<M, F> {
     /// Creates a new [`FunctionMappingMutator`]
+    #[must_use]
     pub fn new(mapper: F, inner: M) -> Self
     where
         M: Named,
@@ -136,6 +137,7 @@ pub struct ToFunctionMappingMutatorMapper<F> {
 
 impl<F> ToFunctionMappingMutatorMapper<F> {
     /// Creates a new [`ToFunctionMappingMutatorMapper`]
+    #[must_use]
     pub fn new(mapper: F) -> Self {
         Self { mapper }
     }
@@ -201,6 +203,7 @@ where
     II: MappedInput,
 {
     /// Creates a new [`MappedInputFunctionMappingMutator`]
+    #[must_use]
     pub fn new(mapper: for<'a> fn(&'a mut IO) -> II::Type<'a>, inner: M) -> Self
     where
         M: Named,
@@ -288,6 +291,7 @@ where
     II: MappedInput,
 {
     /// Creates a new [`ToMappedInputFunctionMappingMutatorMapper`]
+    #[must_use]
     pub fn new(mapper: for<'a> fn(&'a mut IO) -> II::Type<'a>) -> Self {
         Self { mapper }
     }
@@ -343,6 +347,7 @@ pub struct OptionMappingMutator<M> {
 
 impl<M> OptionMappingMutator<M> {
     /// Creates a new [`OptionMappingMutator`]
+    #[must_use]
     pub fn new(inner: M) -> Self
     where
         M: Named,

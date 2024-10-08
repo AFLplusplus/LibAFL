@@ -401,5 +401,6 @@ impl Named for NopMutator {
 /// Extensions of [`crate::inputs::Input`]s that have default mutators
 pub trait DefaultMutators<MT>: Sized {
     /// Get the default mutators for this type
+    #[must_use]
     fn default_mutators() -> MT;
 }

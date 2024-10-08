@@ -1313,32 +1313,32 @@ impl IntoOptionBytes for Option<&[u8]> {
 
 /// Crossover insert mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
-pub struct MappedCrossoverInsertMutator<S, O>
+pub struct MappedCrossoverInsertMutator<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
-    input_mapper: for<'a> fn(&'a <S::Corpus as Corpus>::Input) -> O::Type<'a>,
+    input_mapper: for<'a> fn(&'a IO) -> II::Type<'a>,
 }
 
-impl<S, O> MappedCrossoverInsertMutator<S, O>
+impl<IO, II> MappedCrossoverInsertMutator<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
     /// Creates a new [`MappedCrossoverInsertMutator`]
-    pub fn new(input_mapper: fn(&<S::Corpus as Corpus>::Input) -> O::Type<'_>) -> Self {
+    #[must_use]
+    pub fn new(input_mapper: fn(&IO) -> II::Type<'_>) -> Self {
         Self { input_mapper }
     }
 }
 
-impl<S, I, O> Mutator<I, S> for MappedCrossoverInsertMutator<S, O>
+impl<S, I, IO, II> Mutator<I, S> for MappedCrossoverInsertMutator<IO, II>
 where
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
     S: HasCorpus + HasMaxSize + HasRand,
+    S::Corpus: Corpus<Input = IO>,
     I: HasMutatorBytes,
-    for<'a> O: IntoOptionBytes,
-    for<'a> O::Type<'a>: IntoOptionBytes,
+    for<'a> II: IntoOptionBytes,
+    for<'a> II::Type<'a>: IntoOptionBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1398,10 +1398,9 @@ where
     }
 }
 
-impl<S, O> Named for MappedCrossoverInsertMutator<S, O>
+impl<IO, II> Named for MappedCrossoverInsertMutator<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("MappedCrossoverInsertMutator");
@@ -1411,32 +1410,32 @@ where
 
 /// Crossover replace mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
-pub struct MappedCrossoverReplaceMutator<S, O>
+pub struct MappedCrossoverReplaceMutator<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
-    input_mapper: for<'a> fn(&'a <<S as HasCorpus>::Corpus as Corpus>::Input) -> O::Type<'a>,
+    input_mapper: for<'a> fn(&'a IO) -> II::Type<'a>,
 }
 
-impl<S, O> MappedCrossoverReplaceMutator<S, O>
+impl<IO, II> MappedCrossoverReplaceMutator<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
     /// Creates a new [`MappedCrossoverReplaceMutator`]
-    pub fn new(input_mapper: fn(&<S::Corpus as Corpus>::Input) -> O::Type<'_>) -> Self {
+    #[must_use]
+    pub fn new(input_mapper: fn(&IO) -> II::Type<'_>) -> Self {
         Self { input_mapper }
     }
 }
 
-impl<S, I, O> Mutator<I, S> for MappedCrossoverReplaceMutator<S, O>
+impl<S, I, IO, II> Mutator<I, S> for MappedCrossoverReplaceMutator<IO, II>
 where
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
     S: HasCorpus + HasMaxSize + HasRand,
+    S::Corpus: Corpus<Input = IO>,
     I: HasMutatorBytes,
-    for<'a> O: IntoOptionBytes,
-    for<'a> O::Type<'a>: IntoOptionBytes,
+    for<'a> II: IntoOptionBytes,
+    for<'a> II::Type<'a>: IntoOptionBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1493,10 +1492,9 @@ where
     }
 }
 
-impl<S, O> Named for MappedCrossoverReplaceMutator<S, O>
+impl<IO, II> Named for MappedCrossoverReplaceMutator<IO, II>
 where
-    S: HasCorpus,
-    O: IntoOptionBytes,
+    II: IntoOptionBytes,
 {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("MappedCrossoverReplaceMutator");
