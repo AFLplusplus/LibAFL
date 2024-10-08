@@ -385,7 +385,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool> EdgeCoverageModuleBuilder<AF, PF, V,
     pub fn build(self) -> Result<EdgeCoverageModule<AF, PF, V>, Error> {
         // Trick to make sure the const expr is actually evaluated at compile time.
         // This makes the compiler crash if the edge builder is not initialized correctly.
-        let _ = Self::_IS_INITIALIZED;
+        let () = Self::_IS_INITIALIZED;
 
         Ok(EdgeCoverageModule::new(
             self.address_filter,
