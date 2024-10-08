@@ -181,7 +181,7 @@ where
     /// # Errors
     /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
     #[inline]
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: NonZeroUsize) -> Result<Self, Error> {
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: NonZeroUsize) -> Self {
         Ok(Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
