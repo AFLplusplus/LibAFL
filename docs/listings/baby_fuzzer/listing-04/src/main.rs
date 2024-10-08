@@ -3,7 +3,7 @@ extern crate libafl;
 extern crate libafl_bolts;
 
 use std::path::PathBuf;
-use core::num::NonZero;
+use std::num::NonZero;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,

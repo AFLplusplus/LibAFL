@@ -1,7 +1,7 @@
 /* ANCHOR: use */
 extern crate libafl;
 extern crate libafl_bolts;
-use core::num::NonZero;
+use std::num::NonZero;
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
