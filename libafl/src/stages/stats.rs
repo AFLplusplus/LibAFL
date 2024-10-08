@@ -25,6 +25,7 @@ use crate::{
     executors::HasObservers,
     inputs::UsesInput,
     mutators::Tokens,
+    feedbacks::{TIMEOUT_FEEDBACK_NAME, CRASH_FEEDBACK_NAME},
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
@@ -499,7 +500,7 @@ where
     ) {
         if testcase
             .hit_objectives()
-            .contains(&Cow::Borrowed("CrashFeedback"))
+            .contains(&Cow::Borrowed(CRASH_FEEDBACK_NAME))
         {
             self.last_crash = current_time();
             self.execs_at_last_objective = *state.executions();
@@ -513,7 +514,7 @@ where
     ) {
         if testcase
             .hit_objectives()
-            .contains(&Cow::Borrowed("TimeoutFeedback"))
+            .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
         {
             self.last_hang = current_time();
             self.execs_at_last_objective = *state.executions();

@@ -776,25 +776,28 @@ pub trait ExitKindLogic {
     /// Check whether the provided [`ExitKind`] is actually interesting
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error>;
 }
-
+/// Name used by `CrashFeedback`
+pub const CRASH_FEEDBACK_NAME: &str = "CrashFeedback";
 /// Logic which finds all [`ExitKind::Crash`] exits interesting
 #[derive(Debug, Copy, Clone)]
 pub struct CrashLogic;
 
 impl ExitKindLogic for CrashLogic {
-    const NAME: Cow<'static, str> = Cow::Borrowed("CrashFeedback");
+    const NAME: Cow<'static, str> = Cow::Borrowed(CRASH_FEEDBACK_NAME);
 
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error> {
         Ok(matches!(kind, ExitKind::Crash))
     }
 }
+/// Name used by `TimeoutFeedback`
+pub const TIMEOUT_FEEDBACK_NAME: &str = "TimeoutFeedback";
 
 /// Logic which finds all [`ExitKind::Timeout`] exits interesting
 #[derive(Debug, Copy, Clone)]
 pub struct TimeoutLogic;
 
 impl ExitKindLogic for TimeoutLogic {
-    const NAME: Cow<'static, str> = Cow::Borrowed("TimeoutFeedback");
+    const NAME: Cow<'static, str> = Cow::Borrowed(TIMEOUT_FEEDBACK_NAME);
 
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error> {
         Ok(matches!(kind, ExitKind::Timeout))
