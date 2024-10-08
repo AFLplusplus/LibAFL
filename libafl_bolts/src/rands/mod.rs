@@ -558,7 +558,7 @@ mod tests {
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
         assert!(rand.below(nonzero_lit::usize!(100)) < 100);
-        assert_eq!(rand.below(nonzero_lit::usize!(100)), 0);
+        assert_eq!(rand.below(nonzero_lit::usize!(1)), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }
