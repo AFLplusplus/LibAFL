@@ -111,8 +111,7 @@ pub fn fuzz() {
             .add_module(
                 StdEdgeCoverageModule::builder()
                     .map_observer(edges_observer.as_mut())
-                    .build()
-                    .unwrap(),
+                    .build()?,
             )
             .build()
             .unwrap();

@@ -26,13 +26,8 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_qemu::{
-    emu::Emulator,
-    executor::QemuExecutor,
-    modules::edges::{
-        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND,
-    },
-};
+use libafl_qemu::{emu::Emulator, executor::QemuExecutor, modules::edges::StdEdgeCoverageModule};
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 // use libafl_qemu::QemuSnapshotBuilder; for normal qemu snapshot
 
 pub fn fuzz() {
@@ -52,8 +47,20 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
 
+        // Create an observation channel using the coverage map
+        let mut edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
+                addr_of_mut!(MAX_EDGES_FOUND),
+            ))
+            .track_indices()
+        };
+
         // Choose modules to use
-        let modules = tuple_list!(StdEdgeCoverageModule::builder().build());
+        let modules = tuple_list!(StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()?);
 
         let emu = Emulator::builder()
             .qemu_cli(args)
@@ -68,16 +75,6 @@ pub fn fuzz() {
             |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
                 emulator.run(state, input).unwrap().try_into().unwrap()
             };
-
-        // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
-            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
-                "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
-                addr_of_mut!(MAX_EDGES_FOUND),
-            ))
-            .track_indices()
-        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

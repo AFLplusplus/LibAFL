@@ -27,11 +27,11 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    elf::EasyElf,
-    modules::edges::{StdEdgeCoverageChildModule, EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
-    QemuExitReason, QemuForkExecutor, QemuShutdownCause, Regs,
+    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, CallingConvention,
+    Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason,
+    QemuForkExecutor, QemuShutdownCause, Regs,
 };
+use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 
 #[derive(Default)]
 pub struct Version;
@@ -159,7 +159,7 @@ pub fn fuzz() -> Result<(), Error> {
     let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
-    let edges_observer = unsafe {
+    let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
@@ -218,7 +218,9 @@ pub fn fuzz() -> Result<(), Error> {
         ExitKind::Ok
     };
 
-    let modules = tuple_list!(StdEdgeCoverageChildModule::builder().build());
+    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
+        .map_observer(edges_observer.as_mut())
+        .build()?);
 
     let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
