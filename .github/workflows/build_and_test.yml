@@ -224,9 +224,7 @@ jobs:
 
   fuzzers:
     needs:
-      - ubuntu
       - fuzzers-preflight
-      - common
     strategy:
       fail-fast: true
       matrix:
@@ -333,7 +331,6 @@ jobs:
 
   fuzzers-qemu:
     needs:
-      - common
       - changes
     if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
