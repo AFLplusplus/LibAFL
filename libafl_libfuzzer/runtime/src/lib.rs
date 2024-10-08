@@ -66,10 +66,7 @@
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
-use core::{
-    ffi::{c_char, c_int, CStr},
-    num::NonZeroUsize,
-};
+use core::ffi::{c_char, c_int, CStr};
 use std::{fs::File, io::stderr, os::fd::RawFd};
 
 use env_logger::Target;
@@ -175,7 +172,7 @@ macro_rules! fuzz_with {
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver, CMP_MAP};
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
-
+        use core::num::NonZeroUsize;
         use crate::{
             CustomMutationStatus,
             corpus::{ArtifactCorpus, LibfuzzerCorpus},
