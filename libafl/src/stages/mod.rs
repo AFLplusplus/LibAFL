@@ -29,9 +29,10 @@ use libafl_bolts::{
 };
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
+pub use stats::{AflStatsStage, SyncTime, FuzzTime, CalibrationTime};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
+pub use time_tracker::TimeTrackingStageWrapper;
 use serde::{Deserialize, Serialize};
-pub use stats::AflStatsStage;
 #[cfg(feature = "std")]
 pub use sync::*;
 pub use tmin::{
@@ -60,6 +61,7 @@ use crate::{
 pub mod mutational;
 pub mod push;
 pub mod tmin;
+pub mod time_tracker;
 
 pub mod calibrate;
 pub mod colorization;
