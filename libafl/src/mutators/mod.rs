@@ -399,8 +399,10 @@ impl Named for NopMutator {
 }
 
 /// Extensions of [`crate::inputs::Input`]s that have default mutators
-pub trait DefaultMutators<MT> {
+pub trait DefaultMutators {
+    /// The resulting mutator list type
+    type Type;
     /// Get the default mutators for this type
     #[must_use]
-    fn default_mutators() -> MT;
+    fn default_mutators() -> Self::Type;
 }

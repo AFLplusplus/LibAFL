@@ -285,11 +285,10 @@ mod tests {
                 &self.vec
             }
         }
-        impl DefaultMutators<MappedHavocMutationsType<Self, MutVecInput<'static>, &'static [u8]>>
-            for CustomInput
-        {
-            fn default_mutators(
-            ) -> MappedHavocMutationsType<Self, MutVecInput<'static>, &'static [u8]> {
+        impl DefaultMutators for CustomInput {
+            type Type = MappedHavocMutationsType<Self, MutVecInput<'static>, &'static [u8]>;
+
+            fn default_mutators() -> Self::Type {
                 mapped_havoc_mutations(Self::vec_mut, Self::vec)
             }
         }
