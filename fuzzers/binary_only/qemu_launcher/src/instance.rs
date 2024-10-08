@@ -1,4 +1,4 @@
-use core::{fmt::Debug, ptr::addr_of_mut};
+use core::{fmt::Debug, num::NonZeroUsize, ptr::addr_of_mut};
 use std::{marker::PhantomData, process};
 
 #[cfg(feature = "simplemgr")]
@@ -187,7 +187,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
             let mutator = StdMOptMutator::new::<BytesInput, _>(
                 &mut state,
                 havoc_mutations().merge(tokens_mutations()),
-                7,
+                NonZeroUsize::new(7).unwrap(),
                 5,
             )?;
 
