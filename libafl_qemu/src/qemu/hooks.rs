@@ -712,6 +712,8 @@ create_exec_wrapper!(cmp, (id: u64, v0: u64, v1: u64), 3, 4, CmpHookId);
 
 // Crash hook wrappers
 #[cfg(emulation_mode = "usermode")]
+pub type CrashHookFn<ET, S> = fn(&mut EmulatorModules<ET, S>, i32);
+#[cfg(emulation_mode = "usermode")]
 pub type CrashHookClosure<ET, S> = Box<dyn FnMut(&mut EmulatorModules<ET, S>, i32)>;
 #[cfg(emulation_mode = "usermode")]
 pub type CrashHookFn<ET, S> = fn(&mut EmulatorModules<ET, S>, i32);
@@ -1037,7 +1039,7 @@ impl QemuHooks {
     #[allow(clippy::unused_self)]
     pub(crate) fn set_crash_hook(self, callback: extern "C" fn(i32)) {
         unsafe {
-            libafl_dump_core_hook = callback;
+            libafl_dump_core_hook = Some(callback);
         }
     }
 }

@@ -29,6 +29,7 @@ libafl_qemu = { path = "../../../libafl_qemu", features = [
   "x86_64",
   "usermode",
 ] }
+libafl_targets = { path = "../../../libafl_targets" }
 
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 clap = { version = "4.5.18", features = ["default"] }
