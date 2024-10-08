@@ -25,12 +25,16 @@ if [ ! -d "$AFL_DIR" ]; then
 	cd ${AFL_DIR}
 	git checkout ${AFL_VERSION}
 	LLVM_CONFIG=${LLVM_CONFIG} make 
+fi
+'''
+[tasks.build_frida_mode]
+script_runner = '@shell'
+script = '''
+	cd ${AFL_DIR}
 	cd frida_mode
 	LLVM_CONFIG=${LLVM_CONFIG} make
 	cd ../..
-fi
 '''
-
 [tasks.build_qemuafl]
 script_runner = "@shell"
 script = '''
@@ -162,7 +166,7 @@ test -n "$RUNTIME" -a -n "$RUNTIME_PERSISTENT" && {
 
 unset AFL_FRIDA_PERSISTENT_ADDR
 '''
-dependencies = ["build_afl", "build_libafl_fuzz"]
+dependencies = ["build_afl", "build_frida_mode", "build_libafl_fuzz"]
 
 [tasks.test_qemu]
 script_runner = "@shell"
