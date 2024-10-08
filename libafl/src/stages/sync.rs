@@ -102,22 +102,26 @@ where
             }
         }
 
-        let max_time = match last {
-            None => None,
-            Some(last) => Some(last + self.interval),
-        };
-        let new_max_time = max_time.unwrap_or(current_time());
+        let new_max_time = current_time();
 
         let mut new_files = vec![];
         for dir in &self.sync_dirs {
             log::debug!("Syncing from dir: {:?}", dir);
-            let new_dir_files = find_new_files_rec(dir, &max_time)?;
+            let new_dir_files = find_new_files_rec(dir, &last)?;
             new_files.extend(new_dir_files);
         }
-        *state.metadata_mut::<SyncFromDiskMetadata>().unwrap() = SyncFromDiskMetadata {
-            last_time: new_max_time,
-            left_to_sync: new_files,
-        };
+        match state.metadata_map_mut().get_mut::<SyncFromDiskMetadata>() {
+            Some(m) => {
+                m.last_time = new_max_time;
+                m.left_to_sync = new_files;
+            }
+            None => {
+                state
+                    .metadata_map_mut()
+                    .insert(SyncFromDiskMetadata::new(new_max_time, new_files));
+            }
+        }
+
         let sync_from_disk_metadata = state.metadata_mut::<SyncFromDiskMetadata>().unwrap();
         // Iterate over the paths of files left to sync.
         // By keeping track of these files, we ensure that no file is missed during synchronization,
