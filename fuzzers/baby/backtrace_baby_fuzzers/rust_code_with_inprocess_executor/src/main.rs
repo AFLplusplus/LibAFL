@@ -1,4 +1,4 @@
-use core::num::NonZero;
+use core::num::NonZeroUsize;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{path::PathBuf, ptr::write};

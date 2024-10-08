@@ -1,5 +1,5 @@
 mod utils;
-use core::num::NonZero;
+use core::num::NonZeroUsize;
 
 use libafl::{
     corpus::{Corpus, InMemoryCorpus},

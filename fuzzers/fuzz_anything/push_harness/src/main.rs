@@ -1,6 +1,6 @@
 //! [`Klo-routines`](https://github.com/andreafioraldi/klo-routines/) based fuzzer.
 //! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
-use core::num::NonZero;
+use core::num::NonZeroUsize;
 use std::{path::PathBuf, ptr::addr_of_mut};
 
 use klo_routines::{yield_, KloRoutine};

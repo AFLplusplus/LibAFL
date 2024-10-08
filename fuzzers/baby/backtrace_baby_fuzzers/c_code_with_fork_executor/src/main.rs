@@ -1,4 +1,4 @@
-use core::num::NonZero;
+use core::num::NonZeroUsize;
 use std::{path::PathBuf, time::Duration};
 
 use libafl::{
