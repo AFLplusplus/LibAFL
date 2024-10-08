@@ -36,7 +36,8 @@ use libafl_qemu::{
     modules::{
         cmplog::CmpLogObserver,
         edges::{
-            edges_map_mut_ptr, StdEdgeCoverageClassicModule, EDGES_MAP_SIZE_MAX, MAX_EDGES_FOUND,
+            edges_map_mut_ptr, StdEdgeCoverageClassicModule, EDGES_MAP_ALLOCATED_SIZE,
+            MAX_EDGES_FOUND,
         },
         CmpLogModule,
     },
@@ -89,7 +90,7 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_MAX),
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
                 addr_of_mut!(MAX_EDGES_FOUND),
             ))
             .track_indices()

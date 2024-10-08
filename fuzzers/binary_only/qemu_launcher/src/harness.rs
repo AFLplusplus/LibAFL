@@ -6,8 +6,8 @@ use libafl::{
 use libafl_bolts::AsSlice;
 use libafl_qemu::{ArchExtras, CallingConvention, GuestAddr, GuestReg, MmapPerms, Qemu, Regs};
 
-pub struct Harness<'a> {
-    qemu: &'a Qemu,
+pub struct Harness {
+    qemu: Qemu,
     input_addr: GuestAddr,
     pc: GuestAddr,
     stack_ptr: GuestAddr,
@@ -16,8 +16,8 @@ pub struct Harness<'a> {
 
 pub const MAX_INPUT_SIZE: usize = 1_048_576; // 1MB
 
-impl<'a> Harness<'a> {
-    pub fn new(qemu: &Qemu) -> Result<Harness, Error> {
+impl Harness {
+    pub fn new(qemu: Qemu) -> Result<Harness, Error> {
         let input_addr = qemu
             .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
             .map_err(|e| Error::unknown(format!("Failed to map input buffer: {e:}")))?;

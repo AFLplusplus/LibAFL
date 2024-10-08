@@ -3,6 +3,12 @@
 This folder contains an example linux process fuzzer using qemu systemmode.
 This is demo, most of the time for classic linux process fuzzing, it is better to use a more conventional method.
 
+## Warning
+
+For now, only the fuzzer is public. We plan to release the auto-builder for linux
+images in the near future.
+If you wish to experiment now, you will need to build the linux image manually.
+
 ## Prerequisite
 
 TODO

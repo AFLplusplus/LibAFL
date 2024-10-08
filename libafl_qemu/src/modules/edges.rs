@@ -1,14 +1,12 @@
-use std::{cell::UnsafeCell, cmp::max, fmt::Debug};
+use std::{cell::UnsafeCell, cmp::max, fmt::Debug, ptr, ptr::addr_of};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{inputs::UsesInput, HasMetadata};
+use libafl::{inputs::UsesInput, observers::VariableLengthMapObserver, HasMetadata};
+use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
 #[cfg(emulation_mode = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
-pub use libafl_targets::{
-    edges_map_mut_ptr, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX,
-    MAX_EDGES_FOUND,
-};
+use libafl_targets::EDGES_MAP;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -19,6 +17,18 @@ use crate::{
     },
     qemu::Hook,
 };
+
+#[no_mangle]
+static mut LIBAFL_QEMU_EDGES_MAP_PTR: *mut u8 = ptr::null_mut();
+
+#[no_mangle]
+static mut LIBAFL_QEMU_EDGES_MAP_SIZE_PTR: *mut usize = ptr::null_mut();
+
+#[no_mangle]
+static mut LIBAFL_QEMU_EDGES_MAP_ALLOCATED_SIZE: usize = 0;
+
+#[no_mangle]
+static mut LIBAFL_QEMU_EDGES_MAP_MASK_MAX: usize = 0;
 
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -100,7 +110,7 @@ pub struct EdgeCoverageFullVariant;
 pub type StdEdgeCoverageFullModule =
     EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>;
 pub type StdEdgeCoverageFullModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>;
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant, false>;
 
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
     fn jit_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -193,7 +203,7 @@ pub struct EdgeCoverageClassicVariant;
 pub type StdEdgeCoverageClassicModule =
     EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant>;
 pub type StdEdgeCoverageClassicModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant>;
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant, false>;
 
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
     const DO_SIDE_EFFECTS: bool = false;
@@ -293,7 +303,7 @@ pub struct EdgeCoverageChildVariant;
 pub type StdEdgeCoverageChildModule =
     EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant>;
 pub type StdEdgeCoverageChildModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant>;
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant, false>;
 
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageChildVariant {
     const DO_SIDE_EFFECTS: bool = false;
@@ -339,13 +349,13 @@ impl Default for StdEdgeCoverageChildModuleBuilder {
 
 impl StdEdgeCoverageChildModule {
     #[must_use]
-    pub fn builder() -> StdEdgeCoverageClassicModuleBuilder {
-        EdgeCoverageModuleBuilder::default()
+    pub fn builder() -> StdEdgeCoverageChildModuleBuilder {
+        EdgeCoverageModuleBuilder::default().jit(false)
     }
 }
 
 #[derive(Debug)]
-pub struct EdgeCoverageModuleBuilder<AF, PF, V> {
+pub struct EdgeCoverageModuleBuilder<AF, PF, V, const IS_INITIALIZED: bool> {
     variant: V,
     address_filter: AF,
     page_filter: PF,
@@ -364,8 +374,20 @@ pub struct EdgeCoverageModule<AF, PF, V> {
     use_jit: bool,
 }
 
-impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
-    pub fn new(
+impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V, true> {
+    pub fn build(self) -> Result<EdgeCoverageModule<AF, PF, V>, Error> {
+        Ok(EdgeCoverageModule::new(
+            self.address_filter,
+            self.page_filter,
+            self.variant,
+            self.use_hitcounts,
+            self.use_jit,
+        ))
+    }
+}
+
+impl<AF, PF, V, const IS_INITIALIZED: bool> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
+    fn new(
         variant: V,
         address_filter: AF,
         page_filter: PF,
@@ -381,17 +403,32 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         }
     }
 
-    pub fn build(self) -> EdgeCoverageModule<AF, PF, V> {
-        EdgeCoverageModule::new(
+    #[must_use]
+    pub fn map_observer<O>(self, map_observer: &mut O) -> EdgeCoverageModuleBuilder<AF, PF, V, true>
+    where
+        O: VariableLengthMapObserver,
+    {
+        let map_ptr = map_observer.map_slice_mut().as_mut_ptr() as *mut u8;
+        let map_max_size = map_observer.map_slice_mut().len();
+        let size_ptr = map_observer.as_mut().size_mut() as *mut usize;
+
+        unsafe {
+            LIBAFL_QEMU_EDGES_MAP_PTR = map_ptr;
+            LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = size_ptr;
+            LIBAFL_QEMU_EDGES_MAP_ALLOCATED_SIZE = map_max_size;
+            LIBAFL_QEMU_EDGES_MAP_MASK_MAX = map_max_size - 1;
+        }
+
+        EdgeCoverageModuleBuilder::<AF, PF, V, true>::new(
+            self.variant,
             self.address_filter,
             self.page_filter,
-            self.variant,
             self.use_hitcounts,
             self.use_jit,
         )
     }
 
-    pub fn variant<V2>(self, variant: V2) -> EdgeCoverageModuleBuilder<AF, PF, V2> {
+    pub fn variant<V2>(self, variant: V2) -> EdgeCoverageModuleBuilder<AF, PF, V2, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             variant,
             self.address_filter,
@@ -401,7 +438,10 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         )
     }
 
-    pub fn address_filter<AF2>(self, address_filter: AF2) -> EdgeCoverageModuleBuilder<AF2, PF, V> {
+    pub fn address_filter<AF2>(
+        self,
+        address_filter: AF2,
+    ) -> EdgeCoverageModuleBuilder<AF2, PF, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             address_filter,
@@ -411,7 +451,10 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         )
     }
 
-    pub fn page_filter<PF2>(self, page_filter: PF2) -> EdgeCoverageModuleBuilder<AF, PF2, V> {
+    pub fn page_filter<PF2>(
+        self,
+        page_filter: PF2,
+    ) -> EdgeCoverageModuleBuilder<AF, PF2, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             self.address_filter,
@@ -422,7 +465,10 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
     }
 
     #[must_use]
-    pub fn hitcounts(self, use_hitcounts: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
+    pub fn hitcounts(
+        self,
+        use_hitcounts: bool,
+    ) -> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             self.address_filter,
@@ -433,7 +479,7 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
     }
 
     #[must_use]
-    pub fn jit(self, use_jit: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
+    pub fn jit(self, use_jit: bool) -> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             self.address_filter,
@@ -548,10 +594,15 @@ where
     S: Unpin + UsesInput + HasMetadata,
     V: EdgeCoverageVariant<AF, PF>,
 {
-    if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
+    if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
+        unsafe {
+            assert!(LIBAFL_QEMU_EDGES_MAP_MASK_MAX > 0);
+            assert_ne!(*addr_of!(LIBAFL_QEMU_EDGES_MAP_SIZE_PTR), ptr::null_mut());
+        }
+
         #[cfg(emulation_mode = "usermode")]
         {
-            if !h.must_instrument(src) && !h.must_instrument(dest) {
+            if !module.must_instrument(src) && !module.must_instrument(dest) {
                 return None;
             }
         }
@@ -563,29 +614,30 @@ where
                 .current_cpu()
                 .and_then(|cpu| cpu.current_paging_id());
 
-            if !h.must_instrument(src, paging_id) && !h.must_instrument(dest, paging_id) {
+            if !module.must_instrument(src, paging_id) && !module.must_instrument(dest, paging_id) {
                 return None;
             }
         }
     }
+
     let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
     let meta = state.metadata_or_insert_with(QemuEdgesMapMetadata::new);
 
     match meta.map.entry((src, dest)) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
             unsafe {
-                MAX_EDGES_FOUND = max(MAX_EDGES_FOUND, nxt);
+                let nxt = (id as usize + 1) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
+                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, nxt);
             }
             Some(id)
         }
         Entry::Vacant(e) => {
             let id = meta.current_id;
             e.insert(id);
-            meta.current_id = (id + 1) & (EDGES_MAP_SIZE_MAX as u64 - 1);
             unsafe {
-                MAX_EDGES_FOUND = meta.current_id as usize;
+                meta.current_id = (id + 1) & (LIBAFL_QEMU_EDGES_MAP_MASK_MAX as u64);
+                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = meta.current_id as usize;
             }
             // GuestAddress is u32 for 32 bit guests
             #[allow(clippy::unnecessary_cast)]
@@ -624,9 +676,9 @@ where
     S: Unpin + UsesInput + HasMetadata,
     V: EdgeCoverageVariant<AF, PF>,
 {
-    if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
+    if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
-        if !h.must_instrument(src) && !h.must_instrument(dest) {
+        if !module.must_instrument(src) && !module.must_instrument(dest) {
             return None;
         }
 
@@ -637,29 +689,31 @@ where
                 .current_cpu()
                 .and_then(|cpu| cpu.current_paging_id());
 
-            if !h.must_instrument(src, paging_id) && !h.must_instrument(dest, paging_id) {
+            if !module.must_instrument(src, paging_id) && !module.must_instrument(dest, paging_id) {
                 return None;
             }
         }
+
+        let id = hash_me(src as u64) ^ hash_me(dest as u64);
+
+        unsafe {
+            let nxt = (id as usize + 1) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
+            *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
+        }
+
+        // GuestAddress is u32 for 32 bit guests
+        #[allow(clippy::unnecessary_cast)]
+        Some(id)
+    } else {
+        None
     }
-
-    let id = hash_me(src as u64) ^ hash_me(dest as u64);
-    let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
-
-    unsafe {
-        MAX_EDGES_FOUND = nxt;
-    }
-
-    // GuestAddress is u32 for 32 bit guests
-    #[allow(clippy::unnecessary_cast)]
-    Some(id)
 }
 
 /// # Safety
 /// Increases id at `EDGES_MAP_PTR` - potentially racey if called concurrently.
 pub unsafe extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
     unsafe {
-        let ptr = EDGES_MAP_PTR.add(id as usize);
+        let ptr = LIBAFL_QEMU_EDGES_MAP_PTR.add(id as usize);
         *ptr = (*ptr).wrapping_add(1);
     }
 }
@@ -669,7 +723,7 @@ pub unsafe extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
 /// Worst case we set the byte to 1 multiple times.
 pub unsafe extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
     unsafe {
-        let ptr = EDGES_MAP_PTR.add(id as usize);
+        let ptr = LIBAFL_QEMU_EDGES_MAP_PTR.add(id as usize);
         *ptr = 1;
     }
 }
@@ -687,10 +741,11 @@ where
     S: Unpin + UsesInput + HasMetadata,
     V: EdgeCoverageVariant<AF, PF>,
 {
-    if let Some(h) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
+    // first check if we should filter
+    if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
         #[cfg(emulation_mode = "usermode")]
         {
-            if !h.must_instrument(pc) {
+            if !module.must_instrument(pc) {
                 return None;
             }
         }
@@ -701,17 +756,17 @@ where
                 .current_cpu()
                 .and_then(|cpu| cpu.current_paging_id());
 
-            if !h.must_instrument(pc, page_id) {
+            if !module.must_instrument(pc, page_id) {
                 return None;
             }
         }
     }
 
     let id = hash_me(pc as u64);
-    let nxt = (id as usize + 1) & (EDGES_MAP_SIZE_MAX - 1);
 
     unsafe {
-        MAX_EDGES_FOUND = nxt;
+        let nxt = (id as usize + 1) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
+        *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
     }
 
     // GuestAddress is u32 for 32 bit guests
@@ -724,8 +779,8 @@ where
 pub unsafe extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
-            let entry = EDGES_MAP_PTR.add(x);
+            let x = ((*prev_loc.get() ^ id) as usize) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
+            let entry = LIBAFL_QEMU_EDGES_MAP_PTR.add(x);
             *entry = (*entry).wrapping_add(1);
             *prev_loc.get() = id.overflowing_shr(1).0;
         });
@@ -737,8 +792,8 @@ pub unsafe extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) 
 pub unsafe extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE_MAX - 1);
-            let entry = EDGES_MAP_PTR.add(x);
+            let x = ((*prev_loc.get() ^ id) as usize) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
+            let entry = LIBAFL_QEMU_EDGES_MAP_PTR.add(x);
             *entry = 1;
             *prev_loc.get() = id.overflowing_shr(1).0;
         });

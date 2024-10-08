@@ -2,21 +2,11 @@ use core::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 use libc::{c_char, strlen};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use paste::paste;
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, Python};
 use strum_macros::EnumIter;
 
-use crate::{extern_c_checked, libafl_mapinfo, GuestAddr, MmapPerms};
-
-extern_c_checked! {
-    pub static exec_path: *const u8;
-    pub static guest_base: usize;
-    pub static mut mmap_next_start: GuestAddr;
-
-    pub static mut libafl_dump_core_hook: unsafe extern "C" fn(i32);
-    pub static mut libafl_force_dfl: i32;
-}
+use crate::{libafl_mapinfo, GuestAddr, MmapPerms};
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]

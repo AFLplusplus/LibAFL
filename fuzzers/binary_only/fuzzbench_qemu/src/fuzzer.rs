@@ -38,7 +38,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
-    os::{dup2, unix_signals::Signal},
+    os::dup2,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -50,9 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::{
-        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
-    },
+    modules::edges::StdEdgeCoverageModule,
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
@@ -64,6 +62,7 @@ use libafl_qemu::{
     QemuShutdownCause,
     Regs,
 };
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -253,10 +252,10 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges_observer = unsafe {
+    let mut edges_observer = unsafe {
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
-            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
             addr_of_mut!(MAX_EDGES_FOUND),
         ))
         .track_indices()
@@ -347,9 +346,9 @@ fn fuzz(
 
                 match qemu.run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
-                        Signal::SigInterrupt,
-                    ))) => process::exit(0),
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
+                        signal.handle();
+                    }
                     Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                     _ => panic!("Unexpected QEMU exit."),
                 }
@@ -359,7 +358,10 @@ fn fuzz(
         };
 
     let modules = tuple_list!(
-        StdEdgeCoverageModule::builder().build(),
+        StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()
+            .unwrap(),
         CmpLogModule::default(),
         // QemuAsanHelper::default(asan),
         //QemuSnapshotHelper::new()

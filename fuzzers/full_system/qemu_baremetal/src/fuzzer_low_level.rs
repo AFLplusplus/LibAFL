@@ -29,15 +29,11 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    config,
-    elf::EasyElf,
-    executor::QemuExecutor,
-    modules::edges::{
-        edges_map_mut_ptr, StdEdgeCoverageModuleBuilder, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
-    },
+    config, elf::EasyElf, executor::QemuExecutor, modules::edges::StdEdgeCoverageModuleBuilder,
     Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_qemu_sys::GuestPhysAddr;
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -86,6 +82,17 @@ pub fn fuzz() {
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
+
+        // Create an observation channel using the coverage map
+        let mut edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
+                addr_of_mut!(MAX_EDGES_FOUND),
+            ))
+            .track_indices()
+        };
+
         // Initialize QEMU
         let qemu = Qemu::builder()
             .machine("mps2-an385")
@@ -103,7 +110,9 @@ pub fn fuzz() {
             .build()
             .expect("Failed to initialized QEMU");
 
-        let emulator_modules = tuple_list!(StdEdgeCoverageModuleBuilder::default().build());
+        let emulator_modules = tuple_list!(StdEdgeCoverageModuleBuilder::default()
+            .map_observer(edges_observer.as_mut())
+            .build()?);
 
         let emulator = Emulator::empty()
             .qemu(qemu)
@@ -185,16 +194,6 @@ pub fn fuzz() {
                     ret
                 }
             };
-
-        // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
-            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
-                "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
-                addr_of_mut!(MAX_EDGES_FOUND),
-            ))
-            .track_indices()
-        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

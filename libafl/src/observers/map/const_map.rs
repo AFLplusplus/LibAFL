@@ -12,9 +12,11 @@ use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, Observer},
+    observers::{map::MapObserver, Observer, VariableLengthMapObserver},
     Error,
 };
+
+// TODO: remove the size field and implement ConstantLengthMapObserver
 
 /// Use a const size to speedup `Feedback::is_interesting` when the user can
 /// know the size of the map at compile time.
@@ -24,6 +26,7 @@ pub struct ConstMapObserver<'a, T, const N: usize> {
     map: OwnedMutSlice<'a, T>,
     initial: T,
     name: Cow<'static, str>,
+    size: usize,
 }
 
 impl<I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'_, T, N>
@@ -147,6 +150,27 @@ where
     }
 }
 
+impl<T, const N: usize> VariableLengthMapObserver for ConstMapObserver<'_, T, N>
+where
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug + 'static,
+{
+    fn map_slice(&mut self) -> &[Self::Entry] {
+        self.map.as_slice()
+    }
+
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
+        self.map.as_slice_mut()
+    }
+
+    fn size(&mut self) -> &usize {
+        &N
+    }
+
+    fn size_mut(&mut self) -> &mut usize {
+        &mut self.size
+    }
+}
+
 impl<T, const N: usize> Deref for ConstMapObserver<'_, T, N> {
     type Target = [T];
     fn deref(&self) -> &[T] {
@@ -176,6 +200,7 @@ where
             map: OwnedMutSlice::from(map),
             name: Cow::from(name),
             initial: T::default(),
+            size: N,
         }
     }
 
@@ -188,6 +213,7 @@ where
             map: OwnedMutSlice::from_raw_parts_mut(map_ptr, N),
             name: Cow::from(name),
             initial: T::default(),
+            size: N,
         }
     }
 }
@@ -209,6 +235,7 @@ where
             map: OwnedMutSlice::from(map),
             name: Cow::from(name),
             initial,
+            size: N,
         }
     }
 }

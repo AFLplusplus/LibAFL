@@ -34,5 +34,6 @@ clap = { version = "4.5.18", features = ["derive", "string"] }
 libafl = { path = "../../../libafl" }
 libafl_bolts = { path = "../../../libafl_bolts" }
 libafl_qemu = { path = "../../../libafl_qemu", features = ["usermode"] }
+libafl_targets = { path = "../../../libafl_targets" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 rangemap = { version = "1.5.1" }

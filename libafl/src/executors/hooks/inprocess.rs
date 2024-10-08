@@ -40,10 +40,7 @@ use crate::{
 
 /// The inmem executor's handlers.
 #[allow(missing_debug_implementations)]
-pub struct InProcessHooks<S>
-where
-    S: UsesInput,
-{
+pub struct InProcessHooks<S> {
     /// On crash C function pointer
     #[cfg(feature = "std")]
     pub crash_handler: *const c_void,

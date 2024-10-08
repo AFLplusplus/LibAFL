@@ -385,6 +385,33 @@ pub trait MapObserver:
     fn how_many_set(&self, indexes: &[usize]) -> usize;
 }
 
+/// The "real" length of the underlying map could change at any point in time.
+/// Thus, the size of the map should be fetched each time it is used.
+pub trait VariableLengthMapObserver: MapObserver {
+    /// A mutable slice reference to the map.
+    /// The length of the map gives the maximum allocatable size.
+    fn map_slice(&mut self) -> &[Self::Entry];
+
+    /// A slice reference to the map.
+    /// The length of the map gives the maximum allocatable size.
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry];
+
+    /// A reference to the size of the map.
+    fn size(&mut self) -> &usize;
+
+    /// A mutable reference to the size of the map.
+    fn size_mut(&mut self) -> &mut usize;
+}
+
+/// Implementors guarantee the size of the map is constant at any point in time and equals N.
+pub trait ConstantLengthMapObserver<const N: usize>: MapObserver {
+    /// The size of the map
+    const LENGTH: usize = N;
+
+    /// A mutable slice reference to the map
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry; N];
+}
+
 impl<M> CanTrack for M
 where
     M: MapObserver,

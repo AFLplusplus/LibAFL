@@ -1,6 +1,6 @@
 use std::{
-    intrinsics::copy_nonoverlapping, mem::MaybeUninit, slice::from_raw_parts,
-    str::from_utf8_unchecked,
+    intrinsics::copy_nonoverlapping, mem::MaybeUninit, slice::from_raw_parts_mut,
+    str::from_utf8_unchecked_mut,
 };
 
 use libafl_qemu_sys::{
@@ -9,7 +9,7 @@ use libafl_qemu_sys::{
     pageflags_get_root, read_self_maps, GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot,
     MapInfo, MmapPerms, VerifyAccess,
 };
-use libc::{c_char, c_int, strlen};
+use libc::{c_char, c_int, c_uchar, strlen};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
 
@@ -139,8 +139,8 @@ impl Qemu {
     #[must_use]
     pub fn binary_path<'a>(&self) -> &'a str {
         unsafe {
-            from_utf8_unchecked(from_raw_parts(
-                exec_path,
+            from_utf8_unchecked_mut(from_raw_parts_mut(
+                exec_path as *mut c_uchar,
                 strlen(exec_path as *const c_char),
             ))
         }

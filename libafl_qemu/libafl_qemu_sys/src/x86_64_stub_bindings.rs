@@ -12526,6 +12526,9 @@ pub type IntervalTreeRoot = RBRootLeftCached;
 pub type abi_ulong = target_ulong;
 pub type abi_long = target_long;
 extern "C" {
+    pub static mut guest_base: usize;
+}
+extern "C" {
     #[doc = " --- Begin LibAFL code ---"]
     pub fn pageflags_get_root() -> *mut IntervalTreeRoot;
 }
@@ -13275,6 +13278,12 @@ impl Default for TranslationBlock {
     }
 }
 extern "C" {
+    pub static mut exec_path: *mut ::std::os::raw::c_char;
+}
+extern "C" {
+    pub static mut mmap_next_start: abi_ulong;
+}
+extern "C" {
     pub fn target_mprotect(
         start: abi_ulong,
         len: abi_ulong,
@@ -13756,6 +13765,13 @@ impl Default for libafl_mapinfo {
             s.assume_init()
         }
     }
+}
+extern "C" {
+    pub static mut libafl_dump_core_hook:
+        ::std::option::Option<unsafe extern "C" fn(host_sig: ::std::os::raw::c_int)>;
+}
+extern "C" {
+    pub static mut libafl_force_dfl: ::std::os::raw::c_int;
 }
 extern "C" {
     pub fn libafl_dump_core_exec(signal: ::std::os::raw::c_int);

@@ -1,4 +1,4 @@
-use std::{env, ops::Range};
+use std::env;
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -16,8 +16,6 @@ use libafl_qemu::{
         asan::{init_qemu_with_asan, AsanModule},
         asan_guest::{init_qemu_with_asan_guest, AsanGuestModule},
         cmplog::CmpLogModule,
-        edges::StdEdgeCoverageModule,
-        StdAddressFilter,
     },
     ArchExtras, GuestAddr, Qemu,
 };
@@ -57,7 +55,7 @@ impl<'a> Client<'a> {
             .collect::<Vec<(String, String)>>()
     }
 
-    fn start_pc(qemu: &Qemu) -> Result<GuestAddr, Error> {
+    fn start_pc(qemu: Qemu) -> Result<GuestAddr, Error> {
         let mut elf_buffer = Vec::new();
         let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
@@ -65,39 +63,6 @@ impl<'a> Client<'a> {
             .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
             .ok_or_else(|| Error::empty_optional("Symbol LLVMFuzzerTestOneInput not found"))?;
         Ok(start_pc)
-    }
-
-    #[allow(clippy::similar_names)] // elf != self
-    fn coverage_filter(&self, qemu: &Qemu) -> Result<StdAddressFilter, Error> {
-        /* Conversion is required on 32-bit targets, but not on 64-bit ones */
-        if let Some(includes) = &self.options.include {
-            #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
-            let rules = includes
-                .iter()
-                .map(|x| Range {
-                    start: x.start.into(),
-                    end: x.end.into(),
-                })
-                .collect::<Vec<Range<GuestAddr>>>();
-            Ok(StdAddressFilter::allow_list(rules))
-        } else if let Some(excludes) = &self.options.exclude {
-            #[cfg_attr(target_pointer_width = "64", allow(clippy::useless_conversion))]
-            let rules = excludes
-                .iter()
-                .map(|x| Range {
-                    start: x.start.into(),
-                    end: x.end.into(),
-                })
-                .collect::<Vec<Range<GuestAddr>>>();
-            Ok(StdAddressFilter::deny_list(rules))
-        } else {
-            let mut elf_buffer = Vec::new();
-            let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
-            let range = elf
-                .get_section(".text", qemu.load_addr())
-                .ok_or_else(|| Error::key_not_found("Failed to find .text section"))?;
-            Ok(StdAddressFilter::allow_list(vec![range]))
-        }
     }
 
     pub fn run<M: Monitor>(
@@ -131,7 +96,7 @@ impl<'a> Client<'a> {
             }
         };
 
-        let start_pc = Self::start_pc(&qemu)?;
+        let start_pc = Self::start_pc(qemu)?;
         log::debug!("start_pc @ {start_pc:#x}");
 
         #[cfg(not(feature = "injections"))]
@@ -163,10 +128,6 @@ impl<'a> Client<'a> {
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let edge_coverage_module = StdEdgeCoverageModule::builder()
-            .address_filter(self.coverage_filter(&qemu)?)
-            .build();
-
         let extra_tokens = injection_module
             .as_ref()
             .map(|h| h.tokens.clone())
@@ -174,7 +135,7 @@ impl<'a> Client<'a> {
 
         let instance_builder = Instance::builder()
             .options(self.options)
-            .qemu(&qemu)
+            .qemu(qemu)
             .mgr(mgr)
             .core_id(core_id)
             .extra_tokens(extra_tokens);
@@ -183,7 +144,6 @@ impl<'a> Client<'a> {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
                     tuple_list!(
-                        edge_coverage_module,
                         CmpLogModule::default(),
                         AsanModule::default(asan.take().unwrap()),
                         injection_module,
@@ -193,7 +153,6 @@ impl<'a> Client<'a> {
             } else {
                 instance_builder.build().run(
                     tuple_list!(
-                        edge_coverage_module,
                         CmpLogModule::default(),
                         AsanModule::default(asan.take().unwrap()),
                     ),
@@ -204,9 +163,8 @@ impl<'a> Client<'a> {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
                     tuple_list!(
-                        edge_coverage_module,
                         CmpLogModule::default(),
-                        AsanGuestModule::default(&qemu, asan_lib.take().unwrap()),
+                        AsanGuestModule::default(qemu, asan_lib.take().unwrap()),
                         injection_module
                     ),
                     state,
@@ -214,9 +172,8 @@ impl<'a> Client<'a> {
             } else {
                 instance_builder.build().run(
                     tuple_list!(
-                        edge_coverage_module,
                         CmpLogModule::default(),
-                        AsanGuestModule::default(&qemu, asan_lib.take().unwrap()),
+                        AsanGuestModule::default(qemu, asan_lib.take().unwrap()),
                     ),
                     state,
                 )
@@ -224,52 +181,35 @@ impl<'a> Client<'a> {
         } else if is_asan {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
-                    tuple_list!(
-                        edge_coverage_module,
-                        AsanModule::default(asan.take().unwrap()),
-                        injection_module
-                    ),
+                    tuple_list!(AsanModule::default(asan.take().unwrap()), injection_module),
                     state,
                 )
             } else {
                 instance_builder.build().run(
-                    tuple_list!(
-                        edge_coverage_module,
-                        AsanModule::default(asan.take().unwrap()),
-                    ),
+                    tuple_list!(AsanModule::default(asan.take().unwrap()),),
                     state,
                 )
             }
         } else if is_asan_guest {
-            let modules = tuple_list!(
-                edge_coverage_module,
-                AsanGuestModule::default(&qemu, asan_lib.take().unwrap())
-            );
+            let modules = tuple_list!(AsanGuestModule::default(qemu, asan_lib.take().unwrap()));
             instance_builder.build().run(modules, state)
         } else if is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
-                    tuple_list!(
-                        edge_coverage_module,
-                        CmpLogModule::default(),
-                        injection_module
-                    ),
+                    tuple_list!(CmpLogModule::default(), injection_module),
                     state,
                 )
             } else {
-                instance_builder.build().run(
-                    tuple_list!(edge_coverage_module, CmpLogModule::default()),
-                    state,
-                )
+                instance_builder
+                    .build()
+                    .run(tuple_list!(CmpLogModule::default()), state)
             }
         } else if let Some(injection_module) = injection_module {
             instance_builder
                 .build()
-                .run(tuple_list!(edge_coverage_module, injection_module), state)
+                .run(tuple_list!(injection_module), state)
         } else {
-            instance_builder
-                .build()
-                .run(tuple_list!(edge_coverage_module), state)
+            instance_builder.build().run(tuple_list!(), state)
         }
     }
 }
