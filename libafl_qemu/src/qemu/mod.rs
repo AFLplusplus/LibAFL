@@ -552,7 +552,7 @@ impl Qemu {
         argv.push(ptr::null()); // argv is always null terminated.
 
         unsafe {
-            libafl_qemu_init(argc, argv.as_ptr() as *mut *mut i8);
+            libafl_qemu_init(argc, argv.as_ptr() as *mut *mut ::std::os::raw::c_char);
         }
 
         #[cfg(emulation_mode = "systemmode")]
