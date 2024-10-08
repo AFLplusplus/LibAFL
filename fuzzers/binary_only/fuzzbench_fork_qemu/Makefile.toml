@@ -1,11 +1,27 @@
+env_scripts = ['''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''', '''
+#!@duckscript
+runs_on_ci = get_env RUN_ON_CI
+
+if ${runs_on_ci}
+    cargo_target_dir = get_env CARGO_MAKE_CRATE_TARGET_DIRECTORY
+    set_env TARGET_DIR ${cargo_target_dir}
+end
+''']
+
 # Variables
 [env]
 FUZZER_NAME = 'harness'
 PROJECT_DIR = { script = ["pwd"] }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
-PROFILE_DIR = { value = "release", condition = { env_not_set = [
-  "PROFILE_DIR",
-] } }
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
 
 [tasks.unsupported]
