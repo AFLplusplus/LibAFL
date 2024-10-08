@@ -865,6 +865,37 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 */
 
+/// Merge two lists of types created by the [`tuple_list_type`] macro
+///
+/// ```rust
+/// use libafl_bolts::{merge_tuple_list_type, tuples::{Merge, tuple_list, tuple_list_type}};
+/// #[derive(PartialEq, Debug)]
+/// struct T1;
+/// #[derive(PartialEq, Debug)]
+/// struct T2;
+/// #[derive(PartialEq, Debug)]
+/// struct T3;
+/// #[derive(PartialEq, Debug)]
+/// struct T4;
+/// #[derive(PartialEq, Debug)]
+/// struct T5;
+///
+/// type List1 = tuple_list_type!(T1, T2);
+/// let list1: List1 = tuple_list!(T1, T2);
+/// type List2 = tuple_list_type!(T3, T4, T5);
+/// let list2: List2 = tuple_list!(T3, T4, T5);
+/// type Combined = merge_tuple_list_type!(List1, List2);
+/// let combined: Combined = list1.merge(list2);
+/// let manual: Combined = tuple_list!(T1, T2, T3, T4, T5);
+/// assert_eq!(combined, manual);
+/// ```
+#[macro_export]
+macro_rules! merge_tuple_list_type {
+    ($Type1:ty, $Type2:ty) => {
+        <$Type1 as $crate::tuples::Merge<$Type2>>::MergeResult
+    };
+}
+
 #[cfg(test)]
 mod test {
     use tuple_list::{tuple_list, tuple_list_type};
