@@ -375,8 +375,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, CM, ED, EM, ET, H, OF, OT, S, SM, SP, Z> Executor<EM, Z>
-    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
+impl<CM, ED, EM, ET, H, OF, OT, S, SM, SP, Z> Executor<EM, Z>
+    for QemuForkExecutor<'_, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
     CM: CommandManager<ED, ET, S, SM>,
     ED: EmulatorDriver<CM, ET, S, SM>,
