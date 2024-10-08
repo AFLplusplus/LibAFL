@@ -390,14 +390,13 @@ mod tests {
                 &self.vec
             }
         }
-        impl<S> DefaultMutators<S, MappedHavocMutationsType<S, MutVecInput<'static>, &'static [u8]>>
+        impl<S> DefaultMutators<MappedHavocMutationsType<S, MutVecInput<'static>, &'static [u8]>>
             for CustomInput
         where
             S: HasCorpus,
+            S::Corpus: Corpus<Input = Self>,
         {
             fn default_mutators() -> MappedHavocMutationsType<S, MutVecInput<'static>, &'static [u8]>
-            where
-                S::Corpus: Corpus<Input = Self>,
             {
                 mapped_havoc_mutations(Self::vec_mut, Self::vec)
             }

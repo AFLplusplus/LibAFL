@@ -46,11 +46,7 @@ use libafl_bolts::{tuples::IntoVec, HasLen, Named};
 pub use nautilus::*;
 use tuple_list::NonEmptyTuple;
 
-use crate::{
-    corpus::{Corpus, CorpusId},
-    state::HasCorpus,
-    Error,
-};
+use crate::{corpus::CorpusId, Error};
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event
 // We can use it to report which mutations generated the testcase in the broker logs
@@ -403,11 +399,7 @@ impl Named for NopMutator {
 }
 
 /// Extensions of [`crate::inputs::Input`]s that have default mutators
-pub trait DefaultMutators<S, MT>: Sized {
+pub trait DefaultMutators<MT>: Sized {
     /// Get the default mutators for this type
-    fn default_mutators() -> MT
-    where
-        MT: MutatorsTuple<Self, S>,
-        S: HasCorpus,
-        <S as HasCorpus>::Corpus: Corpus<Input = Self>;
+    fn default_mutators() -> MT;
 }
