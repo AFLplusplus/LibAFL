@@ -375,7 +375,7 @@ macro_rules! fuzz_with {
                 LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations())))
             };
             // Safe to unwrap: stack pow is not 0.
-            let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(), 3);
+            let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(), NonZeroUsize::new(3).unwrap());
 
             let cm_power: StdPowerMutationalStage<_, _, BytesInput, _, _> = StdPowerMutationalStage::new(custom_mutator);
             let cm_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_power, ()));
@@ -390,7 +390,7 @@ macro_rules! fuzz_with {
             let custom_crossover = unsafe {
                 LLVMCustomMutator::crossover_unchecked(StdScheduledMutator::with_max_stack_pow(
                     havoc_mutations_no_crossover().merge(tokens_mutations()),
-                    3,
+                    NonZeroUsize::new(3).unwrap(),
                 ))
             };
             let std_mutator_no_crossover = StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations()));
@@ -411,7 +411,7 @@ macro_rules! fuzz_with {
                     GrimoireRandomDeleteMutator::new(),
                     GrimoireRandomDeleteMutator::new(),
                 ),
-                3,
+                NonZeroUsize::new(3).unwrap(),
             );
             let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::transforming(grimoire_mutator), ()));
 
