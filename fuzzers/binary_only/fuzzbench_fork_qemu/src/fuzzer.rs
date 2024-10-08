@@ -50,7 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     modules::{
         cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
-        edges::{StdEdgeCoverageChildModule, EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR},
+        edges::StdEdgeCoverageChildModule,
     },
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
