@@ -66,7 +66,10 @@
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
 
-use core::ffi::{c_char, c_int, CStr};
+use core::{
+    ffi::{c_char, c_int, CStr},
+    num::NonZeroUsize,
+};
 use std::{fs::File, io::stderr, os::fd::RawFd};
 
 use env_logger::Target;
