@@ -361,7 +361,10 @@ where
             execs_since_crash: total_executions - self.execs_at_last_objective,
             exec_timeout: self.exec_timeout,
             slowest_exec_ms: self.slowest_exec.as_millis(),
+            #[cfg(unix)]
             peak_rss_mb: peak_rss_mb_child_processes()?,
+            #[cfg(not(unix))]
+            peak_rss_mb: 0, // TODO for Windows
             cpu_affinity: self.core_id.0,
             total_edges: map_size as u64,
             edges_found: filled_entries_in_map,

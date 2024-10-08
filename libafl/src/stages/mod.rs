@@ -29,7 +29,6 @@ use libafl_bolts::{
 };
 pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
-pub use stats::{AflStatsStage, SyncTime, FuzzTime, CalibrationTime};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 pub use time_tracker::TimeTrackingStageWrapper;
 use serde::{Deserialize, Serialize};
@@ -73,13 +72,16 @@ pub mod generalization;
 pub mod generation;
 pub mod logics;
 pub mod power;
-pub mod stats;
 #[cfg(feature = "std")]
 pub mod sync;
 pub mod tracing;
 pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
+#[cfg(all(feature = "std", feature ="track_hit_feedbacks"))]
+pub use stats::{AflStatsStage, SyncTime, FuzzTime, CalibrationTime};
+#[cfg(all(feature = "std", feature ="track_hit_feedbacks"))]
+pub mod stats;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
