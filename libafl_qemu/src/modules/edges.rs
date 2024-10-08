@@ -110,7 +110,7 @@ pub struct EdgeCoverageFullVariant;
 pub type StdEdgeCoverageFullModule =
     EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>;
 pub type StdEdgeCoverageFullModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>;
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant, false>;
 
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
     fn jit_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -186,7 +186,6 @@ impl Default for StdEdgeCoverageFullModuleBuilder {
             page_filter: StdPageFilter::default(),
             use_hitcounts: true,
             use_jit: true,
-            observer_registered: false,
         }
     }
 }
@@ -204,7 +203,7 @@ pub struct EdgeCoverageClassicVariant;
 pub type StdEdgeCoverageClassicModule =
     EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant>;
 pub type StdEdgeCoverageClassicModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant>;
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant, false>;
 
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
     const DO_SIDE_EFFECTS: bool = false;
@@ -288,7 +287,6 @@ impl Default for StdEdgeCoverageClassicModuleBuilder {
             page_filter: StdPageFilter::default(),
             use_hitcounts: true,
             use_jit: true,
-            observer_registered: false,
         }
     }
 }
@@ -305,7 +303,7 @@ pub struct EdgeCoverageChildVariant;
 pub type StdEdgeCoverageChildModule =
     EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant>;
 pub type StdEdgeCoverageChildModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant>;
+    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageChildVariant, false>;
 
 impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageChildVariant {
     const DO_SIDE_EFFECTS: bool = false;
@@ -345,7 +343,6 @@ impl Default for StdEdgeCoverageChildModuleBuilder {
             page_filter: StdPageFilter::default(),
             use_hitcounts: true,
             use_jit: true,
-            observer_registered: false,
         }
     }
 }
@@ -358,13 +355,12 @@ impl StdEdgeCoverageChildModule {
 }
 
 #[derive(Debug)]
-pub struct EdgeCoverageModuleBuilder<AF, PF, V> {
+pub struct EdgeCoverageModuleBuilder<AF, PF, V, const IS_INITIALIZED: bool> {
     variant: V,
     address_filter: AF,
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
-    observer_registered: bool,
 }
 
 #[derive(Debug)]
@@ -378,7 +374,19 @@ pub struct EdgeCoverageModule<AF, PF, V> {
     use_jit: bool,
 }
 
-impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
+impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V, true> {
+    pub fn build(self) -> Result<EdgeCoverageModule<AF, PF, V>, Error> {
+        Ok(EdgeCoverageModule::new(
+            self.address_filter,
+            self.page_filter,
+            self.variant,
+            self.use_hitcounts,
+            self.use_jit,
+        ))
+    }
+}
+
+impl<AF, PF, V, const IS_INITIALIZED: bool> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
     fn new(
         variant: V,
         address_filter: AF,
@@ -392,28 +400,11 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
             page_filter,
             use_hitcounts,
             use_jit,
-            observer_registered: false,
         }
-    }
-
-    pub fn build(self) -> Result<EdgeCoverageModule<AF, PF, V>, Error> {
-        if !self.observer_registered {
-            return Err(
-                Error::illegal_argument("No observer has been registered. Please call the `map_observer` method with the map observer used as argument.")
-            );
-        }
-
-        Ok(EdgeCoverageModule::new(
-            self.address_filter,
-            self.page_filter,
-            self.variant,
-            self.use_hitcounts,
-            self.use_jit,
-        ))
     }
 
     #[must_use]
-    pub fn map_observer<O>(mut self, map_observer: &mut O) -> Self
+    pub fn map_observer<O>(self, map_observer: &mut O) -> EdgeCoverageModuleBuilder<AF, PF, V, true>
     where
         O: VariableLengthMapObserver,
     {
@@ -428,11 +419,16 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
             LIBAFL_QEMU_EDGES_MAP_MASK_MAX = map_max_size - 1;
         }
 
-        self.observer_registered = true;
-        self
+        EdgeCoverageModuleBuilder::<AF, PF, V, true>::new(
+            self.variant,
+            self.address_filter,
+            self.page_filter,
+            self.use_hitcounts,
+            self.use_jit,
+        )
     }
 
-    pub fn variant<V2>(self, variant: V2) -> EdgeCoverageModuleBuilder<AF, PF, V2> {
+    pub fn variant<V2>(self, variant: V2) -> EdgeCoverageModuleBuilder<AF, PF, V2, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             variant,
             self.address_filter,
@@ -442,7 +438,10 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         )
     }
 
-    pub fn address_filter<AF2>(self, address_filter: AF2) -> EdgeCoverageModuleBuilder<AF2, PF, V> {
+    pub fn address_filter<AF2>(
+        self,
+        address_filter: AF2,
+    ) -> EdgeCoverageModuleBuilder<AF2, PF, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             address_filter,
@@ -452,7 +451,10 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
         )
     }
 
-    pub fn page_filter<PF2>(self, page_filter: PF2) -> EdgeCoverageModuleBuilder<AF, PF2, V> {
+    pub fn page_filter<PF2>(
+        self,
+        page_filter: PF2,
+    ) -> EdgeCoverageModuleBuilder<AF, PF2, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             self.address_filter,
@@ -463,7 +465,10 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
     }
 
     #[must_use]
-    pub fn hitcounts(self, use_hitcounts: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
+    pub fn hitcounts(
+        self,
+        use_hitcounts: bool,
+    ) -> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             self.address_filter,
@@ -474,7 +479,7 @@ impl<AF, PF, V> EdgeCoverageModuleBuilder<AF, PF, V> {
     }
 
     #[must_use]
-    pub fn jit(self, use_jit: bool) -> EdgeCoverageModuleBuilder<AF, PF, V> {
+    pub fn jit(self, use_jit: bool) -> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
         EdgeCoverageModuleBuilder::new(
             self.variant,
             self.address_filter,
