@@ -15,6 +15,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
+    inputs::MutVecInput,
     monitors::SimpleMonitor,
     mutators::scheduled::StdScheduledMutator,
     observers::StdMapObserver,
@@ -138,14 +139,17 @@ pub fn main() {
     #[cfg(feature = "simple_interface")]
     let (mapped_mutators, optional_mapped_mutators) = {
         // Creating mutators that will operate on input.byte_array
-        let mapped_mutators =
-            mapped_havoc_mutations(CustomInput::byte_array_mut, CustomInput::byte_array);
+        let mapped_mutators = mapped_havoc_mutations::<_, _, MutVecInput<'_>, &[u8]>(
+            CustomInput::byte_array_mut,
+            CustomInput::byte_array,
+        );
 
         // Creating mutators that will operate on input.optional_byte_array
-        let optional_mapped_mutators = optional_mapped_havoc_mutations(
-            CustomInput::optional_byte_array_mut,
-            CustomInput::optional_byte_array,
-        );
+        let optional_mapped_mutators =
+            optional_mapped_havoc_mutations::<_, Option<MutVecInput<'_>>, Option<&[u8]>>(
+                CustomInput::optional_byte_array_mut,
+                CustomInput::optional_byte_array,
+            );
         (mapped_mutators, optional_mapped_mutators)
     };
 
