@@ -6,6 +6,7 @@ PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 PROFILE_DIR = { value = "release", condition = { env_not_set = [
   "PROFILE_DIR",
 ] } }
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
 
 [tasks.unsupported]
 script_runner = "@shell"
@@ -72,7 +73,7 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script = '''
-gdb --args ./target/${PROFILE_DIR}/fuzzbench_fork_qemu ./harness -- --libafl-in ./corpus --libafl-out ./out ./harness | tee fuzz_stdout.log
+gdb --args ${TARGET_DIR}/${PROFILE_DIR}/fuzzbench_fork_qemu ./harness -- --libafl-in ./corpus --libafl-out ./out ./harness | tee fuzz_stdout.log
 if grep -qa "objectives: 1" fuzz_stdout.log; then
     echo "Fuzzer is working"
 else
