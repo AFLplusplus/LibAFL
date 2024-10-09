@@ -575,7 +575,7 @@ mod tests {
             "Skipping test, {test_harness} not found"
         );
 
-        GUM.set(unsafe { Gum::obtain() })
+        GUM.set(Gum::obtain())
             .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
         let simulated_args = vec![
             "libafl_frida_test",
