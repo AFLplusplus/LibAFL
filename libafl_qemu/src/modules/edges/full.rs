@@ -16,11 +16,19 @@ use crate::{
 pub struct EdgeCoverageFullVariant;
 
 pub type StdEdgeCoverageFullModule =
-    EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant>;
-pub type StdEdgeCoverageFullModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant, false>;
+    EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageFullVariant, false, 0>;
+pub type StdEdgeCoverageFullModuleBuilder = EdgeCoverageModuleBuilder<
+    StdAddressFilter,
+    StdPageFilter,
+    EdgeCoverageFullVariant,
+    false,
+    false,
+    0,
+>;
 
-impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
+impl<AF, PF, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
+    EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE> for EdgeCoverageFullVariant
+{
     fn jit_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         AF: AddressFilter,
@@ -29,7 +37,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         let hook_id = emulator_modules.edges(
-            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Empty,
         );
         unsafe {
@@ -48,7 +56,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         let hook_id = emulator_modules.edges(
-            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Empty,
         );
         unsafe {
@@ -67,7 +75,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         emulator_modules.edges(
-            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Raw(trace_edge_hitcount),
         );
     }
@@ -80,7 +88,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageFullVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         emulator_modules.edges(
-            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_unique_edge_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Raw(trace_edge_single),
         );
     }

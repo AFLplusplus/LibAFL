@@ -63,7 +63,7 @@ mod generators {
         EmulatorModules,
     };
 
-    pub fn gen_unique_edge_ids<AF, ET, PF, S, V>(
+    pub fn gen_unique_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         emulator_modules: &mut EmulatorModules<ET, S>,
         state: Option<&mut S>,
         src: GuestAddr,
@@ -74,9 +74,11 @@ mod generators {
         ET: EmulatorModuleTuple<S>,
         PF: PageFilter,
         S: Unpin + UsesInput + HasMetadata,
-        V: EdgeCoverageVariant<AF, PF>,
+        V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
-        if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
+        if let Some(module) =
+            emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
+        {
             unsafe {
                 assert!(LIBAFL_QEMU_EDGES_MAP_MASK_MAX > 0);
                 assert_ne!(*addr_of!(LIBAFL_QEMU_EDGES_MAP_SIZE_PTR), ptr::null_mut());
@@ -131,7 +133,7 @@ mod generators {
     }
 
     #[allow(clippy::unnecessary_cast)]
-    pub fn gen_hashed_edge_ids<AF, ET, PF, S, V>(
+    pub fn gen_hashed_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         src: GuestAddr,
@@ -142,9 +144,11 @@ mod generators {
         ET: EmulatorModuleTuple<S>,
         PF: PageFilter,
         S: Unpin + UsesInput + HasMetadata,
-        V: EdgeCoverageVariant<AF, PF>,
+        V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
-        if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
+        if let Some(module) =
+            emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
+        {
             #[cfg(emulation_mode = "usermode")]
             if !module.must_instrument(src) && !module.must_instrument(dest) {
                 return None;
@@ -180,7 +184,7 @@ mod generators {
     }
 
     #[allow(clippy::unnecessary_cast)]
-    pub fn gen_hashed_block_ids<AF, ET, PF, S, V>(
+    pub fn gen_hashed_block_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
@@ -190,10 +194,18 @@ mod generators {
         ET: EmulatorModuleTuple<S>,
         PF: PageFilter,
         S: Unpin + UsesInput + HasMetadata,
-        V: EdgeCoverageVariant<AF, PF>,
+        V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
+        let mask: usize = if IS_CONST_MAP {
+            const { MAP_SIZE - 1 }
+        } else {
+            unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX as usize }
+        };
+
         // first check if we should filter
-        if let Some(module) = emulator_modules.get::<EdgeCoverageModule<AF, PF, V>>() {
+        if let Some(module) =
+            emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
+        {
             #[cfg(emulation_mode = "usermode")]
             {
                 if !module.must_instrument(pc) {
@@ -216,8 +228,11 @@ mod generators {
         let id = hash_me(pc as u64);
 
         unsafe {
-            let nxt = (id as usize + 1) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
-            *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
+            let nxt = (id as usize + 1) & mask;
+
+            if !IS_CONST_MAP {
+                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
+            }
         }
 
         // GuestAddress is u32 for 32 bit guests
@@ -257,6 +272,7 @@ mod tracers {
     }
 
     /// # Safety
+    ///
     /// Increases id at `EDGES_MAP_PTR` - potentially racey if called concurrently.
     pub unsafe extern "C" fn trace_edge_hitcount_ptr(_: *const (), id: u64) {
         unsafe {
@@ -266,6 +282,7 @@ mod tracers {
     }
 
     /// # Safety
+    ///
     /// Fine.
     /// Worst case we set the byte to 1 multiple times.
     pub unsafe extern "C" fn trace_edge_single_ptr(_: *const (), id: u64) {
@@ -276,6 +293,7 @@ mod tracers {
     }
 
     /// # Safety
+    ///
     /// Dereferences the global `PREV_LOC` variable. May not be called concurrently.
     pub unsafe extern "C" fn trace_block_transition_hitcount(_: *const (), id: u64) {
         unsafe {
@@ -289,6 +307,7 @@ mod tracers {
     }
 
     /// # Safety
+    ///
     /// Dereferences the global `PREV_LOC` variable. May not be called concurrently.
     pub unsafe extern "C" fn trace_block_transition_single(_: *const (), id: u64) {
         unsafe {

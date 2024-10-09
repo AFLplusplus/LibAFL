@@ -18,11 +18,19 @@ use crate::{
 pub struct EdgeCoverageClassicVariant;
 
 pub type StdEdgeCoverageClassicModule =
-    EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant>;
-pub type StdEdgeCoverageClassicModuleBuilder =
-    EdgeCoverageModuleBuilder<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant, false>;
+    EdgeCoverageModule<StdAddressFilter, StdPageFilter, EdgeCoverageClassicVariant, false, 0>;
+pub type StdEdgeCoverageClassicModuleBuilder = EdgeCoverageModuleBuilder<
+    StdAddressFilter,
+    StdPageFilter,
+    EdgeCoverageClassicVariant,
+    false,
+    false,
+    0,
+>;
 
-impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
+impl<AF, PF, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
+    EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE> for EdgeCoverageClassicVariant
+{
     const DO_SIDE_EFFECTS: bool = false;
 
     fn jit_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -33,7 +41,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         let hook_id = emulator_modules.blocks(
-            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Empty,
             Hook::Empty,
         );
@@ -54,7 +62,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         let hook_id = emulator_modules.blocks(
-            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Empty,
             Hook::Empty,
         );
@@ -75,7 +83,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         emulator_modules.blocks(
-            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Empty,
             Hook::Raw(trace_block_transition_hitcount),
         );
@@ -89,7 +97,7 @@ impl<AF, PF> EdgeCoverageVariant<AF, PF> for EdgeCoverageClassicVariant {
         S: Unpin + UsesInput + HasMetadata,
     {
         emulator_modules.blocks(
-            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self>),
+            Hook::Function(gen_hashed_block_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Empty,
             Hook::Raw(trace_block_transition_single),
         );
