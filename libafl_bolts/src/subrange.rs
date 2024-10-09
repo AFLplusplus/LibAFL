@@ -96,14 +96,14 @@ impl<'a, T> From<&'a [T]> for SliceReader<'a, T> {
     }
 }
 
-impl<'a, T> HasLen for SubRangeSlice<'a, T> {
+impl<T> HasLen for SubRangeSlice<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         self.range.len()
     }
 }
 
-impl<'a, T> HasLen for SubRangeMutSlice<'a, T> {
+impl<T> HasLen for SubRangeMutSlice<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         self.range.len()

@@ -7,7 +7,6 @@ use libafl_bolts::tuples::RefIndexable;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::UsesObservers,
     state::{HasExecutions, UsesState},
     Error,
 };
@@ -68,17 +67,12 @@ where
     type State = A::State;
 }
 
-impl<A, B> UsesObservers for CombinedExecutor<A, B>
-where
-    A: UsesObservers,
-{
-    type Observers = A::Observers;
-}
-
 impl<A, B> HasObservers for CombinedExecutor<A, B>
 where
     A: HasObservers,
 {
+    type Observers = A::Observers;
+
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.primary.observers()

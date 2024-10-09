@@ -109,7 +109,7 @@ where
 }
 
 #[allow(clippy::similar_names)]
-impl<'a, H> InMemoryBytesCoverageSugar<'a, H>
+impl<H> InMemoryBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
@@ -229,7 +229,7 @@ where
             if state.must_load_initial_inputs() {
                 if self.input_dirs.is_empty() {
                     // Generator of printable bytearrays of max size 32
-                    let mut generator = RandBytesGenerator::new(32);
+                    let mut generator = RandBytesGenerator::new(32).unwrap();
 
                     // Generate 8 initial inputs
                     state

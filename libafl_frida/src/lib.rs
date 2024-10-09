@@ -523,7 +523,8 @@ mod tests {
                 );
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-                let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1));
+                let mut stages =
+                    tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1).unwrap());
 
                 log::info!("Starting fuzzing!");
                 fuzzer
@@ -574,7 +575,7 @@ mod tests {
             "Skipping test, {test_harness} not found"
         );
 
-        GUM.set(unsafe { Gum::obtain() })
+        GUM.set(Gum::obtain())
             .unwrap_or_else(|_| panic!("Failed to initialize Gum"));
         let simulated_args = vec![
             "libafl_frida_test",

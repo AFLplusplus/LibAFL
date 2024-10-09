@@ -2,12 +2,10 @@ use std::borrow::Cow;
 
 use libafl::{
     corpus::{Corpus, Testcase},
-    events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, MapIndexesMetadata},
-    observers::ObserversTuple,
+    feedbacks::{Feedback, MapIndexesMetadata, StateInitializer},
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::{HasCorpus, State},
+    state::HasCorpus,
     Error, HasMetadata,
 };
 use libafl_bolts::{Named, SerdeAny};
@@ -45,29 +43,24 @@ pub struct PacketLenFeedback {
     len: u64,
 }
 
-impl<S> Feedback<S> for PacketLenFeedback
-where
-    S: State<Input = PacketData>,
-{
+impl<S> StateInitializer<S> for PacketLenFeedback {}
+
+impl<EM, OT, S> Feedback<EM, PacketData, OT, S> for PacketLenFeedback {
     #[inline]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         input: &PacketData,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         self.len = input.length;
         Ok(false)
     }
 
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,

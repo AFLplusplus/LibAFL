@@ -8,8 +8,8 @@ use std::{
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{
-        CentralizedEventManager, EventManagerHooksTuple, EventProcessor,
-        LlmpRestartingEventManager, ProgressReporter,
+        CentralizedEventManager, EventManagerHooksTuple, LlmpRestartingEventManager,
+        ProgressReporter,
     },
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
@@ -530,7 +530,7 @@ pub fn run_fuzzer_with_stages<Z, ST, E, EM>(
 where
     Z: Fuzzer<E, EM, ST>,
     E: UsesState<State = Z::State>,
-    EM: ProgressReporter<State = Z::State> + EventProcessor<E, Z>,
+    EM: ProgressReporter<State = Z::State>,
     ST: StagesTuple<E, EM, Z::State, Z>,
     <Z as UsesState>::State: HasLastReportTime + HasExecutions + HasMetadata,
 {

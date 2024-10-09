@@ -158,7 +158,8 @@ pub fn main() {
             NautilusSpliceMutator::new(&context),
         ),
         2,
-    );
+    )
+    .unwrap();
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

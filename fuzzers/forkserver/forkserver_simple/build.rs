@@ -44,7 +44,7 @@ fn main() {
     let mut compile_command = Command::new(afl_cc_path);
     compile_command
         .args(["src/program.c", "-o"])
-        .arg(&format!("{}/target/release/program", &cwd));
+        .arg(format!("{cwd}/target/release/program"));
 
     if let Ok(llvm_config) = env::var("LLVM_CONFIG") {
         if !llvm_config.is_empty() {

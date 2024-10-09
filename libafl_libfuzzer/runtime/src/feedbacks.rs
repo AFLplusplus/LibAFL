@@ -5,15 +5,13 @@ use std::borrow::Cow;
 use libafl::{
     alloc,
     corpus::Testcase,
-    events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, MinMapFeedback},
+    feedbacks::{Feedback, MinMapFeedback, StateInitializer},
     inputs::{BytesInput, Input},
-    observers::ObserversTuple,
     state::State,
     Error, HasMetadata,
 };
-use libafl_bolts::{impl_serdeany, Named};
+use libafl_bolts::{impl_serdeany, tuples::MatchNameRef, Named};
 use libafl_targets::OomFeedback;
 use serde::{Deserialize, Serialize};
 
@@ -43,22 +41,20 @@ impl Named for LibfuzzerKeepFeedback {
     }
 }
 
-impl<S> Feedback<S> for LibfuzzerKeepFeedback
+impl<S> StateInitializer<S> for LibfuzzerKeepFeedback {}
+
+impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for LibfuzzerKeepFeedback
 where
     S: State,
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _input: &S::Input,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         Ok(*self.keep.borrow())
     }
 
@@ -119,22 +115,21 @@ impl LibfuzzerCrashCauseFeedback {
     }
 }
 
-impl<S> Feedback<S> for LibfuzzerCrashCauseFeedback
+impl<S> StateInitializer<S> for LibfuzzerCrashCauseFeedback {}
+
+impl<EM, OT, S> Feedback<EM, BytesInput, OT, S> for LibfuzzerCrashCauseFeedback
 where
     S: State<Input = BytesInput>,
+    OT: MatchNameRef,
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &BytesInput,
         _observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         self.exit_kind = *exit_kind;
         Ok(false)
     }
@@ -143,16 +138,13 @@ where
         Ok(false)
     }
 
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-    {
+        testcase: &mut Testcase<BytesInput>,
+    ) -> Result<(), Error> {
         match self.exit_kind {
             ExitKind::Crash | ExitKind::Oom if OomFeedback::oomed() => {
                 self.set_filename("oom", testcase);
@@ -183,4 +175,4 @@ where
     }
 }
 
-pub type ShrinkMapFeedback<C, O, T> = MinMapFeedback<C, MappedEdgeMapObserver<O, T>, usize>;
+pub type ShrinkMapFeedback<C, O, T> = MinMapFeedback<C, MappedEdgeMapObserver<O, T>>;

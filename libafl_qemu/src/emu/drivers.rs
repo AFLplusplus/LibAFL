@@ -74,7 +74,7 @@ where
         state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         emulator
             .modules
@@ -201,7 +201,7 @@ where
         state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         if !emulator.driver.hooks_locked {
             emulator

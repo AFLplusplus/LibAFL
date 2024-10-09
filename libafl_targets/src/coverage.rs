@@ -20,12 +20,12 @@ use core::ptr::addr_of_mut;
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
-use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX};
+use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE};
 
 /// The map for edges.
 #[no_mangle]
 #[allow(non_upper_case_globals)]
-pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE_MAX] = [0; EDGES_MAP_SIZE_MAX];
+pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
 /// The map for data dependency
@@ -85,9 +85,9 @@ pub fn autotokens() -> Result<Tokens, Error> {
 
 /// The actual size we use for the map of edges.
 /// This is used for forkserver backend
-#[no_mangle]
 #[allow(non_upper_case_globals)]
-pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
+#[no_mangle]
+pub static mut __afl_map_size: usize = EDGES_MAP_DEFAULT_SIZE;
 
 #[cfg(any(
     feature = "sancov_pcguard_edges",
@@ -127,11 +127,11 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// ```rust,ignore
 /// use libafl::observers::StdMapObserver;
-/// use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE_IN_USE};
+/// use libafl_targets::{EDGES_MAP, EDGES_MAP_DEFAULT_SIZE};
 ///
 /// #[cfg(not(feature = "pointer_maps"))]
 /// let observer = unsafe {
-///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_SIZE_IN_USE)
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_DEFAULT_SIZE)
 /// };
 /// ```
 ///
@@ -192,7 +192,7 @@ pub fn edges_max_num() -> usize {
         } else {
             #[cfg(feature = "pointer_maps")]
             {
-                EDGES_MAP_SIZE_MAX // the upper bound
+                EDGES_MAP_ALLOCATED_SIZE // the upper bound
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
@@ -211,8 +211,7 @@ mod swap {
     use core::fmt::Debug;
 
     use libafl::{
-        inputs::UsesInput,
-        observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
+        observers::{DifferentialObserver, Observer, StdMapObserver},
         Error,
     };
     use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, Named};
@@ -279,21 +278,15 @@ mod swap {
         }
     }
 
-    impl<'a, 'b> Named for DifferentialAFLMapSwapObserver<'a, 'b> {
+    impl Named for DifferentialAFLMapSwapObserver<'_, '_> {
         fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }
 
-    impl<'a, 'b, S> Observer<S> for DifferentialAFLMapSwapObserver<'a, 'b> where S: UsesInput {}
+    impl<I, S> Observer<I, S> for DifferentialAFLMapSwapObserver<'_, '_> {}
 
-    impl<'a, 'b, OTA, OTB, S> DifferentialObserver<OTA, OTB, S>
-        for DifferentialAFLMapSwapObserver<'a, 'b>
-    where
-        OTA: ObserversTuple<S>,
-        OTB: ObserversTuple<S>,
-        S: UsesInput,
-    {
+    impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for DifferentialAFLMapSwapObserver<'_, '_> {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
             let slice = self.first_map.as_slice_mut();
             unsafe {

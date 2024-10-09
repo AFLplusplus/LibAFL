@@ -6,7 +6,8 @@ use libafl_bolts::tuples::RefIndexable;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::{ObserversTuple, UsesObservers},
+    inputs::UsesInput,
+    observers::ObserversTuple,
     state::UsesState,
     Error,
 };
@@ -34,8 +35,8 @@ where
 
 impl<E, SOT> ShadowExecutor<E, SOT>
 where
-    E: HasObservers,
-    SOT: ObserversTuple<<Self as UsesState>::State>,
+    E: HasObservers + UsesState,
+    SOT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
@@ -61,7 +62,7 @@ where
 impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
 where
     E: Executor<EM, Z> + HasObservers,
-    SOT: ObserversTuple<Self::State>,
+    SOT: ObserversTuple<Self::Input, Self::State>,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
 {
@@ -83,18 +84,12 @@ where
     type State = E::State;
 }
 
-impl<E, SOT> UsesObservers for ShadowExecutor<E, SOT>
-where
-    E: UsesObservers,
-{
-    type Observers = E::Observers;
-}
-
 impl<E, SOT> HasObservers for ShadowExecutor<E, SOT>
 where
-    E: HasObservers,
-    SOT: ObserversTuple<Self::State>,
+    E: HasObservers + UsesState,
+    SOT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
 {
+    type Observers = E::Observers;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.executor.observers()

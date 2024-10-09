@@ -250,9 +250,10 @@ where
     EM: UsesState<State = S> + EventFirer,
     S: State + HasExecutions + HasCorpus + HasRand + HasMetadata,
     SP: ShMemProvider,
-    E: HasObservers<State = S> + Executor<EM, Z>,
+    E: HasObservers + Executor<EM, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    Z: EvaluatorObservers<EM, E::Observers, State = S>
+        + ExecutionProcessor<EM, E::Observers, State = S>,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
@@ -288,7 +289,6 @@ where
                         corpus_size: 0, // TODO choose if sending 0 or the actual real value
                         client_config: EventConfig::AlwaysUnique,
                         time: current_time(),
-                        executions: 0,
                         forward_id: None,
                         #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                         node_id: None,

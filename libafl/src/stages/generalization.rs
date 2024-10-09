@@ -73,6 +73,7 @@ where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
     E: Executor<EM, Z, State = Self::State> + HasObservers,
+    E::Observers: ObserversTuple<BytesInput, <Self as UsesState>::State>,
     EM::State:
         UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus + HasNamedMetadata,
     EM: UsesState,
@@ -344,9 +345,9 @@ where
     EM: UsesState,
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    OT: ObserversTuple<<Self as UsesState>::State>,
     <Self as UsesState>::State:
         UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
+    OT: ObserversTuple<BytesInput, <EM as UsesState>::State>,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
@@ -372,8 +373,9 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
-        Z: UsesState<State = <Self as UsesState>::State>,
+        E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers,
+        E::Observers: ObserversTuple<BytesInput, <Self as UsesState>::State>,
+        Z: UsesState<State = EM::State>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -414,8 +416,8 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
-        Z: UsesState<State = <Self as UsesState>::State>,
+        E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers<Observers = OT>,
+        Z: UsesState<State = EM::State>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -453,8 +455,8 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
-        Z: UsesState<State = <Self as UsesState>::State>,
+        E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers<Observers = OT>,
+        Z: UsesState<State = EM::State>,
     {
         let mut index = 0;
         while index < payload.len() {

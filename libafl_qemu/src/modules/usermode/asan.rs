@@ -997,7 +997,7 @@ where
         _observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
         if self.reset(emulator_modules.qemu()) == AsanRollback::HasLeaks {

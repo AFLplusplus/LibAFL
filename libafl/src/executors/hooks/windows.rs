@@ -21,6 +21,7 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
+        observers::ObserversTuple,
         state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     };
 
@@ -30,8 +31,9 @@ pub mod windows_asan_handler {
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
@@ -121,7 +123,8 @@ pub mod windows_exception_handler {
     use std::panic;
 
     use libafl_bolts::os::windows_exceptions::{
-        ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
+        ExceptionCode, ExceptionHandler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE,
+        EXCEPTION_POINTERS,
     };
     use windows::Win32::System::Threading::{
         EnterCriticalSection, ExitProcess, LeaveCriticalSection, CRITICAL_SECTION,
@@ -138,6 +141,7 @@ pub mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::{Input, UsesInput},
+        observers::ObserversTuple,
         state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     };
 
@@ -151,9 +155,15 @@ pub mod windows_exception_handler {
     ) {
     }*/
 
-    impl Handler for InProcessExecutorHandlerData {
+    impl ExceptionHandler for InProcessExecutorHandlerData {
+        /// # Safety
+        /// Will dereference `EXCEPTION_POINTERS` and access `GLOBAL_STATE`.
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+        unsafe fn handle(
+            &mut self,
+            _code: ExceptionCode,
+            exception_pointers: *mut EXCEPTION_POINTERS,
+        ) {
             unsafe {
                 let data = addr_of_mut!(GLOBAL_STATE);
                 let in_handler = (*data).set_in_handler(true);
@@ -179,10 +189,11 @@ pub mod windows_exception_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
-        E: HasObservers,
+        E: HasObservers + Executor<EM, Z>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
@@ -241,9 +252,10 @@ pub mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers + HasInProcessHooks<E::State>,
+        E: HasObservers + HasInProcessHooks<E::State> + Executor<EM, Z>,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
@@ -314,8 +326,9 @@ pub mod windows_exception_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me

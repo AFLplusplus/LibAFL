@@ -34,7 +34,7 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
@@ -80,9 +80,12 @@ pub struct ShutdownSignalData {}
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+///
+/// # Safety
+/// This will exit the program
 #[cfg(all(unix, feature = "std"))]
-impl Handler for ShutdownSignalData {
-    fn handle(
+impl SignalHandler for ShutdownSignalData {
+    unsafe fn handle(
         &mut self,
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -210,7 +213,7 @@ impl EventConfig {
         }
     }
 
-    /// Match if the currenti [`EventConfig`] matches another given config
+    /// Match if the current [`EventConfig`] matches another given config
     #[must_use]
     pub fn match_with(&self, other: &EventConfig) -> bool {
         match self {
@@ -284,8 +287,6 @@ where
         client_config: EventConfig,
         /// The time of generation of the event
         time: Duration,
-        /// The executions of this client
-        executions: u64,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
@@ -327,8 +328,6 @@ where
     Objective {
         /// Objective corpus size
         objective_size: usize,
-        /// The total number of executions when this objective is found
-        executions: u64,
         /// The time when this event was created
         time: Duration,
     },
@@ -398,6 +397,11 @@ where
             } => "todo",*/
         }
     }
+
+    /// Returns true if self is a new testcase, false otherwise.
+    pub fn is_new_testcase(&self) -> bool {
+        matches!(self, Event::NewTestcase { .. })
+    }
 }
 
 /// [`EventFirer`] fires an event.
@@ -437,7 +441,7 @@ pub trait EventFirer: UsesState {
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
     {
         Ok(Some(postcard::to_allocvec(observers)?))
     }
@@ -757,7 +761,7 @@ where
     #[inline]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
     {
         self.inner.serialize_observers(observers)
     }
@@ -893,7 +897,7 @@ pub trait AdaptiveSerializer {
         percentage_threshold: usize,
     ) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<S> + Serialize,
+        OT: ObserversTuple<S::Input, S> + Serialize,
         S: UsesInput,
     {
         match self.time_ref() {
@@ -969,7 +973,6 @@ mod tests {
             corpus_size: 123,
             client_config: EventConfig::AlwaysUnique,
             time: current_time(),
-            executions: 0,
             forward_id: None,
             #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
             node_id: None,
