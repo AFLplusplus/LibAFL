@@ -23,9 +23,8 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
     executors::HasObservers,
-    inputs::UsesInput,
+    feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME},
     mutators::Tokens,
-    feedbacks::{TIMEOUT_FEEDBACK_NAME, CRASH_FEEDBACK_NAME},
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
@@ -228,7 +227,7 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<C, E, EM, O, Z> UsesState for AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> UsesState for AflStatsStage<C, E, EM, O, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -237,7 +236,7 @@ where
     type State = E::State;
 }
 
-impl<C, E, EM, O, Z> Stage<E, EM, Z> for AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> Stage<E, EM, Z> for AflStatsStage<C, E, EM, O, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -412,7 +411,7 @@ where
     }
 }
 
-impl<C, E, EM, O, Z> AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> AflStatsStage<C, E, EM, O, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -449,19 +448,13 @@ where
         Ok(())
     }
 
-    fn maybe_update_is_favored_size(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-    ) {
+    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<E::Input>) {
         if testcase.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-    ) {
+    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<E::Input>) {
         if let Some(exec_time) = testcase.exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
@@ -473,10 +466,7 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+    fn maybe_update_max_depth(&mut self, testcase: &Testcase<E::Input>) -> Result<(), Error> {
         if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
@@ -493,11 +483,7 @@ where
         self.last_find = current_time();
     }
 
-    fn maybe_update_last_crash(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-        state: &E::State,
-    ) {
+    fn maybe_update_last_crash(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
         if testcase
             .hit_objectives()
             .contains(&Cow::Borrowed(CRASH_FEEDBACK_NAME))
@@ -507,11 +493,7 @@ where
         }
     }
 
-    fn maybe_update_last_hang(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-        state: &E::State,
-    ) {
+    fn maybe_update_last_hang(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
         if testcase
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
