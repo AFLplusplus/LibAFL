@@ -110,19 +110,14 @@ where
             let new_dir_files = find_new_files_rec(dir, &last)?;
             new_files.extend(new_dir_files);
         }
-        match state.metadata_map_mut().get_mut::<SyncFromDiskMetadata>() {
-            Some(m) => {
-                m.last_time = new_max_time;
-                m.left_to_sync = new_files;
-            }
-            None => {
-                state
-                    .metadata_map_mut()
-                    .insert(SyncFromDiskMetadata::new(new_max_time, new_files));
-            }
-        }
 
-        let sync_from_disk_metadata = state.metadata_mut::<SyncFromDiskMetadata>().unwrap();
+        let sync_from_disk_metadata = state
+            .metadata_or_insert_with(|| SyncFromDiskMetadata::new(new_max_time, new_files.clone()));
+
+        // At the very first sync, last_time and file_to_sync are set twice
+        sync_from_disk_metadata.last_time = new_max_time;
+        sync_from_disk_metadata.left_to_sync = new_files;
+
         // Iterate over the paths of files left to sync.
         // By keeping track of these files, we ensure that no file is missed during synchronization,
         // even in the event of a target restart.
