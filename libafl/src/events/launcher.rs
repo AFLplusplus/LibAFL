@@ -747,8 +747,9 @@ where
         }
 
         // Create this after forks, to avoid problems with tokio runtime
-
+        //
         // # Safety
+        //
         // The `multi_machine_receiver_hook` needs messages to outlive the receiver.
         // The underlying memory region for incoming messages lives longer than the async thread processing them.
         #[cfg(feature = "multi_machine")]

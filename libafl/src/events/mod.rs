@@ -488,7 +488,7 @@ where
         let executions = *state.executions();
         let cur = current_time();
 
-        // Default no introspection implmentation
+        // Default no introspection implementation
         #[cfg(not(feature = "introspection"))]
         self.fire(
             state,
