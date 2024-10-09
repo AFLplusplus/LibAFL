@@ -305,8 +305,6 @@ pub(crate) async fn serve_metrics(
     clients_count: Family<Labels, Gauge>,
     custom_stat: Family<Labels, Gauge<f64, AtomicU64>>,
 ) -> Result<(), std::io::Error> {
-    tide::log::start();
-
     let mut registry = Registry::default();
 
     registry.register("corpus_count", "Number of test cases in the corpus", corpus);
