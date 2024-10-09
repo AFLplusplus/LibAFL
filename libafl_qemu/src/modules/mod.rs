@@ -38,7 +38,7 @@ pub use cmplog::CmpLogModule;
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use drcov::*;
+pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 
 use crate::{emu::EmulatorModules, Qemu};
 
