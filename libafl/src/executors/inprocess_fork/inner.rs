@@ -105,6 +105,17 @@ where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     Z: UsesState<State = S>,
 {
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        #[cfg(target_os = "linux")]
+        {
+            self.itimerspec = Self::parse_itimerspec(timeout);
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            self.itimerval = Self::parse_itimerval(timeout);
+        }
+    }
+
     pub(super) unsafe fn pre_run_target_child(
         &mut self,
         fuzzer: &mut Z,
@@ -238,6 +249,41 @@ where
         // do nothing
     }
 
+    #[cfg(target_os = "linux")]
+    fn parse_itimerspec(timeout: Duration) -> libc::itimerspec {
+        let milli_sec = timeout.as_millis();
+        let it_value = libc::timespec {
+            tv_sec: (milli_sec / 1000) as _,
+            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
+        };
+        let it_interval = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        let itimerspec = libc::itimerspec {
+            it_interval,
+            it_value,
+        };
+        itimerspec
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn parse_itimerval(timeout: Duration) -> Itimerval {
+        let milli_sec = timeout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+    }
+
     /// Creates a new [`GenericInProcessForkExecutorInner`] with custom hooks
     #[cfg(target_os = "linux")]
     #[allow(clippy::too_many_arguments)]
@@ -253,21 +299,7 @@ where
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self>(state);
-
-        let milli_sec = timeout.as_millis();
-        let it_value = libc::timespec {
-            tv_sec: (milli_sec / 1000) as _,
-            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
-        };
-        let it_interval = libc::timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        };
-        let itimerspec = libc::itimerspec {
-            it_interval,
-            it_value,
-        };
-
+        let itimerspec = Self::parse_itimerspec(timeout);
         Ok(Self {
             shmem_provider,
             observers,
@@ -275,6 +307,11 @@ where
             itimerspec,
             phantom: PhantomData,
         })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        self.itimerspec = Self::parse_itimerspec(timeout);
     }
 
     /// Creates a new [`GenericInProcessForkExecutorInner`], non linux
@@ -293,19 +330,7 @@ where
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self>(state);
 
-        let milli_sec = timeout.as_millis();
-        let it_value = Timeval {
-            tv_sec: (milli_sec / 1000) as i64,
-            tv_usec: (milli_sec % 1000) as i64,
-        };
-        let it_interval = Timeval {
-            tv_sec: 0,
-            tv_usec: 0,
-        };
-        let itimerval = Itimerval {
-            it_interval,
-            it_value,
-        };
+        let itimerval = Self::parse_itimmerval(timeout);
 
         Ok(Self {
             shmem_provider,

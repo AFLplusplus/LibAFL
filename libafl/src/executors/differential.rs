@@ -118,6 +118,10 @@ where
             })
         }
     }
+    fn set_timeout(&mut self, timeout: core::time::Duration) {
+        self.primary.set_timeout(timeout);
+        self.secondary.set_timeout(timeout);
+    }
 }
 
 /// Proxy the observers of the inner executors

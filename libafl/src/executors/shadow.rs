@@ -1,6 +1,6 @@
 //! A `ShadowExecutor` wraps an executor to have shadow observer that will not be considered by the feedbacks and the manager
 
-use core::fmt::{self, Debug, Formatter};
+use core::{fmt::{self, Debug, Formatter}, time::Duration};
 
 use libafl_bolts::tuples::RefIndexable;
 
@@ -74,6 +74,10 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
+    }
+
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.executor.set_timeout(timeout)
     }
 }
 

@@ -180,6 +180,9 @@ where
             }
         }
     }
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.inner.set_timeout(timeout)
+    }
 }
 
 impl<'a, H, HT, OT, S, SP, EM, Z, OF> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>

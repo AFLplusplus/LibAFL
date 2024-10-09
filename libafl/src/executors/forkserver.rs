@@ -1466,6 +1466,10 @@ where
 
         Ok(exit_kind)
     }
+
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = TimeSpec::from_duration(timeout);
+    }
 }
 
 impl<OT, S, SP> UsesState for ForkserverExecutor<OT, S, SP>

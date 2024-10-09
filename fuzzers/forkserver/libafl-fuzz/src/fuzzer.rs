@@ -221,10 +221,13 @@ where
     // Create our Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // Like AFL++, we re-run timeouts to make sure that they aren't false positives
+    // Like AFL++ we re-run all timeouts with double the timeout to assert that they are not false positives
     let timeout_verify_stage = IfStage::new(
         |_, _, _, _| Ok(!opt.ignore_timeouts),
-        tuple_list!(VerifyTimeoutsStage::new(opt.hang_timeout, &time_observer)),
+        tuple_list!(VerifyTimeoutsStage::new(
+            Duration::from_millis(opt.hang_timeout),
+            &time_observer
+        )),
     );
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.

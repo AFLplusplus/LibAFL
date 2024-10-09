@@ -1,6 +1,6 @@
 //! Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
 //! not false positives. AFL++ style
-//! WARNING: DO NOT USE WITH INPROCESS EXECUTORS!
+use core::time::Duration;
 use std::{collections::VecDeque, fmt::Debug, marker::PhantomData};
 
 use libafl::{
@@ -18,18 +18,19 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[derive(Debug)]
 pub struct VerifyTimeoutsStage<E> {
     time_observer_handle: Handle<TimeObserver>,
-    // Timeouts in milliseconds multiplied by two
-    doubled_timeout: u64,
+    doubled_timeout: Duration,
+    original_timeout: Duration,
     // The handle to our time observer
     phantom: PhantomData<E>,
 }
 
 impl<E> VerifyTimeoutsStage<E> {
     /// Create a `VerifyTimeoutsStage`
-    pub fn new(configured_timeout: u64, time_observer: &TimeObserver) -> Self {
+    pub fn new(configured_timeout: Duration, time_observer: &TimeObserver) -> Self {
         Self {
             time_observer_handle: time_observer.handle(),
             doubled_timeout: configured_timeout * 2,
+            original_timeout: configured_timeout,
             phantom: PhantomData,
         }
     }
@@ -87,6 +88,7 @@ where
         let mut timeouts = state
             .metadata_or_insert_with(TimeoutsToVerify::<E::Input>::new)
             .clone();
+        executor.set_timeout(self.doubled_timeout);
         while let Some(input) = timeouts.pop() {
             executor.observers_mut().pre_exec_all(state, &input)?;
             let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
@@ -96,11 +98,11 @@ where
                 .last_runtime()
                 .expect("invariant; we just ran an input - and thus we must have runtime");
             // u128 -> u64 truncation but we should be fine.
-            if matches!(exit_kind, ExitKind::Timeout)
-                && last_runtime.as_millis() > self.doubled_timeout.into()
-            {}
+            if matches!(exit_kind, ExitKind::Timeout) {}
         }
-        *state.metadata_mut::<TimeoutsToVerify<E::Input>>().unwrap() = timeouts;
+        executor.set_timeout(self.original_timeout);
+        let res = state.metadata_mut::<TimeoutsToVerify<E::Input>>().unwrap();
+        *res = TimeoutsToVerify::<E::Input>::new();
         Ok(())
     }
     fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {

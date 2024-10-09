@@ -151,6 +151,9 @@ where
     fn exec_timeout(&self) -> Duration {
         self.timeout
     }
+    fn exec_timeout_mut(&mut self) -> &mut Duration {
+        &mut self.timeout
+    }
 }
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
@@ -280,6 +283,9 @@ where
             obs.observe_stderr(&stderr);
         }
         res
+    }
+    fn set_timeout(&mut self, timeout: Duration) {
+        *self.configurer.exec_timeout_mut() = timeout
     }
 }
 
@@ -592,6 +598,8 @@ pub trait CommandConfigurator<I>: Sized {
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
+    /// Set the timeout duration for execution of the child process.
+    fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
