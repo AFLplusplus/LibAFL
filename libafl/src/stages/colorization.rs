@@ -189,20 +189,11 @@ where
         // This is the buffer we'll randomly mutate during type_replace
         let mut changed = input.clone();
 
-        // input will be consumed so clone it
-        let consumed_input = input.clone();
-
         // First, run orig_input once and get the original hash
 
         // Idea: No need to do this every time
-        let orig_hash = Self::get_raw_map_hash_run(
-            fuzzer,
-            executor,
-            state,
-            manager,
-            consumed_input,
-            observer_handle,
-        )?;
+        let orig_hash =
+            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, &input, observer_handle)?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -240,13 +231,12 @@ where
                     );
                 }
 
-                let consumed_input = input.clone();
                 let changed_hash = Self::get_raw_map_hash_run(
                     fuzzer,
                     executor,
                     state,
                     manager,
-                    consumed_input,
+                    &input,
                     observer_handle,
                 )?;
 
@@ -333,7 +323,7 @@ where
         executor: &mut E,
         state: &mut <Self as UsesState>::State,
         manager: &mut EM,
-        input: E::Input,
+        input: &E::Input,
         observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, &input)?;
