@@ -375,17 +375,13 @@ pub struct EdgeCoverageModule<AF, PF, V> {
 }
 
 impl<AF, PF, V, const IS_INITIALIZED: bool> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED> {
-    const _IS_INITIALIZED: () = {
-        assert!(
-            IS_INITIALIZED,
-            "The edge module builder must be first initialized with a call to `map_observer`."
-        );
-    };
-
     pub fn build(self) -> Result<EdgeCoverageModule<AF, PF, V>, Error> {
-        // Trick to make sure the const expr is actually evaluated at compile time.
-        // This makes the compiler crash if the edge builder is not initialized correctly.
-        let () = Self::_IS_INITIALIZED;
+        const {
+            assert!(
+                IS_INITIALIZED,
+                "The edge module builder must be first initialized with a call to `map_observer`."
+            );
+        };
 
         Ok(EdgeCoverageModule::new(
             self.address_filter,
