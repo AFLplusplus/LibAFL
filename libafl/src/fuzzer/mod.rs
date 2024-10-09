@@ -507,7 +507,6 @@ where
                         state,
                         Event::Objective {
                             objective_size: state.solutions().count(),
-                            executions,
                             time: current_time(),
                         },
                     )?;
