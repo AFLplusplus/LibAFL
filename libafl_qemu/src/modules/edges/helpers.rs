@@ -5,11 +5,14 @@ pub use generators::{gen_hashed_block_ids, gen_hashed_edge_ids, gen_unique_edge_
 use hashbrown::HashMap;
 use libafl_qemu_sys::GuestAddr;
 use serde::{Deserialize, Serialize};
+
 /// Tracers, responsible for propagating an ID in a map.
 pub use tracers::{
     trace_block_transition_hitcount, trace_block_transition_single, trace_edge_hitcount,
     trace_edge_hitcount_ptr, trace_edge_single, trace_edge_single_ptr,
 };
+
+// Constants used for variable-length maps
 
 #[no_mangle]
 pub(super) static mut LIBAFL_QEMU_EDGES_MAP_PTR: *mut u8 = ptr::null_mut();
@@ -56,12 +59,10 @@ mod generators {
         QemuEdgesMapMetadata, LIBAFL_QEMU_EDGES_MAP_MASK_MAX, LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
     };
     use crate::{
-        modules::{
-            hash_me, AddressFilter, EdgeCoverageModule, EdgeCoverageVariant, EmulatorModuleTuple,
-            PageFilter,
-        },
+        modules::{hash_me, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
         EmulatorModules,
     };
+    use super::super::EdgeCoverageVariant;
 
     pub fn gen_unique_edge_ids<AF, ET, PF, S, V>(
         emulator_modules: &mut EmulatorModules<ET, S>,

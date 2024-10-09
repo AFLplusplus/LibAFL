@@ -1,10 +1,13 @@
 use libafl::{inputs::UsesInput, HasMetadata};
 
+use super::{
+    helpers::{gen_unique_edge_ids, trace_edge_hitcount, trace_edge_single},
+    EdgeCoverageVariant,
+};
 use crate::{
     modules::{
-        helpers::{gen_unique_edge_ids, trace_edge_hitcount, trace_edge_single},
-        AddressFilter, EdgeCoverageModule, EdgeCoverageModuleBuilder, EdgeCoverageVariant,
-        EmulatorModuleTuple, PageFilter, StdAddressFilter, StdPageFilter,
+        AddressFilter, EdgeCoverageModule, EdgeCoverageModuleBuilder, EmulatorModuleTuple,
+        PageFilter, StdAddressFilter, StdPageFilter,
     },
     EmulatorModules, Hook,
 };
