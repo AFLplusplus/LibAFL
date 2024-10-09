@@ -67,7 +67,7 @@ impl From<Duration> for FuzzTime {
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<C, O, E, EM, Z> {
+pub struct AflStatsStage<C, E, EM, O, Z> {
     map_observer_handle: Handle<C>,
     stats_file_path: PathBuf,
     plot_file_path: Option<PathBuf>,
@@ -228,7 +228,7 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<C, O, E, EM, Z> UsesState for AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> UsesState for AflStatsStage<C, O, E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -237,7 +237,7 @@ where
     type State = E::State;
 }
 
-impl<C, O, E, EM, Z> Stage<E, EM, Z> for AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> Stage<E, EM, Z> for AflStatsStage<C, O, E, EM, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -412,7 +412,7 @@ where
     }
 }
 
-impl<C, O, E, EM, Z> AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> AflStatsStage<C, O, E, EM, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -422,7 +422,7 @@ where
     O: MapObserver,
 {
     /// Builder for `AflStatsStage`
-    pub fn builder() -> AflStatsStageBuilder<C, O, E, EM, Z> {
+    pub fn builder() -> AflStatsStageBuilder<C, E, EM, O, Z> {
         AflStatsStageBuilder::new()
     }
 
@@ -632,7 +632,7 @@ pub fn get_run_cmdline() -> Cow<'static, str> {
 
 /// The Builder for `AflStatsStage`
 #[derive(Debug)]
-pub struct AflStatsStageBuilder<C, O, E, EM, Z> {
+pub struct AflStatsStageBuilder<C, E, EM, O, Z> {
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     core_id: Option<CoreId>,
@@ -647,7 +647,7 @@ pub struct AflStatsStageBuilder<C, O, E, EM, Z> {
     phantom_data: PhantomData<(O, E, EM, Z)>,
 }
 
-impl<C, O, E, EM, Z> AflStatsStageBuilder<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> AflStatsStageBuilder<C, E, EM, O, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -767,7 +767,7 @@ where
     /// No MapObserver supplied to the builder
     /// No stats_file_path provieded
     #[must_use]
-    pub fn build(self) -> Result<AflStatsStage<C, O, E, EM, Z>, Error> {
+    pub fn build(self) -> Result<AflStatsStage<C, E, EM, O, Z>, Error> {
         if !self.stats_file_path.is_some() {
             return Err(Error::illegal_argument("Must set `stats_file_path`"));
         }
