@@ -326,9 +326,9 @@ where
         input: &E::Input,
         observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
-        executor.observers_mut().pre_exec_all(state, &input)?;
+        executor.observers_mut().pre_exec_all(state, input)?;
 
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
 
         let observers = executor.observers();
         let observer = observers[observer_handle].as_ref();
@@ -337,7 +337,7 @@ where
 
         executor
             .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+            .post_exec_all(state, input, &exit_kind)?;
 
         // let observers = executor.observers();
         // fuzzer.process_execution(state, manager, input, observers, &exit_kind, true)?;
