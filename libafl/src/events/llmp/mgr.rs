@@ -8,14 +8,13 @@ use core::{marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
+#[cfg(feature = "multi_machine")]
+use libafl_bolts::llmp::LLMP_FLAG_MM_FORWARD;
 #[cfg(feature = "llmp_compression")]
-use libafl_bolts::{
-    compress::GzipCompressor,
-    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
-};
+use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
     current_time,
-    llmp::{LlmpClient, LlmpClientDescription, LLMP_FLAG_FROM_MM},
+    llmp::{LlmpClient, LlmpClientDescription, LLMP_FLAG_INITIALIZED},
     shmem::{NopShMemProvider, ShMemProvider},
     tuples::Handle,
     ClientId,
@@ -523,7 +522,12 @@ where
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
-        let flags = LLMP_FLAG_INITIALIZED;
+        let mut flags = LLMP_FLAG_INITIALIZED;
+
+        #[cfg(feature = "multi_machine")]
+        if event.is_new_testcase() {
+            flags = flags | LLMP_FLAG_MM_FORWARD;
+        }
 
         match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
@@ -534,7 +538,8 @@ where
                 )?;
             }
             None => {
-                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+                self.llmp
+                    .send_buf_with_flags(LLMP_TAG_EVENT_TO_BOTH, flags, &serialized)?;
             }
         }
         self.last_sent = current_time();
@@ -548,8 +553,16 @@ where
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
+        let mut flags = LLMP_FLAG_INITIALIZED;
+
+        #[cfg(feature = "multi_machine")]
+        if event.is_new_testcase() {
+            flags = flags | LLMP_FLAG_MM_FORWARD;
+        }
+
         let serialized = postcard::to_allocvec(&event)?;
-        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+        self.llmp
+            .send_buf_with_flags(LLMP_TAG_EVENT_TO_BOTH, flags, &serialized)?;
         Ok(())
     }
 
@@ -605,7 +618,7 @@ where
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         let mut count = 0;
-        while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
+        while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert!(
                 tag != _LLMP_TAG_EVENT_TO_BROKER,
                 "EVENT_TO_BROKER parcel should not have arrived in the client!"
@@ -619,7 +632,7 @@ where
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]
-            let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+            let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
                 compressed = self.compressor.decompress(msg)?;
                 &compressed
             } else {
@@ -627,12 +640,6 @@ where
             };
             let event: Event<S::Input> = postcard::from_bytes(event_bytes)?;
             log::debug!("Received event in normal llmp {}", event.name_detailed());
-
-            // If the message comes from another machine, do not
-            // consider other events than new testcase.
-            if !event.is_new_testcase() && (flags & LLMP_FLAG_FROM_MM == LLMP_FLAG_FROM_MM) {
-                continue;
-            }
 
             self.handle_in_client(fuzzer, executor, state, client_id, event)?;
             count += 1;

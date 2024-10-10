@@ -143,8 +143,8 @@ pub const LLMP_FLAG_INITIALIZED: Flags = Flags(0x0);
 pub const LLMP_FLAG_COMPRESSED: Flags = Flags(0x1);
 /// From another broker.
 pub const LLMP_FLAG_FROM_B2B: Flags = Flags(0x2);
-/// From another machine (with the `multi_machine` mode)
-pub const LLMP_FLAG_FROM_MM: Flags = Flags(0x4);
+/// The message should be forwarded to other machines, and discarded early otherwise
+pub const LLMP_FLAG_MM_FORWARD: Flags = Flags(0x4);
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
@@ -2739,7 +2739,7 @@ where
                             new_page.mark_safe_to_unmap();
 
                             let _new_client = self.inner.add_client(LlmpReceiver {
-                                id: ClientId(0), // will be auto-filled
+                                id: ClientId(0), // will be autofilled
                                 current_recv_shmem: new_page,
                                 last_msg_recvd: ptr::null_mut(),
                                 shmem_provider: self.inner.shmem_provider.clone(),
@@ -2776,7 +2776,9 @@ where
                     let msg_buf = (*msg).try_as_slice_mut(map)?;
 
                     // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
+                    // TODO: use a cached vector here
                     let mut new_msgs: Vec<(Tag, Flags, Vec<u8>)> = Vec::new();
+
                     if let LlmpMsgHookResult::ForwardToClients = self.hooks.on_new_message_all(
                         &mut self.inner,
                         client_id,

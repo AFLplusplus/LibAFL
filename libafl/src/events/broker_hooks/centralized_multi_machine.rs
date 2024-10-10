@@ -9,7 +9,7 @@ use std::{
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag, LLMP_FLAG_FROM_MM},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag, LLMP_FLAG_MM_FORWARD},
     ownedref::OwnedRef,
     shmem::ShMemProvider,
     ClientId, Error,
@@ -30,18 +30,25 @@ use crate::{
     inputs::Input,
 };
 
-/// Makes a raw pointer send + sync.
+/// Makes anything send + sync.
+/// It is intended to be used for raw-pointers in very specific scenarios.
 /// Extremely unsafe to use in general, only use this if you know what you're doing.
+///
+/// Some guarantees that should be enforced to use it in general (for raw pointers):
+///     - the pointee should be initialized
+///     - the pointee should never be written again
+///     - the pointee should never be unmapped
+///     - the pointee should never be moved
 #[derive(Debug, Clone, Copy)]
-pub struct NullLock<T> {
+struct MultiMachineNullLock<T> {
     value: T,
 }
 
-unsafe impl<T> Send for NullLock<T> {}
-unsafe impl<T> Sync for NullLock<T> {}
+unsafe impl<T> Send for MultiMachineNullLock<T> {}
+unsafe impl<T> Sync for MultiMachineNullLock<T> {}
 
-impl<T> NullLock<T> {
-    /// Instantiate a [`NullLock`]
+impl<T> MultiMachineNullLock<T> {
+    /// Instantiate a [`MultiMachineNullLock`]
     ///
     /// # Safety
     ///
@@ -50,15 +57,15 @@ impl<T> NullLock<T> {
         Self { value }
     }
 
-    /// Get a reference to value
-    pub fn get(&self) -> &T {
-        &self.value
-    }
+    // /// Get a reference to value
+    // pub fn get(&self) -> &T {
+    //     &self.value
+    // }
 
-    /// Get a mutable reference to value
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.value
-    }
+    // /// Get a mutable reference to value
+    // pub fn get_mut(&mut self) -> &mut T {
+    //     &mut self.value
+    // }
 
     /// Get back the value
     pub fn into_innter(self) -> T {
@@ -66,8 +73,8 @@ impl<T> NullLock<T> {
     }
 }
 
-/// The Receiving side of the multi-machine architecture
-/// It is responsible for receiving messages from other neighbours.
+/// The sending side of the multi-machine architecture
+/// It is responsible for sending messages to other neighbours.
 /// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
 pub struct TcpMultiMachineLlmpSenderHook<A, I>
@@ -81,7 +88,7 @@ where
     phantom: PhantomData<I>,
 }
 
-/// The Receiving side of the multi-machine architecture
+/// The receiving side of the multi-machine architecture
 /// It is responsible for receiving messages from other neighbours.
 /// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
@@ -164,23 +171,27 @@ where
     SP: ShMemProvider,
     I: Input + Send + Sync + 'static,
 {
-    /// check for received messages, and forward them alongside the incoming message to inner.
+    /// send new interesting messages over the wire
     fn on_new_message(
         &mut self,
         _broker_inner: &mut LlmpBrokerInner<SP>,
         _client_id: ClientId,
         _msg_tag: &mut Tag,
-        _msg_flags: &mut Flags,
+        msg_flags: &mut Flags,
         msg: &mut [u8],
         _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
+        if (*msg_flags & LLMP_FLAG_MM_FORWARD) == Flags(0) {
+            return Ok(LlmpMsgHookResult::ForwardToClients);
+        }
+
         let shared_state = self.shared_state.clone();
 
         // # Safety
+        //
         // Here, we suppose msg will *never* be written again and will always be available.
         // Thus, it is safe to handle this in a separate thread.
-        let msg_lock = unsafe { NullLock::new((msg.as_ptr(), msg.len())) };
-        // let flags = msg_flags.clone();
+        let msg_lock = unsafe { MultiMachineNullLock::new((msg.as_ptr(), msg.len())) };
 
         let _handle: JoinHandle<Result<(), Error>> = self.rt.spawn(async move {
             let mut state_wr_lock = shared_state.write().await;
@@ -255,22 +266,20 @@ where
                         let msg = msg.into_owned().unwrap().into_vec();
                         #[cfg(feature = "llmp_compression")]
                         match state_wr_lock.compressor().maybe_compress(msg.as_ref()) {
-                            Some(comp_buf) => Ok((
-                                _LLMP_TAG_TO_MAIN,
-                                LLMP_FLAG_COMPRESSED | LLMP_FLAG_FROM_MM,
-                                comp_buf,
-                            )),
-                            None => Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg)),
+                            Some(comp_buf) => {
+                                Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_COMPRESSED, comp_buf))
+                            }
+                            None => Ok((_LLMP_TAG_TO_MAIN, Flags(0), msg)),
                         }
                         #[cfg(not(feature = "llmp_compression"))]
-                        Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg))
+                        Ok((_LLMP_TAG_TO_MAIN, Flags(0), msg))
                     }
                     MultiMachineMsg::Event(evt) => {
                         let evt = evt.into_owned().unwrap();
                         let (inner_flags, buf) =
                             Self::try_compress(&mut state_wr_lock, evt.as_ref())?;
 
-                        Ok((_LLMP_TAG_TO_MAIN, inner_flags | LLMP_FLAG_FROM_MM, buf))
+                        Ok((_LLMP_TAG_TO_MAIN, inner_flags, buf))
                     }
                 })
                 .collect();
