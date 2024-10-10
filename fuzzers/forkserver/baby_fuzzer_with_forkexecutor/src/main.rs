@@ -1,15 +1,11 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{
-    path::PathBuf,
-    ptr::write,
-    sync::{Arc, Mutex},
-};
+use std::{path::PathBuf, ptr::write};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{hooks::IntelPTHook, inprocess_fork::GenericInProcessForkExecutor, ExitKind},
+    executors::{ExitKind, InProcessForkExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
@@ -34,8 +30,6 @@ pub fn main() {
     let mut signals = shmem_provider.new_shmem(16).unwrap();
     let signals_len = signals.as_slice().len();
     let signals_ptr = signals.as_slice_mut().as_mut_ptr();
-
-    let pt_trace = Arc::new(Mutex::new(Vec::new()));
 
     let signals_set = |idx: usize| {
         unsafe { write(signals_ptr.add(idx), 1) };
@@ -108,13 +102,8 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut pt_hook = IntelPTHook::new(pt_trace);
-
-    pub type PTInProcessForkExecutor<'a, H, OT, S, SP, EM, Z> =
-        GenericInProcessForkExecutor<'a, H, (IntelPTHook, ()), OT, S, SP, EM, Z>;
     // Create the executor for an in-process function with just one observer
-    let mut executor = PTInProcessForkExecutor::with_hooks(
-        tuple_list!(pt_hook),
+    let mut executor = InProcessForkExecutor::new(
         &mut harness,
         tuple_list!(observer),
         &mut fuzzer,
