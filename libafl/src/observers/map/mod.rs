@@ -390,14 +390,14 @@ pub trait MapObserver:
 pub trait VariableLengthMapObserver: MapObserver {
     /// A mutable slice reference to the map.
     /// The length of the map gives the maximum allocatable size.
-    fn map_slice(&mut self) -> &[Self::Entry];
+    fn map_slice(&self) -> &[Self::Entry];
 
     /// A slice reference to the map.
     /// The length of the map gives the maximum allocatable size.
     fn map_slice_mut(&mut self) -> &mut [Self::Entry];
 
     /// A reference to the size of the map.
-    fn size(&mut self) -> &usize;
+    fn size(&self) -> &usize;
 
     /// A mutable reference to the size of the map.
     fn size_mut(&mut self) -> &mut usize;
@@ -407,6 +407,9 @@ pub trait VariableLengthMapObserver: MapObserver {
 pub trait ConstantLengthMapObserver<const N: usize>: MapObserver {
     /// The size of the map
     const LENGTH: usize = N;
+
+    /// A mutable slice reference to the map
+    fn map_slice(&self) -> &[Self::Entry; N];
 
     /// A mutable slice reference to the map
     fn map_slice_mut(&mut self) -> &mut [Self::Entry; N];

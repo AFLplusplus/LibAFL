@@ -18,7 +18,12 @@ pub mod systemmode;
 pub use systemmode::*;
 
 pub mod edges;
-pub use edges::*;
+pub use edges::{
+    EdgeCoverageModule, EdgeCoverageModuleBuilder, StdEdgeCoverageChildModule,
+    StdEdgeCoverageChildModuleBuilder, StdEdgeCoverageClassicModule,
+    StdEdgeCoverageClassicModuleBuilder, StdEdgeCoverageFullModule,
+    StdEdgeCoverageFullModuleBuilder, StdEdgeCoverageModule, StdEdgeCoverageModuleBuilder,
+};
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
@@ -33,7 +38,7 @@ pub use cmplog::CmpLogModule;
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use drcov::*;
+pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 
 use crate::{emu::EmulatorModules, Qemu};
 
