@@ -1,5 +1,6 @@
 mod input;
 
+use core::num::NonZeroUsize;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
@@ -131,8 +132,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator =
-        CustomInputGenerator::new(1).expect("Failed to create our custom input generator");
+    let mut generator = CustomInputGenerator::new(NonZeroUsize::new(1).unwrap());
 
     // Generate 8 initial inputs
     state
@@ -183,9 +183,9 @@ pub fn main() {
         // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
         .merge(optional_mapped_mutators)
         // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
-        .prepend(
-            ToggleOptionalByteArrayMutator::new(1).expect("Failed to create bytearray mutator"),
-        )
+        .prepend(ToggleOptionalByteArrayMutator::new(
+            NonZeroUsize::new(1).unwrap(),
+        ))
         // Finally, a custom mutator that toggles the boolean part of the input
         .prepend(ToggleBooleanMutator);
 

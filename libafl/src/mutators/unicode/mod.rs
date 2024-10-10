@@ -236,7 +236,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     let temp_range = rand_range(
         state,
         range.end - range.start,
-        NonZero::new(MAX_CHARS).unwrap(),
+        nonzero_lit::usize!(MAX_CHARS),
     );
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
     let range = match core::str::from_utf8(&input.0.bytes()[range.clone()]) {
@@ -254,7 +254,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         return MutationResult::Skipped;
     }
 
-    let replace_len = state.rand_mut().below(NonZero::new(MAX_CHARS).unwrap());
+    let replace_len = state.rand_mut().below(nonzero_lit::usize!(MAX_CHARS));
     let orig_len = range.end - range.start;
     if input.0.len() - orig_len + replace_len > state.max_size() {
         return MutationResult::Skipped;

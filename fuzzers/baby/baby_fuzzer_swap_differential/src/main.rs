@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
@@ -247,7 +248,7 @@ pub fn main() {
     );
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(NonZeroUsize::new(32).unwrap());
 
     // Generate 8 initial inputs
     state

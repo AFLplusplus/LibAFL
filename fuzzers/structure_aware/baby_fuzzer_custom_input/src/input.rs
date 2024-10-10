@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 use std::{
     borrow::Cow,
     hash::{DefaultHasher, Hash, Hasher},
@@ -66,10 +67,10 @@ pub struct CustomInputGenerator<S: HasRand> {
 
 impl<S: HasRand> CustomInputGenerator<S> {
     /// Creates a new [`CustomInputGenerator`]
-    pub fn new(max_len: usize) -> Result<Self, Error> {
-        Ok(Self {
-            bytes_generator: RandBytesGenerator::new(max_len)?,
-        })
+    pub fn new(max_len: NonZeroUsize) -> Self {
+        Self {
+            bytes_generator: RandBytesGenerator::new(max_len),
+        }
     }
 }
 
@@ -105,10 +106,10 @@ where
     S: HasRand,
 {
     /// Creates a new [`ToggleOptionalByteArrayMutator`]
-    pub fn new(length: usize) -> Result<Self, Error> {
-        Ok(Self {
-            generator: RandBytesGenerator::new(length)?,
-        })
+    pub fn new(length: NonZeroUsize) -> Self {
+        Self {
+            generator: RandBytesGenerator::new(length),
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 use std::{path::PathBuf, time::Duration};
 
 use libafl::{
@@ -103,7 +104,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(NonZeroUsize::new(32).unwrap());
 
     // Generate 8 initial inputs
     state

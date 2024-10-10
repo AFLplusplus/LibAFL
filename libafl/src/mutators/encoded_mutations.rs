@@ -126,8 +126,8 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
             Ok(MutationResult::Skipped)
         } else {
             let val = state.rand_mut().choose(input.codes_mut()).unwrap();
-            let num = 1 + state.rand_mut().below(NonZero::new(ARITH_MAX).unwrap()) as u32;
-            *val = match state.rand_mut().below(NonZero::new(2).unwrap()) {
+            let num = 1 + state.rand_mut().below(nonzero_lit::usize!(ARITH_MAX)) as u32;
+            *val = match state.rand_mut().below(nonzero_lit::usize!(2)) {
                 0 => val.wrapping_add(num),
                 _ => val.wrapping_sub(num),
             };
@@ -205,7 +205,7 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.codes().len();
-        let Some(nonzero_size) = NonZero::new(size) else {
+        let Some(nz) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -215,7 +215,7 @@ where
         let off = state
             .rand_mut()
             .below(unsafe { NonZero::new(size + 1).unwrap_unchecked() });
-        let mut len = 1 + state.rand_mut().below(nonzero_size);
+        let mut len = 1 + state.rand_mut().below(nz);
 
         if size + len > max_size {
             if max_size > size {
@@ -266,17 +266,23 @@ pub struct EncodedCopyMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
-        let Some(size) = NonZero::new(size) else {
+        if size <= 1 {
             return Ok(MutationResult::Skipped);
         };
 
-        let from = state.rand_mut().below(size);
-        let to = state.rand_mut().below(size);
+        // # Safety
+        // it's larger than 1
+        let from = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+        let to = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
         // # Safety
         // Both from and to are smaller than size, so size minus any of these can never be 0.
         let len = 1 + state
             .rand_mut()
-            .below(unsafe { NonZero::new(size.get() - max(from, to)).unwrap_unchecked() });
+            .below(unsafe { NonZero::new(size - max(from, to)).unwrap_unchecked() });
 
         unsafe {
             buffer_self_copy(input.codes_mut(), from, to, len);
@@ -321,7 +327,7 @@ where
             }
         }
 
-        let Some(non_zero_size) = NonZero::new(size) else {
+        let Some(nz) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
 
@@ -335,13 +341,13 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let Some(non_zero_other_size) = NonZero::new(other_size) else {
-            return Ok(MutationResult::Skipped);
-        };
-
+        // # Safety
+        // it's larger than 1
         let max_size = state.max_size();
-        let from = state.rand_mut().below(non_zero_other_size);
-        let to = state.rand_mut().below(non_zero_size);
+        let from = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(other_size).unwrap_unchecked() });
+        let to = state.rand_mut().below(nz);
         // # Safety
         // from is smaller than other_size, other_size is larger than 2, so the subtraction is larger than 0.
         let mut len = 1 + state
@@ -414,18 +420,18 @@ where
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
+        // # Safety
+        // other_size >= 2
+        let from = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(other_size).unwrap_unchecked() });
 
-        let Some(non_zero_other_size) = NonZero::new(other_size) else {
-            return Ok(MutationResult::Skipped);
-        };
+        // # Safety
+        // size > 0, other_size > from,
+        let len = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(min(other_size - from, size)).unwrap_unchecked() });
 
-        let from = state.rand_mut().below(non_zero_other_size);
-
-        let Some(non_zero_min_len) = NonZero::new(min(other_size - from, size)) else {
-            return Ok(MutationResult::Skipped);
-        };
-
-        let len = state.rand_mut().below(non_zero_min_len);
         // # Safety
         // size is non-zero, len is below min(size, ...), so the subtraction will always be positive.
         let to = state

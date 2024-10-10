@@ -5,7 +5,7 @@
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug},
-    num::{NonZero, NonZeroUsize},
+    num::NonZeroUsize,
 };
 
 use libafl_bolts::{
@@ -503,7 +503,7 @@ impl<MT> StdMOptMutator<MT> {
     pub fn new<I, S>(
         state: &mut S,
         mutations: MT,
-        max_stack_pow: usize,
+        max_stack_pow: NonZeroUsize,
         swarm_num: usize,
     ) -> Result<Self, Error>
     where
@@ -514,11 +514,7 @@ impl<MT> StdMOptMutator<MT> {
             let rand_seed = state.rand_mut().next();
             state.add_metadata::<MOpt>(MOpt::new(MT::LEN, swarm_num, rand_seed)?);
         }
-        let Some(max_stack_pow) = NonZero::new(max_stack_pow) else {
-            return Err(Error::illegal_argument(
-                "Got 0 as value for max_stack_pow in StdMOptMutator.",
-            ));
-        };
+
         Ok(Self {
             name: Cow::from(format!("StdMOptMutator[{}]", mutations.names().join(","))),
             mode: MOptMode::Pilotfuzzing,

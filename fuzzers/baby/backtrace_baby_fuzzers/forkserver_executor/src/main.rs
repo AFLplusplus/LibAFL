@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use libafl::{
@@ -97,7 +98,7 @@ pub fn main() {
         .unwrap();
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(3).unwrap();
+    let mut generator = RandPrintablesGenerator::new(NonZeroUsize::new(3).unwrap());
 
     // Generate 8 initial inputs
     state

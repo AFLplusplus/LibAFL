@@ -3,7 +3,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use core::{cell::RefCell, time::Duration};
+use core::{cell::RefCell, num::NonZeroUsize, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -370,7 +370,7 @@ fn fuzz_binary(
     let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
-        7,
+        NonZeroUsize::new(7).unwrap(),
         5,
     )?;
 
@@ -585,7 +585,7 @@ fn fuzz_text(
     let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
-        7,
+        NonZeroUsize::new(7).unwrap(),
         5,
     )?;
 
@@ -601,9 +601,9 @@ fn fuzz_text(
             GrimoireRandomDeleteMutator::new(),
             GrimoireRandomDeleteMutator::new(),
         ),
-        3,
-    )
-    .unwrap();
+        NonZeroUsize::new(3).unwrap(),
+    );
+
     let grimoire = StdMutationalStage::transforming(grimoire_mutator);
 
     // A minimization+queue policy to get testcasess from the corpus

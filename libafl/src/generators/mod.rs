@@ -1,10 +1,7 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
 use alloc::vec::Vec;
-use core::{
-    marker::PhantomData,
-    num::{NonZero, NonZeroUsize},
-};
+use core::{marker::PhantomData, num::NonZeroUsize};
 
 use libafl_bolts::rands::Rand;
 
@@ -89,7 +86,7 @@ where
             size = 1;
         }
         let random_bytes: Vec<u8> = (0..size)
-            .map(|_| state.rand_mut().below(NonZero::new(256).unwrap()) as u8)
+            .map(|_| state.rand_mut().below(nonzero_lit::usize!(256)) as u8)
             .collect();
         Ok(BytesInput::new(random_bytes))
     }
@@ -97,18 +94,8 @@ where
 
 impl<S> RandBytesGenerator<S> {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
-    ///
-    /// If you want to save one 0 check, use [`Self::from_nonzero`].
-    pub fn new(max_size: usize) -> Result<Self, Error> {
-        let Some(max_size) = NonZero::new(max_size) else {
-            return Err(Error::illegal_argument("The max_size may not be 0."));
-        };
-        Ok(Self::from_nonzero(max_size))
-    }
-
-    /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn from_nonzero(max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,
@@ -141,19 +128,9 @@ where
 }
 
 impl<S> RandPrintablesGenerator<S> {
-    /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
-    ///
-    /// To skip the 0 `max_size` check, create this using [`Self::from_nonzero`] instead.
-    pub fn new(max_size: usize) -> Result<Self, Error> {
-        let Some(max_size) = NonZero::new(max_size) else {
-            return Err(Error::illegal_argument("The max_size may not be 0."));
-        };
-        Ok(Self::from_nonzero(max_size))
-    }
-
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn from_nonzero(max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,

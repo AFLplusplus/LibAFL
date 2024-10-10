@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
@@ -155,9 +156,8 @@ pub fn main() {
             GramatronSpliceMutator::new(),
             GramatronRecursionMutator::new()
         ),
-        2,
-    )
-    .unwrap();
+        NonZeroUsize::new(2).unwrap(),
+    );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer

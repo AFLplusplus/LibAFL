@@ -202,6 +202,7 @@ libafl_bolts = { version = "0.13.2", path = "../libafl_bolts", default-features 
 ] }
 libafl_derive = { version = "0.13.2", path = "../libafl_derive", optional = true }
 
+nonzero_lit = "0.1.2"
 rustversion = { workspace = true }
 tuple_list = { version = "0.1.3" }
 hashbrown = { workspace = true, features = [

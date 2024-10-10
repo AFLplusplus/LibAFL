@@ -218,7 +218,7 @@ impl<MT> TuneableScheduledMutator<MT> {
         TuneableScheduledMutator {
             name: Cow::from(format!("TuneableMutator[{}]", mutations.names().join(", "))),
             mutations,
-            max_stack_pow: NonZero::new(7).unwrap(),
+            max_stack_pow: nonzero_lit::usize!(7),
         }
     }
 }
