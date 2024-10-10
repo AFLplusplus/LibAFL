@@ -490,31 +490,22 @@ impl Forkserver {
     /// Read from the st pipe
     pub fn read_st(&mut self) -> Result<(usize, i32), Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
-
-        let rlen = self.st_pipe.read(&mut buf)?;
+        self.st_pipe.read_exact(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
-        Ok((rlen, val))
+        Ok((size_of::<i32>(), val))
     }
 
     /// Read bytes of any length from the st pipe
     pub fn read_st_size(&mut self, size: usize) -> Result<(usize, Vec<u8>), Error> {
-        let mut buf = vec![0; size];
-        let mut rlen = 0;
-        while rlen < size {
-            let bytes_read = self.st_pipe.read(&mut buf[rlen..])?;
-            if bytes_read == 0 {
-                break;
-            }
-            rlen += bytes_read;
-        }
-        Ok((rlen, buf))
+        let mut buf = vec![0u8; size];
+        self.st_pipe.read_exact(&mut buf)?;
+        Ok((size, buf))
     }
 
     /// Write to the ctl pipe
     pub fn write_ctl(&mut self, val: i32) -> Result<usize, Error> {
-        let slen = self.ctl_pipe.write(&val.to_ne_bytes())?;
-
-        Ok(slen)
+        self.ctl_pipe.write_all(&val.to_ne_bytes())?;
+        Ok(size_of::<i32>())
     }
 
     /// Read a message from the child process.
