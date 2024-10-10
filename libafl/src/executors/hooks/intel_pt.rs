@@ -1,9 +1,6 @@
 // TODO: docs
 #![allow(missing_docs)]
 
-#[cfg(not(target_os = "linux"))]
-compile_error!("The 'intel_pt' feature can only be enabled on Linux.");
-
 use std::{
     borrow::ToOwned,
     convert::Into,
