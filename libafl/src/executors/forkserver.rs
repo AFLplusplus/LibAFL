@@ -499,8 +499,14 @@ impl Forkserver {
     /// Read bytes of any length from the st pipe
     pub fn read_st_size(&mut self, size: usize) -> Result<(usize, Vec<u8>), Error> {
         let mut buf = vec![0; size];
-
-        let rlen = self.st_pipe.read(&mut buf)?;
+        let mut rlen = 0;
+        while rlen < size {
+            let bytes_read = self.st_pipe.read(&mut buf[rlen..])?;
+            if bytes_read == 0 {
+                break;
+            }
+            rlen += bytes_read;
+        }
         Ok((rlen, buf))
     }
 
