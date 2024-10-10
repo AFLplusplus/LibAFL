@@ -1,6 +1,9 @@
 // TODO: docs
 #![allow(missing_docs)]
 
+#[cfg(not(target_os = "linux"))]
+compile_error!("The 'intel_pt' feature can only be enabled on Linux.");
+
 use std::{
     borrow::ToOwned,
     convert::Into,
@@ -22,7 +25,6 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libafl_bolts::ownedref::OwnedRefMut;
-use libc::__u64;
 use libipt::{block::BlockDecoder, Asid, BlockFlags, ConfigBuilder, Cpu, Image, SectionCache};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
@@ -112,8 +114,8 @@ pub struct IntelPT {
     fd: OwnedFd,
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
-    aux_head: *mut __u64,
-    aux_tail: *mut __u64,
+    aux_head: *mut u64,
+    aux_tail: *mut u64,
     previous_decode_head: u64,
 }
 
