@@ -111,6 +111,11 @@ where
             let input = entry.input_mut().as_mut().unwrap();
 
             let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
+
+            if payload.len() > MAX_GENERALIZED_LEN {
+                return Ok(());
+            }
+
             let original = input.clone();
             let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
@@ -311,17 +316,15 @@ where
             b'"',
         )?;
 
-        if payload.len() <= MAX_GENERALIZED_LEN {
-            // Save the modified input in the corpus
-            {
-                let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
+        // Save the modified input in the corpus
+        {
+            let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
 
-                assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
-                assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
+            assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
+            assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
 
-                let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
-                entry.metadata_map_mut().insert(meta);
-            }
+            let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
+            entry.metadata_map_mut().insert(meta);
         }
 
         Ok(())
