@@ -25,8 +25,6 @@ pub mod timer;
 /// Intel Processor Trace (PT)
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
 pub mod intel_pt;
-#[cfg(all(feature = "intel_pt", not(target_os = "linux")))]
-compile_error!("The 'intel_pt' feature can only be enabled on Linux.");
 
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHook<S>
