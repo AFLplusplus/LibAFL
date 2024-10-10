@@ -234,6 +234,7 @@ jobs:
           - ./fuzzers/baby/baby_fuzzer_swap_differential
           - ./fuzzers/baby/tutorial
           - ./fuzzers/baby/baby_fuzzer
+          - ./fuzzers/baby/baby_fuzzer_intel_pt
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode
           - ./fuzzers/baby/baby_fuzzer_minimizing
