@@ -21,6 +21,7 @@ members = [
   "utils/build_and_test_fuzzers",
   "utils/deexit",
   "utils/libafl_benches",
+  "utils/libafl_jumper",
   "utils/gramatron/construct_automata",
 ]
 default-members = [
@@ -91,3 +92,11 @@ lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
+
+[profile.release-abort]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+abort = true
