@@ -100,6 +100,10 @@ where
             _ => Err(Error::unknown("Tinyinst RunResult is unknown".to_string())),
         }
     }
+
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = timeout;
+    }
 }
 
 /// Builder for `TinyInstExecutor`

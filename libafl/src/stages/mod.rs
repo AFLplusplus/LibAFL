@@ -31,9 +31,9 @@ pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
-pub use stats::AflStatsStage;
 #[cfg(feature = "std")]
 pub use sync::*;
+pub use time_tracker::TimeTrackingStageWrapper;
 pub use tmin::{
     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
 };
@@ -65,19 +65,23 @@ pub mod calibrate;
 pub mod colorization;
 #[cfg(all(feature = "std", unix))]
 pub mod concolic;
-#[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
 pub mod generation;
 pub mod logics;
 pub mod power;
-pub mod stats;
 #[cfg(feature = "std")]
 pub mod sync;
+#[cfg(feature = "std")]
+pub mod time_tracker;
 pub mod tracing;
 pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
+#[cfg(all(feature = "std", feature = "track_hit_feedbacks"))]
+pub use stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
+#[cfg(all(feature = "std", feature = "track_hit_feedbacks"))]
+pub mod stats;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.

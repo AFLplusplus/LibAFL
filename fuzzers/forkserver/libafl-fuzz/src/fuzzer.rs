@@ -13,7 +13,7 @@ use libafl::{
     },
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
-    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::StdFuzzer,
     inputs::BytesInput,
     mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
@@ -23,8 +23,11 @@ use libafl::{
         IndexesLenTimeMinimizerScheduler, QueueScheduler, StdWeightedScheduler,
     },
     stages::{
-        mutational::MultiMutationalStage, CalibrationStage, ColorizationStage, IfStage,
-        StagesTuple, StdMutationalStage, StdPowerMutationalStage, SyncFromDiskStage,
+        mutational::MultiMutationalStage,
+        stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
+        time_tracker::TimeTrackingStageWrapper,
+        CalibrationStage, ColorizationStage, IfStage, StagesTuple, StdMutationalStage,
+        StdPowerMutationalStage, SyncFromDiskStage,
     },
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
@@ -46,16 +49,15 @@ use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTraci
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
     executor::find_afl_binary,
     feedback::{
-        filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
-        seed::SeedFeedback,
+        capture_timeout::CaptureTimeoutFeedback, filepath::CustomFilepathToTestcaseFeedback,
+        persistent_record::PersitentRecordFeedback, seed::SeedFeedback,
     },
     scheduler::SupportedSchedulers,
-    stages::{mutational_stage::SupportedMutationalStages, time_tracker::TimeTrackingStageWrapper},
+    stages::{mutational_stage::SupportedMutationalStages, verify_timeouts::VerifyTimeoutsStage},
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, AFL_HARNESS_FILE_INPUT,
     SHMEM_ENV_VAR,
 };
@@ -109,17 +111,21 @@ where
     let mut tokens = Tokens::new();
     tokens = tokens.add_from_files(&opt.dicts)?;
 
-    let user_token_count = tokens.len();
-
     // Create a AFLStatsStage;
-    let afl_stats_stage = AflStatsStage::new(
-        opt,
-        fuzzer_dir.to_path_buf(),
-        &edges_observer,
-        user_token_count,
-        !opt.no_autodict,
-        core_id,
-    );
+    let afl_stats_stage = AflStatsStage::builder()
+        .stats_file(fuzzer_dir.join("fuzzer_stats"))
+        .plot_file(fuzzer_dir.join("plot_data"))
+        .core_id(core_id)
+        .report_interval(Duration::from_secs(opt.stats_interval))
+        .map_observer(&edges_observer)
+        .uses_autotokens(!opt.no_autodict)
+        .tokens(&tokens)
+        .banner(opt.executable.display().to_string())
+        .version("0.13.2".to_string())
+        .exec_timeout(opt.hang_timeout)
+        .target_mode(fuzzer_target_mode(opt).to_string())
+        .build()
+        .expect("invariant; should never occur");
 
     // Create an observation channel to keep track of the execution time.
     let time_observer = TimeObserver::new("time");
@@ -153,7 +159,7 @@ where
                 CrashFeedback::new(),
                 feedback_and!(
                     ConstFeedback::new(!opt.ignore_timeouts),
-                    TimeoutFeedback::new()
+                    CaptureTimeoutFeedback::new()
                 )
             ),
             MaxMapFeedback::with_name("edges_objective", &edges_observer)
@@ -214,6 +220,15 @@ where
 
     // Create our Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+    // Like AFL++ we re-run all timeouts with double the timeout to assert that they are not false positives
+    let timeout_verify_stage = IfStage::new(
+        |_, _, _, _| Ok(!opt.ignore_timeouts),
+        tuple_list!(VerifyTimeoutsStage::new(
+            Duration::from_millis(opt.hang_timeout),
+            &time_observer
+        )),
+    );
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
     if let Some(preload_env) = &opt.afl_preload {
@@ -396,6 +411,7 @@ where
             calibration,
             cmplog,
             mutational_stage,
+            timeout_verify_stage,
             afl_stats_stage,
             sync_stage
         );
@@ -411,7 +427,13 @@ where
         )?;
     } else {
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, mutational_stage, afl_stats_stage, sync_stage);
+        let mut stages = tuple_list!(
+            calibration,
+            mutational_stage,
+            timeout_verify_stage,
+            afl_stats_stage,
+            sync_stage
+        );
 
         // Run our fuzzer; NO CmpLog
         run_fuzzer_with_stages(

@@ -1,7 +1,7 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 //! In comparison to the [`crate::executors::DiffExecutor`] it does not run the secondary executor in `run_target`.
 
-use core::fmt::Debug;
+use core::{fmt::Debug, time::Duration};
 
 use libafl_bolts::tuples::RefIndexable;
 
@@ -57,6 +57,10 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.primary.run_target(fuzzer, state, mgr, input)
+    }
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.primary.set_timeout(timeout);
+        self.secondary.set_timeout(timeout);
     }
 }
 

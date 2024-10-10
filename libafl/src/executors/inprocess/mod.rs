@@ -131,6 +131,8 @@ where
         self.inner.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }
+
+    fn set_timeout(&mut self, _timeout: Duration) {}
 }
 
 impl<H, HB, HT, OT, S> HasObservers for GenericInProcessExecutor<H, HB, HT, OT, S>

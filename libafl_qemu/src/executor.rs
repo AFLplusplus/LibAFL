@@ -242,6 +242,17 @@ where
 
         Ok(exit_kind)
     }
+
+    fn set_timeout(&mut self, timeout: Duration) {
+        <libafl::executors::inprocess::stateful::StatefulGenericInProcessExecutor<
+            H,
+            &mut H,
+            (),
+            OT,
+            S,
+            crate::emu::Emulator<CM, ED, ET, S, SM>,
+        > as libafl::executors::Executor<EM, Z>>::set_timeout(&mut self.inner, timeout);
+    }
 }
 
 impl<CM, ED, ET, H, OT, S, SM> UsesState for QemuExecutor<'_, CM, ED, ET, H, OT, S, SM>
@@ -410,6 +421,10 @@ where
         );
 
         Ok(exit_kind)
+    }
+
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.inner.set_timeout(timeout);
     }
 }
 

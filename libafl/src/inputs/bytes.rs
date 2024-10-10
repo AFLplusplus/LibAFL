@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// A bytes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(SerdeAny, Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BytesInput {
     /// The raw input bytes
     pub(crate) bytes: Vec<u8>,

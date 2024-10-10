@@ -127,6 +127,16 @@ where
 
         Ok(exit_kind)
     }
+
+    fn set_timeout(&mut self, duration: std::time::Duration) {
+        assert!(
+            duration.as_secs() <= 255,
+            "cannot set a timeout of seconds greater than 255 (u8::MAX)"
+        );
+        let timeout_secs = duration.as_secs() as u8;
+        let timeout_microsecs = duration.subsec_micros();
+        self.helper.set_timeout(timeout_secs, timeout_microsecs);
+    }
 }
 
 impl<S, OT> NyxExecutor<S, OT> {

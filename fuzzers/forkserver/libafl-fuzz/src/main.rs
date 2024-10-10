@@ -66,7 +66,6 @@
 )]
 
 use std::{collections::HashMap, path::PathBuf, time::Duration};
-mod afl_stats;
 mod env_parser;
 mod feedback;
 mod scheduler;
