@@ -44,11 +44,6 @@ pub mod new_hash_feedback;
 pub mod stdio;
 pub mod transferred;
 
-//#[cfg(feature = "intel_pt")]
-//pub mod intel_pt;
-//#[cfg(feature = "intel_pt")]
-//pub use intel_pt::*;
-
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 

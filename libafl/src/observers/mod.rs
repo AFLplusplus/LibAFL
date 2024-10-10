@@ -28,7 +28,6 @@ pub mod value;
 
 /// List observer
 pub mod list;
-
 use core::{fmt::Debug, time::Duration};
 #[cfg(feature = "std")]
 use std::time::Instant;
