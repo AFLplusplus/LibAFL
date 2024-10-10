@@ -105,6 +105,7 @@ where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     Z: UsesState<State = S>,
 {
+    /// Set the thresold for timeout
     pub fn set_timeout(&mut self, timeout: Duration) {
         #[cfg(target_os = "linux")]
         {
@@ -260,11 +261,10 @@ where
             tv_sec: 0,
             tv_nsec: 0,
         };
-        let itimerspec = libc::itimerspec {
+        libc::itimerspec {
             it_interval,
             it_value,
-        };
-        itimerspec
+        }
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -278,10 +278,10 @@ where
             tv_sec: 0,
             tv_usec: 0,
         };
-        let itimerval = Itimerval {
+        Itimerval {
             it_interval,
             it_value,
-        };
+        }
     }
 
     /// Creates a new [`GenericInProcessForkExecutorInner`] with custom hooks

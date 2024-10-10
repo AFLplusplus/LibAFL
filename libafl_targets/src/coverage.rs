@@ -286,7 +286,9 @@ mod swap {
 
     impl<I, S> Observer<I, S> for DifferentialAFLMapSwapObserver<'_, '_> {}
 
-    impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for DifferentialAFLMapSwapObserver<'_, '_> {
+    impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S>
+        for DifferentialAFLMapSwapObserver<'_, '_>
+    {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
             let slice = self.first_map.as_slice_mut();
             unsafe {

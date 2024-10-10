@@ -35,7 +35,7 @@ where
         self.executor.run_target(fuzzer, state, mgr, input)
     }
     fn set_timeout(&mut self, timeout: Duration) {
-        self.executor.set_timeout(timeout)
+        self.executor.set_timeout(timeout);
     }
 }
 

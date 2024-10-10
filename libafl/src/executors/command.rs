@@ -285,7 +285,7 @@ where
         res
     }
     fn set_timeout(&mut self, timeout: Duration) {
-        *self.configurer.exec_timeout_mut() = timeout
+        *self.configurer.exec_timeout_mut() = timeout;
     }
 }
 

@@ -36,7 +36,7 @@ use crate::{
 /// AFL++'s default stats update interval
 pub const AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS: u64 = 60;
 
-/// CalibrationTime - Use in conjunction with `TimeTrackingFeedback`
+/// `CalibrationTime` - Use in conjunction with `TimeTrackingFeedback`
 #[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct CalibrationTime(pub Duration);
 impl From<Duration> for CalibrationTime {
@@ -45,7 +45,7 @@ impl From<Duration> for CalibrationTime {
     }
 }
 
-/// SyncTime - Use in conjunction with `TimeTrackingFeedback`
+/// `SyncTime` - Use in conjunction with `TimeTrackingFeedback`
 #[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct SyncTime(pub Duration);
 impl From<Duration> for SyncTime {
@@ -54,7 +54,7 @@ impl From<Duration> for SyncTime {
     }
 }
 
-/// FuzzTime - Use in conjunction with `TimeTrackingFeedback`
+/// `FuzzTime` - Use in conjunction with `TimeTrackingFeedback`
 #[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct FuzzTime(pub Duration);
 impl From<Duration> for FuzzTime {
@@ -108,7 +108,7 @@ pub struct AflStatsStage<C, E, EM, O, Z> {
     phantom_data: PhantomData<(O, E, EM, Z)>,
 }
 
-/// AFL++'s fuzzer_stats
+/// AFL++'s `fuzzer_stats`
 #[derive(Debug, Clone)]
 pub struct AFLFuzzerStats<'a> {
     /// unix time indicating the start time of afl-fuzz
@@ -207,7 +207,7 @@ pub struct AFLFuzzerStats<'a> {
     /// full command line used for the fuzzing session
     command_line: &'a str,
 }
-/// AFL++'s plot_data
+/// AFL++'s `plot_data`
 #[derive(Debug, Clone)]
 pub struct AFLPlotData<'a> {
     relative_time: &'a u64,
@@ -421,6 +421,7 @@ where
     O: MapObserver,
 {
     /// Builder for `AflStatsStage`
+    #[must_use]
     pub fn builder() -> AflStatsStageBuilder<C, E, EM, O, Z> {
         AflStatsStageBuilder::new()
     }
@@ -439,8 +440,7 @@ where
 
     fn write_plot_data(&self, plot_data: &AFLPlotData) -> Result<(), Error> {
         let mut file = OpenOptions::new().append(true).open(
-            &self
-                .plot_file_path
+            self.plot_file_path
                 .as_ref()
                 .expect("invariant; should never occur"),
         )?;
@@ -607,6 +607,7 @@ impl Display for AFLFuzzerStats<'_> {
     }
 }
 /// Get the command used to invoke libafl-fuzz
+#[must_use]
 pub fn get_run_cmdline() -> Cow<'static, str> {
     let args: Vec<String> = std::env::args().collect();
     Cow::Owned(args.join(" "))
@@ -715,8 +716,8 @@ where
         self.exec_timeout = timeout;
         self
     }
-
-    ///
+    /// Used in the UI (optional)
+    /// default, persistent, qemu, unicorn, non-instrumented etc
     #[must_use]
     pub fn target_mode(mut self, target_mode: String) -> Self {
         self.target_mode = target_mode;
@@ -746,19 +747,18 @@ where
     /// Will error if:
     /// Cannot create the stats file
     /// Cannot create the plot file (if provided)
-    /// No MapObserver supplied to the builder
-    /// No stats_file_path provieded
-    #[must_use]
+    /// No `MapObserver` supplied to the builder
+    /// No `stats_file_path` provieded
     pub fn build(self) -> Result<AflStatsStage<C, E, EM, O, Z>, Error> {
-        if !self.stats_file_path.is_some() {
+        if self.stats_file_path.is_none() {
             return Err(Error::illegal_argument("Must set `stats_file_path`"));
         }
         let stats_file_path = self.stats_file_path.unwrap();
-        if !self.map_observer_handle.is_some() {
+        if self.map_observer_handle.is_none() {
             return Err(Error::illegal_argument("Must set `map_observer`"));
         }
         if let Some(ref plot_file) = self.plot_file_path {
-            Self::create_plot_data_file(&plot_file)?;
+            Self::create_plot_data_file(plot_file)?;
         }
         Self::create_fuzzer_stats_file(&stats_file_path)?;
         Ok(AflStatsStage {

@@ -169,7 +169,7 @@ where
         }
     }
     fn set_timeout(&mut self, timeout: Duration) {
-        self.inner.set_timeout(timeout)
+        self.inner.set_timeout(timeout);
     }
 }
 

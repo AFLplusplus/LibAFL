@@ -95,15 +95,16 @@ where
     OT: ObserversTuple<S::Input, S>,
     S: State,
 {
+    /// Set the threshold for timeout
     pub fn set_timeout(&mut self, duration: Duration) {
         #[cfg(all(feature = "std", windows))]
         {
             *self.hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
         }
-        #[cfg(not(windows))] {
+        #[cfg(not(windows))]
+        {
             self.hooks.0.timer_mut().exec_tmout = duration;
         }
-
     }
     /// This function marks the boundary between the fuzzer and the target
     ///

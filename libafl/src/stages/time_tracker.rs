@@ -9,7 +9,7 @@ use crate::{
     state::{State, UsesState},
     HasMetadata,
 };
-/// Track an inner Stage's execution time 
+/// Track an inner Stage's execution time
 /// ```
 ///#[derive(Debug, SerdeAny, Serialize, Deserialize)]
 ///pub struct FuzzTime(pub Duration);

@@ -132,9 +132,7 @@ where
         Ok(ret)
     }
 
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.inner.set_timeout(timeout)
-    }
+    fn set_timeout(&mut self, _timeout: Duration) {}
 }
 
 impl<H, HB, HT, OT, S> HasObservers for GenericInProcessExecutor<H, HB, HT, OT, S>

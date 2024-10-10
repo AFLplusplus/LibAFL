@@ -118,6 +118,10 @@ where
         self.helper.post_exec(input)?;
         res
     }
+
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        <libafl::executors::inprocess::GenericInProcessExecutor<H, &mut H, (), OT, S> as Executor<EM, Z>>::set_timeout(&mut self.base, timeout);
+    }
 }
 
 impl<H, OT, RT, S> UsesState for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
