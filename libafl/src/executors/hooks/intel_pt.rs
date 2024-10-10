@@ -81,8 +81,6 @@ enum KvmPTMode {
 /// Perf event config for `IntelPT`
 ///
 /// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
-// TODO: move to c2rust-bitfields crate already in use ... tried and there is no doc, this looks way
-// better
 #[bitfield(u64, default = 0)]
 struct PtConfig {
     /// Disable call return address compression. AKA DisRETC in Intel SDM
@@ -91,19 +89,6 @@ struct PtConfig {
     #[bits(24..=27, rw)]
     psb_period: u4,
 }
-
-// pub trait IntelPTDecoder {
-//     fn decode(&mut self, traces: &IntelPTTraces) -> Result((), Error);
-// }
-
-// /// Intel official Intel PT trace decoder
-// pub struct Libipt {}
-
-// impl IntelPTDecoder for Libipt {
-//     fn decode(&mut self, traces: &IntelPTTraces) -> IntelPTTracesResult {
-//         todo!()
-//     }
-// }
 
 // TODO generic decoder: D,
 #[derive(Debug)]
@@ -193,9 +178,7 @@ where
         //     }
         // };
 
-        let mut buff = Vec::new();
-
-        let ips = pt.decode_with_image(self.image.as_mut().unwrap(), Some(&mut buff));
+        let ips = pt.decode_with_image(self.image.as_mut().unwrap(), None);
 
         for ip in ips {
             unsafe { *self.map.add(ip as usize % self.len) += 1 };
