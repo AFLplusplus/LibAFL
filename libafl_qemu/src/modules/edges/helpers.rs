@@ -106,6 +106,12 @@ mod generators {
             }
         }
 
+        let mask: usize = if IS_CONST_MAP {
+            const { MAP_SIZE - 1 }
+        } else {
+            unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX }
+        };
+
         let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
         let meta = state.metadata_or_insert_with(QemuEdgesMapMetadata::new);
 
@@ -113,8 +119,11 @@ mod generators {
             Entry::Occupied(e) => {
                 let id = *e.get();
                 unsafe {
-                    let nxt = (id as usize + 1) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
-                    *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, nxt);
+                    let nxt = (id as usize + 1) & mask;
+
+                    if !IS_CONST_MAP {
+                        *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, nxt);
+                    }
                 }
                 Some(id)
             }
@@ -122,8 +131,11 @@ mod generators {
                 let id = meta.current_id;
                 e.insert(id);
                 unsafe {
-                    meta.current_id = (id + 1) & (LIBAFL_QEMU_EDGES_MAP_MASK_MAX as u64);
-                    *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = meta.current_id as usize;
+                    meta.current_id = (id + 1) & (mask as u64);
+
+                    if !IS_CONST_MAP {
+                        *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = meta.current_id as usize;
+                    }
                 }
                 // GuestAddress is u32 for 32 bit guests
                 #[allow(clippy::unnecessary_cast)]
@@ -168,11 +180,20 @@ mod generators {
                 }
             }
 
+            let mask: usize = if IS_CONST_MAP {
+                const { MAP_SIZE - 1 }
+            } else {
+                unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX }
+            };
+
             let id = hash_me(src as u64) ^ hash_me(dest as u64);
 
             unsafe {
-                let nxt = (id as usize + 1) & LIBAFL_QEMU_EDGES_MAP_MASK_MAX;
-                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
+                let nxt = (id as usize + 1) & mask;
+
+                if !IS_CONST_MAP {
+                    *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
+                }
             }
 
             // GuestAddress is u32 for 32 bit guests
@@ -196,12 +217,6 @@ mod generators {
         S: Unpin + UsesInput + HasMetadata,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
-        let mask: usize = if IS_CONST_MAP {
-            const { MAP_SIZE - 1 }
-        } else {
-            unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX as usize }
-        };
-
         // first check if we should filter
         if let Some(module) =
             emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
@@ -224,6 +239,12 @@ mod generators {
                 }
             }
         }
+
+        let mask: usize = if IS_CONST_MAP {
+            const { MAP_SIZE - 1 }
+        } else {
+            unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX }
+        };
 
         let id = hash_me(pc as u64);
 
