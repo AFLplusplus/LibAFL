@@ -139,7 +139,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);
+    let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations(), 2).unwrap();
     let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
         tuple_list!(
             GrimoireExtensionMutator::new(),
@@ -150,7 +150,8 @@ pub fn main() {
             GrimoireRandomDeleteMutator::new(),
         ),
         3,
-    );
+    )
+    .unwrap();
     let mut stages = tuple_list!(
         generalization,
         StdMutationalStage::new(mutator),

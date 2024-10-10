@@ -55,7 +55,7 @@ use libafl_bolts::{
 use libafl_targets::autotokens;
 use libafl_targets::{
     edges_map_mut_ptr, libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CtxHook,
-    EDGES_MAP_SIZE_IN_USE,
+    EDGES_MAP_DEFAULT_SIZE,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -252,7 +252,7 @@ fn fuzz(
     let edges_observer = HitcountsMapObserver::new(unsafe {
         StdMapObserver::from_mut_slice(
             "edges",
-            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
         )
     })
     .track_indices();

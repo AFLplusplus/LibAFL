@@ -5,7 +5,7 @@ pub mod unix_signal_handler {
     use core::{mem::transmute, ptr::addr_of_mut};
     use std::{io::Write, panic};
 
-    use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
+    use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
     use libc::siginfo_t;
 
     use crate::{
@@ -41,8 +41,10 @@ pub mod unix_signal_handler {
     }*/
 
     #[cfg(unix)]
-    impl Handler for InProcessExecutorHandlerData {
-        fn handle(
+    impl SignalHandler for InProcessExecutorHandlerData {
+        /// # Safety
+        /// This will access global state.
+        unsafe fn handle(
             &mut self,
             signal: Signal,
             info: &mut siginfo_t,

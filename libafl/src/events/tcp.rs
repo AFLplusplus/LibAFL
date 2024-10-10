@@ -321,8 +321,6 @@ where
         match &event {
             Event::NewTestcase {
                 corpus_size,
-                time,
-                executions,
                 forward_id,
                 ..
             } => {
@@ -334,7 +332,6 @@ where
                 monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
-                client.update_executions(*executions, *time);
                 monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
@@ -387,15 +384,10 @@ where
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective {
-                objective_size,
-                executions,
-                time,
-            } => {
+            Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                client.update_executions(*executions, *time);
                 monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }

@@ -95,12 +95,15 @@ fn is_workspace_toml(path: &Path) -> bool {
     false
 }
 
-async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
+async fn run_cargo_fmt(cargo_file_path: PathBuf, is_check: bool, verbose: bool) -> io::Result<()> {
     // Make sure we parse the correct file
-    assert_eq!(path.file_name().unwrap().to_str().unwrap(), "Cargo.toml");
+    assert_eq!(
+        cargo_file_path.file_name().unwrap().to_str().unwrap(),
+        "Cargo.toml"
+    );
 
-    if is_workspace_toml(path.as_path()) {
-        println!("[*] Skipping {}...", path.as_path().display());
+    if is_workspace_toml(cargo_file_path.as_path()) {
+        println!("[*] Skipping {}...", cargo_file_path.as_path().display());
         return Ok(());
     }
 
@@ -112,14 +115,18 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
         .arg("+nightly")
         .arg("fmt")
         .arg("--manifest-path")
-        .arg(path.as_path());
+        .arg(cargo_file_path.as_path());
 
     if is_check {
         fmt_command.arg("--check");
     }
 
     if verbose {
-        println!("[*] {} {}...", task_str, path.as_path().display());
+        println!(
+            "[*] {} {}...",
+            task_str,
+            cargo_file_path.as_path().display()
+        );
     }
 
     let res = fmt_command.output().await?;
@@ -130,7 +137,7 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
         return Err(io::Error::new(
             ErrorKind::Other,
             format!(
-                "Cargo fmt failed. Run cargo fmt for {path:#?}.\nstdout: {stdout}\nstderr: {stderr}"),
+                "Cargo fmt failed. Run cargo fmt for {cargo_file_path:#?}.\nstdout: {stdout}\nstderr: {stderr}\ncommand: {fmt_command:?}"),
         ));
     }
 
@@ -138,7 +145,7 @@ async fn run_cargo_fmt(path: PathBuf, is_check: bool, verbose: bool) -> io::Resu
 }
 
 async fn run_clang_fmt(
-    path: PathBuf,
+    c_file_path: PathBuf,
     clang: String,
     is_check: bool,
     verbose: bool,
@@ -151,16 +158,16 @@ async fn run_clang_fmt(
         .arg("-i")
         .arg("--style")
         .arg("file")
-        .arg(path.as_path());
+        .arg(c_file_path.as_path());
 
     if is_check {
         fmt_command.arg("-Werror").arg("--dry-run");
     }
 
-    fmt_command.arg(path.as_path());
+    fmt_command.arg(c_file_path.as_path());
 
     if verbose {
-        println!("[*] {} {}...", task_str, path.as_path().display());
+        println!("[*] {} {}...", task_str, c_file_path.as_path().display());
     }
 
     let res = fmt_command.output().await?;

@@ -2,7 +2,10 @@
 //! See the original repo [`Grimoire`](https://github.com/RUB-SysSec/grimoire) for more details.
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::cmp::{max, min};
+use core::{
+    cmp::{max, min},
+    num::NonZero,
+};
 
 use libafl_bolts::{
     rands::{choose, fast_bound, Rand},
@@ -246,10 +249,11 @@ where
         let tokens_len = {
             let meta = state.metadata_map().get::<Tokens>();
             if let Some(tokens) = meta {
-                if tokens.is_empty() {
+                if let Some(tokens_len) = NonZero::new(tokens.tokens().len()) {
+                    tokens_len
+                } else {
                     return Ok(MutationResult::Skipped);
                 }
-                tokens.tokens().len()
             } else {
                 return Ok(MutationResult::Skipped);
             }
@@ -271,7 +275,10 @@ where
         let mut mutated = MutationResult::Skipped;
 
         let gen = generalised_meta.generalized_mut();
-        let rand_idx = fast_bound(rand_idx, gen.len());
+        let rand_idx = fast_bound(
+            rand_idx,
+            NonZero::new(gen.len()).ok_or_else(|| Error::empty("No Generalized Metadata found"))?,
+        );
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
@@ -363,8 +370,15 @@ where
         {
             self.gap_indices.push(i);
         }
-        let min_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
-        let max_idx = self.gap_indices[state.rand_mut().below(self.gap_indices.len())];
+
+        let Some(gap_indeces_len) = NonZero::new(self.gap_indices.len()) else {
+            return Err(Error::illegal_state(
+                "Gap indices may not be empty in grimoire mutator!",
+            ));
+        };
+
+        let min_idx = self.gap_indices[state.rand_mut().below(gap_indeces_len)];
+        let max_idx = self.gap_indices[state.rand_mut().below(gap_indeces_len)];
 
         let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
 

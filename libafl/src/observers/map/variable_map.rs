@@ -15,7 +15,7 @@ use libafl_bolts::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, Observer},
+    observers::{map::MapObserver, Observer, VariableLengthMapObserver},
     Error,
 };
 
@@ -29,7 +29,7 @@ pub struct VariableMapObserver<'a, T> {
     name: Cow<'static, str>,
 }
 
-impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
+impl<I, S, T> Observer<I, S> for VariableMapObserver<'_, T>
 where
     Self: MapObserver,
 {
@@ -39,21 +39,21 @@ where
     }
 }
 
-impl<'a, T> Named for VariableMapObserver<'a, T> {
+impl<T> Named for VariableMapObserver<'_, T> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T> HasLen for VariableMapObserver<'a, T> {
+impl<T> HasLen for VariableMapObserver<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         *self.size.as_ref()
     }
 }
 
-impl<'a, T> Hash for VariableMapObserver<'a, T>
+impl<T> Hash for VariableMapObserver<'_, T>
 where
     T: Hash,
 {
@@ -63,19 +63,19 @@ where
     }
 }
 
-impl<'a, T> AsRef<Self> for VariableMapObserver<'a, T> {
+impl<T> AsRef<Self> for VariableMapObserver<'_, T> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'a, T> AsMut<Self> for VariableMapObserver<'a, T> {
+impl<T> AsMut<Self> for VariableMapObserver<'_, T> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<'a, T> MapObserver for VariableMapObserver<'a, T>
+impl<T> MapObserver for VariableMapObserver<'_, T>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
@@ -149,7 +149,28 @@ where
     }
 }
 
-impl<'a, T> Deref for VariableMapObserver<'a, T> {
+impl<T> VariableLengthMapObserver for VariableMapObserver<'_, T>
+where
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
+{
+    fn map_slice(&mut self) -> &[Self::Entry] {
+        self.map.as_ref()
+    }
+
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
+        self.map.as_mut()
+    }
+
+    fn size(&mut self) -> &usize {
+        self.size.as_ref()
+    }
+
+    fn size_mut(&mut self) -> &mut usize {
+        self.size.as_mut()
+    }
+}
+
+impl<T> Deref for VariableMapObserver<'_, T> {
     type Target = [T];
     fn deref(&self) -> &[T] {
         let cnt = *self.size.as_ref();
@@ -157,7 +178,7 @@ impl<'a, T> Deref for VariableMapObserver<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for VariableMapObserver<'a, T> {
+impl<T> DerefMut for VariableMapObserver<'_, T> {
     fn deref_mut(&mut self) -> &mut [T] {
         let cnt = *self.size.as_ref();
         &mut self.map[..cnt]

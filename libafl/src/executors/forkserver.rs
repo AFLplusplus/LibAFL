@@ -37,7 +37,9 @@ use nix::{
 };
 
 #[cfg(feature = "regex")]
-use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
+use crate::observers::{
+    get_asan_runtime_flags, get_asan_runtime_flags_with_log_path, AsanBacktraceObserver,
+};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
@@ -309,6 +311,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        dump_asan_logs: bool,
         coverage_map_size: Option<usize>,
         debug_output: bool,
     ) -> Result<Self, Error> {
@@ -321,6 +324,7 @@ impl Forkserver {
             memlimit,
             is_persistent,
             is_deferred_frksrv,
+            dump_asan_logs,
             coverage_map_size,
             debug_output,
             KILL_SIGNAL_DEFAULT,
@@ -340,6 +344,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        dump_asan_logs: bool,
         coverage_map_size: Option<usize>,
         debug_output: bool,
         kill_signal: Signal,
@@ -385,7 +390,14 @@ impl Forkserver {
         }
 
         #[cfg(feature = "regex")]
-        command.env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path());
+        {
+            let asan_options = if dump_asan_logs {
+                get_asan_runtime_flags_with_log_path()
+            } else {
+                get_asan_runtime_flags()
+            };
+            command.env("ASAN_OPTIONS", asan_options);
+        }
 
         let fsrv_handle = match command
             .env("LD_BIND_NOW", "1")
@@ -822,6 +834,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
+                self.asan_obs.is_some(),
                 self.map_size,
                 self.debug_child,
                 self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
@@ -845,9 +858,9 @@ where
 
         if Self::is_old_forkserver(version_status) {
             log::info!("Old fork server model is used by the target, this still works though.");
-            self.initialize_old_forkserver(version_status, &map, &mut forkserver)?;
+            self.initialize_old_forkserver(version_status, map.as_ref(), &mut forkserver)?;
         } else {
-            self.initialize_forkserver(version_status, &map, &mut forkserver)?;
+            self.initialize_forkserver(version_status, map.as_ref(), &mut forkserver)?;
         }
         Ok((forkserver, input_file, map))
     }
@@ -862,7 +875,7 @@ where
     fn initialize_forkserver(
         &mut self,
         status: i32,
-        map: &Option<SP::ShMem>,
+        map: Option<&SP::ShMem>,
         forkserver: &mut Forkserver,
     ) -> Result<(), Error> {
         let keep = status;
@@ -968,7 +981,7 @@ where
     fn initialize_old_forkserver(
         &mut self,
         status: i32,
-        map: &Option<SP::ShMem>,
+        map: Option<&SP::ShMem>,
         forkserver: &mut Forkserver,
     ) -> Result<(), Error> {
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
@@ -1347,7 +1360,7 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     }
 }
 
-impl<'a> Default for ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+impl Default for ForkserverExecutorBuilder<'_, UnixShMemProvider> {
     fn default() -> Self {
         Self::new()
     }

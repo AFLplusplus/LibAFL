@@ -219,13 +219,13 @@ impl<'a> From<&'a mut Vec<u8>> for MutVecInput<'a> {
     }
 }
 
-impl<'a> HasLen for MutVecInput<'a> {
+impl HasLen for MutVecInput<'_> {
     fn len(&self) -> usize {
         self.0.len()
     }
 }
 
-impl<'a> HasMutatorBytes for MutVecInput<'a> {
+impl HasMutatorBytes for MutVecInput<'_> {
     fn bytes(&self) -> &[u8] {
         self.0
     }
@@ -258,7 +258,7 @@ impl<'a> HasMutatorBytes for MutVecInput<'a> {
     }
 }
 
-impl<'a> MappedInput for MutVecInput<'a> {
+impl MappedInput for MutVecInput<'_> {
     type Type<'b>
         = MutVecInput<'b>
     where

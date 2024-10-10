@@ -1,11 +1,16 @@
 [package]
 name = "pylibafl"
+description = "Python bindings for LibAFL"
 version = "0.13.2"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+keywords = ["fuzzing", "testing", "security", "python"]
 edition = "2021"
+categories = ["development-tools::testing", "emulators", "embedded", "os"]
 
 [dependencies]
-pyo3 = { version = "0.22", features = ["extension-module"] }
-pyo3-log = "0.11"
+pyo3 = { version = "0.22.3", features = ["extension-module"] }
+pyo3-log = { version = "0.11.0" }
 libafl_sugar = { path = "../../libafl_sugar", version = "0.13.2", features = [
   "python",
 ] }
@@ -19,7 +24,7 @@ libafl_qemu = { path = "../../libafl_qemu", version = "0.13.2", features = [
 ] }
 
 [build-dependencies]
-pyo3-build-config = { version = "0.22" }
+pyo3-build-config = { version = "0.22.3" }
 
 [lib]
 name = "pylibafl"

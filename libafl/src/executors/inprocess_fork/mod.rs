@@ -99,8 +99,7 @@ where
     inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> Debug
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S> + Debug,
@@ -127,8 +126,8 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> UsesState
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, OT, S, SP, EM, Z> UsesState
+    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S>,
@@ -141,8 +140,8 @@ where
     type State = S;
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z> Executor<EM, Z>
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<EM, H, HT, OT, S, SP, Z> Executor<EM, Z>
+    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S> + Debug,
@@ -234,8 +233,8 @@ where {
     }
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, OT, S, SP, EM, Z> HasObservers
+    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple<S>,

@@ -29,10 +29,10 @@ where
     map: Option<<SP as ShMemProvider>::ShMem>,
 }
 
-impl<'a> TinyInstExecutor<(), NopShMemProvider, ()> {
+impl TinyInstExecutor<(), NopShMemProvider, ()> {
     /// Create a builder for [`TinyInstExecutor`]
     #[must_use]
-    pub fn builder() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
+    pub fn builder<'a>() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         TinyInstExecutorBuilder::new()
     }
 }
@@ -115,7 +115,7 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
-impl<'a> Default for TinyInstExecutorBuilder<'a, NopShMemProvider> {
+impl Default for TinyInstExecutorBuilder<'_, NopShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
@@ -150,7 +150,7 @@ impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
     }
 }
 
-impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
+impl<SP> TinyInstExecutorBuilder<'_, SP>
 where
     SP: ShMemProvider,
 {

@@ -847,6 +847,9 @@ pub mod unix_shmem {
             ///
             /// This function will return an error if the appropriate flags could not be extracted or set.
             pub fn persist_for_child_processes(&self) -> Result<&Self, Error> {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
                 unsafe {
                     let flags = fcntl(self.shm_fd, libc::F_GETFD);
 
@@ -926,18 +929,25 @@ pub mod unix_shmem {
             type Target = [u8];
 
             fn deref(&self) -> &[u8] {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
         impl DerefMut for MmapShMem {
             fn deref_mut(&mut self) -> &mut [u8] {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
 
         impl Drop for MmapShMem {
             fn drop(&mut self) {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // Mutable borrow so no possible race.
                 unsafe {
                     assert!(
                         !self.map.is_null(),
@@ -1348,7 +1358,7 @@ pub mod win32_shmem {
         Error,
     };
 
-    const INVALID_HANDLE_VALUE: isize = -1;
+    const INVALID_HANDLE_VALUE: *mut c_void = -1isize as *mut c_void;
 
     /// The default [`ShMem`] impl for Windows using `shmctl` & `shmget`
     #[derive(Clone)]

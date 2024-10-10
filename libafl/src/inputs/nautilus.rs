@@ -127,7 +127,7 @@ impl<'a> NautilusToBytesInputConverter<'a> {
     }
 }
 
-impl<'a> InputConverter for NautilusToBytesInputConverter<'a> {
+impl InputConverter for NautilusToBytesInputConverter<'_> {
     type From = NautilusInput;
     type To = BytesInput;
 

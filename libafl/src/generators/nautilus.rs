@@ -107,7 +107,7 @@ impl Debug for NautilusGenerator<'_> {
     }
 }
 
-impl<'a, S: HasRand> Generator<NautilusInput, S> for NautilusGenerator<'a> {
+impl<S: HasRand> Generator<NautilusInput, S> for NautilusGenerator<'_> {
     fn generate(&mut self, state: &mut S) -> Result<NautilusInput, Error> {
         let nonterm = self.nonterminal("START");
         let len = self.ctx.get_random_len_for_nt(&nonterm);

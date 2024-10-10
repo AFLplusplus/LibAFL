@@ -70,7 +70,6 @@ RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --no-deps --tests
 
 # Loop through each project and run Clippy
 for project in "${PROJECTS[@]}"; do
-   echo "aa"
    # Trim leading and trailing whitespace
    project=$(echo "$project" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
    if [ -d "$project" ]; then
