@@ -141,6 +141,7 @@ impl<S> ExecutorHook<S> for IntelPTHook
 where
     S: UsesInput + Serialize,
 {
+    #[allow(clippy::cast_possible_wrap)]
     fn init<E: HasObservers>(&mut self, _state: &mut S) {
         assert!(self.pt.is_none(), "Intel PT was already set up");
         assert!(self.image.is_none(), "Intel PT image was already set up");
@@ -162,14 +163,9 @@ where
                     map.size() as u64,
                     map.start() as u64,
                 ) {
-                    let _ = image
+                    image
                         .add_cached(&mut image_cache, isid, Asid::default())
                         .unwrap();
-                    println!(
-                        "added cache {isid}: {} size: {}",
-                        map.filename().unwrap().to_str().unwrap(),
-                        map.size()
-                    )
                 }
             }
         }
@@ -200,7 +196,7 @@ where
 
         let mut buff = Vec::new();
 
-        let ips = pt.decode_with_image(&mut self.image.as_mut().unwrap(), Some(&mut buff));
+        let ips = pt.decode_with_image(self.image.as_mut().unwrap(), Some(&mut buff));
 
         for ip in ips {
             unsafe { *self.map.add(ip as usize % self.len) += 1 };
@@ -390,7 +386,7 @@ impl IntelPT {
         // TODO remove unwrap()
         let mut config = ConfigBuilder::new(data.as_mut()).unwrap();
         if let Some(cpu) = &*CURRENT_CPU {
-            config.cpu(cpu.clone());
+            config.cpu(*cpu);
         }
         let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
         config.flags(flags);
