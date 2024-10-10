@@ -691,19 +691,16 @@ mod test {
         unistd::{fork, ForkResult},
     };
     use proc_maps::get_process_maps;
-    use static_assertions::{assert_eq_size, const_assert_eq};
+    use static_assertions::{assert_eq_size, const_assert, const_assert_eq};
 
     use super::*;
 
     // PERF_BUFFER_SIZE should be 1+2^n pages
-    const_assert_eq!(
-        (PERF_BUFFER_SIZE - PAGE_SIZE) & (PERF_BUFFER_SIZE - PAGE_SIZE - 1),
-        0
-    );
+    const_assert!((PERF_BUFFER_SIZE - PAGE_SIZE).is_power_of_two());
     // PERF_AUX_BUFFER_SIZE must be page aligned
     const_assert_eq!(PERF_AUX_BUFFER_SIZE % PAGE_SIZE, 0);
     // PERF_AUX_BUFFER_SIZE must be a power of two
-    const_assert_eq!(PERF_AUX_BUFFER_SIZE & (PERF_AUX_BUFFER_SIZE - 1), 0);
+    const_assert!(PERF_AUX_BUFFER_SIZE.is_power_of_two());
     // Only 64-bit systems are supported, ensure we can use usize and u64 interchangeably
     assert_eq_size!(usize, u64);
 
