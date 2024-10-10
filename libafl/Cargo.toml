@@ -289,7 +289,6 @@ document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
 num_enum = { version = "0.7.3", optional = true }
-caps = { version = "0.5.5", optional = true }
 perf-event-open-sys = { version = "4.0.0", optional = true }                  # Uses Linux 5.19.4 headers, consider forking if we need to bump
 raw-cpuid = { version = "11.1.0", optional = true }
 libipt = { git = "https://github.com/Marcondiro/libipt-rs", optional = true } # v2 is not on crates.io, also I made a couple of changes. TODO: rplace this dep
@@ -297,6 +296,9 @@ proc-maps = { version = "0.3.2", optional = true }
 bitbybit = { version = "1.3.2", optional = true }
 arbitrary-int = { version = "1.2.7", optional = true }
 similar = { version = "2.6.0", optional = true, features = ["bytes"] }
+
+[target.'cfg(linux)'.dependencies]
+caps = { version = "0.5.5", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                # For (*nix) libc
