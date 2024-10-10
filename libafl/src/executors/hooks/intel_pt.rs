@@ -6,15 +6,13 @@ use std::{
     convert::Into,
     ffi::CString,
     fs,
-    fs::OpenOptions,
-    io::Write,
     ops::Range,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
         raw::c_void,
     },
     path::Path,
-    ptr, slice,
+    process, ptr, slice,
     string::String,
     sync::LazyLock,
     vec::Vec,
@@ -25,13 +23,14 @@ use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libafl_bolts::ownedref::OwnedRefMut;
 use libc::__u64;
-use libipt::{insn::InsnDecoder, Asid, ConfigBuilder, Cpu, Image};
+use libipt::{block::BlockDecoder, Asid, BlockFlags, ConfigBuilder, Cpu, Image, SectionCache};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
     perf_event_open,
 };
+use proc_maps::get_process_maps;
 use raw_cpuid::CpuId;
 use serde::Serialize;
 
@@ -121,13 +120,21 @@ pub struct IntelPT {
 #[derive(Debug)]
 pub struct IntelPTHook {
     pt: Option<IntelPT>,
+    image: Option<Image<'static>>,
+    image_cache: Option<SectionCache<'static>>,
     map: *mut u8,
     len: usize,
 }
 
 impl IntelPTHook {
     pub fn new(map: *mut u8, len: usize) -> Self {
-        Self { pt: None, map, len }
+        Self {
+            pt: None,
+            image: None,
+            image_cache: None,
+            map,
+            len,
+        }
     }
 }
 impl<S> ExecutorHook<S> for IntelPTHook
@@ -136,65 +143,65 @@ where
 {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {
         assert!(self.pt.is_none(), "Intel PT was already set up");
-        // let mut image_cache = SectionCache::new(Some("image_cache")).unwrap();
-        // let mut image = Image::new(Some("image")).unwrap();
-        //
-        // let maps = get_process_maps(pid as i32).unwrap();
-        // for map in maps {
-        //     if map.is_exec() && map.filename().is_some() {
-        //         if let Ok(isid) = image_cache.add_file(
-        //             map.filename().unwrap().to_str().unwrap(),
-        //             map.offset as u64,
-        //             map.size() as u64,
-        //             map.start() as u64,
-        //         ) {
-        //             let _ = image
-        //                 .add_cached(&mut image_cache, isid, Asid::default())
-        //                 .unwrap();
-        //             println!(
-        //                 "added cache {isid}: {} size: {}",
-        //                 map.filename().unwrap().to_str().unwrap(),
-        //                 map.size()
-        //             )
-        //         }
-        //     }
-        // }
+        assert!(self.image.is_none(), "Intel PT image was already set up");
+        assert!(
+            self.image_cache.is_none(),
+            "Intel PT cache was already set up"
+        );
 
+        let mut image_cache = SectionCache::new(Some("image_cache")).unwrap();
+        let mut image = Image::new(Some("image")).unwrap();
+
+        let pid = process::id();
+        let maps = get_process_maps(pid as i32).unwrap();
+        for map in maps {
+            if map.is_exec() && map.filename().is_some() {
+                if let Ok(isid) = image_cache.add_file(
+                    map.filename().unwrap().to_str().unwrap(),
+                    map.offset as u64,
+                    map.size() as u64,
+                    map.start() as u64,
+                ) {
+                    let _ = image
+                        .add_cached(&mut image_cache, isid, Asid::default())
+                        .unwrap();
+                    println!(
+                        "added cache {isid}: {} size: {}",
+                        map.filename().unwrap().to_str().unwrap(),
+                        map.size()
+                    )
+                }
+            }
+        }
+
+        self.image_cache = Some(image_cache);
+        self.image = Some(image);
         self.pt = Some(IntelPT::try_new(None).unwrap());
     }
 
     #[allow(clippy::cast_possible_wrap)]
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
-        //self.trace.lock().unwrap().clear();
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
     #[allow(clippy::cast_possible_wrap)]
-    fn post_exec(&mut self, state: &mut S, _input: &S::Input) {
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         let pt = self.pt.as_mut().unwrap();
         pt.disable_tracing().unwrap();
 
-        let read_mem = |buf: &mut [u8], addr: u64| {
-            let src = addr as *const u8;
-            let dst = buf.as_mut_ptr();
-            let size = buf.len();
-            unsafe {
-                ptr::copy_nonoverlapping(src, dst, size);
-            }
-        };
+        // let read_mem = |buf: &mut [u8], addr: u64| {
+        //     let src = addr as *const u8;
+        //     let dst = buf.as_mut_ptr();
+        //     let size = buf.len();
+        //     unsafe {
+        //         ptr::copy_nonoverlapping(src, dst, size);
+        //     }
+        // };
 
-        let ips = pt.decode_with_callback(read_mem, None);
-        if unsafe { FILE_NUM } % 1000 == 0 {
-            let s = serde_json::to_vec(&state).unwrap();
-            dump_corpus(&s).unwrap();
-        }
-        unsafe {
-            FILE_NUM += 1;
-        }
-        // if unsafe{FILE_NUM > 500} {
-        //    panic!("ciao ciao");
-        // }
-        //println!("IPs: {ips:x?}");
+        let mut buff = Vec::new();
+
+        let ips = pt.decode_with_image(&mut self.image.as_mut().unwrap(), Some(&mut buff));
+
         for ip in ips {
             unsafe { *self.map.add(ip as usize % self.len) += 1 };
         }
@@ -385,10 +392,9 @@ impl IntelPT {
         if let Some(cpu) = &*CURRENT_CPU {
             config.cpu(cpu.clone());
         }
-        // let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
-        // config.flags(flags);
-        // let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
-        let mut decoder = InsnDecoder::new(&config.finish()).unwrap();
+        let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
+        config.flags(flags);
+        let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
         if let Some(i) = image {
             decoder.set_image(Some(i)).expect("Failed to set image");
         }
@@ -451,7 +457,9 @@ impl IntelPT {
                         status = s;
 
                         // TODO optimize this check and its equivalent up here?
-                        if skip < decoder.offset().expect("Failed to get decoder offset") {
+                        if !b.speculative()
+                            && skip < decoder.offset().expect("Failed to get decoder offset")
+                        {
                             ips.push(b.ip());
                         }
 
@@ -469,7 +477,7 @@ impl IntelPT {
         let offset = decoder
             .sync_offset()
             .expect("Failed to get last sync offset");
-        unsafe { self.aux_tail.write_volatile(offset) };
+        unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
         ips
     }
@@ -674,42 +682,9 @@ pub fn smp_rmb() {
     }
 }
 
-static mut FILE_NUM: u128 = 0;
-fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
-    let trace_path = unsafe { format!("./traces/test_trace_pid_ipt_raw_trace_{FILE_NUM:06}.tmp") };
-    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(trace_path)
-        .expect("Failed to open trace output file");
-
-    file.write_all(buff)
-        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
-
-    Ok(())
-}
-
-fn dump_corpus(buff: &[u8]) -> Result<(), Error> {
-    let trace_path = "./corpus.json";
-    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(trace_path)
-        .expect("Failed to open trace output file");
-
-    file.write_all(buff)
-        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
-    use std::{arch::asm, process};
+    use std::{arch::asm, fs::OpenOptions, io::Write, process};
 
     use arbitrary_int::Number;
     use nix::{
@@ -816,7 +791,7 @@ mod test {
             // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
             println!("Intel PT is not available, skipping test. Reasons:");
             println!("{reason}");
-            //return;
+            return;
         }
 
         let pid = match unsafe { fork() } {
@@ -883,5 +858,21 @@ mod test {
         ips.sort_unstable();
         ips.dedup();
         println!("Intel PT traces unique block ips: {ips:#x?}");
+    }
+
+    fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
+        let trace_path = "./traces/test_trace_pid_ipt_raw_trace_.tmp";
+        fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(trace_path)
+            .expect("Failed to open trace output file");
+
+        file.write_all(buff)
+            .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
+
+        Ok(())
     }
 }
