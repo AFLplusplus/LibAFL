@@ -2,7 +2,6 @@ use std::{
     io::{Read, Seek},
     marker::PhantomData,
     os::fd::AsRawFd,
-    time::Duration,
 };
 
 use libafl::{
