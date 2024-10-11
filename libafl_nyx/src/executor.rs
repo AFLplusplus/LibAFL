@@ -1,7 +1,8 @@
 use std::{
     io::{Read, Seek},
     marker::PhantomData,
-    os::fd::AsRawFd, time::Duration,
+    os::fd::AsRawFd,
+    time::Duration,
 };
 
 use libafl::{
@@ -27,7 +28,6 @@ pub struct NyxExecutor<S, OT> {
     // stderr: Option<StdErrObserver>,
     /// observers
     observers: OT,
-    timeout: Duration,
     /// phantom data to keep generic type <I,S>
     phantom: PhantomData<S>,
 }
@@ -137,7 +137,7 @@ impl<S, OT> HasTimeout for NyxExecutor<S, OT> {
     }
 
     fn timeout(&self) -> std::time::Duration {
-        self.timeout
+        self.helper.timeout
     }
 }
 
@@ -187,7 +187,6 @@ impl NyxExecutorBuilder {
 
     pub fn build<S, OT>(&self, helper: NyxHelper, observers: OT) -> NyxExecutor<S, OT> {
         NyxExecutor {
-            timeout: helper.timeout(),
             helper,
             stdout: self.stdout.clone(),
             // stderr: self.stderr.clone(),
