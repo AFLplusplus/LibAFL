@@ -194,5 +194,14 @@ impl FuzzerOptions {
                 }
             }
         }
+
+        if self.drcov.is_some() && self.rerun_input.is_none() {
+            let mut cmd = FuzzerOptions::command();
+            cmd.error(
+                ErrorKind::ValueValidation,
+                format!("The `drcov` option is only supported with `rerun_input`."),
+            )
+            .exit();
+        }
     }
 }
