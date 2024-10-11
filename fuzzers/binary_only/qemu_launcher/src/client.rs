@@ -15,6 +15,7 @@ use libafl_qemu::{
         asan::{init_qemu_with_asan, AsanModule},
         asan_guest::{init_qemu_with_asan_guest, AsanGuestModule},
         cmplog::CmpLogModule,
+        DrCovModule,
     },
     Qemu,
 };
@@ -125,15 +126,16 @@ impl<'a> Client<'a> {
             .core_id(core_id)
             .extra_tokens(extra_tokens);
 
-        if self.options.drcov.is_some() {
-            tuple_list!(
-                CmpLogModule::default(),
-                AsanModule::default(asan.take().unwrap()),
-                injection_module,
-            ),
-        }
-
-        if is_asan && is_cmplog {
+        if self.options.rerun_input.is_some() && self.options.drcov.is_some() {
+            // Special code path for re-running inputs with DrCov.
+            // TODO: Add ASan support, injection support
+            let drcov = self.options.drcov.as_ref().unwrap();
+            let drcov = DrCovModule::builder()
+                .filename(drcov.clone())
+                .full_trace(true)
+                .build();
+            instance_builder.build().run(tuple_list!(drcov), state)
+        } else if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
                     tuple_list!(

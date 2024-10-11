@@ -10,9 +10,8 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
-    events::{LlmpEventManager, LlmpRestartingEventManager, SimpleEventManager},
+    events::{LlmpEventManager, LlmpRestartingEventManager},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
-    prelude::NopMonitor,
     Error,
 };
 #[cfg(feature = "simplemgr")]
@@ -29,7 +28,7 @@ use {
     std::os::unix::io::{AsRawFd, FromRawFd},
 };
 
-use crate::{client::Client, harness::Harness, options::FuzzerOptions};
+use crate::{client::Client, options::FuzzerOptions};
 
 pub struct Fuzzer {
     options: FuzzerOptions,
