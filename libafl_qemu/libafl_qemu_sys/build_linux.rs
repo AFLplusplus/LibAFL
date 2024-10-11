@@ -65,6 +65,7 @@ pub fn build() {
         })
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
+    println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_GEN_STUBS");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
     println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\"))");
 
