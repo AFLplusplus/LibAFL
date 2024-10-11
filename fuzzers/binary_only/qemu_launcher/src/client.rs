@@ -15,6 +15,7 @@ use libafl_qemu::{
         asan::{init_qemu_with_asan, AsanModule},
         asan_guest::{init_qemu_with_asan_guest, AsanGuestModule},
         cmplog::CmpLogModule,
+        DrCovModule,
     },
     Qemu,
 };
@@ -38,7 +39,7 @@ impl<'a> Client<'a> {
         Client { options }
     }
 
-    fn args(&self) -> Result<Vec<String>, Error> {
+    pub fn args(&self) -> Result<Vec<String>, Error> {
         let program = env::args()
             .next()
             .ok_or_else(|| Error::empty_optional("Failed to read program name"))?;
@@ -49,7 +50,7 @@ impl<'a> Client<'a> {
     }
 
     #[allow(clippy::unused_self)] // Api should look the same as args above
-    fn env(&self) -> Vec<(String, String)> {
+    pub fn env(&self) -> Vec<(String, String)> {
         env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
             .collect::<Vec<(String, String)>>()
@@ -125,7 +126,16 @@ impl<'a> Client<'a> {
             .core_id(core_id)
             .extra_tokens(extra_tokens);
 
-        if is_asan && is_cmplog {
+        if self.options.rerun_input.is_some() && self.options.drcov.is_some() {
+            // Special code path for re-running inputs with DrCov.
+            // TODO: Add ASan support, injection support
+            let drcov = self.options.drcov.as_ref().unwrap();
+            let drcov = DrCovModule::builder()
+                .filename(drcov.clone())
+                .full_trace(true)
+                .build();
+            instance_builder.build().run(tuple_list!(drcov), state)
+        } else if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
                     tuple_list!(
