@@ -187,7 +187,7 @@ struct Opt {
     #[arg(short = 'c')]
     cmplog: Option<String>,
     /// sync to a foreign fuzzer queue directory (requires -M, can be specified up to 32 times)
-    #[arg(short = 'F', num_args = 32)]
+    #[arg(short = 'F')]
     foreign_sync_dirs: Vec<PathBuf>,
     /// fuzzer dictionary (see README.md)
     #[arg(short = 'x')]
