@@ -10,21 +10,26 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
+    events::{LlmpEventManager, LlmpRestartingEventManager, SimpleEventManager},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
+    prelude::NopMonitor,
     Error,
 };
 #[cfg(feature = "simplemgr")]
 use libafl_bolts::core_affinity::CoreId;
-use libafl_bolts::current_time;
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
+use libafl_bolts::{
+    current_time,
+    prelude::{CoreId, StateRestorer},
+};
 #[cfg(unix)]
 use {
     nix::unistd::dup,
     std::os::unix::io::{AsRawFd, FromRawFd},
 };
 
-use crate::{client::Client, options::FuzzerOptions};
+use crate::{client::Client, harness::Harness, options::FuzzerOptions};
 
 pub struct Fuzzer {
     options: FuzzerOptions,
@@ -82,7 +87,7 @@ impl Fuzzer {
     {
         // The shared memory allocator
         #[cfg(not(feature = "simplemgr"))]
-        let shmem_provider = StdShMemProvider::new()?;
+        let mut shmem_provider = StdShMemProvider::new()?;
 
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         #[cfg(not(feature = "simplemgr"))]
@@ -94,10 +99,30 @@ impl Fuzzer {
 
         let client = Client::new(&self.options);
 
+        #[cfg(not(feature = "simplemgr"))]
+        if self.options.rerun_input.is_some() {
+            // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
+            return client.run(
+                None,
+                MonitorTypedEventManager::<_, M>::new(LlmpRestartingEventManager::new(
+                    LlmpEventManager::builder()
+                        .build_on_port(
+                            shmem_provider.clone(),
+                            1337,
+                            EventConfig::AlwaysUnique,
+                            None,
+                        )
+                        .unwrap(),
+                    StateRestorer::new(shmem_provider.new_shmem(0x1000).unwrap()),
+                )),
+                CoreId(0),
+            );
+        }
+
         #[cfg(feature = "simplemgr")]
         return client.run(None, SimpleEventManager::new(monitor), CoreId(0));
 
-        // Build and run a Launcher
+        // Build and run the Launcher / fuzzer.
         #[cfg(not(feature = "simplemgr"))]
         match Launcher::builder()
             .shmem_provider(shmem_provider)

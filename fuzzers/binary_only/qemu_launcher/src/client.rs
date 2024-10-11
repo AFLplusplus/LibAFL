@@ -38,7 +38,7 @@ impl<'a> Client<'a> {
         Client { options }
     }
 
-    fn args(&self) -> Result<Vec<String>, Error> {
+    pub fn args(&self) -> Result<Vec<String>, Error> {
         let program = env::args()
             .next()
             .ok_or_else(|| Error::empty_optional("Failed to read program name"))?;
@@ -49,7 +49,7 @@ impl<'a> Client<'a> {
     }
 
     #[allow(clippy::unused_self)] // Api should look the same as args above
-    fn env(&self) -> Vec<(String, String)> {
+    pub fn env(&self) -> Vec<(String, String)> {
         env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
             .collect::<Vec<(String, String)>>()
@@ -124,6 +124,14 @@ impl<'a> Client<'a> {
             .mgr(mgr)
             .core_id(core_id)
             .extra_tokens(extra_tokens);
+
+        if self.options.drcov.is_some() {
+            tuple_list!(
+                CmpLogModule::default(),
+                AsanModule::default(asan.take().unwrap()),
+                injection_module,
+            ),
+        }
 
         if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {

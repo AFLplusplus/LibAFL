@@ -1,5 +1,5 @@
 use core::{fmt::Debug, ptr::addr_of_mut};
-use std::{marker::PhantomData, ops::Range, process};
+use std::{marker::PhantomData, ops::Range, path::PathBuf, process};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -8,7 +8,7 @@ use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::EventRestarter,
-    executors::ShadowExecutor,
+    executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
@@ -35,16 +35,17 @@ use libafl_bolts::{
     core_affinity::CoreId,
     ownedref::OwnedMutSlice,
     rands::StdRand,
-    tuples::{tuple_list, Merge, Prepend},
+    tuples::{tuple_list, Append, Merge, Prepend},
 };
 use libafl_qemu::{
     elf::EasyElf,
     modules::{
-        cmplog::CmpLogObserver, EmulatorModuleTuple, StdAddressFilter, StdEdgeCoverageModule,
+        cmplog::CmpLogObserver, drcov, DrCovModule, EmulatorModuleTuple, StdAddressFilter, StdEdgeCoverageModule
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+use nix::libc::exit;
 use typed_builder::TypedBuilder;
 
 use crate::{harness::Harness, options::FuzzerOptions};
@@ -201,6 +202,32 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        
+        if self.options.rerun_input.is_some() {
+
+        }
+
+        if let Some(rerun_input) = &self.options.rerun_input {
+            // Rerun a single input.
+
+            if let Some(drcov_filename) = &self.options.drcov {
+                let drcov = DrCovModule::builder().filename(drcov_filename.clone()).build();
+                let modules = modules.prepend(drcov);
+                let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
+                let mut executor = QemuExecutor::new(
+                    emulator,
+                    &mut harness,
+                    observers,
+                    &mut fuzzer,
+                    &mut state,
+                    &mut self.mgr,
+                    self.options.timeout,
+                )?;
+                executor.run_target();
+                return Ok(());
+            }
+            
+        }
 
         let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
 
