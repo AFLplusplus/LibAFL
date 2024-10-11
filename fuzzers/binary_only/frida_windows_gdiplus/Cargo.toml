@@ -1,5 +1,5 @@
 [package]
-name = "frida_gdiplus"
+name = "frida_windows_gdiplus"
 version = "0.13.2"
 authors = ["Richard Johnson <richinseattle@gmail.com>"]
 edition = "2021"
