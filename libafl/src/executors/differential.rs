@@ -16,6 +16,7 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::HasTimeout;
 use crate::{
     corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
@@ -118,9 +119,24 @@ where
             })
         }
     }
+}
+
+impl<A, B, DOT, OTA, OTB> HasTimeout for DiffExecutor<A, B, DOT, OTA, OTB>
+where
+    A: HasTimeout,
+    B: HasTimeout,
+{
     fn set_timeout(&mut self, timeout: core::time::Duration) {
         self.primary.set_timeout(timeout);
         self.secondary.set_timeout(timeout);
+    }
+
+    fn timeout(&self) -> core::time::Duration {
+        assert!(
+            self.primary.timeout() == self.secondary.timeout(),
+            "Primary and Secondary Executors have different timeouts!"
+        );
+        self.primary.timeout()
     }
 }
 

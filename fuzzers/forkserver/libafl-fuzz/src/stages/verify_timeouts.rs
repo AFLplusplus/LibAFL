@@ -5,7 +5,7 @@ use std::{collections::VecDeque, fmt::Debug, marker::PhantomData};
 
 use libafl::{
     inputs::UsesInput,
-    prelude::{BytesInput, Executor, ExitKind, HasObservers, ObserversTuple, TimeObserver},
+    prelude::{BytesInput, HasTimeout, Executor, ExitKind, HasObservers, ObserversTuple, TimeObserver},
     stages::Stage,
     state::{HasCorpus, UsesState},
     HasMetadata,
@@ -72,7 +72,7 @@ impl<I> TimeoutsToVerify<I> {
 impl<E, EM, Z> Stage<E, EM, Z> for VerifyTimeoutsStage<E>
 where
     E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
-    E: Executor<EM, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers + HasTimeout,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
     <E as UsesState>::State: HasMetadata + HasCorpus,
@@ -94,10 +94,6 @@ where
             let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
             let observers = executor.observers();
             let observer = &observers[&self.time_observer_handle];
-            let last_runtime = observer
-                .last_runtime()
-                .expect("invariant; we just ran an input - and thus we must have runtime");
-            // u128 -> u64 truncation but we should be fine.
             if matches!(exit_kind, ExitKind::Timeout) {}
         }
         executor.set_timeout(self.original_timeout);

@@ -36,6 +36,7 @@ use nix::{
     unistd::Pid,
 };
 
+use super::HasTimeout;
 #[cfg(feature = "regex")]
 use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
 use crate::{
@@ -1466,9 +1467,18 @@ where
 
         Ok(exit_kind)
     }
+}
 
+impl<OT, S, SP> HasTimeout for ForkserverExecutor<OT, S, SP>
+where
+    SP: ShMemProvider,
+{
     fn set_timeout(&mut self, timeout: Duration) {
         self.timeout = TimeSpec::from_duration(timeout);
+    }
+
+    fn timeout(&self) -> Duration {
+        self.timeout.into()
     }
 }
 

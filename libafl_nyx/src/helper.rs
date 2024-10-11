@@ -1,5 +1,5 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
-use std::{fmt::Debug, fs::File, path::Path};
+use std::{fmt::Debug, fs::File, path::Path, time::Duration};
 
 use libafl::Error;
 use libnyx::{NyxConfig, NyxProcess, NyxProcessRole};
@@ -7,6 +7,7 @@ use libnyx::{NyxConfig, NyxProcess, NyxProcessRole};
 use crate::settings::NyxSettings;
 
 pub struct NyxHelper {
+    pub timeout: Duration,
     pub nyx_process: NyxProcess,
     pub nyx_stdout: File,
 
@@ -67,6 +68,9 @@ impl NyxHelper {
         let bitmap_buffer = nyx_process.bitmap_buffer_mut().as_mut_ptr();
 
         Ok(Self {
+            timeout: Duration::from_micros(
+                u64::from(settings.timeout_secs) * 100_000 + u64::from(settings.timeout_micro_secs),
+            ),
             nyx_process,
             nyx_stdout,
             bitmap_size,
@@ -75,8 +79,22 @@ impl NyxHelper {
     }
 
     /// Set a timeout for Nyx.
-    pub fn set_timeout(&mut self, secs: u8, micro_secs: u32) {
-        self.nyx_process.option_set_timeout(secs, micro_secs);
+    #[allow(clippy::implicit_saturating_sub)]
+    pub fn set_timeout(&mut self, duration: Duration) {
+        self.timeout = duration;
+        // Since nyx takes seconds as a u8, all seconds above `u8::MAX`
+        // are given as micro seconds
+        let secs = duration.as_secs();
+        let u8_max = u64::from(u8::MAX);
+        let secs_above_u8max = if secs > u8_max { secs - u8_max } else { 0 };
+        let micro_secs = duration.subsec_micros() + (secs_above_u8max * 1_000_000) as u32;
+        // legal truncation
+        self.nyx_process.option_set_timeout(secs as u8, micro_secs);
         self.nyx_process.option_apply();
+    }
+
+    #[must_use]
+    pub fn timeout(&self) -> Duration {
+        self.timeout
     }
 }

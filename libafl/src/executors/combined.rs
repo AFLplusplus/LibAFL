@@ -5,6 +5,7 @@ use core::{fmt::Debug, time::Duration};
 
 use libafl_bolts::tuples::RefIndexable;
 
+use super::HasTimeout;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     state::{HasExecutions, UsesState},
@@ -58,9 +59,24 @@ where
     ) -> Result<ExitKind, Error> {
         self.primary.run_target(fuzzer, state, mgr, input)
     }
+}
+
+impl<A, B> HasTimeout for CombinedExecutor<A, B>
+where
+    A: HasTimeout,
+    B: HasTimeout,
+{
     fn set_timeout(&mut self, timeout: Duration) {
         self.primary.set_timeout(timeout);
         self.secondary.set_timeout(timeout);
+    }
+
+    fn timeout(&self) -> Duration {
+        assert!(
+            self.primary.timeout() == self.secondary.timeout(),
+            "Primary and Secondary Executors have different timeouts!"
+        );
+        self.primary.timeout()
     }
 }
 

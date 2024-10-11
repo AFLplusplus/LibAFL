@@ -21,6 +21,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::ObserversTuple,
+    prelude::HasTimeout,
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
 };
@@ -245,16 +246,22 @@ where
 
         Ok(exit_kind)
     }
+}
 
+impl<CM, ED, ET, H, OT, S, SM> HasTimeout for QemuExecutor<'_, CM, ED, ET, H, OT, S, SM>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    ET: EmulatorModuleTuple<S>,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &mut S, &S::Input) -> ExitKind,
+    OT: ObserversTuple<S::Input, S>,
+    S: State,
+{
     fn set_timeout(&mut self, timeout: Duration) {
-        <libafl::executors::inprocess::stateful::StatefulGenericInProcessExecutor<
-            H,
-            &mut H,
-            (),
-            OT,
-            S,
-            crate::emu::Emulator<CM, ED, ET, S, SM>,
-        > as libafl::executors::Executor<EM, Z>>::set_timeout(&mut self.inner, timeout);
+        self.inner.set_timeout(timeout);
+    }
+
+    fn timeout(&self) -> Duration {
+        self.inner.timeout()
     }
 }
 
@@ -408,9 +415,26 @@ where
     ) -> Result<ExitKind, Error> {
         self.inner.run_target(fuzzer, state, mgr, input)
     }
+}
 
+#[cfg(feature = "fork")]
+impl<CM, ED, EM, ET, H, OT, S, SM, SP, Z> HasTimeout
+    for QemuForkExecutor<'_, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
+where
+    CM: CommandManager<ED, ET, S, SM>,
+    EM: UsesState<State = S>,
+    ET: EmulatorModuleTuple<S>,
+    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    OT: ObserversTuple<S::Input, S>,
+    S: UsesInput,
+    SP: ShMemProvider,
+    Z: UsesState<State = S>,
+{
     fn set_timeout(&mut self, timeout: Duration) {
         self.inner.set_timeout(timeout);
+    }
+    fn timeout(&self) -> Duration {
+        self.inner.timeout()
     }
 }
 

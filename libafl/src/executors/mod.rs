@@ -142,8 +142,13 @@ where
     {
         WithObservers::new(self, observers)
     }
+}
 
-    /// Set the threshold for timeout
+/// A trait that allows to get/set an `Executor`'s timeout thresold
+pub trait HasTimeout {
+    /// Get an timeout
+    fn timeout(&self) -> Duration;
+    /// Set timeout
     fn set_timeout(&mut self, timeout: Duration);
 }
 
@@ -232,7 +237,6 @@ mod test {
                 Ok(ExitKind::Ok)
             }
         }
-        fn set_timeout(&mut self, _timeout: core::time::Duration) {}
     }
 
     #[test]

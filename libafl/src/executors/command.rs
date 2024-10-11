@@ -23,6 +23,7 @@ use libafl_bolts::{
     AsSlice,
 };
 
+use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
 use crate::{
@@ -284,8 +285,19 @@ where
         }
         res
     }
+}
+
+impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
+where
+    S: State,
+    T: CommandConfigurator<S::Input>,
+{
     fn set_timeout(&mut self, timeout: Duration) {
         *self.configurer.exec_timeout_mut() = timeout;
+    }
+
+    fn timeout(&self) -> Duration {
+        self.configurer.exec_timeout()
     }
 }
 

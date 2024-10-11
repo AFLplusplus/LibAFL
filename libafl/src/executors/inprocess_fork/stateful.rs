@@ -18,7 +18,7 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::ExecutorHooksTuple, inprocess_fork::GenericInProcessForkExecutorInner, Executor,
-        ExitKind, HasObservers,
+        ExitKind, HasObservers, HasTimeout,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -168,8 +168,25 @@ where
             }
         }
     }
+}
+
+impl<'a, H, HT, OT, S, SP, ES, EM, Z> HasTimeout
+    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+where
+    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
+    OT: ObserversTuple<S::Input, S>,
+    S: State,
+    SP: ShMemProvider,
+    HT: ExecutorHooksTuple<S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+{
     fn set_timeout(&mut self, timeout: Duration) {
         self.inner.set_timeout(timeout);
+    }
+
+    fn timeout(&self) -> Duration {
+        self.inner.timeout()
     }
 }
 

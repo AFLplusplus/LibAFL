@@ -1,13 +1,14 @@
 use std::{
     io::{Read, Seek},
     marker::PhantomData,
-    os::fd::AsRawFd,
+    os::fd::AsRawFd, time::Duration,
 };
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
+    prelude::HasTimeout,
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -26,6 +27,7 @@ pub struct NyxExecutor<S, OT> {
     // stderr: Option<StdErrObserver>,
     /// observers
     observers: OT,
+    timeout: Duration,
     /// phantom data to keep generic type <I,S>
     phantom: PhantomData<S>,
 }
@@ -127,15 +129,15 @@ where
 
         Ok(exit_kind)
     }
+}
 
+impl<S, OT> HasTimeout for NyxExecutor<S, OT> {
     fn set_timeout(&mut self, duration: std::time::Duration) {
-        assert!(
-            duration.as_secs() <= 255,
-            "cannot set a timeout of seconds greater than 255 (u8::MAX)"
-        );
-        let timeout_secs = duration.as_secs() as u8;
-        let timeout_microsecs = duration.subsec_micros();
-        self.helper.set_timeout(timeout_secs, timeout_microsecs);
+        self.helper.set_timeout(duration);
+    }
+
+    fn timeout(&self) -> std::time::Duration {
+        self.timeout
     }
 }
 
@@ -185,6 +187,7 @@ impl NyxExecutorBuilder {
 
     pub fn build<S, OT>(&self, helper: NyxHelper, observers: OT) -> NyxExecutor<S, OT> {
         NyxExecutor {
+            timeout: helper.timeout(),
             helper,
             stdout: self.stdout.clone(),
             // stderr: self.stderr.clone(),

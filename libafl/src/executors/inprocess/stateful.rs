@@ -16,7 +16,7 @@ use crate::{
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
-        Executor, ExitKind, HasObservers,
+        Executor, ExitKind, HasObservers, HasTimeout,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -121,8 +121,22 @@ where
         self.inner.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }
+}
+
+impl<H, HB, HT, OT, S, ES> HasTimeout for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
+where
+    H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
+    HT: ExecutorHooksTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
+    S: State,
+{
     fn set_timeout(&mut self, timeout: Duration) {
         self.inner.set_timeout(timeout);
+    }
+
+    fn timeout(&self) -> Duration {
+        self.inner.timeout()
     }
 }
 

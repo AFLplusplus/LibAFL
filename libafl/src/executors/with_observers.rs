@@ -1,6 +1,6 @@
 //! A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 
-use core::{fmt::Debug, time::Duration};
+use core::fmt::Debug;
 
 use libafl_bolts::tuples::RefIndexable;
 
@@ -33,9 +33,6 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
-    }
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.executor.set_timeout(timeout);
     }
 }
 

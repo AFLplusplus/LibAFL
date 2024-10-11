@@ -24,7 +24,7 @@ use crate::{
             ExecutorHooksTuple,
         },
         inprocess::HasInProcessHooks,
-        Executor, HasObservers,
+        Executor, HasObservers, HasTimeout as HasExecutorTimeout,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -95,17 +95,6 @@ where
     OT: ObserversTuple<S::Input, S>,
     S: State,
 {
-    /// Set the threshold for timeout
-    pub fn set_timeout(&mut self, duration: Duration) {
-        #[cfg(all(feature = "std", windows))]
-        {
-            *self.hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
-        }
-        #[cfg(not(windows))]
-        {
-            self.hooks.0.timer_mut().exec_tmout = duration;
-        }
-    }
     /// This function marks the boundary between the fuzzer and the target
     ///
     /// # Safety
@@ -159,6 +148,36 @@ where
 
             write_volatile(addr_of_mut!((*data).current_input_ptr), null());
             compiler_fence(Ordering::SeqCst);
+        }
+    }
+}
+
+impl<HT, OT, S> HasExecutorTimeout for GenericInProcessExecutorInner<HT, OT, S>
+where
+    HT: ExecutorHooksTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
+    S: State,
+{
+    /// Set the threshold for timeout
+    fn set_timeout(&mut self, duration: Duration) {
+        #[cfg(all(feature = "std", windows))]
+        {
+            *self.hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
+        }
+        #[cfg(not(windows))]
+        {
+            self.hooks.0.timer_mut().exec_tmout = duration;
+        }
+    }
+
+    fn timeout(&self) -> Duration {
+        #[cfg(all(feature = "std", windows))]
+        {
+            Duration::from_millis(self.hooks.0.millis_sec())
+        }
+        #[cfg(not(windows))]
+        {
+            self.hooks.0.timer().exec_tmout
         }
     }
 }
