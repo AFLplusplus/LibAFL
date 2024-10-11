@@ -61,6 +61,9 @@ pub type ClientMgr<M> =
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
+    /// The harness. We create it before forking, then `take()` it inside the client.
+    #[builder(setter(strip_option))]
+    harness: Option<Harness>,
     qemu: Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
@@ -186,7 +189,12 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         state.add_metadata(tokens);
 
-        let harness = Harness::new(self.qemu)?;
+        let harness = self
+            .harness
+            .take()
+            .expect("The harness can never be None here!");
+        harness.post_fork();
+
         let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
                            _state: &mut _,
                            input: &BytesInput| harness.run(input);
