@@ -1,3 +1,8 @@
+# LibAFL Frida_Windows_GdiPlus Example
+
+This is a an example how to fuzz binary-only dlls on Windows.
+The example fuzzer will explore [gdiplus](https://learn.microsoft.com/en-us/windows/win32/gdiplus/-gdiplus-gdi-start) on Windows, using the [Frida](https://frida.re/) DBI.
+
 ## Build
 
 To build this example, run `cargo build --release` in this folder.
