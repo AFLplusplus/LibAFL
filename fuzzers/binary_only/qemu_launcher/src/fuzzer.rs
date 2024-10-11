@@ -20,7 +20,9 @@ use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{
     current_time,
+    llmp::LlmpBroker,
     prelude::{CoreId, StateRestorer},
+    tuples::tuple_list,
 };
 #[cfg(unix)]
 use {
@@ -100,6 +102,18 @@ impl Fuzzer {
 
         #[cfg(not(feature = "simplemgr"))]
         if self.options.rerun_input.is_some() {
+            // If we want to rerun a single input but we use a restarting mgr, we'll have to create a fake restarting mgr that doesn't actually restart.
+            // It's not pretty but better than recompiling with simplemgr.
+
+            // Just a random number, let's hope it's free :)
+            let broker_port = 13120;
+            let _fake_broker = LlmpBroker::create_attach_to_tcp(
+                shmem_provider.clone(),
+                tuple_list!(),
+                broker_port,
+            )
+            .unwrap();
+
             // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
             return client.run(
                 None,
@@ -107,7 +121,7 @@ impl Fuzzer {
                     LlmpEventManager::builder()
                         .build_on_port(
                             shmem_provider.clone(),
-                            1337,
+                            broker_port,
                             EventConfig::AlwaysUnique,
                             None,
                         )

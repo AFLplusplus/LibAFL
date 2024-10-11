@@ -205,8 +205,9 @@ impl<'a, M: Monitor> Instance<'a, M> {
         let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
 
         if let Some(rerun_input) = &self.options.rerun_input {
+            // TODO: We might want to support non-bytes inputs at some point?
             let bytes = fs::read(rerun_input)
-                .unwrap_or_else(|err| panic!("Could not load file {rerun_input:?}: {err}"));
+                .unwrap_or_else(|_| panic!("Could not load file {rerun_input:?}"));
             let input = BytesInput::new(bytes);
 
             let mut executor = QemuExecutor::new(
