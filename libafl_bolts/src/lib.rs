@@ -682,7 +682,7 @@ where
     type SliceRef = &'a [T];
 
     fn as_slice(&'a self) -> Self::SliceRef {
-        &*self
+        self
     }
 }
 

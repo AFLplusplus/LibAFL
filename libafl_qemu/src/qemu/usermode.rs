@@ -79,26 +79,46 @@ impl Drop for GuestMaps {
 }
 
 impl CPU {
-    /// Write a value to a guest address.
-    ///
-    /// # Safety
-    /// This will write to a translated guest address (using `g2h`).
-    /// It just adds `guest_base` and writes to that location, without checking the bounds.
-    /// This may only be safely used for valid guest addresses!
-    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        let host_addr = Qemu::get().unwrap().g2h(addr);
-        copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
-    }
-
     /// Read a value from a guest address.
+    /// The input address is not checked for validity.
     ///
     /// # Safety
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
+    pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
         let host_addr = Qemu::get().unwrap().g2h(addr);
         copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
+    }
+
+    /// Write a value to a guest address.
+    /// The input address in not checked for validity.
+    ///
+    /// # Safety
+    /// This will write to a translated guest address (using `g2h`).
+    /// It just adds `guest_base` and writes to that location, without checking the bounds.
+    /// This may only be safely used for valid guest addresses!
+    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+        let host_addr = Qemu::get().unwrap().g2h(addr);
+        copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
+    }
+
+    #[must_use]
+    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
+        unsafe { (addr as usize + guest_base) as *mut T }
+    }
+
+    #[must_use]
+    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
+        unsafe { (addr as usize - guest_base) as GuestAddr }
+    }
+
+    #[must_use]
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
+        unsafe {
+            // TODO add support for tagged GuestAddr
+            libafl_qemu_sys::page_check_range(addr, size as GuestAddr, kind.into())
+        }
     }
 }
 

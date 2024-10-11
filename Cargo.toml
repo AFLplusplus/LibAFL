@@ -100,7 +100,6 @@ unexpected_cfgs = "forbid"
 incomplete_features = "allow"
 ambiguous_glob_reexports = "allow"
 
-
 [workspace.lints.clippy]
 # Forbid
 

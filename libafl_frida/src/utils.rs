@@ -162,6 +162,7 @@ const X86_64_REGS: [(RegSpec, X86Register); 34] = [
 
 /// Get the value of a register given a context
 #[cfg(target_arch = "x86_64")]
+#[must_use]
 pub fn get_register(context: &CpuContext, reg: X86Register) -> u64 {
     match reg {
         X86Register::Rax => context.rax(),
@@ -224,8 +225,9 @@ pub(crate) fn frida_to_cs(
     }
 }
 
-#[cfg(target_arch = "x86_64")]
 /// Get the `base`, `idx`, `scale`, `disp` for each operand
+#[cfg(target_arch = "x86_64")]
+#[must_use]
 pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u8, i32)> {
     match operand {
         Operand::MemDeref { base } => {
@@ -263,8 +265,9 @@ pub fn operand_details(operand: &Operand) -> Option<(X86Register, X86Register, u
     }
 }
 
-#[cfg(target_arch = "x86_64")]
 /// Get the immediate value of the operand
+#[cfg(target_arch = "x86_64")]
+#[must_use]
 pub fn immediate_value(operand: &Operand) -> Option<i64> {
     match operand {
         Operand::ImmediateI8 { imm } => Some(i64::from(*imm)),
@@ -290,8 +293,9 @@ pub enum AccessType {
     Write,
 }
 
-#[cfg(target_arch = "x86_64")]
 /// Disassemble "count" number of instructions
+#[cfg(target_arch = "x86_64")]
+#[must_use]
 pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Instruction> {
     let mut counter = count;
     let mut ret = vec![];

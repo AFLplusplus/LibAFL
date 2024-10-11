@@ -79,7 +79,7 @@ pub fn build() {
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_dir = PathBuf::from(src_dir);
-    let stub_bindings_file = src_dir.join("src/x86_64_stub_bindings.rs");
+    let stub_bindings_file = src_dir.join("src/bindings/x86_64_stub_bindings.rs");
 
     if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
         // Only build when we're not generating docs and not in clippy
