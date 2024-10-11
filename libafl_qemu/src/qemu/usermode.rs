@@ -9,7 +9,7 @@ use libafl_qemu_sys::{
     pageflags_get_root, read_self_maps, GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot,
     MapInfo, MmapPerms, VerifyAccess,
 };
-use libc::{c_char, c_int, c_uchar, strlen};
+use libc::{c_int, c_uchar, strlen};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
 
@@ -161,7 +161,7 @@ impl Qemu {
         unsafe {
             from_utf8_unchecked_mut(from_raw_parts_mut(
                 exec_path as *mut c_uchar,
-                strlen(exec_path as *const c_char),
+                strlen(exec_path.cast_const()),
             ))
         }
     }

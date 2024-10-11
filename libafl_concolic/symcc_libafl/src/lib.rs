@@ -63,6 +63,8 @@ pub use clone::clone_symcc;
 
 #[cfg(feature = "build")]
 mod build {
+    #![allow(clippy::module_name_repetitions)]
+
     use std::path::{Path, PathBuf};
 
     /// Builds `SymCC` at the given directory using [`cmake`](https://crates.io/crates/cmake).

@@ -512,7 +512,7 @@ impl Allocator {
             return true;
         }
 
-        if !self.is_managed(address as *mut c_void) {
+        if !self.is_managed(address.cast_mut()) {
             return true;
         }
 
