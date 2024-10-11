@@ -338,7 +338,7 @@ where
 
     /// Launch the broker and the clients and fuzz
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-    #[allow(unused_mut, clippy::match_wild_err_arm)]
+    #[allow(unused_mut, clippy::match_wild_err_arm, clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
