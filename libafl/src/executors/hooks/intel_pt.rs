@@ -381,6 +381,7 @@ impl IntelPT {
         }
         // TODO rewrite decently
         // TODO consider dropping libipt-rs and using sys, or bindgen ourselves
+        let mut previous_block_ip = 0;
         let mut status;
         loop {
             status = match decoder.sync_forward() {
@@ -434,7 +435,9 @@ impl IntelPT {
                         if !b.speculative()
                             && skip < decoder.offset().expect("Failed to get decoder offset")
                         {
-                            ips.push(b.ip());
+                            let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
+                            ips.push(id);
+                            previous_block_ip = b.ip();
                         }
 
                         if status.eos() {
@@ -654,6 +657,20 @@ pub fn smp_rmb() {
     unsafe {
         core::arch::asm!("lfence", options(nostack, preserves_flags));
     }
+}
+
+// copy pasted from libafl_qemu/src/modules/edges.rs
+// adapted from https://xorshift.di.unimi.it/splitmix64.c
+#[inline]
+#[must_use]
+pub const fn hash_me(mut x: u64) -> u64 {
+    x = (x ^ (x.overflowing_shr(30).0))
+        .overflowing_mul(0xbf58476d1ce4e5b9)
+        .0;
+    x = (x ^ (x.overflowing_shr(27).0))
+        .overflowing_mul(0x94d049bb133111eb)
+        .0;
+    x ^ (x.overflowing_shr(31).0)
 }
 
 #[cfg(test)]
