@@ -357,14 +357,10 @@ impl IntelPT {
             }
         };
 
-        // println!("Intel PT: decoding {len} bytes");
         if let Some(b) = copy_buffer {
             b.extend_from_slice(data.as_ref());
         }
 
-        // TODO handle decoding failures with config.decode.callback = <decode function>; config.decode.context = <decode context>;??
-        // apparently the rust library doesn't have the context parameter for the image.set_callback
-        // also, under the hood looks like it is passing the callback itself as context to the C fn 🤔
         // TODO remove unwrap()
         let mut config = ConfigBuilder::new(data.as_mut()).unwrap();
         if let Some(cpu) = &*CURRENT_CPU {
@@ -545,7 +541,7 @@ impl IntelPT {
     /// Check if Intel PT is available on the current system and can be used in combination with
     /// QEMU.
     ///
-    /// If you don't use this with QEMU check out [`Self::availability()`] instead.
+    /// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
     pub fn availability_in_qemu() -> Result<(), Error> {
         let mut reasons = match Self::availability() {
             Err(Error::Unsupported(s, _)) => vec![s],
@@ -678,8 +674,9 @@ mod test {
     use super::*;
 
     // PERF_BUFFER_SIZE should be 1+2^n pages
-    const_assert!((PERF_BUFFER_SIZE - PAGE_SIZE).is_power_of_two());
+    const_assert!(((PERF_BUFFER_SIZE - PAGE_SIZE) / PAGE_SIZE).is_power_of_two());
     // PERF_AUX_BUFFER_SIZE must be page aligned
+    // TODO:replace with is_multiple_of once stable
     const_assert_eq!(PERF_AUX_BUFFER_SIZE % PAGE_SIZE, 0);
     // PERF_AUX_BUFFER_SIZE must be a power of two
     const_assert!(PERF_AUX_BUFFER_SIZE.is_power_of_two());

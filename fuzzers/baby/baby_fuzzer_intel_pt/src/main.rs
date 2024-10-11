@@ -97,7 +97,6 @@ pub fn main() {
 
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe { IntelPTHook::new(SIGNALS_PTR, SIGNALS.len()) };
-    //let pt_hook = IntelPTHook::new();
 
     type PTInProcessExecutor<'a, H, OT, S> =
         GenericInProcessExecutor<H, &'a mut H, (IntelPTHook, ()), OT, S>;

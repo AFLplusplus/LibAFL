@@ -12,8 +12,8 @@ fn main() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
     if cfg!(feature = "intel_pt") && target_os != "linux" {
         println!(
-            "cargo:warning=The 'intel_pt' feature is enabled, but this is not a Linux system \
-            ({target_os}). The feature will not work."
+            "cargo:warning=The 'intel_pt' feature is enabled, it is compatible only with linux but \
+            you are building for ({target_os}). The feature will not work."
         );
     }
 
