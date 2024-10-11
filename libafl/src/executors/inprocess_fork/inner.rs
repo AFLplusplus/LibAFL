@@ -80,15 +80,7 @@ where
     type State = S;
 }
 
-impl<HT, OT, S, SP, EM, Z> HasTimeout for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
-where
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
+impl<HT, OT, S, SP, EM, Z> HasTimeout for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> {
     /// Set the thresold for timeout
     fn set_timeout(&mut self, timeout: Duration) {
         #[cfg(target_os = "linux")]

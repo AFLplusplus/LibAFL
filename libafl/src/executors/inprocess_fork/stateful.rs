@@ -160,13 +160,8 @@ where
 impl<'a, H, HT, OT, S, SP, ES, EM, Z> HasTimeout
     for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where
-    H: FnMut(&S::Input, &mut ES) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
+    S: UsesInput,
 {
     fn set_timeout(&mut self, timeout: Duration) {
         self.inner.set_timeout(timeout);
@@ -176,7 +171,6 @@ where
         self.inner.timeout()
     }
 }
-
 impl<'a, H, HT, OT, S, SP, ES, EM, Z>
     StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
 where

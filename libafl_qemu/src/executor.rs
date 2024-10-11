@@ -432,13 +432,12 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<CM, ED, EM, ET, H, OT, S, SM, SP, Z> HasTimeout
-    for QemuForkExecutor<'_, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
+impl<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z> HasTimeout
+    for QemuForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>
 where
     CM: CommandManager<ED, ET, S, SM>,
-    EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<S>,
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
+    H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
     SP: ShMemProvider,
