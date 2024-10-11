@@ -115,9 +115,23 @@ where
     }
 }
 
-struct IfModule<M> {
+/// A [`EmulatorModule`] that can be enabled conditionally during construction.
+pub struct IfModule<M> {
+    /// If this module is enabled or not
     enabled: bool,
+    /// The inner module
     inner: M,
+}
+
+impl<M> IfModule<M> {
+    /// Create a new [`IfModule`] wrapping an [`EmulatorModule`]
+    /// that will either be enabled or disabled, specified by the `enabled` flag.
+    pub fn new(module: M, enabled: bool) {
+        Self {
+            enabled,
+            inner: module,
+        }
+    }
 }
 
 impl<S, M: EmulatorModule<S>> EmulatorModule<S> for IfModule<M> {
