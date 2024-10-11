@@ -772,10 +772,12 @@ impl Qemu {
     /// Read a value from a guest address.
     ///
     /// # Safety
-    /// This will read from a translated guest address.
+    /// In usermode, this will read from a translated guest address.
     /// This may only be safely used for valid guest addresses.
+    ///
+    /// In any case, no check will be performed on the correctness of the operation.
+    ///
     /// Please refer to [`CPU::read_mem`] for more details.
-    #[cfg(feature = "usermode")]
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
@@ -785,10 +787,12 @@ impl Qemu {
     /// Write a value to a guest address.
     ///
     /// # Safety
-    /// This will read from a translated guest address.
+    /// In usermode, this will write to a translated guest address.
+    ///
+    /// In any case, no check will be performed on the correctness of the operation.
+    ///
     /// This may only be safely used for valid guest addresses.
     /// Please refer to [`CPU::write_mem`] for more details.
-    #[cfg(feature = "usermode")]
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
