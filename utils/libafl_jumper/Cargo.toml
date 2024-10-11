@@ -2,6 +2,14 @@
 name = "libafl_jumper"
 edition = "2021"
 version.workspace = true
+description = "LibAFL_Jumper: Jump to any address in memory."
+repository = "https://github.com/AFLplusplus/LibAFL/"
+license = "MIT OR Apache-2.0"
+categories = [
+  "development-tools::testing",
+  "os",
+]
+keywords = ["fuzzing", "libafl"]
 
 [features]
 default=["std"]
