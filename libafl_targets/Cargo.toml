@@ -86,4 +86,6 @@ serde = { workspace = true, default-features = false, features = [
 ] } # serialization lib
 meminterval = { workspace = true, features = ["serde"], optional = true }
 ahash = { workspace = true, default-features = false, optional = true }
-# serde-big-array = "0.3.2"
+
+[lints]
+workspace = true

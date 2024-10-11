@@ -5,14 +5,6 @@ Have a look at `libafl_qemu` for higher-level abstractions.
 __Warning__: The documentation is built by default for `x86_64` in `usermode`. To access the documentation of other architectures or systemmode, the documentation must be rebuilt with the right features.
 */
 
-#![forbid(unexpected_cfgs)]
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(non_snake_case)]
-#![allow(improper_ctypes)]
-#![allow(unused_mut)]
-#![allow(clippy::all)]
-#![allow(clippy::pedantic)]
 #![cfg_attr(nightly, feature(used_with_arg))]
 
 #[cfg(target_os = "linux")]

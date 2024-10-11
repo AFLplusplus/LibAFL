@@ -73,3 +73,6 @@ libafl_qemu = { path = "../libafl_qemu", version = "0.13.2" }
 [lib]
 name = "libafl_sugar"
 crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true

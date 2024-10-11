@@ -23,8 +23,11 @@ categories = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-log = "0.4.20"
+log = { workspace = true }
 
 [lib]
 name = "deexit"
 crate-type = ["cdylib"]
+
+[lints]
+workspace = true

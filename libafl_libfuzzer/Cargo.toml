@@ -50,3 +50,6 @@ features = ["document-features"]
 all-features = true
 
 rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

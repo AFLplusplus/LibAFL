@@ -1,24 +1,7 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
 #![no_std]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![forbid(unexpected_cfgs)]
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::pub_underscore_fields,
-    clippy::into_iter_without_iter, // broken
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,

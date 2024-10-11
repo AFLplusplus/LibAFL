@@ -142,3 +142,6 @@ cc = { workspace = true }
 [lib]
 name = "libafl_qemu"
 crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true

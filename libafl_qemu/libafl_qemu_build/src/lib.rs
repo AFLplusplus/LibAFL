@@ -1,6 +1,3 @@
-#![forbid(unexpected_cfgs)]
-#![allow(clippy::missing_panics_doc)]
-
 // #[rustversion::nightly]
 // use std::io::{BufRead, BufReader};
 use std::{
