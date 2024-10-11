@@ -92,17 +92,12 @@ z3 = "0.12.1"
 # Forbid
 unexpected_cfgs = "forbid"
 
-# Deny
-
-# Warn
-
 # Allow
 incomplete_features = "allow"
 ambiguous_glob_reexports = "allow"
 
-[workspace.lints.clippy]
-# Forbid
 
+[workspace.lints.clippy]
 # Deny
 all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
@@ -126,20 +121,11 @@ negative_feature_names = "allow"
 unsafe_derive_deserialize = "allow"
 similar_names = "allow"
 too_many_lines = "allow"
-into_iter_without_iter = "allow"        # Broken
-borrow_as_ptr = "allow"                 # Till they fix this buggy lint in clippy
-borrow_deref_ref = "allow"              # Till they fix this buggy lint in clippy
 
 
 [workspace.lints.rustdoc]
-# Forbid
-
 # Deny
 broken_intra_doc_links = "deny"
-
-# Warn
-
-# Allow
 
 
 [profile.release]
