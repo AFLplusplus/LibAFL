@@ -4,7 +4,7 @@ LibAFL supports different instrumentation engines for binary-only fuzzing.
 A potent cross-platform (Windows, MacOS, Android, Linux, iOS) option for binary-only fuzzing is Frida; the dynamic instrumentation tool.
 
 In this section, we will talk about the components in fuzzing with `libafl_frida`.
-You can take a look at a working example in our [`fuzzers/binary_only/frida_libpng`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/binary_only/frida_libpng) folder for Linux, and [`fuzzers/binary_only/frida_gdiplus`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/binary_only/frida_gdiplus) for Windows.
+You can take a look at a working example in our [`fuzzers/binary_only/frida_libpng`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/binary_only/frida_libpng) folder for Linux, and [`fuzzers/binary_only/frida_windows_gdiplus`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/binary_only/frida_windows_gdiplus) for Windows.
 
 ## Dependencies
 

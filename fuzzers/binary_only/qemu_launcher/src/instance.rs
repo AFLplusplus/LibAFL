@@ -1,5 +1,5 @@
 use core::{fmt::Debug, ptr::addr_of_mut};
-use std::{marker::PhantomData, ops::Range, process};
+use std::{fs, marker::PhantomData, ops::Range, process};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -7,8 +7,8 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::EventRestarter,
-    executors::ShadowExecutor,
+    events::{EventRestarter, NopEventManager},
+    executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
@@ -27,7 +27,7 @@ use libafl::{
         StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState, UsesState},
-    Error, HasMetadata,
+    Error, HasMetadata, NopFuzzer,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::StdShMemProvider;
@@ -61,6 +61,9 @@ pub type ClientMgr<M> =
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
+    /// The harness. We create it before forking, then `take()` it inside the client.
+    #[builder(setter(strip_option))]
+    harness: Option<Harness>,
     qemu: Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
@@ -186,7 +189,12 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         state.add_metadata(tokens);
 
-        let harness = Harness::new(self.qemu)?;
+        let harness = self
+            .harness
+            .take()
+            .expect("The harness can never be None here!");
+        harness.post_fork();
+
         let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
                            _state: &mut _,
                            input: &BytesInput| harness.run(input);
@@ -195,6 +203,34 @@ impl<'a, M: Monitor> Instance<'a, M> {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
+
+        if let Some(rerun_input) = &self.options.rerun_input {
+            // TODO: We might want to support non-bytes inputs at some point?
+            let bytes = fs::read(rerun_input)
+                .unwrap_or_else(|_| panic!("Could not load file {rerun_input:?}"));
+            let input = BytesInput::new(bytes);
+
+            let mut executor = QemuExecutor::new(
+                emulator,
+                &mut harness,
+                observers,
+                &mut fuzzer,
+                &mut state,
+                &mut self.mgr,
+                self.options.timeout,
+            )?;
+
+            executor
+                .run_target(
+                    &mut NopFuzzer::new(),
+                    &mut state,
+                    &mut NopEventManager::new(),
+                    &input,
+                )
+                .expect("Error running target");
+            // We're done :)
+            process::exit(0);
+        }
 
         if self.options.is_cmplog_core(self.core_id) {
             // Create a QEMU in-process executor

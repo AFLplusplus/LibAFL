@@ -11,16 +11,17 @@ use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
 use libafl_qemu::modules::injections::InjectionModule;
 use libafl_qemu::{
-    elf::EasyElf,
     modules::{
         asan::{init_qemu_with_asan, AsanModule},
         asan_guest::{init_qemu_with_asan_guest, AsanGuestModule},
         cmplog::CmpLogModule,
+        DrCovModule,
     },
-    ArchExtras, GuestAddr, Qemu,
+    Qemu,
 };
 
 use crate::{
+    harness::Harness,
     instance::{ClientMgr, Instance},
     options::FuzzerOptions,
 };
@@ -38,7 +39,7 @@ impl<'a> Client<'a> {
         Client { options }
     }
 
-    fn args(&self) -> Result<Vec<String>, Error> {
+    pub fn args(&self) -> Result<Vec<String>, Error> {
         let program = env::args()
             .next()
             .ok_or_else(|| Error::empty_optional("Failed to read program name"))?;
@@ -49,22 +50,13 @@ impl<'a> Client<'a> {
     }
 
     #[allow(clippy::unused_self)] // Api should look the same as args above
-    fn env(&self) -> Vec<(String, String)> {
+    pub fn env(&self) -> Vec<(String, String)> {
         env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
             .collect::<Vec<(String, String)>>()
     }
 
-    fn start_pc(qemu: Qemu) -> Result<GuestAddr, Error> {
-        let mut elf_buffer = Vec::new();
-        let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
-
-        let start_pc = elf
-            .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
-            .ok_or_else(|| Error::empty_optional("Symbol LLVMFuzzerTestOneInput not found"))?;
-        Ok(start_pc)
-    }
-
+    #[allow(clippy::too_many_lines)]
     pub fn run<M: Monitor>(
         &self,
         state: Option<ClientState>,
@@ -72,9 +64,11 @@ impl<'a> Client<'a> {
         core_id: CoreId,
     ) -> Result<(), Error> {
         let mut args = self.args()?;
+        Harness::edit_args(&mut args);
         log::debug!("ARGS: {:#?}", args);
 
         let mut env = self.env();
+        Harness::edit_env(&mut env);
         log::debug!("ENV: {:#?}", env);
 
         let is_asan = self.options.is_asan_core(core_id);
@@ -96,9 +90,6 @@ impl<'a> Client<'a> {
             }
         };
 
-        let start_pc = Self::start_pc(qemu)?;
-        log::debug!("start_pc @ {start_pc:#x}");
-
         #[cfg(not(feature = "injections"))]
         let injection_module = None;
 
@@ -118,13 +109,7 @@ impl<'a> Client<'a> {
                 }
             });
 
-        qemu.entry_break(start_pc);
-
-        let ret_addr: GuestAddr = qemu
-            .read_return_address()
-            .map_err(|e| Error::unknown(format!("Failed to read return address: {e:?}")))?;
-        log::debug!("ret_addr = {ret_addr:#x}");
-        qemu.set_breakpoint(ret_addr);
+        let harness = Harness::init(qemu).expect("Error setting up harness.");
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
@@ -136,11 +121,21 @@ impl<'a> Client<'a> {
         let instance_builder = Instance::builder()
             .options(self.options)
             .qemu(qemu)
+            .harness(harness)
             .mgr(mgr)
             .core_id(core_id)
             .extra_tokens(extra_tokens);
 
-        if is_asan && is_cmplog {
+        if self.options.rerun_input.is_some() && self.options.drcov.is_some() {
+            // Special code path for re-running inputs with DrCov.
+            // TODO: Add ASan support, injection support
+            let drcov = self.options.drcov.as_ref().unwrap();
+            let drcov = DrCovModule::builder()
+                .filename(drcov.clone())
+                .full_trace(true)
+                .build();
+            instance_builder.build().run(tuple_list!(drcov), state)
+        } else if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
                     tuple_list!(
