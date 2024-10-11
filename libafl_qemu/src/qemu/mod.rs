@@ -155,10 +155,10 @@ static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
 
 unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
     unsafe {
-        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Qemu, &'r str) -> bool>);
+        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(Qemu, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let qemu = Qemu::get_unchecked();
-        closure(&qemu, cmd)
+        closure(qemu, cmd)
     }
 }
 
@@ -552,7 +552,7 @@ impl Qemu {
         argv.push(ptr::null()); // argv is always null terminated.
 
         unsafe {
-            libafl_qemu_init(argc, argv.as_ptr() as *mut *mut i8);
+            libafl_qemu_init(argc, argv.as_ptr() as *mut *mut ::std::os::raw::c_char);
         }
 
         #[cfg(emulation_mode = "systemmode")]

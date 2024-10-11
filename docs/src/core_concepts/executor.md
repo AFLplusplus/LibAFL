@@ -57,7 +57,7 @@ On your fuzzer side, you can allocate a shared memory region and make the `EDGES
 ```rust,ignore
 let mut shmem;
 unsafe{
-    shmem = StdShMemProvider::new().unwrap().new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
+    shmem = StdShMemProvider::new().unwrap().new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
 }
 let shmem_buf = shmem.as_slice_mut();
 unsafe{

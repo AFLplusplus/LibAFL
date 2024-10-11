@@ -38,7 +38,9 @@ use nix::{
 
 use super::HasTimeout;
 #[cfg(feature = "regex")]
-use crate::observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver};
+use crate::observers::{
+    get_asan_runtime_flags, get_asan_runtime_flags_with_log_path, AsanBacktraceObserver,
+};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
@@ -310,6 +312,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        dump_asan_logs: bool,
         coverage_map_size: Option<usize>,
         debug_output: bool,
     ) -> Result<Self, Error> {
@@ -322,6 +325,7 @@ impl Forkserver {
             memlimit,
             is_persistent,
             is_deferred_frksrv,
+            dump_asan_logs,
             coverage_map_size,
             debug_output,
             KILL_SIGNAL_DEFAULT,
@@ -341,6 +345,7 @@ impl Forkserver {
         memlimit: u64,
         is_persistent: bool,
         is_deferred_frksrv: bool,
+        dump_asan_logs: bool,
         coverage_map_size: Option<usize>,
         debug_output: bool,
         kill_signal: Signal,
@@ -386,7 +391,14 @@ impl Forkserver {
         }
 
         #[cfg(feature = "regex")]
-        command.env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path());
+        {
+            let asan_options = if dump_asan_logs {
+                get_asan_runtime_flags_with_log_path()
+            } else {
+                get_asan_runtime_flags()
+            };
+            command.env("ASAN_OPTIONS", asan_options);
+        }
 
         let fsrv_handle = match command
             .env("LD_BIND_NOW", "1")
@@ -823,6 +835,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
+                self.asan_obs.is_some(),
                 self.map_size,
                 self.debug_child,
                 self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),

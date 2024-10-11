@@ -66,28 +66,6 @@ jobs:
       - name: Test libafl_targets no_std
         run: cd libafl_targets && cargo test --no-default-features
 
-  llvm-tester:
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-    strategy:
-      matrix:
-        llvm-version: [ "16", "17" ] # Add 18 when KyleMayes/install-llvm-action enables it
-    steps:
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - name: Install curl
-        run: sudo apt-get install clang
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "${{matrix.llvm-version}}"
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "llvm-tester" }
-      - name: Build and test with llvm-${{ matrix.llvm-version }}
-        run: pwd && ls & cd libafl_cc && cargo build --release
-
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:
@@ -246,9 +224,7 @@ jobs:
 
   fuzzers:
     needs:
-      - ubuntu
       - fuzzers-preflight
-      - common
     strategy:
       fail-fast: true
       matrix:
@@ -271,7 +247,7 @@ jobs:
           # Binary-only
           - ./fuzzers/binary_only/fuzzbench_fork_qemu
           - ./fuzzers/binary_only/frida_executable_libpng
-          - ./fuzzers/binary_only/frida_gdiplus
+          - ./fuzzers/binary_only/frida_windows_gdiplus
           - ./fuzzers/binary_only/frida_libpng
           - ./fuzzers/binary_only/fuzzbench_qemu
           - ./fuzzers/binary_only/tinyinst_simple
@@ -355,7 +331,6 @@ jobs:
 
   fuzzers-qemu:
     needs:
-      - common
       - changes
     if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
@@ -457,8 +432,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/binary_only/frida_gdiplus
-        run: cd fuzzers/binary_only/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+      - name: Build fuzzers/binary_only/frida_windows_gdiplus
+        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest

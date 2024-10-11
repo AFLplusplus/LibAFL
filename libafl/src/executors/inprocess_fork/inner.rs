@@ -35,15 +35,7 @@ use crate::{
 };
 
 /// Inner state of GenericInProcessExecutor-like structures.
-pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
-where
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
+pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> {
     pub(super) hooks: (InChildProcessHooks<S>, HT),
     pub(super) shmem_provider: SP,
     pub(super) observers: OT,
@@ -56,12 +48,9 @@ where
 
 impl<HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S::Input, S> + Debug,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S> + Debug,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    HT: Debug,
+    OT: Debug,
+    SP: Debug,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -86,12 +75,7 @@ where
 
 impl<HT, OT, S, SP, EM, Z> UsesState for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S::Input, S>,
     S: State,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type State = S;
 }
@@ -255,9 +239,6 @@ where
     HT: ExecutorHooksTuple<S>,
     S: State,
     OT: ObserversTuple<S::Input, S>,
-    SP: ShMemProvider,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: UsesState<State = S>,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
@@ -358,12 +339,8 @@ where
 
 impl<HT, OT, S, SP, EM, Z> HasObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple<S>,
-    S: State,
     OT: ObserversTuple<S::Input, S>,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    S: State,
 {
     type Observers = OT;
 
