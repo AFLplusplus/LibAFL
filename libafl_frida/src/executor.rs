@@ -14,10 +14,9 @@ use libafl::{
     state::{HasCorpus, HasSolutions},
 };
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout, InProcessExecutor},
     inputs::HasTargetBytes,
     observers::ObserversTuple,
-    prelude::HasTimeout,
     state::{HasExecutions, State, UsesState},
     Error,
 };

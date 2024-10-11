@@ -4,20 +4,17 @@ use core::time::Duration;
 use std::{collections::VecDeque, fmt::Debug, marker::PhantomData};
 
 use libafl::{
-    inputs::UsesInput,
-    prelude::{BytesInput, HasTimeout, Executor, ExitKind, HasObservers, ObserversTuple, TimeObserver},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    inputs::{BytesInput, UsesInput},
+    observers::ObserversTuple,
     stages::Stage,
     state::{HasCorpus, UsesState},
     HasMetadata,
 };
-use libafl_bolts::{
-    tuples::{Handle, Handled},
-    Error,
-};
+use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[derive(Debug)]
 pub struct VerifyTimeoutsStage<E> {
-    time_observer_handle: Handle<TimeObserver>,
     doubled_timeout: Duration,
     original_timeout: Duration,
     // The handle to our time observer
@@ -26,9 +23,8 @@ pub struct VerifyTimeoutsStage<E> {
 
 impl<E> VerifyTimeoutsStage<E> {
     /// Create a `VerifyTimeoutsStage`
-    pub fn new(configured_timeout: Duration, time_observer: &TimeObserver) -> Self {
+    pub fn new(configured_timeout: Duration) -> Self {
         Self {
-            time_observer_handle: time_observer.handle(),
             doubled_timeout: configured_timeout * 2,
             original_timeout: configured_timeout,
             phantom: PhantomData,
@@ -90,10 +86,7 @@ where
             .clone();
         executor.set_timeout(self.doubled_timeout);
         while let Some(input) = timeouts.pop() {
-            executor.observers_mut().pre_exec_all(state, &input)?;
             let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
-            let observers = executor.observers();
-            let observer = &observers[&self.time_observer_handle];
             if matches!(exit_kind, ExitKind::Timeout) {}
         }
         executor.set_timeout(self.original_timeout);

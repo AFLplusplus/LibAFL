@@ -226,7 +226,6 @@ where
         |_, _, _, _| Ok(!opt.ignore_timeouts),
         tuple_list!(VerifyTimeoutsStage::new(
             Duration::from_millis(opt.hang_timeout),
-            &time_observer
         )),
     );
 

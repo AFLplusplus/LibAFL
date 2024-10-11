@@ -5,10 +5,9 @@ use std::{
 };
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
-    prelude::HasTimeout,
     state::{HasExecutions, State, UsesState},
     Error,
 };

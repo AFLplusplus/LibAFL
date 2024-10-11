@@ -1,7 +1,7 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use libafl::{
-    corpus::Testcase, executors::ExitKind, feedbacks::Feedback, prelude::StateInitializer, Error,
+    corpus::Testcase, executors::ExitKind, feedbacks::{StateInitializer, Feedback}, Error,
 };
 use libafl_bolts::Named;
 

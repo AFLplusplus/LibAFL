@@ -1,10 +1,9 @@
 use core::{marker::PhantomData, ptr, time::Duration};
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::HasTargetBytes,
     observers::ObserversTuple,
-    prelude::HasTimeout,
     state::{HasExecutions, State, UsesState},
     Error,
 };
