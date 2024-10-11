@@ -316,6 +316,7 @@ pub fn disas_count(decoder: &InstDecoder, data: &[u8], count: usize) -> Vec<Inst
 
 #[cfg(target_arch = "aarch64")]
 /// Disassemble "count" number of instructions
+#[must_use]
 pub fn disas_count(decoder: &InstDecoder, data: &[u8], _count: usize) -> Vec<Instruction> {
     let mut ret = vec![];
 
