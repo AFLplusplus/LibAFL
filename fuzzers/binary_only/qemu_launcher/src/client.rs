@@ -149,7 +149,7 @@ impl<'a> Client<'a> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, asan_lib.take().unwrap()),
+                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
                         injection_module
                     ),
                     state,
@@ -158,7 +158,7 @@ impl<'a> Client<'a> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, asan_lib.take().unwrap()),
+                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
                     ),
                     state,
                 )

@@ -98,7 +98,7 @@ impl Harness {
         }
         let len = len as GuestReg;
 
-        unsafe { self.qemu.write_mem(self.input_addr, buf) };
+        self.qemu.write_mem(self.input_addr, buf).unwrap();
 
         self.qemu
             .write_reg(Regs::Pc, self.pc)
