@@ -3,9 +3,8 @@ use std::{borrow::Cow, collections::VecDeque};
 use libafl::{
     corpus::{Corpus, Testcase},
     executors::ExitKind,
-    feedbacks::{Feedback, FeedbackFactory},
+    feedbacks::{Feedback, FeedbackFactory, StateInitializer},
     inputs::Input,
-    prelude::StateInitializer,
     state::HasCorpus,
 };
 use libafl_bolts::{Error, Named};
