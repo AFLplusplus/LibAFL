@@ -18,7 +18,7 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
     }
 }
 
-/// Good to kickstart an emulated fuzzing process inside LibAFL_QEMU.
+/// Good to kickstart an emulated fuzzing process inside `LibAFL_QEMU`.
 ///
 /// # Safety
 /// This is the most unsafest function you will see today.
@@ -84,9 +84,9 @@ pub unsafe extern "C" fn libafl_jmp(target: *mut c_void) -> ! {
 #[cfg(feature = "std")]
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        panic!("No address given");
-    }
+
+    assert!(args.len() >= 2, "No address given");
+
     let mut hex_str: &str = &args[1];
     if hex_str.starts_with("0x") || hex_str.starts_with("0X") {
         hex_str = &hex_str[2..];
@@ -127,15 +127,16 @@ fn decode_hex_and_jmp(hex_string: &str) -> ! {
     let mut addr: u64 = 0;
     for val in hex_buf {
         addr = addr.shl(8);
-        addr += *val as u64;
+        addr += u64::from(*val);
     }
 
     #[cfg(feature = "std")]
     println!("Hex: {addr:#x}");
 
+    #[allow(clippy::cast_possible_truncation)]
     let addr = addr as usize;
 
-    let entrypoint: *mut c_void = addr as *const c_void as _; //opt.entrypoint as *mut c_void;
+    let entrypoint = addr as *mut c_void;
 
     // # Safety
     // Obviously unsafe, we're just jumping to a random place in memory...
