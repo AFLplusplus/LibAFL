@@ -5,10 +5,9 @@ use std::{
 
 use libafl::{
     corpus::CorpusId,
-    generators::Generator,
+    generators::{Generator, RandBytesGenerator},
     inputs::{BytesInput, HasTargetBytes, Input, MutVecInput},
     mutators::{MutationResult, Mutator},
-    prelude::RandBytesGenerator,
     state::HasRand,
     Error, SerdeAny,
 };

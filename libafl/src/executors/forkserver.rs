@@ -9,7 +9,7 @@ use core::{
 use std::{
     env,
     ffi::{OsStr, OsString},
-    io::{self, prelude::*, ErrorKind},
+    io::{self, ErrorKind, Read, Write},
     os::{
         fd::{AsRawFd, BorrowedFd},
         unix::{io::RawFd, process::CommandExt},
