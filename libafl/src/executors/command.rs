@@ -583,7 +583,7 @@ impl CommandExecutorBuilder {
 ///     fn exec_timeout(&self) -> Duration {
 ///         Duration::from_secs(5)
 ///     }
-///     fn exec_timeout_mut(&mut self, duration: Duration) {
+///     fn exec_timeout_mut(&mut self) -> &mut Duration {
 ///         todo!()
 ///     }
 /// }

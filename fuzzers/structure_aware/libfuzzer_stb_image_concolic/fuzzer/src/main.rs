@@ -257,7 +257,7 @@ impl CommandConfigurator<BytesInput> for MyCommandConfigurator {
         Duration::from_secs(5)
     }
 
-    fn exec_timeout_mut(&mut self, duration: Duration) {
+    fn exec_timeout_mut(&mut self) -> &mut Duration {
         todo!()
     }
 }
