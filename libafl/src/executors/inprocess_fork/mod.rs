@@ -182,8 +182,8 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> HasTimeout
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, OT, S, SP, EM, Z> HasTimeout
+    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S::Input, S>,

@@ -224,9 +224,9 @@ where
     // Like AFL++ we re-run all timeouts with double the timeout to assert that they are not false positives
     let timeout_verify_stage = IfStage::new(
         |_, _, _, _| Ok(!opt.ignore_timeouts),
-        tuple_list!(VerifyTimeoutsStage::new(
-            Duration::from_millis(opt.hang_timeout),
-        )),
+        tuple_list!(VerifyTimeoutsStage::new(Duration::from_millis(
+            opt.hang_timeout
+        ),)),
     );
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.

@@ -157,8 +157,8 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, ES, EM, Z> HasTimeout
-    for StatefulGenericInProcessForkExecutor<'a, H, HT, OT, S, SP, ES, EM, Z>
+impl<H, HT, OT, S, SP, ES, EM, Z> HasTimeout
+    for StatefulGenericInProcessForkExecutor<'_, H, HT, OT, S, SP, ES, EM, Z>
 where
     H: FnMut(&mut ES, &S::Input) -> ExitKind + ?Sized,
     S: UsesInput,
