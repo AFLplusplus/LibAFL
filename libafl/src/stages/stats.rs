@@ -396,7 +396,6 @@ where
             saved_crashes: &stats.saved_crashes,
             execs_done: &stats.execs_done,
         };
-        println!("writing");
         self.write_fuzzer_stats(&stats)?;
         if self.plot_file_path.is_some() {
             self.write_plot_data(&plot_data)?;
@@ -473,10 +472,6 @@ where
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
             }
-        } else {
-            return Err(Error::illegal_state(
-                "testcase must have scheduler metdata?",
-            ));
         }
         Ok(())
     }
