@@ -9,7 +9,7 @@ use crate::{
     state::{State, UsesState},
     HasMetadata,
 };
-
+/// Track an inner Stage's execution time
 #[derive(Debug)]
 pub struct TimeTrackingStageWrapper<T, S, ST> {
     inner: ST,
