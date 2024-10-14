@@ -490,9 +490,19 @@ impl Forkserver {
     /// Read from the st pipe
     pub fn read_st(&mut self) -> Result<i32, Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
-        self.st_pipe.read_exact(&mut buf)?;
+        let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
-        Ok(val)
+        if rlen == size_of::<i32>() {
+            Ok(val)
+        } else {
+            // NOTE: The underlying API does not guarantee that the read will return
+            //       exactly four bytes, but the chance of this happening is very low.
+            //       This is a sacrifice of correctness for performance.
+            Err(Error::illegal_state(format!(
+                "Could not read from st pipe. Expected {} bytes, got {rlen} bytes",
+                size_of::<i32>()
+            )))
+        }
     }
 
     /// Read bytes of any length from the st pipe
@@ -504,9 +514,18 @@ impl Forkserver {
 
     /// Write to the ctl pipe
     pub fn write_ctl(&mut self, val: i32) -> Result<(), Error> {
-        self.ctl_pipe
-            .write_all(&val.to_ne_bytes())
-            .map_err(Into::into)
+        let slen = self.ctl_pipe.write(&val.to_ne_bytes())?;
+        if slen == size_of::<i32>() {
+            Ok(())
+        } else {
+            // NOTE: The underlying API does not guarantee that exactly four bytes
+            //       are written, but the chance of this happening is very low.
+            //       This is a sacrifice of correctness for performance.
+            Err(Error::illegal_state(format!(
+                "Could not write to ctl pipe. Expected {} bytes, wrote {slen} bytes",
+                size_of::<i32>()
+            )))
+        }
     }
 
     /// Read a message from the child process.
