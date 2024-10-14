@@ -14,15 +14,11 @@ use libafl::{
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-#[cfg(feature = "simplemgr")]
-use libafl_bolts::core_affinity::CoreId;
+use libafl_bolts::{core_affinity::CoreId, current_time, llmp::LlmpBroker, tuples::tuple_list};
 #[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{
-    current_time,
-    llmp::LlmpBroker,
-    prelude::{CoreId, StateRestorer},
-    tuples::tuple_list,
+    shmem::{ShMemProvider, StdShMemProvider},
+    staterestore::StateRestorer,
 };
 #[cfg(unix)]
 use {
