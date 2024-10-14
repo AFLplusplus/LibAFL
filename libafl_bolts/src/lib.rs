@@ -1075,6 +1075,46 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
     }));
 }
 
+// Credit goes to https://github.com/thomcc/nonzero_lit
+// We don't want add another dependency and just want to use usize macro of it.
+#[doc(hidden)]
+pub mod _private {
+    pub use core::num::NonZeroUsize;
+
+    macro_rules! define_nz_ctor {
+        ($(pub fn $nz_func:ident($n:ident : $int:ident) -> $NonZeroInt:ident;)+) => {$(
+            #[inline]
+            #[must_use]
+            pub const fn $nz_func($n : $int) -> $NonZeroInt {
+                // Note: Hacky const fn assert.
+                let _ = ["N must not be zero"][($n == 0) as usize];
+
+                match $NonZeroInt::new($n) {
+                    Some(x) => x,
+                    // The assert above makes this branch unreachable
+                    None => loop {},
+                }
+            }
+        )+};
+    }
+
+    define_nz_ctor! {
+        pub fn nz_usize(n: usize) -> NonZeroUsize;
+    }
+}
+
+/// 0 cost way to create check nonzero on compilation.
+#[macro_export]
+macro_rules! nonzero {
+    ($val:expr $(,)?) => {{
+        const __E: usize = $val;
+        {
+            const NZ: $crate::_private::NonZeroUsize = $crate::_private::nz_usize(__E);
+            NZ
+        }
+    }};
+}
+
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {

@@ -3,7 +3,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use core::{cell::RefCell, num::NonZeroUsize, time::Duration};
+use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -303,7 +303,7 @@ fn fuzz(
     let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
-        NonZeroUsize::new(7).unwrap(),
+        7,
         5,
     )?;
 

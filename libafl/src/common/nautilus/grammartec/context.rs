@@ -2,7 +2,10 @@ use alloc::{borrow::ToOwned, string::String, vec::Vec};
 use core::num::NonZero;
 
 use hashbrown::HashMap;
-use libafl_bolts::rands::{Rand, RomuDuoJrRand};
+use libafl_bolts::{
+    nonzero,
+    rands::{Rand, RomuDuoJrRand},
+};
 use pyo3::prelude::PyObject;
 
 use super::{
@@ -265,7 +268,7 @@ impl Context {
             .take_while(move |r| self.rules_to_min_size[*r] <= max_len)
             .filter(move |r| {
                 self.rules_to_num_options[*r] > 1
-                    || rand.below(nonzero_lit::usize!(100)) <= p_include_short_rules
+                    || rand.below(nonzero!(100)) <= p_include_short_rules
             })
     }
 

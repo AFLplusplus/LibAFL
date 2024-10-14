@@ -1,5 +1,5 @@
-use core::{fmt::Debug, num::NonZeroUsize, ptr::addr_of_mut};
-use std::{marker::PhantomData, ops::Range, process};
+use core::{fmt::Debug, ptr::addr_of_mut};
+use std::{fs, marker::PhantomData, ops::Range, process, time::Duration};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -7,8 +7,8 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::EventRestarter,
-    executors::ShadowExecutor,
+    events::{EventRestarter, NopEventManager},
+    executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
@@ -23,11 +23,11 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
-        StagesTuple, StdMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
+        ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState, UsesState},
-    Error, HasMetadata,
+    Error, HasMetadata, NopFuzzer,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::StdShMemProvider;
@@ -61,6 +61,9 @@ pub type ClientMgr<M> =
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
+    /// The harness. We create it before forking, then `take()` it inside the client.
+    #[builder(setter(strip_option))]
+    harness: Option<Harness>,
     qemu: Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
@@ -70,7 +73,7 @@ pub struct Instance<'a, M: Monitor> {
     phantom: PhantomData<M>,
 }
 
-impl<'a, M: Monitor> Instance<'a, M> {
+impl<M: Monitor> Instance<'_, M> {
     #[allow(clippy::similar_names)] // elf != self
     fn coverage_filter(&self, qemu: Qemu) -> Result<StdAddressFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
@@ -104,6 +107,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn run<ET>(&mut self, modules: ET, state: Option<ClientState>) -> Result<(), Error>
     where
         ET: EmulatorModuleTuple<ClientState> + Debug,
@@ -131,6 +135,11 @@ impl<'a, M: Monitor> Instance<'a, M> {
         let map_feedback = MaxMapFeedback::new(&edges_observer);
 
         let calibration = CalibrationStage::new(&map_feedback);
+
+        let stats_stage = IfStage::new(
+            |_, _, _, _| Ok(self.options.tui),
+            tuple_list!(AflStatsStage::new(Duration::from_secs(5))),
+        );
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
@@ -186,7 +195,12 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         state.add_metadata(tokens);
 
-        let harness = Harness::new(self.qemu)?;
+        let harness = self
+            .harness
+            .take()
+            .expect("The harness can never be None here!");
+        harness.post_fork();
+
         let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
                            _state: &mut _,
                            input: &BytesInput| harness.run(input);
@@ -195,6 +209,34 @@ impl<'a, M: Monitor> Instance<'a, M> {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
+
+        if let Some(rerun_input) = &self.options.rerun_input {
+            // TODO: We might want to support non-bytes inputs at some point?
+            let bytes = fs::read(rerun_input)
+                .unwrap_or_else(|_| panic!("Could not load file {rerun_input:?}"));
+            let input = BytesInput::new(bytes);
+
+            let mut executor = QemuExecutor::new(
+                emulator,
+                &mut harness,
+                observers,
+                &mut fuzzer,
+                &mut state,
+                &mut self.mgr,
+                self.options.timeout,
+            )?;
+
+            executor
+                .run_target(
+                    &mut NopFuzzer::new(),
+                    &mut state,
+                    &mut NopEventManager::new(),
+                    &input,
+                )
+                .expect("Error running target");
+            // We're done :)
+            process::exit(0);
+        }
 
         if self.options.is_cmplog_core(self.core_id) {
             // Create a QEMU in-process executor
@@ -224,7 +266,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
             let mutator = StdMOptMutator::new::<BytesInput, _>(
                 &mut state,
                 havoc_mutations().merge(tokens_mutations()),
-                NonZeroUsize::new(7).unwrap(),
+                7,
                 5,
             )?;
 
@@ -232,7 +274,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
                 StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!
-            let mut stages = tuple_list!(calibration, tracing, i2s, power);
+            let mut stages = tuple_list!(calibration, tracing, i2s, power, stats_stage);
 
             self.fuzz(&mut state, &mut fuzzer, &mut executor, &mut stages)
         } else {

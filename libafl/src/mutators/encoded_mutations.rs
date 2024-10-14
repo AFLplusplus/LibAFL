@@ -18,7 +18,7 @@ use crate::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
     },
-    random_corpus_id_with_disabled,
+    nonzero, random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -126,8 +126,8 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
             Ok(MutationResult::Skipped)
         } else {
             let val = state.rand_mut().choose(input.codes_mut()).unwrap();
-            let num = 1 + state.rand_mut().below(nonzero_lit::usize!(ARITH_MAX)) as u32;
-            *val = match state.rand_mut().below(nonzero_lit::usize!(2)) {
+            let num = 1 + state.rand_mut().below(nonzero!(ARITH_MAX)) as u32;
+            *val = match state.rand_mut().below(nonzero!(2)) {
                 0 => val.wrapping_add(num),
                 _ => val.wrapping_sub(num),
             };

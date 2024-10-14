@@ -3,7 +3,7 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use core::{num::NonZeroUsize, time::Duration};
+use core::time::Duration;
 use std::{
     env,
     os::raw::{c_char, c_int},
@@ -240,7 +240,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         if state.must_load_initial_inputs() {
             if input_dirs.is_empty() {
                 // Generator of printable bytearrays of max size 32
-                let mut generator = RandBytesGenerator::new(NonZeroUsize::new(32).unwrap());
+                let mut generator = RandBytesGenerator::new(32);
 
                 // Generate 8 initial inputs
                 state

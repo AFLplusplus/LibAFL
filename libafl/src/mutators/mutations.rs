@@ -18,7 +18,7 @@ use crate::{
     corpus::Corpus,
     inputs::HasMutatorBytes,
     mutators::{MutationResult, Mutator},
-    random_corpus_id_with_disabled,
+    nonzero, random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -311,7 +311,7 @@ where
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
-            *byte ^= 1 + state.rand_mut().below(nonzero_lit::usize!(254)) as u8;
+            *byte ^= 1 + state.rand_mut().below(nonzero!(254)) as u8;
             Ok(MutationResult::Mutated)
         }
     }
@@ -362,8 +362,8 @@ macro_rules! add_mutator_impl {
                     let val = <$size>::from_ne_bytes(bytes.try_into().unwrap());
 
                     // mutate
-                    let num = 1 + state.rand_mut().below(nonzero_lit::usize!(ARITH_MAX)) as $size;
-                    let new_val = match state.rand_mut().below(nonzero_lit::usize!(4)) {
+                    let num = 1 + state.rand_mut().below(nonzero!(ARITH_MAX)) as $size;
+                    let new_val = match state.rand_mut().below(nonzero!(4)) {
                         0 => val.wrapping_add(num),
                         1 => val.wrapping_sub(num),
                         2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
@@ -566,7 +566,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(nonzero_lit::usize!(16));
+        let mut amount = 1 + state.rand_mut().below(nonzero!(16));
         // # Safety
         // It's a safe assumption that size + 1 is never 0.
         // If we wrap around we have _a lot_ of elements - and the code will break later anyway.
@@ -629,7 +629,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(nonzero_lit::usize!(16));
+        let mut amount = 1 + state.rand_mut().below(nonzero!(16));
         // # Safety
         // size + 1 can never be 0
         let offset = state

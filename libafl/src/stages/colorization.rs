@@ -19,6 +19,7 @@ use crate::{
     executors::{Executor, HasObservers},
     inputs::{HasMutatorBytes, UsesInput},
     mutators::mutations::buffer_copy,
+    nonzero,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
@@ -353,11 +354,11 @@ where
             let c = match bytes[idx] {
                 0x41..=0x46 => {
                     // 'A' + 1 + rand('F' - 'A')
-                    0x41 + 1 + state.rand_mut().below(nonzero_lit::usize!(5)) as u8
+                    0x41 + 1 + state.rand_mut().below(nonzero!(5)) as u8
                 }
                 0x61..=0x66 => {
                     // 'a' + 1 + rand('f' - 'a')
-                    0x61 + 1 + state.rand_mut().below(nonzero_lit::usize!(5)) as u8
+                    0x61 + 1 + state.rand_mut().below(nonzero!(5)) as u8
                 }
                 0x30 => {
                     // '0' -> '1'
@@ -369,35 +370,35 @@ where
                 }
                 0x32..=0x39 => {
                     // '2' + 1 + rand('9' - '2')
-                    0x32 + 1 + state.rand_mut().below(nonzero_lit::usize!(7)) as u8
+                    0x32 + 1 + state.rand_mut().below(nonzero!(7)) as u8
                 }
                 0x47..=0x5a => {
                     // 'G' + 1 + rand('Z' - 'G')
-                    0x47 + 1 + state.rand_mut().below(nonzero_lit::usize!(19)) as u8
+                    0x47 + 1 + state.rand_mut().below(nonzero!(19)) as u8
                 }
                 0x67..=0x7a => {
                     // 'g' + 1 + rand('z' - 'g')
-                    0x67 + 1 + state.rand_mut().below(nonzero_lit::usize!(19)) as u8
+                    0x67 + 1 + state.rand_mut().below(nonzero!(19)) as u8
                 }
                 0x21..=0x2a => {
                     // '!' + 1 + rand('*' - '!');
-                    0x21 + 1 + state.rand_mut().below(nonzero_lit::usize!(9)) as u8
+                    0x21 + 1 + state.rand_mut().below(nonzero!(9)) as u8
                 }
                 0x2c..=0x2e => {
                     // ',' + 1 + rand('.' - ',')
-                    0x2c + 1 + state.rand_mut().below(nonzero_lit::usize!(2)) as u8
+                    0x2c + 1 + state.rand_mut().below(nonzero!(2)) as u8
                 }
                 0x3a..=0x40 => {
                     // ':' + 1 + rand('@' - ':')
-                    0x3a + 1 + state.rand_mut().below(nonzero_lit::usize!(6)) as u8
+                    0x3a + 1 + state.rand_mut().below(nonzero!(6)) as u8
                 }
                 0x5b..=0x60 => {
                     // '[' + 1 + rand('`' - '[')
-                    0x5b + 1 + state.rand_mut().below(nonzero_lit::usize!(5)) as u8
+                    0x5b + 1 + state.rand_mut().below(nonzero!(5)) as u8
                 }
                 0x7b..=0x7e => {
                     // '{' + 1 + rand('~' - '{')
-                    0x7b + 1 + state.rand_mut().below(nonzero_lit::usize!(3)) as u8
+                    0x7b + 1 + state.rand_mut().below(nonzero!(3)) as u8
                 }
                 0x2b => {
                     // '+' -> '/'

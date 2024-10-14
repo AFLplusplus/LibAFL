@@ -6,7 +6,7 @@ use libafl::{
     state::{State, UsesState},
     HasMetadata,
 };
-use libafl_bolts::current_time;
+use libafl_bolts::{current_time, Error};
 
 pub struct TimeTrackingStageWrapper<T, S, ST> {
     inner: ST,
@@ -46,7 +46,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut M,
-    ) -> Result<(), libafl::prelude::Error> {
+    ) -> Result<(), Error> {
         let before_run = current_time();
         self.inner.perform(fuzzer, executor, state, manager)?;
         let after_run = current_time();
@@ -55,11 +55,11 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, libafl::prelude::Error> {
+    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         self.inner.should_restart(state)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), libafl::prelude::Error> {
+    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
         self.inner.clear_progress(state)
     }
 
@@ -69,7 +69,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut M,
-    ) -> Result<(), libafl::prelude::Error> {
+    ) -> Result<(), Error> {
         self.inner
             .perform_restartable(fuzzer, executor, state, manager)
     }

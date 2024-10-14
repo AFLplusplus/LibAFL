@@ -1,6 +1,5 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
-use core::num::NonZero;
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
@@ -214,7 +213,7 @@ impl ForkserverBytesCoverageSugar<'_> {
             if state.must_load_initial_inputs() {
                 if self.input_dirs.is_empty() {
                     // Generator of printable bytearrays of max size 32
-                    let mut generator = RandBytesGenerator::new(NonZero::new(32).unwrap());
+                    let mut generator = RandBytesGenerator::new(32);
 
                     // Generate 8 initial inputs
                     state

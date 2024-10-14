@@ -10,6 +10,7 @@ use crate::{
     corpus::Corpus,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
+    nonzero,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
         ExecutionCountRestartHelper, MutationalStage, Stage,
@@ -250,7 +251,7 @@ where
             // fall back to random
             1 + state
                 .rand_mut()
-                .below(nonzero_lit::usize!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)),
+                .below(nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)),
         )
     }
 }

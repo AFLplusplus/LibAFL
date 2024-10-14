@@ -15,6 +15,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
+    nonzero,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
@@ -260,10 +261,7 @@ where
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
         // Safe to unwrap: DEFAULT_MUTATIONAL_MAX_ITERATIONS is never 0.
-        Self::transforming_with_max_iterations(
-            mutator,
-            nonzero_lit::usize!(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
-        )
+        Self::transforming_with_max_iterations(mutator, nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 
     /// Creates a new mutational stage with the given max iterations
@@ -284,10 +282,7 @@ where
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
         // Safe to unwrap: DEFAULT_MUTATIONAL_MAX_ITERATIONS is never 0.
-        Self::transforming_with_max_iterations(
-            mutator,
-            nonzero_lit::usize!(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
-        )
+        Self::transforming_with_max_iterations(mutator, nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 
     /// Creates a new transforming mutational stage with the given max iterations

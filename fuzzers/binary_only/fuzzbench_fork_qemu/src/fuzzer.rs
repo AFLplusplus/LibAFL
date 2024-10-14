@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use core::{cell::RefCell, num::NonZeroUsize};
+use core::cell::RefCell;
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -306,7 +306,7 @@ fn fuzz(
     let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
-        NonZeroUsize::new(7).unwrap(),
+        7,
         5,
     )?;
 

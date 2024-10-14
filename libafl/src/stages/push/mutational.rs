@@ -18,6 +18,7 @@ use crate::{
     inputs::UsesInput,
     mark_feature_time,
     mutators::Mutator,
+    nonzero,
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
@@ -73,7 +74,7 @@ where
     fn iterations(&self, state: &mut Z::State, _corpus_id: CorpusId) -> Result<usize, Error> {
         Ok(1 + state
             .rand_mut()
-            .below(nonzero_lit::usize!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)))
+            .below(nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)))
     }
 
     /// Sets the current corpus index

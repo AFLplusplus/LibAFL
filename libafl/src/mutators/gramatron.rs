@@ -16,7 +16,7 @@ use crate::{
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
-    random_corpus_id,
+    nonzero, random_corpus_id,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
@@ -259,7 +259,7 @@ where
 
         input.terminals_mut().truncate(idx_1);
 
-        for _ in 0..state.rand_mut().below(nonzero_lit::usize!(RECUR_THRESHOLD)) {
+        for _ in 0..state.rand_mut().below(nonzero!(RECUR_THRESHOLD)) {
             input.terminals_mut().extend_from_slice(&self.feature);
         }
 

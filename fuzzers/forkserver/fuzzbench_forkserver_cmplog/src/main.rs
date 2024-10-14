@@ -1,4 +1,4 @@
-use core::{cell::RefCell, num::NonZeroUsize, time::Duration};
+use core::{cell::RefCell, time::Duration};
 use std::{
     env,
     fs::{self, OpenOptions},
@@ -296,7 +296,7 @@ fn fuzz(
     let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
-        NonZeroUsize::new(7).unwrap(),
+        7,
         5,
     )?;
 

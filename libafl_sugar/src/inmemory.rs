@@ -1,10 +1,7 @@
 //! In-Memory fuzzing made easy.
 //! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
-use core::{
-    fmt::{self, Debug, Formatter},
-    num::NonZero,
-};
+use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
@@ -232,7 +229,7 @@ where
             if state.must_load_initial_inputs() {
                 if self.input_dirs.is_empty() {
                     // Generator of printable bytearrays of max size 32
-                    let mut generator = RandBytesGenerator::new(NonZero::new(32).unwrap());
+                    let mut generator = RandBytesGenerator::new(32);
 
                     // Generate 8 initial inputs
                     state

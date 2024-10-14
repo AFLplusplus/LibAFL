@@ -550,15 +550,18 @@ impl XkcdRand {
 
 #[cfg(test)]
 mod tests {
-    use crate::rands::{
-        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
-        Xoshiro256PlusPlusRand,
+    use crate::{
+        nonzero,
+        rands::{
+            Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+            Xoshiro256PlusPlusRand,
+        },
     };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(nonzero_lit::usize!(100)) < 100);
-        assert_eq!(rand.below(nonzero_lit::usize!(1)), 0);
+        assert!(rand.below(nonzero!(100)) < 100);
+        assert_eq!(rand.below(nonzero!(1)), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }

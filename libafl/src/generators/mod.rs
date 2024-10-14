@@ -1,11 +1,11 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
 use alloc::vec::Vec;
-use core::{marker::PhantomData, num::NonZeroUsize};
+use core::marker::PhantomData;
 
 use libafl_bolts::rands::Rand;
 
-use crate::{inputs::bytes::BytesInput, state::HasRand, Error};
+use crate::{inputs::bytes::BytesInput, nonzero, state::HasRand, Error};
 
 pub mod gramatron;
 pub use gramatron::*;
@@ -72,7 +72,7 @@ where
 #[derive(Clone, Debug)]
 /// Generates random bytes
 pub struct RandBytesGenerator<S> {
-    max_size: NonZeroUsize,
+    max_size: usize,
     phantom: PhantomData<S>,
 }
 
@@ -81,12 +81,12 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().below(self.max_size);
+        let mut size = state.rand_mut().zero_upto(self.max_size);
         if size == 0 {
             size = 1;
         }
         let random_bytes: Vec<u8> = (0..size)
-            .map(|_| state.rand_mut().below(nonzero_lit::usize!(256)) as u8)
+            .map(|_| state.rand_mut().below(nonzero!(256)) as u8)
             .collect();
         Ok(BytesInput::new(random_bytes))
     }
@@ -95,7 +95,7 @@ where
 impl<S> RandBytesGenerator<S> {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: usize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,
@@ -106,7 +106,7 @@ impl<S> RandBytesGenerator<S> {
 #[derive(Clone, Debug)]
 /// Generates random printable characters
 pub struct RandPrintablesGenerator<S> {
-    max_size: NonZeroUsize,
+    max_size: usize,
     phantom: PhantomData<S>,
 }
 
@@ -115,7 +115,7 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().below(self.max_size);
+        let mut size = state.rand_mut().zero_upto(self.max_size);
         if size == 0 {
             size = 1;
         }
@@ -130,7 +130,7 @@ where
 impl<S> RandPrintablesGenerator<S> {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: usize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,

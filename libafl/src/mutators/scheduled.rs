@@ -3,7 +3,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
-    num::{NonZero, NonZeroUsize},
+    num::NonZero,
     ops::{Deref, DerefMut},
 };
 
@@ -12,7 +12,6 @@ use libafl_bolts::{
     tuples::{tuple_list, tuple_list_type, HasConstLen, NamedTuple},
     Named,
 };
-use nonzero_lit;
 use serde::{Deserialize, Serialize};
 
 use super::MutationId;
@@ -22,6 +21,7 @@ use crate::{
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
+    nonzero,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
@@ -103,7 +103,7 @@ where
 pub struct StdScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: NonZeroUsize,
+    max_stack_pow: usize,
 }
 
 impl<MT> Named for StdScheduledMutator<MT> {
@@ -145,7 +145,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(self.max_stack_pow))
+        1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
@@ -172,7 +172,7 @@ where
                 mutations.names().join(", ")
             )),
             mutations,
-            max_stack_pow: nonzero_lit::usize!(7),
+            max_stack_pow: 7,
         }
     }
 
@@ -181,7 +181,7 @@ where
     /// # Errors
     /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
     #[inline]
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: NonZeroUsize) -> Self {
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
         Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
@@ -264,7 +264,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(nonzero_lit::usize!(7)))
+        1 << (1 + state.rand_mut().below(nonzero!(7)))
     }
 
     /// Get the next mutation to apply

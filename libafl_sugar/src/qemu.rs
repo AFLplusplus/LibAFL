@@ -2,7 +2,6 @@
 //!
 use core::{
     fmt::{self, Debug, Formatter},
-    num::NonZero,
     ptr::addr_of_mut,
 };
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
@@ -260,7 +259,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(NonZero::new(32).unwrap());
+                        let mut generator = RandBytesGenerator::new(32);
 
                         // Generate 8 initial inputs
                         state
@@ -376,7 +375,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(NonZero::new(32).unwrap());
+                        let mut generator = RandBytesGenerator::new(32);
 
                         // Generate 8 initial inputs
                         state

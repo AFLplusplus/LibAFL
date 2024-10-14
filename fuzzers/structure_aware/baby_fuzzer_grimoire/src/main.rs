@@ -1,4 +1,3 @@
-use core::num::NonZeroUsize;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{fs, io::Read, path::PathBuf, ptr::write};
@@ -140,8 +139,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator =
-        StdScheduledMutator::with_max_stack_pow(havoc_mutations(), NonZeroUsize::new(2).unwrap());
+    let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);
     let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
         tuple_list!(
             GrimoireExtensionMutator::new(),
@@ -151,7 +149,7 @@ pub fn main() {
             GrimoireRandomDeleteMutator::new(),
             GrimoireRandomDeleteMutator::new(),
         ),
-        NonZeroUsize::new(3).unwrap(),
+        3,
     );
     let mut stages = tuple_list!(
         generalization,

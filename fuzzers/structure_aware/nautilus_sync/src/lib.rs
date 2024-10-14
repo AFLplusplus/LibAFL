@@ -2,7 +2,6 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use core::num::NonZeroUsize;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{env, net::SocketAddr, path::PathBuf, time::Duration};
@@ -230,7 +229,7 @@ pub extern "C" fn libafl_main() {
                 NautilusSpliceMutator::new(&context),
                 NautilusSpliceMutator::new(&context),
             ),
-            NonZeroUsize::new(2).unwrap(),
+            2,
         );
 
         if let Some(conv) = event_converter.take() {

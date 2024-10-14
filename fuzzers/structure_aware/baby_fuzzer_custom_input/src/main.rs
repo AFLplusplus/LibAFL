@@ -1,6 +1,5 @@
 mod input;
 
-use core::num::NonZeroUsize;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 use std::{
@@ -43,7 +42,7 @@ use {
 /// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 16;
 static mut SIGNALS: [u8; SIGNALS_LEN] = [0; 16];
-static mut SIGNALS_PTR: *mut u8 = addr_of_mut!(SIGNALS) as _;
+static mut SIGNALS_PTR: *mut u8 = unsafe { addr_of_mut!(SIGNALS) as _ };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -132,7 +131,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = CustomInputGenerator::new(NonZeroUsize::new(1).unwrap());
+    let mut generator = CustomInputGenerator::new(1);
 
     // Generate 8 initial inputs
     state
@@ -183,9 +182,7 @@ pub fn main() {
         // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
         .merge(optional_mapped_mutators)
         // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
-        .prepend(ToggleOptionalByteArrayMutator::new(
-            NonZeroUsize::new(1).unwrap(),
-        ))
+        .prepend(ToggleOptionalByteArrayMutator::new(1))
         // Finally, a custom mutator that toggles the boolean part of the input
         .prepend(ToggleBooleanMutator);
 

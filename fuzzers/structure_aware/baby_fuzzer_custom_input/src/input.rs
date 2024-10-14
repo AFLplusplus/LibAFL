@@ -1,4 +1,3 @@
-use core::num::NonZeroUsize;
 use std::{
     borrow::Cow,
     hash::{DefaultHasher, Hash, Hasher},
@@ -6,10 +5,9 @@ use std::{
 
 use libafl::{
     corpus::CorpusId,
-    generators::Generator,
+    generators::{Generator, RandBytesGenerator},
     inputs::{BytesInput, HasTargetBytes, Input, MutVecInput},
     mutators::{MutationResult, Mutator},
-    prelude::RandBytesGenerator,
     state::HasRand,
     Error, SerdeAny,
 };
@@ -67,7 +65,7 @@ pub struct CustomInputGenerator<S: HasRand> {
 
 impl<S: HasRand> CustomInputGenerator<S> {
     /// Creates a new [`CustomInputGenerator`]
-    pub fn new(max_len: NonZeroUsize) -> Self {
+    pub fn new(max_len: usize) -> Self {
         Self {
             bytes_generator: RandBytesGenerator::new(max_len),
         }
@@ -106,7 +104,7 @@ where
     S: HasRand,
 {
     /// Creates a new [`ToggleOptionalByteArrayMutator`]
-    pub fn new(length: NonZeroUsize) -> Self {
+    pub fn new(length: usize) -> Self {
         Self {
             generator: RandBytesGenerator::new(length),
         }

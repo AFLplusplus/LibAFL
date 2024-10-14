@@ -3,10 +3,7 @@
 //! It uses a modified Particle Swarm Optimization algorithm to determine an optimal distribution of mutators.
 //! See <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
-use core::{
-    fmt::{self, Debug},
-    num::NonZeroUsize,
-};
+use core::fmt::{self, Debug};
 
 use libafl_bolts::{
     rands::{Rand, StdRand},
@@ -370,7 +367,7 @@ pub struct StdMOptMutator<MT> {
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
-    max_stack_pow: NonZeroUsize,
+    max_stack_pow: usize,
 }
 
 impl<I, MT, S> Mutator<I, S> for StdMOptMutator<MT>
@@ -503,7 +500,7 @@ impl<MT> StdMOptMutator<MT> {
     pub fn new<I, S>(
         state: &mut S,
         mutations: MT,
-        max_stack_pow: NonZeroUsize,
+        max_stack_pow: usize,
         swarm_num: usize,
     ) -> Result<Self, Error>
     where
@@ -614,7 +611,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(self.max_stack_pow))
+        1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply

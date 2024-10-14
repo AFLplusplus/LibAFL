@@ -3,7 +3,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use core::{cell::RefCell, num::NonZeroUsize, time::Duration};
+use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -370,7 +370,7 @@ fn fuzz_binary(
     let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
-        NonZeroUsize::new(7).unwrap(),
+        7,
         5,
     )?;
 
@@ -585,7 +585,7 @@ fn fuzz_text(
     let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
-        NonZeroUsize::new(7).unwrap(),
+        7,
         5,
     )?;
 
@@ -601,7 +601,7 @@ fn fuzz_text(
             GrimoireRandomDeleteMutator::new(),
             GrimoireRandomDeleteMutator::new(),
         ),
-        NonZeroUsize::new(3).unwrap(),
+        3,
     );
 
     let grimoire = StdMutationalStage::transforming(grimoire_mutator);
