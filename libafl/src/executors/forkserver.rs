@@ -488,54 +488,27 @@ impl Forkserver {
     }
 
     /// Read from the st pipe
-    pub fn read_st(&mut self) -> Result<i32, Error> {
+    pub fn read_st(&mut self) -> Result<(usize, i32), Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
+
         let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
-        if rlen == size_of::<i32>() {
-            Ok(val)
-        } else {
-            // NOTE: The underlying API does not guarantee that the read will return
-            //       exactly four bytes, but the chance of this happening is very low.
-            //       This is a sacrifice of correctness for performance.
-            Err(Error::illegal_state(format!(
-                "Could not read from st pipe. Expected {} bytes, got {rlen} bytes",
-                size_of::<i32>()
-            )))
-        }
+        Ok((rlen, val))
     }
 
     /// Read bytes of any length from the st pipe
-    pub fn read_st_size(&mut self, size: usize) -> Result<Vec<u8>, Error> {
-        let mut buf = Vec::with_capacity(size);
-        // SAFETY: `buf` will not be returned with `Ok` unless it is filled with `size` bytes.
-        //         So it is ok to set the length to `size` such that the length of `&mut buf` is `size`
-        //         and the `read_exact` call will try to read `size` bytes.
-        #[allow(
-            clippy::uninit_vec,
-            reason = "The vec will be filled right after setting the length."
-        )]
-        unsafe {
-            buf.set_len(size);
-        }
-        self.st_pipe.read_exact(&mut buf)?;
-        Ok(buf)
+    pub fn read_st_size(&mut self, size: usize) -> Result<(usize, Vec<u8>), Error> {
+        let mut buf = vec![0; size];
+
+        let rlen = self.st_pipe.read(&mut buf)?;
+        Ok((rlen, buf))
     }
 
     /// Write to the ctl pipe
-    pub fn write_ctl(&mut self, val: i32) -> Result<(), Error> {
+    pub fn write_ctl(&mut self, val: i32) -> Result<usize, Error> {
         let slen = self.ctl_pipe.write(&val.to_ne_bytes())?;
-        if slen == size_of::<i32>() {
-            Ok(())
-        } else {
-            // NOTE: The underlying API does not guarantee that exactly four bytes
-            //       are written, but the chance of this happening is very low.
-            //       This is a sacrifice of correctness for performance.
-            Err(Error::illegal_state(format!(
-                "Could not write to ctl pipe. Expected {} bytes, wrote {slen} bytes",
-                size_of::<i32>()
-            )))
-        }
+
+        Ok(slen)
     }
 
     /// Read a message from the child process.
@@ -873,10 +846,11 @@ where
             }
         };
 
-        // Initial handshake, read 4-bytes hello message from the forkserver.
-        let Ok(version_status) = forkserver.read_st() else {
+        let (rlen, version_status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
+
+        if rlen != 4 {
             return Err(Error::unknown("Failed to start a forkserver".to_string()));
-        };
+        }
 
         if (version_status & FS_NEW_ERROR) == FS_NEW_ERROR {
             report_error_and_exit(version_status & 0x0000ffff)?;
@@ -922,7 +896,8 @@ where
 
         let xored_status = (status as u32 ^ 0xffffffff) as i32;
 
-        if forkserver.write_ctl(xored_status).is_err() {
+        let send_len = forkserver.write_ctl(xored_status)?;
+        if send_len != 4 {
             return Err(Error::unknown("Writing to forkserver failed.".to_string()));
         }
 
@@ -931,18 +906,20 @@ where
             version
         );
 
-        let Ok(status) = forkserver.read_st() else {
+        let (read_len, status) = forkserver.read_st()?;
+        if read_len != 4 {
             return Err(Error::unknown(
                 "Reading from forkserver failed.".to_string(),
             ));
-        };
+        }
 
         if status & FS_NEW_OPT_MAPSIZE == FS_NEW_OPT_MAPSIZE {
-            let Ok(fsrv_map_size) = forkserver.read_st() else {
+            let (read_len, fsrv_map_size) = forkserver.read_st()?;
+            if read_len != 4 {
                 return Err(Error::unknown(
                     "Failed to read map size from forkserver".to_string(),
                 ));
-            };
+            }
             self.set_map_size(fsrv_map_size)?;
         }
 
@@ -960,11 +937,12 @@ where
         if status & FS_NEW_OPT_AUTODICT != 0 {
             // Here unlike shmem input fuzzing, we are forced to read things
             // hence no self.autotokens.is_some() to check if we proceed
-            let Ok(autotokens_size) = forkserver.read_st() else {
+            let (read_len, autotokens_size) = forkserver.read_st()?;
+            if read_len != 4 {
                 return Err(Error::unknown(
                     "Failed to read autotokens size from forkserver".to_string(),
                 ));
-            };
+            }
 
             let tokens_size_max = 0xffffff;
 
@@ -974,17 +952,20 @@ where
                 ));
             }
             log::info!("Autotokens size {autotokens_size:x}");
-            let Ok(buf) = forkserver.read_st_size(autotokens_size as usize) else {
+            let (rlen, buf) = forkserver.read_st_size(autotokens_size as usize)?;
+
+            if rlen != autotokens_size as usize {
                 return Err(Error::unknown("Failed to load autotokens".to_string()));
-            };
+            }
             if let Some(t) = &mut self.autotokens {
                 t.parse_autodict(&buf, autotokens_size as usize);
             }
         }
 
-        let Ok(aflx) = forkserver.read_st() else {
+        let (read_len, aflx) = forkserver.read_st()?;
+        if read_len != 4 {
             return Err(Error::unknown("Reading from forkserver failed".to_string()));
-        };
+        }
 
         if aflx != keep {
             return Err(Error::unknown(format!(
@@ -1034,16 +1015,18 @@ where
                 // if send_status is not changed (Options are available but we didn't use any), then don't send the next write_ctl message.
                 // This is important
 
-                if forkserver.write_ctl(send_status).is_err() {
+                let send_len = forkserver.write_ctl(send_status)?;
+                if send_len != 4 {
                     return Err(Error::unknown("Writing to forkserver failed.".to_string()));
                 }
 
                 if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
-                    let Ok(dict_size) = forkserver.read_st() else {
+                    let (read_len, dict_size) = forkserver.read_st()?;
+                    if read_len != 4 {
                         return Err(Error::unknown(
                             "Reading from forkserver failed.".to_string(),
                         ));
-                    };
+                    }
 
                     if !(2..=0xffffff).contains(&dict_size) {
                         return Err(Error::illegal_state(
@@ -1053,9 +1036,11 @@ where
 
                     log::info!("Autodict size {dict_size:x}");
 
-                    let Ok(buf) = forkserver.read_st_size(dict_size as usize) else {
+                    let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+
+                    if rlen != dict_size as usize {
                         return Err(Error::unknown("Failed to load autodictionary".to_string()));
-                    };
+                    }
                     if let Some(t) = &mut self.autotokens {
                         t.parse_autodict(&buf, dict_size as usize);
                     }
@@ -1437,18 +1422,22 @@ where
                 .write_buf(&input_bytes.as_slice()[..input_size])?;
         }
 
+        let send_len = self.forkserver.write_ctl(last_run_timed_out)?;
+
         self.forkserver.set_last_run_timed_out(false);
-        if self.forkserver.write_ctl(last_run_timed_out).is_err() {
+
+        if send_len != 4 {
             return Err(Error::unknown(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
         }
 
-        let Ok(pid) = self.forkserver.read_st() else {
+        let (recv_pid_len, pid) = self.forkserver.read_st()?;
+        if recv_pid_len != 4 {
             return Err(Error::unknown(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
-        };
+        }
 
         if pid <= 0 {
             return Err(Error::unknown(
@@ -1477,7 +1466,8 @@ where
 
             // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
             let _ = kill(self.forkserver().child_pid(), self.forkserver.kill_signal);
-            if self.forkserver.read_st().is_err() {
+            let (recv_status_len, _) = self.forkserver.read_st()?;
+            if recv_status_len != 4 {
                 return Err(Error::unknown("Could not kill timed-out child".to_string()));
             }
             exit_kind = ExitKind::Timeout;
