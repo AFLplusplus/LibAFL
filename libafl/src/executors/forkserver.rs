@@ -507,7 +507,14 @@ impl Forkserver {
 
     /// Read bytes of any length from the st pipe
     pub fn read_st_size(&mut self, size: usize) -> Result<Vec<u8>, Error> {
-        let mut buf = vec![0u8; size];
+        let mut buf = Vec::with_capacity(size);
+        // SAFETY: `buf` will not be returned with `Ok` unless it is filled with `size` bytes.
+        //         So it is ok to set the length to `size` such that the length of `&mut buf` is `size`
+        //         and the `read_exact` call will try to read `size` bytes.
+        #[allow(clippy::uninit_vec, reason = "The vec will be filled right after setting the length.")]
+        unsafe {
+            buf.set_len(size);
+        }
         self.st_pipe.read_exact(&mut buf)?;
         Ok(buf)
     }
