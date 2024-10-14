@@ -73,7 +73,7 @@ pub struct Instance<'a, M: Monitor> {
     phantom: PhantomData<M>,
 }
 
-impl<'a, M: Monitor> Instance<'a, M> {
+impl<M: Monitor> Instance<'_, M> {
     #[allow(clippy::similar_names)] // elf != self
     fn coverage_filter(&self, qemu: Qemu) -> Result<StdAddressFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
@@ -107,6 +107,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn run<ET>(&mut self, modules: ET, state: Option<ClientState>) -> Result<(), Error>
     where
         ET: EmulatorModuleTuple<ClientState> + Debug,
@@ -135,7 +136,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         let calibration = CalibrationStage::new(&map_feedback);
 
-        let stats = IfStage::new(
+        let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
             tuple_list!(AflStatsStage::new(Duration::from_secs(5))),
         );
@@ -273,7 +274,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
                 StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!
-            let mut stages = tuple_list!(calibration, tracing, i2s, power, stats);
+            let mut stages = tuple_list!(calibration, tracing, i2s, power, stats_stage);
 
             self.fuzz(&mut state, &mut fuzzer, &mut executor, &mut stages)
         } else {
