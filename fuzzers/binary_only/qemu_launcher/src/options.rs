@@ -199,7 +199,7 @@ impl FuzzerOptions {
             let mut cmd = FuzzerOptions::command();
             cmd.error(
                 ErrorKind::ValueValidation,
-                format!("The `drcov` option is only supported with `rerun_input`."),
+                "The `drcov` option is only supported with `rerun_input`.".to_string(),
             )
             .exit();
         }

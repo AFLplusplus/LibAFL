@@ -1,5 +1,5 @@
 use core::{fmt::Debug, ptr::addr_of_mut};
-use std::{fs, marker::PhantomData, ops::Range, process};
+use std::{fs, marker::PhantomData, ops::Range, process, time::Duration};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -23,8 +23,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
-        StagesTuple, StdMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
+        ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState, UsesState},
     Error, HasMetadata, NopFuzzer,
@@ -73,7 +73,7 @@ pub struct Instance<'a, M: Monitor> {
     phantom: PhantomData<M>,
 }
 
-impl<'a, M: Monitor> Instance<'a, M> {
+impl<M: Monitor> Instance<'_, M> {
     #[allow(clippy::similar_names)] // elf != self
     fn coverage_filter(&self, qemu: Qemu) -> Result<StdAddressFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
@@ -107,6 +107,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn run<ET>(&mut self, modules: ET, state: Option<ClientState>) -> Result<(), Error>
     where
         ET: EmulatorModuleTuple<ClientState> + Debug,
@@ -134,6 +135,11 @@ impl<'a, M: Monitor> Instance<'a, M> {
         let map_feedback = MaxMapFeedback::new(&edges_observer);
 
         let calibration = CalibrationStage::new(&map_feedback);
+
+        let stats_stage = IfStage::new(
+            |_, _, _, _| Ok(self.options.tui),
+            tuple_list!(AflStatsStage::new(Duration::from_secs(5))),
+        );
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
@@ -268,7 +274,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
                 StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!
-            let mut stages = tuple_list!(calibration, tracing, i2s, power);
+            let mut stages = tuple_list!(calibration, tracing, i2s, power, stats_stage);
 
             self.fuzz(&mut state, &mut fuzzer, &mut executor, &mut stages)
         } else {

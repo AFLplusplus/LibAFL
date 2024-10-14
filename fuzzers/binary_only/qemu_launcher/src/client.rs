@@ -34,7 +34,7 @@ pub struct Client<'a> {
     options: &'a FuzzerOptions,
 }
 
-impl<'a> Client<'a> {
+impl Client<'_> {
     pub fn new(options: &FuzzerOptions) -> Client {
         Client { options }
     }
