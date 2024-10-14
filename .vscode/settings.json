@@ -7,10 +7,6 @@
     "rust-analyzer.check.overrideCommand": [
         "cargo",
         "check",
-    ],
-    "workbench.colorCustomizations": {
-        "activityBar.background": "#F39C9F",
-        "titleBar.activeBackground": "#F7BFC1",
-        "titleBar.activeForeground": "#370708"
-    },
+        "--message-format=json",
+    ]
 }
