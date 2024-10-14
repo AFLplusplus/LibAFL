@@ -34,7 +34,6 @@ default = [
   "llmp_broker_timeouts",
   "rand_trait",
   "fork",
-  "prelude",
   "gzip",
   "regex",
   "serdeany_autoreg",

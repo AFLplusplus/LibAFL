@@ -167,10 +167,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         })
     }
 
-    /// Create an LLMP event manager on a port
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
+    /// Create an LLMP event manager on a port.
+    /// It expects a broker to exist on this port.
     #[cfg(feature = "std")]
     pub fn build_on_port<S, SP>(
         self,

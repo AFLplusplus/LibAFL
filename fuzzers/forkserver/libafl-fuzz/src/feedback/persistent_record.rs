@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use libafl::{
     corpus::{Corpus, Testcase},
     executors::ExitKind,
-    feedbacks::{Feedback, StateInitializer, FeedbackFactory},
+    feedbacks::{Feedback, FeedbackFactory, StateInitializer},
     inputs::Input,
     state::HasCorpus,
 };
