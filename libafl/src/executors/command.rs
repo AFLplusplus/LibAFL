@@ -583,6 +583,9 @@ impl CommandExecutorBuilder {
 ///     fn exec_timeout(&self) -> Duration {
 ///         Duration::from_secs(5)
 ///     }
+///     fn exec_timeout_mut(&mut self, duration: Duration) {
+///         todo!()
+///     }
 /// }
 ///
 /// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
