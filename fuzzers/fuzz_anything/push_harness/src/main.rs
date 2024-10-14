@@ -39,7 +39,7 @@ fn input_generator() {
         ExitKind::Ok
     };
 
-    let signals_ptr = addr_of_mut!(SIGNALS);
+    let signals_ptr = unsafe { addr_of_mut!(SIGNALS) };
     let signals_len = unsafe { *signals_ptr }.len();
 
     // Create an observation channel using the signals map
