@@ -500,7 +500,7 @@ impl Forkserver {
     pub fn read_st_size(&mut self, size: usize) -> Result<(usize, Vec<u8>), Error> {
         let mut buf = vec![0; size];
 
-        let rlen = self.st_pipe.read(&mut buf)?;
+        let rlen = self.st_pipe.read_exact(&mut buf)?;
         Ok((rlen, buf))
     }
 
