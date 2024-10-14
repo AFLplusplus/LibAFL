@@ -23,7 +23,6 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
     executors::HasObservers,
-    feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
@@ -32,7 +31,8 @@ use crate::{
     std::string::ToString,
     Error, HasMetadata, HasNamedMetadata, HasScheduler, SerdeAny,
 };
-
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 /// AFL++'s default stats update interval
 pub const AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS: u64 = 60;
 
@@ -275,8 +275,10 @@ where
             // New testcase!
             self.cycles_wo_finds = 0;
             self.update_last_find();
-            self.maybe_update_last_crash(&testcase, state);
-            self.maybe_update_last_hang(&testcase, state);
+            #[cfg(feature = "track_hit_feedbacks")] {
+                self.maybe_update_last_crash(&testcase, state);
+                self.maybe_update_last_hang(&testcase, state);
+            }
             self.update_has_fuzzed_size();
             self.maybe_update_is_favored_size(&testcase);
         }
@@ -483,7 +485,9 @@ where
         self.last_find = current_time();
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
     fn maybe_update_last_crash(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
+        #[cfg(feature = "track_hit_feedbacks")]
         if testcase
             .hit_objectives()
             .contains(&Cow::Borrowed(CRASH_FEEDBACK_NAME))
@@ -493,6 +497,7 @@ where
         }
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
     fn maybe_update_last_hang(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
         if testcase
             .hit_objectives()

@@ -32,6 +32,7 @@ pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
+pub use stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
 pub use sync::*;
 pub use time_tracker::TimeTrackingStageWrapper;
 pub use tmin::{
@@ -71,17 +72,13 @@ pub mod generation;
 pub mod logics;
 pub mod power;
 #[cfg(feature = "std")]
+pub mod stats;
 pub mod sync;
-#[cfg(feature = "std")]
 pub mod time_tracker;
 pub mod tracing;
 pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
-#[cfg(all(feature = "std", feature = "track_hit_feedbacks"))]
-pub use stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
-#[cfg(all(feature = "std", feature = "track_hit_feedbacks"))]
-pub mod stats;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.

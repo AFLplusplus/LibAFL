@@ -9,18 +9,7 @@ use crate::{
     state::{State, UsesState},
     HasMetadata,
 };
-/// Track an inner Stage's execution time
-/// ```
-///#[derive(Debug, SerdeAny, Serialize, Deserialize)]
-///pub struct FuzzTime(pub Duration);
-///impl From<Duration> for FuzzTime {
-///    fn from(value: Duration) -> Self {
-///        Self(value)
-///    }
-///}
-/// TimeTrackingStageWrapper::<FuzzTime, _, _>::new(my_fuzz_stage);
-/// state.metadata::<FuzzTime>();
-/// ```
+
 #[derive(Debug)]
 pub struct TimeTrackingStageWrapper<T, S, ST> {
     inner: ST,
