@@ -19,6 +19,8 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
@@ -31,8 +33,6 @@ use crate::{
     std::string::ToString,
     Error, HasMetadata, HasNamedMetadata, HasScheduler, SerdeAny,
 };
-#[cfg(feature = "track_hit_feedbacks")]
-use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 /// AFL++'s default stats update interval
 pub const AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS: u64 = 60;
 
@@ -275,7 +275,8 @@ where
             // New testcase!
             self.cycles_wo_finds = 0;
             self.update_last_find();
-            #[cfg(feature = "track_hit_feedbacks")] {
+            #[cfg(feature = "track_hit_feedbacks")]
+            {
                 self.maybe_update_last_crash(&testcase, state);
                 self.maybe_update_last_hang(&testcase, state);
             }
@@ -283,7 +284,7 @@ where
             self.maybe_update_is_favored_size(&testcase);
         }
         self.maybe_update_slowest_exec(&testcase);
-        self.maybe_update_max_depth(&testcase)?;
+        self.maybe_update_max_depth(&testcase);
 
         // See if we actually need to run the stage, if not, avoid dynamic value computation.
         if !self.check_interval() {
@@ -467,13 +468,12 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth(&mut self, testcase: &Testcase<E::Input>) -> Result<(), Error> {
+    fn maybe_update_max_depth(&mut self, testcase: &Testcase<E::Input>) {
         if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
             }
         }
-        Ok(())
     }
 
     fn update_last_find(&mut self) {
@@ -606,7 +606,7 @@ impl Display for AFLFuzzerStats<'_> {
         Ok(())
     }
 }
-/// Get the command used to invoke libafl-fuzz
+/// Get the command used to invoke the fuzzer
 #[must_use]
 pub fn get_run_cmdline() -> Cow<'static, str> {
     let args: Vec<String> = std::env::args().collect();
