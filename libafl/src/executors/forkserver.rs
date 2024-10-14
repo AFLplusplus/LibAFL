@@ -511,7 +511,10 @@ impl Forkserver {
         // SAFETY: `buf` will not be returned with `Ok` unless it is filled with `size` bytes.
         //         So it is ok to set the length to `size` such that the length of `&mut buf` is `size`
         //         and the `read_exact` call will try to read `size` bytes.
-        #[allow(clippy::uninit_vec, reason = "The vec will be filled right after setting the length.")]
+        #[allow(
+            clippy::uninit_vec,
+            reason = "The vec will be filled right after setting the length."
+        )]
         unsafe {
             buf.set_len(size);
         }
