@@ -15,6 +15,8 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 use crate::executors::hooks::inprocess::HasTimeout;
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::hooks::inprocess::HasTimeout;
+#[cfg(feature = "std")]
+use crate::executors::HasTimeout as HasExecutorTimeout;
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -24,7 +26,7 @@ use crate::{
             ExecutorHooksTuple,
         },
         inprocess::HasInProcessHooks,
-        Executor, HasObservers, HasTimeout as HasExecutorTimeout,
+        Executor, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -140,7 +142,7 @@ where
         }
     }
 }
-
+#[cfg(feature = "std")]
 impl<HT, OT, S> HasExecutorTimeout for GenericInProcessExecutorInner<HT, OT, S>
 where
     HT: ExecutorHooksTuple<S>,
@@ -149,7 +151,7 @@ where
 {
     /// Set the threshold for timeout
     fn set_timeout(&mut self, duration: Duration) {
-        #[cfg(all(feature = "std", windows))]
+        #[cfg(windows)]
         {
             *self.hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
         }
@@ -160,7 +162,7 @@ where
     }
 
     fn timeout(&self) -> Duration {
-        #[cfg(all(feature = "std", windows))]
+        #[cfg(windows)]
         {
             Duration::from_millis(self.hooks.0.millis_sec())
         }

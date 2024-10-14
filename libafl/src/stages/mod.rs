@@ -33,7 +33,9 @@ pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 pub use stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
+#[cfg(feature = "std")]
 pub use sync::*;
+#[cfg(feature = "std")]
 pub use time_tracker::TimeTrackingStageWrapper;
 pub use tmin::{
     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
@@ -66,6 +68,7 @@ pub mod calibrate;
 pub mod colorization;
 #[cfg(all(feature = "std", unix))]
 pub mod concolic;
+#[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
 pub mod generation;
@@ -73,7 +76,9 @@ pub mod logics;
 pub mod power;
 #[cfg(feature = "std")]
 pub mod stats;
+#[cfg(feature = "std")]
 pub mod sync;
+#[cfg(feature = "std")]
 pub mod time_tracker;
 pub mod tracing;
 pub mod tuneable;

@@ -10,13 +10,15 @@ use core::{
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
+#[cfg(feature = "std")]
+use crate::executors::HasTimeout;
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
-        Executor, ExitKind, HasObservers, HasTimeout,
+        Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -122,7 +124,7 @@ where
         Ok(ret)
     }
 }
-
+#[cfg(feature = "std")]
 impl<H, HB, HT, OT, S, ES> HasTimeout for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,

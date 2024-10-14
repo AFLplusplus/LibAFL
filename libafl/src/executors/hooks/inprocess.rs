@@ -27,14 +27,14 @@ use crate::executors::hooks::timer::TimerStruct;
 use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(windows)]
 use crate::state::State;
+#[cfg(feature = "std")]
+use crate::{corpus::Corpus, observers::ObserversTuple, state::UsesState};
 use crate::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
-    observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
+    state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
 
