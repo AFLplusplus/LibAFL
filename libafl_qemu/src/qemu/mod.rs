@@ -1113,12 +1113,16 @@ pub mod pybind {
         }
 
         fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-            self.qemu.write_mem(addr, buf).unwrap();
+            self.qemu
+                .write_mem(addr, buf)
+                .expect("Write to memory failed.");
         }
 
         fn read_mem(&self, addr: GuestAddr, size: usize) -> Vec<u8> {
             let mut buf = vec![0; size];
-            self.qemu.read_mem(addr, &mut buf).unwrap();
+            self.qemu
+                .read_mem(addr, &mut buf)
+                .expect("Read to memory failed.");
             buf
         }
 
