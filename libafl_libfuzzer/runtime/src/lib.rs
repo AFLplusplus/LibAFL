@@ -467,7 +467,7 @@ macro_rules! fuzz_with {
                 }
                 if state.corpus().count() < 1 {
                     // Generator of bytearrays of max size 64
-                    let mut generator = RandBytesGenerator::from(RandBytesGenerator::new(NonZeroUsize::new(64).unwrap()));
+                    let mut generator = RandBytesGenerator::from(RandBytesGenerator::new(64));
 
                     // Generate 1024 initial inputs
                     state
