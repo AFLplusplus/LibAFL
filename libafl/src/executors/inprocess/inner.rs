@@ -11,8 +11,6 @@ use libafl_bolts::tuples::{tuple_list, Merge, RefIndexable};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(feature = "std")]
-use crate::executors::hooks::inprocess::HasTimeout;
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
