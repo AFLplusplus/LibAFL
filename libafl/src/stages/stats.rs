@@ -31,7 +31,7 @@ use crate::{
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
     std::string::ToString,
-    Error, HasMetadata, HasNamedMetadata, HasScheduler, SerdeAny,
+    Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };
 /// AFL++'s default stats update interval
 pub const AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS: u64 = 60;

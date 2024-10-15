@@ -296,11 +296,6 @@ where
         })
     }
 
-    #[cfg(not(target_os = "linux"))]
-    pub fn set_timeout(&mut self, timeout: Duration) {
-        self.itimerspec = parse_itimerspec(timeout);
-    }
-
     /// Creates a new [`GenericInProcessForkExecutorInner`], non linux
     #[cfg(not(target_os = "linux"))]
     #[allow(clippy::too_many_arguments)]
