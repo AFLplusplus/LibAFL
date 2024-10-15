@@ -5,7 +5,7 @@ use std::{
 };
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
     state::{HasExecutions, State, UsesState},
@@ -126,16 +126,6 @@ where
         }
 
         Ok(exit_kind)
-    }
-}
-
-impl<S, OT> HasTimeout for NyxExecutor<S, OT> {
-    fn set_timeout(&mut self, duration: std::time::Duration) {
-        self.helper.set_timeout(duration);
-    }
-
-    fn timeout(&self) -> std::time::Duration {
-        self.helper.timeout
     }
 }
 

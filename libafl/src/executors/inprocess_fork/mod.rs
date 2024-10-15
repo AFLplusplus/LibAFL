@@ -12,7 +12,7 @@ use libafl_bolts::{
 use libc::siginfo_t;
 use nix::unistd::{fork, ForkResult};
 
-use super::{hooks::ExecutorHooksTuple, HasTimeout};
+use super::hooks::ExecutorHooksTuple;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -179,25 +179,6 @@ where
                 Err(e) => Err(Error::from(e)),
             }
         }
-    }
-}
-
-impl<H, HT, OT, S, SP, EM, Z> HasTimeout
-    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.inner.set_timeout(timeout);
-    }
-    fn timeout(&self) -> Duration {
-        self.inner.timeout()
     }
 }
 

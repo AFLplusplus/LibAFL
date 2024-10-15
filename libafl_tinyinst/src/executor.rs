@@ -1,7 +1,7 @@
 use core::{marker::PhantomData, ptr, time::Duration};
 
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::ObserversTuple,
     state::{HasExecutions, State, UsesState},
@@ -99,19 +99,6 @@ where
             )),
             _ => Err(Error::unknown("Tinyinst RunResult is unknown".to_string())),
         }
-    }
-}
-
-impl<S, SP, OT> HasTimeout for TinyInstExecutor<S, SP, OT>
-where
-    SP: ShMemProvider,
-{
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.timeout = timeout;
-    }
-
-    fn timeout(&self) -> Duration {
-        self.timeout
     }
 }
 

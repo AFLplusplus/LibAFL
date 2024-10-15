@@ -18,8 +18,6 @@ use core::{
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
-#[cfg(feature = "std")]
-use super::HasTimeout;
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
 use crate::{
@@ -132,24 +130,6 @@ where
         self.inner.hooks.post_exec_all(state, input);
         self.inner.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<H, HB, HT, OT, S> HasTimeout for GenericInProcessExecutor<H, HB, HT, OT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-{
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.inner.set_timeout(timeout);
-    }
-
-    fn timeout(&self) -> Duration {
-        self.inner.timeout()
     }
 }
 

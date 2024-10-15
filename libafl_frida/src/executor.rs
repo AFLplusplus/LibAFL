@@ -14,7 +14,7 @@ use libafl::{
     state::{HasCorpus, HasSolutions},
 };
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, HasTimeout, InProcessExecutor},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::HasTargetBytes,
     observers::ObserversTuple,
     state::{HasExecutions, State, UsesState},
@@ -117,22 +117,6 @@ where
         }
         self.helper.post_exec(input)?;
         res
-    }
-}
-
-impl<H, OT, RT, S> HasTimeout for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State,
-    S::Input: HasTargetBytes,
-    OT: ObserversTuple<S::Input, S> + Debug,
-{
-    fn set_timeout(&mut self, timeout: std::time::Duration) {
-        self.base.set_timeout(timeout);
-    }
-
-    fn timeout(&self) -> std::time::Duration {
-        self.base.timeout()
     }
 }
 

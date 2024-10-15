@@ -26,7 +26,7 @@ use crate::{
             inprocess_fork::{InChildProcessHooks, FORK_EXECUTOR_GLOBAL_DATA},
             ExecutorHooksTuple,
         },
-        ExitKind, HasObservers, HasTimeout,
+        ExitKind, HasObservers,
     },
     inputs::UsesInput,
     observers::ObserversTuple,
@@ -78,24 +78,6 @@ where
     S: State,
 {
     type State = S;
-}
-
-impl<HT, OT, S, SP, EM, Z> HasTimeout for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> {
-    /// Set the thresold for timeout
-    fn set_timeout(&mut self, timeout: Duration) {
-        #[cfg(target_os = "linux")]
-        {
-            self.itimerspec = parse_itimerspec(timeout);
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            self.itimerval = parse_itimerval(timeout);
-        }
-    }
-
-    fn timeout(&self) -> Duration {
-        todo!()
-    }
 }
 
 #[cfg(target_os = "linux")]

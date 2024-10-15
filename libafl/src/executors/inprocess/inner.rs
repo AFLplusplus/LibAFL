@@ -13,8 +13,6 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(feature = "std")]
 use crate::executors::hooks::inprocess::HasTimeout;
-#[cfg(feature = "std")]
-use crate::executors::HasTimeout as HasExecutorTimeout;
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -137,36 +135,6 @@ where
 
             write_volatile(addr_of_mut!((*data).current_input_ptr), null());
             compiler_fence(Ordering::SeqCst);
-        }
-    }
-}
-#[cfg(feature = "std")]
-impl<HT, OT, S> HasExecutorTimeout for GenericInProcessExecutorInner<HT, OT, S>
-where
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-{
-    /// Set the threshold for timeout
-    fn set_timeout(&mut self, duration: Duration) {
-        #[cfg(windows)]
-        {
-            *self.hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
-        }
-        #[cfg(not(windows))]
-        {
-            self.hooks.0.timer_mut().exec_tmout = duration;
-        }
-    }
-
-    fn timeout(&self) -> Duration {
-        #[cfg(windows)]
-        {
-            Duration::from_millis(self.hooks.0.millis_sec())
-        }
-        #[cfg(not(windows))]
-        {
-            self.hooks.0.timer().exec_tmout
         }
     }
 }
