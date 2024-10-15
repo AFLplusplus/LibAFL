@@ -89,6 +89,9 @@ const FS_ERROR_OLD_CMPLOG: i32 = 32_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
 
+/// Forkserver message. We'll reuse it in a testcase.
+const FAILED_TO_START_FORKSERVER_MSG: &str = "Failed to start forkserver";
+
 fn report_error_and_exit(status: i32) -> Result<(), Error> {
     /* Report on the error received via the forkserver controller and exit */
     match status {
@@ -873,9 +876,9 @@ where
         };
 
         // Initial handshake, read 4-bytes hello message from the forkserver.
-        let version_status = forkserver
-            .read_st()
-            .map_err(|err| Error::illegal_state(format!("Failed to start forkserver: {err:?}")))?;
+        let version_status = forkserver.read_st().map_err(|err| {
+            Error::illegal_state(format!("{FAILED_TO_START_FORKSERVER_MSG}: {err:?}"))
+        })?;
 
         if (version_status & FS_NEW_ERROR) == FS_NEW_ERROR {
             report_error_and_exit(version_status & 0x0000ffff)?;
@@ -1533,7 +1536,7 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
-        executors::forkserver::ForkserverExecutor,
+        executors::forkserver::{ForkserverExecutor, FAILED_TO_START_FORKSERVER_MSG},
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
@@ -1568,10 +1571,13 @@ mod tests {
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
             Ok(_) => true,
-            Err(e) => match e {
-                Error::Unknown(s, _) => s == "Failed to start a forkserver",
-                _ => false,
-            },
+            Err(e) => {
+                println!("Error: {e:?}");
+                match e {
+                    Error::IllegalState(s, _) => s.contains(FAILED_TO_START_FORKSERVER_MSG),
+                    _ => false,
+                }
+            }
         };
         assert!(result);
     }
