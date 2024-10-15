@@ -328,7 +328,7 @@ where
 
         let off = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size.saturating_add(1)) });
+            .below(unsafe { NonZero::new(size.saturating_add(1)).unwrap() });
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
