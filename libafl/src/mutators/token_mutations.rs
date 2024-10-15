@@ -324,11 +324,11 @@ where
 
         let size = input.bytes().len();
         // # Safety
-        // it's capped by max_size. can't overflow into 0
+        // after saturating add it's always above 0
 
         let off = state
             .rand_mut()
-            .below(unsafe { NonZero::new(size.wrapping_add(1)).unwrap_unchecked() });
+            .below(unsafe { NonZero::new(size.saturating_add(1)) });
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];

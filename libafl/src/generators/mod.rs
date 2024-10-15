@@ -1,7 +1,7 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
 use alloc::vec::Vec;
-use core::marker::PhantomData;
+use core::{marker::PhantomData, num::NonZeroUsize};
 
 use libafl_bolts::rands::Rand;
 
@@ -71,20 +71,16 @@ where
 
 #[derive(Clone, Debug)]
 /// Generates random bytes
-pub struct RandBytesGenerator<S> {
-    max_size: usize,
-    phantom: PhantomData<S>,
+pub struct RandBytesGenerator {
+    max_size: NonZeroUsize,
 }
 
-impl<S> Generator<BytesInput, S> for RandBytesGenerator<S>
+impl<S> Generator<BytesInput, S> for RandBytesGenerator
 where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().zero_upto(self.max_size);
-        if size == 0 {
-            size = 1;
-        }
+        let size = 1 + state.rand_mut().below(self.max_size);
         let random_bytes: Vec<u8> = (0..size)
             .map(|_| state.rand_mut().below(nonzero!(256)) as u8)
             .collect();
@@ -92,33 +88,30 @@ where
     }
 }
 
-impl<S> RandBytesGenerator<S> {
+impl RandBytesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
     pub fn new(max_size: usize) -> Self {
-        Self {
-            max_size,
-            phantom: PhantomData,
-        }
+        // # Safety
+        // Saturating added 1 so it's always above 0
+        let max_size = unsafe { NonZeroUsize::new(max_size.saturating_add(1)).unwrap_unchecked() };
+        Self { max_size }
     }
 }
 
 #[derive(Clone, Debug)]
 /// Generates random printable characters
-pub struct RandPrintablesGenerator<S> {
-    max_size: usize,
-    phantom: PhantomData<S>,
+pub struct RandPrintablesGenerator {
+    max_size: NonZeroUsize,
 }
 
-impl<S> Generator<BytesInput, S> for RandPrintablesGenerator<S>
+impl<S> Generator<BytesInput, S> for RandPrintablesGenerator
 where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().zero_upto(self.max_size);
-        if size == 0 {
-            size = 1;
-        }
+        let size = 1 + state.rand_mut().below(self.max_size);
+
         let printables = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz \t\n!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".as_bytes();
         let random_bytes: Vec<u8> = (0..size)
             .map(|_| *state.rand_mut().choose(printables).unwrap())
@@ -127,13 +120,13 @@ where
     }
 }
 
-impl<S> RandPrintablesGenerator<S> {
+impl RandPrintablesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
     pub fn new(max_size: usize) -> Self {
-        Self {
-            max_size,
-            phantom: PhantomData,
-        }
+        // # Safety
+        // Saturating added 1 so it's always above 0
+        let max_size = unsafe { NonZeroUsize::new(max_size.saturating_add(1)).unwrap_unchecked() };
+        Self { max_size }
     }
 }
