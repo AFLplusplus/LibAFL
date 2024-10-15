@@ -294,7 +294,7 @@ where
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self>(state);
 
-        let itimerval = parse_itimmerval(timeout);
+        let itimerval = parse_itimerval(timeout);
 
         Ok(Self {
             shmem_provider,
