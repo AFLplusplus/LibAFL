@@ -2,25 +2,6 @@
 The tinyinst module for `LibAFL`.
 */
 
-#![warn(clippy::cargo)]
-#![deny(clippy::cargo_common_metadata)]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![forbid(unexpected_cfgs)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::unreadable_literal,
-    clippy::negative_feature_names
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -60,9 +41,6 @@ The tinyinst module for `LibAFL`.
         while_true
     )
 )]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
 
 /// Tinyinst executor
 pub mod executor;

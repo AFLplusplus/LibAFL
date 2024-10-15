@@ -75,28 +75,6 @@
 //! to the runtime (e.g., to prevent coverage being collected on the runtime).
 //!
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
-#![forbid(unexpected_cfgs)]
-#![warn(clippy::cargo)]
-#![allow(ambiguous_glob_reexports)]
-#![deny(clippy::cargo_common_metadata)]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::ptr_cast_constness,
-    clippy::unsafe_derive_deserialize,
-    clippy::similar_names,
-    clippy::too_many_lines
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -137,9 +115,6 @@
         while_true
     )
 )]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
 
 use std::ffi::{c_char, c_int};
 

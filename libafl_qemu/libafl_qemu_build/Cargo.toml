@@ -39,3 +39,6 @@ cc = { workspace = true }
 regex = { workspace = true }
 rustversion = { workspace = true }
 rustc_version = "0.4.1"
+
+[lints]
+workspace = true

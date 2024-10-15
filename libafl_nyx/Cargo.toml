@@ -38,3 +38,6 @@ libafl_targets = { path = "../libafl_targets", version = "0.13.2", features = [
 
 nix = { workspace = true, default-features = true, features = ["fs"] }
 typed-builder = { workspace = true }
+
+[lints]
+workspace = true
