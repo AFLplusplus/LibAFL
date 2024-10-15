@@ -491,9 +491,8 @@ impl Forkserver {
     pub fn read_st(&mut self) -> Result<i32, Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
         let rlen = self.st_pipe.read(&mut buf)?;
-        let val: i32 = i32::from_ne_bytes(buf);
         if rlen == size_of::<i32>() {
-            Ok(val)
+            Ok(i32::from_ne_bytes(buf))
         } else {
             // NOTE: The underlying API does not guarantee that the read will return
             //       exactly four bytes, but the chance of this happening is very low.
@@ -506,7 +505,7 @@ impl Forkserver {
     }
 
     /// Read bytes of any length from the st pipe
-    pub fn read_st_size(&mut self, size: usize) -> Result<Vec<u8>, Error> {
+    pub fn read_st_of_len(&mut self, size: usize) -> Result<Vec<u8>, Error> {
         let mut buf = Vec::with_capacity(size);
         // SAFETY: `buf` will not be returned with `Ok` unless it is filled with `size` bytes.
         //         So it is ok to set the length to `size` such that the length of `&mut buf` is `size`
@@ -874,9 +873,9 @@ where
         };
 
         // Initial handshake, read 4-bytes hello message from the forkserver.
-        let Ok(version_status) = forkserver.read_st() else {
-            return Err(Error::unknown("Failed to start a forkserver".to_string()));
-        };
+        let version_status = forkserver
+            .read_st()
+            .map_err(|err| Error::illegal_state(format!("Failed to start forkserver: {err:?}")))?;
 
         if (version_status & FS_NEW_ERROR) == FS_NEW_ERROR {
             report_error_and_exit(version_status & 0x0000ffff)?;
@@ -908,13 +907,13 @@ where
         let version: u32 = status as u32 - 0x41464c00_u32;
         match version {
             0 => {
-                return Err(Error::unknown("Fork server version is not assigned, this should not happen. Recompile target."));
+                return Err(Error::illegal_state("Fork server version is not assigned, this should not happen. Recompile target."));
             }
             FS_NEW_VERSION_MIN..=FS_NEW_VERSION_MAX => {
                 // good, do nothing
             }
             _ => {
-                return Err(Error::unknown(
+                return Err(Error::illegal_state(
                     "Fork server version is not supported. Recompile the target.",
                 ));
             }
@@ -922,8 +921,10 @@ where
 
         let xored_status = (status as u32 ^ 0xffffffff) as i32;
 
-        if forkserver.write_ctl(xored_status).is_err() {
-            return Err(Error::unknown("Writing to forkserver failed.".to_string()));
+        if let Err(err) = forkserver.write_ctl(xored_status) {
+            return Err(Error::illegal_state(format!(
+                "Writing to forkserver failed: {err:?}"
+            )));
         }
 
         log::info!(
@@ -931,18 +932,14 @@ where
             version
         );
 
-        let Ok(status) = forkserver.read_st() else {
-            return Err(Error::unknown(
-                "Reading from forkserver failed.".to_string(),
-            ));
-        };
+        let status = forkserver.read_st().map_err(|err| {
+            Error::illegal_state(format!("Reading from forkserver failed: {err:?}"))
+        })?;
 
         if status & FS_NEW_OPT_MAPSIZE == FS_NEW_OPT_MAPSIZE {
-            let Ok(fsrv_map_size) = forkserver.read_st() else {
-                return Err(Error::unknown(
-                    "Failed to read map size from forkserver".to_string(),
-                ));
-            };
+            let fsrv_map_size = forkserver.read_st().map_err(|err| {
+                Error::illegal_state(format!("Failed to read map size from forkserver: {err:?}"))
+            })?;
             self.set_map_size(fsrv_map_size)?;
         }
 
@@ -951,7 +948,7 @@ where
                 log::info!("Using SHARED MEMORY FUZZING feature.");
                 self.uses_shmem_testcase = true;
             } else {
-                return Err(Error::unknown(
+                return Err(Error::illegal_state(
                     "Target requested sharedmem fuzzing, but you didn't prepare shmem",
                 ));
             }
@@ -960,11 +957,11 @@ where
         if status & FS_NEW_OPT_AUTODICT != 0 {
             // Here unlike shmem input fuzzing, we are forced to read things
             // hence no self.autotokens.is_some() to check if we proceed
-            let Ok(autotokens_size) = forkserver.read_st() else {
-                return Err(Error::unknown(
-                    "Failed to read autotokens size from forkserver".to_string(),
-                ));
-            };
+            let autotokens_size = forkserver.read_st().map_err(|err| {
+                Error::illegal_state(format!(
+                    "Failed to read autotokens size from forkserver: {err:?}",
+                ))
+            })?;
 
             let tokens_size_max = 0xffffff;
 
@@ -974,17 +971,19 @@ where
                 ));
             }
             log::info!("Autotokens size {autotokens_size:x}");
-            let Ok(buf) = forkserver.read_st_size(autotokens_size as usize) else {
-                return Err(Error::unknown("Failed to load autotokens".to_string()));
-            };
+            let buf = forkserver
+                .read_st_of_len(autotokens_size as usize)
+                .map_err(|err| {
+                    Error::illegal_state(format!("Failed to load autotokens: {err:?}"))
+                })?;
             if let Some(t) = &mut self.autotokens {
                 t.parse_autodict(&buf, autotokens_size as usize);
             }
         }
 
-        let Ok(aflx) = forkserver.read_st() else {
-            return Err(Error::unknown("Reading from forkserver failed".to_string()));
-        };
+        let aflx = forkserver.read_st().map_err(|err| {
+            Error::illegal_state(format!("Reading from forkserver failed: {err:?}"))
+        })?;
 
         if aflx != keep {
             return Err(Error::unknown(format!(
@@ -1034,16 +1033,16 @@ where
                 // if send_status is not changed (Options are available but we didn't use any), then don't send the next write_ctl message.
                 // This is important
 
-                if forkserver.write_ctl(send_status).is_err() {
-                    return Err(Error::unknown("Writing to forkserver failed.".to_string()));
+                if let Err(err) = forkserver.write_ctl(send_status) {
+                    return Err(Error::illegal_state(format!(
+                        "Writing to forkserver failed: {err:?}"
+                    )));
                 }
 
                 if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
-                    let Ok(dict_size) = forkserver.read_st() else {
-                        return Err(Error::unknown(
-                            "Reading from forkserver failed.".to_string(),
-                        ));
-                    };
+                    let dict_size = forkserver.read_st().map_err(|err| {
+                        Error::illegal_state(format!("Reading from forkserver failed: {err:?}"))
+                    })?;
 
                     if !(2..=0xffffff).contains(&dict_size) {
                         return Err(Error::illegal_state(
@@ -1053,9 +1052,11 @@ where
 
                     log::info!("Autodict size {dict_size:x}");
 
-                    let Ok(buf) = forkserver.read_st_size(dict_size as usize) else {
-                        return Err(Error::unknown("Failed to load autodictionary".to_string()));
-                    };
+                    let buf = forkserver
+                        .read_st_of_len(dict_size as usize)
+                        .map_err(|err| {
+                            Error::unknown(format!("Failed to load autodictionary: {err:?}"))
+                        })?;
                     if let Some(t) = &mut self.autotokens {
                         t.parse_autodict(&buf, dict_size as usize);
                     }
@@ -1438,17 +1439,17 @@ where
         }
 
         self.forkserver.set_last_run_timed_out(false);
-        if self.forkserver.write_ctl(last_run_timed_out).is_err() {
-            return Err(Error::unknown(
-                "Unable to request new process from fork server (OOM?)".to_string(),
-            ));
+        if let Err(err) = self.forkserver.write_ctl(last_run_timed_out) {
+            return Err(Error::unknown(format!(
+                "Unable to request new process from fork server (OOM?): {err:?}"
+            )));
         }
 
-        let Ok(pid) = self.forkserver.read_st() else {
-            return Err(Error::unknown(
-                "Unable to request new process from fork server (OOM?)".to_string(),
-            ));
-        };
+        let pid = self.forkserver.read_st().map_err(|err| {
+            Error::unknown(format!(
+                "Unable to request new process from fork server (OOM?): {err:?}"
+            ))
+        })?;
 
         if pid <= 0 {
             return Err(Error::unknown(
@@ -1477,8 +1478,10 @@ where
 
             // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
             let _ = kill(self.forkserver().child_pid(), self.forkserver.kill_signal);
-            if self.forkserver.read_st().is_err() {
-                return Err(Error::unknown("Could not kill timed-out child".to_string()));
+            if let Err(err) = self.forkserver.read_st() {
+                return Err(Error::unknown(format!(
+                    "Could not kill timed-out child: {err:?}"
+                )));
             }
             exit_kind = ExitKind::Timeout;
         }
