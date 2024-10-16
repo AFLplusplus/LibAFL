@@ -65,6 +65,7 @@ pub fn build() {
         })
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
+    println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_GEN_STUBS");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
     println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\"))");
 
@@ -78,7 +79,7 @@ pub fn build() {
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_dir = PathBuf::from(src_dir);
-    let stub_bindings_file = src_dir.join("src/x86_64_stub_bindings.rs");
+    let stub_bindings_file = src_dir.join("src/bindings/x86_64_stub_bindings.rs");
 
     if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
         // Only build when we're not generating docs and not in clippy

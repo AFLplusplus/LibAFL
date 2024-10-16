@@ -298,7 +298,7 @@ where
 
         let mem_chunk =
             QemuMemoryChunk::virt(buf_addr as GuestVirtAddr, total_size as GuestReg, cpu);
-        mem_chunk.read(qemu, str_copy.as_slice_mut());
+        mem_chunk.read(qemu, str_copy.as_slice_mut())?;
 
         let c_str: &CStr = CStr::from_bytes_with_nul(str_copy.as_slice()).unwrap();
 
@@ -325,7 +325,7 @@ where
 
         Ok(TestCommand::new(
             received_value,
-            bindings::LIBAFL_QEMU_TEST_VALUE as GuestReg,
+            GuestReg::from(bindings::LIBAFL_QEMU_TEST_VALUE),
         ))
     }
 }

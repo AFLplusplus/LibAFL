@@ -605,6 +605,7 @@ impl AsanErrorsObserver {
     ///
     /// # Safety
     /// The field should not be accessed multiple times at the same time (i.e., from different threads)!
+    #[must_use]
     pub fn from_static_asan_errors() -> Self {
         Self::Static
     }

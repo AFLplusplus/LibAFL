@@ -208,7 +208,7 @@ impl SnapshotModule {
                     // TODO not just for R pages
                     unsafe {
                         info.data = Some(Box::new(core::mem::zeroed()));
-                        qemu.read_mem(addr, &mut info.data.as_mut().unwrap()[..]);
+                        qemu.read_mem_unchecked(addr, &mut info.data.as_mut().unwrap()[..]);
                     }
                 }
                 self.pages.insert(addr, info);
@@ -299,7 +299,8 @@ impl SnapshotModule {
                             qemu.read_mem(
                                 addr,
                                 current_page_content.as_mut_ptr().as_mut().unwrap(),
-                            );
+                            )
+                            .unwrap();
                         }
 
                         let current_page_content: &mut [u8; SNAPSHOT_PAGE_SIZE] =
@@ -411,7 +412,7 @@ impl SnapshotModule {
                                 return true; // Restore later
                             }
 
-                            unsafe { qemu.write_mem(*page, &data[..]) };
+                            unsafe { qemu.write_mem_unchecked(*page, &data[..]) };
                         } else {
                             panic!("Cannot restored a dirty but unsaved page");
                         }
@@ -446,7 +447,7 @@ impl SnapshotModule {
                 if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
                     if let Some(data) = info.data.as_ref() {
-                        unsafe { qemu.write_mem(*page, &data[..]) };
+                        unsafe { qemu.write_mem_unchecked(*page, &data[..]) };
                     } else {
                         panic!("Cannot restored a dirty but unsaved page");
                     }
