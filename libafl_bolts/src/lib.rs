@@ -1092,7 +1092,7 @@ pub mod _private {
                 match $NonZeroInt::new($n) {
                     Some(x) => x,
                     // The assert above makes this branch unreachable
-                    None => loop {},
+                    None => unreachable!(),
                 }
             }
         )+};
