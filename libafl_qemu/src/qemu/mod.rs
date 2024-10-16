@@ -830,9 +830,7 @@ impl Qemu {
         // For ARMv6 and before, this could be wrong since SCTLR.U could be 0.
         // TODO: check precisely for architecture before doing this.
         #[cfg(target_arch = "arm")]
-        let addr = {
-            addr & !1
-        };
+        let addr = { addr & !1 };
 
         unsafe {
             libafl_qemu_set_breakpoint(addr.into());
@@ -845,9 +843,7 @@ impl Qemu {
         // For ARMv6 and before, this could be wrong since SCTLR.U could be 0.
         // TODO: check precisely for architecture before doing this.
         #[cfg(target_arch = "arm")]
-        let addr = {
-            addr & !1
-        };
+        let addr = { addr & !1 };
 
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
