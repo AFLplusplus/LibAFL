@@ -46,13 +46,6 @@ auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
 [build-dependencies]
 cc = { workspace = true, features = ["parallel"] }
 
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-yaxpeax-arm = "0.3.0"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-yaxpeax-x86 = "2.0.0"
-iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
-
 [dependencies]
 libafl = { path = "../libafl", default-features = false, version = "0.13.2", features = [
   "std",
@@ -101,12 +94,6 @@ yaxpeax-arch = "0.3.2"
 
 document-features = { workspace = true, optional = true } # Document all features of this crate (for `cargo doc`)
 
-[target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.22", features = ["kernel"] }
-
-[target.'cfg(target_vendor="apple")'.dependencies]
-mach-sys = { version = "0.5.4" }
-
 [dev-dependencies]
 serial_test = { workspace = true, default-features = false, features = [
   "logging",
@@ -115,3 +102,19 @@ clap = { workspace = true, features = ["derive"] }
 libloading = "0.8.5"
 mimalloc = { workspace = true, default-features = false }
 dlmalloc = { version = "0.2.6", features = ["global"] }
+
+[lints]
+workspace = true
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+yaxpeax-arm = "0.3.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+yaxpeax-x86 = "2.0.0"
+iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winsafe = { version = "0.0.22", features = ["kernel"] }
+
+[target.'cfg(target_vendor="apple")'.dependencies]
+mach-sys = { version = "0.5.4" }

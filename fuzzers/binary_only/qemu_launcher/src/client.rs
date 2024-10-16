@@ -159,7 +159,7 @@ impl Client<'_> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, asan_lib.take().unwrap()),
+                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
                         injection_module
                     ),
                     state,
@@ -168,7 +168,7 @@ impl Client<'_> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, asan_lib.take().unwrap()),
+                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
                     ),
                     state,
                 )
@@ -186,7 +186,7 @@ impl Client<'_> {
                 )
             }
         } else if is_asan_guest {
-            let modules = tuple_list!(AsanGuestModule::default(qemu, asan_lib.take().unwrap()));
+            let modules = tuple_list!(AsanGuestModule::default(qemu, &asan_lib.take().unwrap()));
             instance_builder.build().run(modules, state)
         } else if is_cmplog {
             if let Some(injection_module) = injection_module {

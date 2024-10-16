@@ -273,6 +273,9 @@ document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
 
+[lints]
+workspace = true
+
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                # For (*nix) libc
 z3 = { workspace = true, optional = true } # for concolic mutation

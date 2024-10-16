@@ -98,7 +98,12 @@ impl Harness {
         }
         let len = len as GuestReg;
 
-        unsafe { self.qemu.write_mem(self.input_addr, buf) };
+        self.qemu.write_mem(self.input_addr, buf).map_err(|e| {
+            Error::unknown(format!(
+                "Failed to write to memory@{:#x}: {e:?}",
+                self.input_addr
+            ))
+        })?;
 
         self.qemu
             .write_reg(Regs::Pc, self.pc)

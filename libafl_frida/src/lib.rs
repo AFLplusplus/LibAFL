@@ -7,25 +7,6 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
 
 */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
-#![forbid(unexpected_cfgs)]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::unreadable_literal,
-    clippy::ptr_cast_constness,
-    clippy::must_use_candidate,
-    clippy::too_many_arguments
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
