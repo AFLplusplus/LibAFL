@@ -108,6 +108,7 @@ pub struct DrCovModule<F> {
     full_trace: bool,
     drcov_len: usize,
 }
+
 impl DrCovModule<NopAddressFilter> {
     #[must_use]
     pub fn builder() -> DrCovModuleBuilder<NopAddressFilter> {
@@ -119,11 +120,7 @@ impl DrCovModule<NopAddressFilter> {
         }
     }
 }
-
-impl<F> DrCovModule<F>
-where
-    F: AddressFilter,
-{
+impl<F> DrCovModule<F> {
     #[must_use]
     #[allow(clippy::let_underscore_untyped)]
     pub fn new(
@@ -146,84 +143,7 @@ where
         }
     }
 
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(&addr)
-    }
-}
-
-impl<F, S> EmulatorModule<S> for DrCovModule<F>
-where
-    F: AddressFilter,
-    S: Unpin + UsesInput + HasMetadata,
-{
-    type ModuleAddressFilter = F;
-    #[cfg(emulation_mode = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
-
-    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
-    where
-        ET: EmulatorModuleTuple<S>,
-    {
-        emulator_modules.blocks(
-            Hook::Function(gen_unique_block_ids::<ET, F, S>),
-            Hook::Function(gen_block_lengths::<ET, F, S>),
-            Hook::Function(exec_trace_block::<ET, F, S>),
-        );
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
-        ET: EmulatorModuleTuple<S>,
-    {
-        if self.module_mapping.is_none() {
-            log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
-
-            let qemu = emulator_modules.qemu();
-
-            let mut module_mapping: RangeMap<usize, (u16, String)> = RangeMap::new();
-
-            for (i, (r, p)) in qemu
-                .mappings()
-                .filter_map(|m| {
-                    m.path()
-                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                        .filter(|(_, p)| !p.is_empty())
-                })
-                .enumerate()
-            {
-                module_mapping.insert(r, (i as u16, p));
-            }
-
-            self.module_mapping = Some(module_mapping);
-        } else {
-            log::info!("Using user-provided module mapping for DrCov module.");
-        }
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
-        ET: EmulatorModuleTuple<S>,
-    {
-        assert!(
-            self.module_mapping.is_some(),
-            "DrCov should have a module mapping already set."
-        );
-    }
-
-    fn post_exec<OT, ET>(
-        &mut self,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
-        _state: &mut S,
-        _input: &S::Input,
-        _observers: &mut OT,
-        _exit_kind: &mut ExitKind,
-    ) where
-        OT: ObserversTuple<S::Input, S>,
-        ET: EmulatorModuleTuple<S>,
-    {
+    pub fn write(&mut self) {
         let lengths_opt = DRCOV_LENGTHS.lock().unwrap();
         let lengths = lengths_opt.as_ref().unwrap();
         if self.full_trace {
@@ -321,6 +241,100 @@ where
             }
             self.drcov_len = DRCOV_MAP.lock().unwrap().as_ref().unwrap().len();
         }
+    }
+}
+
+impl<F> DrCovModule<F>
+where
+    F: AddressFilter,
+{
+    #[must_use]
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
+        self.filter.allowed(&addr)
+    }
+}
+
+impl<F, S> EmulatorModule<S> for DrCovModule<F>
+where
+    F: AddressFilter,
+    S: Unpin + UsesInput + HasMetadata,
+{
+    type ModuleAddressFilter = F;
+    #[cfg(emulation_mode = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
+
+    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+        emulator_modules.blocks(
+            Hook::Function(gen_unique_block_ids::<ET, F, S>),
+            Hook::Function(gen_block_lengths::<ET, F, S>),
+            Hook::Function(exec_trace_block::<ET, F, S>),
+        );
+    }
+
+    #[cfg(emulation_mode = "usermode")]
+    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+        if self.module_mapping.is_none() {
+            log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
+
+            let qemu = emulator_modules.qemu();
+
+            let mut module_mapping: RangeMap<usize, (u16, String)> = RangeMap::new();
+
+            for (i, (r, p)) in qemu
+                .mappings()
+                .filter_map(|m| {
+                    m.path()
+                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                        .filter(|(_, p)| !p.is_empty())
+                })
+                .enumerate()
+            {
+                module_mapping.insert(r, (i as u16, p));
+            }
+
+            self.module_mapping = Some(module_mapping);
+        } else {
+            log::info!("Using user-provided module mapping for DrCov module.");
+        }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+        assert!(
+            self.module_mapping.is_some(),
+            "DrCov should have a module mapping already set."
+        );
+    }
+
+    fn post_exec<OT, ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+        _input: &S::Input,
+        _observers: &mut OT,
+        _exit_kind: &mut ExitKind,
+    ) where
+        OT: ObserversTuple<S::Input, S>,
+        ET: EmulatorModuleTuple<S>,
+    {
+        self.write();
+    }
+
+    unsafe fn on_crash(&mut self) {
+        self.write();
+    }
+
+    unsafe fn on_timeout(&mut self) {
+        self.write();
     }
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
