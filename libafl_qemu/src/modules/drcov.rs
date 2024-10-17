@@ -326,15 +326,15 @@ where
         OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
-        self.write()
+        self.write();
     }
 
     fn on_crash(&mut self) {
-        self.write()
+        self.write();
     }
 
     fn on_timeout(&mut self) {
-        self.write()
+        self.write();
     }
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
