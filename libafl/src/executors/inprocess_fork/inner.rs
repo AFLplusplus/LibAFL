@@ -80,6 +80,40 @@ where
     type State = S;
 }
 
+#[cfg(target_os = "linux")]
+fn parse_itimerspec(timeout: Duration) -> libc::itimerspec {
+    let milli_sec = timeout.as_millis();
+    let it_value = libc::timespec {
+        tv_sec: (milli_sec / 1000) as _,
+        tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
+    };
+    let it_interval = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    libc::itimerspec {
+        it_interval,
+        it_value,
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn parse_itimerval(timeout: Duration) -> Itimerval {
+    let milli_sec = timeout.as_millis();
+    let it_value = Timeval {
+        tv_sec: (milli_sec / 1000) as i64,
+        tv_usec: (milli_sec % 1000) as i64,
+    };
+    let it_interval = Timeval {
+        tv_sec: 0,
+        tv_usec: 0,
+    };
+    Itimerval {
+        it_interval,
+        it_value,
+    }
+}
+
 impl<EM, HT, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
     OT: ObserversTuple<S::Input, S> + Debug,
@@ -234,21 +268,7 @@ where
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self>(state);
-
-        let milli_sec = timeout.as_millis();
-        let it_value = libc::timespec {
-            tv_sec: (milli_sec / 1000) as _,
-            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
-        };
-        let it_interval = libc::timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        };
-        let itimerspec = libc::itimerspec {
-            it_interval,
-            it_value,
-        };
-
+        let itimerspec = parse_itimerspec(timeout);
         Ok(Self {
             shmem_provider,
             observers,
@@ -274,19 +294,7 @@ where
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self>(state);
 
-        let milli_sec = timeout.as_millis();
-        let it_value = Timeval {
-            tv_sec: (milli_sec / 1000) as i64,
-            tv_usec: (milli_sec % 1000) as i64,
-        };
-        let it_interval = Timeval {
-            tv_sec: 0,
-            tv_usec: 0,
-        };
-        let itimerval = Itimerval {
-            it_interval,
-            it_value,
-        };
+        let itimerval = parse_itimerval(timeout);
 
         Ok(Self {
             shmem_provider,
