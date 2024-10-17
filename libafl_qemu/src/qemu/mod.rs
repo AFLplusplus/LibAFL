@@ -825,12 +825,26 @@ impl Qemu {
     }
 
     pub fn set_breakpoint(&self, addr: GuestAddr) {
+        // Remove thumb bit encoded in addresses.
+        // Since ARMv7, instructions are (half-)word aligned, so this is safe.
+        // For ARMv6 and before, this could be wrong since SCTLR.U could be 0.
+        // TODO: check precisely for architecture before doing this.
+        #[cfg(target_arch = "arm")]
+        let addr = { addr & !1 };
+
         unsafe {
             libafl_qemu_set_breakpoint(addr.into());
         }
     }
 
     pub fn remove_breakpoint(&self, addr: GuestAddr) {
+        // Remove thumb bit encoded in addresses.
+        // Since ARMv7, instructions are (half-)word aligned, so this is safe.
+        // For ARMv6 and before, this could be wrong since SCTLR.U could be 0.
+        // TODO: check precisely for architecture before doing this.
+        #[cfg(target_arch = "arm")]
+        let addr = { addr & !1 };
+
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
         }
