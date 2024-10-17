@@ -22,12 +22,11 @@ use libafl_bolts::{
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
-use nix::sys::wait::WaitStatus::Stopped;
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 use nix::{
     sys::{
         ptrace::{cont, setoptions, Options},
-        wait::WaitPidFlag,
+        wait::{WaitPidFlag, WaitStatus::Stopped},
     },
     unistd::Pid,
 };
@@ -308,7 +307,7 @@ pub(crate) struct SerdeAnyi32 {
     pub inner: i32,
 }
 libafl_bolts::impl_serdeany!(SerdeAnyi32);
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", target_os = "linux"))]
 impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, Pid, HT>
 where
     EM: UsesState<State = S>,
