@@ -1,53 +1,48 @@
-#[cfg(windows)]
-use std::ptr::write_volatile;
 use std::{
-    io::Write,
+    env,
+    ffi::{CStr, CString},
+    os::unix::ffi::OsStrExt,
     path::PathBuf,
-    process::{Child, Command, Stdio},
     time::Duration,
 };
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::command::CommandConfigurator,
-    feedback_and,
-    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
+    executors::{command::CommandConfigurator, hooks::intel_pt::IntelPTChildHook},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, HasMutatorBytes},
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
-    observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
+    observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
-    Error,
 };
-use libafl_bolts::{
-    rands::StdRand,
-    shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
-    tuples::tuple_list,
-    AsSlice, AsSliceMut,
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, Error};
+use nix::{
+    sys::{
+        ptrace::traceme,
+        signal::{raise, Signal},
+    },
+    unistd::{execv, fork, ForkResult, Pid},
 };
 
-#[allow(clippy::similar_names)]
+/// Coverage map
+static mut SIGNALS: [u8; 0x10_000] = [0; 0x10_000];
+static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+
 pub fn main() {
-    let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
-    let mut signals = shmem_provider.new_shmem(3).unwrap();
-    let shmem_id = signals.id();
-
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", signals.as_slice_mut()) };
-    // Create a stacktrace observer
-    let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_and!(CrashFeedback::new(), NewHashFeedback::new(&bt_observer));
-    // let mut objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -79,37 +74,51 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // Create the executor for an in-process function with just one observer
+    let mut hook = unsafe {
+        IntelPTChildHook::new(
+            SIGNALS_PTR,
+            SIGNALS.len(),
+            &[0x555555568000..0x5555555a8000],
+        )
+    };
+
     #[derive(Debug)]
-    struct MyExecutor {
-        shmem_id: ShMemId,
-    }
+    pub struct MyCommandConfigurator {}
 
-    impl CommandConfigurator<BytesInput, Child> for MyExecutor {
-        fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
-            let mut command = Command::new("./test_command");
+    impl CommandConfigurator<BytesInput, Pid> for MyCommandConfigurator {
+        fn spawn_child(&mut self, input: &BytesInput) -> Result<Pid, Error> {
+            // TODO move to new
+            let executable = PathBuf::from(env::args().next().unwrap())
+                .parent()
+                .unwrap()
+                .join("target_program")
+                .into_os_string();
+            let input = [input.bytes(), &[b'\0']].concat();
+            let arg1 = CStr::from_bytes_until_nul(&input).unwrap();
 
-            let command = command
-                .args([self.shmem_id.as_str()])
-                .env("ASAN_OPTIONS", get_asan_runtime_flags());
+            let child = match unsafe { fork() } {
+                Ok(ForkResult::Parent { child }) => child,
+                Ok(ForkResult::Child) => {
+                    traceme().unwrap();
+                    raise(Signal::SIGSTOP).expect("Failed to stop the process");
 
-            command
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped());
+                    execv(&CString::new(executable.as_bytes()).unwrap(), &[arg1]).unwrap();
 
-            let child = command.spawn().expect("failed to start process");
-            let mut stdin = child.stdin.as_ref().unwrap();
-            stdin.write_all(input.target_bytes().as_slice())?;
+                    unreachable!("execv returns only on error and its result is unwrapped");
+                }
+                Err(e) => panic!("Fork failed {e}"),
+            };
+
             Ok(child)
         }
 
         fn exec_timeout(&self) -> Duration {
-            Duration::from_secs(5)
+            Duration::from_secs(2)
         }
     }
 
-    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
+    let command_configurator = MyCommandConfigurator {};
+    let mut executor = command_configurator.into_executor(tuple_list!(observer), tuple_list!(hook));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32).unwrap();
