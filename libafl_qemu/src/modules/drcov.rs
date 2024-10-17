@@ -329,11 +329,11 @@ where
         self.write();
     }
 
-    fn on_crash(&mut self) {
+    unsafe fn on_crash(&mut self) {
         self.write();
     }
 
-    fn on_timeout(&mut self) {
+    unsafe fn on_timeout(&mut self) {
         self.write();
     }
 

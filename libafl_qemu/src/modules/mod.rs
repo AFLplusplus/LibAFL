@@ -95,9 +95,9 @@ where
     {
     }
 
-    fn on_crash(&mut self) {}
+    unsafe fn on_crash(&mut self) {}
 
-    fn on_timeout(&mut self) {}
+    unsafe fn on_timeout(&mut self) {}
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter;
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
@@ -153,9 +153,9 @@ where
         OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>;
 
-    fn on_crash_all(&mut self);
+    unsafe fn on_crash_all(&mut self);
 
-    fn on_timeout_all(&mut self);
+    unsafe fn on_timeout_all(&mut self);
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
 
@@ -204,9 +204,9 @@ where
     {
     }
 
-    fn on_crash_all(&mut self) {}
+    unsafe fn on_crash_all(&mut self) {}
 
-    fn on_timeout_all(&mut self) {}
+    unsafe fn on_timeout_all(&mut self) {}
 
     fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
 
@@ -267,12 +267,12 @@ where
             .post_exec_all(emulator_modules, state, input, observers, exit_kind);
     }
 
-    fn on_crash_all(&mut self) {
+    unsafe fn on_crash_all(&mut self) {
         self.0.on_crash();
         self.1.on_crash_all();
     }
 
-    fn on_timeout_all(&mut self) {
+    unsafe fn on_timeout_all(&mut self) {
         self.0.on_timeout();
         self.1.on_timeout_all();
     }
