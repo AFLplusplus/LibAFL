@@ -6,6 +6,8 @@ use std::{
     convert::Into,
     ffi::CString,
     fs,
+    fs::OpenOptions,
+    io::Write,
     ops::Range,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
@@ -22,7 +24,10 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libafl_bolts::ownedref::OwnedRefMut;
-use libipt::{block::BlockDecoder, Asid, BlockFlags, ConfigBuilder, Cpu, Image, SectionCache};
+use libipt::{
+    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Asid, BlockFlags,
+    ConfigBuilder, Cpu, Image, SectionCache,
+};
 use num_enum::TryFromPrimitive;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
@@ -34,10 +39,11 @@ use raw_cpuid::CpuId;
 use serde::Serialize;
 
 use crate::{
-    executors::{hooks::ExecutorHook, HasObservers},
+    executors::{command::SerdeAnyi32, hooks::ExecutorHook, HasObservers},
     inputs::UsesInput,
+    state::HasCorpus,
     std::string::ToString,
-    Error,
+    Error, HasNamedMetadata,
 };
 
 const PAGE_SIZE: usize = 4096;
@@ -99,6 +105,7 @@ pub struct IntelPT {
     aux_head: *mut u64,
     aux_tail: *mut u64,
     previous_decode_head: u64,
+    ip_filters: Vec<Range<usize>>,
 }
 
 #[derive(Debug)]
@@ -108,6 +115,112 @@ pub struct IntelPTHook {
     image_cache: Option<SectionCache<'static>>,
     map: *mut u8,
     len: usize,
+}
+
+#[derive(Debug)]
+pub struct IntelPTChildHook {
+    pt: Option<IntelPT>,
+    image: Option<Image<'static>>,
+    image_cache: Option<SectionCache<'static>>,
+    ip_filters: Vec<Range<usize>>,
+    map: *mut u8,
+    len: usize,
+}
+
+impl IntelPTChildHook {
+    pub fn new(map: *mut u8, len: usize, ip_filters: &[Range<usize>]) -> Self {
+        Self {
+            pt: None,
+            image: None,
+            image_cache: None,
+            ip_filters: ip_filters.to_vec(),
+            map,
+            len,
+        }
+    }
+}
+
+impl<S> ExecutorHook<S> for IntelPTChildHook
+where
+    S: UsesInput + Serialize + HasNamedMetadata + HasCorpus,
+    S::Corpus: core::fmt::Debug,
+{
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {
+        assert!(self.image.is_none(), "Intel PT image was already set up");
+        assert!(
+            self.image_cache.is_none(),
+            "Intel PT cache was already set up"
+        );
+        let mut image_cache = SectionCache::new(Some("image_cache")).unwrap();
+        let mut image = Image::new(Some("image")).unwrap();
+        let pid: SerdeAnyi32 = *_state
+            .named_metadata_map()
+            .get("child")
+            .expect("Child pid not in state metadata");
+
+        let maps = get_process_maps(pid.inner).unwrap();
+        for map in maps {
+            if map.is_exec() && map.filename().is_some() {
+                if let Ok(isid) = image_cache.add_file(
+                    map.filename().unwrap().to_str().unwrap(),
+                    map.offset as u64,
+                    map.size() as u64,
+                    map.start() as u64,
+                ) {
+                    image
+                        .add_cached(&mut image_cache, isid, Asid::default())
+                        .unwrap();
+                    println!(
+                        "{}\toffset: {:x}\tsize: {:x}\t start: {:x}",
+                        map.filename().unwrap().to_str().unwrap(),
+                        map.offset as u64,
+                        map.size() as u64,
+                        map.start() as u64,
+                    );
+                }
+            }
+        }
+
+        self.image_cache = Some(image_cache);
+        self.image = Some(image);
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        assert!(self.pt.is_none(), "Intel PT was already set up");
+
+        let pid: SerdeAnyi32 = *_state
+            .named_metadata_map()
+            .get("child")
+            .expect("Child pid not in state metadata");
+
+        self.pt = Some(IntelPT::try_new(Some(pid.inner)).unwrap());
+        self.pt
+            .as_mut()
+            .unwrap()
+            .set_ip_filters(&*self.ip_filters)
+            .unwrap();
+        self.pt.as_mut().unwrap().enable_tracing().unwrap();
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        let pt = self.pt.as_mut().unwrap();
+        pt.disable_tracing().unwrap();
+
+        let ids = pt.decode_with_image(self.image.as_mut().unwrap(), None);
+
+        for ip in ids {
+            unsafe {
+                let map_loc = self.map.add(ip as usize % self.len);
+                *map_loc = (*map_loc).saturating_add(1);
+            };
+        }
+
+        // println!("{:?}", _state.corpus());
+
+        self.pt = None;
+    }
 }
 
 impl IntelPTHook {
@@ -188,7 +301,7 @@ where
 
 impl IntelPT {
     // TODO consider a builder for this
-    pub(crate) fn try_new(pid: Option<i32>) -> Result<Self, Error> {
+    pub fn try_new(pid: Option<i32>) -> Result<Self, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         // TODO: take advantage of PTWRITE to better isolate target code?
 
@@ -232,6 +345,8 @@ impl IntelPT {
         let aux_head = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_head) };
         let aux_tail = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_tail) };
 
+        let ip_filters = Vec::with_capacity(*NUM_OF_ADDR_FILTERS.as_ref().unwrap() as usize);
+
         Ok(Self {
             fd,
             perf_buffer,
@@ -239,27 +354,51 @@ impl IntelPT {
             aux_head,
             aux_tail,
             previous_decode_head: 0,
+            ip_filters,
         })
     }
 
     pub fn set_ip_filters(&mut self, filters: &[Range<usize>]) -> Result<(), Error> {
-        let mut str_filter = String::new();
+        let mut str_filter = Vec::with_capacity(filters.len());
         for filter in filters {
             let size = filter.end - filter.start;
-            str_filter.push_str(format!("filter {:#x}/{:#x} ", filter.start, size).as_str());
+            str_filter.push(format!("filter {:#016x}/{:#016x}", filter.start, size));
         }
 
-        debug_assert!(!str_filter.contains('\0'));
-        // SAFETY: CString::from_vec_unchecked is safe because no null bytes are present in the
-        // string
-        let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
+        // SAFETY: CString::from_vec_unchecked is safe because no null bytes are added to str_filter
+        let c_str_filter =
+            unsafe { CString::from_vec_unchecked(str_filter.join(" ").into_bytes()) };
         match unsafe { SET_FILTER(self.fd.as_raw_fd(), c_str_filter.into_raw()) } {
             -1 => Err(Error::last_os_error("Failed to set IP filters")),
-            0 => Ok(()),
+            0 => {
+                self.ip_filters = filters.to_vec();
+                Ok(())
+            }
             ret => Err(Error::unsupported(format!(
                 "Failed to set IP filter, ioctl returned unexpected value {ret}"
             ))),
         }
+    }
+
+    fn ip_filters_to_addr_filter(&self) -> AddrFilter {
+        let mut builder = AddrFilterBuilder::new();
+        let mut iter = self
+            .ip_filters
+            .iter()
+            .map(|f| AddrRange::new(f.start as u64, f.end as u64, AddrConfig::FILTER));
+        if let Some(f) = iter.next() {
+            builder.addr0(f);
+            if let Some(f) = iter.next() {
+                builder.addr1(f);
+                if let Some(f) = iter.next() {
+                    builder.addr2(f);
+                    if let Some(f) = iter.next() {
+                        builder.addr3(f);
+                    }
+                }
+            }
+        }
+        builder.finish()
     }
 
     pub fn enable_tracing(&mut self) -> Result<(), Error> {
@@ -363,6 +502,7 @@ impl IntelPT {
 
         // TODO remove unwrap()
         let mut config = ConfigBuilder::new(data.as_mut()).unwrap();
+        config.filter(self.ip_filters_to_addr_filter());
         if let Some(cpu) = &*CURRENT_CPU {
             config.cpu(*cpu);
         }
@@ -848,20 +988,22 @@ mod test {
         ips.dedup();
         println!("Intel PT traces unique block ips: {ips:#x?}");
     }
+}
 
-    fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
-        let trace_path = "./traces/test_trace_pid_ipt_raw_trace_.tmp";
-        fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(trace_path)
-            .expect("Failed to open trace output file");
+static mut FILENUM: u32 = 0;
+fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
+    let trace_path = unsafe { format!("./traces/test_trace_pid_ipt_raw_trace_{FILENUM}.tmp") };
+    unsafe { FILENUM += 1 };
+    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
+    let mut file = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(trace_path)
+        .expect("Failed to open trace output file");
 
-        file.write_all(buff)
-            .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
+    file.write_all(buff)
+        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
 
-        Ok(())
-    }
+    Ok(())
 }

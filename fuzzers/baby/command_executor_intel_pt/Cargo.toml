@@ -1,0 +1,21 @@
+[package]
+name = "command_executor_intel_pt"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[dependencies]
+libafl = { path = "../../../libafl", features = ["intel_pt"] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+nix = { version = "0.29.0" , features = ["ptrace", "signal"]}
+proc-maps = "0.3.2"
+libipt = { git = "https://github.com/Marcondiro/libipt-rs" }
