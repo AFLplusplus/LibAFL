@@ -77,8 +77,8 @@ pub mod executor;
 pub mod utils;
 
 // for parsing asan and cmplog cores
-use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 
+use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[allow(clippy::struct_excessive_bools)]
@@ -326,6 +326,7 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
+    use core::num::NonZero;
     use std::sync::OnceLock;
 
     use clap::Parser;
@@ -504,8 +505,10 @@ mod tests {
                 );
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-                let mut stages =
-                    tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1).unwrap());
+                let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
+                    mutator,
+                    NonZero::new(1).unwrap()
+                ));
 
                 log::info!("Starting fuzzing!");
                 fuzzer

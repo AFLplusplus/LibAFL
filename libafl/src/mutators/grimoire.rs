@@ -259,6 +259,11 @@ where
             }
         };
 
+        let gen = generalised_meta.generalized_mut();
+        let Some(_) = NonZero::new(gen.len()) else {
+            return Err(Error::illegal_state("No generalized metadata found."));
+        };
+
         let token_find = state.rand_mut().below(tokens_len);
         let mut token_replace = state.rand_mut().below(tokens_len);
         if token_find == token_replace {
@@ -274,11 +279,11 @@ where
 
         let mut mutated = MutationResult::Skipped;
 
-        let gen = generalised_meta.generalized_mut();
-        let rand_idx = fast_bound(
-            rand_idx,
-            NonZero::new(gen.len()).ok_or_else(|| Error::empty("No Generalized Metadata found"))?,
-        );
+        // # Safety
+        // gen.len() is positive.
+        let rand_idx = fast_bound(rand_idx, unsafe {
+            NonZero::new(gen.len()).unwrap_unchecked()
+        });
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {

@@ -18,7 +18,7 @@ use crate::{
     corpus::Corpus,
     inputs::HasMutatorBytes,
     mutators::{MutationResult, Mutator},
-    random_corpus_id_with_disabled,
+    nonzero, random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -73,10 +73,7 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 pub fn rand_range<S: HasRand>(state: &mut S, upper: usize, max_len: NonZeroUsize) -> Range<usize> {
     let len = 1 + state.rand_mut().below(max_len);
     // sample from [1..upper + len]
-    let Some(upper_len_minus1) = NonZero::new(upper + len - 1) else {
-        return 0..0;
-    };
-    let mut offset2 = 1 + state.rand_mut().below(upper_len_minus1);
+    let mut offset2 = 1 + state.rand_mut().zero_upto(upper + len - 1);
     let offset1 = offset2.saturating_sub(len);
     if offset2 > upper {
         offset2 = upper;
@@ -314,7 +311,7 @@ where
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut()).unwrap();
-            *byte ^= 1 + state.rand_mut().below(NonZero::new(254).unwrap()) as u8;
+            *byte ^= 1 + state.rand_mut().below(nonzero!(254)) as u8;
             Ok(MutationResult::Mutated)
         }
     }
@@ -365,8 +362,8 @@ macro_rules! add_mutator_impl {
                     let val = <$size>::from_ne_bytes(bytes.try_into().unwrap());
 
                     // mutate
-                    let num = 1 + state.rand_mut().below(NonZero::new(ARITH_MAX).unwrap()) as $size;
-                    let new_val = match state.rand_mut().below(NonZero::new(4).unwrap()) {
+                    let num = 1 + state.rand_mut().below(nonzero!(ARITH_MAX)) as $size;
+                    let new_val = match state.rand_mut().below(nonzero!(4)) {
                         0 => val.wrapping_add(num),
                         1 => val.wrapping_sub(num),
                         2 => val.swap_bytes().wrapping_add(num).swap_bytes(),
@@ -569,7 +566,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(NonZero::new(16).unwrap());
+        let mut amount = 1 + state.rand_mut().below(nonzero!(16));
         // # Safety
         // It's a safe assumption that size + 1 is never 0.
         // If we wrap around we have _a lot_ of elements - and the code will break later anyway.
@@ -632,7 +629,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let mut amount = 1 + state.rand_mut().below(NonZero::new(16).unwrap());
+        let mut amount = 1 + state.rand_mut().below(nonzero!(16));
         // # Safety
         // size + 1 can never be 0
         let offset = state
@@ -835,9 +832,9 @@ where
         let max_insert_len = min(size - target, state.max_size() - size);
         let max_insert_len = min(16, max_insert_len);
 
-        let Some(max_insert_len) = NonZero::new(max_insert_len) else {
-            return Ok(MutationResult::Skipped);
-        };
+        // # Safety
+        // size > target and state.max_size() > size
+        let max_insert_len = unsafe { NonZero::new(max_insert_len).unwrap_unchecked() };
 
         let range = rand_range(state, size, max_insert_len);
 
@@ -989,13 +986,6 @@ where
             }
             Ok(MutationResult::Mutated)
         } else if first.end != size {
-            // The first range comes before the second range
-            debug_assert!(
-                first.end < size,
-                "First.end ({}) should never be larger than size ({})!",
-                first.end,
-                size
-            );
             // # Safety
             // first.end is not equal to size, so subtracting them can never be 0.
             let mut second = rand_range(state, size - first.end, unsafe {

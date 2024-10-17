@@ -5,7 +5,6 @@ use alloc::rc::Rc;
 use core::{
     cell::{Cell, RefCell},
     fmt::Debug,
-    num::NonZero,
 };
 
 use libafl_bolts::rands::Rand;
@@ -19,6 +18,7 @@ use crate::{
     inputs::UsesInput,
     mark_feature_time,
     mutators::Mutator,
+    nonzero,
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
@@ -29,7 +29,7 @@ use crate::{
 use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
-pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
+pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
 ///
@@ -74,7 +74,7 @@ where
     fn iterations(&self, state: &mut Z::State, _corpus_id: CorpusId) -> Result<usize, Error> {
         Ok(1 + state
             .rand_mut()
-            .below(NonZero::new(DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap()))
+            .below(nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)))
     }
 
     /// Sets the current corpus index

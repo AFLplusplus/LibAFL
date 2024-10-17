@@ -96,6 +96,13 @@ pub fn fast_bound(rand: u64, n: NonZeroUsize) -> usize {
     (mul >> 64) as usize
 }
 
+#[inline]
+#[must_use]
+fn fast_bound_usize(rand: u64, n: usize) -> usize {
+    let mul = u128::from(rand).wrapping_mul(u128::from(n as u64));
+    (mul >> 64) as usize
+}
+
 /// Ways to get random around here.
 /// Please note that these are not cryptographically secure.
 /// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
@@ -130,14 +137,9 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         fast_bound(self.next(), upper_bound_excl)
     }
 
-    /// Gets a value below the given bound (inclusive)
-    #[inline]
-    fn below_incl(&mut self, upper_bound_incl: usize) -> usize {
-        let Some(upper_bound) = NonZero::new(upper_bound_incl.wrapping_add(1)) else {
-            // The max value + 1 wrapped around to 0. We just do a "normal" random.
-            return self.next() as usize;
-        };
-        self.below(upper_bound)
+    /// Gets a value between [0, n]
+    fn zero_upto(&mut self, n: usize) -> usize {
+        fast_bound_usize(self.next(), n)
     }
 
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
@@ -548,17 +550,18 @@ impl XkcdRand {
 
 #[cfg(test)]
 mod tests {
-    use core::num::NonZero;
-
-    use crate::rands::{
-        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
-        Xoshiro256PlusPlusRand,
+    use crate::{
+        nonzero,
+        rands::{
+            Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+            Xoshiro256PlusPlusRand,
+        },
     };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(NonZero::new(100).unwrap()) < 100);
-        assert_eq!(rand.below(NonZero::new(1).unwrap()), 0);
+        assert!(rand.below(nonzero!(100)) < 100);
+        assert_eq!(rand.below(nonzero!(1)), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }

@@ -4,10 +4,7 @@
 //! a specific mutator for a specified amount of iterations
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::{
-    fmt::Debug,
-    num::{NonZero, NonZeroUsize},
-};
+use core::{fmt::Debug, num::NonZero};
 
 use libafl_bolts::{
     impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand,
@@ -86,7 +83,7 @@ impl TuneableScheduledMutatorMetadata {
 pub struct TuneableScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: NonZeroUsize,
+    max_stack_pow: usize,
 }
 
 impl<I, MT, S> Mutator<I, S> for TuneableScheduledMutator<MT>
@@ -135,7 +132,7 @@ where
                 iters
             } else {
                 // fall back to random
-                1 << (1 + state.rand_mut().below(self.max_stack_pow))
+                1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
             }
         } else {
             // We will sample using the mutation probabilities.
@@ -218,7 +215,7 @@ impl<MT> TuneableScheduledMutator<MT> {
         TuneableScheduledMutator {
             name: Cow::from(format!("TuneableMutator[{}]", mutations.names().join(", "))),
             mutations,
-            max_stack_pow: NonZero::new(7).unwrap(),
+            max_stack_pow: 7,
         }
     }
 }

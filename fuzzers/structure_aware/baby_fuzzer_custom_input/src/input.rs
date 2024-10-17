@@ -60,15 +60,15 @@ impl CustomInput {
 
 /// A generator for [`CustomInput`] used in this example
 pub struct CustomInputGenerator<S: HasRand> {
-    pub bytes_generator: RandBytesGenerator<S>,
+    pub bytes_generator: RandBytesGenerator,
 }
 
 impl<S: HasRand> CustomInputGenerator<S> {
     /// Creates a new [`CustomInputGenerator`]
-    pub fn new(max_len: usize) -> Result<Self, Error> {
-        Ok(Self {
-            bytes_generator: RandBytesGenerator::new(max_len)?,
-        })
+    pub fn new(max_len: usize) -> Self {
+        Self {
+            bytes_generator: RandBytesGenerator::new(max_len),
+        }
     }
 }
 
@@ -99,15 +99,15 @@ pub struct ToggleOptionalByteArrayMutator<G> {
     generator: G,
 }
 
-impl<S> ToggleOptionalByteArrayMutator<RandBytesGenerator<S>>
+impl<S> ToggleOptionalByteArrayMutator<RandBytesGenerator>
 where
     S: HasRand,
 {
     /// Creates a new [`ToggleOptionalByteArrayMutator`]
-    pub fn new(length: usize) -> Result<Self, Error> {
-        Ok(Self {
-            generator: RandBytesGenerator::new(length)?,
-        })
+    pub fn new(length: usize) -> Self {
+        Self {
+            generator: RandBytesGenerator::new(length),
+        }
     }
 }
 

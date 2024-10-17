@@ -5,10 +5,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::{
-    marker::PhantomData,
-    num::{NonZero, NonZeroUsize},
-};
+use core::{marker::PhantomData, num::NonZeroUsize};
 
 use libafl_bolts::{rands::Rand, Named};
 
@@ -18,6 +15,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
+    nonzero,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
@@ -155,7 +153,7 @@ where
 
 /// Default value, how many iterations each stage gets, as an upper bound.
 /// It may randomly continue earlier.
-pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
+pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
@@ -263,12 +261,12 @@ where
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
         // Safe to unwrap: DEFAULT_MUTATIONAL_MAX_ITERATIONS is never 0.
-        Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap()
+        Self::transforming_with_max_iterations(mutator, nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 
     /// Creates a new mutational stage with the given max iterations
     #[inline]
-    pub fn with_max_iterations(mutator: M, max_iterations: usize) -> Result<Self, Error> {
+    pub fn with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
         Self::transforming_with_max_iterations(mutator, max_iterations)
     }
 }
@@ -284,7 +282,7 @@ where
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
         // Safe to unwrap: DEFAULT_MUTATIONAL_MAX_ITERATIONS is never 0.
-        Self::transforming_with_max_iterations(mutator, DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap()
+        Self::transforming_with_max_iterations(mutator, nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 
     /// Creates a new transforming mutational stage with the given max iterations
@@ -292,14 +290,7 @@ where
     /// # Errors
     /// Will return [`Error::IllegalArgument`] for `max_iterations` of 0.
     #[inline]
-    pub fn transforming_with_max_iterations(
-        mutator: M,
-        max_iterations: usize,
-    ) -> Result<Self, Error> {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let Some(max_iterations) = NonZero::new(max_iterations) else {
-            return Err(Error::illegal_argument("0 max iterations is not allowed.."));
-        };
+    pub fn transforming_with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
         let stage_id = unsafe {
             let ret = MUTATIONAL_STAGE_ID;
             MUTATIONAL_STAGE_ID += 1;
@@ -307,12 +298,12 @@ where
         };
         let name =
             Cow::Owned(MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str());
-        Ok(Self {
+        Self {
             name,
             mutator,
             max_iterations,
             phantom: PhantomData,
-        })
+        }
     }
 }
 

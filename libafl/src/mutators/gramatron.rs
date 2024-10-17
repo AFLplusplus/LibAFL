@@ -16,7 +16,7 @@ use crate::{
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
-    random_corpus_id,
+    nonzero, random_corpus_id,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
@@ -222,12 +222,12 @@ where
         let chosen = *state.rand_mut().choose(&self.states).unwrap();
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
-        let Some(non_zero_chosen_nums_minus_one) = NonZero::new(chosen_nums - 1) else {
+        let Some(minus_one) = NonZero::new(chosen_nums - 1) else {
             return Ok(MutationResult::Skipped);
         };
 
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut first = state.rand_mut().below(non_zero_chosen_nums_minus_one) as i64;
+        let mut first = state.rand_mut().below(minus_one) as i64;
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut second = state
             .rand_mut()
@@ -259,10 +259,7 @@ where
 
         input.terminals_mut().truncate(idx_1);
 
-        for _ in 0..state
-            .rand_mut()
-            .below(NonZero::new(RECUR_THRESHOLD).unwrap())
-        {
+        for _ in 0..state.rand_mut().below(nonzero!(RECUR_THRESHOLD)) {
             input.terminals_mut().extend_from_slice(&self.feature);
         }
 
