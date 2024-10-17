@@ -198,7 +198,7 @@ where
         self.pt
             .as_mut()
             .unwrap()
-            .set_ip_filters(&*self.ip_filters)
+            .set_ip_filters(&self.ip_filters)
             .unwrap();
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
