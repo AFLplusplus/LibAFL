@@ -8,7 +8,7 @@ use core::{
 use std::ptr;
 #[cfg(emulation_mode = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
-use libc::siginfo_t;
+
 use libafl::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -35,6 +35,7 @@ use libafl_bolts::{
 use libafl_qemu_sys::libafl_exit_request_timeout;
 #[cfg(emulation_mode = "usermode")]
 use libafl_qemu_sys::libafl_qemu_handle_crash;
+use libc::siginfo_t;
 
 #[cfg(emulation_mode = "usermode")]
 use crate::EmulatorModules;
@@ -123,10 +124,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, OF, S, Z>(
         }
 
         libafl::executors::hooks::unix::unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>(
-            signal,
-            info,
-            context,
-            data,
+            signal, info, context, data,
         );
     }
 }
