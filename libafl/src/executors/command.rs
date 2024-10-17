@@ -34,13 +34,14 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
+#[cfg(target_os = "linux")]
+use crate::HasNamedMetadata;
 use crate::{
     executors::{hooks::ExecutorHooksTuple, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasExecutions, State, UsesState},
     std::borrow::ToOwned,
-    HasNamedMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};

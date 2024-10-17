@@ -6,8 +6,6 @@ use std::{
     convert::Into,
     ffi::CString,
     fs,
-    fs::OpenOptions,
-    io::Write,
     ops::Range,
     os::{
         fd::{AsRawFd, FromRawFd, OwnedFd},
@@ -988,22 +986,21 @@ mod test {
         ips.dedup();
         println!("Intel PT traces unique block ips: {ips:#x?}");
     }
-}
+    //static mut FILENUM: u32 = 0;
+    fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
+        let trace_path = "./traces/test_trace_pid_ipt_raw_trace.tmp"; //format!({FILENUM})
+                                                                      //unsafe { FILENUM += 1 };
+        fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(trace_path)
+            .expect("Failed to open trace output file");
 
-static mut FILENUM: u32 = 0;
-fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
-    let trace_path = unsafe { format!("./traces/test_trace_pid_ipt_raw_trace_{FILENUM}.tmp") };
-    unsafe { FILENUM += 1 };
-    fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(trace_path)
-        .expect("Failed to open trace output file");
+        file.write_all(buff)
+            .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
 
-    file.write_all(buff)
-        .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
-
-    Ok(())
+        Ok(())
+    }
 }
