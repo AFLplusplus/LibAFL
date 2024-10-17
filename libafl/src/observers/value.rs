@@ -23,6 +23,7 @@ use crate::{
 /// The intent is that the value is something with interior mutability which the target could write to even though this
 /// observer has a reference to it. Use [`RefCellValueObserver`] if using a [`RefCell`] around the value.
 #[derive(Serialize, Deserialize, Debug)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct ValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
@@ -66,15 +67,15 @@ impl<'a, T> ValueObserver<'a, T> {
 }
 
 /// This *does not* reset the value inside the observer.
-impl<'a, I, S, T> Observer<I, S> for ValueObserver<'a, T> {}
+impl<I, S, T> Observer<I, S> for ValueObserver<'_, T> {}
 
-impl<'a, T> Named for ValueObserver<'a, T> {
+impl<T> Named for ValueObserver<'_, T> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T: Hash> ObserverWithHashField for ValueObserver<'a, T> {
+impl<T: Hash> ObserverWithHashField for ValueObserver<'_, T> {
     fn hash(&self) -> Option<u64> {
         Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(self.value.as_ref()))
     }
@@ -82,6 +83,7 @@ impl<'a, T: Hash> ObserverWithHashField for ValueObserver<'a, T> {
 
 /// A simple observer with a single [`RefCell`]'d value.
 #[derive(Serialize, Deserialize, Debug)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct RefCellValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
@@ -141,15 +143,15 @@ impl<'a, T> RefCellValueObserver<'a, T> {
 }
 
 /// This *does not* reset the value inside the observer.
-impl<'a, I, S, T> Observer<I, S> for RefCellValueObserver<'a, T> {}
+impl<I, S, T> Observer<I, S> for RefCellValueObserver<'_, T> {}
 
-impl<'a, T> Named for RefCellValueObserver<'a, T> {
+impl<T> Named for RefCellValueObserver<'_, T> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T> ObserverWithHashField for RefCellValueObserver<'a, T>
+impl<T> ObserverWithHashField for RefCellValueObserver<'_, T>
 where
     T: Hash,
 {
@@ -248,7 +250,7 @@ impl<'it, T: 'it> Iterator for RefCellValueObserverIterMut<'it, T> {
     }
 }
 
-impl<'a, A: Hash> Hash for RefCellValueObserver<'a, A> {
+impl<A: Hash> Hash for RefCellValueObserver<'_, A> {
     /// Panics if the contained value is already mutably borrowed (calls
     /// [`RefCell::borrow`]).
     #[inline]

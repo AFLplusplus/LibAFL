@@ -226,7 +226,7 @@ pub struct StdCmpObserver<'a, CM> {
     add_meta: bool,
 }
 
-impl<'a, CM> CmpObserver for StdCmpObserver<'a, CM>
+impl<CM> CmpObserver for StdCmpObserver<'_, CM>
 where
     CM: HasLen,
 {
@@ -249,7 +249,7 @@ where
     }
 }
 
-impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
+impl<CM, I, S> Observer<I, S> for StdCmpObserver<'_, CM>
 where
     CM: Serialize + CmpMap + HasLen,
     S: HasMetadata,
@@ -270,7 +270,7 @@ where
     }
 }
 
-impl<'a, CM> Named for StdCmpObserver<'a, CM> {
+impl<CM> Named for StdCmpObserver<'_, CM> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

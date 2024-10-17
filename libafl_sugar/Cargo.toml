@@ -53,7 +53,7 @@ ppc = ["libafl_qemu/ppc"]
 hexagon = ["libafl_qemu/hexagon"]
 
 [build-dependencies]
-pyo3-build-config = { version = "0.22", optional = true }
+pyo3-build-config = { workspace = true, optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.13.2" }
@@ -61,11 +61,11 @@ libafl_bolts = { path = "../libafl_bolts", version = "0.13.2" }
 libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 
 # Document all features of this crate (for `cargo doc`)
-document-features = { version = "0.2", optional = true }
+document-features = { workspace = true, optional = true }
 
-typed-builder = "0.18"                       # Implement the builder pattern at compiletime
-pyo3 = { version = "0.22", optional = true }
-log = "0.4.20"
+typed-builder = { workspace = true }         # Implement the builder pattern at compiletime
+pyo3 = { workspace = true, optional = true }
+log = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libafl_qemu = { path = "../libafl_qemu", version = "0.13.2" }
@@ -73,3 +73,6 @@ libafl_qemu = { path = "../libafl_qemu", version = "0.13.2" }
 [lib]
 name = "libafl_sugar"
 crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true

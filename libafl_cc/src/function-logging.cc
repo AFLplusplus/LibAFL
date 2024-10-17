@@ -64,7 +64,7 @@
 
 using namespace llvm;
 
-#define MAP_SIZE EDGES_MAP_SIZE_IN_USE
+#define MAP_SIZE EDGES_MAP_DEFAULT_SIZE
 
 namespace {
 

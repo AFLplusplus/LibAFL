@@ -188,7 +188,7 @@ impl<'a> BacktraceObserver<'a> {
     }
 }
 
-impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
+impl ObserverWithHashField for BacktraceObserver<'_> {
     /// Gets the hash value of this observer.
     #[must_use]
     fn hash(&self) -> Option<u64> {
@@ -196,7 +196,7 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     }
 }
 
-impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a> {
+impl<I, S> Observer<I, S> for BacktraceObserver<'_> {
     fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
             if *exit_kind == ExitKind::Crash {
@@ -218,7 +218,7 @@ impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a> {
     }
 }
 
-impl<'a> Named for BacktraceObserver<'a> {
+impl Named for BacktraceObserver<'_> {
     fn name(&self) -> &Cow<'static, str> {
         &self.observer_name
     }

@@ -1,5 +1,7 @@
 //! The high-level hooks
-#![allow(clippy::type_complexity, clippy::missing_transmute_annotations)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::missing_transmute_annotations)]
+#![allow(clippy::too_many_arguments)]
 
 use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
@@ -52,6 +54,9 @@ impl<const N: usize, H: HookId> TcgHookState<N, H> {
         }
     }
 
+    /// # Safety
+    ///
+    /// ids should be in sync with QEMU hooks ids.
     pub unsafe fn set_id(&mut self, id: H) {
         self.id = id;
     }
@@ -66,6 +71,9 @@ impl<H: HookId> HookState<H> {
         }
     }
 
+    /// # Safety
+    ///
+    /// ids should be in sync with QEMU hooks ids.
     pub unsafe fn set_id(&mut self, id: H) {
         self.id = id;
     }
@@ -112,7 +120,7 @@ macro_rules! create_wrapper {
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
-                    let func: &mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*)> = transmute(hook);
+                    let func: &mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*)> = &mut *(ptr::from_mut::<FatPtr>(hook) as *mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*)>);
                     func(modules, inprocess_get_state::<S>(), $($param),*);
                 }
             }
@@ -137,7 +145,7 @@ macro_rules! create_wrapper {
             {
                 unsafe {
                     let modules = EmulatorModules::<ET, S>::emulator_modules_mut_unchecked();
-                    let func: &mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*) -> $ret_type> = transmute(hook);
+                    let func: &mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*) -> $ret_type> = &mut *(ptr::from_mut::<FatPtr>(hook) as *mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*) -> $ret_type>);
                     func(modules, inprocess_get_state::<S>(), $($param),*)
                 }
             }
@@ -164,7 +172,9 @@ macro_rules! create_pre_exec_wrapper {
                         HookRepr::Closure(ptr) => {
                             let func: &mut Box<
                                 dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*),
-                            > = transmute(ptr);
+                            > = &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut Box<
+                                dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*),
+                            >);
                             func(modules, inprocess_get_state::<S>(), $($param),*)
                         }
                         _ => (),
@@ -194,7 +204,9 @@ macro_rules! create_post_exec_wrapper {
                         HookRepr::Closure(ptr) => {
                             let func: &mut Box<
                                 dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*),
-                            > = transmute(ptr);
+                            > = &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut Box<
+                                dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*),
+                            >);
                             func(modules, inprocess_get_state::<S>(), $($param),*);
                         }
                         _ => (),
@@ -224,7 +236,7 @@ macro_rules! create_gen_wrapper {
                         HookRepr::Closure(ptr) => {
                             let func: &mut Box<
                                 dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*) -> Option<$ret_type>,
-                            > = transmute(ptr);
+                            > = &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*) -> Option<$ret_type>>);
                             func(modules, inprocess_get_state::<S>(), $($param),*).map_or(SKIP_EXEC_HOOK, |id| id)
                         }
                         _ => 0,
@@ -253,7 +265,7 @@ macro_rules! create_post_gen_wrapper {
                         HookRepr::Closure(ptr) => {
                             let func: &mut Box<
                                 dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*),
-                            > = transmute(ptr);
+                            > = &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*)>);
                             func(modules, inprocess_get_state::<S>(), $($param),*);
                         }
                         _ => (),
@@ -280,7 +292,7 @@ macro_rules! create_exec_wrapper {
                         }
                         HookRepr::Closure(ptr) => {
                             let func: &mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*)> =
-                                transmute(ptr);
+                                &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut Box<dyn FnMut(&mut EmulatorModules<ET, S>, Option<&mut S>, $($param_type),*)>);
                             func(modules, inprocess_get_state::<S>(), $($param),*);
                         }
                         _ => (),
@@ -712,6 +724,8 @@ create_exec_wrapper!(cmp, (id: u64, v0: u64, v1: u64), 3, 4, CmpHookId);
 
 // Crash hook wrappers
 #[cfg(emulation_mode = "usermode")]
+pub type CrashHookFn<ET, S> = fn(&mut EmulatorModules<ET, S>, i32);
+#[cfg(emulation_mode = "usermode")]
 pub type CrashHookClosure<ET, S> = Box<dyn FnMut(&mut EmulatorModules<ET, S>, i32)>;
 
 /// The thin wrapper around QEMU hooks.
@@ -1035,7 +1049,7 @@ impl QemuHooks {
     #[allow(clippy::unused_self)]
     pub(crate) fn set_crash_hook(self, callback: extern "C" fn(i32)) {
         unsafe {
-            libafl_dump_core_hook = callback;
+            libafl_dump_core_hook = Some(callback);
         }
     }
 }

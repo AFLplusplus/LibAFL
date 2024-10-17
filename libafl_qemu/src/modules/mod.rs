@@ -18,7 +18,7 @@ pub mod systemmode;
 pub use systemmode::*;
 
 pub mod edges;
-pub use edges::EdgeCoverageModule;
+pub use edges::*;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
@@ -29,6 +29,11 @@ pub use calls::CallTracerModule;
 pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::CmpLogModule;
+
+#[cfg(not(cpu_target = "hexagon"))]
+pub mod drcov;
+#[cfg(not(cpu_target = "hexagon"))]
+pub use drcov::*;
 
 use crate::{emu::EmulatorModules, Qemu};
 

@@ -1,7 +1,10 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
 use alloc::vec::Vec;
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    num::{NonZero, NonZeroUsize},
+};
 
 use libafl_bolts::rands::Rand;
 
@@ -58,7 +61,7 @@ impl<'a, I, S, G> GeneratorIter<'a, I, S, G> {
     }
 }
 
-impl<'a, I, S, G> Iterator for GeneratorIter<'a, I, S, G>
+impl<I, S, G> Iterator for GeneratorIter<'_, I, S, G>
 where
     G: Generator<I, S>,
 {
@@ -72,7 +75,7 @@ where
 #[derive(Clone, Debug)]
 /// Generates random bytes
 pub struct RandBytesGenerator<S> {
-    max_size: usize,
+    max_size: NonZeroUsize,
     phantom: PhantomData<S>,
 }
 
@@ -86,7 +89,7 @@ where
             size = 1;
         }
         let random_bytes: Vec<u8> = (0..size)
-            .map(|_| state.rand_mut().below(256) as u8)
+            .map(|_| state.rand_mut().below(NonZero::new(256).unwrap()) as u8)
             .collect();
         Ok(BytesInput::new(random_bytes))
     }
@@ -94,8 +97,18 @@ where
 
 impl<S> RandBytesGenerator<S> {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
+    ///
+    /// If you want to save one 0 check, use [`Self::from_nonzero`].
+    pub fn new(max_size: usize) -> Result<Self, Error> {
+        let Some(max_size) = NonZero::new(max_size) else {
+            return Err(Error::illegal_argument("The max_size may not be 0."));
+        };
+        Ok(Self::from_nonzero(max_size))
+    }
+
+    /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(max_size: usize) -> Self {
+    pub fn from_nonzero(max_size: NonZeroUsize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,
@@ -106,7 +119,7 @@ impl<S> RandBytesGenerator<S> {
 #[derive(Clone, Debug)]
 /// Generates random printable characters
 pub struct RandPrintablesGenerator<S> {
-    max_size: usize,
+    max_size: NonZeroUsize,
     phantom: PhantomData<S>,
 }
 
@@ -129,8 +142,18 @@ where
 
 impl<S> RandPrintablesGenerator<S> {
     /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
+    ///
+    /// To skip the 0 `max_size` check, create this using [`Self::from_nonzero`] instead.
+    pub fn new(max_size: usize) -> Result<Self, Error> {
+        let Some(max_size) = NonZero::new(max_size) else {
+            return Err(Error::illegal_argument("The max_size may not be 0."));
+        };
+        Ok(Self::from_nonzero(max_size))
+    }
+
+    /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(max_size: usize) -> Self {
+    pub fn from_nonzero(max_size: NonZeroUsize) -> Self {
         Self {
             max_size,
             phantom: PhantomData,

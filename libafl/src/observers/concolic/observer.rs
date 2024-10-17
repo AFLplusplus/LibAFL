@@ -16,9 +16,9 @@ pub struct ConcolicObserver<'map> {
     name: Cow<'static, str>,
 }
 
-impl<'map, I, S> Observer<I, S> for ConcolicObserver<'map> {}
+impl<I, S> Observer<I, S> for ConcolicObserver<'_> {}
 
-impl<'map> ConcolicObserver<'map> {
+impl ConcolicObserver<'_> {
     /// Create the concolic observer metadata for this run
     #[must_use]
     pub fn create_metadata_from_current_map(&self) -> ConcolicMetadata {
@@ -28,7 +28,7 @@ impl<'map> ConcolicObserver<'map> {
     }
 }
 
-impl<'map> Named for ConcolicObserver<'map> {
+impl Named for ConcolicObserver<'_> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

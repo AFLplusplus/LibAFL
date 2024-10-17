@@ -41,14 +41,14 @@ where
     // thread_id for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
-    stalker: Stalker<'a>,
+    stalker: Stalker,
     /// User provided callback for instrumentation
     helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     followed: bool,
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<H, OT, RT, S> Debug for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: State,
@@ -64,8 +64,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, Z>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<EM, H, OT, RT, S, Z> Executor<EM, Z> for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
@@ -121,7 +120,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> UsesState for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<H, OT, RT, S> UsesState for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S::Input, S>,
@@ -131,7 +130,7 @@ where
     type State = S;
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> HasObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<H, OT, RT, S> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,

@@ -18,15 +18,15 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl/", features = [
+libafl = { path = "../../../libafl", features = [
   "std",
   "llmp_compression",
   "llmp_bind_public",
   "frida_cli",
   "errors_backtrace",
 ] } #,  "llmp_small_maps", "llmp_debug"]}
-libafl_bolts = { path = "../../../libafl_bolts/" }
-frida-gum = { version = "0.13.6", features = [
+libafl_bolts = { path = "../../../libafl_bolts" }
+frida-gum = { version = "0.14.0", features = [
   "auto-download",
   "event-sink",
   "invocation-listener",
@@ -35,8 +35,8 @@ libafl_frida = { path = "../../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../../libafl_targets", features = [
   "sancov_cmplog",
 ] }
-libloading = "0.7"
-mimalloc = { version = "*", default-features = false }
-color-backtrace = "0.5"
-log = "0.4.20"
-env_logger = "0.10.0"
+libloading = "0.8.5"
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+mimalloc = { version = "0.1.43", default-features = false }
+color-backtrace = "0.6.1"
+env_logger = "0.11.5"

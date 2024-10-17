@@ -123,7 +123,8 @@ pub mod windows_exception_handler {
     use std::panic;
 
     use libafl_bolts::os::windows_exceptions::{
-        ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
+        ExceptionCode, ExceptionHandler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE,
+        EXCEPTION_POINTERS,
     };
     use windows::Win32::System::Threading::{
         EnterCriticalSection, ExitProcess, LeaveCriticalSection, CRITICAL_SECTION,
@@ -154,9 +155,15 @@ pub mod windows_exception_handler {
     ) {
     }*/
 
-    impl Handler for InProcessExecutorHandlerData {
+    impl ExceptionHandler for InProcessExecutorHandlerData {
+        /// # Safety
+        /// Will dereference `EXCEPTION_POINTERS` and access `GLOBAL_STATE`.
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+        unsafe fn handle(
+            &mut self,
+            _code: ExceptionCode,
+            exception_pointers: *mut EXCEPTION_POINTERS,
+        ) {
             unsafe {
                 let data = addr_of_mut!(GLOBAL_STATE);
                 let in_handler = (*data).set_in_handler(true);

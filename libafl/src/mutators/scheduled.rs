@@ -3,6 +3,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
+    num::{NonZero, NonZeroUsize},
     ops::{Deref, DerefMut},
 };
 
@@ -101,7 +102,7 @@ where
 pub struct StdScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: usize,
+    max_stack_pow: NonZeroUsize,
 }
 
 impl<MT> Named for StdScheduledMutator<MT> {
@@ -148,8 +149,13 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(self.mutations.len() != 0);
-        state.rand_mut().below(self.mutations.len()).into()
+        debug_assert_ne!(self.mutations.len(), 0);
+        // # Safety
+        // We check for empty mutations
+        state
+            .rand_mut()
+            .below(unsafe { NonZero::new(self.mutations.len()).unwrap_unchecked() })
+            .into()
     }
 }
 
@@ -165,20 +171,27 @@ where
                 mutations.names().join(", ")
             )),
             mutations,
-            max_stack_pow: 7,
+            max_stack_pow: NonZero::new(7).unwrap(),
         }
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
-        StdScheduledMutator {
+    ///
+    /// # Errors
+    /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
+    #[inline]
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Result<Self, Error> {
+        let Some(max_stack_pow) = NonZero::new(max_stack_pow) else {
+            return Err(Error::illegal_argument("Max stack pow may not be 0."));
+        };
+        Ok(Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
                 mutations.names().join(", ")
             )),
             mutations,
             max_stack_pow,
-        }
+        })
     }
 }
 
@@ -253,15 +266,17 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(6))
+        1 << (1 + state.rand_mut().below(NonZero::new(6).unwrap()))
     }
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(<SM::Mutations as HasConstLen>::LEN != 0);
+        // # Safety
+        // In debug we check the length. Worst case we end up with an illegal MutationId and fail later.
         state
             .rand_mut()
-            .below(<SM::Mutations as HasConstLen>::LEN)
+            .below(unsafe { NonZero::new(<SM::Mutations as HasConstLen>::LEN).unwrap_unchecked() })
             .into()
     }
 

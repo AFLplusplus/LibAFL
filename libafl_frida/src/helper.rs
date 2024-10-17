@@ -147,6 +147,7 @@ pub struct FridaInstrumentationHelperBuilder {
 
 impl FridaInstrumentationHelperBuilder {
     /// Create a new [`FridaInstrumentationHelperBuilder`]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -404,11 +405,12 @@ where
     })
 }
 
-impl<'a> FridaInstrumentationHelper<'a, ()> {
+impl FridaInstrumentationHelper<'_, ()> {
     /// Create a builder to initialize a [`FridaInstrumentationHelper`].
     ///
     /// See the documentation of [`FridaInstrumentationHelperBuilder`]
     /// for more details.
+    #[must_use]
     pub fn builder() -> FridaInstrumentationHelperBuilder {
         FridaInstrumentationHelperBuilder::default()
     }
@@ -644,6 +646,7 @@ where
     }
 
     /// Returns ref to the Transformer
+    #[must_use]
     pub fn transformer(&self) -> &Transformer<'a> {
         &self.transformer
     }
@@ -671,6 +674,7 @@ where
     }
 
     /// If stalker is enabled
+    #[must_use]
     pub fn stalker_enabled(&self) -> bool {
         self.stalker_enabled
     }
@@ -684,6 +688,7 @@ where
     }
 
     /// Ranges
+    #[must_use]
     pub fn ranges(&self) -> Ref<RangeMap<usize, (u16, String)>> {
         self.ranges.borrow()
     }

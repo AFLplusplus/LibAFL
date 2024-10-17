@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use std::{num::NonZeroUsize, thread, time};
 
-use libafl_bolts::{bolts_prelude::LlmpMsgHookResult, llmp::LlmpBrokerInner};
+use libafl_bolts::llmp::{LlmpBrokerInner, LlmpMsgHookResult};
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 use libafl_bolts::{
     llmp::{self, Flags, LlmpHook, Tag},

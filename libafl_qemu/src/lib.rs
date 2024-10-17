@@ -4,7 +4,6 @@
 /*! */
 #![doc = include_str!("../README.md")]
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
-#![forbid(unexpected_cfgs)]
 // libafl_qemu only supports Linux currently
 #![cfg(target_os = "linux")]
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
@@ -13,16 +12,6 @@
     any(cpu_target = "x86_64", cpu_target = "aarch64"),
     allow(clippy::useless_conversion)
 )]
-#![allow(clippy::needless_pass_by_value)]
-#![allow(clippy::needless_pass_by_ref_mut)]
-#![allow(clippy::transmute_ptr_to_ptr)]
-#![allow(clippy::ptr_cast_constness)]
-#![allow(clippy::too_many_arguments)]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
-// Allow only ATM, it will be evetually removed
-#![allow(clippy::missing_safety_doc)]
 // libafl_qemu_sys export types with empty struct markers (e.g. struct {} start_init_save)
 // This causes bindgen to generate empty Rust struct that are generally not FFI-safe due to C++ having empty structs with size 1
 // As the QEMU codebase is C, it is FFI-safe and we just ignore the warning

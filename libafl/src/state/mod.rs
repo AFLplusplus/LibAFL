@@ -235,7 +235,7 @@ pub struct LoadConfig<'a, I, S, Z> {
 }
 
 #[cfg(feature = "std")]
-impl<'a, I, S, Z> Debug for LoadConfig<'a, I, S, Z> {
+impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "LoadConfig {{}}")
     }

@@ -97,7 +97,7 @@ use tuple_list::tuple_list;
 #[cfg(all(unix, not(miri)))]
 use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use crate::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
 #[cfg(all(windows, feature = "std"))]
 use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
 #[cfg(feature = "std")]
@@ -143,6 +143,8 @@ pub const LLMP_FLAG_INITIALIZED: Flags = Flags(0x0);
 pub const LLMP_FLAG_COMPRESSED: Flags = Flags(0x1);
 /// From another broker.
 pub const LLMP_FLAG_FROM_B2B: Flags = Flags(0x2);
+/// From another machine (with the `multi_machine` mode)
+pub const LLMP_FLAG_FROM_MM: Flags = Flags(0x4);
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
@@ -2185,8 +2187,8 @@ pub struct LlmpShutdownSignalHandler {
 }
 
 #[cfg(unix)]
-impl Handler for LlmpShutdownSignalHandler {
-    fn handle(
+impl SignalHandler for LlmpShutdownSignalHandler {
+    unsafe fn handle(
         &mut self,
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -2652,6 +2654,7 @@ where
     /// It is supposed that the message is never unmapped.
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
+    #[allow(clippy::too_many_lines)]
     unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
         let mut new_messages = false;
 

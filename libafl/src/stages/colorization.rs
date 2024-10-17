@@ -4,7 +4,7 @@ use alloc::{
     collections::binary_heap::BinaryHeap,
     vec::Vec,
 };
-use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
+use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, num::NonZero, ops::Range};
 
 use libafl_bolts::{
     rands::Rand,
@@ -189,20 +189,11 @@ where
         // This is the buffer we'll randomly mutate during type_replace
         let mut changed = input.clone();
 
-        // input will be consumed so clone it
-        let consumed_input = input.clone();
-
         // First, run orig_input once and get the original hash
 
         // Idea: No need to do this every time
-        let orig_hash = Self::get_raw_map_hash_run(
-            fuzzer,
-            executor,
-            state,
-            manager,
-            consumed_input,
-            observer_handle,
-        )?;
+        let orig_hash =
+            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, &input, observer_handle)?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -240,13 +231,12 @@ where
                     );
                 }
 
-                let consumed_input = input.clone();
                 let changed_hash = Self::get_raw_map_hash_run(
                     fuzzer,
                     executor,
                     state,
                     manager,
-                    consumed_input,
+                    &input,
                     observer_handle,
                 )?;
 
@@ -333,12 +323,12 @@ where
         executor: &mut E,
         state: &mut <Self as UsesState>::State,
         manager: &mut EM,
-        input: E::Input,
+        input: &E::Input,
         observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
-        executor.observers_mut().pre_exec_all(state, &input)?;
+        executor.observers_mut().pre_exec_all(state, input)?;
 
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
 
         let observers = executor.observers();
         let observer = observers[observer_handle].as_ref();
@@ -347,7 +337,7 @@ where
 
         executor
             .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+            .post_exec_all(state, input, &exit_kind)?;
 
         // let observers = executor.observers();
         // fuzzer.process_execution(state, manager, input, observers, &exit_kind, true)?;
@@ -363,11 +353,11 @@ where
             let c = match bytes[idx] {
                 0x41..=0x46 => {
                     // 'A' + 1 + rand('F' - 'A')
-                    0x41 + 1 + state.rand_mut().below(5) as u8
+                    0x41 + 1 + state.rand_mut().below(NonZero::new(5).unwrap()) as u8
                 }
                 0x61..=0x66 => {
                     // 'a' + 1 + rand('f' - 'a')
-                    0x61 + 1 + state.rand_mut().below(5) as u8
+                    0x61 + 1 + state.rand_mut().below(NonZero::new(5).unwrap()) as u8
                 }
                 0x30 => {
                     // '0' -> '1'
@@ -379,35 +369,35 @@ where
                 }
                 0x32..=0x39 => {
                     // '2' + 1 + rand('9' - '2')
-                    0x32 + 1 + state.rand_mut().below(7) as u8
+                    0x32 + 1 + state.rand_mut().below(NonZero::new(7).unwrap()) as u8
                 }
                 0x47..=0x5a => {
                     // 'G' + 1 + rand('Z' - 'G')
-                    0x47 + 1 + state.rand_mut().below(19) as u8
+                    0x47 + 1 + state.rand_mut().below(NonZero::new(19).unwrap()) as u8
                 }
                 0x67..=0x7a => {
                     // 'g' + 1 + rand('z' - 'g')
-                    0x67 + 1 + state.rand_mut().below(19) as u8
+                    0x67 + 1 + state.rand_mut().below(NonZero::new(19).unwrap()) as u8
                 }
                 0x21..=0x2a => {
                     // '!' + 1 + rand('*' - '!');
-                    0x21 + 1 + state.rand_mut().below(9) as u8
+                    0x21 + 1 + state.rand_mut().below(NonZero::new(9).unwrap()) as u8
                 }
                 0x2c..=0x2e => {
                     // ',' + 1 + rand('.' - ',')
-                    0x2c + 1 + state.rand_mut().below(2) as u8
+                    0x2c + 1 + state.rand_mut().below(NonZero::new(2).unwrap()) as u8
                 }
                 0x3a..=0x40 => {
                     // ':' + 1 + rand('@' - ':')
-                    0x3a + 1 + state.rand_mut().below(6) as u8
+                    0x3a + 1 + state.rand_mut().below(NonZero::new(6).unwrap()) as u8
                 }
                 0x5b..=0x60 => {
                     // '[' + 1 + rand('`' - '[')
-                    0x5b + 1 + state.rand_mut().below(5) as u8
+                    0x5b + 1 + state.rand_mut().below(NonZero::new(5).unwrap()) as u8
                 }
                 0x7b..=0x7e => {
                     // '{' + 1 + rand('~' - '{')
-                    0x7b + 1 + state.rand_mut().below(3) as u8
+                    0x7b + 1 + state.rand_mut().below(NonZero::new(3).unwrap()) as u8
                 }
                 0x2b => {
                     // '+' -> '/'

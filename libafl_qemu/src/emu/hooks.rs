@@ -15,8 +15,8 @@ use crate::qemu::{
 };
 #[cfg(emulation_mode = "usermode")]
 use crate::qemu::{
-    CrashHookClosure, PostSyscallHookClosure, PostSyscallHookFn, PreSyscallHookClosure,
-    PreSyscallHookFn,
+    CrashHookClosure, CrashHookFn, PostSyscallHookClosure, PostSyscallHookFn,
+    PreSyscallHookClosure, PreSyscallHookFn,
 };
 use crate::{
     cpu_run_post_exec_hook_wrapper, cpu_run_pre_exec_hook_wrapper,
@@ -69,26 +69,24 @@ macro_rules! hook_to_repr {
 static mut EMULATOR_TOOLS: *mut () = ptr::null_mut();
 
 #[cfg(emulation_mode = "usermode")]
-static mut CRASH_HOOKS: Vec<HookRepr> = vec![];
-
-#[cfg(emulation_mode = "usermode")]
 pub extern "C" fn crash_hook_wrapper<ET, S>(target_sig: i32)
 where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
     unsafe {
-        let hooks = Qemu::get().unwrap().hooks();
+        let emulator_modules = EmulatorModules::<ET, S>::emulator_modules_mut().unwrap();
 
-        for crash_hook in &mut (*addr_of_mut!(CRASH_HOOKS)) {
+        for crash_hook in &mut (*addr_of_mut!(emulator_modules.hooks.crash_hooks)) {
             match crash_hook {
                 HookRepr::Function(ptr) => {
-                    let func: fn(QemuHooks, i32) = transmute(*ptr);
-                    func(hooks, target_sig);
+                    let func: CrashHookFn<ET, S> = transmute(*ptr);
+                    func(emulator_modules, target_sig);
                 }
                 HookRepr::Closure(ptr) => {
-                    let func: &mut Box<dyn FnMut(QemuHooks, i32)> = transmute(ptr);
-                    func(hooks, target_sig);
+                    let func: &mut CrashHookClosure<ET, S> =
+                        &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut CrashHookClosure<ET, S>);
+                    func(emulator_modules, target_sig);
                 }
                 HookRepr::Empty => (),
             }

@@ -72,7 +72,7 @@ pub struct AFLppCmpLogObserver<'a> {
     original: bool,
 }
 
-impl<'a> CmpObserver for AFLppCmpLogObserver<'a> {
+impl CmpObserver for AFLppCmpLogObserver<'_> {
     type Map = AFLppCmpLogMap;
 
     /// Get the number of usable cmps (all by default)
@@ -92,7 +92,7 @@ impl<'a> CmpObserver for AFLppCmpLogObserver<'a> {
     }
 }
 
-impl<'a, I, S> Observer<I, S> for AFLppCmpLogObserver<'a>
+impl<I, S> Observer<I, S> for AFLppCmpLogObserver<'_>
 where
     S: HasMetadata,
 {
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<'a> Named for AFLppCmpLogObserver<'a> {
+impl Named for AFLppCmpLogObserver<'_> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

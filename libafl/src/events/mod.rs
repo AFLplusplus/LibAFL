@@ -34,7 +34,7 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
@@ -80,9 +80,12 @@ pub struct ShutdownSignalData {}
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+///
+/// # Safety
+/// This will exit the program
 #[cfg(all(unix, feature = "std"))]
-impl Handler for ShutdownSignalData {
-    fn handle(
+impl SignalHandler for ShutdownSignalData {
+    unsafe fn handle(
         &mut self,
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -282,8 +285,6 @@ pub enum Event<I> {
         client_config: EventConfig,
         /// The time of generation of the event
         time: Duration,
-        /// The executions of this client
-        executions: u64,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
@@ -325,8 +326,6 @@ pub enum Event<I> {
     Objective {
         /// Objective corpus size
         objective_size: usize,
-        /// The total number of executions when this objective is found
-        executions: u64,
         /// The time when this event was created
         time: Duration,
     },
@@ -395,6 +394,11 @@ impl<I> Event<I> {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
         }
+    }
+
+    /// Returns true if self is a new testcase, false otherwise.
+    pub fn is_new_testcase(&self) -> bool {
+        matches!(self, Event::NewTestcase { .. })
     }
 }
 
@@ -905,7 +909,6 @@ mod tests {
             corpus_size: 123,
             client_config: EventConfig::AlwaysUnique,
             time: current_time(),
-            executions: 0,
             forward_id: None,
             #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
             node_id: None,

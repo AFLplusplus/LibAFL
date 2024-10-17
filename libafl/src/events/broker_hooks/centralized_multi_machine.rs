@@ -9,7 +9,7 @@ use std::{
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
-    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
+    llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag, LLMP_FLAG_FROM_MM},
     ownedref::OwnedRef,
     shmem::ShMemProvider,
     ClientId, Error,
@@ -176,7 +176,8 @@ where
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
 
-        // Here, we suppose msg will never be written again and will always be available.
+        // # Safety
+        // Here, we suppose msg will *never* be written again and will always be available.
         // Thus, it is safe to handle this in a separate thread.
         let msg_lock = unsafe { NullLock::new((msg.as_ptr(), msg.len())) };
         // let flags = msg_flags.clone();
@@ -254,20 +255,22 @@ where
                         let msg = msg.into_owned().unwrap().into_vec();
                         #[cfg(feature = "llmp_compression")]
                         match state_wr_lock.compressor().maybe_compress(msg.as_ref()) {
-                            Some(comp_buf) => {
-                                Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_COMPRESSED, comp_buf))
-                            }
-                            None => Ok((_LLMP_TAG_TO_MAIN, Flags(0), msg)),
+                            Some(comp_buf) => Ok((
+                                _LLMP_TAG_TO_MAIN,
+                                LLMP_FLAG_COMPRESSED | LLMP_FLAG_FROM_MM,
+                                comp_buf,
+                            )),
+                            None => Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg)),
                         }
                         #[cfg(not(feature = "llmp_compression"))]
-                        Ok((_LLMP_TAG_TO_MAIN, Flags(0), msg))
+                        Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg))
                     }
                     MultiMachineMsg::Event(evt) => {
                         let evt = evt.into_owned().unwrap();
                         let (inner_flags, buf) =
                             Self::try_compress(&mut state_wr_lock, evt.as_ref())?;
 
-                        Ok((_LLMP_TAG_TO_MAIN, inner_flags, buf))
+                        Ok((_LLMP_TAG_TO_MAIN, inner_flags | LLMP_FLAG_FROM_MM, buf))
                     }
                 })
                 .collect();

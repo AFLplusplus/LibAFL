@@ -4,14 +4,24 @@ members = [
   "libafl",
   "libafl_bolts",
   "libafl_cc",
+  "libafl_concolic/symcc_runtime",
+  "libafl_concolic/symcc_libafl",
   "libafl_derive",
+  "libafl_frida",
+  "libafl_libfuzzer",
+  "libafl_nyx",
   "libafl_targets",
+  "libafl_tinyinst",
+  "libafl_qemu",
+  "libafl_qemu/libafl_qemu_build",
+  "libafl_qemu/libafl_qemu_sys",
   "libafl_sugar",
   "libafl_concolic/test/dump_constraints",
   "libafl_concolic/test/runtime_test",
   "utils/build_and_test_fuzzers",
   "utils/deexit",
   "utils/libafl_benches",
+  "utils/libafl_jumper",
   "utils/gramatron/construct_automata",
 ]
 default-members = [
@@ -25,6 +35,7 @@ default-members = [
 exclude = [
   "bindings",
   "fuzzers",
+  "libafl_libfuzzer_runtime",
   "utils/noaslr",
   "utils/gdb_qemu",
   "utils/libafl_fmt",
@@ -32,24 +43,100 @@ exclude = [
   "utils/multi_machine_generator",
   "scripts",
   # additional crates
-  "libafl_concolic/symcc_runtime",
-  "libafl_concolic/symcc_libafl",
-  "libafl_frida",
-  "libafl_libfuzzer",
-  "libafl_libfuzzer_runtime",
-  "libafl_nyx",
-  "libafl_qemu",
-  "libafl_tinyinst",
-  "libafl_qemu/libafl_qemu_build",
-  "libafl_qemu/libafl_qemu_sys",
   "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 
 [workspace.package]
 version = "0.13.2"
 
+[workspace.dependencies]
+ahash = { version = "0.8.11", default-features = false } # The hash function already used in hashbrown
+backtrace = { version = "0.3.74", default-features = false } # Used to get the stacktrace in StacktraceObserver
+bindgen = "0.70.1"
+clap = "4.5.18"
+cc = "1.1.21"
+cmake = "0.1.51"
+document-features = "0.2.10"
+hashbrown = { version = "0.14.5", default-features = false } # A faster hashmap, nostd compatible
+libc = "0.2.159" # For (*nix) libc
+log = "0.4.22"
+meminterval = "0.4.1"
+mimalloc = { version = "0.1.43", default-features = false }
+nix = { version = "0.29.0", default-features = false }
+num_enum = { version = "0.7.3", default-features = false }
+num-traits = { version = "0.2.19", default-features = false }
+paste = "1.0.15"
+postcard = { version = "1.0.10", features = [
+  "alloc",
+], default-features = false } # no_std compatible serde serialization format
+pyo3 = "0.22.3"
+pyo3-build-config = "0.22.3"
+pyo3-log = "0.11.0"
+rangemap = "1.5.1"
+regex = "1.10.6"
+rustversion = "1.0.17"
+serde = { version = "1.0.210", default-features = false } # serialization lib
+serial_test = { version = "3.1.1", default-features = false }
+serde_json = { version = "1.0.128", default-features = false }
+serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
+strum = "0.26.3"
+strum_macros = "0.26.4"
+toml = "0.8.19" # For parsing the injections toml file
+typed-builder = "0.20.0" # Implement the builder pattern at compiletime
+uuid = { version = "1.10.0", features = ["serde", "v4"] }
+which = "6.0.3"
+windows = "0.58.0"
+z3 = "0.12.1"
+
+
+[workspace.lints.rust]
+# Forbid
+unexpected_cfgs = "forbid"
+
+# Allow
+incomplete_features = "allow"
+ambiguous_glob_reexports = "allow"
+
+
+[workspace.lints.clippy]
+# Deny
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+cargo_common_metadata = "deny"
+
+# Warn
+cargo = { level = "warn", priority = -1 }
+negative_feature_names = "warn"
+
+# Allow
+unreadable_literal = "allow"
+type_repetition_in_bounds = "allow"
+missing_errors_doc = "allow"
+cast_possible_truncation = "allow"
+used_underscore_binding = "allow"
+ptr_as_ptr = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+unsafe_derive_deserialize = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+
+
+[workspace.lints.rustdoc]
+# Deny
+broken_intra_doc_links = "deny"
+
+
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
+
+[profile.release-abort]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+abort = true
