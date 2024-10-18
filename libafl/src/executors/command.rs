@@ -363,6 +363,7 @@ where
             Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
             s => {
                 // TODO other cases
+                // TODO ignore SIGWINCH
                 return Err(Error::unsupported(format!("Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})")));
             }
         };

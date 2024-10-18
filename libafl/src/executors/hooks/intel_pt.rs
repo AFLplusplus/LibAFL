@@ -138,6 +138,7 @@ impl IntelPTChildHook {
     }
 }
 
+// TODO remove some S traits
 impl<S> ExecutorHook<S> for IntelPTChildHook
 where
     S: UsesInput + Serialize + HasNamedMetadata + HasCorpus,
@@ -206,13 +207,15 @@ where
         let pt = self.pt.as_mut().unwrap();
         pt.disable_tracing().unwrap();
 
-        let ids = pt.decode_with_image(self.image.as_mut().unwrap(), None);
+        let decode_res = pt.decode_with_image(self.image.as_mut().unwrap(), None);
 
-        for ip in ids {
-            unsafe {
-                let map_loc = self.map.add(ip as usize % self.len);
-                *map_loc = (*map_loc).saturating_add(1);
-            };
+        if let Ok(ids) = decode_res {
+            for ip in ids {
+                unsafe {
+                    let map_loc = self.map.add(ip as usize % self.len);
+                    *map_loc = (*map_loc).saturating_add(1);
+                };
+            }
         }
 
         // println!("{:?}", _state.corpus());
@@ -289,10 +292,15 @@ where
         //     }
         // };
 
-        let ips = pt.decode_with_image(self.image.as_mut().unwrap(), None);
+        let decode_res = pt.decode_with_image(self.image.as_mut().unwrap(), None);
 
-        for ip in ips {
-            unsafe { *self.map.add(ip as usize % self.len) += 1 };
+        if let Ok(ids) = decode_res {
+            for ip in ids {
+                unsafe {
+                    let map_loc = self.map.add(ip as usize % self.len);
+                    *map_loc = (*map_loc).saturating_add(1);
+                };
+            }
         }
     }
 }
@@ -343,7 +351,11 @@ impl IntelPT {
         let aux_head = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_head) };
         let aux_tail = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_tail) };
 
-        let ip_filters = Vec::with_capacity(*NUM_OF_ADDR_FILTERS.as_ref().unwrap() as usize);
+        let ip_filters = Vec::with_capacity(
+            *NUM_OF_ADDR_FILTERS
+                .as_ref()
+                .map_err(|e| Error::unsupported(e.to_string()))? as usize,
+        );
 
         Ok(Self {
             fd,
@@ -423,7 +435,7 @@ impl IntelPT {
         &mut self,
         image: &mut Image,
         copy_buffer: Option<&mut Vec<u8>>,
-    ) -> Vec<u64> {
+    ) -> Result<Vec<u64>, Error> {
         self.decode(
             None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
             Some(image),
@@ -436,7 +448,7 @@ impl IntelPT {
         &mut self,
         read_memory: F,
         copy_buffer: Option<&mut Vec<u8>>,
-    ) -> Vec<u64> {
+    ) -> Result<Vec<u64>, Error> {
         self.decode(
             Some(|buff: &mut [u8], addr: u64, _: Asid| {
                 debug_assert!(i32::try_from(buff.len()).is_ok());
@@ -453,7 +465,7 @@ impl IntelPT {
         read_memory: Option<F>,
         image: Option<&mut Image>,
         copy_buffer: Option<&mut Vec<u8>>,
-    ) -> Vec<u64> {
+    ) -> Result<Vec<u64>, Error> {
         let mut ips = Vec::new();
 
         let head = unsafe { self.aux_head.read_volatile() };
@@ -499,21 +511,23 @@ impl IntelPT {
         }
 
         // TODO remove unwrap()
-        let mut config = ConfigBuilder::new(data.as_mut()).unwrap();
+        let mut config =
+            ConfigBuilder::new(data.as_mut()).map_err(|e| Error::unknown(e.to_string()))?;
         config.filter(self.ip_filters_to_addr_filter());
         if let Some(cpu) = &*CURRENT_CPU {
             config.cpu(*cpu);
         }
         let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
         config.flags(flags);
-        let mut decoder = BlockDecoder::new(&config.finish()).unwrap();
+        let mut decoder =
+            BlockDecoder::new(&config.finish()).map_err(|e| Error::unknown(e.to_string()))?;
         if let Some(i) = image {
             decoder.set_image(Some(i)).expect("Failed to set image");
         }
         if let Some(rm) = read_memory {
             decoder
                 .image()
-                .unwrap()
+                .map_err(|e| Error::unknown(e.to_string()))?
                 .set_callback(Some(rm))
                 .expect("Failed to set get memory callback");
         }
@@ -594,7 +608,7 @@ impl IntelPT {
             .expect("Failed to get last sync offset");
         unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
-        ips
+        Ok(ips)
     }
 
     /// Check if Intel PT is available on the current system.
@@ -979,7 +993,7 @@ mod test {
         }
 
         let mut trace = Vec::new();
-        let mut ips = pt.decode_with_image(&mut image, Some(&mut trace));
+        let mut ips = pt.decode_with_image(&mut image, Some(&mut trace)).unwrap();
         let _ = dump_trace_to_file(&trace)
             .inspect_err(|e| println!("Failed to dump trace to file: {e}"));
         ips.sort_unstable();
