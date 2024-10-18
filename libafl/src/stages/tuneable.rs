@@ -1,7 +1,7 @@
 //! A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
 
 use alloc::string::{String, ToString};
-use core::{marker::PhantomData, num::NonZero, time::Duration};
+use core::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,7 @@ use crate::{
     corpus::Corpus,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
+    nonzero,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
         ExecutionCountRestartHelper, MutationalStage, Stage,
@@ -250,7 +251,7 @@ where
             // fall back to random
             1 + state
                 .rand_mut()
-                .below(NonZero::new(DEFAULT_MUTATIONAL_MAX_ITERATIONS).unwrap()),
+                .below(nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)),
         )
     }
 }

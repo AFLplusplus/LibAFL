@@ -3,7 +3,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
-    num::{NonZero, NonZeroUsize},
+    num::NonZero,
     ops::{Deref, DerefMut},
 };
 
@@ -21,6 +21,7 @@ use crate::{
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
+    nonzero,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
@@ -102,7 +103,7 @@ where
 pub struct StdScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
-    max_stack_pow: NonZeroUsize,
+    max_stack_pow: usize,
 }
 
 impl<MT> Named for StdScheduledMutator<MT> {
@@ -144,7 +145,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(self.max_stack_pow))
+        1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
@@ -171,7 +172,7 @@ where
                 mutations.names().join(", ")
             )),
             mutations,
-            max_stack_pow: NonZero::new(7).unwrap(),
+            max_stack_pow: 7,
         }
     }
 
@@ -180,18 +181,15 @@ where
     /// # Errors
     /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
     #[inline]
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Result<Self, Error> {
-        let Some(max_stack_pow) = NonZero::new(max_stack_pow) else {
-            return Err(Error::illegal_argument("Max stack pow may not be 0."));
-        };
-        Ok(Self {
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
+        Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
                 mutations.names().join(", ")
             )),
             mutations,
             max_stack_pow,
-        })
+        }
     }
 }
 
@@ -266,7 +264,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(NonZero::new(6).unwrap()))
+        1 << (1 + state.rand_mut().below(nonzero!(7)))
     }
 
     /// Get the next mutation to apply
