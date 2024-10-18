@@ -13,6 +13,10 @@ fn main() {
             "-C",
             "panic=abort",
             "-O",
+            // no ASLR support. This is not mandatory, but, if not set, requires to disable ASLR at
+            // OS level
+            "-C",
+            "relocation-model=static",
         ])
         .output();
     match out {
