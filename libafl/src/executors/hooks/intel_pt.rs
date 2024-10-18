@@ -510,7 +510,6 @@ impl IntelPT {
             b.extend_from_slice(data.as_ref());
         }
 
-        // TODO remove unwrap()
         let mut config =
             ConfigBuilder::new(data.as_mut()).map_err(|e| Error::unknown(e.to_string()))?;
         config.filter(self.ip_filters_to_addr_filter());
@@ -522,17 +521,23 @@ impl IntelPT {
         let mut decoder =
             BlockDecoder::new(&config.finish()).map_err(|e| Error::unknown(e.to_string()))?;
         if let Some(i) = image {
-            decoder.set_image(Some(i)).expect("Failed to set image");
+            decoder
+                .set_image(Some(i))
+                .map_err(|e| Error::unknown(format!("Failed to set image {}", e.to_string())))?;
         }
         if let Some(rm) = read_memory {
             decoder
                 .image()
                 .map_err(|e| Error::unknown(e.to_string()))?
                 .set_callback(Some(rm))
-                .expect("Failed to set get memory callback");
+                .map_err(|e| {
+                    Error::unknown(format!(
+                        "Failed to set get memory callback {}",
+                        e.to_string()
+                    ))
+                })?;
         }
         // TODO rewrite decently
-        // TODO consider dropping libipt-rs and using sys, or bindgen ourselves
         let mut previous_block_ip = 0;
         let mut status;
         loop {
@@ -585,7 +590,10 @@ impl IntelPT {
 
                         // TODO optimize this check and its equivalent up here?
                         if !b.speculative()
-                            && skip < decoder.offset().expect("Failed to get decoder offset")
+                            && skip
+                                < decoder
+                                    .offset()
+                                    .map_err(|e| Error::unknown(e.to_string()))?
                         {
                             let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
                             ips.push(id);
@@ -602,10 +610,12 @@ impl IntelPT {
 
         // Advance the trace pointer up to the latest sync point, otherwise the next execution might
         // not contain the PSB.
-        decoder.sync_backward().expect("Failed to sync backward");
+        decoder
+            .sync_backward()
+            .map_err(|e| Error::unknown(e.to_string()))?;
         let offset = decoder
             .sync_offset()
-            .expect("Failed to get last sync offset");
+            .map_err(|e| Error::unknown(e.to_string()))?;
         unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
         Ok(ips)

@@ -25,8 +25,11 @@ use libafl_bolts::{
 #[cfg(target_os = "linux")]
 use nix::{
     sys::{
-        ptrace::{cont, setoptions, Options},
-        wait::{WaitPidFlag, WaitStatus::Stopped},
+        ptrace::{cont, detach, setoptions, Options},
+        wait::{
+            WaitPidFlag,
+            WaitStatus::{Signaled, Stopped},
+        },
     },
     unistd::Pid,
 };
@@ -354,16 +357,17 @@ where
         }
         self.hooks.pre_exec_all(state, input);
 
-        cont(child, None)?;
+        detach(child, None)?;
         // TODO: use self.configurer.exec_timeout() for the waitpid
         let res = match waitpid(child, None).expect("waiting on child failed") {
             Exited(pid, 0) if pid == child => ExitKind::Ok,
             Exited(pid, _) if pid == child => ExitKind::Crash,
+            Signaled(pid, Signal::SIGABRT, _has_coredump) if pid == child => ExitKind::Crash,
+            Signaled(pid, Signal::SIGKILL, _has_coredump) if pid == child => ExitKind::Oom,
             Stopped(pid, Signal::SIGABRT) if pid == child => ExitKind::Crash,
             Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
             s => {
-                // TODO other cases
-                // TODO ignore SIGWINCH
+                // TODO other cases?
                 return Err(Error::unsupported(format!("Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})")));
             }
         };
