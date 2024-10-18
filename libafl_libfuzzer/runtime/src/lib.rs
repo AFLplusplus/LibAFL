@@ -74,7 +74,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
 };
-use libafl_bolts::{nonzero, AsSlice};
+use libafl_bolts::AsSlice;
 use libc::_exit;
 use mimalloc::MiMalloc;
 
@@ -170,6 +170,7 @@ macro_rules! fuzz_with {
             StdFuzzer,
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver, CMP_MAP};
+        use libafl_bolts::nonzero;
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
         use core::num::NonZeroUsize;
