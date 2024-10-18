@@ -23,7 +23,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasSolutions, StdState},
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
 #[cfg(not(miri))]
 use mimalloc::MiMalloc;
@@ -247,7 +247,7 @@ pub fn main() {
     );
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

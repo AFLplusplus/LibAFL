@@ -94,10 +94,7 @@ where
 impl RandBytesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(max_size: usize) -> Self {
-        // # Safety
-        // Saturating added 1 so it's always above 0
-        let max_size = unsafe { NonZeroUsize::new(max_size.saturating_add(1)).unwrap_unchecked() };
+    pub fn new(max_size: NonZeroUsize) -> Self {
         Self { max_size }
     }
 }
@@ -126,10 +123,7 @@ where
 impl RandPrintablesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(max_size: usize) -> Self {
-        // # Safety
-        // Saturating added 1 so it's always above 0
-        let max_size = unsafe { NonZeroUsize::new(max_size.saturating_add(1)).unwrap_unchecked() };
+    pub fn new(max_size: NonZeroUsize) -> Self {
         Self { max_size }
     }
 }
