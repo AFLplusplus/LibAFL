@@ -56,8 +56,11 @@ where
     first_exec: bool,
 }
 
+/// # Safety
+///
+/// This should be used as a crash handler, and nothing else.
 #[cfg(emulation_mode = "usermode")]
-pub unsafe fn inproc_qemu_crash_handler(
+unsafe fn inproc_qemu_crash_handler(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
@@ -329,6 +332,7 @@ where
     Z: HasObjective<State = S>,
     Z::Objective: Feedback<EM, S::Input, OT, S>,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         emulator: Emulator<CM, ED, ET, S, SM>,
         harness_fn: &'a mut H,

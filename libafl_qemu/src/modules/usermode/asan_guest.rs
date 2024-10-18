@@ -146,7 +146,7 @@ impl<F> AsanGuestModule<F> {
 
 impl AsanGuestModule<StdAddressFilter> {
     #[must_use]
-    pub fn default(qemu: Qemu, asan: String) -> Self {
+    pub fn default(qemu: Qemu, asan: &str) -> Self {
         Self::new(qemu, asan, StdAddressFilter::default())
     }
 }
@@ -156,7 +156,7 @@ where
     F: AddressFilter,
 {
     #[must_use]
-    pub fn new(qemu: Qemu, asan: String, filter: F) -> Self {
+    pub fn new(qemu: Qemu, asan: &str, filter: F) -> Self {
         for mapping in qemu.mappings() {
             println!("mapping: {mapping:#?}");
         }

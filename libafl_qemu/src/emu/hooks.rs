@@ -84,7 +84,8 @@ where
                     func(emulator_modules, target_sig);
                 }
                 HookRepr::Closure(ptr) => {
-                    let func: &mut CrashHookClosure<ET, S> = transmute(ptr);
+                    let func: &mut CrashHookClosure<ET, S> =
+                        &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut CrashHookClosure<ET, S>);
                     func(emulator_modules, target_sig);
                 }
                 HookRepr::Empty => (),

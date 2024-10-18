@@ -2654,6 +2654,7 @@ where
     /// It is supposed that the message is never unmapped.
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
+    #[allow(clippy::too_many_lines)]
     unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
         let mut new_messages = false;
 
