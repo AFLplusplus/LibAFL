@@ -46,7 +46,7 @@ use crate::{
 
 const PAGE_SIZE: usize = 4096;
 const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
-const PERF_AUX_BUFFER_SIZE: usize = 64 * 1024 * 1024;
+const PERF_AUX_BUFFER_SIZE: usize = 1 * 1024 * 1024;
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
 static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
@@ -209,13 +209,16 @@ where
 
         let decode_res = pt.decode_with_image(self.image.as_mut().unwrap(), None);
 
-        if let Ok(ids) = decode_res {
-            for ip in ids {
-                unsafe {
-                    let map_loc = self.map.add(ip as usize % self.len);
-                    *map_loc = (*map_loc).saturating_add(1);
-                };
+        match decode_res {
+            Ok(ids) => {
+                for ip in ids {
+                    unsafe {
+                        let map_loc = self.map.add(ip as usize % self.len);
+                        *map_loc = (*map_loc).saturating_add(1);
+                    }
+                }
             }
+            Err(e) => log::warn!("Intel PT trace decoding failed: {e}"),
         }
 
         // println!("{:?}", _state.corpus());
@@ -310,6 +313,8 @@ impl IntelPT {
     pub fn try_new(pid: Option<i32>) -> Result<Self, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         // TODO: take advantage of PTWRITE to better isolate target code?
+        // TODO: By default, the AUX buffer will be truncated if it will
+        // not fit in the available space in the ring buffer
 
         let fd = match unsafe {
             perf_event_open(
@@ -470,12 +475,22 @@ impl IntelPT {
 
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
-        debug_assert!(head >= tail, "Intel PT: aux head is behind aux tail.");
-        debug_assert!(
-            self.previous_decode_head >= tail,
-            "Intel PT: aux previous head is behind aux tail."
-        );
+        if head < tail {
+            return Err(Error::unknown(
+                "Intel PT: aux buffer head is behind aux tail.",
+            ));
+        };
+        if self.previous_decode_head < tail {
+            return Err(Error::unknown(
+                "Intel PT: aux previous head is behind aux tail.",
+            ));
+        };
         let len = (head - tail) as usize;
+        if len >= PERF_AUX_BUFFER_SIZE {
+            log::warn!(
+                "This fuzzer run resulted in a full PT buffer. Try increasing the aux buffer size or refining the IP filters."
+            );
+        }
         let skip = self.previous_decode_head - tail;
 
         let head_wrap = wrap_aux_pointer(head);

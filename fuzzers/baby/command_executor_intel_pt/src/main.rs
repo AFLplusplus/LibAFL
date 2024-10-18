@@ -35,6 +35,9 @@ static mut SIGNALS: [u8; 0x10_000] = [0; 0x10_000];
 static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 pub fn main() {
+    // Enable logging
+    env_logger::init();
+
     // Create an observation channel using the signals map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
