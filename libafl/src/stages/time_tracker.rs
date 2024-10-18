@@ -1,13 +1,16 @@
+//! Stage that wraps another stage and tracks it's execution time in `State`
 use std::{marker::PhantomData, time::Duration};
 
-use libafl::{
+use libafl_bolts::{current_time, Error};
+
+use crate::{
     inputs::UsesInput,
     stages::Stage,
     state::{State, UsesState},
     HasMetadata,
 };
-use libafl_bolts::{current_time, Error};
-
+/// Track an inner Stage's execution time
+#[derive(Debug)]
 pub struct TimeTrackingStageWrapper<T, S, ST> {
     inner: ST,
     count: Duration,
@@ -15,6 +18,7 @@ pub struct TimeTrackingStageWrapper<T, S, ST> {
 }
 
 impl<T, S, ST> TimeTrackingStageWrapper<T, S, ST> {
+    /// Create a `TimeTrackingStageWrapper`
     pub fn new(inner: ST) -> Self {
         Self {
             inner,

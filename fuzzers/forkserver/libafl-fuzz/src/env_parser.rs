@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
-use libafl::Error;
+use libafl::{stages::stats::AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS, Error};
 use libafl_bolts::core_affinity::Cores;
 
 use crate::Opt;
@@ -73,6 +73,8 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     }
     if let Ok(res) = std::env::var("AFL_FUZZER_STATS_UPDATE_INTERVAL") {
         opt.stats_interval = res.parse()?;
+    } else {
+        opt.stats_interval = AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS;
     }
     if let Ok(res) = std::env::var("AFL_BROKER_PORT") {
         opt.broker_port = Some(res.parse()?);

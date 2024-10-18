@@ -31,9 +31,12 @@ pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
-pub use stats::AflStatsStage;
+#[cfg(feature = "std")]
+pub use stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
 #[cfg(feature = "std")]
 pub use sync::*;
+#[cfg(feature = "std")]
+pub use time_tracker::TimeTrackingStageWrapper;
 pub use tmin::{
     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
 };
@@ -71,9 +74,12 @@ pub mod generalization;
 pub mod generation;
 pub mod logics;
 pub mod power;
+#[cfg(feature = "std")]
 pub mod stats;
 #[cfg(feature = "std")]
 pub mod sync;
+#[cfg(feature = "std")]
+pub mod time_tracker;
 pub mod tracing;
 pub mod tuneable;
 #[cfg(feature = "unicode")]
