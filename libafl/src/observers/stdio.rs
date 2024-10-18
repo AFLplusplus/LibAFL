@@ -108,7 +108,7 @@ use crate::{observers::Observer, Error};
 ///         .arg("--decode")
 ///         .stdout_observer(stdout_observer.handle())
 ///         .stderr_observer(stderr_observer.handle())
-///         .build(tuple_list!(stdout_observer, stderr_observer))
+///         .build(tuple_list!(stdout_observer, stderr_observer), ())
 ///         .unwrap();
 ///
 ///     let mut state = StdState::new(

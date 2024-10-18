@@ -22,6 +22,10 @@ pub mod inprocess;
 #[cfg(feature = "std")]
 pub mod timer;
 
+/// Intel Processor Trace (PT)
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
+pub mod intel_pt;
+
 /// The hook that runs before and after the executor runs the target
 pub trait ExecutorHook<S>
 where
