@@ -45,6 +45,7 @@ use crate::{
 };
 
 const PAGE_SIZE: usize = 4096;
+// TODO parametrize buffer sizes?
 const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
 const PERF_AUX_BUFFER_SIZE: usize = 1 * 1024 * 1024;
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
@@ -104,6 +105,12 @@ pub struct IntelPT {
     aux_tail: *mut u64,
     previous_decode_head: u64,
     ip_filters: Vec<Range<usize>>,
+}
+
+#[derive(Debug)]
+pub struct IntelPTBuilder {
+    pid: Option<u32>,
+    exclude_kernel: bool,
 }
 
 #[derive(Debug)]
@@ -193,7 +200,8 @@ where
             .get("child")
             .expect("Child pid not in state metadata");
 
-        self.pt = Some(IntelPT::try_new(Some(pid.inner)).unwrap());
+        let pt_builder = IntelPT::builder().pid(Some(pid.inner as u32));
+        self.pt = Some(pt_builder.build().unwrap());
         self.pt
             .as_mut()
             .unwrap()
@@ -273,7 +281,8 @@ where
 
         self.image_cache = Some(image_cache);
         self.image = Some(image);
-        self.pt = Some(IntelPT::try_new(None).unwrap());
+        let pt_builder = IntelPT::builder();
+        self.pt = Some(pt_builder.build().unwrap());
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -308,18 +317,25 @@ where
     }
 }
 
-impl IntelPT {
-    // TODO consider a builder for this
-    pub fn try_new(pid: Option<i32>) -> Result<Self, Error> {
+impl Default for IntelPTBuilder {
+    fn default() -> Self {
+        Self {
+            pid: None,
+            exclude_kernel: true,
+        }
+    }
+}
+
+impl IntelPTBuilder {
+    pub fn build(&self) -> Result<IntelPT, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
+        perf_event_attr.set_exclude_kernel(self.exclude_kernel.into());
         // TODO: take advantage of PTWRITE to better isolate target code?
-        // TODO: By default, the AUX buffer will be truncated if it will
-        // not fit in the available space in the ring buffer
 
         let fd = match unsafe {
             perf_event_open(
                 ptr::from_mut(&mut perf_event_attr),
-                pid.unwrap_or(0),
+                self.pid.unwrap_or(0) as i32,
                 -1,
                 -1,
                 PERF_FLAG_FD_CLOEXEC.into(),
@@ -362,7 +378,7 @@ impl IntelPT {
                 .map_err(|e| Error::unsupported(e.to_string()))? as usize,
         );
 
-        Ok(Self {
+        Ok(IntelPT {
             fd,
             perf_buffer,
             perf_aux_buffer,
@@ -371,6 +387,22 @@ impl IntelPT {
             previous_decode_head: 0,
             ip_filters,
         })
+    }
+
+    pub fn pid(mut self, pid: Option<u32>) -> Self {
+        self.pid = pid;
+        self
+    }
+
+    pub fn exclude_kernel(mut self, exclude_kernel: bool) -> Self {
+        self.exclude_kernel = exclude_kernel;
+        self
+    }
+}
+
+impl IntelPT {
+    pub fn builder() -> IntelPTBuilder {
+        IntelPTBuilder::default()
     }
 
     pub fn set_ip_filters(&mut self, filters: &[Range<usize>]) -> Result<(), Error> {
@@ -813,8 +845,6 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
         Err(e) => Err(Error::unsupported(e.clone())),
     }?;
     attr.set_disabled(1);
-    //TODO parametrize?
-    attr.set_exclude_kernel(1);
     attr.config = PtConfig::builder()
         .with_noretcomp(true)
         .with_psb_period(u4::new(0))
@@ -982,7 +1012,8 @@ mod test {
             Err(e) => panic!("Fork failed {e}"),
         };
 
-        let mut pt = IntelPT::try_new(Some(pid.as_raw())).expect("Failed to create IntelPT");
+        let pt_builder = IntelPT::builder().pid(Some(pid.as_raw() as u32));
+        let mut pt = pt_builder.build().expect("Failed to create IntelPT");
         pt.enable_tracing().expect("Failed to enable tracing");
 
         waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
