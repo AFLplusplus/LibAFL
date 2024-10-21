@@ -15,7 +15,9 @@ use libafl::{
     state::{HasSolutions, StdState},
     Fuzzer, StdFuzzer,
 };
-use libafl_bolts::{rands::StdRand, serdeany::RegistryBuilder, tuples::tuple_list, AsSlice};
+use libafl_bolts::{
+    nonzero, rands::StdRand, serdeany::RegistryBuilder, tuples::tuple_list, AsSlice,
+};
 use wasm_bindgen::prelude::*;
 use web_sys::{Performance, Window};
 
@@ -126,7 +128,7 @@ pub fn fuzz() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

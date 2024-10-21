@@ -1,6 +1,7 @@
 use std::{
     env,
     ffi::{CStr, CString},
+    num::NonZero,
     os::unix::ffi::OsStrExt,
     path::PathBuf,
     time::Duration,
@@ -31,6 +32,8 @@ use nix::{
 };
 
 /// Coverage map
+// TODO: move away from this, it is unsafe also in single thread
+// https://users.rust-lang.org/t/is-static-mut-unsafe-in-a-single-threaded-context/94242
 static mut SIGNALS: [u8; 0x10_000] = [0; 0x10_000];
 static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
@@ -119,7 +122,7 @@ pub fn main() {
     let mut executor = command_configurator.into_executor(tuple_list!(observer), tuple_list!(hook));
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());
 
     // Generate 8 initial inputs
     state
