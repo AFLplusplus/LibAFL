@@ -47,7 +47,7 @@ use crate::{
 const PAGE_SIZE: usize = 4096;
 // TODO parametrize buffer sizes?
 const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
-const PERF_AUX_BUFFER_SIZE: usize = 1 * 1024 * 1024;
+const PERF_AUX_BUFFER_SIZE: usize = 2 * 1024 * 1024;
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
 static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
@@ -109,7 +109,7 @@ pub struct IntelPT {
 
 #[derive(Debug)]
 pub struct IntelPTBuilder {
-    pid: Option<u32>,
+    pid: Option<libc::pid_t>,
     exclude_kernel: bool,
 }
 
@@ -200,7 +200,7 @@ where
             .get("child")
             .expect("Child pid not in state metadata");
 
-        let pt_builder = IntelPT::builder().pid(Some(pid.inner as u32));
+        let pt_builder = IntelPT::builder().pid(Some(pid.inner));
         self.pt = Some(pt_builder.build().unwrap());
         self.pt
             .as_mut()
@@ -330,12 +330,12 @@ impl IntelPTBuilder {
     pub fn build(&self) -> Result<IntelPT, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         perf_event_attr.set_exclude_kernel(self.exclude_kernel.into());
-        // TODO: take advantage of PTWRITE to better isolate target code?
 
+        // SAFETY: perf_event_attr is properly initialized
         let fd = match unsafe {
             perf_event_open(
                 ptr::from_mut(&mut perf_event_attr),
-                self.pid.unwrap_or(0) as i32,
+                self.pid.unwrap_or(0),
                 -1,
                 -1,
                 PERF_FLAG_FD_CLOEXEC.into(),
@@ -372,11 +372,7 @@ impl IntelPTBuilder {
         let aux_head = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_head) };
         let aux_tail = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_tail) };
 
-        let ip_filters = Vec::with_capacity(
-            *NUM_OF_ADDR_FILTERS
-                .as_ref()
-                .map_err(|e| Error::unsupported(e.to_string()))? as usize,
-        );
+        let ip_filters = Vec::with_capacity(*NUM_OF_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize);
 
         Ok(IntelPT {
             fd,
@@ -389,11 +385,13 @@ impl IntelPTBuilder {
         })
     }
 
-    pub fn pid(mut self, pid: Option<u32>) -> Self {
+    #[must_use]
+    pub fn pid(mut self, pid: Option<libc::pid_t>) -> Self {
         self.pid = pid;
         self
     }
 
+    #[must_use]
     pub fn exclude_kernel(mut self, exclude_kernel: bool) -> Self {
         self.exclude_kernel = exclude_kernel;
         self
@@ -401,6 +399,7 @@ impl IntelPTBuilder {
 }
 
 impl IntelPT {
+    #[must_use]
     pub fn builder() -> IntelPTBuilder {
         IntelPTBuilder::default()
     }
@@ -570,19 +569,14 @@ impl IntelPT {
         if let Some(i) = image {
             decoder
                 .set_image(Some(i))
-                .map_err(|e| Error::unknown(format!("Failed to set image {}", e.to_string())))?;
+                .map_err(|e| Error::unknown(format!("Failed to set image {e}")))?;
         }
         if let Some(rm) = read_memory {
             decoder
                 .image()
                 .map_err(|e| Error::unknown(e.to_string()))?
                 .set_callback(Some(rm))
-                .map_err(|e| {
-                    Error::unknown(format!(
-                        "Failed to set get memory callback {}",
-                        e.to_string()
-                    ))
-                })?;
+                .map_err(|e| Error::unknown(format!("Failed to set get memory callback {e}")))?;
         }
         // TODO rewrite decently
         let mut previous_block_ip = 0;
@@ -816,18 +810,16 @@ fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, Error> {
     }
 }
 
-#[allow(clippy::cast_possible_wrap)]
 fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_void, Error> {
-    // PROT_WRITE sets PT to stop when the buffer is full
-    debug_assert!(i64::try_from(offset).is_ok());
     match unsafe {
         libc::mmap(
             ptr::null_mut(),
             size as usize,
+            // PROT_WRITE sets PT to stop when the buffer is full
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_SHARED,
             fd.as_raw_fd(),
-            offset as i64,
+            i64::try_from(offset)?,
         )
     } {
         libc::MAP_FAILED => Err(Error::last_os_error(
@@ -838,18 +830,25 @@ fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_
 }
 
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
-    let mut attr: perf_event_attr = unsafe { core::mem::zeroed() };
-    attr.size = size_of::<perf_event_attr>() as u32;
-    attr.type_ = match &*PERF_EVENT_TYPE {
+    let type_ = match &*PERF_EVENT_TYPE {
         Ok(t) => Ok(*t),
         Err(e) => Err(Error::unsupported(e.clone())),
     }?;
-    attr.set_disabled(1);
-    attr.config = PtConfig::builder()
+    let config = PtConfig::builder()
         .with_noretcomp(true)
         .with_psb_period(u4::new(0))
         .build()
         .raw_value;
+
+    let mut attr = perf_event_attr {
+        size: size_of::<perf_event_attr>() as u32,
+        type_,
+        config,
+        ..Default::default()
+    };
+
+    // Do not enable tracing as soon as the perf_event_open syscall is issued
+    attr.set_disabled(1);
 
     Ok(attr)
 }
@@ -861,6 +860,7 @@ const fn wrap_aux_pointer(ptr: u64) -> u64 {
 
 #[inline]
 pub fn smp_rmb() {
+    // SAFETY: just a memory barrier
     unsafe {
         core::arch::asm!("lfence", options(nostack, preserves_flags));
     }
@@ -1012,7 +1012,7 @@ mod test {
             Err(e) => panic!("Fork failed {e}"),
         };
 
-        let pt_builder = IntelPT::builder().pid(Some(pid.as_raw() as u32));
+        let pt_builder = IntelPT::builder().pid(Some(pid.as_raw()));
         let mut pt = pt_builder.build().expect("Failed to create IntelPT");
         pt.enable_tracing().expect("Failed to enable tracing");
 
