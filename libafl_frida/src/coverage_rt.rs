@@ -16,7 +16,7 @@ pub const MAP_SIZE: usize = 64 * 1024;
 
 #[derive(Debug)]
 struct CoverageRuntimeInner {
-    map: Box<[u8]>,
+    map: [u8; MAP_SIZE],
     previous_pc: u64,
     _pinned: PhantomPinned,
 }
@@ -62,9 +62,10 @@ impl FridaRuntime for CoverageRuntime {
 impl CoverageRuntime {
     /// Create a new coverage runtime
     #[must_use]
+    #[allow(clippy::large_stack_arrays)]
     pub fn new() -> Self {
         Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
-            map: vec![0_u8; MAP_SIZE].into_boxed_slice(),
+            map: [0_u8; MAP_SIZE],
             previous_pc: 0,
             _pinned: PhantomPinned,
         })))
