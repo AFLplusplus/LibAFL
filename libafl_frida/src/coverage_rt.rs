@@ -16,7 +16,7 @@ pub const MAP_SIZE: usize = 64 * 1024;
 
 #[derive(Debug)]
 struct CoverageRuntimeInner {
-    map: [u8; MAP_SIZE],
+    map: Box<[u8]>,
     previous_pc: u64,
     _pinned: PhantomPinned,
 }
@@ -64,7 +64,7 @@ impl CoverageRuntime {
     #[must_use]
     pub fn new() -> Self {
         Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
-            map: [0_u8; MAP_SIZE],
+            map: vec![0_u8; MAP_SIZE].into_boxed_slice(),
             previous_pc: 0,
             _pinned: PhantomPinned,
         })))

@@ -95,8 +95,14 @@ where
     {
     }
 
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
     unsafe fn on_crash(&mut self) {}
 
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
     unsafe fn on_timeout(&mut self) {}
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter;
@@ -153,8 +159,14 @@ where
         OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>;
 
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
     unsafe fn on_crash_all(&mut self);
 
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
     unsafe fn on_timeout_all(&mut self);
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
