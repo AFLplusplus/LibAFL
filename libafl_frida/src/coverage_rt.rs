@@ -62,6 +62,7 @@ impl FridaRuntime for CoverageRuntime {
 impl CoverageRuntime {
     /// Create a new coverage runtime
     #[must_use]
+    #[allow(clippy::large_stack_arrays)]
     pub fn new() -> Self {
         Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
             map: [0_u8; MAP_SIZE],
