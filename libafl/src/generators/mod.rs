@@ -8,7 +8,7 @@ use libafl_bolts::rands::Rand;
 use crate::{inputs::bytes::BytesInput, nonzero, state::HasRand, Error};
 
 pub mod gramatron;
-use core::cmp::min;
+use core::cmp::max;
 
 pub use gramatron::*;
 
