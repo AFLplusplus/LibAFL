@@ -23,8 +23,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StatsStage, IfStage,
-        ShadowTracingStage, StagesTuple, StdMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, IfStage, ShadowTracingStage,
+        StagesTuple, StatsStage, StdMutationalStage,
     },
     state::{HasCorpus, StdState, UsesState},
     Error, HasMetadata, NopFuzzer,
