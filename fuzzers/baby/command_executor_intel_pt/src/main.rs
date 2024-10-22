@@ -22,7 +22,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, Error};
+use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list, Error};
 use nix::{
     sys::{
         ptrace::traceme,
@@ -38,6 +38,10 @@ static mut SIGNALS: [u8; 0x10_000] = [0; 0x10_000];
 static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 pub fn main() {
+    // Let's set the default logging level to `warn`
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "warn")
+    }
     // Enable logging
     env_logger::init();
 
@@ -101,6 +105,8 @@ pub fn main() {
                 Ok(ForkResult::Parent { child }) => child,
                 Ok(ForkResult::Child) => {
                     traceme().unwrap();
+                    let cores = core_affinity::get_core_ids().unwrap();
+                    cores[0].set_affinity().unwrap();
                     raise(Signal::SIGSTOP).expect("Failed to stop the process");
 
                     execv(&CString::new(executable.as_bytes()).unwrap(), &[arg1]).unwrap();

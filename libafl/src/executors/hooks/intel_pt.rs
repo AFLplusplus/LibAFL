@@ -109,9 +109,11 @@ pub struct IntelPT {
 
 #[derive(Debug)]
 pub struct IntelPTBuilder {
-    pid: Option<libc::pid_t>,
+    pid: Option<i32>,
+    cpu: Option<usize>,
     exclude_kernel: bool,
     exclude_hv: bool,
+    inherit: bool,
 }
 
 #[derive(Debug)]
@@ -177,8 +179,8 @@ where
                     image
                         .add_cached(&mut image_cache, isid, Asid::default())
                         .unwrap();
-                    println!(
-                        "{}\toffset: {:x}\tsize: {:x}\t start: {:x}",
+                    log::info!(
+                        "mapped {}\toffset: {:x}\tsize: {:x}\t start: {:x}",
                         map.filename().unwrap().to_str().unwrap(),
                         map.offset as u64,
                         map.size() as u64,
@@ -190,24 +192,20 @@ where
 
         self.image_cache = Some(image_cache);
         self.image = Some(image);
-    }
 
-    #[allow(clippy::cast_possible_wrap)]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         assert!(self.pt.is_none(), "Intel PT was already set up");
 
-        let pid: SerdeAnyi32 = *_state
-            .named_metadata_map()
-            .get("child")
-            .expect("Child pid not in state metadata");
-
-        let pt_builder = IntelPT::builder().pid(Some(pid.inner));
+        let pt_builder = IntelPT::builder().cpu(Some(0)).inherit(true); //.pid(Some(pid.inner))
         self.pt = Some(pt_builder.build().unwrap());
         self.pt
             .as_mut()
             .unwrap()
             .set_ip_filters(&self.ip_filters)
             .unwrap();
+    }
+
+    #[allow(clippy::cast_possible_wrap)]
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.pt.as_mut().unwrap().enable_tracing().unwrap();
     }
 
@@ -232,7 +230,7 @@ where
 
         // println!("{:?}", _state.corpus());
 
-        self.pt = None;
+        // self.pt = None;
     }
 }
 
@@ -322,24 +320,34 @@ impl Default for IntelPTBuilder {
     fn default() -> Self {
         Self {
             pid: None,
+            cpu: None,
             exclude_kernel: true,
             exclude_hv: true,
+            inherit: false,
         }
     }
 }
 
 impl IntelPTBuilder {
     pub fn build(&self) -> Result<IntelPT, Error> {
+        self.check_config();
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         perf_event_attr.set_exclude_kernel(self.exclude_kernel.into());
         perf_event_attr.set_exclude_hv(self.exclude_hv.into());
+        perf_event_attr.set_inherit(self.inherit.into());
+
+        let cpu = if let Some(c) = self.cpu {
+            i32::try_from(c)?
+        } else {
+            -1
+        };
 
         // SAFETY: perf_event_attr is properly initialized
         let fd = match unsafe {
             perf_event_open(
                 ptr::from_mut(&mut perf_event_attr),
                 self.pid.unwrap_or(0),
-                -1,
+                cpu,
                 -1,
                 PERF_FLAG_FD_CLOEXEC.into(),
             )
@@ -388,9 +396,26 @@ impl IntelPTBuilder {
         })
     }
 
+    /// Warn if the configuration is not recommended
+    #[inline]
+    fn check_config(&self) {
+        if self.inherit && self.cpu.is_none() {
+            log::warn!(
+                "IntelPT set up on all CPUs with process inheritance enabled. This configuration \
+                is not recommended and might not work as expected"
+            );
+        }
+    }
+
     #[must_use]
-    pub fn pid(mut self, pid: Option<libc::pid_t>) -> Self {
+    pub fn pid(mut self, pid: Option<i32>) -> Self {
         self.pid = pid;
+        self
+    }
+
+    #[must_use]
+    pub fn cpu(mut self, cpu: Option<usize>) -> Self {
+        self.cpu = cpu;
         self
     }
 
@@ -403,6 +428,12 @@ impl IntelPTBuilder {
     #[must_use]
     pub fn exclude_hv(mut self, exclude_hv: bool) -> Self {
         self.exclude_hv = exclude_hv;
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn inherit(mut self, inherit: bool) -> Self {
+        self.inherit = inherit;
         self
     }
 }
@@ -857,9 +888,7 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     };
 
     // Do not enable tracing as soon as the perf_event_open syscall is issued
-    attr.set_disabled(1);
-    // attr.set_inherit(1);
-    // attr.set_enable_on_exec(1); works only when specifying the CPU
+    attr.set_disabled(true.into());
 
     Ok(attr)
 }
