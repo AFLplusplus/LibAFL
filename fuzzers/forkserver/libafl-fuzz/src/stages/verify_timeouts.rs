@@ -4,24 +4,25 @@ use core::time::Duration;
 use std::{collections::VecDeque, fmt::Debug, marker::PhantomData};
 
 use libafl::{
+    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::Stage,
-    state::{HasCorpus, UsesState},
+    state::{HasCorpus, State, UsesState},
     HasMetadata,
 };
 use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[derive(Debug)]
-pub struct VerifyTimeoutsStage<E> {
+pub struct VerifyTimeoutsStage<E, S> {
     doubled_timeout: Duration,
     original_timeout: Duration,
     // The handle to our time observer
-    phantom: PhantomData<E>,
+    phantom: PhantomData<(E, S)>,
 }
 
-impl<E> VerifyTimeoutsStage<E> {
+impl<E, S> VerifyTimeoutsStage<E, S> {
     /// Create a `VerifyTimeoutsStage`
     pub fn new(configured_timeout: Duration) -> Self {
         Self {
@@ -32,12 +33,11 @@ impl<E> VerifyTimeoutsStage<E> {
     }
 }
 
-impl<E> UsesState for VerifyTimeoutsStage<E>
+impl<E, S> UsesState for VerifyTimeoutsStage<E, S>
 where
-    E: UsesState,
-    <E as UsesState>::State: HasMetadata + HasCorpus,
+    S: State,
 {
-    type State = E::State;
+    type State = S;
 }
 
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -65,14 +65,15 @@ impl<I> TimeoutsToVerify<I> {
     }
 }
 
-impl<E, EM, Z> Stage<E, EM, Z> for VerifyTimeoutsStage<E>
+impl<E, EM, Z, S> Stage<E, EM, Z> for VerifyTimeoutsStage<E, S>
 where
     E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
-    E: Executor<EM, Z> + HasObservers + HasTimeout,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
-    <E as UsesState>::State: HasMetadata + HasCorpus,
-    E::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
+    E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+    S: HasCorpus + State + HasMetadata,
+    Self::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
+    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     fn perform(
         &mut self,
@@ -82,7 +83,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         let mut timeouts = state
-            .metadata_or_insert_with(TimeoutsToVerify::<E::Input>::new)
+            .metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new)
             .clone();
         executor.set_timeout(self.doubled_timeout);
         while let Some(input) = timeouts.pop() {

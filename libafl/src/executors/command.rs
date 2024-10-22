@@ -27,10 +27,11 @@ use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
 use crate::{
+    corpus::Corpus,
     executors::HasObservers,
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::{HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -289,8 +290,8 @@ where
 
 impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
 where
-    S: State,
-    T: CommandConfigurator<S::Input>,
+    S: HasCorpus,
+    T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
 {
     fn set_timeout(&mut self, timeout: Duration) {
         *self.configurer.exec_timeout_mut() = timeout;
