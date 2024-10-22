@@ -1,4 +1,4 @@
-use std::{arch::asm, env::args_os, hint::black_box};
+use std::{env::args_os, hint::black_box};
 
 fn main() {
     let input = args_os().last().unwrap();

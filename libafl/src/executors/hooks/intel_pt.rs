@@ -27,6 +27,7 @@ use libipt::{
     ConfigBuilder, Cpu, Image, SectionCache,
 };
 use num_enum::TryFromPrimitive;
+use num_traits::Euclid;
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
@@ -45,9 +46,6 @@ use crate::{
 };
 
 const PAGE_SIZE: usize = 4096;
-// TODO parametrize buffer sizes?
-const PERF_BUFFER_SIZE: usize = (1 + (1 << 7)) * PAGE_SIZE;
-const PERF_AUX_BUFFER_SIZE: usize = 2 * 1024 * 1024;
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
 static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
@@ -101,19 +99,23 @@ pub struct IntelPT {
     fd: OwnedFd,
     perf_buffer: *mut c_void,
     perf_aux_buffer: *mut c_void,
+    perf_buffer_size: usize,
+    perf_aux_buffer_size: usize,
     aux_head: *mut u64,
     aux_tail: *mut u64,
     previous_decode_head: u64,
     ip_filters: Vec<Range<usize>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IntelPTBuilder {
     pid: Option<i32>,
     cpu: Option<usize>,
     exclude_kernel: bool,
     exclude_hv: bool,
     inherit: bool,
+    perf_buffer_size: usize,
+    perf_aux_buffer_size: usize,
 }
 
 #[derive(Debug)]
@@ -324,6 +326,8 @@ impl Default for IntelPTBuilder {
             exclude_kernel: true,
             exclude_hv: true,
             inherit: false,
+            perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
+            perf_aux_buffer_size: 2 * 1024 * 1024,
         }
     }
 }
@@ -360,7 +364,7 @@ impl IntelPTBuilder {
             }
         };
 
-        let perf_buffer = setup_perf_buffer(&fd)?;
+        let perf_buffer = setup_perf_buffer(&fd, self.perf_buffer_size)?;
 
         // the first perf_buff page is a metadata page
         let buff_metadata = perf_buffer.cast::<perf_event_mmap_page>();
@@ -373,7 +377,7 @@ impl IntelPTBuilder {
             aux_offset.write_volatile(next_page_aligned_addr(
                 data_offset.read_volatile() + data_size.read_volatile(),
             ));
-            aux_size.write_volatile(PERF_AUX_BUFFER_SIZE as u64);
+            aux_size.write_volatile(self.perf_aux_buffer_size as u64);
         }
 
         let perf_aux_buffer = unsafe {
@@ -389,6 +393,8 @@ impl IntelPTBuilder {
             fd,
             perf_buffer,
             perf_aux_buffer,
+            perf_buffer_size: self.perf_buffer_size,
+            perf_aux_buffer_size: self.perf_aux_buffer_size,
             aux_head,
             aux_tail,
             previous_decode_head: 0,
@@ -432,9 +438,42 @@ impl IntelPTBuilder {
     }
 
     #[must_use]
-    pub(crate) fn inherit(mut self, inherit: bool) -> Self {
+    pub fn inherit(mut self, inherit: bool) -> Self {
         self.inherit = inherit;
         self
+    }
+
+    pub fn perf_buffer_size(mut self, perf_buffer_size: usize) -> Result<Self, Error> {
+        let err = Err(Error::illegal_argument(
+            "IntelPT perf_buffer_size should be 1+2^n pages",
+        ));
+        if perf_buffer_size < PAGE_SIZE {
+            return err;
+        }
+        let (q, r) = (perf_buffer_size - PAGE_SIZE).div_rem_euclid(&PAGE_SIZE);
+        if !q.is_power_of_two() || r != 0 {
+            return err;
+        }
+
+        self.perf_buffer_size = perf_buffer_size;
+        Ok(self)
+    }
+
+    pub fn perf_aux_buffer_size(mut self, perf_aux_buffer_size: usize) -> Result<Self, Error> {
+        // todo:replace with is_multiple_of once stable
+        if perf_aux_buffer_size % PAGE_SIZE != 0 {
+            return Err(Error::illegal_argument(
+                "IntelPT perf_aux_buffer must be page aligned",
+            ));
+        }
+        if !perf_aux_buffer_size.is_power_of_two() {
+            return Err(Error::illegal_argument(
+                "IntelPT perf_aux_buffer must be a power of two",
+            ));
+        }
+
+        self.perf_aux_buffer_size = perf_aux_buffer_size;
+        Ok(self)
     }
 }
 
@@ -557,15 +596,15 @@ impl IntelPT {
             ));
         };
         let len = (head - tail) as usize;
-        if len >= PERF_AUX_BUFFER_SIZE {
+        if len >= self.perf_aux_buffer_size {
             log::warn!(
                 "This fuzzer run resulted in a full PT buffer. Try increasing the aux buffer size or refining the IP filters."
             );
         }
         let skip = self.previous_decode_head - tail;
 
-        let head_wrap = wrap_aux_pointer(head);
-        let tail_wrap = wrap_aux_pointer(tail);
+        let head_wrap = wrap_aux_pointer(head, self.perf_aux_buffer_size);
+        let tail_wrap = wrap_aux_pointer(tail, self.perf_aux_buffer_size);
 
         smp_rmb(); // TODO double check impl
 
@@ -578,7 +617,7 @@ impl IntelPT {
             // Head pointer wrapped, the trace is split
             unsafe {
                 let first_ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
-                let first_len = PERF_AUX_BUFFER_SIZE - tail_wrap as usize;
+                let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
                 let second_ptr = self.perf_aux_buffer as *mut u8;
                 let second_len = head_wrap as usize;
                 OwnedRefMut::Owned(
@@ -821,9 +860,9 @@ impl IntelPT {
 impl Drop for IntelPT {
     fn drop(&mut self) {
         unsafe {
-            let ret = libc::munmap(self.perf_aux_buffer, PERF_AUX_BUFFER_SIZE);
+            let ret = libc::munmap(self.perf_aux_buffer, self.perf_aux_buffer_size);
             debug_assert_eq!(ret, 0, "Intel PT: Failed to unmap perf aux buffer");
-            let ret = libc::munmap(self.perf_buffer, PERF_BUFFER_SIZE);
+            let ret = libc::munmap(self.perf_buffer, self.perf_buffer_size);
             debug_assert_eq!(ret, 0, "Intel PT: Failed to unmap perf buffer");
         }
     }
@@ -834,11 +873,11 @@ const fn next_page_aligned_addr(address: u64) -> u64 {
     (address + PAGE_SIZE as u64 - 1) & !(PAGE_SIZE as u64 - 1)
 }
 
-fn setup_perf_buffer(fd: &OwnedFd) -> Result<*mut c_void, Error> {
+fn setup_perf_buffer(fd: &OwnedFd, perf_buffer_size: usize) -> Result<*mut c_void, Error> {
     match unsafe {
         libc::mmap(
             ptr::null_mut(),
-            PERF_BUFFER_SIZE,
+            perf_buffer_size,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_SHARED,
             fd.as_raw_fd(),
@@ -894,8 +933,8 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
 }
 
 #[inline]
-const fn wrap_aux_pointer(ptr: u64) -> u64 {
-    ptr & (PERF_AUX_BUFFER_SIZE as u64 - 1)
+const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
+    ptr & (perf_aux_buffer_size as u64 - 1)
 }
 
 #[inline]
@@ -933,19 +972,23 @@ mod test {
         unistd::{fork, ForkResult},
     };
     use proc_maps::get_process_maps;
-    use static_assertions::{assert_eq_size, const_assert, const_assert_eq};
+    use static_assertions::assert_eq_size;
 
     use super::*;
 
-    // PERF_BUFFER_SIZE should be 1+2^n pages
-    const_assert!(((PERF_BUFFER_SIZE - PAGE_SIZE) / PAGE_SIZE).is_power_of_two());
-    // PERF_AUX_BUFFER_SIZE must be page aligned
-    // TODO:replace with is_multiple_of once stable
-    const_assert_eq!(PERF_AUX_BUFFER_SIZE % PAGE_SIZE, 0);
-    // PERF_AUX_BUFFER_SIZE must be a power of two
-    const_assert!(PERF_AUX_BUFFER_SIZE.is_power_of_two());
     // Only 64-bit systems are supported, ensure we can use usize and u64 interchangeably
     assert_eq_size!(usize, u64);
+
+    #[test]
+    fn intel_pt_builder_default() {
+        let default = IntelPT::builder();
+        IntelPT::builder()
+            .perf_buffer_size(default.perf_buffer_size)
+            .unwrap();
+        IntelPT::builder()
+            .perf_aux_buffer_size(default.perf_aux_buffer_size)
+            .unwrap();
+    }
 
     #[test]
     fn intel_pt_pt_config_noretcomp_format() {
