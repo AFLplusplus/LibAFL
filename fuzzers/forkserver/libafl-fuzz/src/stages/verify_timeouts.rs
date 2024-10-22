@@ -10,7 +10,7 @@ use libafl::{
     observers::ObserversTuple,
     stages::Stage,
     state::{HasCorpus, State, UsesState},
-    HasMetadata, Evaluator,
+    Evaluator, HasMetadata,
 };
 use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
