@@ -24,7 +24,7 @@ use libafl::{
     },
     stages::{
         mutational::MultiMutationalStage,
-        stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
+        afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
         time_tracker::TimeTrackingStageWrapper,
         CalibrationStage, ColorizationStage, IfStage, StagesTuple, StdMutationalStage,
         StdPowerMutationalStage, SyncFromDiskStage,

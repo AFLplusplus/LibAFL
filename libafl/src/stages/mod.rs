@@ -12,6 +12,8 @@ use alloc::{
 };
 use core::{fmt, marker::PhantomData};
 
+#[cfg(feature = "std")]
+pub use afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
 #[cfg(all(feature = "std", unix))]
@@ -31,8 +33,7 @@ pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "std")]
-pub use stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
+pub use stats::StatsStage;
 #[cfg(feature = "std")]
 pub use sync::*;
 #[cfg(feature = "std")]
@@ -64,6 +65,8 @@ pub mod mutational;
 pub mod push;
 pub mod tmin;
 
+#[cfg(feature = "std")]
+pub mod afl_stats;
 pub mod calibrate;
 pub mod colorization;
 #[cfg(all(feature = "std", unix))]
@@ -74,7 +77,6 @@ pub mod generalization;
 pub mod generation;
 pub mod logics;
 pub mod power;
-#[cfg(feature = "std")]
 pub mod stats;
 #[cfg(feature = "std")]
 pub mod sync;
