@@ -5,12 +5,12 @@ use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData,
 
 use libafl::{
     corpus::Corpus,
-    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    executors::{Executor, HasObservers, HasTimeout},
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::Stage,
     state::{HasCorpus, State, UsesState},
-    HasMetadata,
+    HasMetadata, Evaluator,
 };
 use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -75,7 +75,7 @@ where
     E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    Z: UsesState<State = S> + Evaluator<E, EM>,
     S: HasCorpus + State + HasMetadata,
     Self::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
     <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
@@ -96,9 +96,7 @@ where
         executor.set_timeout(self.doubled_timeout);
         *self.capture_feedback.borrow_mut() = false;
         while let Some(input) = timeouts.pop() {
-            println!("verifying!");
-            let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
-            if matches!(exit_kind, ExitKind::Timeout) {}
+            fuzzer.evaluate_input(state, executor, manager, input)?;
         }
         executor.set_timeout(self.original_timeout);
         *self.capture_feedback.borrow_mut() = true;

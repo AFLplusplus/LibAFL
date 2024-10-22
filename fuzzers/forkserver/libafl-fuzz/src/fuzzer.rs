@@ -1,5 +1,5 @@
 use std::{
-    borrow::{BorrowMut, Cow},
+    borrow::Cow,
     cell::RefCell,
     marker::PhantomData,
     path::{Path, PathBuf},
