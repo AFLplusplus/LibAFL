@@ -66,11 +66,13 @@ where
     A: HasTimeout,
     B: HasTimeout,
 {
+    #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
         self.primary.set_timeout(timeout);
         self.secondary.set_timeout(timeout);
     }
 
+    #[inline]
     fn timeout(&self) -> Duration {
         assert!(
             self.primary.timeout() == self.secondary.timeout(),

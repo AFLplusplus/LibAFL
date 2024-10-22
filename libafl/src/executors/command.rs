@@ -293,10 +293,12 @@ where
     S: HasCorpus,
     T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
 {
+    #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
         *self.configurer.exec_timeout_mut() = timeout;
     }
 
+    #[inline]
     fn timeout(&self) -> Duration {
         self.configurer.exec_timeout()
     }

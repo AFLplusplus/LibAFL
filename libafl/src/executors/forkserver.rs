@@ -1486,10 +1486,12 @@ impl<OT, S, SP> HasTimeout for ForkserverExecutor<OT, S, SP>
 where
     SP: ShMemProvider,
 {
+    #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
         self.timeout = TimeSpec::from_duration(timeout);
     }
 
+    #[inline]
     fn timeout(&self) -> Duration {
         self.timeout.into()
     }

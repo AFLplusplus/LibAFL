@@ -85,10 +85,11 @@ impl<E, SOT> HasTimeout for ShadowExecutor<E, SOT>
 where
     E: HasTimeout,
 {
+    #[inline]
     fn set_timeout(&mut self, timeout: Duration) {
         self.executor.set_timeout(timeout);
     }
-
+    #[inline]
     fn timeout(&self) -> Duration {
         self.executor.timeout()
     }

@@ -146,8 +146,9 @@ where
 
 /// A trait that allows to get/set an `Executor`'s timeout thresold
 pub trait HasTimeout {
-    /// Get an timeout
+    /// Get a timeout
     fn timeout(&self) -> Duration;
+
     /// Set timeout
     fn set_timeout(&mut self, timeout: Duration);
 }
