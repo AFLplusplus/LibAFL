@@ -12,13 +12,15 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::stages::verify_timeouts::TimeoutsToVerify;
 
-#[derive(Serialize, Deserialize)]
-pub struct CaptureTimeoutFeedback {}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CaptureTimeoutFeedback {
+    enabled: bool,
+}
 
 impl CaptureTimeoutFeedback {
     /// Create a new [`CaptureTimeoutFeedback`].
     pub fn new() -> Self {
-        Self {}
+        Self { enabled: true }
     }
 }
 
@@ -46,7 +48,7 @@ where
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        if matches!(exit_kind, ExitKind::Timeout) {
+        if self.enabled && matches!(exit_kind, ExitKind::Timeout) {
             let timeouts = state.metadata_or_insert_with(|| TimeoutsToVerify::<I>::new());
             timeouts.push(input.clone());
         }
@@ -67,5 +69,18 @@ where
     #[inline]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
+    }
+}
+
+impl CaptureTimeoutFeedback {
+    /// Enable capturing of timeouts for re-running.
+    /// WARN: when re-running the timeouts, this feedback must be disabled 
+    /// else it will keep capturing timeouts
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+    /// Disable capturing of timeouts.
+    pub fn disable(&mut self) {
+        self.enabled = false;
     }
 }

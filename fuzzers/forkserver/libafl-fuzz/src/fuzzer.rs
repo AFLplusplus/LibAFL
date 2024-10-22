@@ -146,6 +146,18 @@ where
         opt,
     );
 
+    let mut capture_timeout_feedback = CaptureTimeoutFeedback::new();
+    
+    // Like AFL++ we re-run all timeouts with double the timeout to assert that they are not false positives
+    let timeout_verify_stage = IfStage::new(
+        |_, _, _, _| Ok(!opt.ignore_timeouts),
+        tuple_list!(VerifyTimeoutsStage::new(
+            &mut capture_timeout_feedback,
+            Duration::from_millis(
+            opt.hang_timeout
+        ),)),
+    );
+    
     /*
      * Feedback to decide if the Input is "solution worthy".
      * We check if it's a crash or a timeout (if we are configured to consider timeouts)
@@ -159,7 +171,7 @@ where
                 CrashFeedback::new(),
                 feedback_and!(
                     ConstFeedback::new(!opt.ignore_timeouts),
-                    CaptureTimeoutFeedback::new()
+                    capture_timeout_feedback,
                 )
             ),
             MaxMapFeedback::with_name("edges_objective", &edges_observer)
@@ -221,13 +233,6 @@ where
     // Create our Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // Like AFL++ we re-run all timeouts with double the timeout to assert that they are not false positives
-    let timeout_verify_stage = IfStage::new(
-        |_, _, _, _| Ok(!opt.ignore_timeouts),
-        tuple_list!(VerifyTimeoutsStage::new(Duration::from_millis(
-            opt.hang_timeout
-        ),)),
-    );
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
     if let Some(preload_env) = &opt.afl_preload {
