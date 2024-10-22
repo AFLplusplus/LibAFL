@@ -23,7 +23,7 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, StatsStage, IfStage,
         ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState, UsesState},
@@ -138,7 +138,7 @@ impl<M: Monitor> Instance<'_, M> {
 
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
-            tuple_list!(AflStatsStage::new(Duration::from_secs(5))),
+            tuple_list!(StatsStage::new(Duration::from_secs(5))),
         );
 
         // Feedback to rate the interestingness of an input

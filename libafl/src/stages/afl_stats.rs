@@ -10,12 +10,13 @@ use std::{
     process,
 };
 
+#[cfg(unix)]
+use libafl_bolts::os::peak_rss_mb_child_processes;
 use libafl_bolts::{
     core_affinity::CoreId,
     current_time,
-    os::peak_rss_mb_child_processes,
     tuples::{Handle, Handled, MatchNameRef},
-    Named,
+    Named, SerdeAny,
 };
 use serde::{Deserialize, Serialize};
 
