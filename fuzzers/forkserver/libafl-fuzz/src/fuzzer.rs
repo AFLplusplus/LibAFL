@@ -23,8 +23,8 @@ use libafl::{
         IndexesLenTimeMinimizerScheduler, QueueScheduler, StdWeightedScheduler,
     },
     stages::{
-        mutational::MultiMutationalStage,
         afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
+        mutational::MultiMutationalStage,
         time_tracker::TimeTrackingStageWrapper,
         CalibrationStage, ColorizationStage, IfStage, StagesTuple, StdMutationalStage,
         StdPowerMutationalStage, SyncFromDiskStage,
