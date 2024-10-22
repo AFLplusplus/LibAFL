@@ -113,7 +113,7 @@ script_runner = "@shell"
 script = '''
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
-AFL_CORES=0 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
+LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=0 timeout 10 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
 ls -l ./test/output-cmplog/fuzzer_main/hangs
 ls -l ./test/output-cmplog/fuzzer_main/crashes
 test -n "$( ls ${PROJECT_DIR}/test/output-cmplog/fuzzer_main/hangs/id:0000* ${PROJECT_DIR}/test/output-cmplog/fuzzer_main/crashes/id:0000*)" || {

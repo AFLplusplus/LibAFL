@@ -1,7 +1,9 @@
 use std::{
-    borrow::Cow,
+    borrow::{BorrowMut, Cow},
+    cell::RefCell,
     marker::PhantomData,
     path::{Path, PathBuf},
+    rc::Rc,
     time::Duration,
 };
 
@@ -146,18 +148,20 @@ where
         opt,
     );
 
-    let mut capture_timeout_feedback = CaptureTimeoutFeedback::new();
-    
+    // We need to share this reference as [`VerifyTimeoutsStage`] will toggle this
+    // value before re-running the alleged timeouts so we don't keep capturing timeouts infinitely.
+    let enable_capture_timeouts = Rc::new(RefCell::new(false));
+    let capture_timeout_feedback = CaptureTimeoutFeedback::new(Rc::clone(&enable_capture_timeouts));
+
     // Like AFL++ we re-run all timeouts with double the timeout to assert that they are not false positives
     let timeout_verify_stage = IfStage::new(
         |_, _, _, _| Ok(!opt.ignore_timeouts),
         tuple_list!(VerifyTimeoutsStage::new(
-            &mut capture_timeout_feedback,
-            Duration::from_millis(
-            opt.hang_timeout
-        ),)),
+            enable_capture_timeouts,
+            Duration::from_millis(opt.hang_timeout),
+        )),
     );
-    
+
     /*
      * Feedback to decide if the Input is "solution worthy".
      * We check if it's a crash or a timeout (if we are configured to consider timeouts)
@@ -232,7 +236,6 @@ where
 
     // Create our Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
 
     // Set LD_PRELOAD (Linux) && DYLD_INSERT_LIBRARIES (OSX) for target.
     if let Some(preload_env) = &opt.afl_preload {

@@ -1,7 +1,7 @@
 //! Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
 //! not false positives. AFL++ style
 use core::time::Duration;
-use std::{collections::VecDeque, fmt::Debug, marker::PhantomData};
+use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData, rc::Rc};
 
 use libafl::{
     corpus::Corpus,
@@ -15,21 +15,17 @@ use libafl::{
 use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::feedback::capture_timeout::CaptureTimeoutFeedback;
 #[derive(Debug)]
-pub struct VerifyTimeoutsStage<'a, E, S> {
+pub struct VerifyTimeoutsStage<E, S> {
     doubled_timeout: Duration,
     original_timeout: Duration,
-    capture_feedback: &'a mut CaptureTimeoutFeedback,
+    capture_feedback: Rc<RefCell<bool>>,
     phantom: PhantomData<(E, S)>,
 }
 
-impl<'a, E, S> VerifyTimeoutsStage<'a, E, S> {
+impl<E, S> VerifyTimeoutsStage<E, S> {
     /// Create a `VerifyTimeoutsStage`
-    pub fn new(
-        capture_feedback: &'a mut CaptureTimeoutFeedback,
-        configured_timeout: Duration,
-    ) -> Self {
+    pub fn new(capture_feedback: Rc<RefCell<bool>>, configured_timeout: Duration) -> Self {
         Self {
             capture_feedback,
             doubled_timeout: configured_timeout * 2,
@@ -39,7 +35,7 @@ impl<'a, E, S> VerifyTimeoutsStage<'a, E, S> {
     }
 }
 
-impl<E, S> UsesState for VerifyTimeoutsStage<'_, E, S>
+impl<E, S> UsesState for VerifyTimeoutsStage<E, S>
 where
     S: State,
 {
@@ -74,7 +70,7 @@ impl<I> TimeoutsToVerify<I> {
     }
 }
 
-impl<E, EM, Z, S> Stage<E, EM, Z> for VerifyTimeoutsStage<'_, E, S>
+impl<E, EM, Z, S> Stage<E, EM, Z> for VerifyTimeoutsStage<E, S>
 where
     E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
@@ -98,13 +94,14 @@ where
             return Ok(());
         }
         executor.set_timeout(self.doubled_timeout);
-        self.capture_feedback.disable();
+        *self.capture_feedback.borrow_mut() = false;
         while let Some(input) = timeouts.pop() {
+            println!("verifying!");
             let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
             if matches!(exit_kind, ExitKind::Timeout) {}
         }
         executor.set_timeout(self.original_timeout);
-        self.capture_feedback.enable();
+        *self.capture_feedback.borrow_mut() = true;
         let res = state.metadata_mut::<TimeoutsToVerify<E::Input>>().unwrap();
         *res = TimeoutsToVerify::<E::Input>::new();
         Ok(())
