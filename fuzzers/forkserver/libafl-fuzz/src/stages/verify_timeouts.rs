@@ -19,15 +19,15 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub struct VerifyTimeoutsStage<E, S> {
     doubled_timeout: Duration,
     original_timeout: Duration,
-    capture_feedback: Rc<RefCell<bool>>,
+    capture_timeouts: Rc<RefCell<bool>>,
     phantom: PhantomData<(E, S)>,
 }
 
 impl<E, S> VerifyTimeoutsStage<E, S> {
     /// Create a `VerifyTimeoutsStage`
-    pub fn new(capture_feedback: Rc<RefCell<bool>>, configured_timeout: Duration) -> Self {
+    pub fn new(capture_timeouts: Rc<RefCell<bool>>, configured_timeout: Duration) -> Self {
         Self {
-            capture_feedback,
+            capture_timeouts,
             doubled_timeout: configured_timeout * 2,
             original_timeout: configured_timeout,
             phantom: PhantomData,
@@ -94,12 +94,12 @@ where
             return Ok(());
         }
         executor.set_timeout(self.doubled_timeout);
-        *self.capture_feedback.borrow_mut() = false;
+        *self.capture_timeouts.borrow_mut() = false;
         while let Some(input) = timeouts.pop() {
             fuzzer.evaluate_input(state, executor, manager, input)?;
         }
         executor.set_timeout(self.original_timeout);
-        *self.capture_feedback.borrow_mut() = true;
+        *self.capture_timeouts.borrow_mut() = true;
         let res = state.metadata_mut::<TimeoutsToVerify<E::Input>>().unwrap();
         *res = TimeoutsToVerify::<E::Input>::new();
         Ok(())
