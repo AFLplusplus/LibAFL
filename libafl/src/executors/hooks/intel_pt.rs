@@ -111,6 +111,7 @@ pub struct IntelPT {
 pub struct IntelPTBuilder {
     pid: Option<libc::pid_t>,
     exclude_kernel: bool,
+    exclude_hv: bool,
 }
 
 #[derive(Debug)]
@@ -322,6 +323,7 @@ impl Default for IntelPTBuilder {
         Self {
             pid: None,
             exclude_kernel: true,
+            exclude_hv: true,
         }
     }
 }
@@ -330,6 +332,7 @@ impl IntelPTBuilder {
     pub fn build(&self) -> Result<IntelPT, Error> {
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
         perf_event_attr.set_exclude_kernel(self.exclude_kernel.into());
+        perf_event_attr.set_exclude_hv(self.exclude_hv.into());
 
         // SAFETY: perf_event_attr is properly initialized
         let fd = match unsafe {
@@ -394,6 +397,12 @@ impl IntelPTBuilder {
     #[must_use]
     pub fn exclude_kernel(mut self, exclude_kernel: bool) -> Self {
         self.exclude_kernel = exclude_kernel;
+        self
+    }
+
+    #[must_use]
+    pub fn exclude_hv(mut self, exclude_hv: bool) -> Self {
+        self.exclude_hv = exclude_hv;
         self
     }
 }
@@ -849,6 +858,8 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
 
     // Do not enable tracing as soon as the perf_event_open syscall is issued
     attr.set_disabled(1);
+    // attr.set_inherit(1);
+    // attr.set_enable_on_exec(1); works only when specifying the CPU
 
     Ok(attr)
 }
