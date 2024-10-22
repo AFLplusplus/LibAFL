@@ -16,7 +16,7 @@ use libafl_bolts::{
     core_affinity::CoreId,
     current_time,
     tuples::{Handle, Handled, MatchNameRef},
-    Named, SerdeAny,
+    Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +38,7 @@ use crate::{
 pub const AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS: u64 = 60;
 
 /// `CalibrationTime` - Use in conjunction with `TimeTrackingFeedback`
-#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CalibrationTime(pub Duration);
 impl From<Duration> for CalibrationTime {
     fn from(value: Duration) -> Self {
@@ -46,8 +46,10 @@ impl From<Duration> for CalibrationTime {
     }
 }
 
+libafl_bolts::impl_serdeany!(CalibrationTime);
+
 /// `SyncTime` - Use in conjunction with `TimeTrackingFeedback`
-#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SyncTime(pub Duration);
 impl From<Duration> for SyncTime {
     fn from(value: Duration) -> Self {
@@ -55,14 +57,18 @@ impl From<Duration> for SyncTime {
     }
 }
 
+libafl_bolts::impl_serdeany!(SyncTime);
+
 /// `FuzzTime` - Use in conjunction with `TimeTrackingFeedback`
-#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FuzzTime(pub Duration);
 impl From<Duration> for FuzzTime {
     fn from(value: Duration) -> Self {
         Self(value)
     }
 }
+
+libafl_bolts::impl_serdeany!(FuzzTime);
 
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
