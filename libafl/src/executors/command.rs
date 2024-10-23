@@ -167,11 +167,11 @@ where
     }
 }
 
-/// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
+/// A `CommandExecutor` is a wrapper around [`Command`] to execute a target as a child process.
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, S, T, C, HT> {
+pub struct CommandExecutor<OT, S, T, HT = (), C = Child> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
@@ -181,7 +181,7 @@ pub struct CommandExecutor<OT, S, T, C, HT> {
     phantom_child: PhantomData<C>,
 }
 
-impl CommandExecutor<(), (), (), (), ()> {
+impl CommandExecutor<(), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -190,7 +190,7 @@ impl CommandExecutor<(), (), (), (), ()> {
     /// `arg`, `args`, `env`, and so on.
     ///
     /// By default, input is read from stdin, unless you specify a different location using
-    /// * `arg_input_arg` for input delivered _as_ an command line argument
+    /// * `arg_input_arg` for input delivered _as_ a command line argument
     /// * `arg_input_file` for input via a file of a specific name
     /// * `arg_input_file_std` for a file with default name (at the right location in the arguments)
     #[must_use]
@@ -199,12 +199,12 @@ impl CommandExecutor<(), (), (), (), ()> {
     }
 }
 
-impl<OT, S, T, C, HT> Debug for CommandExecutor<OT, S, T, C, HT>
+impl<OT, S, T, HT, C> Debug for CommandExecutor<OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
-    C: Debug,
     HT: Debug,
+    C: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
@@ -215,11 +215,10 @@ where
     }
 }
 
-impl<OT, S, T, C, HT> CommandExecutor<OT, S, T, C, HT>
+impl<OT, S, T, HT, C> CommandExecutor<OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
-    C: Debug,
 {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
@@ -229,14 +228,13 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, Child, HT>
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
-    T: CommandConfigurator<S::Input, Child> + Debug,
+    T: CommandConfigurator<S::Input> + Debug,
     OT: Debug + MatchName + ObserversTuple<S::Input, S>,
     Z: UsesState<State = S>,
-    HT: ExecutorHooksTuple<S>,
 {
     fn run_target(
         &mut self,
@@ -312,7 +310,7 @@ pub(crate) struct SerdeAnyi32 {
 }
 libafl_bolts::impl_serdeany!(SerdeAnyi32);
 #[cfg(all(feature = "std", target_os = "linux"))]
-impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, Pid, HT>
+impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions + HasNamedMetadata,
@@ -378,14 +376,14 @@ where
     }
 }
 
-impl<OT, S, T, C, HT> UsesState for CommandExecutor<OT, S, T, C, HT>
+impl<OT, S, T, HT, C> UsesState for CommandExecutor<OT, S, T, HT, C>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<OT, S, T, C, HT> HasObservers for CommandExecutor<OT, S, T, C, HT>
+impl<OT, S, T, HT, C> HasObservers for CommandExecutor<OT, S, T, HT, C>
 where
     S: State,
     T: Debug,
@@ -571,7 +569,7 @@ impl CommandExecutorBuilder {
         &self,
         observers: OT,
         hooks: HT,
-    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator, Child, HT>, Error>
+    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator, HT>, Error>
     where
         OT: MatchName + ObserversTuple<S::Input, S>,
         S: UsesInput,
@@ -623,16 +621,17 @@ impl CommandExecutorBuilder {
             timeout: self.timeout,
             command,
         };
-        Ok(<StdCommandConfigurator as CommandConfigurator<
-            S::Input,
-            Child,
-        >>::into_executor::<OT, S, HT>(
-            configurator, observers, hooks
-        ))
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S, HT>(
+                configurator,
+                observers,
+                hooks,
+            ),
+        )
     }
 }
 
-/// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
+/// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
@@ -674,7 +673,7 @@ impl CommandExecutorBuilder {
 /// }
 /// ```
 #[cfg(all(feature = "std", any(unix, doc)))]
-pub trait CommandConfigurator<I, C>: Sized {
+pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
         None
@@ -691,11 +690,7 @@ pub trait CommandConfigurator<I, C>: Sized {
     fn exec_timeout(&self) -> Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S, HT>(
-        self,
-        observers: OT,
-        hooks: HT,
-    ) -> CommandExecutor<OT, S, Self, C, HT>
+    fn into_executor<OT, S, HT>(self, observers: OT, hooks: HT) -> CommandExecutor<OT, S, Self, HT>
     where
         OT: MatchName,
         HT: ExecutorHooksTuple<S>,
