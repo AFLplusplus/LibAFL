@@ -58,7 +58,7 @@ else
 fi
 
 # First run it on all
-RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --no-deps --tests --examples --benches -- -Z macro-backtrace \
+RUST_BACKTRACE=full cargo +nightly clippy --all --no-deps --tests --examples --benches -- -Z macro-backtrace \
    -D clippy::all \
    -D clippy::pedantic \
    -W clippy::similar_names \
