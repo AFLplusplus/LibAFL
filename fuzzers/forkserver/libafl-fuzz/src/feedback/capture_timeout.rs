@@ -49,7 +49,6 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
         if *self.enabled.borrow() && matches!(exit_kind, ExitKind::Timeout) {
-            println!("borrowing");
             let timeouts = state.metadata_or_insert_with(|| TimeoutsToVerify::<I>::new());
             timeouts.push(input.clone());
         }

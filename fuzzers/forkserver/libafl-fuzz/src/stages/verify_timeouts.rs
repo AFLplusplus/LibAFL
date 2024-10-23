@@ -96,7 +96,6 @@ where
         executor.set_timeout(self.doubled_timeout);
         *self.capture_timeouts.borrow_mut() = false;
         while let Some(input) = timeouts.pop() {
-            println!("verifying");
             fuzzer.evaluate_input(state, executor, manager, input)?;
         }
         executor.set_timeout(self.original_timeout);
