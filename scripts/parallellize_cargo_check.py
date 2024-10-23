@@ -36,9 +36,11 @@ for task in output[
 ]:
     print("Running ", task)
     print(os.environ)
-    if (("--manifest-path libafl_qemu/Cargo.toml" in task or "--manifest-path libafl_qemu_sys/Cargo.toml" in task)
+    if (("--manifest-path libafl_qemu/Cargo.toml" in task or "--manifest-path libafl_qemu/libafl_qemu_sys/Cargo.toml" in task)
             and "--no-default-features" in task
-            and not("usermode" in task)):
+            and not("usermode" in task)
+            and not("systemmode" in task)
+            and not("slirp" in task)):
         # either usermode or systemmode are mandatory for libafl_qemu
         task += " --features usermode"
 
