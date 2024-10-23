@@ -3,6 +3,9 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 cd "$SCRIPT_DIR/.." || exit 1
 
+CLIPPY_CMD="RUST_BACKTRACE=full cargo +nightly clippy --no-deps --tests --examples --benches"
+RUSTC_FLAGS="-Z macro-backtrace"
+
 set -e
 # Function to run Clippy on a single directory
 run_clippy() {
@@ -11,20 +14,7 @@ run_clippy() {
    echo "Running Clippy on $dir"
    pushd "$dir" || return 1
 
-   RUST_BACKTRACE=full cargo +nightly clippy --all ${features:+"$features"} --no-deps --tests --examples --benches -- -Z macro-backtrace \
-      -D clippy::all \
-      -D clippy::pedantic \
-      -W clippy::similar_names \
-      -A clippy::type_repetition_in_bounds \
-      -A clippy::missing-errors-doc \
-      -A clippy::cast-possible-truncation \
-      -A clippy::used-underscore-binding \
-      -A clippy::ptr-as-ptr \
-      -A clippy::missing-panics-doc \
-      -A clippy::missing-docs-in-private-items \
-      -A clippy::unseparated-literal-suffix \
-      -A clippy::module-name-repetitions \
-      -A clippy::unreadable-literal
+   eval "$CLIPPY_CMD ${features:+"$features"} -- $RUSTC_FLAGS"
 
    popd || return 1
 }
@@ -58,21 +48,7 @@ else
 fi
 
 # First run it on all
-RUST_BACKTRACE=full cargo +nightly clippy --all --no-deps --tests --examples --benches -- -Z macro-backtrace \
-   -D clippy::all \
-   -D clippy::pedantic \
-   -W clippy::similar_names \
-   -A clippy::type_repetition_in_bounds \
-   -A clippy::missing-errors-doc \
-   -A clippy::cast-possible-truncation \
-   -A clippy::used-underscore-binding \
-   -A clippy::ptr-as-ptr \
-   -A clippy::missing-panics-doc \
-   -A clippy::missing-docs-in-private-items \
-   -A clippy::unseparated-literal-suffix \
-   -A clippy::module-name-repetitions \
-   -A clippy::unreadable-literal
-
+eval "$CLIPPY_CMD --workspace -- $RUSTC_FLAGS"
 
 # Loop through each project and run Clippy
 for project in "${PROJECTS[@]}"; do
