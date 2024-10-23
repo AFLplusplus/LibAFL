@@ -576,10 +576,9 @@ impl CommandExecutorBuilder {
     {
         let configurator = self.build_common()?;
         Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S, ()>(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
                 configurator,
                 observers,
-                (),
             ),
         )
     }
@@ -598,11 +597,11 @@ impl CommandExecutorBuilder {
     {
         let configurator = self.build_common()?;
         Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S, HT>(
-                configurator,
-                observers,
-                hooks,
-            ),
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor_with_hooks::<
+                OT,
+                S,
+                HT,
+            >(configurator, observers, hooks),
         )
     }
 
@@ -693,7 +692,7 @@ impl CommandExecutorBuilder {
 ///     Z: UsesState<State = EM::State>,
 ///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
 /// {
-///     MyExecutor.into_executor((), ())
+///     MyExecutor.into_executor(())
 /// }
 /// ```
 #[cfg(all(feature = "std", any(unix, doc)))]
@@ -714,7 +713,21 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout(&self) -> Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S, HT>(
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
+    where
+        OT: MatchName,
+    {
+        CommandExecutor {
+            configurer: self,
+            observers,
+            hooks: (),
+            phantom: PhantomData,
+            phantom_child: PhantomData,
+        }
+    }
+
+    /// Create an `Executor` with hooks from this `CommandConfigurator`.
+    fn into_executor_with_hooks<OT, S, HT>(
         self,
         observers: OT,
         hooks: HT,
