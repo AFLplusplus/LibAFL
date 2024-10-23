@@ -95,6 +95,16 @@ where
     {
     }
 
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_crash(&mut self) {}
+
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_timeout(&mut self) {}
+
     fn address_filter(&self) -> &Self::ModuleAddressFilter;
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
     fn update_address_filter(&mut self, qemu: Qemu, filter: Self::ModuleAddressFilter) {
@@ -149,6 +159,16 @@ where
         OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>;
 
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_crash_all(&mut self);
+
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_timeout_all(&mut self);
+
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
 
     #[cfg(emulation_mode = "systemmode")]
@@ -195,6 +215,10 @@ where
         ET: EmulatorModuleTuple<S>,
     {
     }
+
+    unsafe fn on_crash_all(&mut self) {}
+
+    unsafe fn on_timeout_all(&mut self) {}
 
     fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
 
@@ -253,6 +277,16 @@ where
             .post_exec(emulator_modules, state, input, observers, exit_kind);
         self.1
             .post_exec_all(emulator_modules, state, input, observers, exit_kind);
+    }
+
+    unsafe fn on_crash_all(&mut self) {
+        self.0.on_crash();
+        self.1.on_crash_all();
+    }
+
+    unsafe fn on_timeout_all(&mut self) {
+        self.0.on_timeout();
+        self.1.on_timeout_all();
     }
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
