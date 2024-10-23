@@ -1057,7 +1057,7 @@ macro_rules! nonzero {
     // https://github.com/rust-lang/rust/issues/67441
     ($val:expr) => {
         const {
-            match core::num::NonZeroUsize::new($val) {
+            match core::num::NonZero::new($val) {
                 Some(x) => x,
                 None => panic!("Value passed to `nonzero!` was zero"),
             }
