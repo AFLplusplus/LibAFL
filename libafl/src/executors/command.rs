@@ -565,7 +565,27 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<OT, HT, S>(
+    pub fn build<OT, S>(
+        &self,
+        observers: OT,
+    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
+    where
+        OT: MatchName + ObserversTuple<S::Input, S>,
+        S: UsesInput,
+        S::Input: Input + HasTargetBytes,
+    {
+        let configurator = self.build_common()?;
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S, ()>(
+                configurator,
+                observers,
+                (),
+            ),
+        )
+    }
+
+    /// Builds the `CommandExecutor` with hooks
+    pub fn build_with_hooks<OT, HT, S>(
         &self,
         observers: OT,
         hooks: HT,
@@ -576,6 +596,17 @@ impl CommandExecutorBuilder {
         S::Input: Input + HasTargetBytes,
         HT: ExecutorHooksTuple<S>,
     {
+        let configurator = self.build_common()?;
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S, HT>(
+                configurator,
+                observers,
+                hooks,
+            ),
+        )
+    }
+
+    fn build_common(&self) -> Result<StdCommandConfigurator, Error> {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
@@ -613,21 +644,14 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::piped());
         }
 
-        let configurator = StdCommandConfigurator {
+        Ok(StdCommandConfigurator {
             debug_child: self.debug_child,
             stdout_observer: self.stdout.clone(),
             stderr_observer: self.stderr.clone(),
             input_location: self.input_location.clone(),
             timeout: self.timeout,
             command,
-        };
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S, HT>(
-                configurator,
-                observers,
-                hooks,
-            ),
-        )
+        })
     }
 }
 
@@ -641,7 +665,7 @@ impl CommandExecutorBuilder {
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
-/// impl CommandConfigurator<BytesInput, Child> for MyExecutor {
+/// impl CommandConfigurator<BytesInput> for MyExecutor {
 ///     fn spawn_child(
 ///        &mut self,
 ///        input: &BytesInput,
@@ -690,7 +714,11 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout(&self) -> Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S, HT>(self, observers: OT, hooks: HT) -> CommandExecutor<OT, S, Self, HT>
+    fn into_executor<OT, S, HT>(
+        self,
+        observers: OT,
+        hooks: HT,
+    ) -> CommandExecutor<OT, S, Self, HT, C>
     where
         OT: MatchName,
         HT: ExecutorHooksTuple<S>,
@@ -732,7 +760,7 @@ mod tests {
         executor
             .program("ls")
             .input(InputLocation::Arg { argnum: 0 });
-        let executor = executor.build((), ());
+        let executor = executor.build(());
         let mut executor = executor.unwrap();
 
         executor
