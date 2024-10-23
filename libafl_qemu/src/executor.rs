@@ -6,7 +6,7 @@ use core::{
 };
 #[cfg(feature = "usermode")]
 use std::ptr;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use libafl::{
@@ -102,7 +102,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, OF, S, Z>(
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
     <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     {
         if BREAK_ON_TMOUT.load(Ordering::Acquire) {
             libafl_exit_request_timeout();
@@ -116,7 +116,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, OF, S, Z>(
         }
     }
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     {
         // run modules' crash callback
         if let Some(emulator_modules) = EmulatorModules::<ET, S>::emulator_modules_mut() {

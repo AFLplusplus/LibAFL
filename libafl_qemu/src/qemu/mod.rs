@@ -715,7 +715,7 @@ impl Qemu {
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
 
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
 
                 _ => return Err(QemuExitError::UnknownKind),
@@ -1030,12 +1030,12 @@ impl QemuMemoryChunk {
 
         match self.addr {
             GuestAddrKind::Physical(hwaddr) => {
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 {
                     // For now the default behaviour is to fall back to virtual addresses
                     qemu.read_mem(hwaddr.try_into().unwrap(), output_sliced)?;
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 unsafe {
                     qemu.read_phys_mem(hwaddr, output_sliced);
                 }

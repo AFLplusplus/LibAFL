@@ -74,7 +74,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
@@ -98,12 +98,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
@@ -137,7 +137,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
@@ -163,12 +163,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
@@ -391,7 +391,7 @@ where
     S: Unpin + UsesInput,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
@@ -413,12 +413,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         &mut NopPageFilter
     }

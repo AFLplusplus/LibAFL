@@ -368,7 +368,7 @@ pub struct EdgeCoverageModule<AF, PF, V> {
     variant: V,
     address_filter: AF,
     // we only use it in system mode at the moment.
-    #[cfg_attr(not(emulation_mode = "systemmode"), allow(dead_code))]
+    #[cfg_attr(not(feature = "systemmode"), allow(dead_code))]
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
@@ -569,12 +569,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &self.page_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         &mut self.page_filter
     }

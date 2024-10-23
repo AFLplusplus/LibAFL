@@ -10,7 +10,7 @@ use libafl_bolts::tuples::{Handle, Handled, MatchFirstType, MatchNameRef};
 use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     capstone,
@@ -390,7 +390,7 @@ where
     T: CallTraceCollectorTuple + Debug,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -445,12 +445,12 @@ where
         &mut self.filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
