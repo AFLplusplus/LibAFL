@@ -1,4 +1,4 @@
-use std::{hint::black_box, path::PathBuf, time::Duration};
+use std::{hint::black_box, num::NonZero, path::PathBuf, time::Duration};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -113,7 +113,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());
 
     // Generate 8 initial inputs
     state
