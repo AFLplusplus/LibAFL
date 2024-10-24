@@ -1423,7 +1423,7 @@ impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
             timeout: self.timeout,
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
-            target_bytes_converter: target_bytes_converter,
+            target_bytes_converter,
         }
     }
 }
