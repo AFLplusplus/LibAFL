@@ -274,6 +274,7 @@ jobs:
           - ./fuzzers/structure_aware/baby_fuzzer_multi
           - ./fuzzers/structure_aware/baby_fuzzer_custom_input
           - ./fuzzers/structure_aware/baby_fuzzer_nautilus
+          - ./fuzzers/structure_aware/forkserver_simple_nautilus
 
           # In-process
           - ./fuzzers/fuzz_anything/cargo_fuzz

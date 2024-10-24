@@ -91,9 +91,9 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 /// Convert between two input types with a state
 pub trait InputConverter: Debug {
     /// Source type
-    type From: Input;
+    type From;
     /// Destination type
-    type To: Input;
+    type To;
 
     /// Convert the src type to the dest
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error>;
@@ -340,5 +340,44 @@ where
 
     fn convert(&mut self, input: Self::From) -> Result<Self::To, Error> {
         (self.convert_cb)(input)
+    }
+}
+
+/// A converter that converts from `input` to target bytes
+pub trait TargetBytesConverter {
+    /// The input
+    type Input;
+
+    /// Create target bytes
+    fn to_target_bytes<'a>(&mut self, input: &'a Self::Input) -> OwnedSlice<'a, u8>;
+}
+
+/// Simply gets the target bytes out from a [`HasTargetBytes`] type.
+#[derive(Debug)]
+pub struct NopTargetBytesConverter<I> {
+    phantom: PhantomData<I>,
+}
+
+impl<I> NopTargetBytesConverter<I> {
+    /// Create a new [`NopTargetBytesConverter`]
+    #[must_use]
+    pub fn new() -> NopTargetBytesConverter<I> {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> Default for NopTargetBytesConverter<I> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<I: HasTargetBytes> TargetBytesConverter for NopTargetBytesConverter<I> {
+    type Input = I;
+
+    fn to_target_bytes<'a>(&mut self, input: &'a Self::Input) -> OwnedSlice<'a, u8> {
+        input.target_bytes()
     }
 }

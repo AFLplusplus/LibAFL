@@ -42,7 +42,9 @@ use crate::observers::{
 };
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input, UsesInput},
+    inputs::{
+        BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter, UsesInput,
+    },
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::{HasExecutions, State, UsesState},
@@ -70,9 +72,9 @@ const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
 
 #[allow(clippy::cast_possible_wrap)]
-const FS_NEW_OPT_AUTODICT: i32 = 0x00000800_u32 as i32;
+const FS_NEW_OPT_AUTODTCT: i32 = 0x00000800_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
-const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
+const FS_OPT_AUTODTCT: i32 = 0x10000000_u32 as i32;
 
 #[allow(clippy::cast_possible_wrap)]
 const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
@@ -584,13 +586,14 @@ impl Forkserver {
 ///
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-pub struct ForkserverExecutor<OT, S, SP>
+pub struct ForkserverExecutor<TC, OT, S, SP>
 where
     SP: ShMemProvider,
 {
     target: OsString,
     args: Vec<OsString>,
     input_file: InputFile,
+    target_bytes_converter: TC,
     uses_shmem_testcase: bool,
     forkserver: Forkserver,
     observers: OT,
@@ -605,8 +608,9 @@ where
     crash_exitcode: Option<i8>,
 }
 
-impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
+impl<TC, OT, S, SP> Debug for ForkserverExecutor<TC, OT, S, SP>
 where
+    TC: Debug,
     OT: Debug,
     SP: ShMemProvider,
 {
@@ -615,6 +619,7 @@ where
             .field("target", &self.target)
             .field("args", &self.args)
             .field("input_file", &self.input_file)
+            .field("target_bytes_converter", &self.target_bytes_converter)
             .field("uses_shmem_testcase", &self.uses_shmem_testcase)
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
@@ -623,15 +628,17 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), UnixShMemProvider> {
+impl ForkserverExecutor<(), (), (), UnixShMemProvider> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
-    pub fn builder() -> ForkserverExecutorBuilder<'static, UnixShMemProvider> {
+    pub fn builder(
+    ) -> ForkserverExecutorBuilder<'static, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
+    {
         ForkserverExecutorBuilder::new()
     }
 }
 
-impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
+impl<TC, OT, S, SP> ForkserverExecutor<TC, OT, S, SP>
 where
     OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
@@ -671,7 +678,7 @@ where
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
-pub struct ForkserverExecutorBuilder<'a, SP> {
+pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
@@ -691,9 +698,10 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     #[cfg(feature = "regex")]
     asan_obs: Option<Handle<AsanBacktraceObserver>>,
     crash_exitcode: Option<i8>,
+    target_bytes_converter: TC,
 }
 
-impl<'a, SP> ForkserverExecutorBuilder<'a, SP>
+impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP>
 where
     SP: ShMemProvider,
 {
@@ -703,11 +711,12 @@ where
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[allow(clippy::pedantic)]
-    pub fn build<OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, S, SP>, Error>
+    pub fn build<OT, S>(mut self, observers: OT) -> Result<ForkserverExecutor<TC, OT, S, SP>, Error>
     where
         OT: ObserversTuple<S::Input, S>,
         S: UsesInput,
-        S::Input: Input + HasTargetBytes,
+        S::Input: Input,
+        TC: TargetBytesConverter,
         SP: ShMemProvider,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
@@ -758,16 +767,17 @@ where
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
+            target_bytes_converter: self.target_bytes_converter,
         })
     }
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
     #[allow(clippy::pedantic)]
     pub fn build_dynamic_map<A, MO, OT, S>(
-        &mut self,
+        mut self,
         mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<(A, OT), S, SP>, Error>
+    ) -> Result<ForkserverExecutor<TC, (A, OT), S, SP>, Error>
     where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         A: Observer<S::Input, S> + AsMut<MO>,
@@ -822,6 +832,7 @@ where
                 .clone()
                 .unwrap_or(AsanBacktraceObserver::default().handle()),
             crash_exitcode: self.crash_exitcode,
+            target_bytes_converter: self.target_bytes_converter,
         })
     }
 
@@ -957,7 +968,7 @@ where
             }
         }
 
-        if status & FS_NEW_OPT_AUTODICT != 0 {
+        if status & FS_NEW_OPT_AUTODTCT != 0 {
             // Here unlike shmem input fuzzing, we are forced to read things
             // hence no self.autotokens.is_some() to check if we proceed
             let autotokens_size = forkserver.read_st().map_err(|err| {
@@ -1010,14 +1021,14 @@ where
             self.set_map_size(fsrv_map_size)?;
         }
 
-        // Only with SHMEM or AUTODICT we can send send_status back or it breaks!
+        // Only with SHMEM or AUTODTCT we can send send_status back or it breaks!
         // If forkserver is responding, we then check if there's any option enabled.
         // We'll send 4-bytes message back to the forkserver to tell which features to use
         // The forkserver is listening to our response if either shmem fuzzing is enabled or auto dict is enabled
         // <https://github.com/AFLplusplus/AFLplusplus/blob/147654f8715d237fe45c1657c87b2fe36c4db22a/instrumentation/afl-compiler-rt.o.c#L1026>
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED
             && (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ
-                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT)
+                || status & FS_OPT_AUTODTCT == FS_OPT_AUTODTCT)
         {
             let mut send_status = FS_OPT_ENABLED;
 
@@ -1027,9 +1038,9 @@ where
                 self.uses_shmem_testcase = true;
             }
 
-            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
-                log::info!("Using AUTODICT feature");
-                send_status |= FS_OPT_AUTODICT;
+            if (status & FS_OPT_AUTODTCT == FS_OPT_AUTODTCT) && self.autotokens.is_some() {
+                log::info!("Using AUTODTCT feature");
+                send_status |= FS_OPT_AUTODTCT;
             }
 
             if send_status != FS_OPT_ENABLED {
@@ -1042,7 +1053,7 @@ where
                     )));
                 }
 
-                if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
+                if (send_status & FS_OPT_AUTODTCT) == FS_OPT_AUTODTCT {
                     let dict_size = forkserver.read_st().map_err(|err| {
                         Error::illegal_state(format!("Reading from forkserver failed: {err:?}"))
                     })?;
@@ -1318,7 +1329,7 @@ where
     }
 }
 
-impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
@@ -1326,7 +1337,8 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
-    pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+    pub fn new(
+    ) -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             program: None,
             arguments: vec![],
@@ -1346,14 +1358,17 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             timeout: None,
             asan_obs: None,
             crash_exitcode: None,
+            target_bytes_converter: NopTargetBytesConverter::new(),
         }
     }
+}
 
+impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
         shmem_provider: &'a mut SP,
-    ) -> ForkserverExecutorBuilder<'a, SP> {
+    ) -> ForkserverExecutorBuilder<'a, TC, SP> {
         ForkserverExecutorBuilder {
             // Set the new provider
             shmem_provider: Some(shmem_provider),
@@ -1375,22 +1390,57 @@ impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
             timeout: self.timeout,
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
+            target_bytes_converter: self.target_bytes_converter,
         }
     }
 }
 
-impl Default for ForkserverExecutorBuilder<'_, UnixShMemProvider> {
+impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
+    /// Shmem provider for forkserver's shared memory testcase feature.
+    pub fn target_bytes_converter<TC2: TargetBytesConverter>(
+        self,
+        target_bytes_converter: TC2,
+    ) -> ForkserverExecutorBuilder<'a, TC2, SP> {
+        ForkserverExecutorBuilder {
+            // Set the new provider
+            shmem_provider: self.shmem_provider,
+            // Copy all other values from the old Builder
+            program: self.program,
+            arguments: self.arguments,
+            envs: self.envs,
+            debug_child: self.debug_child,
+            use_stdin: self.use_stdin,
+            uses_shmem_testcase: self.uses_shmem_testcase,
+            is_persistent: self.is_persistent,
+            is_deferred_frksrv: self.is_deferred_frksrv,
+            autotokens: self.autotokens,
+            input_filename: self.input_filename,
+            map_size: self.map_size,
+            max_input_size: self.max_input_size,
+            min_input_size: self.min_input_size,
+            kill_signal: self.kill_signal,
+            timeout: self.timeout,
+            asan_obs: self.asan_obs,
+            crash_exitcode: self.crash_exitcode,
+            target_bytes_converter: target_bytes_converter,
+        }
+    }
+}
+
+impl Default
+    for ForkserverExecutorBuilder<'_, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
+impl<EM, TC, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<TC, OT, S, SP>
 where
     OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     S: State + HasExecutions,
-    S::Input: HasTargetBytes,
+    TC: TargetBytesConverter<Input = S::Input>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
@@ -1408,7 +1458,7 @@ where
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
 
-        let mut input_bytes = input.target_bytes();
+        let mut input_bytes = self.target_bytes_converter.to_target_bytes(input);
         let mut input_size = input_bytes.as_slice().len();
         if input_size > self.max_input_size {
             // Truncate like AFL++ does
@@ -1497,7 +1547,7 @@ where
     }
 }
 
-impl<OT, S, SP> UsesState for ForkserverExecutor<OT, S, SP>
+impl<TC, OT, S, SP> UsesState for ForkserverExecutor<TC, OT, S, SP>
 where
     S: State,
     SP: ShMemProvider,
@@ -1505,7 +1555,7 @@ where
     type State = S;
 }
 
-impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
+impl<TC, OT, S, SP> HasObservers for ForkserverExecutor<TC, OT, S, SP>
 where
     OT: ObserversTuple<S::Input, S>,
     S: State,

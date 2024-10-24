@@ -11,6 +11,7 @@ use std::{
     io::{self, Read, Write},
     path::PathBuf,
     process,
+    ptr::addr_of_mut,
 };
 
 use clap::{Arg, Command};
@@ -252,7 +253,8 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let func_list = unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut FUNCTION_LIST)) };
+    let func_list =
+        unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut *addr_of_mut!(FUNCTION_LIST))) };
     let profiling_observer = ProfilingObserver::new("concatenated.json", func_list)?;
     let callhook = CallHook::new();
 
