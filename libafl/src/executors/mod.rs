@@ -2,7 +2,7 @@
 
 #[cfg(unix)]
 use alloc::vec::Vec;
-use core::fmt::Debug;
+use core::{fmt::Debug, time::Duration};
 
 pub use combined::CombinedExecutor;
 #[cfg(all(feature = "std", any(unix, doc)))]
@@ -142,6 +142,15 @@ where
     {
         WithObservers::new(self, observers)
     }
+}
+
+/// A trait that allows to get/set an `Executor`'s timeout thresold
+pub trait HasTimeout {
+    /// Get a timeout
+    fn timeout(&self) -> Duration;
+
+    /// Set timeout
+    fn set_timeout(&mut self, timeout: Duration);
 }
 
 /// The common signals we want to handle

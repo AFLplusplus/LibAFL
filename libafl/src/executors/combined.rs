@@ -1,10 +1,11 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 //! In comparison to the [`crate::executors::DiffExecutor`] it does not run the secondary executor in `run_target`.
 
-use core::fmt::Debug;
+use core::{fmt::Debug, time::Duration};
 
 use libafl_bolts::tuples::RefIndexable;
 
+use super::HasTimeout;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     state::{HasExecutions, UsesState},
@@ -57,6 +58,27 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.primary.run_target(fuzzer, state, mgr, input)
+    }
+}
+
+impl<A, B> HasTimeout for CombinedExecutor<A, B>
+where
+    A: HasTimeout,
+    B: HasTimeout,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.primary.set_timeout(timeout);
+        self.secondary.set_timeout(timeout);
+    }
+
+    #[inline]
+    fn timeout(&self) -> Duration {
+        assert!(
+            self.primary.timeout() == self.secondary.timeout(),
+            "Primary and Secondary Executors have different timeouts!"
+        );
+        self.primary.timeout()
     }
 }
 
