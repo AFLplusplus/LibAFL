@@ -1521,6 +1521,7 @@ where
                 false
             };
             if libc::WIFSIGNALED(self.forkserver().status()) || exitcode_is_crash {
+                println!("CRASH");
                 exit_kind = ExitKind::Crash;
                 #[cfg(feature = "regex")]
                 if let Some(asan_observer) = self.observers.get_mut(&self.asan_obs) {
@@ -1537,6 +1538,7 @@ where
                     "Could not kill timed-out child: {err:?}"
                 )));
             }
+            println!("TIMEOUT");
             exit_kind = ExitKind::Timeout;
         }
 
