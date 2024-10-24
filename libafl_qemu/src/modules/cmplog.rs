@@ -1,7 +1,7 @@
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use std::ptr::addr_of_mut;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, HasMetadata};
@@ -14,9 +14,9 @@ pub use libafl_targets::{
 };
 use serde::{Deserialize, Serialize};
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
 use crate::{
     emu::EmulatorModules,
@@ -74,7 +74,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
@@ -98,12 +98,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
@@ -137,7 +137,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
@@ -163,12 +163,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
@@ -247,14 +247,14 @@ pub extern "C" fn trace_cmp8_cmplog(_: *const (), id: u64, v0: u64, v1: u64) {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 #[derive(Debug)]
 pub struct CmpLogRoutinesModule {
     address_filter: StdAddressFilter,
     cs: Capstone,
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl CmpLogRoutinesModule {
     #[must_use]
     pub fn new(address_filter: StdAddressFilter) -> Self {
@@ -326,14 +326,14 @@ impl CmpLogRoutinesModule {
         if let Some(h) = emulator_modules.get::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 unsafe {
                     std::slice::from_raw_parts(qemu.g2h(pc), 512)
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 &mut [0; 512]
             };
-            #[cfg(emulation_mode = "systemmode")]
+            #[cfg(feature = "systemmode")]
             unsafe {
                 qemu.read_mem(pc, code)
             }; // TODO handle faults
@@ -370,11 +370,11 @@ impl CmpLogRoutinesModule {
 
                 iaddr += insn.bytes().len() as GuestAddr;
 
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 unsafe {
                     code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 unsafe {
                     qemu.read_mem(pc, code);
                 } // TODO handle faults
@@ -385,13 +385,13 @@ impl CmpLogRoutinesModule {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 impl<S> EmulatorModule<S> for CmpLogRoutinesModule
 where
     S: Unpin + UsesInput,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
@@ -413,12 +413,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         &mut NopPageFilter
     }

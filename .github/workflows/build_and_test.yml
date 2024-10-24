@@ -130,7 +130,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run clippy
-        run: ./scripts/clippy.sh
+        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed

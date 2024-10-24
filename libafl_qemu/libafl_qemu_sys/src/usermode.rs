@@ -104,6 +104,8 @@ impl IntoPy<PyObject> for MmapPerms {
         n.into_py(py)
     }
 }
+
+#[cfg(target_os = "linux")]
 impl From<libafl_mapinfo> for MapInfo {
     fn from(map_info: libafl_mapinfo) -> Self {
         let path: Option<String> = if map_info.path.is_null() {

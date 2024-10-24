@@ -36,6 +36,20 @@ for task in output[
 ]:
     print("Running ", task)
     print(os.environ)
+    if (("--manifest-path libafl_qemu/Cargo.toml" in task or "--manifest-path libafl_qemu/libafl_qemu_sys/Cargo.toml" in task)
+            and "--no-default-features" in task
+            and "usermode" not in task
+            and "systemmode" not in task
+            and "slirp" not in task):
+        # either usermode or systemmode are mandatory for libafl_qemu
+        task += " --features usermode"
+
+    if ("--manifest-path utils/libafl_jumper/Cargo.toml" in task
+            and "--no-default-features" in task
+            and "--features" not in task):
+         # ignore libafl_jumper no std
+        continue
+
     if "libafl_frida" in task:
         # DOCS_RS is needed for libafl_frida to build without auto-download feature
         cargo_check = subprocess.check_output(

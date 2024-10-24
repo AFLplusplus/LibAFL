@@ -12,7 +12,7 @@ use libafl::{
 };
 use libafl_bolts::AsSlice;
 use libafl_qemu_sys::GuestAddr;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 use libc::c_uint;
 use num_enum::TryFromPrimitive;
@@ -457,7 +457,7 @@ where
         }
 
         // Auto page filtering if option is enabled
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         if emu.driver_mut().allow_page_on_start() {
             if let Some(page_id) = qemu.current_cpu().unwrap().current_paging_id() {
                 emu.modules_mut().modules_mut().allow_page_id_all(page_id);
@@ -566,13 +566,13 @@ where
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Debug, Clone)]
 pub struct PageAllowCommand {
     page_id: GuestPhysAddr,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl<CM, ED, ET, S, SM> IsCommand<CM, ED, ET, S, SM> for PageAllowCommand
 where
     ET: EmulatorModuleTuple<S>,
@@ -760,7 +760,7 @@ impl Display for AddressAllowCommand {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Display for PageAllowCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Allowed page: {:?}", self.page_id)

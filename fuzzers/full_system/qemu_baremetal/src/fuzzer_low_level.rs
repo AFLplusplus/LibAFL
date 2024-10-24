@@ -30,9 +30,9 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     config, elf::EasyElf, executor::QemuExecutor, modules::edges::StdEdgeCoverageModuleBuilder,
-    Emulator, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    Emulator, GuestPhysAddr, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause,
+    Regs,
 };
-use libafl_qemu_sys::GuestPhysAddr;
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
