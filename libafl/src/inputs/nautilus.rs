@@ -148,6 +148,7 @@ pub struct NautilusTargetBytesConverter<'a> {
 
 impl<'a> NautilusTargetBytesConverter<'a> {
     /// Create a new [`NautilusTargetBytesConverter`]
+    #[must_use]
     pub fn new(ctx: &'a NautilusContext) -> NautilusTargetBytesConverter<'a> {
         NautilusTargetBytesConverter { ctx }
     }
