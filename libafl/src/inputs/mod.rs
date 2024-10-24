@@ -360,10 +360,17 @@ pub struct NopTargetBytesConverter<I> {
 
 impl<I> NopTargetBytesConverter<I> {
     /// Create a new [`NopTargetBytesConverter`]
+    #[must_use]
     pub fn new() -> NopTargetBytesConverter<I> {
         Self {
             phantom: PhantomData,
         }
+    }
+}
+
+impl<I> Default for NopTargetBytesConverter<I> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
