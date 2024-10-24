@@ -223,8 +223,6 @@ jobs:
         run: ./scripts/check_tested_fuzzers.sh
 
   fuzzers:
-    needs:
-      - fuzzers-preflight
     strategy:
       fail-fast: true
       matrix:
