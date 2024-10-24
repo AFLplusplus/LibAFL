@@ -76,7 +76,9 @@ pub fn main() {
     )
     .unwrap();
 
-    let _ = state.metadata_or_insert_with::<NautilusChunksMetadata>(|| NautilusChunksMetadata::new("/tmp/".into()));
+    let _ = state.metadata_or_insert_with::<NautilusChunksMetadata>(|| {
+        NautilusChunksMetadata::new("/tmp/".into())
+    });
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{s}"));
