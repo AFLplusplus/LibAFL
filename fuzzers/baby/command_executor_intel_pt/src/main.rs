@@ -85,7 +85,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let hook =
-        unsafe { IntelPTChildHook::new(SIGNALS_PTR, SIGNALS.len(), &[0x21_0000..0x25_0000]) };
+        unsafe { IntelPTChildHook::new(SIGNALS_PTR, SIGNALS.len(), &[0x21_0000..=0x25_0000]) };
 
     #[derive(Debug)]
     pub struct MyCommandConfigurator {}
