@@ -181,6 +181,8 @@ pub fn generate(
         .allowlist_function("qemu_main_loop")
         .allowlist_function("qemu_cleanup")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
+        .blocklist_type("siginfo_t")
+        .raw_line("use libc::siginfo_t;")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
     // arch specific functions

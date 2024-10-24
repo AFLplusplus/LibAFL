@@ -1,6 +1,7 @@
 /* ANCHOR: use */
 extern crate libafl;
 extern crate libafl_bolts;
+use std::num::NonZeroUsize;
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -17,7 +18,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice, nonzero};
 use std::path::PathBuf;
 /* ANCHOR_END: use */
 
@@ -97,7 +98,7 @@ fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

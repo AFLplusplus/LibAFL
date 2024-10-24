@@ -343,6 +343,7 @@ where
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn syscall_hook<ET, S>(
     emulator_modules: &mut EmulatorModules<ET, S>, // our instantiated QemuHooks
     _state: Option<&mut S>,

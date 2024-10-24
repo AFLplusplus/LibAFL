@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 use std::{
     borrow::Cow,
     hash::{DefaultHasher, Hash, Hasher},
@@ -59,20 +60,20 @@ impl CustomInput {
 }
 
 /// A generator for [`CustomInput`] used in this example
-pub struct CustomInputGenerator<S: HasRand> {
-    pub bytes_generator: RandBytesGenerator<S>,
+pub struct CustomInputGenerator {
+    pub bytes_generator: RandBytesGenerator,
 }
 
-impl<S: HasRand> CustomInputGenerator<S> {
+impl CustomInputGenerator {
     /// Creates a new [`CustomInputGenerator`]
-    pub fn new(max_len: usize) -> Result<Self, Error> {
-        Ok(Self {
-            bytes_generator: RandBytesGenerator::new(max_len)?,
-        })
+    pub fn new(max_len: NonZeroUsize) -> Self {
+        Self {
+            bytes_generator: RandBytesGenerator::new(max_len),
+        }
     }
 }
 
-impl<S> Generator<CustomInput, S> for CustomInputGenerator<S>
+impl<S> Generator<CustomInput, S> for CustomInputGenerator
 where
     S: HasRand,
 {
@@ -99,15 +100,12 @@ pub struct ToggleOptionalByteArrayMutator<G> {
     generator: G,
 }
 
-impl<S> ToggleOptionalByteArrayMutator<RandBytesGenerator<S>>
-where
-    S: HasRand,
-{
+impl ToggleOptionalByteArrayMutator<RandBytesGenerator> {
     /// Creates a new [`ToggleOptionalByteArrayMutator`]
-    pub fn new(length: usize) -> Result<Self, Error> {
-        Ok(Self {
-            generator: RandBytesGenerator::new(length)?,
-        })
+    pub fn new(length: NonZeroUsize) -> Self {
+        Self {
+            generator: RandBytesGenerator::new(length),
+        }
     }
 }
 

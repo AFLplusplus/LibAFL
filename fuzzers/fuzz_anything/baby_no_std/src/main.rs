@@ -25,7 +25,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 #[cfg(any(windows, unix))]
 use libc::{abort, printf};
 use static_alloc::Bump;
@@ -144,7 +144,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

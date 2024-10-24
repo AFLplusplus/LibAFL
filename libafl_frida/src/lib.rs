@@ -7,25 +7,6 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
 
 */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
-#![forbid(unexpected_cfgs)]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::unreadable_literal,
-    clippy::ptr_cast_constness,
-    clippy::must_use_candidate,
-    clippy::too_many_arguments
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -96,8 +77,8 @@ pub mod executor;
 pub mod utils;
 
 // for parsing asan and cmplog cores
-use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 
+use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[allow(clippy::struct_excessive_bools)]
@@ -345,6 +326,7 @@ impl Default for FridaOptions {
 
 #[cfg(test)]
 mod tests {
+    use core::num::NonZero;
     use std::sync::OnceLock;
 
     use clap::Parser;
@@ -523,8 +505,10 @@ mod tests {
                 );
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-                let mut stages =
-                    tuple_list!(StdMutationalStage::with_max_iterations(mutator, 1).unwrap());
+                let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(
+                    mutator,
+                    NonZero::new(1).unwrap()
+                ));
 
                 log::info!("Starting fuzzing!");
                 fuzzer

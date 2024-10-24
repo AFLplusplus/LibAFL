@@ -15,7 +15,7 @@ use libafl::{
     schedulers::QueueScheduler,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice, nonzero};
 use std::path::PathBuf;
 /* ANCHOR_END: use */
 
@@ -105,7 +105,7 @@ fn main() {
     /* ANCHOR_END: executor_with_observer */
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

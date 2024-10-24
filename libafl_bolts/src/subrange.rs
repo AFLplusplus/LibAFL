@@ -349,7 +349,7 @@ mod tests {
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(8);
         let bytes_read_ref: &[u8] = &[];
-        assert_eq!(&*bytes_read.as_slice(), bytes_read_ref);
+        assert_eq!(bytes_read.as_slice(), bytes_read_ref);
     }
 
     #[test]

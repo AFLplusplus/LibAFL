@@ -646,8 +646,9 @@ where
     }
 }
 
-// # Safety
-// Calling this concurrently for the same id is racey and may lose updates.
+/// # Safety
+///
+/// Calling this concurrently for the same id is racey and may lose updates.
 pub unsafe extern "C" fn trace_edge_hitcount(_: *const (), id: u64) {
     unsafe {
         EDGES_MAP[id as usize] = EDGES_MAP[id as usize].wrapping_add(1);

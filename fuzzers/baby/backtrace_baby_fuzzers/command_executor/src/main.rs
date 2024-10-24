@@ -25,6 +25,7 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
+    nonzero,
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
     tuples::tuple_list,
@@ -118,7 +119,7 @@ pub fn main() {
         MyExecutor { shmem_id, timeout }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

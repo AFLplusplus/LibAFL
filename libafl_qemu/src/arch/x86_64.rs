@@ -84,7 +84,7 @@ impl crate::ArchExtras for crate::CPU {
     {
         let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
         let mut ret_addr = [0; size_of::<GuestReg>()];
-        unsafe { self.read_mem(stack_ptr, &mut ret_addr) };
+        unsafe { self.read_mem_unchecked(stack_ptr, &mut ret_addr) };
         Ok(GuestReg::from_le_bytes(ret_addr).into())
     }
 
@@ -95,7 +95,7 @@ impl crate::ArchExtras for crate::CPU {
         let stack_ptr: GuestReg = self.read_reg(Regs::Rsp)?;
         let val: GuestReg = val.into();
         let ret_addr = val.to_le_bytes();
-        unsafe { self.write_mem(stack_ptr, &ret_addr) };
+        unsafe { self.write_mem_unchecked(stack_ptr, &ret_addr) };
         Ok(())
     }
 
