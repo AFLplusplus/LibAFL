@@ -108,6 +108,15 @@ regex = ["std", "dep:regex"]
 ## Enables deduplication based on `libcasr` for `StacktraceObserver`
 casr = ["libcasr", "std", "regex"]
 
+## Intel Processor Trace Observer
+intel_pt = [
+  "std",
+  "dep:libipt",
+  "dep:num_enum",
+  "dep:proc-maps",
+  "libafl_bolts/intel_pt",
+]
+
 ## Enables features for corpus minimization
 cmin = ["z3"]
 
@@ -195,6 +204,7 @@ serde_json = { workspace = true, default-features = false, features = [
 ] }
 # clippy-suggested optimised byte counter
 bytecount = "0.6.8"
+static_assertions = "1.1.0"
 
 [dependencies]
 libafl_bolts = { version = "0.13.2", path = "../libafl_bolts", default-features = false, features = [
@@ -221,7 +231,10 @@ typed-builder = { workspace = true, optional = true } # Implement the builder pa
 serde_json = { workspace = true, optional = true, default-features = false, features = [
   "alloc",
 ] }
-nix = { workspace = true, default-features = true, optional = true }
+nix = { workspace = true, features = [
+  "ptrace",
+  "signal",
+], default-features = true, optional = true }
 regex = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 libm = "0.2.8"
@@ -273,6 +286,9 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
+num_enum = { version = "0.7.3", optional = true }
+proc-maps = { version = "0.3.2", optional = true }
+libipt = { git = "https://github.com/Marcondiro/libipt-rs", optional = true }
 
 [lints]
 workspace = true

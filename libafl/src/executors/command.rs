@@ -22,11 +22,25 @@ use libafl_bolts::{
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
+#[cfg(target_os = "linux")]
+use nix::{
+    sys::{
+        ptrace::{cont, detach, setoptions, Options},
+        wait::{
+            WaitPidFlag,
+            WaitStatus::{Signaled, Stopped},
+        },
+    },
+    unistd::Pid,
+};
+use serde::{Deserialize, Serialize};
 
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
+#[cfg(target_os = "linux")]
+use crate::HasNamedMetadata;
 use crate::{
-    executors::HasObservers,
+    executors::{hooks::ExecutorHooksTuple, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasExecutions, State, UsesState},
@@ -73,7 +87,7 @@ pub struct StdCommandConfigurator {
     command: Command,
 }
 
-impl<I> CommandConfigurator<I> for StdCommandConfigurator
+impl<I> CommandConfigurator<I, Child> for StdCommandConfigurator
 where
     I: HasTargetBytes,
 {
@@ -153,16 +167,18 @@ where
     }
 }
 
-/// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
+/// A `CommandExecutor` is a wrapper around [`Command`] to execute a target as a child process.
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, S, T> {
+pub struct CommandExecutor<OT, S, T, HT = (), C = Child> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
+    hooks: HT,
     phantom: PhantomData<S>,
+    phantom_child: PhantomData<C>,
 }
 
 impl CommandExecutor<(), (), ()> {
@@ -174,7 +190,7 @@ impl CommandExecutor<(), (), ()> {
     /// `arg`, `args`, `env`, and so on.
     ///
     /// By default, input is read from stdin, unless you specify a different location using
-    /// * `arg_input_arg` for input delivered _as_ an command line argument
+    /// * `arg_input_arg` for input delivered _as_ a command line argument
     /// * `arg_input_file` for input via a file of a specific name
     /// * `arg_input_file_std` for a file with default name (at the right location in the arguments)
     #[must_use]
@@ -183,20 +199,23 @@ impl CommandExecutor<(), (), ()> {
     }
 }
 
-impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
+impl<OT, S, T, HT, C> Debug for CommandExecutor<OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
+    HT: Debug,
+    C: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
             .field("inner", &self.configurer)
             .field("observers", &self.observers)
+            .field("hooks", &self.hooks)
             .finish()
     }
 }
 
-impl<OT, S, T> CommandExecutor<OT, S, T>
+impl<OT, S, T, HT, C> CommandExecutor<OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
@@ -283,14 +302,88 @@ where
     }
 }
 
-impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
+#[allow(missing_docs)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub(crate) struct SerdeAnyi32 {
+    /// The actual i32
+    pub inner: i32,
+}
+libafl_bolts::impl_serdeany!(SerdeAnyi32);
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
+where
+    EM: UsesState<State = S>,
+    S: State + HasExecutions + HasNamedMetadata,
+    T: CommandConfigurator<S::Input, Pid> + Debug,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
+    Z: UsesState<State = S>,
+    HT: ExecutorHooksTuple<S>,
+{
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        use nix::sys::{
+            signal::Signal,
+            wait::{waitpid, WaitStatus::Exited},
+        };
+        *state.executions_mut() += 1;
+
+        let child = self.configurer.spawn_child(input)?;
+
+        state.named_metadata_map_mut().insert(
+            "child",
+            SerdeAnyi32 {
+                inner: child.as_raw(),
+            },
+        );
+
+        waitpid(child, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
+        // TODO check WaitStatus
+        setoptions(child, Options::PTRACE_O_TRACEEXEC)?;
+        cont(child, None)?;
+
+        waitpid(child, None).expect("Failed to wait for the child process");
+        // TODO check WaitStatus
+
+        self.observers.pre_exec_child_all(state, input)?;
+        if *state.executions() == 1 {
+            self.hooks.init_all::<Self>(state);
+        }
+        self.hooks.pre_exec_all(state, input);
+
+        detach(child, None)?;
+        // TODO: use self.configurer.exec_timeout() for the waitpid
+        let res = match waitpid(child, None).expect("waiting on child failed") {
+            Exited(pid, 0) if pid == child => ExitKind::Ok,
+            Exited(pid, _) if pid == child => ExitKind::Crash,
+            Signaled(pid, Signal::SIGABRT, _has_coredump) if pid == child => ExitKind::Crash,
+            Signaled(pid, Signal::SIGKILL, _has_coredump) if pid == child => ExitKind::Oom,
+            Stopped(pid, Signal::SIGABRT) if pid == child => ExitKind::Crash,
+            Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
+            s => {
+                // TODO other cases?
+                return Err(Error::unsupported(format!("Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})")));
+            }
+        };
+
+        self.observers.post_exec_child_all(state, input, &res)?;
+        self.hooks.post_exec_all(state, input);
+        Ok(res)
+    }
+}
+
+impl<OT, S, T, HT, C> UsesState for CommandExecutor<OT, S, T, HT, C>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
+impl<OT, S, T, HT, C> HasObservers for CommandExecutor<OT, S, T, HT, C>
 where
     S: State,
     T: Debug,
@@ -481,6 +574,38 @@ impl CommandExecutorBuilder {
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
     {
+        let configurator = self.build_common()?;
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
+                configurator,
+                observers,
+            ),
+        )
+    }
+
+    /// Builds the `CommandExecutor` with hooks
+    pub fn build_with_hooks<OT, HT, S>(
+        &self,
+        observers: OT,
+        hooks: HT,
+    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator, HT>, Error>
+    where
+        OT: MatchName + ObserversTuple<S::Input, S>,
+        S: UsesInput,
+        S::Input: Input + HasTargetBytes,
+        HT: ExecutorHooksTuple<S>,
+    {
+        let configurator = self.build_common()?;
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor_with_hooks::<
+                OT,
+                S,
+                HT,
+            >(configurator, observers, hooks),
+        )
+    }
+
+    fn build_common(&self) -> Result<StdCommandConfigurator, Error> {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
@@ -518,24 +643,18 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::piped());
         }
 
-        let configurator = StdCommandConfigurator {
+        Ok(StdCommandConfigurator {
             debug_child: self.debug_child,
             stdout_observer: self.stdout.clone(),
             stderr_observer: self.stderr.clone(),
             input_location: self.input_location.clone(),
             timeout: self.timeout,
             command,
-        };
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
-                configurator,
-                observers,
-            ),
-        )
+        })
     }
 }
 
-/// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
+/// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
@@ -577,7 +696,7 @@ impl CommandExecutorBuilder {
 /// }
 /// ```
 #[cfg(all(feature = "std", any(unix, doc)))]
-pub trait CommandConfigurator<I>: Sized {
+pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
         None
@@ -588,7 +707,7 @@ pub trait CommandConfigurator<I>: Sized {
     }
 
     /// Spawns a new process with the given configuration.
-    fn spawn_child(&mut self, input: &I) -> Result<Child, Error>;
+    fn spawn_child(&mut self, input: &I) -> Result<C, Error>;
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
@@ -601,7 +720,29 @@ pub trait CommandConfigurator<I>: Sized {
         CommandExecutor {
             configurer: self,
             observers,
+            hooks: (),
             phantom: PhantomData,
+            phantom_child: PhantomData,
+        }
+    }
+
+    /// Create an `Executor` with hooks from this `CommandConfigurator`.
+    fn into_executor_with_hooks<OT, S, HT>(
+        self,
+        observers: OT,
+        hooks: HT,
+    ) -> CommandExecutor<OT, S, Self, HT, C>
+    where
+        OT: MatchName,
+        HT: ExecutorHooksTuple<S>,
+        S: UsesInput,
+    {
+        CommandExecutor {
+            configurer: self,
+            observers,
+            hooks,
+            phantom: PhantomData,
+            phantom_child: PhantomData,
         }
     }
 }
