@@ -51,8 +51,9 @@ where
         if *self.enabled.borrow() && matches!(exit_kind, ExitKind::Timeout) {
             let timeouts = state.metadata_or_insert_with(|| TimeoutsToVerify::<I>::new());
             timeouts.push(input.clone());
+            return Ok(false);
         }
-        Ok(false)
+        Ok(matches!(exit_kind, ExitKind::Timeout))
     }
 
     fn append_metadata(
