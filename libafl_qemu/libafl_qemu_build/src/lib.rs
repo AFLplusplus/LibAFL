@@ -223,6 +223,7 @@ fn qemu_bindgen_clang_args(
     let target_arch_dir = match cpu_target {
         "x86_64" => format!("-I{}/target/i386", qemu_dir.display()),
         "aarch64" => format!("-I{}/target/arm", qemu_dir.display()),
+        "riscv32" | "riscv64" => format!("-I{}/target/riscv", qemu_dir.display()),
         _ => format!("-I{}/target/{cpu_target}", qemu_dir.display()),
     };
 

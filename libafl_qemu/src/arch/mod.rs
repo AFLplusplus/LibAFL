@@ -32,3 +32,8 @@ pub use ppc::*;
 pub mod hexagon;
 #[cfg(cpu_target = "hexagon")]
 pub use hexagon::*;
+
+#[cfg(any(cpu_target = "riscv32", cpu_target = "riscv64"))]
+pub mod riscv;
+#[cfg(any(cpu_target = "riscv32", cpu_target = "riscv64"))]
+pub use riscv::*;
