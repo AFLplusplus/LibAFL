@@ -23,7 +23,7 @@ use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Asid, BlockFlags,
-    ConfigBuilder, Cpu, Image,
+    ConfigBuilder, Cpu, Image, PtErrorCode, Status,
 };
 use log::trace;
 use num_enum::TryFromPrimitive;
@@ -300,78 +300,62 @@ impl IntelPT {
                 .set_callback(Some(rm))
                 .map_err(|e| Error::unknown(format!("Failed to set get memory callback {e}")))?;
         }
-        // TODO rewrite decently
+
         let mut previous_block_ip = 0;
         let mut status;
-        loop {
-            status = match decoder.sync_forward() {
-                Ok(s) => s,
+        'sync: loop {
+            match decoder.sync_forward() {
+                Ok(s) => {
+                    status = s;
+                    'block: loop {
+                        while status.event_pending() {
+                            match decoder.event() {
+                                Ok((_, s)) => {
+                                    status = s;
+                                }
+                                Err(e) => {
+                                    trace!("PT error in event {e:?}");
+                                    break 'block;
+                                }
+                            };
+                        }
+
+                        match decoder.next() {
+                            Ok((b, s)) => {
+                                status = s;
+                                let offset = decoder
+                                    .offset()
+                                    .map_err(|e| Error::unknown(e.to_string()))?;
+
+                                if !b.speculative() && skip < offset {
+                                    let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
+                                    ips.push(id);
+                                    previous_block_ip = b.ip();
+                                }
+                            }
+                            Err((_, e)) => {
+                                if e.code() != PtErrorCode::Eos {
+                                    trace!("PT error in block next {e:?}");
+                                }
+                                status = Status::from_bits(e.code() as u32).unwrap();
+                            }
+                        }
+                        if status.eos() {
+                            break 'block;
+                        }
+                    }
+                }
                 Err(e) => {
-                    trace!("PT error in sync forward {e:?}");
-                    break;
+                    if e.code() != PtErrorCode::Eos {
+                        trace!("PT error in sync forward {e:?}");
+                    }
+                    break 'sync;
                 }
             };
-
-            loop {
-                if loop {
-                    if !status.event_pending() {
-                        break Ok(());
-                    }
-                    match decoder.event() {
-                        Ok((_, s)) => {
-                            status = s;
-                        }
-                        Err(e) => {
-                            trace!("PT error in event {e:?}");
-                            break Err(e);
-                        }
-                    };
-                }
-                .is_err()
-                {
-                    break;
-                }
-
-                let block = decoder.next();
-                match block {
-                    Err(_) => {
-                        // libipt-rs library ignores the fact that
-                        // Even in case of errors, we may have succeeded in decoding some instructions.
-                        // https://github.com/intel/libipt/blob/4a06fdffae39dadef91ae18247add91029ff43c0/ptxed/src/ptxed.c#L1954
-                        // Using my fork that fixes this atm
-                        // println!("pterror in packet next {e:?}");
-                        // println!("err block ip: 0x{:x?}", b.ip());
-                        //if skip < decoder.offset().expect("Failed to get decoder offset") {
-                        //    ips.push(b.ip());
-                        //}
-                        // status = Status::from_bits(e.code() as u32).unwrap();
-                        break;
-                    }
-                    Ok((b, s)) => {
-                        status = s;
-
-                        // TODO optimize this check and its equivalent up here?
-                        if !b.speculative()
-                            && skip
-                                < decoder
-                                    .offset()
-                                    .map_err(|e| Error::unknown(e.to_string()))?
-                        {
-                            let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
-                            ips.push(id);
-                            previous_block_ip = b.ip();
-                        }
-
-                        if status.eos() {
-                            break;
-                        }
-                    }
-                }
-            }
         }
 
-        // Advance the trace pointer up to the latest sync point, otherwise the next execution might
-        // not contain the PSB.
+        // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
+        // might not contain a PSB packet.
         decoder
             .sync_backward()
             .map_err(|e| Error::unknown(e.to_string()))?;
