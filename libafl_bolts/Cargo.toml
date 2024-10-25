@@ -32,7 +32,6 @@ default = [
   "llmp_compression",
   "llmp_small_maps",
   "rand_trait",
-  "prelude",
   "gzip",
   "serdeany_autoreg",
   "alloc",
@@ -170,6 +169,9 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
+
+[lints]
+workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }                                            # For (*nix) libc

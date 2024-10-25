@@ -380,7 +380,10 @@ where
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         let qemu = emu.qemu();
 
-        let ret_value = self.location.write(qemu, input.target_bytes().as_slice());
+        let ret_value = self
+            .location
+            .write(qemu, input.target_bytes().as_slice())
+            .unwrap();
 
         if let Some(reg) = ret_reg {
             self.cpu.write_reg(reg, ret_value).unwrap();
@@ -443,7 +446,8 @@ where
         // Write input to input location
         let ret_value = self
             .input_location
-            .write(qemu, input.target_bytes().as_slice());
+            .write(qemu, input.target_bytes().as_slice())
+            .unwrap();
 
         // Unleash hooks if locked
         if emu.driver_mut().unlock_hooks() {

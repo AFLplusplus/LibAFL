@@ -1421,7 +1421,7 @@ pub mod win32_shmem {
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS.0,
                     BOOL(0),
-                    PCSTR(map_str_bytes.as_ptr() as *mut _),
+                    PCSTR(map_str_bytes.as_ptr().cast_mut()),
                 )?;
 
                 let map =

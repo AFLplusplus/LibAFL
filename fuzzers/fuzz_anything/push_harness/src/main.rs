@@ -18,7 +18,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -39,7 +39,7 @@ fn input_generator() {
         ExitKind::Ok
     };
 
-    let signals_ptr = addr_of_mut!(SIGNALS);
+    let signals_ptr = unsafe { addr_of_mut!(SIGNALS) };
     let signals_len = unsafe { *signals_ptr }.len();
 
     // Create an observation channel using the signals map
@@ -93,7 +93,7 @@ fn input_generator() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32).unwrap();
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

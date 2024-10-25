@@ -170,9 +170,10 @@ macro_rules! fuzz_with {
             StdFuzzer,
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OomFeedback, OomObserver, CMP_MAP};
+        use libafl_bolts::nonzero;
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
-
+        use core::num::NonZeroUsize;
         use crate::{
             CustomMutationStatus,
             corpus::{ArtifactCorpus, LibfuzzerCorpus},
@@ -375,7 +376,7 @@ macro_rules! fuzz_with {
                 LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations())))
             };
             // Safe to unwrap: stack pow is not 0.
-            let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(), 3).unwrap();
+            let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(),3);
 
             let cm_power: StdPowerMutationalStage<_, _, BytesInput, _, _> = StdPowerMutationalStage::new(custom_mutator);
             let cm_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_power, ()));
@@ -391,7 +392,7 @@ macro_rules! fuzz_with {
                 LLVMCustomMutator::crossover_unchecked(StdScheduledMutator::with_max_stack_pow(
                     havoc_mutations_no_crossover().merge(tokens_mutations()),
                     3,
-                ).unwrap())
+                ))
             };
             let std_mutator_no_crossover = StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations()));
 
@@ -412,7 +413,7 @@ macro_rules! fuzz_with {
                     GrimoireRandomDeleteMutator::new(),
                 ),
                 3,
-            ).unwrap();
+            );
             let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::transforming(grimoire_mutator), ()));
 
             // A minimization+queue policy to get testcasess from the corpus
@@ -467,7 +468,7 @@ macro_rules! fuzz_with {
                 }
                 if state.corpus().count() < 1 {
                     // Generator of bytearrays of max size 64
-                    let mut generator = RandBytesGenerator::from(RandBytesGenerator::new(64).unwrap());
+                    let mut generator = RandBytesGenerator::from(RandBytesGenerator::new(nonzero!(64)));
 
                     // Generate 1024 initial inputs
                     state

@@ -516,7 +516,7 @@ impl<'a, T> From<OwnedMutSlice<'a, T>> for OwnedSlice<'a, T> {
         Self {
             inner: match mut_slice.inner {
                 OwnedMutSliceInner::RefRaw(ptr, len, unsafe_marker) => {
-                    OwnedSliceInner::RefRaw(ptr as _, len, unsafe_marker)
+                    OwnedSliceInner::RefRaw(ptr.cast_const(), len, unsafe_marker)
                 }
                 OwnedMutSliceInner::Ref(r) => OwnedSliceInner::Ref(r as _),
                 OwnedMutSliceInner::Owned(v) => OwnedSliceInner::Owned(v),

@@ -30,7 +30,7 @@ use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 /// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 16;
 static mut SIGNALS: [u8; SIGNALS_LEN] = [0; SIGNALS_LEN];
-static mut SIGNALS_PTR: *mut u8 = addr_of_mut!(SIGNALS) as _;
+static mut SIGNALS_PTR: *mut u8 = unsafe { addr_of_mut!(SIGNALS) as _ };
 /*
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -156,8 +156,7 @@ pub fn main() {
             GramatronRecursionMutator::new()
         ),
         2,
-    )
-    .unwrap();
+    );
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
