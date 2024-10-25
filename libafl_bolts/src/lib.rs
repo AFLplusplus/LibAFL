@@ -706,7 +706,7 @@ where
     type SliceRef = &'a [T; N];
 
     fn as_sized_slice(&'a self) -> Self::SliceRef {
-        &*self
+        self
     }
 }
 

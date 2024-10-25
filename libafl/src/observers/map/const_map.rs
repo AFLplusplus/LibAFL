@@ -9,7 +9,7 @@ use core::{
 use std::ptr::NonNull;
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedMutSizedSlice, AsSlice, AsSliceMut, HasLen, Named};
+use libafl_bolts::{ownedref::OwnedMutSizedSlice, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -85,19 +85,19 @@ where
 
     #[inline]
     fn get(&self, idx: usize) -> T {
-        self.as_slice()[idx]
+        self[idx]
     }
 
     #[inline]
     fn set(&mut self, idx: usize, val: T) {
-        self.map.as_slice_mut()[idx] = val;
+        (*self)[idx] = val;
     }
 
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64 {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice();
+        let map = self.map.as_slice();
         let mut res = 0;
         for x in &map[0..cnt] {
             if *x != initial {
@@ -108,7 +108,7 @@ where
     }
 
     fn usable_count(&self) -> usize {
-        self.as_slice().len()
+        self.len()
     }
 
     #[inline]
@@ -122,7 +122,7 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice_mut();
+        let map = &mut (*self);
         for x in &mut map[0..cnt] {
             *x = initial;
         }
@@ -130,14 +130,14 @@ where
     }
 
     fn to_vec(&self) -> Vec<T> {
-        self.as_slice().to_vec()
+        self.map.to_vec()
     }
 
     /// Get the number of set entries with the specified indexes
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice();
+        let map = self.map.as_slice();
         let mut res = 0;
         for i in indexes {
             if *i < cnt && map[*i] != initial {
@@ -153,24 +153,25 @@ where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug + 'static,
 {
     fn map_slice(&self) -> &[Self::Entry; N] {
-        self.map.as_slice()
+        &self.map
     }
 
     fn map_slice_mut(&mut self) -> &mut [Self::Entry; N] {
-        self.map.as_slice_mut()
+        &mut self.map
     }
 }
 
 impl<T, const N: usize> Deref for ConstMapObserver<'_, T, N> {
     type Target = [T];
+
     fn deref(&self) -> &[T] {
-        &self.map
+        self.map.as_slice()
     }
 }
 
 impl<T, const N: usize> DerefMut for ConstMapObserver<'_, T, N> {
     fn deref_mut(&mut self) -> &mut [T] {
-        &mut self.map
+        self.map.as_mut_slice()
     }
 }
 
@@ -197,6 +198,7 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
+    #[must_use]
     pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: NonNull<T>) -> Self {
         ConstMapObserver {
             map: OwnedMutSizedSlice::from_raw_parts_mut(map_ptr),
