@@ -32,12 +32,7 @@ libafl_targets = { path = "../../../libafl_targets" }
 libafl_qemu = { path = "../../../libafl_qemu", features = [
   "arm",
   "systemmode",
-] }
-libafl_qemu_sys = { path = "../../../libafl_qemu/libafl_qemu_sys", features = [
-  "arm",
-  "systemmode",
-] }
-
+], default-features = false }
 env_logger = "0.11.5"
 log = { version = "0.4.22", features = ["release_max_level_info"] }
 
