@@ -105,7 +105,7 @@ pub struct IntelPT {
 }
 
 /// Builder for [`IntelPT`]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IntelPTBuilder {
     pid: Option<i32>,
     cpu: Option<usize>,
@@ -117,7 +117,9 @@ pub struct IntelPTBuilder {
 }
 
 impl IntelPT {
-    /// Create a builder
+    /// Create a default builder
+    ///
+    /// Checkout [`IntelPTBuilder::default()`] for more details
     #[must_use]
     pub fn builder() -> IntelPTBuilder {
         IntelPTBuilder::default()
@@ -139,7 +141,15 @@ impl IntelPT {
         // SAFETY: CString::from_vec_unchecked is safe because no null bytes are added to str_filter
         let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
         match unsafe { SET_FILTER(self.fd.as_raw_fd(), c_str_filter.into_raw()) } {
-            -1 => Err(Error::last_os_error("Failed to set IP filters")),
+            -1 => {
+                let availability = match Self::availability() {
+                    Ok(()) => String::new(),
+                    Err(reasons) => format!(" Possible reasons: {reasons}"),
+                };
+                Err(Error::last_os_error(format!(
+                    "Failed to set IP filters.{availability}"
+                )))
+            }
             0 => {
                 self.ip_filters = filters.to_vec();
                 Ok(())
@@ -171,12 +181,20 @@ impl IntelPT {
         builder.finish()
     }
 
-    /// Start the tracing
+    /// Start tracing
     ///
     /// Be aware that the tracing is not started on [`IntelPT`] construction.
     pub fn enable_tracing(&mut self) -> Result<(), Error> {
         match unsafe { ENABLE(self.fd.as_raw_fd(), 0) } {
-            -1 => Err(Error::last_os_error("Failed to enable tracing")),
+            -1 => {
+                let availability = match Self::availability() {
+                    Ok(()) => String::new(),
+                    Err(reasons) => format!(" Possible reasons: {reasons}"),
+                };
+                Err(Error::last_os_error(format!(
+                    "Failed to enable tracing.{availability}"
+                )))
+            }
             0 => Ok(()),
             ret => Err(Error::unsupported(format!(
                 "Failed to enable tracing, ioctl returned unexpected value {ret}"
@@ -184,7 +202,7 @@ impl IntelPT {
         }
     }
 
-    /// Stop Intel PT tracing.
+    /// Stop tracing
     ///
     /// This doesn't drop [`IntelPT`], the configuration will be preserved.
     pub fn disable_tracing(&mut self) -> Result<(), Error> {
@@ -369,26 +387,27 @@ impl IntelPT {
 
     /// Check if Intel PT is available on the current system.
     ///
-    /// This function can be helpful when `IntelPT::try_new` or `set_ip_filter` fail for an unclear
-    /// reason.
-    ///
     /// Returns `Ok(())` if Intel PT is available and has the features used by `LibAFL`, otherwise
-    /// returns an `Err` containing the reasons.
+    /// returns an `Err` containing a description of the reasons.
     ///
     /// If you use this with QEMU check out [`Self::availability_in_qemu()`] instead.
-    pub fn availability() -> Result<(), Error> {
+    ///
+    /// Due to the numerous factors that can affect `IntelPT` availability, this function was
+    /// developed on a best-effort basis.
+    /// The outcome of these checks does not fully guarantee whether `IntelPT` will function or not.
+    pub fn availability() -> Result<(), String> {
         let mut reasons = Vec::new();
         if cfg!(not(target_os = "linux")) {
-            reasons.push("Only linux hosts are supported at the moment.".to_owned());
+            reasons.push("Only linux hosts are supported at the moment".to_owned());
         }
         if cfg!(not(target_arch = "x86_64")) {
-            reasons.push("Only x86_64 is supported.".to_owned());
+            reasons.push("Only x86_64 is supported".to_owned());
         }
 
         let cpuid = CpuId::new();
         if let Some(vendor) = cpuid.get_vendor_info() {
             if vendor.as_str() != "GenuineIntel" && vendor.as_str() != "GenuineIotel" {
-                reasons.push("Only Intel CPUs are supported.".to_owned());
+                reasons.push("Only Intel CPUs are supported".to_owned());
             }
         } else {
             reasons.push("Failed to read CPU vendor".to_owned());
@@ -396,7 +415,7 @@ impl IntelPT {
 
         if let Some(ef) = cpuid.get_extended_feature_info() {
             if !ef.has_processor_trace() {
-                reasons.push("Intel PT is not supported by the CPU.".to_owned());
+                reasons.push("Intel PT is not supported by the CPU".to_owned());
             }
         } else {
             reasons.push("Failed to read CPU Extended Features".to_owned());
@@ -436,7 +455,7 @@ impl IntelPT {
 
                 for rc in required_caps {
                     if !current_capabilities.contains(&rc) {
-                        reasons.push(format!("Required capability {rc} missing."));
+                        reasons.push(format!("Required capability {rc} missing"));
                     }
                 }
             }
@@ -446,7 +465,7 @@ impl IntelPT {
         if reasons.is_empty() {
             Ok(())
         } else {
-            Err(Error::unsupported(reasons.join("\n")))
+            Err(reasons.join("; "))
         }
     }
 
@@ -454,10 +473,9 @@ impl IntelPT {
     /// QEMU.
     ///
     /// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
-    pub fn availability_in_qemu() -> Result<(), Error> {
+    pub fn availability_in_qemu() -> Result<(), String> {
         let mut reasons = match Self::availability() {
-            Err(Error::Unsupported(s, _)) => vec![s],
-            Err(e) => panic!("IntelPT::availability() returned an unknown error {e}"),
+            Err(s) => vec![s],
             Ok(()) => Vec::new(),
         };
 
@@ -479,7 +497,7 @@ impl IntelPT {
         if reasons.is_empty() {
             Ok(())
         } else {
-            Err(Error::unsupported(reasons.join("\n")))
+            Err(reasons.join("; "))
         }
     }
 }
@@ -496,6 +514,21 @@ impl Drop for IntelPT {
 }
 
 impl Default for IntelPTBuilder {
+    /// Create a default builder for [`IntelPT`]
+    ///
+    /// The default configuration corresponds to:
+    /// ```rust
+    /// use libafl_bolts::intel_pt::{IntelPTBuilder, PAGE_SIZE};
+    /// let builder = unsafe { std::mem::zeroed::<IntelPTBuilder>() }
+    ///     .pid(None)
+    ///     .cpu(None)
+    ///     .exclude_kernel(true)
+    ///     .exclude_hv(true)
+    ///     .inherit(false)
+    ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE).unwrap()
+    ///     .perf_aux_buffer_size(2 * 1024 * 1024).unwrap();
+    /// assert_eq!(builder, IntelPTBuilder::default());
+    /// ```
     fn default() -> Self {
         Self {
             pid: None,
@@ -534,7 +567,15 @@ impl IntelPTBuilder {
                 PERF_FLAG_FD_CLOEXEC.into(),
             )
         } {
-            -1 => return Err(Error::last_os_error("Failed to open Intel PT perf event")),
+            -1 => {
+                let availability = match IntelPT::availability() {
+                    Ok(()) => String::new(),
+                    Err(reasons) => format!(" Possible reasons: {reasons}"),
+                };
+                return Err(Error::last_os_error(format!(
+                    "Failed to open Intel PT perf event.{availability}"
+                )));
+            }
             fd => {
                 // SAFETY: On success, perf_event_open() returns a new file descriptor.
                 // On error, -1 is returned, and it is checked above
