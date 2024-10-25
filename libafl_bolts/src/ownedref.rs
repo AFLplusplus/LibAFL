@@ -10,10 +10,10 @@ use core::{
     clone::Clone,
     fmt::Debug,
     ops::{Deref, DerefMut, RangeBounds},
+    ptr::NonNull,
     slice,
     slice::SliceIndex,
 };
-use std::ptr::NonNull;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -24,7 +24,8 @@ use crate::{
 /// Constant size array visitor for serde deserialization.
 /// Mostly taken from <https://github.com/serde-rs/serde/issues/1937#issuecomment-812137971>
 mod arrays {
-    use std::{boxed::Box, convert::TryInto, marker::PhantomData, vec::Vec};
+    use alloc::{boxed::Box, fmt, vec::Vec};
+    use core::{convert::TryInto, marker::PhantomData};
 
     use serde::{
         de::{SeqAccess, Visitor},
@@ -39,7 +40,7 @@ mod arrays {
     {
         type Value = Box<[T; N]>;
 
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str(&format!("an array of length {N}"))
         }
 
