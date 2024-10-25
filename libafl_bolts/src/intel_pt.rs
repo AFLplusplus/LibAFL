@@ -104,7 +104,7 @@ pub struct IntelPT {
     ip_filters: Vec<RangeInclusive<usize>>,
 }
 
-/// Builder for IntelPT
+/// Builder for [`IntelPT`]
 #[derive(Debug, Clone)]
 pub struct IntelPTBuilder {
     pid: Option<i32>,
@@ -134,7 +134,7 @@ impl IntelPT {
                 format!("filter {:#016x}/{:#016x} ", filter.start(), size)
             })
             .reduce(|acc, s| acc + &s)
-            .unwrap_or("".to_string());
+            .unwrap_or_default();
 
         // SAFETY: CString::from_vec_unchecked is safe because no null bytes are added to str_filter
         let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
@@ -173,7 +173,7 @@ impl IntelPT {
 
     /// Start the tracing
     ///
-    /// Be aware that the tracing is not started on [IntelPT] construction.
+    /// Be aware that the tracing is not started on [`IntelPT`] construction.
     pub fn enable_tracing(&mut self) -> Result<(), Error> {
         match unsafe { ENABLE(self.fd.as_raw_fd(), 0) } {
             -1 => Err(Error::last_os_error("Failed to enable tracing")),
@@ -186,7 +186,7 @@ impl IntelPT {
 
     /// Stop Intel PT tracing.
     ///
-    /// This doesn't drop [IntelPT], the configuration will be preserved.
+    /// This doesn't drop [`IntelPT`], the configuration will be preserved.
     pub fn disable_tracing(&mut self) -> Result<(), Error> {
         match unsafe { DISABLE(self.fd.as_raw_fd(), 0) } {
             -1 => Err(Error::last_os_error("Failed to disable tracing")),
@@ -510,7 +510,7 @@ impl Default for IntelPTBuilder {
 }
 
 impl IntelPTBuilder {
-    /// Build the [super::IntelPT] struct
+    /// Build the [`super::IntelPT`] struct
     pub fn build(&self) -> Result<IntelPT, Error> {
         self.check_config();
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;

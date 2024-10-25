@@ -19,7 +19,7 @@ categories = [
   "os",
   "no-std",
 ]
-rust-version = "1.70.0"
+rust-version = "1.80.0"
 
 [package.metadata.docs.rs]
 features = ["document-features"]
