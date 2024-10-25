@@ -25,10 +25,11 @@ libafl = { path = "../../../libafl", features = [
   "frida_cli",
 ] } #,  "llmp_small_maps", "llmp_debug"]}
 libafl_bolts = { path = "../../../libafl_bolts" }
-frida-gum = { version = "0.14.0", features = [
+frida-gum = { version = "0.14.2", features = [
   "auto-download",
   "event-sink",
   "invocation-listener",
+  "script",
 ] }
 libafl_frida = { path = "../../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../../libafl_targets", features = [
