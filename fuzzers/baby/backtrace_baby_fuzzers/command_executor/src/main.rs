@@ -86,7 +86,7 @@ pub fn main() {
         shmem_id: ShMemId,
     }
 
-    impl CommandConfigurator<BytesInput, Child> for MyExecutor {
+    impl CommandConfigurator<BytesInput> for MyExecutor {
         fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
 
