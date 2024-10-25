@@ -1,4 +1,4 @@
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use std::ptr::addr_of_mut;
 use std::{path::PathBuf, sync::Mutex};
 
@@ -9,7 +9,7 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     emu::EmulatorModules,
@@ -260,7 +260,7 @@ where
     S: Unpin + UsesInput + HasMetadata,
 {
     type ModuleAddressFilter = F;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -274,7 +274,7 @@ where
         );
     }
 
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
@@ -304,7 +304,7 @@ where
         }
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
     where
         ET: EmulatorModuleTuple<S>,
@@ -345,12 +345,12 @@ where
         &mut self.filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }

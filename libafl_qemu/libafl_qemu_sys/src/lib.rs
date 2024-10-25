@@ -17,14 +17,14 @@ use strum_macros::EnumIter;
 mod bindings;
 pub use bindings::*;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-// #[cfg(emulation_mode = "systemmode")]
+// #[cfg(feature = "systemmode")]
 // mod systemmode;
-// #[cfg(emulation_mode = "systemmode")]
+// #[cfg(feature = "systemmode")]
 // pub use systemmode::*;
 
 /// Safe linking with of extern "C" functions.
