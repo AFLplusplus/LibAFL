@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use libafl::{inputs::UsesInput, observers::VariableLengthMapObserver, HasMetadata};
 use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
@@ -110,7 +110,7 @@ pub struct EdgeCoverageModule<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZ
     variant: V,
     address_filter: AF,
     // we only use it in system mode at the moment.
-    #[cfg_attr(not(emulation_mode = "systemmode"), allow(dead_code))]
+    #[cfg_attr(not(feature = "systemmode"), allow(dead_code))]
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
@@ -296,13 +296,13 @@ where
     AF: AddressFilter,
     PF: PageFilter,
 {
-    #[cfg(emulation_mode = "usermode")]
+    #[cfg(feature = "usermode")]
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr) -> bool {
         self.address_filter.allowed(&addr)
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     #[must_use]
     pub fn must_instrument(&self, addr: GuestAddr, page_id: Option<GuestPhysAddr>) -> bool {
         if let Some(page_id) = page_id {
@@ -323,7 +323,7 @@ where
 {
     type ModuleAddressFilter = AF;
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = PF;
     const HOOKS_DO_SIDE_EFFECTS: bool = V::DO_SIDE_EFFECTS;
 
@@ -352,12 +352,12 @@ where
         &mut self.address_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &self.page_filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         &mut self.page_filter
     }

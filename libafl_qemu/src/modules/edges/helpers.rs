@@ -95,14 +95,14 @@ mod generators {
                 assert_ne!(*addr_of!(LIBAFL_QEMU_EDGES_MAP_SIZE_PTR), ptr::null_mut());
             }
 
-            #[cfg(emulation_mode = "usermode")]
+            #[cfg(feature = "usermode")]
             {
                 if !module.must_instrument(src) && !module.must_instrument(dest) {
                     return None;
                 }
             }
 
-            #[cfg(emulation_mode = "systemmode")]
+            #[cfg(feature = "systemmode")]
             {
                 let paging_id = emulator_modules
                     .qemu()
@@ -168,12 +168,12 @@ mod generators {
         if let Some(module) =
             emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
         {
-            #[cfg(emulation_mode = "usermode")]
+            #[cfg(feature = "usermode")]
             if !module.must_instrument(src) && !module.must_instrument(dest) {
                 return None;
             }
 
-            #[cfg(emulation_mode = "systemmode")]
+            #[cfg(feature = "systemmode")]
             {
                 let paging_id = emulator_modules
                     .qemu()
@@ -224,13 +224,13 @@ mod generators {
         if let Some(module) =
             emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
         {
-            #[cfg(emulation_mode = "usermode")]
+            #[cfg(feature = "usermode")]
             {
                 if !module.must_instrument(pc) {
                     return None;
                 }
             }
-            #[cfg(emulation_mode = "systemmode")]
+            #[cfg(feature = "systemmode")]
             {
                 let page_id = emulator_modules
                     .qemu()
