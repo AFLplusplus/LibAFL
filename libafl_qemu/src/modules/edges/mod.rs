@@ -185,14 +185,14 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
     }
 
     #[must_use]
-    pub fn const_map_observer<O>(
+    pub fn const_map_observer<O, const NEW_MAP_SIZE: usize>(
         self,
         _const_map_observer: &mut O,
-    ) -> EdgeCoverageModuleBuilder<AF, PF, V, true, true, MAP_SIZE>
+    ) -> EdgeCoverageModuleBuilder<AF, PF, V, true, true, NEW_MAP_SIZE>
     where
-        O: ConstantLengthMapObserver<MAP_SIZE>,
+        O: ConstantLengthMapObserver<NEW_MAP_SIZE>,
     {
-        EdgeCoverageModuleBuilder::<AF, PF, V, true, true, MAP_SIZE>::new(
+        EdgeCoverageModuleBuilder::<AF, PF, V, true, true, NEW_MAP_SIZE>::new(
             self.variant,
             self.address_filter,
             self.page_filter,
