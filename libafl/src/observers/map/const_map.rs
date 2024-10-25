@@ -5,8 +5,8 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
+    ptr,
 };
-use std::ptr::NonNull;
 
 use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedMutSizedSlice, HasLen, Named};
@@ -199,7 +199,7 @@ where
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
     #[must_use]
-    pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: NonNull<T>) -> Self {
+    pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: ptr::NonNull<T>) -> Self {
         ConstMapObserver {
             map: OwnedMutSizedSlice::from_raw_parts_mut(map_ptr),
             name: Cow::from(name),
