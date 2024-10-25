@@ -117,7 +117,7 @@ pub struct StdEmulatorDriver {
     input_location: OnceCell<InputLocation>,
     #[builder(default = true)]
     hooks_locked: bool,
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     #[builder(default = false)]
     allow_page_on_start: bool,
     #[cfg(feature = "x86_64")]
@@ -147,7 +147,7 @@ impl StdEmulatorDriver {
         was_locked
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     pub fn allow_page_on_start(&self) -> bool {
         self.allow_page_on_start
     }
