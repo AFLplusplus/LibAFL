@@ -286,8 +286,8 @@ serial_test = { workspace = true, optional = true, default-features = false, fea
 document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
-num_enum = { version = "0.7.3", optional = true }
-proc-maps = { version = "0.3.2", optional = true }
+num_enum = { workspace = true, optional = true }
+proc-maps = { workspace = true, optional = true }
 libipt = { git = "https://github.com/Marcondiro/libipt-rs", optional = true }
 
 [lints]

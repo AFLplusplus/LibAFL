@@ -173,6 +173,7 @@ impl IntelPT {
         }
     }
 
+    /// Decode the traces given the image
     pub fn decode_with_image(
         &mut self,
         image: &mut Image,
@@ -185,22 +186,22 @@ impl IntelPT {
         )
     }
 
-    #[allow(clippy::cast_possible_wrap)]
-    pub fn decode_with_callback<F: Fn(&mut [u8], u64)>(
-        &mut self,
-        read_memory: F,
-        copy_buffer: Option<&mut Vec<u8>>,
-    ) -> Result<Vec<u64>, Error> {
-        self.decode(
-            Some(|buff: &mut [u8], addr: u64, _: Asid| {
-                debug_assert!(i32::try_from(buff.len()).is_ok());
-                read_memory(buff, addr);
-                buff.len() as i32
-            }),
-            None,
-            copy_buffer,
-        )
-    }
+    // #[allow(clippy::cast_possible_wrap)]
+    // fn decode_with_callback<F: Fn(&mut [u8], u64)>(
+    //     &mut self,
+    //     read_memory: F,
+    //     copy_buffer: Option<&mut Vec<u8>>,
+    // ) -> Result<Vec<u64>, Error> {
+    //     self.decode(
+    //         Some(|buff: &mut [u8], addr: u64, _: Asid| {
+    //             debug_assert!(i32::try_from(buff.len()).is_ok());
+    //             read_memory(buff, addr);
+    //             buff.len() as i32
+    //         }),
+    //         None,
+    //         copy_buffer,
+    //     )
+    // }
 
     fn decode<F: Fn(&mut [u8], u64, Asid) -> i32>(
         &mut self,
