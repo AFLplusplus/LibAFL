@@ -63,6 +63,17 @@ mod generators {
         EmulatorModules,
     };
 
+    fn get_mask<const IS_CONST_MAP: bool, const MAP_SIZE: usize>() -> usize {
+        if IS_CONST_MAP {
+            const {
+                assert!(MAP_SIZE > 0, "The size of the map should be bigger than 0.");
+                MAP_SIZE.overflowing_sub(1).0
+            }
+        } else {
+            unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX }
+        }
+    }
+
     pub fn gen_unique_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         emulator_modules: &mut EmulatorModules<ET, S>,
         state: Option<&mut S>,
@@ -106,11 +117,7 @@ mod generators {
             }
         }
 
-        let mask: usize = if IS_CONST_MAP {
-            const { MAP_SIZE - 1 }
-        } else {
-            unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX }
-        };
+        let mask: usize = get_mask::<IS_CONST_MAP, MAP_SIZE>();
 
         let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
         let meta = state.metadata_or_insert_with(QemuEdgesMapMetadata::new);
@@ -180,11 +187,7 @@ mod generators {
                 }
             }
 
-            let mask: usize = if IS_CONST_MAP {
-                const { MAP_SIZE - 1 }
-            } else {
-                unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX }
-            };
+            let mask: usize = get_mask::<IS_CONST_MAP, MAP_SIZE>();
 
             let id = hash_me(src as u64) ^ hash_me(dest as u64);
 
@@ -240,11 +243,7 @@ mod generators {
             }
         }
 
-        let mask: usize = if IS_CONST_MAP {
-            const { MAP_SIZE - 1 }
-        } else {
-            unsafe { LIBAFL_QEMU_EDGES_MAP_MASK_MAX }
-        };
+        let mask: usize = get_mask::<IS_CONST_MAP, MAP_SIZE>();
 
         let id = hash_me(pc as u64);
 
