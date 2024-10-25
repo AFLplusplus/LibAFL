@@ -43,12 +43,21 @@ const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
 /// Number of address filters available on the running CPU
 pub static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
+    // Looks like this info is available in two different files, second path as fail-over
     let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
-    let s = fs::read_to_string(&path)
-        .map_err(|_| format!("Failed to read Intel PT number of address filters from {path}"))?;
-    s.trim()
-        .parse::<u32>()
-        .map_err(|_| format!("Failed to parse Intel PT number of address filters in {path}"))
+    let path2 = format!("{PT_EVENT_PATH}/caps/num_address_ranges");
+    let err = format!("Failed to read Intel PT number of address filters from {path} and {path2}");
+
+    let s = fs::read_to_string(&path);
+    if let Ok(s) = s {
+        let n = s.trim().parse::<u32>();
+        if let Ok(n) = n {
+            return Ok(n);
+        }
+    }
+
+    let s2 = fs::read_to_string(&path2).map_err(|_| err.clone())?;
+    s2.trim().parse::<u32>().map_err(|_| err)
 });
 
 static CURRENT_CPU: LazyLock<Option<Cpu>> = LazyLock::new(|| {
@@ -149,7 +158,7 @@ impl IntelPT {
 
     /// Start the tracing
     ///
-    /// Be aware that the tracing is not started on IntelPT construction.
+    /// Be aware that the tracing is not started on [IntelPT] construction.
     pub fn enable_tracing(&mut self) -> Result<(), Error> {
         match unsafe { ENABLE(self.fd.as_raw_fd(), 0) } {
             -1 => Err(Error::last_os_error("Failed to enable tracing")),
@@ -162,7 +171,7 @@ impl IntelPT {
 
     /// Stop Intel PT tracing.
     ///
-    /// This doesn't drop IntelPT, the configuration will be preserved.
+    /// This doesn't drop [IntelPT], the configuration will be preserved.
     pub fn disable_tracing(&mut self) -> Result<(), Error> {
         match unsafe { DISABLE(self.fd.as_raw_fd(), 0) } {
             -1 => Err(Error::last_os_error("Failed to disable tracing")),
@@ -174,15 +183,10 @@ impl IntelPT {
     }
 
     /// Decode the traces given the image
-    pub fn decode_with_image(
-        &mut self,
-        image: &mut Image,
-        copy_buffer: Option<&mut Vec<u8>>,
-    ) -> Result<Vec<u64>, Error> {
+    pub fn decode_with_image(&mut self, image: &mut Image) -> Result<Vec<u64>, Error> {
         self.decode(
             None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
             Some(image),
-            copy_buffer,
         )
     }
 
@@ -207,7 +211,6 @@ impl IntelPT {
         &mut self,
         read_memory: Option<F>,
         image: Option<&mut Image>,
-        copy_buffer: Option<&mut Vec<u8>>,
     ) -> Result<Vec<u64>, Error> {
         let mut ips = Vec::new();
 
@@ -258,10 +261,6 @@ impl IntelPT {
                 )
             }
         };
-
-        if let Some(b) = copy_buffer {
-            b.extend_from_slice(data.as_ref());
-        }
 
         let mut config =
             ConfigBuilder::new(data.as_mut()).map_err(|e| Error::unknown(e.to_string()))?;
@@ -782,7 +781,7 @@ const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use std::{arch::asm, fs::OpenOptions, io::Write, process};
+    use std::{arch::asm, process};
 
     use arbitrary_int::Number;
     use nix::{
@@ -952,29 +951,9 @@ mod test {
             }
         }
 
-        let mut trace = Vec::new();
-        let mut ips = pt.decode_with_image(&mut image, Some(&mut trace)).unwrap();
-        let _ = dump_trace_to_file(&trace)
-            .inspect_err(|e| println!("Failed to dump trace to file: {e}"));
+        let mut ips = pt.decode_with_image(&mut image).unwrap();
         ips.sort_unstable();
         ips.dedup();
         println!("Intel PT traces unique block ips: {ips:#x?}");
-    }
-    //static mut FILENUM: u32 = 0;
-    fn dump_trace_to_file(buff: &[u8]) -> Result<(), Error> {
-        let trace_path = "./traces/test_trace_pid_ipt_raw_trace.tmp"; //format!({FILENUM})
-                                                                      //unsafe { FILENUM += 1 };
-        fs::create_dir_all(Path::new(&trace_path).parent().unwrap())?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(trace_path)
-            .expect("Failed to open trace output file");
-
-        file.write_all(buff)
-            .map_err(|e| Error::os_error(e, "Failed to write traces"))?;
-
-        Ok(())
     }
 }
