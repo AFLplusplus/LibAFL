@@ -114,7 +114,7 @@ where
         let pt = self.pt.as_mut().unwrap();
         pt.disable_tracing().unwrap();
 
-        let decode_res = pt.decode_with_image(self.image.as_mut().unwrap(), None);
+        let decode_res = pt.decode_with_image(self.image.as_mut().unwrap());
 
         match decode_res {
             Ok(ids) => {
@@ -203,7 +203,7 @@ where
         //     }
         // };
 
-        let decode_res = pt.decode_with_image(self.image.as_mut().unwrap(), None);
+        let decode_res = pt.decode_with_image(self.image.as_mut().unwrap());
 
         if let Ok(ids) = decode_res {
             for ip in ids {

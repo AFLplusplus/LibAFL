@@ -25,6 +25,7 @@ use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Asid, BlockFlags,
     ConfigBuilder, Cpu, Image,
 };
+use log::trace;
 use num_enum::TryFromPrimitive;
 use num_traits::Euclid;
 use perf_event_open_sys::{
@@ -43,7 +44,7 @@ const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
 /// Number of address filters available on the running CPU
 pub static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
-    // Looks like this info is available in two different files, second path as fail-over
+    // This info is available in two different files, use the second path as fail-over
     let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
     let path2 = format!("{PT_EVENT_PATH}/caps/num_address_ranges");
     let err = format!("Failed to read Intel PT number of address filters from {path} and {path2}");
@@ -103,6 +104,18 @@ pub struct IntelPT {
     ip_filters: Vec<RangeInclusive<usize>>,
 }
 
+/// Builder for IntelPT
+#[derive(Debug, Clone)]
+pub struct IntelPTBuilder {
+    pid: Option<i32>,
+    cpu: Option<usize>,
+    exclude_kernel: bool,
+    exclude_hv: bool,
+    inherit: bool,
+    perf_buffer_size: usize,
+    perf_aux_buffer_size: usize,
+}
+
 impl IntelPT {
     /// Create a builder
     #[must_use]
@@ -114,15 +127,17 @@ impl IntelPT {
     ///
     /// Only instructions in `filters` ranges will be traced.
     pub fn set_ip_filters(&mut self, filters: &[RangeInclusive<usize>]) -> Result<(), Error> {
-        let mut str_filter = Vec::with_capacity(filters.len());
-        for filter in filters {
-            let size = filter.end() - filter.start();
-            str_filter.push(format!("filter {:#016x}/{:#016x}", filter.start(), size));
-        }
+        let str_filter = filters
+            .iter()
+            .map(|filter| {
+                let size = filter.end() - filter.start();
+                format!("filter {:#016x}/{:#016x} ", filter.start(), size)
+            })
+            .reduce(|acc, s| acc + &s)
+            .unwrap_or("".to_string());
 
         // SAFETY: CString::from_vec_unchecked is safe because no null bytes are added to str_filter
-        let c_str_filter =
-            unsafe { CString::from_vec_unchecked(str_filter.join(" ").into_bytes()) };
+        let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
         match unsafe { SET_FILTER(self.fd.as_raw_fd(), c_str_filter.into_raw()) } {
             -1 => Err(Error::last_os_error("Failed to set IP filters")),
             0 => {
@@ -229,7 +244,8 @@ impl IntelPT {
         let len = (head - tail) as usize;
         if len >= self.perf_aux_buffer_size {
             log::warn!(
-                "This fuzzer run resulted in a full PT buffer. Try increasing the aux buffer size or refining the IP filters."
+                "The fuzzer run filled the entire PT buffer. Consider increasing the aux buffer \
+                size or refining the IP filters."
             );
         }
         let skip = self.previous_decode_head - tail;
@@ -237,7 +253,7 @@ impl IntelPT {
         let head_wrap = wrap_aux_pointer(head, self.perf_aux_buffer_size);
         let tail_wrap = wrap_aux_pointer(tail, self.perf_aux_buffer_size);
 
-        smp_rmb(); // TODO double check impl
+        smp_rmb();
 
         let mut data = if head_wrap >= tail_wrap {
             unsafe {
@@ -290,8 +306,8 @@ impl IntelPT {
         loop {
             status = match decoder.sync_forward() {
                 Ok(s) => s,
-                Err(_) => {
-                    // println!("pterror in sync {e:?}");
+                Err(e) => {
+                    trace!("PT error in sync forward {e:?}");
                     break;
                 }
             };
@@ -303,11 +319,10 @@ impl IntelPT {
                     }
                     match decoder.event() {
                         Ok((_, s)) => {
-                            // TODO maybe we care about some events?
                             status = s;
                         }
                         Err(e) => {
-                            println!("pterror in event {e:?}");
+                            trace!("PT error in event {e:?}");
                             break Err(e);
                         }
                     };
@@ -494,18 +509,6 @@ impl Drop for IntelPT {
             debug_assert_eq!(ret, 0, "Intel PT: Failed to unmap perf buffer");
         }
     }
-}
-
-/// Builder for IntelPT
-#[derive(Debug, Clone)]
-pub struct IntelPTBuilder {
-    pid: Option<i32>,
-    cpu: Option<usize>,
-    exclude_kernel: bool,
-    exclude_hv: bool,
-    inherit: bool,
-    perf_buffer_size: usize,
-    perf_aux_buffer_size: usize,
 }
 
 impl Default for IntelPTBuilder {
