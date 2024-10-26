@@ -15,7 +15,7 @@ use libafl::{
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::StdFuzzer,
-    inputs::BytesInput,
+    inputs::{BytesInput, NopTargetBytesConverter},
     mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -431,7 +431,7 @@ fn base_executor_builder<'a>(
     opt: &'a Opt,
     shmem_provider: &'a mut UnixShMemProvider,
     fuzzer_dir: &Path,
-) -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
+) -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
     let mut executor = ForkserverExecutor::builder()
         .program(opt.executable.clone())
         .coverage_map_size(opt.map_size.unwrap_or(AFL_DEFAULT_MAP_SIZE))
