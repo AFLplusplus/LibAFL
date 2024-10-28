@@ -107,7 +107,7 @@ pub struct IntelPT {
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntelPTBuilder {
     pid: Option<i32>,
-    cpu: Option<usize>,
+    cpu: i32,
     exclude_kernel: bool,
     exclude_hv: bool,
     inherit: bool,
@@ -519,7 +519,7 @@ impl Default for IntelPTBuilder {
     /// use libafl_bolts::intel_pt::{IntelPTBuilder, PAGE_SIZE};
     /// let builder = unsafe { std::mem::zeroed::<IntelPTBuilder>() }
     ///     .pid(None)
-    ///     .cpu(None)
+    ///     .all_cpus()
     ///     .exclude_kernel(true)
     ///     .exclude_hv(true)
     ///     .inherit(false)
@@ -530,7 +530,7 @@ impl Default for IntelPTBuilder {
     fn default() -> Self {
         Self {
             pid: None,
-            cpu: None,
+            cpu: -1,
             exclude_kernel: true,
             exclude_hv: true,
             inherit: false,
@@ -549,18 +549,12 @@ impl IntelPTBuilder {
         perf_event_attr.set_exclude_hv(self.exclude_hv.into());
         perf_event_attr.set_inherit(self.inherit.into());
 
-        let cpu = if let Some(c) = self.cpu {
-            i32::try_from(c)?
-        } else {
-            -1
-        };
-
         // SAFETY: perf_event_attr is properly initialized
         let fd = match unsafe {
             perf_event_open(
                 ptr::from_mut(&mut perf_event_attr),
                 self.pid.unwrap_or(0),
-                cpu,
+                self.cpu,
                 -1,
                 PERF_FLAG_FD_CLOEXEC.into(),
             )
@@ -622,7 +616,7 @@ impl IntelPTBuilder {
     /// Warn if the configuration is not recommended
     #[inline]
     fn check_config(&self) {
-        if self.inherit && self.cpu.is_none() {
+        if self.inherit && self.cpu == -1 {
             log::warn!(
                 "IntelPT set up on all CPUs with process inheritance enabled. This configuration \
                 is not recommended and might not work as expected"
@@ -638,11 +632,21 @@ impl IntelPTBuilder {
     }
 
     #[must_use]
-    /// Set the CPU to be traced, set to `None` to trace all CPUs.
-    pub fn cpu(mut self, cpu: Option<usize>) -> Self {
-        self.cpu = cpu;
+    /// Set the CPU to be traced
+    ///
+    /// # Panics
+    ///
+    /// The function will panic if `cpu` is greater than `i32::MAX`
+    pub fn cpu(mut self, cpu: usize) -> Self {
+        self.cpu = cpu.try_into().unwrap();
         self
-        // TODO change to cpu() and all_cpus()?
+    }
+
+    #[must_use]
+    /// Trace all the CPUs
+    pub fn all_cpus(mut self) -> Self {
+        self.cpu = -1;
+        self
     }
 
     #[must_use]

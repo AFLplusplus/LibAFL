@@ -1,6 +1,3 @@
-// TODO: docs
-#![allow(missing_docs)]
-
 use std::string::String;
 
 use libafl_bolts::intel_pt::IntelPT;
@@ -14,14 +11,20 @@ use crate::{
     Error,
 };
 
+/// Info of a binary's section that can be used during `Intel PT` traces decoding
 #[derive(Debug)]
 pub struct Section {
-    pub file_name: String,
+    /// Path of the binary
+    pub file_path: String,
+    /// Offset of the section in the file
     pub file_offset: usize,
+    /// Size of the section
     pub size: usize,
+    /// Start virtual address of the section once loaded in memory
     pub virtual_address: usize,
 }
 
+/// Hook to enable Intel Processor Trace (PT) tracing
 #[derive(Debug, TypedBuilder)]
 pub struct IntelPTHook {
     #[builder(default = IntelPT::builder().build().unwrap())]
@@ -68,7 +71,7 @@ fn sections_to_image(
 
     for s in sections {
         let isid = image_cache.add_file(
-            &s.file_name,
+            &s.file_path,
             s.file_offset as u64,
             s.size as u64,
             s.virtual_address as u64,
