@@ -53,10 +53,11 @@ jobs:
         run: ./scripts/check_for_blobs.sh
       - name: Build libafl debug
         run: cargo build -p libafl
-      - name: Test the book
+      - name: Test the book (Linux)
         # TODO: fix books test fail with updated windows-rs
         if: runner.os == 'Linux'
         run: cd docs && mdbook test -L ../target/debug/deps
+      - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
         run: cd docs && mdbook test -L ../target/debug/deps -L /Library/Frameworks/Python.framework/Versions/3.13/lib
       - name: Run tests
