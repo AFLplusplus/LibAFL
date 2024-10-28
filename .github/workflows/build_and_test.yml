@@ -23,9 +23,6 @@ jobs:
         os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Install Python
-        if: runner.os == 'MacOS'
-        run: brew install python
       - name: Install mimetype
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libfile-mimeinfo-perl
@@ -58,8 +55,10 @@ jobs:
         run: cargo build -p libafl
       - name: Test the book
         # TODO: fix books test fail with updated windows-rs
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         run: cd docs && mdbook test -L ../target/debug/deps
+        if: runner.os == 'MacOS'
+        run: cd docs && mdbook test -L ../target/debug/deps -L /Library/Frameworks/Python.framework/Versions/3.13/lib
       - name: Run tests
         run: cargo test
       - name: Test libafl no_std
