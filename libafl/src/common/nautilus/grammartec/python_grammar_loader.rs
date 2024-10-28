@@ -23,7 +23,7 @@ impl PyContext {
         }
     }
 
-    fn rule(&mut self, py: Python, nt: &str, format: Bound<PyAny>) -> PyResult<()> {
+    fn rule(&mut self, py: Python, nt: &str, format: &Bound<PyAny>) -> PyResult<()> {
         if let Ok(s) = format.extract::<&str>() {
             self.ctx.add_rule(nt, s.as_bytes());
         } else if let Ok(s) = format.extract::<&[u8]>() {
@@ -36,6 +36,7 @@ impl PyContext {
         Ok(())
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn script(&mut self, nt: &str, nts: Vec<String>, script: PyObject) {
         self.ctx.add_script(nt, &nts, script);
     }

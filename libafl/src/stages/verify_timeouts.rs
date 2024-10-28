@@ -1,3 +1,4 @@
+#![allow(clippy::too_long_first_doc_paragraph)]
 //! Stage that re-runs captured Timeouts with double the timeout to verify
 //! Note: To capture the timeouts, use in conjunction with `CaptureTimeoutFeedback`
 //! Note: Will NOT work with in process executors due to the potential for restarts/crashes when
