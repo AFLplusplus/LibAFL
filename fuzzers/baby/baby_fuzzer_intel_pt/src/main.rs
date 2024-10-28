@@ -8,7 +8,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        hooks::intel_pt::{IntelPT, IntelPTHook},
+        hooks::intel_pt::{IntelPTHook, Section},
         inprocess::GenericInProcessExecutor,
         ExitKind,
     },
@@ -23,6 +23,7 @@ use libafl::{
     state::StdState,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use procfs::process::{MMapPath, Process};
 
 /// Coverage map
 static mut SIGNALS: [u8; 1024] = [0; 1024];
@@ -30,10 +31,6 @@ static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 #[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
-    // Check that IntelPT is available
-    // TODO: call availability if try_new fails in the lib?
-    IntelPT::availability().expect("Intel PT check failed");
-
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -95,8 +92,38 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+    // Get the memory map of the current process
+    let myself = Process::myself().unwrap();
+    let maps = myself
+        .maps()
+        .unwrap()
+        .iter()
+        .filter(|&m| matches!(m.pathname, MMapPath::Path(..)))
+        .map(|m| {
+            let file_path = match &m.pathname {
+                MMapPath::Path(p) => p,
+                _ => unreachable!("pathname variants are filtered"),
+            }
+            .to_string_lossy()
+            .to_string();
+            let size = m.address.1 - m.address.0;
+            Section {
+                file_path,
+                file_offset: m.offset,
+                size,
+                virtual_address: m.address.0,
+            }
+        })
+        .collect::<Vec<Section>>();
+
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
-    let pt_hook = unsafe { IntelPTHook::new(SIGNALS_PTR, SIGNALS.len()) };
+    let pt_hook = unsafe {
+        IntelPTHook::builder()
+            .map_ptr(SIGNALS_PTR)
+            .map_len(SIGNALS.len())
+            .image(&maps)
+    }
+    .build();
 
     type PTInProcessExecutor<'a, H, OT, S> =
         GenericInProcessExecutor<H, &'a mut H, (IntelPTHook, ()), OT, S>;

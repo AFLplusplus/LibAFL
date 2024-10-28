@@ -109,12 +109,7 @@ regex = ["std", "dep:regex"]
 casr = ["libcasr", "std", "regex"]
 
 ## Intel Processor Trace Observer
-intel_pt = [
-  "std",
-  "dep:libipt",
-  "dep:num_enum",
-  "libafl_bolts/intel_pt",
-]
+intel_pt = ["std", "dep:libipt", "dep:num_enum", "libafl_bolts/intel_pt"]
 
 ## Enables features for corpus minimization
 cmin = ["z3"]

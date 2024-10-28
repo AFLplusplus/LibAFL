@@ -17,11 +17,11 @@ pub struct Section {
     /// Path of the binary
     pub file_path: String,
     /// Offset of the section in the file
-    pub file_offset: usize,
+    pub file_offset: u64,
     /// Size of the section
-    pub size: usize,
+    pub size: u64,
     /// Start virtual address of the section once loaded in memory
-    pub virtual_address: usize,
+    pub virtual_address: u64,
 }
 
 /// Hook to enable Intel Processor Trace (PT) tracing
@@ -70,12 +70,7 @@ fn sections_to_image(
     let mut image = Image::new(Some("image"))?;
 
     for s in sections {
-        let isid = image_cache.add_file(
-            &s.file_path,
-            s.file_offset as u64,
-            s.size as u64,
-            s.virtual_address as u64,
-        )?;
+        let isid = image_cache.add_file(&s.file_path, s.file_offset, s.size, s.virtual_address)?;
         image.add_cached(&mut image_cache, isid, Asid::default())?;
     }
 
