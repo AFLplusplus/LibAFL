@@ -27,6 +27,10 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
 use crate::{corpus::Testcase, executors::ExitKind, observers::TimeObserver, Error};
+
+#[cfg(feature = "std")]
+pub mod capture_feedback;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
@@ -43,6 +47,9 @@ pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub mod stdio;
 pub mod transferred;
+
+#[cfg(feature = "std")]
+pub use capture_feedback::CaptureTimeoutFeedback;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
@@ -776,25 +783,28 @@ pub trait ExitKindLogic {
     /// Check whether the provided [`ExitKind`] is actually interesting
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error>;
 }
-
+/// Name used by `CrashFeedback`
+pub const CRASH_FEEDBACK_NAME: &str = "CrashFeedback";
 /// Logic which finds all [`ExitKind::Crash`] exits interesting
 #[derive(Debug, Copy, Clone)]
 pub struct CrashLogic;
 
 impl ExitKindLogic for CrashLogic {
-    const NAME: Cow<'static, str> = Cow::Borrowed("CrashFeedback");
+    const NAME: Cow<'static, str> = Cow::Borrowed(CRASH_FEEDBACK_NAME);
 
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error> {
         Ok(matches!(kind, ExitKind::Crash))
     }
 }
+/// Name used by `TimeoutFeedback`
+pub const TIMEOUT_FEEDBACK_NAME: &str = "TimeoutFeedback";
 
 /// Logic which finds all [`ExitKind::Timeout`] exits interesting
 #[derive(Debug, Copy, Clone)]
 pub struct TimeoutLogic;
 
 impl ExitKindLogic for TimeoutLogic {
-    const NAME: Cow<'static, str> = Cow::Borrowed("TimeoutFeedback");
+    const NAME: Cow<'static, str> = Cow::Borrowed(TIMEOUT_FEEDBACK_NAME);
 
     fn check_exit_kind(kind: &ExitKind) -> Result<bool, Error> {
         Ok(matches!(kind, ExitKind::Timeout))
