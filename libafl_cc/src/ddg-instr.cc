@@ -387,7 +387,7 @@ class DDGInstrModulePass : public PassInfoMixin<DDGInstrModulePass> {
                   Stores[Dependency];
               unsigned ConsideredStores = 0;
               bool    *ReachingStores = isReachableByStore(
-                     &AllStoresPerVariable, LOI, &DT, &LI, &ConsideredStores);
+                  &AllStoresPerVariable, LOI, &DT, &LI, &ConsideredStores);
 
               // ReachingStores[0] refers to the last Store instruction that we
               // met (i.e., the last in `AllStoresPerVariable` This is why we
@@ -503,7 +503,7 @@ class DDGInstrModulePass : public PassInfoMixin<DDGInstrModulePass> {
                   Stores[Dependency];
               unsigned ConsideredStores = 0;
               bool    *ReachingStores = isReachableByStore(
-                     &AllStoresPerVariable, ST, DT, LI, &ConsideredStores);
+                  &AllStoresPerVariable, ST, DT, LI, &ConsideredStores);
 
               // ReachingStores[0] refers to the last Store instruction that we
               // met (i.e., the last in `AllStoresPerVariable` This is why we
@@ -625,7 +625,7 @@ class DDGInstrModulePass : public PassInfoMixin<DDGInstrModulePass> {
                       Stores[Dependency];
                   unsigned ConsideredStores = 0;
                   bool    *ReachingStores = isReachableByStore(
-                         &AllStoresPerVariable, Call, DT, LI, &ConsideredStores);
+                      &AllStoresPerVariable, Call, DT, LI, &ConsideredStores);
                   unsigned i = 0;
                   for (std::vector<FlowWriteInstruction *>::reverse_iterator
                            it = AllStoresPerVariable.rbegin();

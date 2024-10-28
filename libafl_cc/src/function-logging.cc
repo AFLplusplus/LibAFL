@@ -159,7 +159,7 @@ bool FunctionLogging::runOnModule(Module &M) {
     IRB.SetInsertPoint(&entry.front());
     std::vector<Value *> args;
     llvm::Value         *value = llvm::ConstantInt::get(
-                llvm::Type::getInt64Ty(F.getContext()), function_id);
+        llvm::Type::getInt64Ty(F.getContext()), function_id);
     args.push_back(value);
     IRB.CreateCall(callHook, args);
   }
