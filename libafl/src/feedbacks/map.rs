@@ -431,7 +431,6 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
     {
         let res = self.is_interesting_default(state, observers);
 
