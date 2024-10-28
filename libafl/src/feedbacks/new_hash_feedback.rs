@@ -15,7 +15,6 @@ use crate::feedbacks::premature_last_result_err;
 use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
-    inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
     Error, HasNamedMetadata,
 };

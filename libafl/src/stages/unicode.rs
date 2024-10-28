@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, HasMutatorBytes, Input},
     stages::Stage,
     state::{HasCorpus, HasCurrentTestcase, State, UsesState},
 };
