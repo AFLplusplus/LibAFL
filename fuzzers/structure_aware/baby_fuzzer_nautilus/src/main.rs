@@ -35,7 +35,7 @@ fn signals_set(idx: usize) {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let context = NautilusContext::from_file(15, PathBuf::from("grammar.json"));
+    let context = NautilusContext::from_file(15, "grammar.json");
     let mut bytes = vec![];
 
     // The closure that we want to fuzz

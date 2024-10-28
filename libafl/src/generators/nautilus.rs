@@ -4,7 +4,7 @@ use alloc::{
     vec::Vec,
 };
 use core::fmt::Debug;
-use std::{fs, io::BufReader, path::PathBuf};
+use std::{fs, io::BufReader, path::Path};
 
 use libafl_bolts::rands::Rand;
 
@@ -86,8 +86,8 @@ impl NautilusContext {
 
     /// Create a new [`NautilusContext`] from a file
     #[must_use]
-    pub fn from_file(tree_depth: usize, grammar_file: PathBuf) -> Self {
-        if grammar_file.extension().unwrap_or_default() == "py" {
+    pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Self {
+        if grammar_file.as_ref().extension().unwrap_or_default() == "py" {
             let ctx = python_grammar_loader::load_python_grammar(
                 fs::read_to_string(grammar_file)
                     .expect("Error reading grammar file")
