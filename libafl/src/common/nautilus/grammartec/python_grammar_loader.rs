@@ -1,11 +1,8 @@
-// Nautilus
-// Copyright (C) 2024  Daniel Teuchert, Cornelius Aschermann, Sergej Schumilo
-
 use std::{string::String, vec::Vec};
 
 use pyo3::{prelude::*, pyclass, types::IntoPyDict};
 
-use crate::nautilus::grammartec::context::Context;
+use crate::{nautilus::grammartec::context::Context, Error};
 
 #[pyclass]
 struct PyContext {
@@ -36,7 +33,7 @@ impl PyContext {
                 "format argument should be string or bytes",
             ));
         }
-        return Ok(());
+        Ok(())
     }
 
     fn script(&mut self, nt: &str, nts: Vec<String>, script: PyObject) {
@@ -48,17 +45,18 @@ impl PyContext {
     }
 }
 
-fn main_(py: Python, grammar: &str) -> PyResult<Context> {
-    let py_ctx = Bound::new(py, PyContext::new()).unwrap();
+fn loader(py: Python, grammar: &str) -> PyResult<Context> {
+    let py_ctx = Bound::new(py, PyContext::new())?;
     let locals = [("ctx", &py_ctx)].into_py_dict_bound(py);
     py.run_bound(grammar, None, Some(&locals))?;
-    return Ok(py_ctx.borrow().get_context());
+    Ok(py_ctx.borrow().get_context())
 }
 
+#[must_use]
 pub fn load_python_grammar(grammar: &str) -> Context {
-    return Python::with_gil(|py| {
-        main_(py, grammar)
+    Python::with_gil(|py| {
+        loader(py, grammar)
             .map_err(|e| e.print_and_set_sys_last_vars(py))
-            .unwrap()
-    });
+            .expect("failed to parse python grammar")
+    })
 }

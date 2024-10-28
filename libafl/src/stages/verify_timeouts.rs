@@ -104,8 +104,9 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let mut timeouts =
-            state.metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new).clone();
+        let mut timeouts = state
+            .metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new)
+            .clone();
         if timeouts.count() == 0 {
             return Ok(());
         }

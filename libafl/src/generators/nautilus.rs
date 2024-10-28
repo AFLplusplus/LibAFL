@@ -87,7 +87,7 @@ impl NautilusContext {
     /// Create a new [`NautilusContext`] from a file
     #[must_use]
     pub fn from_file(tree_depth: usize, grammar_file: PathBuf) -> Self {
-        return match grammar_file.extension().unwrap_or_default() == "py" {
+        match grammar_file.extension().unwrap_or_default() == "py" {
             true => {
                 let ctx = python_grammar_loader::load_python_grammar(
                     fs::read_to_string(grammar_file)
@@ -103,7 +103,7 @@ impl NautilusContext {
                     serde_json::from_reader(reader).expect("Cannot parse grammar file");
                 Self::new(tree_depth, &rules)
             }
-        };
+        }
     }
 }
 
