@@ -27,6 +27,10 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 use serde::{Deserialize, Serialize};
 
 use crate::{corpus::Testcase, executors::ExitKind, observers::TimeObserver, Error};
+
+#[cfg(feature = "std")]
+pub mod capture_feedback;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
@@ -43,6 +47,9 @@ pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub mod stdio;
 pub mod transferred;
+
+#[cfg(feature = "std")]
+pub use capture_feedback::CaptureTimeoutFeedback;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;

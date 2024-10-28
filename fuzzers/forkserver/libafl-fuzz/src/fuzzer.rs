@@ -15,7 +15,7 @@ use libafl::{
     },
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
-    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, CaptureTimeoutFeedback},
     fuzzer::StdFuzzer,
     inputs::{BytesInput, NopTargetBytesConverter},
     mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
@@ -29,7 +29,7 @@ use libafl::{
         mutational::MultiMutationalStage,
         time_tracker::TimeTrackingStageWrapper,
         CalibrationStage, ColorizationStage, IfStage, StagesTuple, StdMutationalStage,
-        StdPowerMutationalStage, SyncFromDiskStage,
+        StdPowerMutationalStage, SyncFromDiskStage, VerifyTimeoutsStage,
     },
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
@@ -55,11 +55,11 @@ use crate::{
     env_parser::AFL_DEFAULT_MAP_SIZE,
     executor::find_afl_binary,
     feedback::{
-        capture_timeout::CaptureTimeoutFeedback, filepath::CustomFilepathToTestcaseFeedback,
-        persistent_record::PersitentRecordFeedback, seed::SeedFeedback,
+        filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
+        seed::SeedFeedback,
     },
     scheduler::SupportedSchedulers,
-    stages::{mutational_stage::SupportedMutationalStages, verify_timeouts::VerifyTimeoutsStage},
+    stages::mutational_stage::SupportedMutationalStages,
     Opt, AFL_DEFAULT_INPUT_LEN_MAX, AFL_DEFAULT_INPUT_LEN_MIN, AFL_HARNESS_FILE_INPUT,
     SHMEM_ENV_VAR,
 };

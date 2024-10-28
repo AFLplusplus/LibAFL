@@ -1,9 +1,9 @@
-//! Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
-//! not false positives. AFL++ style
+//! Stage that re-runs captured Timeouts with double the timeout to verify
+//! Note: To capture the timeouts, use in conjunction with `CaptureTimeoutFeedback`
 use core::time::Duration;
 use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData, rc::Rc};
 
-use libafl::{
+use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers, HasTimeout},
     inputs::{BytesInput, UsesInput},
@@ -15,6 +15,8 @@ use libafl::{
 use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+/// Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
+/// not false positives. AFL++ style.
 #[derive(Debug)]
 pub struct VerifyTimeoutsStage<E, S> {
     doubled_timeout: Duration,
@@ -42,6 +44,7 @@ where
     type State = S;
 }
 
+/// Timeouts that `VerifyTimeoutsStage` will read from
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: for<'a> Deserialize<'a> + Serialize")]
 pub struct TimeoutsToVerify<I> {
@@ -54,18 +57,25 @@ libafl_bolts::impl_serdeany!(
 );
 
 impl<I> TimeoutsToVerify<I> {
-    pub fn new() -> Self {
+    /// Create a new `TimeoutsToVerify`
+    #[must_use] pub fn new() -> Self {
         Self {
             inputs: VecDeque::new(),
         }
     }
+    
+    /// Add a `TimeoutsToVerify` to queue
     pub fn push(&mut self, input: I) {
         self.inputs.push_back(input);
     }
+    
+    /// Pop a `TimeoutsToVerify` to queue
     pub fn pop(&mut self) -> Option<I> {
         self.inputs.pop_front()
     }
-    pub fn count(&self) -> usize {
+    
+    /// Count `TimeoutsToVerify` in queue
+    #[must_use] pub fn count(&self) -> usize {
         self.inputs.len()
     }
 }

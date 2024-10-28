@@ -46,6 +46,8 @@ pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
 #[cfg(feature = "unicode")]
 pub use unicode::*;
+#[cfg(feature = "std")]
+pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
@@ -71,6 +73,8 @@ pub mod calibrate;
 pub mod colorization;
 #[cfg(all(feature = "std", unix))]
 pub mod concolic;
+#[cfg(feature = "std")]
+pub mod verify_timeouts;
 #[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
