@@ -113,7 +113,6 @@ intel_pt = [
   "std",
   "dep:libipt",
   "dep:num_enum",
-  "dep:proc-maps",
   "libafl_bolts/intel_pt",
 ]
 
@@ -287,7 +286,6 @@ document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
-proc-maps = { workspace = true, optional = true }
 libipt = { git = "https://github.com/Marcondiro/libipt-rs", optional = true }
 
 [lints]

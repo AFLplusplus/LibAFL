@@ -23,7 +23,7 @@ use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Asid, BlockFlags,
-    ConfigBuilder, Cpu, Image, PtError, PtErrorCode, Status,
+    ConfigBuilder, Cpu, Image, PtError, PtErrorCode,
 };
 use num_enum::TryFromPrimitive;
 use num_traits::Euclid;
@@ -358,7 +358,6 @@ impl IntelPT {
                                 if e.code() != PtErrorCode::Eos {
                                     log::trace!("PT error in block next {e:?}");
                                 }
-                                status = Status::from_bits(e.code() as u32).unwrap();
                             }
                         }
                         if status.eos() {
@@ -643,6 +642,7 @@ impl IntelPTBuilder {
     pub fn cpu(mut self, cpu: Option<usize>) -> Self {
         self.cpu = cpu;
         self
+        // TODO change to cpu() and all_cpus()?
     }
 
     #[must_use]
