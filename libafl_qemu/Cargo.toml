@@ -125,7 +125,9 @@ paste = { workspace = true }
 enum-map = "2.7.3"
 serde_yaml = { workspace = true, optional = true } # For parsing the injections yaml file
 toml = { workspace = true, optional = true } # For parsing the injections toml file
-pyo3 = { version = "0.22.3", optional = true, features = ["multiple-pymethods"] }
+pyo3 = { version = "0.22.3", optional = true, features = [
+  "multiple-pymethods",
+] }
 bytes-utils = "0.1.4"
 typed-builder = { workspace = true }
 memmap2 = "0.9.5"

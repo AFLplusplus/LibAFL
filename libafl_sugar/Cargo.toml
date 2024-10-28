@@ -63,7 +63,7 @@ libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 
-typed-builder = { workspace = true }         # Implement the builder pattern at compiletime
+typed-builder = { workspace = true }           # Implement the builder pattern at compiletime
 pyo3 = { version = "0.22.3", optional = true }
 log = { workspace = true }
 
