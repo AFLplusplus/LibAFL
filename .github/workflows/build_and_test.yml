@@ -468,7 +468,7 @@ jobs:
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - name: Install deps
-        run: brew install z3 gtk+3
+        run: brew install z3 gtk+3 python
       - name: Install cxxbridge
         run: cargo install cxxbridge-cmd
       - uses: actions/checkout@v4
