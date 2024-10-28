@@ -23,22 +23,10 @@ use libafl_bolts::{
     AsSlice,
 };
 #[cfg(target_os = "linux")]
-use nix::{
-    sys::{
-        ptrace::{cont, detach, setoptions, Options},
-        wait::{
-            WaitPidFlag,
-            WaitStatus::{Signaled, Stopped},
-        },
-    },
-    unistd::Pid,
-};
-use serde::{Deserialize, Serialize};
+use nix::unistd::Pid;
 
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
-#[cfg(target_os = "linux")]
-use crate::HasNamedMetadata;
 use crate::{
     executors::{hooks::ExecutorHooksTuple, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
@@ -204,7 +192,6 @@ where
     T: Debug,
     OT: Debug,
     HT: Debug,
-    C: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
@@ -302,18 +289,11 @@ where
     }
 }
 
-#[allow(missing_docs)]
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-pub(crate) struct SerdeAnyi32 {
-    /// The actual i32
-    pub inner: i32,
-}
-libafl_bolts::impl_serdeany!(SerdeAnyi32);
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
 where
     EM: UsesState<State = S>,
-    S: State + HasExecutions + HasNamedMetadata,
+    S: State + HasExecutions,
     T: CommandConfigurator<S::Input, Pid> + Debug,
     OT: Debug + MatchName + ObserversTuple<S::Input, S>,
     Z: UsesState<State = S>,
@@ -327,27 +307,33 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use nix::sys::{
+            ptrace::{cont, detach, setoptions, Event::PTRACE_EVENT_EXEC, Options},
             signal::Signal,
-            wait::{waitpid, WaitStatus::Exited},
+            wait::{
+                waitpid, WaitPidFlag,
+                WaitStatus::{Exited, PtraceEvent, Signaled, Stopped},
+            },
         };
+
         *state.executions_mut() += 1;
 
         let child = self.configurer.spawn_child(input)?;
 
-        state.named_metadata_map_mut().insert(
-            "child",
-            SerdeAnyi32 {
-                inner: child.as_raw(),
-            },
-        );
+        let wait_status = waitpid(child, Some(WaitPidFlag::WUNTRACED))?;
+        if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
+            return Err(Error::unknown("Unexpected state of child process"));
+        }
 
-        waitpid(child, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
-        // TODO check WaitStatus
         setoptions(child, Options::PTRACE_O_TRACEEXEC)?;
         cont(child, None)?;
 
-        waitpid(child, None).expect("Failed to wait for the child process");
-        // TODO check WaitStatus
+        let wait_status = waitpid(child, None)?;
+        if !matches!(
+            wait_status,
+            PtraceEvent(c, Signal::SIGTRAP, e) if c == child && e == (PTRACE_EVENT_EXEC as i32)
+        ) {
+            return Err(Error::unknown("Unexpected state of child process"));
+        }
 
         self.observers.pre_exec_child_all(state, input)?;
         if *state.executions() == 1 {
