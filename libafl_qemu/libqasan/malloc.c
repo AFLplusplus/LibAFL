@@ -84,8 +84,8 @@ static unsigned char __tmp_alloc_zone[TMP_ZONE_SIZE];
 #else
 
 // From dlmalloc.c
-void *dlmemalign(size_t, size_t);
-void  dlfree(void *);
+void                     *dlmemalign(size_t, size_t);
+void                      dlfree(void *);
   #define backend_memalign dlmemalign
   #define backend_free dlfree
 
