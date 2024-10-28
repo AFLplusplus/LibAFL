@@ -53,7 +53,7 @@ ppc = ["libafl_qemu/ppc"]
 hexagon = ["libafl_qemu/hexagon"]
 
 [build-dependencies]
-pyo3-build-config = { workspace = true, optional = true }
+pyo3-build-config = { version = "0.22.3", optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.13.2" }
@@ -64,7 +64,7 @@ libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 document-features = { workspace = true, optional = true }
 
 typed-builder = { workspace = true }         # Implement the builder pattern at compiletime
-pyo3 = { workspace = true, optional = true }
+pyo3 = { version = "0.22.3", optional = true }
 log = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
