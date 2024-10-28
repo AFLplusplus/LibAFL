@@ -20,6 +20,8 @@ use crate::{
 
 /// Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
 /// not false positives. AFL++ style.
+/// Note: Will NOT work with in process executors due to the potential for restarts/crashes when
+/// running inputs.
 #[derive(Debug)]
 pub struct VerifyTimeoutsStage<E, S> {
     doubled_timeout: Duration,
@@ -102,7 +104,8 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let mut timeouts = state.metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new);
+        let mut timeouts =
+            state.metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new);
         if timeouts.count() == 0 {
             return Ok(());
         }
