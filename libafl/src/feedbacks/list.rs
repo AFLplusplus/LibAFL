@@ -66,7 +66,7 @@ libafl_bolts::impl_serdeany!(
 
 impl<T> ListFeedback<T>
 where
-    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
     fn has_interesting_list_observer_feedback<I, OT, S>(
         &mut self,
@@ -108,7 +108,7 @@ where
 impl<S, T> StateInitializer<S> for ListFeedback<T>
 where
     S: HasNamedMetadata,
-    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());
@@ -120,7 +120,7 @@ impl<EM, I, OT, S, T> Feedback<EM, I, OT, S> for ListFeedback<T>
 where
     OT: MatchName + ObserversTuple<I, S>,
     S: HasNamedMetadata,
-    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting(

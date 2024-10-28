@@ -676,18 +676,20 @@ where
         self.map_size
     }
 
+    /// Execute input and increase the execution counter.
     #[inline]
-    fn execute_input_tracked(&mut self, state: &mut S, input: &TC::Input) -> Result<ExitKind, Error>
+    fn execute_input(&mut self, state: &mut S, input: &TC::Input) -> Result<ExitKind, Error>
     where
         S: HasExecutions,
     {
         *state.executions_mut() += 1;
 
-        self.execute_input(input)
+        self.execute_input_uncounted(input)
     }
 
+    /// Execute input, but side-step the execution counter.
     #[inline]
-    fn execute_input(&mut self, input: &TC::Input) -> Result<ExitKind, Error> {
+    fn execute_input_uncounted(&mut self, input: &TC::Input) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
@@ -1559,7 +1561,7 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.execute_input_tracked(state, input)
+        self.execute_input(state, input)
     }
 }
 
