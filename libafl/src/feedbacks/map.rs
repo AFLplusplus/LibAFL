@@ -622,11 +622,11 @@ where
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
-    fn is_interesting_u8_simd_optimized<S: HasNamedMetadata, OT: MatchName>(
-        &mut self,
-        state: &mut S,
-        observers: &OT,
-    ) -> bool {
+    fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
+    where
+        S: HasNamedMetadata,
+        OT: MatchName,
+    {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
 

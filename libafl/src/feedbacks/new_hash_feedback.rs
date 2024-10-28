@@ -155,7 +155,7 @@ impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
 where
     O: ObserverWithHashField + Named,
     OT: MatchName + ObserversTuple<I, S>,
-    S: HasNamedMetadata + UsesInput,
+    S: HasNamedMetadata,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
