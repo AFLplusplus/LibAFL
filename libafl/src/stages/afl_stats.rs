@@ -261,6 +261,7 @@ where
     <Z as HasScheduler>::Scheduler: HasQueueCycles,
     <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
 {
+    #[allow(clippy::too-many-lines)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
