@@ -23,9 +23,8 @@ use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Asid, BlockFlags,
-    ConfigBuilder, Cpu, Image, PtErrorCode, Status,
+    ConfigBuilder, Cpu, Image, PtError, PtErrorCode, Status,
 };
-use log::trace;
 use num_enum::TryFromPrimitive;
 use num_traits::Euclid;
 use perf_event_open_sys::{
@@ -114,6 +113,12 @@ pub struct IntelPTBuilder {
     inherit: bool,
     perf_buffer_size: usize,
     perf_aux_buffer_size: usize,
+}
+
+impl From<PtError> for Error {
+    fn from(err: PtError) -> Self {
+        Self::unknown(format!("libipt error: {err}"))
+    }
 }
 
 impl IntelPT {
@@ -223,6 +228,14 @@ impl IntelPT {
         )
     }
 
+    //         // let read_mem = |buf: &mut [u8], addr: u64| {
+    //         //     let src = addr as *const u8;
+    //         //     let dst = buf.as_mut_ptr();
+    //         //     let size = buf.len();
+    //         //     unsafe {
+    //         //         ptr::copy_nonoverlapping(src, dst, size);
+    //         //     }
+    //         // };
     // #[allow(clippy::cast_possible_wrap)]
     // fn decode_with_callback<F: Fn(&mut [u8], u64)>(
     //     &mut self,
@@ -296,27 +309,19 @@ impl IntelPT {
             }
         };
 
-        let mut config =
-            ConfigBuilder::new(data.as_mut()).map_err(|e| Error::unknown(e.to_string()))?;
+        let mut config = ConfigBuilder::new(data.as_mut())?;
         config.filter(self.ip_filters_to_addr_filter());
         if let Some(cpu) = &*CURRENT_CPU {
             config.cpu(*cpu);
         }
         let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
         config.flags(flags);
-        let mut decoder =
-            BlockDecoder::new(&config.finish()).map_err(|e| Error::unknown(e.to_string()))?;
+        let mut decoder = BlockDecoder::new(&config.finish())?;
         if let Some(i) = image {
-            decoder
-                .set_image(Some(i))
-                .map_err(|e| Error::unknown(format!("Failed to set image {e}")))?;
+            decoder.set_image(Some(i))?;
         }
         if let Some(rm) = read_memory {
-            decoder
-                .image()
-                .map_err(|e| Error::unknown(e.to_string()))?
-                .set_callback(Some(rm))
-                .map_err(|e| Error::unknown(format!("Failed to set get memory callback {e}")))?;
+            decoder.image()?.set_callback(Some(rm))?;
         }
 
         let mut previous_block_ip = 0;
@@ -332,7 +337,7 @@ impl IntelPT {
                                     status = s;
                                 }
                                 Err(e) => {
-                                    trace!("PT error in event {e:?}");
+                                    log::trace!("PT error in event {e:?}");
                                     break 'block;
                                 }
                             };
@@ -341,9 +346,7 @@ impl IntelPT {
                         match decoder.next() {
                             Ok((b, s)) => {
                                 status = s;
-                                let offset = decoder
-                                    .offset()
-                                    .map_err(|e| Error::unknown(e.to_string()))?;
+                                let offset = decoder.offset()?;
 
                                 if !b.speculative() && skip < offset {
                                     let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
@@ -353,7 +356,7 @@ impl IntelPT {
                             }
                             Err((_, e)) => {
                                 if e.code() != PtErrorCode::Eos {
-                                    trace!("PT error in block next {e:?}");
+                                    log::trace!("PT error in block next {e:?}");
                                 }
                                 status = Status::from_bits(e.code() as u32).unwrap();
                             }
@@ -365,7 +368,7 @@ impl IntelPT {
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
-                        trace!("PT error in sync forward {e:?}");
+                        log::trace!("PT error in sync forward {e:?}");
                     }
                     break 'sync;
                 }
@@ -374,12 +377,8 @@ impl IntelPT {
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
         // might not contain a PSB packet.
-        decoder
-            .sync_backward()
-            .map_err(|e| Error::unknown(e.to_string()))?;
-        let offset = decoder
-            .sync_offset()
-            .map_err(|e| Error::unknown(e.to_string()))?;
+        decoder.sync_backward()?;
+        let offset = decoder.sync_offset()?;
         unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
         Ok(ips)

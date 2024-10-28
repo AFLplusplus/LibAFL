@@ -133,7 +133,7 @@ llmp_small_maps = ["alloc"]
 rustversion = { workspace = true }
 
 [dev-dependencies]
-proc-maps = { workspace = true }
+proc-maps = "0.4.0"
 
 [dependencies]
 libafl_derive = { version = "0.13.2", optional = true, path = "../libafl_derive" }
