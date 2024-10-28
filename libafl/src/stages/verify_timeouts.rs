@@ -1,5 +1,7 @@
 //! Stage that re-runs captured Timeouts with double the timeout to verify
 //! Note: To capture the timeouts, use in conjunction with `CaptureTimeoutFeedback`
+//! Note: Will NOT work with in process executors due to the potential for restarts/crashes when
+//! running inputs.
 use core::time::Duration;
 use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData, rc::Rc};
 
@@ -100,9 +102,7 @@ where
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        let mut timeouts = state
-            .metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new)
-            .clone();
+        let mut timeouts = state.metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new);
         if timeouts.count() == 0 {
             return Ok(());
         }
