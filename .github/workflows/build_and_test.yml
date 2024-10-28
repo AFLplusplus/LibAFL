@@ -59,7 +59,7 @@ jobs:
         run: cd docs && mdbook test -L ../target/debug/deps
       - name: Test the book (MacOS)
         if: runner.os == 'MacOS'
-        run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags)
+        run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
       - name: Run tests
         run: cargo test
       - name: Test libafl no_std
