@@ -83,16 +83,16 @@ typedef uint32_t libafl_word;
 #endif
 
 #ifdef _WIN32
-  #define LIBAFL_DEFINE_FUNCTIONS(name, _opcode)                           \
-    #ifdef __cplusplus extern "C" {                                        \
+  #define LIBAFL_DEFINE_FUNCTIONS(name, _opcode)                                                                \
+    #ifdef __cplusplus extern "C" {                                          \
       #endif libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0( \
           libafl_word action);                                             \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(        \
           libafl_word action, ##name##libafl_word arg1);                   \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(        \
-          libafl_word action, libafl_word arg1, libafl_word arg2);         \
+          libafl_word action, libafl_word arg1, libafl_word arg2); \
       #ifdef __cplusplus                                                   \
-    }                                                                      \
+    } \
     #endif
 #else
   #if defined(__x86_64__)
