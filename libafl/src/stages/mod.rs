@@ -74,8 +74,6 @@ pub mod colorization;
 #[cfg(all(feature = "std", unix))]
 pub mod concolic;
 #[cfg(feature = "std")]
-pub mod verify_timeouts;
-#[cfg(feature = "std")]
 pub mod dump;
 pub mod generalization;
 pub mod generation;
@@ -90,6 +88,8 @@ pub mod tracing;
 pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
+#[cfg(feature = "std")]
+pub mod verify_timeouts;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.

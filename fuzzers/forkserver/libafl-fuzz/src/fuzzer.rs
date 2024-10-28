@@ -15,7 +15,9 @@ use libafl::{
     },
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
-    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, CaptureTimeoutFeedback},
+    feedbacks::{
+        CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
+    },
     fuzzer::StdFuzzer,
     inputs::{BytesInput, NopTargetBytesConverter},
     mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},

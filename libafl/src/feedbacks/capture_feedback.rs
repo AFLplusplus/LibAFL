@@ -1,17 +1,17 @@
-//! Feedback that captures Timeouts for re-running 
+//! Feedback that captures Timeouts for re-running
 use std::{borrow::Cow, cell::RefCell, fmt::Debug, rc::Rc};
+
+use libafl_bolts::{Error, Named};
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
+    stages::verify_timeouts::TimeoutsToVerify,
     state::HasCorpus,
     HasMetadata,
 };
-use libafl_bolts::{Error, Named};
-use serde::{de::DeserializeOwned, Serialize};
-
-use crate::stages::verify_timeouts::TimeoutsToVerify;
 
 /// A Feedback that captures all timeouts and stores them in State for re-evaluation later.
 /// Use in conjunction with `VerifyTimeoutsStage`

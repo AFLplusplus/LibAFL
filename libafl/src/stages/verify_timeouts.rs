@@ -3,6 +3,9 @@
 use core::time::Duration;
 use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData, rc::Rc};
 
+use libafl_bolts::Error;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers, HasTimeout},
@@ -12,8 +15,6 @@ use crate::{
     state::{HasCorpus, State, UsesState},
     Evaluator, HasMetadata,
 };
-use libafl_bolts::Error;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
 /// not false positives. AFL++ style.
@@ -58,24 +59,26 @@ libafl_bolts::impl_serdeany!(
 
 impl<I> TimeoutsToVerify<I> {
     /// Create a new `TimeoutsToVerify`
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             inputs: VecDeque::new(),
         }
     }
-    
+
     /// Add a `TimeoutsToVerify` to queue
     pub fn push(&mut self, input: I) {
         self.inputs.push_back(input);
     }
-    
+
     /// Pop a `TimeoutsToVerify` to queue
     pub fn pop(&mut self) -> Option<I> {
         self.inputs.pop_front()
     }
-    
+
     /// Count `TimeoutsToVerify` in queue
-    #[must_use] pub fn count(&self) -> usize {
+    #[must_use]
+    pub fn count(&self) -> usize {
         self.inputs.len()
     }
 }
