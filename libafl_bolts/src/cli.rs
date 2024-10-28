@@ -68,6 +68,8 @@ use alloc::{string::String, vec::Vec};
 use std::error;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
+#[cfg(feature = "frida_cli")]
+use clap::ValueEnum;
 use clap::{Command, CommandFactory, Parser};
 use serde::{Deserialize, Serialize};
 
@@ -100,6 +102,17 @@ fn parse_instrumentation_location(
             16,
         )?,
     ))
+}
+
+/// The scripting engine to use for JavaScript scripting support
+#[cfg(feature = "frida_cli")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, ValueEnum, Default)]
+pub enum FridaScriptBackend {
+    /// The Google V8 engine
+    V8,
+    /// `QuickJS` by Fabrice Bellard
+    #[default]
+    QuickJS,
 }
 
 /// Top-level container for cli options/arguments/subcommands
@@ -300,6 +313,16 @@ pub struct FuzzerOptions {
         requires = "replay"
     )]
     pub repeat: Option<usize>,
+
+    /// The backend scripting engine to use for JavaScript scripting support
+    #[cfg(feature = "frida_cli")]
+    #[arg(long, help_heading = "Frida Options")]
+    pub backend: Option<FridaScriptBackend>,
+
+    /// The path to the Frida script to load into the target
+    #[cfg(feature = "frida_cli")]
+    #[arg(long, help_heading = "Frida Options")]
+    pub script: Option<PathBuf>,
 }
 
 impl FuzzerOptions {
