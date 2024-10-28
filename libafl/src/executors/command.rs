@@ -162,15 +162,15 @@ where
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<I, OT, S, T> {
+pub struct CommandExecutor<OT, S, T> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl CommandExecutor<(), (), (), ()> {
+impl CommandExecutor<(), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -188,7 +188,7 @@ impl CommandExecutor<(), (), (), ()> {
     }
 }
 
-impl<I, OT, S, T> Debug for CommandExecutor<I, OT, S, T>
+impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
 where
     T: Debug,
     OT: Debug,
@@ -201,7 +201,7 @@ where
     }
 }
 
-impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
+impl<OT, S, T> CommandExecutor<OT, S, T>
 where
     T: Debug,
     OT: Debug,
@@ -214,11 +214,11 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
+impl<OT, S, T> CommandExecutor<OT, S, T>
 where
-    S: State + HasExecutions + UsesInput<Input = I>,
+    S: State + HasExecutions + UsesInput,
     T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + ObserversTuple<I, S>,
+    OT: Debug + ObserversTuple<S::Input, S>,
 {
     fn execute_input_with_command(
         &mut self,
@@ -285,12 +285,12 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<I, OT, S, T>
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
-    S: State + HasExecutions + UsesInput<Input = I>,
+    S: State + HasExecutions + UsesInput,
     T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<I, S>,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
     Z: UsesState<State = S>,
 {
     fn run_target(
@@ -305,7 +305,7 @@ where
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<I, OT, S, T> HasTimeout for CommandExecutor<I, OT, S, T>
+impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
 where
     S: HasCorpus,
     T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
@@ -321,14 +321,14 @@ where
     }
 }
 
-impl<I, OT, S, T> UsesState for CommandExecutor<I, OT, S, T>
+impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<I, OT, S, T> HasObservers for CommandExecutor<I, OT, S, T>
+impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
 where
     S: State,
     T: Debug,
@@ -510,14 +510,14 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<I, OT, S>(
+    pub fn build<OT, S>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
+    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
         OT: MatchName + ObserversTuple<S::Input, S>,
-        S: UsesInput<Input = I>,
-        I: Input + HasTargetBytes,
+        S: UsesInput,
+        S::Input: Input + HasTargetBytes,
     {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
@@ -637,7 +637,7 @@ pub trait CommandConfigurator<I>: Sized {
     fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<I, OT, S, Self>
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
     where
         OT: MatchName,
     {
