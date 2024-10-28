@@ -79,19 +79,21 @@ pub struct MinimizerScheduler<CS, F, M, S> {
     phantom: PhantomData<(F, M, S)>,
 }
 
-impl<CS, F, I, M, O, S> RemovableScheduler<I, S> for MinimizerScheduler<CS, F, M, O>
+impl<CS, F, M, O, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S>
+    for MinimizerScheduler<CS, F, M, O>
 where
-    CS: RemovableScheduler<I, S> + Scheduler<I, S>,
-    F: TestcaseScore<I, S>,
+    CS: RemovableScheduler<<S::Corpus as Corpus>::Input, S>
+        + Scheduler<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Replaces the [`Testcase`] at the given [`CorpusId`]
     fn on_replace(
         &mut self,
         state: &mut S,
         id: CorpusId,
-        testcase: &Testcase<I>,
+        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
     ) -> Result<(), Error> {
         self.base.on_replace(state, id, testcase)?;
         self.update_score(state, id)
@@ -102,7 +104,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        testcase: &Option<Testcase<I>>,
+        testcase: &Option<Testcase<<S::Corpus as Corpus>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, id, testcase)?;
         let mut entries =
@@ -186,12 +188,12 @@ where
     }
 }
 
-impl<CS, F, I, M, O, S> Scheduler<I, S> for MinimizerScheduler<CS, F, M, O>
+impl<CS, F, M, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for MinimizerScheduler<CS, F, M, O>
 where
-    CS: Scheduler<I, S>,
-    F: TestcaseScore<I, S>,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    F: TestcaseScore<S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -200,7 +202,12 @@ where
     }
 
     /// An input has been evaluated
-    fn on_evaluation<OT>(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error>
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
     where
         OT: MatchName,
     {
@@ -243,10 +250,10 @@ where
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_score<I, S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
+    pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        F: TestcaseScore<I, S>,
-        S: HasCorpus<Input = I> + HasMetadata,
+        F: TestcaseScore<S>,
+        S: HasCorpus + HasMetadata,
     {
         // Create a new top rated meta if not existing
         if state.metadata_map().get::<TopRatedsMetadata>().is_none() {

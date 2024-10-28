@@ -24,6 +24,7 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
+    nonzero,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
@@ -76,7 +77,7 @@ pub struct ForkserverBytesCoverageSugar<'a> {
 }
 
 #[allow(clippy::similar_names)]
-impl<'a> ForkserverBytesCoverageSugar<'a> {
+impl ForkserverBytesCoverageSugar<'_> {
     /// Runs the fuzzer.
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
@@ -213,7 +214,7 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
             if state.must_load_initial_inputs() {
                 if self.input_dirs.is_empty() {
                     // Generator of printable bytearrays of max size 32
-                    let mut generator = RandBytesGenerator::new(32);
+                    let mut generator = RandBytesGenerator::new(nonzero!(32));
 
                     // Generate 8 initial inputs
                     state

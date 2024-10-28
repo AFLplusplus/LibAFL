@@ -95,9 +95,9 @@ where
     /// Inserts an edge into CFG.
     #[must_use]
     pub fn new() -> Self {
-        let map_size = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
+        let map_size = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
             .map_or(Ok(65536), str::parse)
-            .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
+            .expect("Could not parse LIBAFL_EDGES_MAP_DEFAULT_SIZE");
         Self {
             edges: (0..map_size).map(|_| None).collect(),
             func_to_entry_bb: HashMap::default(),

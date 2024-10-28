@@ -23,13 +23,15 @@ use libafl_bolts::{
     AsSlice,
 };
 
+use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
 use crate::{
+    corpus::Corpus,
     executors::HasObservers,
     inputs::{HasTargetBytes, UsesInput},
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
-    state::{HasExecutions, State, UsesState},
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
+    state::{HasCorpus, HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -151,21 +153,24 @@ where
     fn exec_timeout(&self) -> Duration {
         self.timeout
     }
+    fn exec_timeout_mut(&mut self) -> &mut Duration {
+        &mut self.timeout
+    }
 }
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, S, T> {
+pub struct CommandExecutor<I, OT, S, T> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl CommandExecutor<(), (), ()> {
+impl CommandExecutor<(), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -183,7 +188,7 @@ impl CommandExecutor<(), (), ()> {
     }
 }
 
-impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> Debug for CommandExecutor<I, OT, S, T>
 where
     T: Debug,
     OT: Debug,
@@ -196,7 +201,7 @@ where
     }
 }
 
-impl<OT, S, T> CommandExecutor<OT, S, T>
+impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
 where
     T: Debug,
     OT: Debug,
@@ -209,11 +214,11 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<OT, S, T> CommandExecutor<OT, S, T>
+impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
 where
-    S: State + HasExecutions,
+    S: State + HasExecutions + UsesInput<Input = I>,
     T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + ObserversTuple<S>,
+    OT: Debug + ObserversTuple<I, S>,
 {
     fn execute_input_with_command(
         &mut self,
@@ -279,14 +284,13 @@ where
     }
 }
 
-// this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<EM, I, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<I, OT, S, T>
 where
     EM: UsesState<State = S>,
-    S: State + HasExecutions,
+    S: State + HasExecutions + UsesInput<Input = I>,
     T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S>,
+    OT: Debug + MatchName + ObserversTuple<I, S>,
     Z: UsesState<State = S>,
 {
     fn run_target(
@@ -294,33 +298,44 @@ where
         _fuzzer: &mut Z,
         state: &mut Self::State,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S as UsesInput>::Input,
     ) -> Result<ExitKind, Error> {
         self.execute_input_with_command(state, input)
     }
 }
 
-impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
+// this only works on unix because of the reliance on checking the process signal for detecting OOM
+impl<I, OT, S, T> HasTimeout for CommandExecutor<I, OT, S, T>
+where
+    S: HasCorpus,
+    T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        *self.configurer.exec_timeout_mut() = timeout;
+    }
+
+    #[inline]
+    fn timeout(&self) -> Duration {
+        self.configurer.exec_timeout()
+    }
+}
+
+impl<I, OT, S, T> UsesState for CommandExecutor<I, OT, S, T>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-{
-    type Observers = OT;
-}
-
-impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> HasObservers for CommandExecutor<I, OT, S, T>
 where
     S: State,
     T: Debug,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
+    type Observers = OT;
+
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
@@ -495,14 +510,14 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<OT, S>(
+    pub fn build<I, OT, S>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
+    ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
     where
-        OT: MatchName + ObserversTuple<S>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
+        OT: MatchName + ObserversTuple<S::Input, S>,
+        S: UsesInput<Input = I>,
+        I: Input + HasTargetBytes,
     {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
@@ -588,6 +603,9 @@ impl CommandExecutorBuilder {
 ///     fn exec_timeout(&self) -> Duration {
 ///         Duration::from_secs(5)
 ///     }
+///     fn exec_timeout_mut(&mut self) -> &mut Duration {
+///         todo!()
+///     }
 /// }
 ///
 /// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
@@ -615,9 +633,11 @@ pub trait CommandConfigurator<I>: Sized {
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
+    /// Set the timeout duration for execution of the child process.
+    fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<I, OT, S, Self>
     where
         OT: MatchName,
     {

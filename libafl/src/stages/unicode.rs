@@ -8,9 +8,8 @@ use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::HasMetadata,
-    corpus::HasTestcase,
-    inputs::{BytesInput, HasMutatorBytes, Input},
+    corpus::Corpus,
+    inputs::{BytesInput, HasMutatorBytes},
     stages::Stage,
     state::{HasCorpus, HasCurrentTestcase, State, UsesState},
 };
@@ -118,7 +117,8 @@ where
 
 impl<S, E, EM, Z> Stage<E, EM, Z> for UnicodeIdentificationStage<S>
 where
-    S: HasTestcase<Input = BytesInput> + HasCorpus + State,
+    S: HasCorpus + State + HasCurrentTestcase,
+    S::Corpus: Corpus<Input = BytesInput>,
     E: UsesState<State = S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,

@@ -27,10 +27,13 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 }
 
 /// Initialize the sancov `8-bit-counters` - usually called by `llvm`.
+///
+/// # Safety
+/// Start and stop are being dereferenced.
 #[no_mangle]
 #[allow(clippy::cast_sign_loss)]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
-pub extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
+pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
         let counter_maps = &mut *addr_of_mut!(COUNTERS_MAPS);
         for existing in counter_maps {
@@ -75,8 +78,7 @@ mod observers {
 
     use ahash::RandomState;
     use libafl::{
-        inputs::UsesInput,
-        observers::{DifferentialObserver, MapObserver, Observer, ObserversTuple},
+        observers::{DifferentialObserver, MapObserver, Observer},
         Error,
     };
     use libafl_bolts::{
@@ -128,20 +130,18 @@ mod observers {
         iter_idx: usize,
     }
 
-    impl<S> Observer<S> for CountersMultiMapObserver<false>
+    impl<I, S> Observer<I, S> for CountersMultiMapObserver<false>
     where
-        S: UsesInput,
         Self: MapObserver,
     {
         #[inline]
-        fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+        fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
             self.reset_map()
         }
     }
 
-    impl<S> Observer<S> for CountersMultiMapObserver<true>
+    impl<I, S> Observer<I, S> for CountersMultiMapObserver<true>
     where
-        S: UsesInput,
         Self: MapObserver,
     {
         // in differential mode, we are *not* responsible for resetting the map!
@@ -386,12 +386,5 @@ mod observers {
         }
     }
 
-    impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for CountersMultiMapObserver<true>
-    where
-        Self: MapObserver,
-        OTA: ObserversTuple<S>,
-        OTB: ObserversTuple<S>,
-        S: UsesInput,
-    {
-    }
+    impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for CountersMultiMapObserver<true> {}
 }

@@ -7,25 +7,36 @@
     feature = "sancov_ctx"
 ))]
 use alloc::borrow::Cow;
+#[cfg(any(
+    feature = "sancov_pcguard_edges",
+    feature = "sancov_pcguard_hitcounts",
+    feature = "sancov_ngram4",
+    feature = "sancov_ctx"
+))]
+#[cfg(not(feature = "pointer_maps"))]
+use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
 
-use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_SIZE_IN_USE, EDGES_MAP_SIZE_MAX};
+use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE};
 
 /// The map for edges.
 #[no_mangle]
-pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE_MAX] = [0; EDGES_MAP_SIZE_MAX];
+#[allow(non_upper_case_globals)]
+pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
 /// The map for data dependency
 #[no_mangle]
+#[allow(non_upper_case_globals)]
 pub static mut __ddg_area_ptr_local: [u8; DDG_MAP_SIZE] = [0; DDG_MAP_SIZE];
 pub use __ddg_area_ptr_local as DDG_MAP;
 
 /// The map for accounting mem writes.
 #[no_mangle]
+#[allow(non_upper_case_globals)]
 pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
 pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 
@@ -60,6 +71,8 @@ pub use __ddg_area_ptr as DDG_MAP_PTR;
 /// Return Tokens from the compile-time token section
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 pub fn autotokens() -> Result<Tokens, Error> {
+    // # Safety
+    // All values are checked before dereferencing.
     unsafe {
         if __token_start.is_null() || __token_stop.is_null() {
             Ok(Tokens::default())
@@ -72,8 +85,9 @@ pub fn autotokens() -> Result<Tokens, Error> {
 
 /// The actual size we use for the map of edges.
 /// This is used for forkserver backend
+#[allow(non_upper_case_globals)]
 #[no_mangle]
-pub static mut __afl_map_size: usize = EDGES_MAP_SIZE_IN_USE;
+pub static mut __afl_map_size: usize = EDGES_MAP_DEFAULT_SIZE;
 
 #[cfg(any(
     feature = "sancov_pcguard_edges",
@@ -113,11 +127,11 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
 ///
 /// ```rust,ignore
 /// use libafl::observers::StdMapObserver;
-/// use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE_IN_USE};
+/// use libafl_targets::{EDGES_MAP, EDGES_MAP_DEFAULT_SIZE};
 ///
 /// #[cfg(not(feature = "pointer_maps"))]
 /// let observer = unsafe {
-///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_SIZE_IN_USE)
+///     StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), EDGES_MAP_DEFAULT_SIZE)
 /// };
 /// ```
 ///
@@ -178,11 +192,11 @@ pub fn edges_max_num() -> usize {
         } else {
             #[cfg(feature = "pointer_maps")]
             {
-                EDGES_MAP_SIZE_MAX // the upper bound
+                EDGES_MAP_ALLOCATED_SIZE // the upper bound
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
-                EDGES_MAP.len()
+                (*addr_of!(EDGES_MAP)).len()
             }
         }
     }
@@ -197,8 +211,7 @@ mod swap {
     use core::fmt::Debug;
 
     use libafl::{
-        inputs::UsesInput,
-        observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
+        observers::{DifferentialObserver, Observer, StdMapObserver},
         Error,
     };
     use libafl_bolts::{ownedref::OwnedMutSlice, AsSliceMut, Named};
@@ -265,20 +278,16 @@ mod swap {
         }
     }
 
-    impl<'a, 'b> Named for DifferentialAFLMapSwapObserver<'a, 'b> {
+    impl Named for DifferentialAFLMapSwapObserver<'_, '_> {
         fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }
 
-    impl<'a, 'b, S> Observer<S> for DifferentialAFLMapSwapObserver<'a, 'b> where S: UsesInput {}
+    impl<I, S> Observer<I, S> for DifferentialAFLMapSwapObserver<'_, '_> {}
 
-    impl<'a, 'b, OTA, OTB, S> DifferentialObserver<OTA, OTB, S>
-        for DifferentialAFLMapSwapObserver<'a, 'b>
-    where
-        OTA: ObserversTuple<S>,
-        OTB: ObserversTuple<S>,
-        S: UsesInput,
+    impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S>
+        for DifferentialAFLMapSwapObserver<'_, '_>
     {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
             let slice = self.first_map.as_slice_mut();

@@ -86,7 +86,7 @@ pub fn main() -> Result<(), Error> {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state
@@ -94,8 +94,8 @@ pub fn main() -> Result<(), Error> {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
-    let minimizer = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(
         StdMutationalStage::new(mutator),
         StdTMinMutationalStage::new(minimizer, factory, 128)
@@ -121,7 +121,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut mgr = SimpleEventManager::new(mon);
 
-    let minimizer = StdScheduledMutator::new(havoc_mutations::<BytesInput>());
+    let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
         minimizer,
         CrashFeedback::new(),

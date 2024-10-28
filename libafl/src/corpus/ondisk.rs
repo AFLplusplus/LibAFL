@@ -6,7 +6,10 @@
 //! which stores a certain number of [`Testcase`]s in memory and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
-use core::{cell::RefCell, time::Duration};
+use core::{
+    cell::{Ref, RefCell, RefMut},
+    time::Duration,
+};
 use std::path::{Path, PathBuf};
 
 use libafl_bolts::serdeany::SerdeAnyMap;
@@ -14,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error,
 };
 
@@ -41,36 +44,24 @@ pub struct OnDiskMetadata<'a> {
     pub metadata: &'a SerdeAnyMap,
     /// The exec time for this [`Testcase`]
     pub exec_time: &'a Option<Duration>,
-    /// The amount of executions for this [`Testcase`]
-    pub executions: &'a u64,
 }
 
 /// A corpus able to store [`Testcase`]s to disk, and load them from disk, when they are being used.
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OnDiskCorpus<I>
-where
-    I: Input,
-{
+pub struct OnDiskCorpus<I> {
     /// The root directory backing this corpus
     dir_path: PathBuf,
     /// We wrapp a cached corpus and set its size to 1.
     inner: CachedOnDiskCorpus<I>,
 }
 
-impl<I> UsesInput for OnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
 impl<I> Corpus for OnDiskCorpus<I>
 where
     I: Input,
 {
+    type Input = I;
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -188,25 +179,16 @@ impl<I> HasTestcase for OnDiskCorpus<I>
 where
     I: Input,
 {
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
 
-impl<I> OnDiskCorpus<I>
-where
-    I: Input,
-{
+impl<I> OnDiskCorpus<I> {
     /// Creates an [`OnDiskCorpus`].
     ///
     /// This corpus stores all testcases to disk.

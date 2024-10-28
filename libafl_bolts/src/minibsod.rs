@@ -1176,11 +1176,12 @@ mod tests {
 
     use std::{
         io::{stdout, BufWriter},
+        os::raw::c_void,
         sync::mpsc,
     };
 
     use windows::Win32::{
-        Foundation::{CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS},
+        Foundation::{CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE},
         System::{
             Diagnostics::Debug::{
                 GetThreadContext, CONTEXT, CONTEXT_FULL_AMD64, CONTEXT_FULL_ARM64, CONTEXT_FULL_X86,
@@ -1191,6 +1192,12 @@ mod tests {
 
     use crate::minibsod::dump_registers;
 
+    #[derive(Default)]
+    #[repr(align(16))]
+    struct Align16 {
+        pub ctx: CONTEXT,
+    }
+
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_dump_registers() {
@@ -1199,32 +1206,27 @@ mod tests {
         let t = std::thread::spawn(move || {
             let cur = unsafe { GetCurrentThread() };
             let proc = unsafe { GetCurrentProcess() };
-            let mut out = Default::default();
+            let mut out = HANDLE::default();
             unsafe {
                 DuplicateHandle(
                     proc,
                     cur,
                     proc,
-                    &mut out as *mut _,
+                    std::ptr::addr_of_mut!(out),
                     0,
                     true,
                     DUPLICATE_SAME_ACCESS,
                 )
-                .unwrap()
+                .unwrap();
             };
-            tx.send(out).unwrap();
+            tx.send(out.0 as i64).unwrap();
             evt_rx.recv().unwrap();
         });
 
         let thread = rx.recv().unwrap();
-        eprintln!("thread: {:?}", thread);
+        let thread = HANDLE(thread as *mut c_void);
+        eprintln!("thread: {thread:?}");
         unsafe { SuspendThread(thread) };
-
-        #[derive(Default)]
-        #[repr(align(16))]
-        struct Align16 {
-            pub ctx: CONTEXT,
-        }
 
         // https://stackoverflow.com/questions/56516445/getting-0x3e6-when-calling-getthreadcontext-for-debugged-thread
         let mut c = Align16::default();
@@ -1235,7 +1237,7 @@ mod tests {
         } else if cfg!(target_arch = "aarch64") {
             c.ctx.ContextFlags = CONTEXT_FULL_ARM64;
         }
-        unsafe { GetThreadContext(thread, &mut c.ctx as *mut _).unwrap() };
+        unsafe { GetThreadContext(thread, std::ptr::addr_of_mut!(c.ctx)).unwrap() };
 
         let mut writer = BufWriter::new(stdout());
         dump_registers(&mut writer, &c.ctx).unwrap();

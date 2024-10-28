@@ -3,12 +3,9 @@ use alloc::borrow::Cow;
 use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    inputs::UsesInput,
-    observers::{
-        concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
-        Observer,
-    },
+use crate::observers::{
+    concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
+    Observer,
 };
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.
@@ -19,9 +16,9 @@ pub struct ConcolicObserver<'map> {
     name: Cow<'static, str>,
 }
 
-impl<'map, S> Observer<S> for ConcolicObserver<'map> where S: UsesInput {}
+impl<I, S> Observer<I, S> for ConcolicObserver<'_> {}
 
-impl<'map> ConcolicObserver<'map> {
+impl ConcolicObserver<'_> {
     /// Create the concolic observer metadata for this run
     #[must_use]
     pub fn create_metadata_from_current_map(&self) -> ConcolicMetadata {
@@ -31,7 +28,7 @@ impl<'map> ConcolicObserver<'map> {
     }
 }
 
-impl<'map> Named for ConcolicObserver<'map> {
+impl Named for ConcolicObserver<'_> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

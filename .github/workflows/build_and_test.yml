@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Install mimetype
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y libfile-mimeinfo-perl
+        run: sudo apt-get update && sudo apt-get install -y libfile-mimeinfo-perl
       - name: install mdbook
         uses: baptiste0928/cargo-install@v3
         with:
@@ -66,28 +66,6 @@ jobs:
       - name: Test libafl_targets no_std
         run: cd libafl_targets && cargo test --no-default-features
 
-  llvm-tester:
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-    strategy:
-      matrix:
-        llvm-version: [ "16", "17" ] # Add 18 when KyleMayes/install-llvm-action enables it
-    steps:
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - name: Install curl
-        run: sudo apt-get install clang
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "${{matrix.llvm-version}}"
-      - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "llvm-tester" }
-      - name: Build and test with llvm-${{ matrix.llvm-version }}
-        run: pwd && ls & cd libafl_cc && cargo build --release
-
   ubuntu-doc-build:
     runs-on: ubuntu-24.04
     steps:
@@ -110,7 +88,6 @@ jobs:
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
-    needs: ubuntu
     steps:
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
@@ -153,7 +130,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Run clippy
-        run: ./scripts/clippy.sh
+        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
@@ -182,7 +159,7 @@ jobs:
     needs: ubuntu
     steps:
       - name: Install curl
-        run: sudo apt-get install clang
+        run: sudo apt-get update && sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
@@ -196,7 +173,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Install deps
-        run: sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
+        run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
       - name: Install maturin
         run: cargo install --locked maturin
       - uses: actions/checkout@v4
@@ -206,7 +183,7 @@ jobs:
       - name: Run a maturin build
         run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
       - name: Run python test
-        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/binary-only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
+        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
 
   cargo-fmt:
     runs-on: ubuntu-24.04
@@ -227,7 +204,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install linkspector
         shell: bash
-        run: sudo apt-get install -y npm && npm install -g @umbrelladocs/linkspector
+        run: sudo apt-get update && sudo apt-get install -y npm && npm install -g @umbrelladocs/linkspector
       - name: Run linkspector
         shell: bash
         run: ./scripts/check_md_links.sh
@@ -236,7 +213,7 @@ jobs:
       #   uses: umbrelladocs/action-linkspector@v1
       #   with:
       #     fail_on_error: 'true'
-      #     config_file: '.github/workflows/.linkspector.yml'
+      #     config_file: '.github/.linkspector.yml'
 
   fuzzers-preflight:
     runs-on: ubuntu-24.04
@@ -247,29 +224,19 @@ jobs:
 
   fuzzers:
     needs:
-      - ubuntu
       - fuzzers-preflight
-      - common
     strategy:
       fail-fast: true
       matrix:
         os: [ ubuntu-24.04 ]
         fuzzer:
           # Baby
-          - ./fuzzers/baby/baby_fuzzer_with_forkexecutor
-          - ./fuzzers/baby/baby_no_std
           - ./fuzzers/baby/baby_fuzzer_swap_differential
-          - ./fuzzers/baby/baby_fuzzer_grimoire
-          - ./fuzzers/baby/baby_fuzzer_gramatron
+          - ./fuzzers/baby/tutorial
           - ./fuzzers/baby/baby_fuzzer
-          - ./fuzzers/baby/baby_fuzzer_custom_input
-          - ./fuzzers/baby/baby_fuzzer_nautilus
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode
-          - ./fuzzers/baby/baby_fuzzer_multi
-          - ./fuzzers/baby/baby_fuzzer_wasm
           - ./fuzzers/baby/baby_fuzzer_minimizing
-          - ./fuzzers/baby/baby_fuzzer_tokens
           - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
@@ -278,12 +245,12 @@ jobs:
           - ./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
 
           # Binary-only
-          - ./fuzzers/binary-only/fuzzbench_fork_qemu
-          - ./fuzzers/binary-only/frida_executable_libpng
-          - ./fuzzers/binary-only/frida_gdiplus
-          - ./fuzzers/binary-only/frida_libpng
-          - ./fuzzers/binary-only/fuzzbench_qemu
-          - ./fuzzers/binary-only/tinyinst_simple
+          - ./fuzzers/binary_only/fuzzbench_fork_qemu
+          - ./fuzzers/binary_only/frida_executable_libpng
+          - ./fuzzers/binary_only/frida_windows_gdiplus
+          - ./fuzzers/binary_only/frida_libpng
+          - ./fuzzers/binary_only/fuzzbench_qemu
+          - ./fuzzers/binary_only/tinyinst_simple
 
           # Forkserver
           - ./fuzzers/forkserver/forkserver_simple
@@ -291,16 +258,24 @@ jobs:
           - ./fuzzers/forkserver/fuzzbench_forkserver
           - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
           - ./fuzzers/forkserver/libafl-fuzz
+          - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
 
           # Full-system
-          - ./fuzzers/full-system/nyx_libxml2_standalone
-          - ./fuzzers/full-system/nyx_libxml2_parallel
+          - ./fuzzers/full_system/nyx_libxml2_standalone
+          - ./fuzzers/full_system/nyx_libxml2_parallel
 
-          # Grammar-aware
-          - ./fuzzers/grammar-aware/nautilus_sync
+          # Structure-aware
+          - ./fuzzers/structure_aware/nautilus_sync
+          - ./fuzzers/structure_aware/baby_fuzzer_grimoire
+          - ./fuzzers/structure_aware/baby_fuzzer_gramatron
+          - ./fuzzers/structure_aware/baby_fuzzer_tokens
+          - ./fuzzers/structure_aware/baby_fuzzer_multi
+          - ./fuzzers/structure_aware/baby_fuzzer_custom_input
+          - ./fuzzers/structure_aware/baby_fuzzer_nautilus
+          - ./fuzzers/structure_aware/forkserver_simple_nautilus
 
           # In-process
-          - ./fuzzers/inprocess/cargo_fuzz
+          - ./fuzzers/fuzz_anything/cargo_fuzz
           # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
@@ -315,15 +290,17 @@ jobs:
           # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
           - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
           - ./fuzzers/inprocess/libfuzzer_stb_image
-          # - ./fuzzers/inprocess/libfuzzer_stb_image_concolic
+          # - ./fuzzers/structure_aware/libfuzzer_stb_image_concolic
           # - ./fuzzers/inprocess/libfuzzer_windows_asan
-          - ./fuzzers/inprocess/push_harness
-          - ./fuzzers/inprocess/push_stage_harness
           # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
-          - ./fuzzers/inprocess/tutorial
 
-          # Others
-          - ./fuzzers/others/libafl_atheris
+          # Fuzz Anything
+          - ./fuzzers/fuzz_anything/push_harness
+          - ./fuzzers/fuzz_anything/push_stage_harness
+          - ./fuzzers/fuzz_anything/libafl_atheris
+          - ./fuzzers/fuzz_anything/baby_no_std
+          - ./fuzzers/fuzz_anything/baby_fuzzer_wasm
+
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -355,7 +332,6 @@ jobs:
 
   fuzzers-qemu:
     needs:
-      - common
       - changes
     if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
@@ -363,14 +339,14 @@ jobs:
         os: [ubuntu-24.04]
         fuzzer:
           # Binary only
-          - ./fuzzers/binary-only/qemu_cmin
-          - ./fuzzers/binary-only/qemu_coverage
-          - ./fuzzers/binary-only/qemu_launcher
+          - ./fuzzers/binary_only/qemu_cmin
+          - ./fuzzers/binary_only/qemu_coverage
+          - ./fuzzers/binary_only/qemu_launcher
 
           # Full-system
-          - ./fuzzers/full-system/qemu_baremetal
-          # - ./fuzzers/full-system/qemu_linux_kernel
-          #- ./fuzzers/full-system/qemu_linux_process
+          - ./fuzzers/full_system/qemu_baremetal
+          # - ./fuzzers/full_system/qemu_linux_kernel
+          #- ./fuzzers/full_system/qemu_linux_process
 
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
@@ -393,9 +369,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build aarch64-unknown-none
-        run: cd ./fuzzers/baby/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
-        run: cd ./fuzzers/baby/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
+        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
       - name: no_std tests
         run: cd ./libafl && cargo test --no-default-features
 
@@ -437,8 +413,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/binary-only/frida_libpng
-        run: cd fuzzers/binary-only/frida_libpng/ && cargo make test
+      - name: Build fuzzers/binary_only/frida_libpng
+        run: cd fuzzers/binary_only/frida_libpng/ && cargo make test
 
   windows-frida-libfuzzer-stb-image:
     runs-on: windows-latest
@@ -457,8 +433,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/binary-only/frida_gdiplus
-        run: cd fuzzers/binary-only/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+      - name: Build fuzzers/binary_only/frida_windows_gdiplus
+        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
@@ -469,8 +445,8 @@ jobs:
         run: cargo install cxxbridge-cmd
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/binary-only/tinyinst_simple
-        run: cd fuzzers/binary-only/tinyinst_simple/ && cargo make test
+      - name: Build fuzzers/binary_only/tinyinst_simple
+        run: cd fuzzers/binary_only/tinyinst_simple/ && cargo make test
 
   windows-clippy:
     runs-on: windows-latest
@@ -521,7 +497,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Install curl
-        run: sudo apt-get install clang
+        run: sudo apt-get update && sudo apt-get install clang
       - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
         with:
@@ -544,36 +520,3 @@ jobs:
     #  run: clang -v
     #- name: Windows Test
     #  run: C:\Rust\.cargo\bin\cargo.exe test --verbose
-
-  freebsd:
-    runs-on: ubuntu-22.04
-    name: Simple build in FreeBSD
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test in FreeBSD
-        id: test
-        uses: vmactions/freebsd-vm@v1
-        with:
-          usesh: true
-          sync: rsync
-          copyback: false
-          mem: 2048
-          release: 13.2
-          prepare: |
-            pkg install -y curl bash sudo llvm16
-            curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-          run: |
-            freebsd-version
-            . "$HOME/.cargo/env"
-            rustup toolchain install nightly
-            export LLVM_CONFIG=/usr/local/bin/llvm-config16
-            pwd
-            ls -lah
-            echo "local/bin"
-            ls -lah /usr/local/bin/
-            which llvm-config
-            chmod +x ./scripts/clippy.sh
-            bash ./scripts/shmem_limits_fbsd.sh
-            bash ./scripts/clippy.sh
-            cargo test

@@ -6,6 +6,7 @@ vendor
 
 .DS_Store
 .env
+.vscode
 
 *.test
 *.tmp
@@ -33,7 +34,7 @@ callgrind.out.*
 perf.data
 perf.data.old
 
-.vscode
+.vscode/settings.json
 test.dict
 
 .idea/
@@ -42,7 +43,6 @@ test.dict
 AFLplusplus
 test_*
 *_fuzzer
-*_harness
 
 # Ignore common dummy and logfiles
 *.log
@@ -73,6 +73,5 @@ libafl_nyx/packer
 # common harness names
 harness
 program
-fuzzer
 fuzzer_libpng*
 forkserver_simple

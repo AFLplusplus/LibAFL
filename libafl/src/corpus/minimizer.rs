@@ -24,28 +24,6 @@ use crate::{
     Error, HasMetadata, HasScheduler,
 };
 
-/// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for
-/// details.
-pub trait CorpusMinimizer<E>
-where
-    E: UsesState,
-    E::State: HasCorpus,
-{
-    /// Minimize the corpus of the provided state.
-    fn minimize<CS, EM, Z>(
-        &self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        manager: &mut EM,
-        state: &mut E::State,
-    ) -> Result<(), Error>
-    where
-        E: Executor<EM, Z> + HasObservers,
-        CS: Scheduler<E::Input, E::State> + RemovableScheduler<E::Input, E::State>, // schedulers that has on_remove/on_replace only!
-        EM: EventFirer<State = E::State>,
-        Z: HasScheduler<Scheduler = CS, State = E::State>;
-}
-
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
@@ -62,7 +40,7 @@ impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
-    TS: TestcaseScore<E::Input, E::State>,
+    TS: TestcaseScore<E::State>,
     C: Named,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
@@ -75,17 +53,19 @@ where
     }
 }
 
-impl<C, E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<C, E, O, T, TS>
+impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
 where
     E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
     E::State: HasMetadata + HasCorpus + HasExecutions,
+    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<E::Input, E::State>,
+    TS: TestcaseScore<E::State>,
 {
+    /// Do the minimization
     #[allow(clippy::too_many_lines)]
-    fn minimize<CS, EM, Z>(
+    pub fn minimize<CS, EM, Z>(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
@@ -94,6 +74,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers,
+        E::Observers: ObserversTuple<E::Input, E::State>,
         CS: Scheduler<E::Input, E::State> + RemovableScheduler<E::Input, E::State>,
         EM: EventFirer<State = E::State>,
         Z: HasScheduler<Scheduler = CS, State = E::State>,

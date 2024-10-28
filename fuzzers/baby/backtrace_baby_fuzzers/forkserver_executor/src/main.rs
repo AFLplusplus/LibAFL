@@ -21,6 +21,7 @@ use libafl_bolts::shmem::StdShMemProvider;
 #[cfg(target_vendor = "apple")]
 use libafl_bolts::shmem::UnixShMemProvider;
 use libafl_bolts::{
+    nonzero,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
@@ -97,7 +98,7 @@ pub fn main() {
         .unwrap();
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(3);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

@@ -33,7 +33,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     struct W<'a, T: ?Sized, U: ?Sized>(&'a Cell<bool>, PhantomData<fn() -> (&'a T, &'a U)>);
 
     // default implementation: if the types are unequal, we will use the clone implementation
-    impl<'a, T: ?Sized, U: ?Sized> Clone for W<'a, T, U> {
+    impl<T: ?Sized, U: ?Sized> Clone for W<'_, T, U> {
         #[inline]
         fn clone(&self) -> Self {
             // indicate that the types are unequal
@@ -46,7 +46,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 
     // specialized implementation: Copy is only implemented if the types are the same
     #[allow(clippy::mismatching_type_param_order)]
-    impl<'a, T: ?Sized> Copy for W<'a, T, T> {}
+    impl<T: ?Sized> Copy for W<'_, T, T> {}
 
     let detected = Cell::new(true);
     // [].clone() is *specialized* in core.
@@ -417,12 +417,19 @@ where
 pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
+
+    /// Gets all the names
+    fn names(&self) -> Vec<Cow<'static, str>>;
 }
 
 #[cfg(feature = "alloc")]
 impl NamedTuple for () {
     fn name(&self, _index: usize) -> Option<&Cow<'static, str>> {
         None
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        Vec::new()
     }
 }
 
@@ -447,6 +454,13 @@ where
         } else {
             self.1.name(index - 1)
         }
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        let first = self.0.name().clone();
+        let mut last = self.1.names();
+        last.insert(0, first);
+        last
     }
 }
 
@@ -596,7 +610,6 @@ pub struct RefIndexable<RM, M>(RM, PhantomData<M>);
 impl<RM, M> From<RM> for RefIndexable<RM, M>
 where
     RM: Deref<Target = M>,
-    M: MatchName,
 {
     fn from(value: RM) -> Self {
         RefIndexable(value, PhantomData)

@@ -35,14 +35,14 @@ pub use drivers::*;
 mod snapshot;
 pub use snapshot::*;
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub use systemmode::*;
 
 #[derive(Clone, Copy)]
@@ -441,7 +441,7 @@ where
         state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         ED::post_harness_exec(self, input, observers, state, exit_kind);
     }

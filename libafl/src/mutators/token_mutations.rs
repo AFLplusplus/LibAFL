@@ -6,6 +6,7 @@ use core::slice::from_raw_parts;
 use core::{
     fmt::Debug,
     mem::size_of,
+    num::NonZero,
     ops::{Add, AddAssign, Deref},
     slice::Iter,
 };
@@ -24,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
-    inputs::{HasMutatorBytes, UsesInput},
+    inputs::HasMutatorBytes,
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
@@ -313,15 +314,21 @@ where
             let Some(meta) = state.metadata_map().get::<Tokens>() else {
                 return Ok(MutationResult::Skipped);
             };
-            if meta.tokens().is_empty() {
+            if let Some(tokens_len) = NonZero::new(meta.tokens().len()) {
+                tokens_len
+            } else {
                 return Ok(MutationResult::Skipped);
             }
-            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len);
 
         let size = input.bytes().len();
-        let off = state.rand_mut().below(size + 1);
+        // # Safety
+        // after saturating add it's always above 0
+
+        let off = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size.saturating_add(1)).unwrap_unchecked() });
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -367,27 +374,28 @@ pub struct TokenReplace;
 
 impl<I, S> Mutator<I, S> for TokenReplace
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        if size == 0 {
+        let off = if let Some(nz) = NonZero::new(size) {
+            state.rand_mut().below(nz)
+        } else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let tokens_len = {
             let Some(meta) = state.metadata_map().get::<Tokens>() else {
                 return Ok(MutationResult::Skipped);
             };
-            if meta.tokens().is_empty() {
+            if let Some(tokens_len) = NonZero::new(meta.tokens().len()) {
+                tokens_len
+            } else {
                 return Ok(MutationResult::Skipped);
             }
-            meta.tokens().len()
         };
         let token_idx = state.rand_mut().below(tokens_len);
-
-        let off = state.rand_mut().below(size);
 
         let meta = state.metadata_map().get::<Tokens>().unwrap();
         let token = &meta.tokens()[token_idx];
@@ -426,26 +434,28 @@ pub struct I2SRandReplace;
 
 impl<I, S> Mutator<I, S> for I2SRandReplace
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
-        if size == 0 {
+        let Some(size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let cmps_len = {
             let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
                 return Ok(MutationResult::Skipped);
             };
             log::trace!("meta: {:x?}", meta);
-            if meta.list.is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
             meta.list.len()
         };
+
+        let Some(cmps_len) = NonZero::new(cmps_len) else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let idx = state.rand_mut().below(cmps_len);
 
         let off = state.rand_mut().below(size);
@@ -615,31 +625,31 @@ where
     S: HasRand,
 {
     let sz_log = SZ.ilog2() as usize;
-    let res = state.rand_mut().below_incl(sz_log);
+    // # Safety
+    // We add 1 so this can never be 0.
+    // On 32 bit systems this could overflow in theory but this is highly unlikely.
+    let sz_log_inclusive = unsafe { NonZero::new(sz_log + 1).unwrap_unchecked() };
+    let res = state.rand_mut().below(sz_log_inclusive);
     2_usize.pow(res as u32)
 }
 
 impl<I, S> Mutator<I, S> for I2SRandReplaceBinonly
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes().len();
-        if size == 0 {
+        let Some(size) = NonZero::new(input.bytes().len()) else {
             return Ok(MutationResult::Skipped);
-        }
+        };
+        let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
+            return Ok(MutationResult::Skipped);
+        };
+        log::trace!("meta: {:x?}", meta);
 
-        let cmps_len = {
-            let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
-                return Ok(MutationResult::Skipped);
-            };
-            log::trace!("meta: {:x?}", meta);
-            if meta.list.is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.list.len()
+        let Some(cmps_len) = NonZero::new(meta.list.len()) else {
+            return Ok(MutationResult::Skipped);
         };
         let idx = state.rand_mut().below(cmps_len);
 
@@ -1294,7 +1304,7 @@ impl AFLppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
-    S: UsesInput + HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
+    S: HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
     I: HasMutatorBytes + From<Vec<u8>>,
 {
     #[allow(clippy::needless_range_loop)]

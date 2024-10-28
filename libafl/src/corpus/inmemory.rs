@@ -8,18 +8,13 @@ use serde::{Deserialize, Serialize};
 use super::HasTestcase;
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    inputs::{Input, UsesInput},
     Error,
 };
 
 /// Keep track of the stored `Testcase` and the siblings ids (insertion order)
 #[cfg(not(feature = "corpus_btreemap"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TestcaseStorageItem<I>
-where
-    I: Input,
-{
+pub struct TestcaseStorageItem<I> {
     /// The stored testcase
     pub testcase: RefCell<Testcase<I>>,
     /// Previously inserted id
@@ -30,11 +25,7 @@ where
 
 /// The map type in which testcases are stored (disable the feature `corpus_btreemap` to use a `HashMap` instead of `BTreeMap`)
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TestcaseStorageMap<I>
-where
-    I: Input,
-{
+pub struct TestcaseStorageMap<I> {
     #[cfg(not(feature = "corpus_btreemap"))]
     /// A map of `CorpusId` to `TestcaseStorageItem`
     pub map: hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>,
@@ -51,10 +42,7 @@ where
     last_id: Option<CorpusId>,
 }
 
-impl<I> TestcaseStorageMap<I>
-where
-    I: Input,
-{
+impl<I> TestcaseStorageMap<I> {
     /// Insert a key in the keys set
     fn insert_key(&mut self, id: CorpusId) {
         if let Err(idx) = self.keys.binary_search(&id) {
@@ -235,11 +223,7 @@ where
 }
 /// Storage map for the testcases (used in `Corpus` implementations) with an incremental index
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct TestcaseStorage<I>
-where
-    I: Input,
-{
+pub struct TestcaseStorage<I> {
     /// The map in which enabled testcases are stored
     pub enabled: TestcaseStorageMap<I>,
     /// The map in which disabled testcases are stored
@@ -248,17 +232,7 @@ where
     progressive_id: usize,
 }
 
-impl<I> UsesInput for TestcaseStorage<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
-impl<I> TestcaseStorage<I>
-where
-    I: Input,
-{
+impl<I> TestcaseStorage<I> {
     /// Insert a testcase assigning a `CorpusId` to it
     pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
         self.insert_inner(testcase, false)
@@ -335,26 +309,14 @@ where
 
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct InMemoryCorpus<I>
-where
-    I: Input,
-{
+pub struct InMemoryCorpus<I> {
     storage: TestcaseStorage<I>,
     current: Option<CorpusId>,
 }
 
-impl<I> UsesInput for InMemoryCorpus<I>
-where
-    I: Input,
-{
+impl<I> Corpus for InMemoryCorpus<I> {
     type Input = I;
-}
 
-impl<I> Corpus for InMemoryCorpus<I>
-where
-    I: Input,
-{
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -492,29 +454,23 @@ where
     }
 }
 
-impl<I> HasTestcase for InMemoryCorpus<I>
-where
-    I: Input,
-{
+impl<I> HasTestcase for InMemoryCorpus<I> {
     fn testcase(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<core::cell::Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<core::cell::RefMut<Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
 
-impl<I> InMemoryCorpus<I>
-where
-    I: Input,
-{
+impl<I> InMemoryCorpus<I> {
     /// Creates a new [`InMemoryCorpus`], keeping all [`Testcase`]`s` in memory.
     /// This is the simplest and fastest option, however test progress will be lost on exit or on OOM.
     #[must_use]

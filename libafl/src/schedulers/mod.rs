@@ -215,7 +215,7 @@ pub struct RandScheduler<S> {
 
 impl<I, S> Scheduler<I, S> for RandScheduler<S>
 where
-    S: HasCorpus + HasRand + HasTestcase,
+    S: HasCorpus + HasRand,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id

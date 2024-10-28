@@ -17,6 +17,7 @@ use libafl::{
     state::StdState,
 };
 use libafl_bolts::{
+    nonzero,
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -103,7 +104,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

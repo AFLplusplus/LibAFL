@@ -242,7 +242,7 @@ pub mod serdeany_registry {
         /// # Safety
         /// This may never be called concurrently or at the same time as `register`.
         /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
-        pub fn finalize() {
+        pub unsafe fn finalize() {
             unsafe {
                 (*addr_of_mut!(REGISTRY)).finalize();
             }

@@ -23,6 +23,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
+  "usermode",
   "fork",
   "build_libgasan",
   "build_libqasan",
@@ -95,50 +96,53 @@ libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features 
   "derive",
 ] }
 libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
-libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.13.2" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.13.2", default-features = false }
 libafl_derive = { path = "../libafl_derive", version = "0.13.2" }
 
-serde = { version = "1.0", default-features = false, features = [
+serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
-hashbrown = { version = "0.14", features = [
+hashbrown = { workspace = true, default-features = true, features = [
   "serde",
 ] } # A faster hashmap, nostd compatible
-num-traits = "0.2"
-num-derive = "0.4"
-num_enum = "0.7"
-goblin = "0.8"
-libc = "0.2"
-strum = "0.26"
-strum_macros = "0.26"
-syscall-numbers = "4.0"
-meminterval = "0.4"
-thread_local = "1.1.4"
+num-traits = { workspace = true, default-features = true }
+num-derive = "0.4.2"
+num_enum = { workspace = true, default-features = true }
+goblin = "0.8.2"
+libc = { workspace = true }
+strum = "0.26.3"
+strum_macros = "0.26.4"
+syscall-numbers = "4.0.0"
+meminterval = { workspace = true }
+thread_local = "1.1.8"
 capstone = "0.12.0"
-rangemap = "1.3"
-log = "0.4"
-object = "0.36"
-addr2line = "0.24"
-typed-arena = "2.0"
-paste = "1"
-enum-map = "2.7"
-serde_yaml = { version = "0.9", optional = true } # For parsing the injections yaml file
-toml = { version = "0.8.13", optional = true } # For parsing the injections toml file
-pyo3 = { version = "0.22", optional = true, features = ["multiple-pymethods"] }
-bytes-utils = "0.1"
-typed-builder = "0.19"
-memmap2 = "0.9"
-getset = "0.1"
+rangemap = { workspace = true }
+log = { workspace = true }
+object = "0.36.4"
+addr2line = "0.24.1"
+typed-arena = "2.0.2"
+paste = { workspace = true }
+enum-map = "2.7.3"
+serde_yaml = { workspace = true, optional = true } # For parsing the injections yaml file
+toml = { workspace = true, optional = true } # For parsing the injections toml file
+pyo3 = { workspace = true, optional = true, features = ["multiple-pymethods"] }
+bytes-utils = "0.1.4"
+typed-builder = { workspace = true }
+memmap2 = "0.9.5"
+getset = "0.1.3"
 # Document all features of this crate (for `cargo doc`)
-document-features = { version = "0.2", optional = true }
+document-features = { workspace = true, optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "./libafl_qemu_build", version = "0.13.2" }
-pyo3-build-config = { version = "0.22", optional = true }
-rustversion = "1.0"
-bindgen = "0.69"
-cc = "1.0"
+pyo3-build-config = { workspace = true, optional = true }
+rustversion = { workspace = true }
+bindgen = { workspace = true }
+cc = { workspace = true }
 
 [lib]
 name = "libafl_qemu"
 crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true

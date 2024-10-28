@@ -23,11 +23,12 @@ extern "C" {
 
 /// Calls the (native) libfuzzer initialize function.
 /// Returns the value returned by the init function.
-/// # Note
+///
+/// # Safety
 /// Calls the libfuzzer-style init function which is native code.
 #[allow(clippy::similar_names)]
 #[allow(clippy::must_use_candidate)] // nobody uses that return code...
-pub fn libfuzzer_initialize(args: &[String]) -> i32 {
+pub unsafe fn libfuzzer_initialize(args: &[String]) -> i32 {
     let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
     assert!(argv.len() < i32::MAX as usize);
@@ -40,9 +41,10 @@ pub fn libfuzzer_initialize(args: &[String]) -> i32 {
 }
 
 /// Call a single input of a libfuzzer-style cpp-harness
-/// # Note
+///
+/// # Safety
 /// Calls the libfuzzer harness. We actually think the target is unsafe and crashes eventually, that's why we do all this fuzzing.
 #[allow(clippy::must_use_candidate)]
-pub fn libfuzzer_test_one_input(buf: &[u8]) -> i32 {
+pub unsafe fn libfuzzer_test_one_input(buf: &[u8]) -> i32 {
     unsafe { LLVMFuzzerTestOneInput(buf.as_ptr(), buf.len()) }
 }

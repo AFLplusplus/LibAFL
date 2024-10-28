@@ -1,6 +1,7 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use libafl::{
+    corpus::Corpus,
     inputs::Input,
     mutators::Mutator,
     stages::{mutational::MutatedTransform, MutationalStage, Stage},
@@ -26,6 +27,7 @@ where
     SM: MutationalStage<E, EM, I, M, Z, State = S>,
     P: MutationalStage<E, EM, I, M, Z, State = S>,
     S: State<Input = I> + HasRand + HasCorpus + HasNamedMetadata,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     /// The mutator, added to this stage
     #[inline]
@@ -85,6 +87,7 @@ where
     SM: MutationalStage<E, EM, I, M, Z, State = S>,
     P: MutationalStage<E, EM, I, M, Z, State = S>,
     S: State<Input = I> + HasRand + HasCorpus + HasNamedMetadata,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]

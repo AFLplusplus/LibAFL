@@ -110,11 +110,11 @@ pub struct CoverageAccountingScheduler<'a, CS, O> {
     inner: IndexesLenTimeMinimizerScheduler<CS, O>,
 }
 
-impl<'a, CS, I, O, S> Scheduler<I, S> for CoverageAccountingScheduler<'a, CS, O>
+impl<CS, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for CoverageAccountingScheduler<'_, CS, O>
 where
-    CS: Scheduler<I, S>,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand,
-    I: HasLen,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasMetadata + HasRand,
+    <S::Corpus as Corpus>::Input: HasLen,
     O: CanTrack,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -122,7 +122,12 @@ where
         self.inner.on_add(state, id)
     }
 
-    fn on_evaluation<OT>(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error>
+    fn on_evaluation<OT>(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+        observers: &OT,
+    ) -> Result<(), Error>
     where
         OT: MatchName,
     {

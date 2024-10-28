@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 use libafl_bolts::{ownedref::OwnedMutPtr, Named};
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, observers::Observer, state::State, Error};
+use crate::{observers::Observer, Error};
 #[derive(Debug, Serialize, Deserialize)]
 /// The json data
 pub struct FunctionData {
@@ -124,14 +124,11 @@ impl Named for ProfilingObserver {
     }
 }
 
-impl<S> Observer<S> for ProfilingObserver
-where
-    S: State,
-{
+impl<I, S> Observer<I, S> for ProfilingObserver {
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &<S as UsesInput>::Input,
+        _input: &I,
         _exit_kind: &crate::executors::ExitKind,
     ) -> Result<(), Error> {
         // in reality, this should be done in a stage

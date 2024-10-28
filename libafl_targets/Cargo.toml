@@ -65,25 +65,27 @@ cmplog_extended_instrumentation = [
 function-logging = ["common"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 [build-dependencies]
-bindgen = "0.69.4"
-cc = { version = "1.0", features = ["parallel"] }
-rustversion = "1.0"
+bindgen = "0.70.1"
+cc = { version = "1.1.21", features = ["parallel"] }
+rustversion = "1.0.17"
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.13.2", default-features = false, features = [
 ] }
 libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features = false, features = [
 ] }
-libc = "0.2"
-hashbrown = "0.14"
-once_cell = "1.19"
-log = "0.4.20"
-rustversion = "1.0"
+libc = { workspace = true }
+hashbrown = { workspace = true, default-features = true }
+once_cell = "1.19.0"
+log = { workspace = true }
+rustversion = { workspace = true }
 
-rangemap = "1.3"
-serde = { version = "1.0", default-features = false, features = [
+rangemap = { workspace = true }
+serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
-meminterval = { version = "0.4", features = ["serde"], optional = true }
-ahash = { version = "0.8", default-features = false, optional = true }
-# serde-big-array = "0.3.2"
+meminterval = { workspace = true, features = ["serde"], optional = true }
+ahash = { workspace = true, default-features = false, optional = true }
+
+[lints]
+workspace = true

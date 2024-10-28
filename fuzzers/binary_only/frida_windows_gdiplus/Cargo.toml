@@ -1,0 +1,42 @@
+[package]
+name = "frida_windows_gdiplus"
+version = "0.13.2"
+authors = ["Richard Johnson <richinseattle@gmail.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../../libafl", features = [
+  "std",
+  "llmp_compression",
+  "llmp_bind_public",
+  "frida_cli",
+  "errors_backtrace",
+] } #,  "llmp_small_maps", "llmp_debug"]}
+libafl_bolts = { path = "../../../libafl_bolts" }
+frida-gum = { version = "0.14.2", features = [
+  "auto-download",
+  "event-sink",
+  "invocation-listener",
+  "script",
+] }
+libafl_frida = { path = "../../../libafl_frida", features = ["cmplog"] }
+libafl_targets = { path = "../../../libafl_targets", features = [
+  "sancov_cmplog",
+] }
+libloading = "0.8.5"
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+mimalloc = { version = "0.1.43", default-features = false }
+dlmalloc = { version = "0.2.6", features = ["global"] }
+color-backtrace = "0.6.1"
+env_logger = "0.11.5"
+iced-x86 = { version = "1.21.0", features = ["code_asm"] }

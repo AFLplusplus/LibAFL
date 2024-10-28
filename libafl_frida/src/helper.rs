@@ -1,7 +1,8 @@
 use core::fmt::{self, Debug, Formatter};
 use std::{
     cell::{Ref, RefCell, RefMut},
-    fs,
+    ffi::CStr,
+    fs::{self, read_to_string},
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -9,13 +10,17 @@ use std::{
 use frida_gum::{
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
-    Gum, Module, ModuleDetails, ModuleMap, PageProtection,
+    Backend, Gum, Module, ModuleDetails, ModuleMap, PageProtection, Script,
 };
+use frida_gum_sys::gchar;
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
 };
-use libafl_bolts::{cli::FuzzerOptions, tuples::MatchFirstType};
+use libafl_bolts::{
+    cli::{FridaScriptBackend, FuzzerOptions},
+    tuples::MatchFirstType,
+};
 use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
@@ -147,8 +152,35 @@ pub struct FridaInstrumentationHelperBuilder {
 
 impl FridaInstrumentationHelperBuilder {
     /// Create a new [`FridaInstrumentationHelperBuilder`]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Load a script
+    ///
+    /// See [`Script::new`] for details
+    #[must_use]
+    pub fn load_script<F: Fn(&str, &[u8])>(
+        self,
+        backend: FridaScriptBackend,
+        path: &Path,
+        callback: Option<F>,
+    ) -> Self {
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("Failed to get script file name from path: {path:}");
+        let script_prefix = include_str!("script.js");
+        let file_contents = read_to_string(path).expect("Failed to read script: {path:}");
+        let payload = script_prefix.to_string() + &file_contents;
+        let gum = Gum::obtain();
+        let backend = match backend {
+            FridaScriptBackend::V8 => Backend::obtain_v8(&gum),
+            FridaScriptBackend::QuickJS => Backend::obtain_qjs(&gum),
+        };
+        Script::load(&backend, name, payload, callback).unwrap();
+        self
     }
 
     /// Enable or disable the [`Stalker`](https://frida.re/docs/stalker/)
@@ -373,6 +405,16 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
     }
 }
 
+/// A callback function to test calling back from FRIDA's JavaScript scripting support
+/// # Safety
+/// This function receives a raw pointer to a C string
+#[no_mangle]
+pub unsafe extern "C" fn test_function(message: *const gchar) {
+    if let Ok(msg) = CStr::from_ptr(message).to_str() {
+        println!("{msg}");
+    }
+}
+
 /// Helper function to get the size of a module's CODE section from frida
 #[must_use]
 pub fn get_module_size(module_name: &str) -> usize {
@@ -404,11 +446,12 @@ where
     })
 }
 
-impl<'a> FridaInstrumentationHelper<'a, ()> {
+impl FridaInstrumentationHelper<'_, ()> {
     /// Create a builder to initialize a [`FridaInstrumentationHelper`].
     ///
     /// See the documentation of [`FridaInstrumentationHelperBuilder`]
     /// for more details.
+    #[must_use]
     pub fn builder() -> FridaInstrumentationHelperBuilder {
         FridaInstrumentationHelperBuilder::default()
     }
@@ -428,7 +471,7 @@ where
             .iter()
             .map(PathBuf::from)
             .collect::<Vec<_>>();
-        FridaInstrumentationHelper::builder()
+        let builder = FridaInstrumentationHelper::builder()
             .enable_stalker(options.cmplog || options.asan || !options.disable_coverage)
             .disable_excludes(options.disable_excludes)
             .instrument_module_if(move |module| pathlist_contains_module(&harness, module))
@@ -440,8 +483,22 @@ where
                     name: name.clone(),
                     range: *offset..*offset + 4,
                 }
-            }))
-            .build(gum, runtimes)
+            }));
+
+        let builder = if let Some(script) = &options.script {
+            builder.load_script(
+                options.backend.unwrap_or_default(),
+                script,
+                Some(FridaInstrumentationHelper::<RT>::script_callback),
+            )
+        } else {
+            builder
+        };
+        builder.build(gum, runtimes)
+    }
+
+    fn script_callback(msg: &str, bytes: &[u8]) {
+        println!("msg: {msg:}, bytes: {bytes:x?}");
     }
 
     #[allow(clippy::too_many_lines)]
@@ -644,6 +701,7 @@ where
     }
 
     /// Returns ref to the Transformer
+    #[must_use]
     pub fn transformer(&self) -> &Transformer<'a> {
         &self.transformer
     }
@@ -671,6 +729,7 @@ where
     }
 
     /// If stalker is enabled
+    #[must_use]
     pub fn stalker_enabled(&self) -> bool {
         self.stalker_enabled
     }
@@ -684,6 +743,7 @@ where
     }
 
     /// Ranges
+    #[must_use]
     pub fn ranges(&self) -> Ref<RangeMap<usize, (u16, String)>> {
         self.ranges.borrow()
     }

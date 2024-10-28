@@ -33,7 +33,7 @@ use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
-    feedbacks::Feedback,
+    feedbacks::StateInitializer,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, NopInput, UsesInput},
@@ -74,14 +74,30 @@ where
 }
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus: UsesInput {
+pub trait HasCorpus {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus<Input = <Self as UsesInput>::Input>;
+    type Corpus: Corpus;
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
     /// The testcase corpus (mutable)
     fn corpus_mut(&mut self) -> &mut Self::Corpus;
+}
+
+// Reflexivity
+impl<C> HasCorpus for C
+where
+    C: Corpus,
+{
+    type Corpus = Self;
+
+    fn corpus(&self) -> &Self::Corpus {
+        self
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        self
+    }
 }
 
 /// Interact with the maximum size
@@ -93,9 +109,9 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions: UsesInput {
+pub trait HasSolutions {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus<Input = <Self as UsesInput>::Input>;
+    type Solutions: Corpus;
 
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
@@ -219,7 +235,7 @@ pub struct LoadConfig<'a, I, S, Z> {
 }
 
 #[cfg(feature = "std")]
-impl<'a, I, S, Z> Debug for LoadConfig<'a, I, S, Z> {
+impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "LoadConfig {{}}")
     }
@@ -289,9 +305,9 @@ where
 
 impl<I, C, R, SC> State for StdState<I, C, R, SC>
 where
-    C: Corpus<Input = Self::Input>,
+    C: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
     R: Rand,
-    SC: Corpus<Input = Self::Input>,
+    SC: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
     Self: UsesInput,
 {
 }
@@ -317,9 +333,7 @@ where
 
 impl<I, C, R, SC> HasCorpus for StdState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
-    R: Rand,
+    C: Corpus,
 {
     type Corpus = C;
 
@@ -338,23 +352,15 @@ where
 
 impl<I, C, R, SC> HasTestcase for StdState<I, C, R, SC>
 where
-    I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
-    R: Rand,
+    C: Corpus,
 {
     /// To get the testcase
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<Ref<'_, Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<C::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow())
     }
 
     /// To get mutable testcase
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<'_, Testcase<<Self as UsesInput>::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
@@ -504,20 +510,20 @@ impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
 }
 
 /// Has information about the current [`Testcase`] we are fuzzing
-pub trait HasCurrentTestcase<I>
-where
-    I: Input,
-{
+pub trait HasCurrentTestcase: HasCorpus {
     /// Gets the current [`Testcase`] we are fuzzing
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error>;
+    fn current_testcase(&self)
+        -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
     //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
 
     /// Gets the current [`Testcase`] we are fuzzing (mut)
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error>;
+    fn current_testcase_mut(
+        &self,
+    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
     //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
 
     /// Gets a cloned representation of the current [`Testcase`].
@@ -527,15 +533,17 @@ where
     /// # Note
     /// This allocates memory and copies the contents!
     /// For performance reasons, if you just need to access the testcase, use [`Self::current_testcase`] instead.
-    fn current_input_cloned(&self) -> Result<I, Error>;
+    fn current_input_cloned(&self) -> Result<<Self::Corpus as Corpus>::Input, Error>;
 }
 
-impl<I, T> HasCurrentTestcase<I> for T
+impl<T> HasCurrentTestcase for T
 where
-    I: Input,
-    T: HasCorpus + HasCurrentCorpusId + UsesInput<Input = I>,
+    T: HasCorpus + HasCurrentCorpusId,
+    <Self::Corpus as Corpus>::Input: Clone,
 {
-    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error> {
+    fn current_testcase(
+        &self,
+    ) -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::key_not_found(
                 "We are not currently processing a testcase",
@@ -545,7 +553,9 @@ where
         Ok(self.corpus().get(corpus_id)?.borrow())
     }
 
-    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error> {
+    fn current_testcase_mut(
+        &self,
+    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "We are not currently processing a testcase",
@@ -555,7 +565,7 @@ where
         Ok(self.corpus().get(corpus_id)?.borrow_mut())
     }
 
-    fn current_input_cloned(&self) -> Result<I, Error> {
+    fn current_input_cloned(&self) -> Result<<Self::Corpus as Corpus>::Input, Error> {
         let mut testcase = self.current_testcase_mut()?;
         Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
     }
@@ -1151,8 +1161,10 @@ where
         objective: &mut O,
     ) -> Result<Self, Error>
     where
-        F: Feedback<Self>,
-        O: Feedback<Self>,
+        F: StateInitializer<Self>,
+        O: StateInitializer<Self>,
+        C: Serialize + DeserializeOwned,
+        SC: Serialize + DeserializeOwned,
     {
         let mut state = Self {
             rand,

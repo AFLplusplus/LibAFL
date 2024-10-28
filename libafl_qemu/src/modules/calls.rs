@@ -10,7 +10,7 @@ use libafl_bolts::tuples::{Handle, Handled, MatchFirstType, MatchNameRef};
 use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     capstone,
@@ -56,7 +56,7 @@ pub trait CallTraceCollector: 'static {
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         S: Unpin + UsesInput,
     {
     }
@@ -94,7 +94,7 @@ pub trait CallTraceCollectorTuple: 'static + MatchFirstType {
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         S: Unpin + UsesInput;
 }
 
@@ -136,7 +136,7 @@ impl CallTraceCollectorTuple for () {
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         S: Unpin + UsesInput,
     {
     }
@@ -206,7 +206,7 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         S: Unpin + UsesInput,
     {
         self.0.post_exec(qemu, input, observers, exit_kind);
@@ -300,14 +300,14 @@ where
         if let Some(h) = emulator_modules.modules().match_first_type::<Self>() {
             #[allow(unused_mut)]
             let mut code = {
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 unsafe {
                     std::slice::from_raw_parts(qemu.g2h(pc), 512)
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 &mut [0; 512]
             };
-            #[cfg(emulation_mode = "systemmode")]
+            #[cfg(feature = "systemmode")]
             unsafe {
                 qemu.read_mem(pc, code)
             }; // TODO handle faults
@@ -342,11 +342,11 @@ where
 
                 iaddr += insn.bytes().len() as GuestAddr;
 
-                #[cfg(emulation_mode = "usermode")]
+                #[cfg(feature = "usermode")]
                 unsafe {
                     code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
                 }
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 unsafe {
                     qemu.read_mem(pc, code);
                 } // TODO handle faults
@@ -390,7 +390,7 @@ where
     T: CallTraceCollectorTuple + Debug,
 {
     type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
     fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -426,7 +426,7 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
         self.collectors.as_mut().unwrap().post_exec_all(
@@ -445,12 +445,12 @@ where
         &mut self.filter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter {
         &NopPageFilter
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
         unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
@@ -528,7 +528,7 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         S: Unpin + UsesInput,
     {
         let observer = observers
@@ -543,19 +543,19 @@ static mut CALLSTACKS: Option<ThreadLocal<UnsafeCell<Vec<GuestAddr>>>> = None;
 #[derive(Debug)]
 pub struct FullBacktraceCollector {}
 
-impl Default for FullBacktraceCollector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl FullBacktraceCollector {
-    pub fn new() -> Self {
+    /// # Safety
+    /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
+    pub unsafe fn new() -> Self {
         unsafe { (*addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
         Self {}
     }
 
     pub fn reset(&mut self) {
+        // # Safety
+        // This accesses the global [`CALLSTACKS`] variable.
+        // While it is racey, it might be fine if multiple clear the vecs concurrently.
+        // TODO: This should probably be rewritten in a safer way.
         unsafe {
             for tls in (*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
@@ -564,6 +564,9 @@ impl FullBacktraceCollector {
     }
 
     pub fn backtrace() -> Option<&'static [GuestAddr]> {
+        // # Safety
+        // This accesses the global [`CALLSTACKS`] variable.
+        // However, the actual variable access is behind a `ThreadLocal` class.
         unsafe {
             if let Some(c) = (*addr_of_mut!(CALLSTACKS)).as_mut() {
                 Some(&*c.get_or_default().get())

@@ -324,7 +324,9 @@ impl Allocator {
                 continue;
             }
             // First poison the memory.
-            Self::poison(map_to_shadow!(self, address), allocation.size);
+            unsafe {
+                Self::poison(map_to_shadow!(self, address), allocation.size);
+            }
 
             // Reset the allocaiton metadata object
             allocation.size = 0;
@@ -359,7 +361,11 @@ impl Allocator {
         }
     }
 
-    fn unpoison(start: usize, size: usize) {
+    /// Unpoison an area in memory
+    ///
+    /// # Safety
+    /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
+    unsafe fn unpoison(start: usize, size: usize) {
         unsafe {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0xff);
 
@@ -372,8 +378,11 @@ impl Allocator {
         }
     }
 
-    /// Poisonn an area in memory
-    pub fn poison(start: usize, size: usize) {
+    /// Poison an area in memory
+    ///
+    /// # Safety
+    /// start needs to be a valid address, We need to be able to fill `size / 8` bytes.
+    pub unsafe fn poison(start: usize, size: usize) {
         unsafe {
             std::slice::from_raw_parts_mut(start as *mut u8, size / 8).fill(0x0);
 
@@ -445,7 +454,9 @@ impl Allocator {
         }
 
         if unpoison {
-            Self::unpoison(shadow_mapping_start, end - start);
+            unsafe {
+                Self::unpoison(shadow_mapping_start, end - start);
+            }
         }
 
         (shadow_mapping_start, (end - start) / 8 + 1)
@@ -501,7 +512,7 @@ impl Allocator {
             return true;
         }
 
-        if !self.is_managed(address as *mut c_void) {
+        if !self.is_managed(address.cast_mut()) {
             return true;
         }
 
@@ -608,9 +619,9 @@ impl Allocator {
                 if info.is_submap != 0 {
                     depth += 1;
                     continue;
-                } else {
-                    break;
                 }
+
+                break;
             }
 
             if kr != KERN_SUCCESS {
@@ -633,6 +644,8 @@ impl Allocator {
             size = 0;
         }
     }
+
+    /// Unpoisons all memory
     #[cfg(not(target_vendor = "apple"))]
     pub fn unpoison_all_existing_memory(&mut self) {
         RangeDetails::enumerate_with_prot(

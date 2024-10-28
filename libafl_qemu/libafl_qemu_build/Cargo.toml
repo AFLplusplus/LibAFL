@@ -30,12 +30,15 @@ paranoid_debug = [
 ] # Will perform as many checks as possible. The target will be greatly slowed down.
 
 [dependencies]
-bindgen = "0.69.4"
-which = "6.0"
-json = "0.12"
-shell-words = "1.1"
-pkg-config = "0.3.26"
-cc = "1.0"
-regex = "1"
-rustversion = "1.0"
-rustc_version = "0.4"
+bindgen = { workspace = true }
+which = { workspace = true }
+json = "0.12.4"
+shell-words = "1.1.0"
+pkg-config = "0.3.31"
+cc = { workspace = true }
+regex = { workspace = true }
+rustversion = { workspace = true }
+rustc_version = "0.4.1"
+
+[lints]
+workspace = true

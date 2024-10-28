@@ -6,19 +6,19 @@ use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 pub mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[allow(unused_imports)]
 pub use systemmode::*;
 
 pub mod edges;
-pub use edges::EdgeCoverageModule;
+pub use edges::*;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod calls;
@@ -30,6 +30,11 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::CmpLogModule;
 
+#[cfg(not(cpu_target = "hexagon"))]
+pub mod drcov;
+#[cfg(not(cpu_target = "hexagon"))]
+pub use drcov::*;
+
 use crate::{emu::EmulatorModules, Qemu};
 
 /// A module for `libafl_qemu`.
@@ -40,7 +45,7 @@ where
 {
     type ModuleAddressFilter: AddressFilter;
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     type ModulePageFilter: PageFilter;
 
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
@@ -85,18 +90,39 @@ where
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
     }
 
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_crash(&mut self) {}
+
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_timeout(&mut self) {}
+
     fn address_filter(&self) -> &Self::ModuleAddressFilter;
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
+    fn update_address_filter(&mut self, qemu: Qemu, filter: Self::ModuleAddressFilter) {
+        *self.address_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
+    }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter(&self) -> &Self::ModulePageFilter;
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter;
+    #[cfg(feature = "systemmode")]
+    fn update_page_filter(&mut self, qemu: Qemu, filter: Self::ModulePageFilter) {
+        *self.page_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
+    }
 }
 
 pub trait EmulatorModuleTuple<S>:
@@ -130,12 +156,22 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>;
+
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_crash_all(&mut self);
+
+    /// # Safety
+    ///
+    /// This is getting executed in a signal handler.
+    unsafe fn on_timeout_all(&mut self);
 
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn allow_page_id_all(&mut self, page_id: GuestPhysAddr);
 }
 
@@ -175,14 +211,18 @@ where
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
     }
 
+    unsafe fn on_crash_all(&mut self) {}
+
+    unsafe fn on_timeout_all(&mut self) {}
+
     fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn allow_page_id_all(&mut self, _page_id: GuestPhysAddr) {}
 }
 
@@ -230,7 +270,7 @@ where
         observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
         self.0
@@ -239,12 +279,22 @@ where
             .post_exec_all(emulator_modules, state, input, observers, exit_kind);
     }
 
+    unsafe fn on_crash_all(&mut self) {
+        self.0.on_crash();
+        self.1.on_crash_all();
+    }
+
+    unsafe fn on_timeout_all(&mut self) {
+        self.0.on_timeout();
+        self.1.on_timeout_all();
+    }
+
     fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
         self.0.address_filter_mut().register(address_range.clone());
         self.1.allow_address_range_all(address_range);
     }
 
-    #[cfg(emulation_mode = "systemmode")]
+    #[cfg(feature = "systemmode")]
     fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
         self.0.page_filter_mut().register(page_id.clone());
         self.1.allow_page_id_all(page_id)
@@ -375,11 +425,11 @@ pub struct PageFilterVec {
     registered_pages: HashSet<GuestPhysAddr>,
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[derive(Clone, Debug)]
 pub struct StdPageFilter(FilterList<PageFilterVec>);
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub type StdPageFilter = NopPageFilter;
 
 impl Default for PageFilterVec {
@@ -390,7 +440,7 @@ impl Default for PageFilterVec {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl Default for StdPageFilter {
     fn default() -> Self {
         Self(FilterList::None)
@@ -412,7 +462,7 @@ impl PageFilter for PageFilterVec {
     }
 }
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 impl PageFilter for StdPageFilter {
     fn register(&mut self, page_id: GuestPhysAddr) {
         self.0.register(page_id);
@@ -467,7 +517,7 @@ impl PageFilter for NopPageFilter {
     }
 }
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> = UnsafeCell::new(NopAddressFilter);
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);

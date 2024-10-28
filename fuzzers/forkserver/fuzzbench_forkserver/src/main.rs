@@ -21,9 +21,7 @@ use libafl::{
         havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
         StdScheduledMutator, Tokens,
     },
-    observers::{
-        CanTrack, HitcountsMapObserver, StdCmpValuesObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{CanTrack, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -293,14 +291,15 @@ fn fuzz(
     println!("Let's fuzz :)");
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(
+    let mutator = StdMOptMutator::new::<BytesInput, _>(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
         7,
         5,
     )?;
 
-    let power = StdPowerMutationalStage::new(mutator);
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+        StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
@@ -352,7 +351,7 @@ fn fuzz(
         cmplog_shmem.write_to_env("__AFL_CMPLOG_SHM_ID").unwrap();
         let cmpmap = unsafe { OwnedRefMut::<AFLppCmpLogMap>::from_shmem(&mut cmplog_shmem) };
 
-        let cmplog_observer = StdCmpValuesObserver::new("cmplog", cmpmap, true);
+        let cmplog_observer = StdCmpObserver::new("cmplog", cmpmap, true);
 
         let cmplog_executor = ForkserverExecutor::builder()
             .program(exec)

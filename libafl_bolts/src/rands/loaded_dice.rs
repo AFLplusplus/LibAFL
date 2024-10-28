@@ -11,7 +11,7 @@ Assume we want to sample from the following distribution: `p(0)=0.5, p(1)=0.3, p
 use libafl_bolts::rands::{StdRand, loaded_dice::LoadedDiceSampler};
 fn main() {
     let mut rand = StdRand::new();
-    let mut sampler = LoadedDiceSampler::new(&[0.5, 0.3, 0.1, 0.1]);
+    let mut sampler = LoadedDiceSampler::new(&[0.5, 0.3, 0.1, 0.1]).unwrap();
     let iter: usize = 100;
     for i in (0..iter) {
         println!("{}", sampler.sample(&mut rand));
@@ -25,6 +25,7 @@ Original code by @eqv, see <https://github.com/eqv/loaded_dice>
 use alloc::vec::Vec;
 
 use super::Rand;
+use crate::Error;
 
 /// Helper struct for [`LoadedDiceSampler`]
 #[derive(Clone, Debug, PartialEq)]
@@ -53,15 +54,23 @@ pub struct LoadedDiceSampler {
 
 impl LoadedDiceSampler {
     /// Create a new [`LoadedDiceSampler`] with the given probabilities
-    #[must_use]
-    pub fn new(probs: &[f64]) -> Self {
+    pub fn new(probs: &[f64]) -> Result<Self, Error> {
+        if probs.is_empty() {
+            return Err(Error::illegal_argument(
+                "Tried to construct LoadedDiceSampler with empty probs array",
+            ));
+        }
         let entries = LoadedDiceSampler::construct_table(probs);
-        Self { entries }
+        Ok(Self { entries })
     }
 
     /// Get one sample according to the predefined probabilities.
     pub fn sample<R: Rand>(&mut self, rand: &mut R) -> usize {
-        let index = rand.below(self.entries.len());
+        let len = self.entries.len();
+        debug_assert_ne!(len, 0, "Lenght should never be 0 here.");
+        // # SAFETY
+        // len can never be 0 here.
+        let index = rand.below(unsafe { len.try_into().unwrap_unchecked() });
         let coin = rand.next_float();
         let entry = &self.entries[index];
         if coin > entry.prob_of_val {
@@ -114,7 +123,7 @@ mod tests {
         let base = (0..len).map(|_| rng.next_float()).collect::<Vec<_>>();
         let sum: f64 = base.iter().sum();
         let base = base.iter().map(|v| v / sum).collect::<Vec<_>>();
-        let mut sampler = LoadedDiceSampler::new(&base);
+        let mut sampler = LoadedDiceSampler::new(&base).unwrap();
         let mut res: Vec<usize> = vec![0; len];
         let iter: usize = 1000000;
         for _ in 0..iter {

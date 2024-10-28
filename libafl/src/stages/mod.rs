@@ -12,6 +12,8 @@ use alloc::{
 };
 use core::{fmt, marker::PhantomData};
 
+#[cfg(feature = "std")]
+pub use afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime};
 pub use calibrate::CalibrationStage;
 pub use colorization::*;
 #[cfg(all(feature = "std", unix))]
@@ -31,9 +33,11 @@ pub use logics::*;
 pub use mutational::{MutationalStage, StdMutationalStage};
 pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 use serde::{Deserialize, Serialize};
-pub use stats::AflStatsStage;
+pub use stats::StatsStage;
 #[cfg(feature = "std")]
 pub use sync::*;
+#[cfg(feature = "std")]
+pub use time_tracker::TimeTrackingStageWrapper;
 pub use tmin::{
     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
 };
@@ -42,6 +46,8 @@ pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
 #[cfg(feature = "unicode")]
 pub use unicode::*;
+#[cfg(feature = "std")]
+pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
@@ -61,6 +67,8 @@ pub mod mutational;
 pub mod push;
 pub mod tmin;
 
+#[cfg(feature = "std")]
+pub mod afl_stats;
 pub mod calibrate;
 pub mod colorization;
 #[cfg(all(feature = "std", unix))]
@@ -74,10 +82,14 @@ pub mod power;
 pub mod stats;
 #[cfg(feature = "std")]
 pub mod sync;
+#[cfg(feature = "std")]
+pub mod time_tracker;
 pub mod tracing;
 pub mod tuneable;
 #[cfg(feature = "unicode")]
 pub mod unicode;
+#[cfg(feature = "std")]
+pub mod verify_timeouts;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -439,16 +451,16 @@ where
         + HasCurrentCorpusId
         + HasNamedMetadata
         + HasMetadata,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
+    E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers<Observers = OT>,
     EM: EventFirer<State = Self::State>
         + EventRestarter
         + HasEventManagerId
         + ProgressReporter<State = Self::State>,
-    OT: ObserversTuple<Self::State>,
+    OT: ObserversTuple<Self::Input, Self::State>,
     PS: PushStage<CS, EM, OT, Z>,
     Z: ExecutesInput<E, EM>
-        + ExecutionProcessor
-        + EvaluatorObservers<OT>
+        + ExecutionProcessor<EM, OT>
+        + EvaluatorObservers<EM, OT>
         + HasScheduler<Scheduler = CS>,
 {
     fn perform(

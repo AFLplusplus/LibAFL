@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase},
+    corpus::{Corpus, CorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -102,23 +102,22 @@ where
             }
         }
 
-        let max_time = match last {
-            None => None,
-            Some(last) => Some(last + self.interval),
-        };
-        let new_max_time = max_time.unwrap_or(current_time());
+        let new_max_time = current_time();
 
         let mut new_files = vec![];
         for dir in &self.sync_dirs {
             log::debug!("Syncing from dir: {:?}", dir);
-            let new_dir_files = find_new_files_rec(dir, &max_time)?;
+            let new_dir_files = find_new_files_rec(dir, &last)?;
             new_files.extend(new_dir_files);
         }
-        *state.metadata_mut::<SyncFromDiskMetadata>().unwrap() = SyncFromDiskMetadata {
-            last_time: new_max_time,
-            left_to_sync: new_files,
-        };
-        let sync_from_disk_metadata = state.metadata_mut::<SyncFromDiskMetadata>().unwrap();
+
+        let sync_from_disk_metadata = state
+            .metadata_or_insert_with(|| SyncFromDiskMetadata::new(new_max_time, new_files.clone()));
+
+        // At the very first sync, last_time and file_to_sync are set twice
+        sync_from_disk_metadata.last_time = new_max_time;
+        sync_from_disk_metadata.left_to_sync = new_files;
+
         // Iterate over the paths of files left to sync.
         // By keeping track of these files, we ensure that no file is missed during synchronization,
         // even in the event of a target restart.
@@ -249,14 +248,17 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
-    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata + HasTestcase,
+    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata,
     SP: ShMemProvider,
-    E: HasObservers<State = S> + Executor<EM, Z>,
+    E: HasObservers + Executor<EM, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<State = S>,
+    Z: EvaluatorObservers<EM, E::Observers, State = S>
+        + ExecutionProcessor<EM, E::Observers, State = S>,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,
+    S::Corpus: Corpus<Input = S::Input>, // delete me
 {
     #[inline]
     fn perform(
@@ -287,7 +289,6 @@ where
                         corpus_size: 0, // TODO choose if sending 0 or the actual real value
                         client_config: EventConfig::AlwaysUnique,
                         time: current_time(),
-                        executions: 0,
                         forward_id: None,
                         #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                         node_id: None,

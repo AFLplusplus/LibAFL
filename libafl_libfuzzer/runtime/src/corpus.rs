@@ -12,7 +12,7 @@ use libafl::{
         inmemory::{TestcaseStorage, TestcaseStorageMap},
         Corpus, CorpusId, Testcase,
     },
-    inputs::{Input, UsesInput},
+    inputs::Input,
 };
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
@@ -140,17 +140,12 @@ where
     }
 }
 
-impl<I> UsesInput for LibfuzzerCorpus<I>
-where
-    I: Input + Serialize + for<'de> Deserialize<'de>,
-{
-    type Input = I;
-}
-
 impl<I> Corpus for LibfuzzerCorpus<I>
 where
     I: Input + Serialize + for<'de> Deserialize<'de>,
 {
+    type Input = I;
+
     #[inline]
     fn count(&self) -> usize {
         self.mapping.enabled.map.len()
@@ -282,17 +277,12 @@ where
     }
 }
 
-impl<I> UsesInput for ArtifactCorpus<I>
-where
-    I: Input + Serialize + for<'de> Deserialize<'de>,
-{
-    type Input = I;
-}
-
 impl<I> Corpus for ArtifactCorpus<I>
 where
     I: Input + Serialize + for<'de> Deserialize<'de>,
 {
+    type Input = I;
+
     fn count(&self) -> usize {
         self.count
     }

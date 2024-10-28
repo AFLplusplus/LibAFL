@@ -1,4 +1,4 @@
-//! Stage to compute/report AFL stats
+//! Stage to compute/report minimal AFL-like stats
 
 #[cfg(feature = "std")]
 use alloc::{borrow::Cow, string::ToString};
@@ -22,9 +22,9 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
 };
 
-/// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
+/// The [`StatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<E, EM, Z> {
+pub struct StatsStage<E, EM, Z> {
     // the number of testcases that have been fuzzed
     has_fuzzed_size: usize,
     // the number of "favored" testcases
@@ -41,14 +41,14 @@ pub struct AflStatsStage<E, EM, Z> {
     phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<E, EM, Z> UsesState for AflStatsStage<E, EM, Z>
+impl<E, EM, Z> UsesState for StatsStage<E, EM, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, EM, Z> Stage<E, EM, Z> for AflStatsStage<E, EM, Z>
+impl<E, EM, Z> Stage<E, EM, Z> for StatsStage<E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = Self::State>,
@@ -78,16 +78,7 @@ where
     }
 }
 
-impl<E, EM, Z> AflStatsStage<E, EM, Z> {
-    /// create a new instance of the [`AflStatsStage`]
-    #[must_use]
-    pub fn new(interval: Duration) -> Self {
-        Self {
-            stats_report_interval: interval,
-            ..Default::default()
-        }
-    }
-
+impl<E, EM, Z> StatsStage<E, EM, Z> {
     fn update_and_report_afl_stats(
         &mut self,
         state: &mut <Self as UsesState>::State,
@@ -138,7 +129,7 @@ impl<E, EM, Z> AflStatsStage<E, EM, Z> {
                 _manager.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: Cow::from("AflStats"),
+                        name: Cow::from("Stats"),
                         value: UserStats::new(
                             UserStatsValue::String(Cow::from(json.to_string())),
                             AggregatorOps::None,
@@ -162,8 +153,19 @@ impl<E, EM, Z> AflStatsStage<E, EM, Z> {
     }
 }
 
-impl<E, EM, Z> Default for AflStatsStage<E, EM, Z> {
-    /// the default instance of the [`AflStatsStage`]
+impl<E, EM, Z> StatsStage<E, EM, Z> {
+    /// create a new instance of the [`StatsStage`]
+    #[must_use]
+    pub fn new(interval: Duration) -> Self {
+        Self {
+            stats_report_interval: interval,
+            ..Default::default()
+        }
+    }
+}
+
+impl<E, EM, Z> Default for StatsStage<E, EM, Z> {
+    /// the default instance of the [`StatsStage`]
     #[must_use]
     fn default() -> Self {
         Self {

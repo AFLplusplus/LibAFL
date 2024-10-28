@@ -96,14 +96,14 @@ impl<'a, T> From<&'a [T]> for SliceReader<'a, T> {
     }
 }
 
-impl<'a, T> HasLen for SubRangeSlice<'a, T> {
+impl<T> HasLen for SubRangeSlice<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         self.range.len()
     }
 }
 
-impl<'a, T> HasLen for SubRangeMutSlice<'a, T> {
+impl<T> HasLen for SubRangeMutSlice<'_, T> {
     #[inline]
     fn len(&self) -> usize {
         self.range.len()
@@ -349,7 +349,7 @@ mod tests {
 
         let bytes_read = bytes_reader.next_sub_slice_truncated(8);
         let bytes_read_ref: &[u8] = &[];
-        assert_eq!(&*bytes_read.as_slice(), bytes_read_ref);
+        assert_eq!(bytes_read.as_slice(), bytes_read_ref);
     }
 
     #[test]

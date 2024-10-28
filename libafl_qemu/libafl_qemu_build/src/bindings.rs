@@ -133,6 +133,11 @@ pub fn generate(
         })
         .header(wrapper_h.display().to_string())
         .clang_args(clang_args)
+        .allowlist_var("libafl_dump_core_hook")
+        .allowlist_var("libafl_force_dfl")
+        .allowlist_var("mmap_next_start")
+        .allowlist_var("guest_base")
+        .allowlist_var("exec_path")
         .allowlist_type("target_ulong")
         .allowlist_type("target_long")
         .allowlist_type("CPUState")
@@ -176,6 +181,8 @@ pub fn generate(
         .allowlist_function("qemu_main_loop")
         .allowlist_function("qemu_cleanup")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
+        .blocklist_type("siginfo_t")
+        .raw_line("use libc::siginfo_t;")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
 
     // arch specific functions

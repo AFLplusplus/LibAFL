@@ -128,7 +128,7 @@ pub fn check_autoresume(fuzzer_dir: &Path, auto_resume: bool) -> Result<Flock<Fi
             }
         }
         if !auto_resume && last_update.saturating_sub(start_time) > OUTPUT_GRACE * 60 {
-            return Err(Error::illegal_state("The job output directory already exists and contains results! use AFL_AUTORESUME=true or provide \"-\" for -i "));
+            return Err(Error::illegal_state("The job output directory already exists and contains results! use AFL_AUTORESUME=1 or provide \"-\" for -i "));
         }
     }
     if !auto_resume {

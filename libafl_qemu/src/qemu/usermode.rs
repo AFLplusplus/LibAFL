@@ -1,6 +1,6 @@
 use std::{
-    intrinsics::copy_nonoverlapping, mem::MaybeUninit, slice::from_raw_parts,
-    str::from_utf8_unchecked,
+    intrinsics::copy_nonoverlapping, mem::MaybeUninit, slice::from_raw_parts_mut,
+    str::from_utf8_unchecked_mut,
 };
 
 use libafl_qemu_sys::{
@@ -9,7 +9,7 @@ use libafl_qemu_sys::{
     pageflags_get_root, read_self_maps, GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot,
     MapInfo, MmapPerms, VerifyAccess,
 };
-use libc::{c_char, c_int, strlen};
+use libc::{c_int, c_uchar, strlen};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
 
@@ -79,26 +79,46 @@ impl Drop for GuestMaps {
 }
 
 impl CPU {
-    /// Write a value to a guest address.
-    ///
-    /// # Safety
-    /// This will write to a translated guest address (using `g2h`).
-    /// It just adds `guest_base` and writes to that location, without checking the bounds.
-    /// This may only be safely used for valid guest addresses!
-    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        let host_addr = Qemu::get().unwrap().g2h(addr);
-        copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
-    }
-
     /// Read a value from a guest address.
+    /// The input address is not checked for validity.
     ///
     /// # Safety
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
+    pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
         let host_addr = Qemu::get().unwrap().g2h(addr);
         copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
+    }
+
+    /// Write a value to a guest address.
+    /// The input address in not checked for validity.
+    ///
+    /// # Safety
+    /// This will write to a translated guest address (using `g2h`).
+    /// It just adds `guest_base` and writes to that location, without checking the bounds.
+    /// This may only be safely used for valid guest addresses!
+    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+        let host_addr = Qemu::get().unwrap().g2h(addr);
+        copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
+    }
+
+    #[must_use]
+    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
+        unsafe { (addr as usize + guest_base) as *mut T }
+    }
+
+    #[must_use]
+    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
+        unsafe { (addr as usize - guest_base) as GuestAddr }
+    }
+
+    #[must_use]
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
+        unsafe {
+            // TODO add support for tagged GuestAddr
+            libafl_qemu_sys::page_check_range(addr, size as GuestAddr, kind.into())
+        }
     }
 }
 
@@ -139,9 +159,9 @@ impl Qemu {
     #[must_use]
     pub fn binary_path<'a>(&self) -> &'a str {
         unsafe {
-            from_utf8_unchecked(from_raw_parts(
-                exec_path,
-                strlen(exec_path as *const c_char),
+            from_utf8_unchecked_mut(from_raw_parts_mut(
+                exec_path as *mut c_uchar,
+                strlen(exec_path.cast_const()),
             ))
         }
     }
@@ -338,7 +358,9 @@ pub mod pybind {
             self.qemu.unmap(addr, size).map_err(PyValueError::new_err)
         }
 
-        fn set_syscall_hook(&self, hook: PyObject) {
+        /// # Safety
+        /// Accesses the global `PY_SYSCALL_HOOK` and may not be called concurrently.
+        unsafe fn set_syscall_hook(&self, hook: PyObject) {
             unsafe {
                 (*core::ptr::addr_of_mut!(PY_SYSCALL_HOOK)) = Some(hook);
             }

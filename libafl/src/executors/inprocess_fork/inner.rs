@@ -29,21 +29,13 @@ use crate::{
         ExitKind, HasObservers,
     },
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{State, UsesState},
     Error,
 };
 
 /// Inner state of GenericInProcessExecutor-like structures.
-pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
-where
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
+pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> {
     pub(super) hooks: (InChildProcessHooks<S>, HT),
     pub(super) shmem_provider: SP,
     pub(super) observers: OT,
@@ -56,12 +48,9 @@ where
 
 impl<HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S> + Debug,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S> + Debug,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
+    HT: Debug,
+    OT: Debug,
+    SP: Debug,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -86,19 +75,48 @@ where
 
 impl<HT, OT, S, SP, EM, Z> UsesState for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S>,
     S: State,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type State = S;
 }
 
+#[cfg(target_os = "linux")]
+fn parse_itimerspec(timeout: Duration) -> libc::itimerspec {
+    let milli_sec = timeout.as_millis();
+    let it_value = libc::timespec {
+        tv_sec: (milli_sec / 1000) as _,
+        tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
+    };
+    let it_interval = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    libc::itimerspec {
+        it_interval,
+        it_value,
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn parse_itimerval(timeout: Duration) -> Itimerval {
+    let milli_sec = timeout.as_millis();
+    let it_value = Timeval {
+        tv_sec: (milli_sec / 1000) as i64,
+        tv_usec: (milli_sec % 1000) as i64,
+    };
+    let it_interval = Timeval {
+        tv_sec: 0,
+        tv_usec: 0,
+    };
+    Itimerval {
+        it_interval,
+        it_value,
+    }
+}
+
 impl<EM, HT, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: State + UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
@@ -194,10 +212,7 @@ impl<HT, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, 
 where
     HT: ExecutorHooksTuple<S>,
     S: State,
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: UsesState<State = S>,
+    OT: ObserversTuple<S::Input, S>,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
@@ -253,21 +268,7 @@ where
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self>(state);
-
-        let milli_sec = timeout.as_millis();
-        let it_value = libc::timespec {
-            tv_sec: (milli_sec / 1000) as _,
-            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
-        };
-        let it_interval = libc::timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        };
-        let itimerspec = libc::itimerspec {
-            it_interval,
-            it_value,
-        };
-
+        let itimerspec = parse_itimerspec(timeout);
         Ok(Self {
             shmem_provider,
             observers,
@@ -293,19 +294,7 @@ where
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
         hooks.init_all::<Self>(state);
 
-        let milli_sec = timeout.as_millis();
-        let it_value = Timeval {
-            tv_sec: (milli_sec / 1000) as i64,
-            tv_usec: (milli_sec % 1000) as i64,
-        };
-        let it_interval = Timeval {
-            tv_sec: 0,
-            tv_usec: 0,
-        };
-        let itimerval = Itimerval {
-            it_interval,
-            it_value,
-        };
+        let itimerval = parse_itimerval(timeout);
 
         Ok(Self {
             shmem_provider,
@@ -317,27 +306,13 @@ where
     }
 }
 
-impl<HT, OT, S, SP, EM, Z> UsesObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
-where
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
-    type Observers = OT;
-}
-
 impl<HT, OT, S, SP, EM, Z> HasObservers for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)

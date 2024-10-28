@@ -165,10 +165,10 @@ where
     type State = M::State;
 }
 
-impl<M, O, S> Observer<S> for MappedEdgeMapObserver<M, O>
+impl<M, O, S> Observer<S::Input, S> for MappedEdgeMapObserver<M, O>
 where
-    M: Observer<S> + Debug,
-    O: Observer<S> + Debug,
+    M: Observer<S::Input, S> + Debug,
+    O: Observer<S::Input, S> + Debug,
     S: UsesInput,
 {
     fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
@@ -224,6 +224,7 @@ where
 impl<'it, M, O> AsIter<'it> for MappedEdgeMapObserver<M, O>
 where
     M: MapObserver + for<'a> AsIter<'a, Item = M::Entry>,
+    M::Entry: 'it,
     O: ValueObserver + 'it,
 {
     type Item = O::ValueType;
@@ -261,7 +262,7 @@ impl Named for SizeValueObserver {
     }
 }
 
-impl<S> Observer<S> for SizeValueObserver
+impl<S> Observer<S::Input, S> for SizeValueObserver
 where
     S: UsesInput,
     S::Input: HasLen,
@@ -305,7 +306,7 @@ impl Named for TimeValueObserver {
     }
 }
 
-impl<S> Observer<S> for TimeValueObserver
+impl<S> Observer<S::Input, S> for TimeValueObserver
 where
     S: UsesInput,
 {
@@ -367,7 +368,7 @@ impl Named for SizeTimeValueObserver {
     }
 }
 
-impl<S> Observer<S> for SizeTimeValueObserver
+impl<S> Observer<S::Input, S> for SizeTimeValueObserver
 where
     S: UsesInput,
     S::Input: HasLen,

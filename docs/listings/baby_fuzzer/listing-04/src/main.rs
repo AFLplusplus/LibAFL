@@ -3,7 +3,6 @@ extern crate libafl;
 extern crate libafl_bolts;
 
 use std::path::PathBuf;
-
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -15,7 +14,7 @@ use libafl::{
     schedulers::QueueScheduler,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice, nonzero};
 /* ANCHOR_END: use */
 
 fn main() {
@@ -77,7 +76,7 @@ fn main() {
 
     /* ANCHOR: generator */
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

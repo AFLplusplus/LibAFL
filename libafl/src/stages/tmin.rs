@@ -8,7 +8,7 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
-    tuples::{Handle, Handled, MatchNameRef},
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
     HasLen, Named,
 };
 use serde::Serialize;
@@ -19,11 +19,11 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
     executors::{ExitKind, HasObservers},
-    feedbacks::{Feedback, FeedbackFactory, HasObserverHandle},
+    feedbacks::{Feedback, FeedbackFactory, HasObserverHandle, StateInitializer},
     inputs::UsesInput,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple, UsesObservers},
+    observers::{MapObserver, ObserversTuple},
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
@@ -45,10 +45,10 @@ pub trait TMinMutationalStage<E, EM, F, IP, M, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F, E::Observers>
 where
     E: UsesState<State = Self::State> + HasObservers,
-    <E as UsesObservers>::Observers: Serialize,
+    E::Observers: ObserversTuple<Self::Input, Self::State> + Serialize,
     EM: UsesState<State = Self::State> + EventFirer,
-    F: Feedback<Self::State>,
-    Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions,
+    F: Feedback<EM, Self::Input, E::Observers, Self::State>,
+    Self::State: HasMaxSize + HasCorpus + HasSolutions + HasExecutions + HasCurrentTestcase,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + Hash + HasLen,
     IP: Clone + MutatedTransformPost<Self::State>,
     M: Mutator<Self::Input, Self::State>,
@@ -56,8 +56,10 @@ where
         + HasScheduler
         + HasFeedback
         + ExecutesInput<E, EM>
-        + ExecutionProcessor,
+        + ExecutionProcessor<EM, E::Observers>,
+    Z::Feedback: Feedback<EM, Self::Input, E::Observers, Self::State>,
     Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -188,7 +190,7 @@ where
             fuzzer
                 .feedback_mut()
                 .is_interesting(state, manager, &base, &*observers, &exit_kind)?;
-            let mut testcase = Testcase::with_executions(base, *state.executions());
+            let mut testcase = Testcase::from(base);
             fuzzer
                 .feedback_mut()
                 .append_metadata(state, manager, &*observers, &mut testcase)?;
@@ -238,18 +240,20 @@ where
 
 impl<E, EM, F, FF, IP, M, Z> Stage<E, EM, Z> for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
-    Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
+    Z: HasScheduler + ExecutionProcessor<EM, E::Observers> + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
-    E: HasObservers<State = Self::State>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + UsesState<State = Z::State>,
+    E::Observers: ObserversTuple<Self::Input, Self::State> + Serialize,
     EM: EventFirer<State = Self::State>,
     FF: FeedbackFactory<F, E::Observers>,
-    F: Feedback<Self::State>,
+    F: Feedback<EM, Self::Input, E::Observers, Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State:
+    Z::State:
         HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
+    Z::Feedback: Feedback<EM, Self::Input, E::Observers, Self::State>,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, // delete me
 {
     fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
         self.restart_helper.should_restart(state, &self.name)
@@ -300,18 +304,25 @@ pub static TMIN_STAGE_NAME: &str = "tmin";
 impl<E, EM, F, FF, IP, M, Z> TMinMutationalStage<E, EM, F, IP, M, Z>
     for StdTMinMutationalStage<E, EM, F, FF, IP, M, Z>
 where
-    Z: HasScheduler + ExecutionProcessor + ExecutesInput<E, EM> + HasFeedback,
+    Z: HasScheduler + ExecutionProcessor<EM, E::Observers> + ExecutesInput<E, EM> + HasFeedback,
     Z::Scheduler: RemovableScheduler<Self::Input, Self::State>,
-    E: HasObservers<State = Self::State>,
-    <E as UsesObservers>::Observers: Serialize,
+    E: HasObservers + UsesState<State = Z::State>,
+    E::Observers: ObserversTuple<Self::Input, Self::State> + Serialize,
     EM: EventFirer<State = Self::State>,
     FF: FeedbackFactory<F, E::Observers>,
-    F: Feedback<Self::State>,
+    F: Feedback<EM, Self::Input, E::Observers, Self::State>,
     Self::Input: MutatedTransform<Self::Input, Self::State, Post = IP> + Clone + HasLen + Hash,
-    Self::State:
-        HasMetadata + HasExecutions + HasSolutions + HasCorpus + HasMaxSize + HasNamedMetadata,
+    Z::State: HasMetadata
+        + HasExecutions
+        + HasSolutions
+        + HasCorpus
+        + HasMaxSize
+        + HasNamedMetadata
+        + HasCurrentTestcase,
+    Z::Feedback: Feedback<EM, Self::Input, E::Observers, Self::State>,
     M: Mutator<Self::Input, Self::State>,
     IP: MutatedTransformPost<Self::State> + Clone,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, // delete me
 {
     /// The mutator, added to this stage
     #[inline]
@@ -383,24 +394,23 @@ impl<C, M, S> HasObserverHandle for MapEqualityFeedback<C, M, S> {
     }
 }
 
-impl<C, M, S> Feedback<S> for MapEqualityFeedback<C, M, S>
+impl<C, M, S> StateInitializer<S> for MapEqualityFeedback<C, M, S> {}
+
+impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for MapEqualityFeedback<C, M, S>
 where
     M: MapObserver,
     C: AsRef<M>,
     S: State,
+    OT: MatchName,
 {
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         let obs = observers
             .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
@@ -450,7 +460,7 @@ impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqual
 where
     M: MapObserver,
     C: AsRef<M> + Handled,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {

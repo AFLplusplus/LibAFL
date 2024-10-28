@@ -44,14 +44,17 @@ dump-cfg = []
 profiling = []
 
 [build-dependencies]
-cc = { version = "1.0", features = ["parallel"] }
-which = "6.0"
+cc = { workspace = true, features = ["parallel"] }
+which = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.build-dependencies]
-glob = "0.3"
+glob = "0.3.1"
 
 [dependencies]
-serde = { version = "1.0", default-features = false, features = [
+serde = { workspace = true, default-features = false, features = [
   "alloc",
   "derive",
 ] } # serialization lib
+
+[lints]
+workspace = true

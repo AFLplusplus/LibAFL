@@ -15,21 +15,24 @@ use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
-use crate::{corpus::CorpusId, inputs::UsesInput, Error, HasMetadata};
+use crate::{corpus::CorpusId, state::HasCorpus, Error, HasMetadata};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-pub trait HasTestcase: UsesInput {
+pub trait HasTestcase: HasCorpus {
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<<Self as UsesInput>::Input>>, Error>;
+    fn testcase(
+        &self,
+        id: CorpusId,
+    ) -> Result<Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
 
     /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self as UsesInput>::Input>>, Error>;
+    ) -> Result<RefMut<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
 }
 
 /// An entry in the [`Testcase`] Corpus
@@ -51,8 +54,6 @@ pub struct Testcase<I> {
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
     cached_len: Option<usize>,
-    /// Number of executions done at discovery time
-    executions: u64,
     /// Number of fuzzing iterations of this particular input updated in `perform_mutational`
     scheduled_count: usize,
     /// Parent [`CorpusId`], if known
@@ -168,18 +169,6 @@ impl<I> Testcase<I> {
         self.exec_time = Some(time);
     }
 
-    /// Get the executions
-    #[inline]
-    pub fn executions(&self) -> &u64 {
-        &self.executions
-    }
-
-    /// Get the executions (mutable)
-    #[inline]
-    pub fn executions_mut(&mut self) -> &mut u64 {
-        &mut self.executions
-    }
-
     /// Get the `scheduled_count`
     #[inline]
     pub fn scheduled_count(&self) -> usize {
@@ -245,7 +234,6 @@ impl<I> Testcase<I> {
             metadata_path: None,
             exec_time: None,
             cached_len: None,
-            executions: 0,
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
@@ -270,7 +258,6 @@ impl<I> Testcase<I> {
             metadata_path: None,
             exec_time: None,
             cached_len: None,
-            executions: 0,
             scheduled_count: 0,
             parent_id: Some(parent_id),
             disabled: false,
@@ -295,32 +282,6 @@ impl<I> Testcase<I> {
             metadata_path: None,
             exec_time: None,
             cached_len: None,
-            executions: 0,
-            scheduled_count: 0,
-            parent_id: None,
-            disabled: false,
-            objectives_found: 0,
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_feedbacks: Vec::new(),
-            #[cfg(feature = "track_hit_feedbacks")]
-            hit_objectives: Vec::new(),
-        }
-    }
-
-    /// Create a new Testcase instance given an input and the number of executions
-    #[inline]
-    pub fn with_executions(input: I, executions: u64) -> Self {
-        Self {
-            input: Some(input),
-            filename: None,
-            #[cfg(feature = "std")]
-            file_path: None,
-            metadata: SerdeAnyMap::default(),
-            #[cfg(feature = "std")]
-            metadata_path: None,
-            exec_time: None,
-            cached_len: None,
-            executions,
             scheduled_count: 0,
             parent_id: None,
             disabled: false,
@@ -370,7 +331,6 @@ impl<I> Default for Testcase<I> {
             exec_time: None,
             cached_len: None,
             scheduled_count: 0,
-            executions: 0,
             parent_id: None,
             #[cfg(feature = "std")]
             file_path: None,
