@@ -266,22 +266,6 @@ pub mod serdeany_registry {
         }
     }
 
-    /*
-    #[cfg(feature = "anymap_debug")]
-    impl fmt::Debug for SerdeAnyMap {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            let json = serde_json::to_string(&self);
-            write!(f, "SerdeAnyMap: [{:?}]", json)
-        }
-    }
-
-    #[cfg(not(feature = "anymap_debug"))]
-    impl fmt::Debug for SerdeAnyMap {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "SerdeAnymap with {} elements", self.len())
-        }
-    }*/
-
     #[allow(unused_qualifications)]
     impl SerdeAnyMap {
         /// Get an element from the map.
