@@ -27,7 +27,6 @@ rustc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
-  "nautilus",
   "std",
   "derive",
   "llmp_compression",
@@ -180,7 +179,7 @@ llmp_small_maps = [
 nautilus = [
   "std",
   "serde_json/std",
-  "pyo3",
+  "dep:pyo3",
   "rand_trait",
   "regex-syntax",
   "regex",
@@ -261,8 +260,8 @@ arrayvec = { version = "0.7.6", optional = true, default-features = false } # us
 const_format = "0.2.33" # used for providing helpful compiler output
 const_panic = "0.2.9"   # similarly, for formatting const panic output
 
-pyo3 = { workspace = true, optional = true }          # For nautilus
-regex-syntax = { version = "0.8.4", optional = true } # For nautilus
+pyo3 = { version = "0.22.3", features = ["gil-refs"], optional = true }
+regex-syntax = { version = "0.8.4", optional = true }                   # For nautilus
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
