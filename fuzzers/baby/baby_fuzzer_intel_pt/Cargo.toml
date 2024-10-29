@@ -19,6 +19,8 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
-libafl = { path = "../../../libafl/", features = ["intel_pt"] }
+libafl = { path = "../../../libafl/", default-features = false, features = [
+  "intel_pt",
+] }
 libafl_bolts = { path = "../../../libafl_bolts/" }
 procfs = "0.17.0"

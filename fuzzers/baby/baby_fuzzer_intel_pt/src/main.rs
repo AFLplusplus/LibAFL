@@ -25,11 +25,12 @@ use libafl::{
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 use procfs::process::{MMapPath, Process};
 
-/// Coverage map
-static mut SIGNALS: [u8; 1024] = [0; 1024];
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+// Coverage map
+const MAP_SIZE: usize = 4096;
+static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
+#[allow(static_mut_refs)]
+static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
-#[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
@@ -48,7 +49,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -119,8 +120,8 @@ pub fn main() {
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe {
         IntelPTHook::builder()
-            .map_ptr(SIGNALS_PTR)
-            .map_len(SIGNALS.len())
+            .map_ptr(MAP_PTR)
+            .map_len(MAP_SIZE)
             .image(&maps)
     }
     .build();
