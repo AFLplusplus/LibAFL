@@ -425,7 +425,7 @@ where
         &mut self,
         state: &mut S,
         _manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
+        _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
