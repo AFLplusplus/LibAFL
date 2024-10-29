@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, HasTargetBytes},
     stages::Stage,
     state::{HasCorpus, HasCurrentTestcase, State, UsesState},
     HasMetadata,
@@ -89,6 +89,24 @@ impl<S> UnicodeIdentificationStage<S> {
             phantom: PhantomData,
         }
     }
+    fn identify_unicode_in_current_testcase(state: &mut S) -> Result<(), Error>
+    where
+        S: HasCurrentTestcase,
+        <S::Corpus as Corpus>::Input: HasTargetBytes,
+    {
+        let mut tc = state.current_testcase_mut()?;
+        if tc.has_metadata::<UnicodeIdentificationMetadata>() {
+            return Ok(()); // skip recompute
+        }
+
+        let input = tc.load_input(state.corpus())?;
+
+        let bytes = input.target_bytes();
+        let metadata = extract_metadata(&bytes);
+        tc.add_metadata(metadata);
+
+        Ok(())
+    }
 }
 
 impl<S> UsesState for UnicodeIdentificationStage<S>
@@ -113,18 +131,7 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
-        let mut tc = state.current_testcase_mut()?;
-        if tc.has_metadata::<UnicodeIdentificationMetadata>() {
-            return Ok(()); // skip recompute
-        }
-
-        let input = tc.load_input(state.corpus())?;
-
-        let bytes = input.bytes();
-        let metadata = extract_metadata(bytes);
-        tc.add_metadata(metadata);
-
-        Ok(())
+        UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
     }
 
     #[inline]
