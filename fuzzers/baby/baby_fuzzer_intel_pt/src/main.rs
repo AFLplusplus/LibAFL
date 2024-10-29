@@ -99,21 +99,20 @@ pub fn main() {
         .maps()
         .unwrap()
         .iter()
-        .filter(|&m| matches!(m.pathname, MMapPath::Path(..)))
-        .map(|m| {
+        .filter_map(|m| {
             let file_path = match &m.pathname {
                 MMapPath::Path(p) => p,
-                _ => unreachable!("pathname variants are filtered"),
+                _ => return None,
             }
             .to_string_lossy()
             .to_string();
             let size = m.address.1 - m.address.0;
-            Section {
+            Some(Section {
                 file_path,
                 file_offset: m.offset,
                 size,
                 virtual_address: m.address.0,
-            }
+            })
         })
         .collect::<Vec<Section>>();
 
