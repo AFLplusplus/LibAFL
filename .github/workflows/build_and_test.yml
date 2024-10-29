@@ -494,7 +494,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build iOS
-        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print(__import__('platform').python_version())") cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
+        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
 
   android:
     runs-on: ubuntu-24.04
@@ -512,7 +512,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
-        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print(__import__('platform').python_version())") cd libafl && cargo ndk -t arm64-v8a build --release
+        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cd libafl && cargo ndk -t arm64-v8a build --release
 
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
