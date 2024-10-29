@@ -48,7 +48,7 @@ pub fn main() {
         ExitKind::Ok
     };
 
-    // Create an observation channel using the signals map
+    // Create an observation channel using the map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
 
     // Feedback to rate the interestingness of an input

@@ -9,14 +9,7 @@ authors = [
 edition = "2021"
 
 [features]
-default = []
 tui = []
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
 
 [dependencies]
 libafl = { path = "../../../libafl/", default-features = false, features = [
