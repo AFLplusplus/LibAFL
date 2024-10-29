@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// The metadata to remember past observed value
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(bound = "T: Eq + Hash + for<'a> Deserialize<'a> + Serialize")]
 pub struct ListFeedbackMetadata<T> {
     /// Contains the information of past observed set of values.
@@ -42,6 +42,13 @@ impl<T> ListFeedbackMetadata<T> {
     }
 }
 
+impl<T> Default for ListFeedbackMetadata<T> {
+    #[must_use]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> HasRefCnt for ListFeedbackMetadata<T> {
     fn refcnt(&self) -> isize {
         self.tcref
@@ -60,13 +67,13 @@ pub struct ListFeedback<T> {
 }
 
 libafl_bolts::impl_serdeany!(
-    ListFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned + Eq + Hash>,
+    ListFeedbackMetadata<T: Debug + 'static + Serialize + DeserializeOwned + Eq + Hash>,
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<bool>,<char>,<usize>
 );
 
 impl<T> ListFeedback<T>
 where
-    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + 'static + Copy,
 {
     fn has_interesting_list_observer_feedback<OT, S>(
         &mut self,
