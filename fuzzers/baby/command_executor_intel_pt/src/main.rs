@@ -28,6 +28,8 @@ use libafl::{
 use libafl_bolts::{core_affinity, intel_pt::IntelPT, rands::StdRand, tuples::tuple_list, Error};
 use nix::{
     sys::{
+        personality,
+        personality::Persona,
         ptrace::traceme,
         signal::{raise, Signal},
     },
@@ -125,9 +127,15 @@ pub fn main() {
                 Ok(ForkResult::Parent { child }) => child,
                 Ok(ForkResult::Child) => {
                     traceme().unwrap();
+
                     let cores = core_affinity::get_core_ids().unwrap();
                     cores[0].set_affinity().unwrap();
-                    raise(Signal::SIGSTOP).expect("Failed to stop the process");
+
+                    // Disable Address Space Layout Randomization (ASLR)
+                    let pers = personality::get().unwrap();
+                    personality::set(pers | Persona::ADDR_NO_RANDOMIZE).unwrap();
+
+                    raise(Signal::SIGSTOP).unwrap();
 
                     execv(&CString::new(executable.as_bytes()).unwrap(), &[arg1]).unwrap();
 
