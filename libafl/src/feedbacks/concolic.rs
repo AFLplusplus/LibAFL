@@ -15,7 +15,7 @@ use libafl_bolts::{
 use crate::{
     corpus::Testcase,
     feedbacks::{Feedback, StateInitializer},
-    observers::{concolic::ConcolicObserver, ObserversTuple},
+    observers::concolic::ConcolicObserver,
     Error, HasMetadata,
 };
 
@@ -39,12 +39,12 @@ impl<'map> ConcolicFeedback<'map> {
         }
     }
 
-    fn add_concolic_feedback_to_metadata<I, OT, S>(
+    fn add_concolic_feedback_to_metadata<I, OT>(
         &mut self,
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) where
-        OT: ObserversTuple<I, S>,
+        OT: MatchName,
     {
         if let Some(metadata) = observers
             .get(&self.observer_handle)
@@ -65,7 +65,7 @@ impl<S> StateInitializer<S> for ConcolicFeedback<'_> {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConcolicFeedback<'_>
 where
-    OT: MatchName + ObserversTuple<I, S>,
+    OT: MatchName,
 {
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {

@@ -428,10 +428,7 @@ where
         _input: &<S as UsesInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-    {
+    ) -> Result<bool, Error> {
         let res = self.is_interesting_default(state, observers);
 
         #[cfg(feature = "track_hit_feedbacks")]
