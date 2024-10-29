@@ -53,6 +53,7 @@ fn loader(py: Python, grammar: &str) -> PyResult<Context> {
     Ok(py_ctx.borrow().get_context())
 }
 
+/// Create a `NautilusContext` from a python grammar file
 #[must_use]
 pub fn load_python_grammar(grammar: &str) -> Context {
     Python::with_gil(|py| {
