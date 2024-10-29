@@ -536,7 +536,7 @@ impl Default for IntelPTBuilder {
 }
 
 impl IntelPTBuilder {
-    /// Build the [`super::IntelPT`] struct
+    /// Build the [`IntelPT`] struct
     pub fn build(&self) -> Result<IntelPT, Error> {
         self.check_config();
         let mut perf_event_attr = new_perf_event_attr_intel_pt()?;
