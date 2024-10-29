@@ -424,7 +424,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let mut tmpfile = File::create(&tmpfile_path)?;
 
             let json_error =
-                |err| Error::illegal_state(format!("Failed to json-ify metadata: {err:?}"));
+                |err| Error::serialize(format!("Failed to json-ify metadata: {err:?}"));
 
             let serialized = match self.meta_format.as_ref().unwrap() {
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
