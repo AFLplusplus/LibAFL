@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::Testcase,
     feedbacks::{Feedback, StateInitializer},
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
+    observers::{StdErrObserver, StdOutObserver},
     Error, HasMetadata,
 };
 
@@ -35,13 +35,13 @@ pub struct StdOutToMetadataFeedback {
 impl StdOutToMetadataFeedback {
     /// Append to the testcase the generated metadata in case of a new corpus item.
     #[inline]
-    fn append_stdout_observation_to_testcase<I, S, OT>(
+    fn append_stdout_observation_to_testcase<I, OT>(
         &mut self,
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: MatchName,
     {
         let observer = observers
             .get(&self.o_ref)
@@ -64,7 +64,7 @@ impl<S> StateInitializer<S> for StdOutToMetadataFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for StdOutToMetadataFeedback
 where
-    OT: MatchName + ObserversTuple<I, S>,
+    OT: MatchName,
 {
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {

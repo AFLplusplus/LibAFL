@@ -15,7 +15,7 @@ use crate::feedbacks::premature_last_result_err;
 use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
-    observers::{ObserverWithHashField, ObserversTuple},
+    observers::ObserverWithHashField,
     Error, HasNamedMetadata,
 };
 
@@ -105,13 +105,13 @@ where
     O: ObserverWithHashField + Named,
 {
     #[allow(clippy::wrong_self_convention)]
-    fn has_interesting_backtrace_hash_observation<I, OT, S: HasNamedMetadata>(
+    fn has_interesting_backtrace_hash_observation<OT, S: HasNamedMetadata>(
         &mut self,
         state: &mut S,
         observers: &OT,
     ) -> Result<bool, Error>
     where
-        OT: ObserversTuple<I, S>,
+        OT: MatchName,
     {
         let observer = observers
             .get(&self.o_ref)
@@ -153,7 +153,7 @@ where
 impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
 where
     O: ObserverWithHashField + Named,
-    OT: MatchName + ObserversTuple<I, S>,
+    OT: MatchName,
     S: HasNamedMetadata,
 {
     #[allow(clippy::wrong_self_convention)]

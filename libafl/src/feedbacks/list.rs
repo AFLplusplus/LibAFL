@@ -11,7 +11,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
-    observers::{ListObserver, ObserversTuple},
+    observers::ListObserver,
     HasNamedMetadata,
 };
 
@@ -68,13 +68,13 @@ impl<T> ListFeedback<T>
 where
     T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
-    fn has_interesting_list_observer_feedback<I, OT, S>(
+    fn has_interesting_list_observer_feedback<OT, S>(
         &mut self,
         state: &mut S,
         observers: &OT,
     ) -> bool
     where
-        OT: ObserversTuple<I, S>,
+        OT: MatchName,
         S: HasNamedMetadata,
     {
         let observer = observers.get(&self.observer_handle).unwrap();
@@ -118,7 +118,7 @@ where
 
 impl<EM, I, OT, S, T> Feedback<EM, I, OT, S> for ListFeedback<T>
 where
-    OT: MatchName + ObserversTuple<I, S>,
+    OT: MatchName,
     S: HasNamedMetadata,
     T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
