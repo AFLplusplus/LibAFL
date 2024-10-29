@@ -109,8 +109,6 @@ impl ChunkStore {
 }
 
 #[cfg(test)]
-// Due to fs::create_dir_all, miri won't work
-#[cfg(not(miri))]
 mod tests {
     use alloc::string::ToString;
     use std::fs;
