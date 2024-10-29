@@ -85,7 +85,6 @@ impl NautilusContext {
     }
 
     /// Create a new [`NautilusContext`] from a file
-    #[must_use]
     pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Result<Self, Error> {
         if grammar_file.as_ref().extension().unwrap_or_default() == "py" {
             let ctx = python_grammar_loader::load_python_grammar(
