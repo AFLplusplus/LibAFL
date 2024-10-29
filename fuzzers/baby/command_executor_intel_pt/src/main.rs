@@ -10,7 +10,10 @@ use std::{
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{command::CommandConfigurator, hooks::intel_pt::IntelPTChildHook},
+    executors::{
+        command::CommandConfigurator,
+        hooks::intel_pt::{IntelPTHook, Section},
+    },
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
@@ -22,7 +25,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list, Error};
+use libafl_bolts::{core_affinity, intel_pt::IntelPT, rands::StdRand, tuples::tuple_list, Error};
 use nix::{
     sys::{
         ptrace::traceme,
@@ -31,11 +34,11 @@ use nix::{
     unistd::{execv, fork, ForkResult, Pid},
 };
 
-/// Coverage map
-// TODO: move away from this, it is unsafe also in single thread
-// https://users.rust-lang.org/t/is-static-mut-unsafe-in-a-single-threaded-context/94242
-static mut SIGNALS: [u8; 0x10_000] = [0; 0x10_000];
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+// Coverage map
+const MAP_SIZE: usize = 4096;
+static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
+#[allow(static_mut_refs)]
+static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
 pub fn main() {
     // Let's set the default logging level to `warn`
@@ -46,7 +49,7 @@ pub fn main() {
     env_logger::init();
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -84,8 +87,25 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let hook =
-        unsafe { IntelPTChildHook::new(SIGNALS_PTR, SIGNALS.len(), &[0x21_0000..=0x25_0000]) };
+    let mut intel_pt = IntelPT::builder().cpu(0).inherit(true).build().unwrap();
+    intel_pt.set_ip_filters(&[0x21_0000..=0x25_0000]).unwrap();
+    let executable = PathBuf::from(env::args().next().unwrap())
+        .parent()
+        .unwrap()
+        .join("target_program")
+        .to_string_lossy()
+        .to_string();
+    let sections = [Section {
+        file_path: executable,
+        file_offset: 0xf0a0,
+        size: 0x40000,
+        virtual_address: 0x2100a0,
+    }];
+
+    let hook = unsafe { IntelPTHook::builder().map_ptr(MAP_PTR).map_len(MAP_SIZE) }
+        .intel_pt(intel_pt)
+        .image(&sections)
+        .build();
 
     #[derive(Debug)]
     pub struct MyCommandConfigurator {}
@@ -121,6 +141,10 @@ pub fn main() {
 
         fn exec_timeout(&self) -> Duration {
             Duration::from_secs(2)
+        }
+
+        fn exec_timeout_mut(&mut self) -> &mut Duration {
+            todo!()
         }
     }
 
