@@ -114,7 +114,7 @@ pub mod subrange;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
 
-#[cfg(feature = "intel_pt")]
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 pub mod intel_pt;
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
