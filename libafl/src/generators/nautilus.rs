@@ -86,20 +86,17 @@ impl NautilusContext {
 
     /// Create a new [`NautilusContext`] from a file
     #[must_use]
-    pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Self {
+    pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Result<Self, Error> {
         if grammar_file.as_ref().extension().unwrap_or_default() == "py" {
             let ctx = python_grammar_loader::load_python_grammar(
-                fs::read_to_string(grammar_file)
-                    .expect("Error reading grammar file")
-                    .as_str(),
+                fs::read_to_string(grammar_file)?.as_str(),
             );
-            return Self { ctx };
+            return Ok(Self { ctx });
         }
-        let file = fs::File::open(grammar_file).expect("Cannot open grammar file");
+        let file = fs::File::open(grammar_file)?;
         let reader = BufReader::new(file);
-        let rules: Vec<Vec<String>> =
-            serde_json::from_reader(reader).expect("Cannot parse grammar file");
-        Self::new(tree_depth, &rules)
+        let rules: Vec<Vec<String>> = serde_json::from_reader(reader)?;
+        Ok(Self::new(tree_depth, &rules))
     }
 }
 
