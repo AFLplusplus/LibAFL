@@ -1,4 +1,4 @@
-use std::string::String;
+use std::{ptr::slice_from_raw_parts_mut, string::String};
 
 use libafl_bolts::intel_pt::IntelPT;
 use libipt::{Asid, Image, SectionCache};
@@ -48,18 +48,11 @@ where
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.intel_pt.disable_tracing().unwrap();
 
-        let decode_res = self.intel_pt.decode_with_image(&mut self.image.0);
-        match decode_res {
-            Ok(ids) => {
-                for ip in ids {
-                    unsafe {
-                        let map_loc = self.map_ptr.add(ip as usize % self.map_len);
-                        *map_loc = (*map_loc).saturating_add(1);
-                    }
-                }
-            }
-            Err(e) => log::warn!("Intel PT trace decoding failed: {e}"),
-        }
+        let mut slice = unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) };
+        let _ = self
+            .intel_pt
+            .decode_traces_into_map(&mut self.image.0, &mut slice)
+            .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
     }
 }
 

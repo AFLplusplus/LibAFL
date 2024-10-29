@@ -22,11 +22,11 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 use libipt::{
-    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Asid, BlockFlags,
+    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
     ConfigBuilder, Cpu, Image, PtError, PtErrorCode,
 };
 use num_enum::TryFromPrimitive;
-use num_traits::Euclid;
+use num_traits::{Euclid, SaturatingAdd};
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
@@ -220,14 +220,6 @@ impl IntelPT {
         }
     }
 
-    /// Decode the traces given the image
-    pub fn decode_with_image(&mut self, image: &mut Image) -> Result<Vec<u64>, Error> {
-        self.decode(
-            None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
-            Some(image),
-        )
-    }
-
     //         // let read_mem = |buf: &mut [u8], addr: u64| {
     //         //     let src = addr as *const u8;
     //         //     let dst = buf.as_mut_ptr();
@@ -253,13 +245,17 @@ impl IntelPT {
     //     )
     // }
 
-    fn decode<F: Fn(&mut [u8], u64, Asid) -> i32>(
+    /// Fill the coverage map by decoding the PT traces
+    ///
+    /// This function consumes the traces.
+    pub fn decode_traces_into_map<T>(
         &mut self,
-        read_memory: Option<F>,
-        image: Option<&mut Image>,
-    ) -> Result<Vec<u64>, Error> {
-        let mut ips = Vec::new();
-
+        image: &mut Image,
+        map: &mut [T],
+    ) -> Result<(), Error>
+    where
+        T: SaturatingAdd + From<u8>,
+    {
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
         if head < tail {
@@ -317,12 +313,7 @@ impl IntelPT {
         let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
         config.flags(flags);
         let mut decoder = BlockDecoder::new(&config.finish())?;
-        if let Some(i) = image {
-            decoder.set_image(Some(i))?;
-        }
-        if let Some(rm) = read_memory {
-            decoder.image()?.set_callback(Some(rm))?;
-        }
+        decoder.set_image(Some(image))?;
 
         let mut previous_block_ip = 0;
         let mut status;
@@ -350,7 +341,11 @@ impl IntelPT {
 
                                 if !b.speculative() && skip < offset {
                                     let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
-                                    ips.push(id);
+                                    // SAFETY: the index is < map.len() since the modulo operation is applied
+                                    let map_loc =
+                                        unsafe { map.get_unchecked_mut(id as usize % map.len()) };
+                                    *map_loc = (*map_loc).saturating_add(&1u8.into());
+
                                     previous_block_ip = b.ip();
                                 }
                             }
@@ -380,7 +375,7 @@ impl IntelPT {
         let offset = decoder.sync_offset()?;
         unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
-        Ok(ips)
+        Ok(())
     }
 
     /// Check if Intel PT is available on the current system.
@@ -982,9 +977,8 @@ mod test {
             }
         }
 
-        let mut ips = pt.decode_with_image(&mut image).unwrap();
-        ips.sort_unstable();
-        ips.dedup();
-        println!("Intel PT traces unique block ips: {ips:#x?}");
+        let mut map = vec![0; 128];
+        pt.decode_traces_into_map(&mut image, &mut map).unwrap();
+        println!("Intel PT traces unique block ips: {map:#x?}");
     }
 }
