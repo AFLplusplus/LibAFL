@@ -1,3 +1,4 @@
+#![allow(clippy::too_long_first_doc_paragraph)]
 //! Stage that re-runs captured Timeouts with double the timeout to verify
 //! Note: To capture the timeouts, use in conjunction with `CaptureTimeoutFeedback`
 //! Note: Will NOT work with in process executors due to the potential for restarts/crashes when
@@ -8,10 +9,12 @@ use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData,
 use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(not(miri))]
+use crate::inputs::BytesInput;
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers, HasTimeout},
-    inputs::{BytesInput, UsesInput},
+    inputs::UsesInput,
     observers::ObserversTuple,
     stages::Stage,
     state::{HasCorpus, State, UsesState},
