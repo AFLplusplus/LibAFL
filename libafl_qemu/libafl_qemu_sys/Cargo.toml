@@ -63,11 +63,11 @@ num_enum = { workspace = true, default-features = true }
 libc = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-pyo3 = { workspace = true, optional = true }
+pyo3 = { version = "0.22.3", optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.13.2" }
-pyo3-build-config = { workspace = true, optional = true }
+pyo3-build-config = { version = "0.22.3", optional = true }
 rustversion = { workspace = true }
 
 [lints]

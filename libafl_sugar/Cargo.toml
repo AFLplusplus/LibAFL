@@ -57,7 +57,7 @@ riscv32 = ["libafl_qemu/riscv32"]
 riscv64 = ["libafl_qemu/riscv64"]
 
 [build-dependencies]
-pyo3-build-config = { workspace = true, optional = true }
+pyo3-build-config = { version = "0.22.3", optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.13.2" }
@@ -67,8 +67,8 @@ libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 
-typed-builder = { workspace = true }         # Implement the builder pattern at compiletime
-pyo3 = { workspace = true, optional = true }
+typed-builder = { workspace = true }           # Implement the builder pattern at compiletime
+pyo3 = { version = "0.22.3", optional = true }
 log = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
