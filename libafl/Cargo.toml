@@ -108,7 +108,14 @@ regex = ["std", "dep:regex"]
 casr = ["libcasr", "std", "regex"]
 
 ## Intel Processor Trace Observer
-intel_pt = ["std", "dep:libipt", "dep:num_enum", "libafl_bolts/intel_pt"]
+intel_pt = [
+  "std",
+  "libafl_bolts/intel_pt",
+  "nix/ptrace",
+  "nix/signal",
+  "dep:libipt",
+  "dep:num_enum",
+]
 
 ## Enables features for corpus minimization
 cmin = ["z3"]
@@ -197,7 +204,7 @@ serde_json = { workspace = true, default-features = false, features = [
 ] }
 # clippy-suggested optimised byte counter
 bytecount = "0.6.8"
-static_assertions = "1.1.0"
+static_assertions = { workspace = true }
 
 [dependencies]
 libafl_bolts = { version = "0.13.2", path = "../libafl_bolts", default-features = false, features = [
@@ -224,10 +231,7 @@ typed-builder = { workspace = true, optional = true } # Implement the builder pa
 serde_json = { workspace = true, optional = true, default-features = false, features = [
   "alloc",
 ] }
-nix = { workspace = true, features = [
-  "ptrace",
-  "signal",
-], default-features = true, optional = true }
+nix = { workspace = true, default-features = true, optional = true }
 regex = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 libm = "0.2.8"

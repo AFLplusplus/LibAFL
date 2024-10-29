@@ -88,13 +88,13 @@ gzip = ["miniz_oxide", "alloc"]
 
 ## Enable intel_pt module
 intel_pt = [
+  "std",
   "dep:arbitrary-int",
   "dep:bitbybit",
   "dep:caps",
   "dep:libipt",
   "dep:perf-event-open-sys",
   "dep:raw-cpuid",
-  "std",
 ]
 
 ## Replaces `ahash` with the potentially faster [`xxh3`](https://github.com/Cyan4973/xxHash) in some parts of the lib.
@@ -137,7 +137,7 @@ proc-maps = "0.4.0"
 
 [dependencies]
 libafl_derive = { version = "0.13.2", optional = true, path = "../libafl_derive" }
-static_assertions = "1.1.0"
+static_assertions = { workspace = true }
 
 tuple_list = { version = "0.1.3" }
 hashbrown = { workspace = true, features = [
