@@ -27,7 +27,6 @@ rustc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
-  "nautilus",
   "std",
   "derive",
   "llmp_compression",
@@ -180,7 +179,7 @@ llmp_small_maps = [
 nautilus = [
   "std",
   "serde_json/std",
-  "pyo3",
+  "dep:pyo3",
   "rand_trait",
   "regex-syntax",
   "regex",
