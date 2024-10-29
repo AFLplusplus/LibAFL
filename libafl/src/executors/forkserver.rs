@@ -1551,7 +1551,6 @@ where
     TC: TargetBytesConverter<Input = S::Input>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
-    S::Input: HasTargetBytes,
 {
     #[inline]
     fn run_target(
