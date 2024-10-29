@@ -49,7 +49,7 @@ document-features = ["dep:document-features"]
 std = [
   "serde_json",
   "serde_json/std",
-  "nix",
+  "dep:nix",
   "serde/std",
   "bincode",
   "wait-timeout",
@@ -111,9 +111,8 @@ casr = ["libcasr", "std", "regex"]
 intel_pt = [
   "std",
   "libafl_bolts/intel_pt",
-  "nix/ptrace",
-  "nix/signal",
   "dep:libipt",
+  "dep:nix",
   "dep:num_enum",
 ]
 
@@ -231,7 +230,7 @@ typed-builder = { workspace = true, optional = true } # Implement the builder pa
 serde_json = { workspace = true, optional = true, default-features = false, features = [
   "alloc",
 ] }
-nix = { workspace = true, default-features = true, optional = true }
+nix = { workspace = true, optional = true, features = ["signal", "ptrace"] }
 regex = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 libm = "0.2.8"
