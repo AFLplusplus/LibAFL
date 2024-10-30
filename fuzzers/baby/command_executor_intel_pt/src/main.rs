@@ -25,7 +25,13 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{core_affinity, intel_pt::IntelPT, rands::StdRand, tuples::tuple_list, Error};
+use libafl_bolts::{
+    core_affinity,
+    intel_pt::{IntelPT, PAGE_SIZE},
+    rands::StdRand,
+    tuples::tuple_list,
+    Error,
+};
 use nix::{
     sys::{
         personality,
@@ -50,7 +56,7 @@ pub fn main() {
     // Enable logging
     env_logger::init();
 
-    // Create an observation channel using the signals map
+    // Create an observation channel using the map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
@@ -90,7 +96,17 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let mut intel_pt = IntelPT::builder().cpu(0).inherit(true).build().unwrap();
-    intel_pt.set_ip_filters(&[0x21_0000..=0x25_0000]).unwrap();
+
+    // The target is a ET_DYN elf, will be relocated with this offset
+    // see https://github.com/torvalds/linux/blob/c1e939a21eb111a6d6067b38e8e04b8809b64c4e/arch/x86/include/asm/elf.h#L234C1-L239C38
+    const DEFAULT_MAP_WINDOW: usize = (1 << 47) - PAGE_SIZE;
+    const ELF_ET_DYN_BASE: usize = DEFAULT_MAP_WINDOW / 3 * 2 & !(PAGE_SIZE - 1);
+
+    // Set the filter and image of our target.
+    // These information can be retrieved from `readelf -l` (for example)
+    intel_pt
+        .set_ip_filters(&[ELF_ET_DYN_BASE + 0x14000..=ELF_ET_DYN_BASE + 0x14000 + 0x40000])
+        .unwrap();
     let executable = PathBuf::from(env::args().next().unwrap())
         .parent()
         .unwrap()
@@ -99,9 +115,9 @@ pub fn main() {
         .to_string();
     let sections = [Section {
         file_path: executable,
-        file_offset: 0xf0a0,
+        file_offset: 0x13000,
         size: 0x40000,
-        virtual_address: 0x2100a0,
+        virtual_address: (ELF_ET_DYN_BASE + 0x14000) as u64,
     }];
 
     let hook = unsafe { IntelPTHook::builder().map_ptr(MAP_PTR).map_len(MAP_SIZE) }
