@@ -407,12 +407,12 @@ where
     default fn is_interesting(
         &mut self,
         state: &mut S,
-        manager: &mut EM,
-        input: &I,
+        _manager: &mut EM,
+        _input: &I,
         observers: &OT,
-        exit_kind: &ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+        let res = self.is_interesting_default(state, observers);
         #[cfg(feature = "track_hit_feedbacks")]
         {
             self.last_result = Some(res);
@@ -424,12 +424,12 @@ where
     fn is_interesting(
         &mut self,
         state: &mut S,
-        manager: &mut EM,
-        input: &I,
+        _manager: &mut EM,
+        _input: &I,
         observers: &OT,
-        exit_kind: &ExitKind,
+        _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
-        let res = self.is_interesting_default(state, manager, input, observers, exit_kind);
+        let res = self.is_interesting_default(state, observers);
 
         #[cfg(feature = "track_hit_feedbacks")]
         {
@@ -553,6 +553,76 @@ where
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
+        Ok(self.is_interesting_u8_simd_optimized(state, observers))
+    }
+}
+
+impl<C, N, O, R> Named for MapFeedback<C, N, O, R> {
+    #[inline]
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+#[allow(clippy::ptr_arg)]
+fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
+    if name.chars().all(char::is_lowercase) {
+        name.clone()
+    } else {
+        name.to_lowercase().into()
+    }
+}
+
+impl<C, N, O, R> MapFeedback<C, N, O, R>
+where
+    C: CanTrack + AsRef<O> + Named,
+{
+    /// Create new `MapFeedback`
+    #[must_use]
+    pub fn new(map_observer: &C) -> Self {
+        Self {
+            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
+            name: map_observer.name().clone(),
+            map_ref: map_observer.handle(),
+            stats_name: create_stats_name(map_observer.name()),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
+    /// feedback is needed twice, but with a different history. Using `new()` always results in the
+    /// same name and therefore also the same history.
+    #[must_use]
+    pub fn with_name(name: &'static str, map_observer: &C) -> Self {
+        let name = Cow::from(name);
+        Self {
+            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
+            map_ref: map_observer.handle(),
+            stats_name: create_stats_name(&name),
+            name,
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Specialize for the common coverage map size, maximization of u8s
+#[rustversion::nightly]
+impl<C, O> MapFeedback<C, DifferentIsNovel, O, MaxReducer>
+where
+    O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
+    C: CanTrack + AsRef<O>,
+{
+    #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::needless_range_loop)]
+    fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
+    where
+        S: HasNamedMetadata,
+        OT: MatchName,
+    {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
 
@@ -648,14 +718,7 @@ where
         {
             self.last_result = Some(interesting);
         }
-        Ok(interesting)
-    }
-}
-
-impl<C, N, O, R> Named for MapFeedback<C, N, O, R> {
-    #[inline]
-    fn name(&self) -> &Cow<'static, str> {
-        &self.name
+        interesting
     }
 }
 
@@ -665,51 +728,6 @@ impl<C, N, O, R> HasObserverHandle for MapFeedback<C, N, O, R> {
     #[inline]
     fn observer_handle(&self) -> &Handle<C> {
         &self.map_ref
-    }
-}
-
-#[allow(clippy::ptr_arg)]
-fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
-    if name.chars().all(char::is_lowercase) {
-        name.clone()
-    } else {
-        name.to_lowercase().into()
-    }
-}
-
-impl<C, N, O, R> MapFeedback<C, N, O, R>
-where
-    C: CanTrack + Named + AsRef<O>,
-{
-    /// Create new `MapFeedback`
-    #[must_use]
-    pub fn new(map_observer: &C) -> Self {
-        Self {
-            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            name: map_observer.name().clone(),
-            map_ref: map_observer.handle(),
-            stats_name: create_stats_name(map_observer.name()),
-            #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
-    /// feedback is needed twice, but with a different history. Using `new()` always results in the
-    /// same name and therefore also the same history.
-    #[must_use]
-    pub fn with_name(name: &'static str, map_observer: &C) -> Self {
-        let name = Cow::from(name);
-        Self {
-            novelties: if C::NOVELTIES { Some(vec![]) } else { None },
-            map_ref: map_observer.handle(),
-            stats_name: create_stats_name(&name),
-            name,
-            #[cfg(feature = "track_hit_feedbacks")]
-            last_result: None,
-            phantom: PhantomData,
-        }
     }
 }
 
@@ -724,14 +742,7 @@ where
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn is_interesting_default<EM, I, OT, S>(
-        &mut self,
-        state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> bool
+    fn is_interesting_default<OT, S>(&mut self, state: &mut S, observers: &OT) -> bool
     where
         S: HasNamedMetadata,
         OT: MatchName,

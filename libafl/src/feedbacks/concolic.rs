@@ -38,6 +38,21 @@ impl<'map> ConcolicFeedback<'map> {
             observer_handle: observer.handle(),
         }
     }
+
+    fn add_concolic_feedback_to_metadata<I, OT>(
+        &mut self,
+        observers: &OT,
+        testcase: &mut Testcase<I>,
+    ) where
+        OT: MatchName,
+    {
+        if let Some(metadata) = observers
+            .get(&self.observer_handle)
+            .map(ConcolicObserver::create_metadata_from_current_map)
+        {
+            testcase.metadata_map_mut().insert(metadata);
+        }
+    }
 }
 
 impl Named for ConcolicFeedback<'_> {
@@ -64,12 +79,7 @@ where
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
-        if let Some(metadata) = observers
-            .get(&self.observer_handle)
-            .map(ConcolicObserver::create_metadata_from_current_map)
-        {
-            testcase.metadata_map_mut().insert(metadata);
-        }
+        self.add_concolic_feedback_to_metadata(observers, testcase);
         Ok(())
     }
 }
