@@ -123,7 +123,12 @@ pub struct AsanGuestModule<F> {
     mappings: Vec<QemuAsanGuestMapping>,
 }
 
-#[cfg(any(cpu_target = "aarch64", cpu_target = "x86_64", feature = "clippy"))]
+#[cfg(any(
+    cpu_target = "aarch64",
+    cpu_target = "x86_64",
+    cpu_target = "riscv64",
+    feature = "clippy"
+))]
 impl<F> AsanGuestModule<F> {
     const HIGH_SHADOW_START: GuestAddr = 0x02008fff7000;
     const HIGH_SHADOW_END: GuestAddr = 0x10007fff7fff;
@@ -135,7 +140,8 @@ impl<F> AsanGuestModule<F> {
     cpu_target = "arm",
     cpu_target = "i386",
     cpu_target = "mips",
-    cpu_target = "ppc"
+    cpu_target = "ppc",
+    cpu_target = "riscv32",
 ))]
 impl<F> AsanGuestModule<F> {
     const HIGH_SHADOW_START: GuestAddr = 0x28000000;
