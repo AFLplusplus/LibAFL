@@ -220,21 +220,13 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> CommandExecutor<OT, S, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    Z: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput<Input = I>,
+    T: CommandConfigurator<I> + Debug,
+    OT: Debug + ObserversTuple<I, S>,
 {
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        _mgr: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
@@ -294,6 +286,27 @@ where
     }
 }
 
+#[cfg(all(feature = "std", unix))]
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+where
+    EM: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput,
+    T: CommandConfigurator<S::Input> + Debug,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.execute_input_with_command(state, input)
+    }
+}
+
+// this only works on unix because of the reliance on checking the process signal for detecting OOM
 impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
 where
     S: HasCorpus,

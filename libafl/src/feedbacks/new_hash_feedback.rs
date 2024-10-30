@@ -100,34 +100,19 @@ pub struct NewHashFeedback<O> {
     last_result: Option<bool>,
 }
 
-impl<O, S> StateInitializer<S> for NewHashFeedback<O>
+impl<O> NewHashFeedback<O>
 where
-    S: HasNamedMetadata,
-{
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(
-            &self.name,
-            NewHashFeedbackMetadata::with_capacity(self.capacity),
-        );
-        Ok(())
-    }
-}
-
-impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
-where
-    O: ObserverWithHashField,
-    OT: MatchName,
-    S: HasNamedMetadata,
+    O: ObserverWithHashField + Named,
 {
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting(
+    fn has_interesting_backtrace_hash_observation<OT, S: HasNamedMetadata>(
         &mut self,
         state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
         observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, Error>
+    where
+        OT: MatchName,
+    {
         let observer = observers
             .get(&self.o_ref)
             .expect("A NewHashFeedback needs a BacktraceObserver");
@@ -150,6 +135,39 @@ where
         }
         Ok(res)
     }
+}
+
+impl<O, S> StateInitializer<S> for NewHashFeedback<O>
+where
+    S: HasNamedMetadata,
+{
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        state.add_named_metadata(
+            &self.name,
+            NewHashFeedbackMetadata::with_capacity(self.capacity),
+        );
+        Ok(())
+    }
+}
+
+impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
+where
+    O: ObserverWithHashField + Named,
+    OT: MatchName,
+    S: HasNamedMetadata,
+{
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting(
+        &mut self,
+        state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        self.has_interesting_backtrace_hash_observation(state, observers)
+    }
+
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         self.last_result.ok_or(premature_last_result_err())
