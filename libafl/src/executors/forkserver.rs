@@ -26,6 +26,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
     AsSlice, AsSliceMut, Truncate,
 };
+use libc::RLIM_INFINITY;
 use nix::{
     sys::{
         select::{pselect, FdSet},
@@ -133,7 +134,7 @@ pub trait ConfigTarget {
     /// Sets the sid
     fn setsid(&mut self) -> &mut Self;
     /// Sets a mem limit
-    fn setlimit(&mut self, memlimit: u64) -> &mut Self;
+    fn setlimit(&mut self, memlimit: u64, afl_debug: bool) -> &mut Self;
     /// Sets the stdin
     fn setstdin(&mut self, fd: RawFd, use_stdin: bool) -> &mut Self;
     /// Sets the AFL forkserver pipes
@@ -207,7 +208,7 @@ impl ConfigTarget for Command {
     }
 
     #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
-    fn setlimit(&mut self, memlimit: u64) -> &mut Self {
+    fn setlimit(&mut self, memlimit: u64, afl_debug: bool) -> &mut Self {
         if memlimit == 0 {
             return self;
         }
@@ -220,11 +221,6 @@ impl ConfigTarget for Command {
                 rlim_cur: memlimit,
                 rlim_max: memlimit,
             };
-            let r0 = libc::rlimit {
-                rlim_cur: 0,
-                rlim_max: 0,
-            };
-
             #[cfg(target_os = "openbsd")]
             let mut ret = unsafe { libc::setrlimit(libc::RLIMIT_RSS, &r) };
             #[cfg(not(target_os = "openbsd"))]
@@ -232,6 +228,10 @@ impl ConfigTarget for Command {
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
+            let r0 = libc::rlimit {
+                rlim_cur: if afl_debug { RLIM_INFINITY } else { 0 },
+                rlim_max: if afl_debug { RLIM_INFINITY } else { 0 },
+            };
             ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
@@ -367,6 +367,15 @@ impl Forkserver {
             return Err(Error::unknown("__AFL_SHM_ID not set. It is necessary to set this env, otherwise the forkserver cannot communicate with the fuzzer".to_string()));
         }
 
+        let afl_debug = if let Ok(afl_debug) = env::var("AFL_DEBUG") {
+            if afl_debug != "1" && afl_debug != "0" {
+                return Err(Error::illegal_argument("AFL_DEBUG must be either 1 or 0"));
+            }
+            afl_debug == "1"
+        } else {
+            false
+        };
+
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
@@ -408,7 +417,7 @@ impl Forkserver {
         let fsrv_handle = match command
             .env("LD_BIND_NOW", "1")
             .envs(envs)
-            .setlimit(memlimit)
+            .setlimit(memlimit, afl_debug)
             .setsid()
             .setstdin(input_filefd, use_stdin)
             .setpipe(
