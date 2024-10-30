@@ -15,5 +15,5 @@ tui = []
 libafl = { path = "../../../libafl/", default-features = false, features = [
   "intel_pt",
 ] }
-libafl_bolts = { path = "../../../libafl_bolts/" }
-procfs = "0.17.0"
+libafl_bolts = { path = "../../../libafl_bolts/", features = ["intel_pt"] }
+proc-maps = "0.4.0"

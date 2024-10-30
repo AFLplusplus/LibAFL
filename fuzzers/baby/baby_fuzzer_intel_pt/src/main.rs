@@ -1,4 +1,4 @@
-use std::{hint::black_box, num::NonZero, path::PathBuf, time::Duration};
+use std::{hint::black_box, num::NonZero, path::PathBuf, process, time::Duration};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -23,7 +23,7 @@ use libafl::{
     state::StdState,
 };
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
-use procfs::process::{MMapPath, Process};
+use proc_maps::get_process_maps;
 
 // Coverage map
 const MAP_SIZE: usize = 4096;
@@ -94,34 +94,30 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Get the memory map of the current process
-    let myself = Process::myself().unwrap();
-    let maps = myself
-        .maps()
-        .unwrap()
+    let my_pid = i32::try_from(process::id()).unwrap();
+    let process_maps = get_process_maps(my_pid).unwrap();
+    let sections = process_maps
         .iter()
-        .filter_map(|m| {
-            let file_path = match &m.pathname {
-                MMapPath::Path(p) => p,
-                _ => return None,
+        .filter_map(|pm| {
+            if pm.is_exec() && pm.filename().is_some() {
+                Some(Section {
+                    file_path: pm.filename().unwrap().to_string_lossy().to_string(),
+                    file_offset: pm.offset as u64,
+                    size: pm.size() as u64,
+                    virtual_address: pm.start() as u64,
+                })
+            } else {
+                None
             }
-            .to_string_lossy()
-            .to_string();
-            let size = m.address.1 - m.address.0;
-            Some(Section {
-                file_path,
-                file_offset: m.offset,
-                size,
-                virtual_address: m.address.0,
-            })
         })
-        .collect::<Vec<Section>>();
+        .collect::<Vec<_>>();
 
     // Intel PT hook that will handle the setup of Intel PT for each execution and fill the map
     let pt_hook = unsafe {
         IntelPTHook::builder()
             .map_ptr(MAP_PTR)
             .map_len(MAP_SIZE)
-            .image(&maps)
+            .image(&sections)
     }
     .build();
 

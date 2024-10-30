@@ -117,7 +117,7 @@ pub struct IntelPTBuilder {
 
 impl From<PtError> for Error {
     fn from(err: PtError) -> Self {
-        Self::unknown(format!("libipt error: {err}"))
+        Self::unknown(err.to_string())
     }
 }
 

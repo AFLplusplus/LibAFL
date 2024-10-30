@@ -1,4 +1,7 @@
-use std::{ptr::slice_from_raw_parts_mut, string::String};
+use std::{
+    ptr::slice_from_raw_parts_mut,
+    string::{String, ToString},
+};
 
 use libafl_bolts::intel_pt::IntelPT;
 use libipt::{Asid, Image, SectionCache};
@@ -63,8 +66,24 @@ fn sections_to_image(
     let mut image = Image::new(Some("image"))?;
 
     for s in sections {
-        let isid = image_cache.add_file(&s.file_path, s.file_offset, s.size, s.virtual_address)?;
-        image.add_cached(&mut image_cache, isid, Asid::default())?;
+        let isid = image_cache.add_file(&s.file_path, s.file_offset, s.size, s.virtual_address);
+        if let Err(e) = isid {
+            log::warn!(
+                "Error while caching {} {} - skipped",
+                s.file_path,
+                e.to_string()
+            );
+            continue;
+        }
+
+        if let Err(e) = image.add_cached(&mut image_cache, isid.unwrap(), Asid::default()) {
+            log::warn!(
+                "Error while adding cache to image {} {} - skipped",
+                s.file_path,
+                e.to_string()
+            );
+            continue;
+        }
     }
 
     Ok((image, image_cache))
