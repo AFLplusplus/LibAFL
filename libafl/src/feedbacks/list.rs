@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// The metadata to remember past observed value
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(bound = "T: Eq + Hash + for<'a> Deserialize<'a> + Serialize")]
 pub struct ListFeedbackMetadata<T> {
     /// Contains the information of past observed set of values.
@@ -42,6 +42,13 @@ impl<T> ListFeedbackMetadata<T> {
     }
 }
 
+impl<T> Default for ListFeedbackMetadata<T> {
+    #[must_use]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> HasRefCnt for ListFeedbackMetadata<T> {
     fn refcnt(&self) -> isize {
         self.tcref
@@ -60,36 +67,23 @@ pub struct ListFeedback<T> {
 }
 
 libafl_bolts::impl_serdeany!(
-    ListFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned + Eq + Hash>,
+    ListFeedbackMetadata<T: Debug + 'static + Serialize + DeserializeOwned + Eq + Hash>,
     <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<bool>,<char>,<usize>
 );
 
-impl<S, T> StateInitializer<S> for ListFeedback<T>
+impl<T> ListFeedback<T>
 where
-    S: HasNamedMetadata,
-    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + 'static + Copy,
 {
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());
-        Ok(())
-    }
-}
-
-impl<EM, I, OT, S, T> Feedback<EM, I, OT, S> for ListFeedback<T>
-where
-    OT: MatchName,
-    S: HasNamedMetadata,
-    T: Debug + Serialize + Hash + Eq + DeserializeOwned + Default + Copy + 'static,
-{
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting(
+    fn has_interesting_list_observer_feedback<OT, S>(
         &mut self,
         state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
         observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error> {
+    ) -> bool
+    where
+        OT: MatchName,
+        S: HasNamedMetadata,
+    {
         let observer = observers.get(&self.observer_handle).unwrap();
         // TODO register the list content in a testcase metadata
         self.novelty.clear();
@@ -103,7 +97,48 @@ where
                 self.novelty.insert(*v);
             }
         }
-        Ok(!self.novelty.is_empty())
+        !self.novelty.is_empty()
+    }
+
+    fn append_list_observer_metadata<S: HasNamedMetadata>(&mut self, state: &mut S) {
+        let history_set = state
+            .named_metadata_map_mut()
+            .get_mut::<ListFeedbackMetadata<T>>(self.name())
+            .unwrap();
+
+        for v in &self.novelty {
+            history_set.set.insert(*v);
+        }
+    }
+}
+
+impl<S, T> StateInitializer<S> for ListFeedback<T>
+where
+    S: HasNamedMetadata,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
+{
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        state.add_named_metadata(self.name(), ListFeedbackMetadata::<T>::default());
+        Ok(())
+    }
+}
+
+impl<EM, I, OT, S, T> Feedback<EM, I, OT, S> for ListFeedback<T>
+where
+    OT: MatchName,
+    S: HasNamedMetadata,
+    T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
+{
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting(
+        &mut self,
+        state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        Ok(self.has_interesting_list_observer_feedback(state, observers))
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
@@ -118,14 +153,7 @@ where
         _observers: &OT,
         _testcase: &mut crate::corpus::Testcase<I>,
     ) -> Result<(), Error> {
-        let history_set = state
-            .named_metadata_map_mut()
-            .get_mut::<ListFeedbackMetadata<T>>(self.name())
-            .unwrap();
-
-        for v in &self.novelty {
-            history_set.set.insert(*v);
-        }
+        self.append_list_observer_metadata(state);
         Ok(())
     }
 }

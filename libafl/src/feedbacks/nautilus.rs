@@ -60,6 +60,26 @@ impl<'a> NautilusFeedback<'a> {
     pub fn new(context: &'a NautilusContext) -> Self {
         Self { ctx: &context.ctx }
     }
+
+    fn append_nautilus_metadata_to_state<S>(
+        &mut self,
+        state: &mut S,
+        testcase: &mut Testcase<NautilusInput>,
+    ) -> Result<(), Error>
+    where
+        S: HasCorpus + HasMetadata,
+        S::Corpus: Corpus<Input = NautilusInput>,
+    {
+        state.corpus().load_input_into(testcase)?;
+        let input = testcase.input().as_ref().unwrap().clone();
+        let meta = state
+            .metadata_map_mut()
+            .get_mut::<NautilusChunksMetadata>()
+            .expect("NautilusChunksMetadata not in the state");
+        meta.cks.add_tree(input.tree, self.ctx);
+
+        Ok(())
+    }
 }
 
 impl Named for NautilusFeedback<'_> {
@@ -95,14 +115,7 @@ where
         _observers: &OT,
         testcase: &mut Testcase<NautilusInput>,
     ) -> Result<(), Error> {
-        state.corpus().load_input_into(testcase)?;
-        let input = testcase.input().as_ref().unwrap().clone();
-        let meta = state
-            .metadata_map_mut()
-            .get_mut::<NautilusChunksMetadata>()
-            .expect("NautilusChunksMetadata not in the state");
-        meta.cks.add_tree(input.tree, self.ctx);
-        Ok(())
+        self.append_nautilus_metadata_to_state(state, testcase)
     }
 
     fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
