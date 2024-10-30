@@ -158,7 +158,7 @@ fn configure_qemu(
         .arg("--disable-linux-aio")
         .arg("--disable-linux-io-uring")
         .arg("--disable-linux-user")
-        .arg("--disable-live-block-migration")
+        // .arg("--disable-live-block-migration")
         .arg("--disable-lzfse")
         .arg("--disable-lzo")
         .arg("--disable-l2tpv3")
