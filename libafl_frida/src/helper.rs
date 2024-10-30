@@ -10,7 +10,7 @@ use std::{
 use frida_gum::{
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
-    Backend, Gum, Module, ModuleDetails, ModuleMap, PageProtection, Script,
+    Backend, Gum, ModuleDetails, ModuleMap, Script,
 };
 use frida_gum_sys::gchar;
 use libafl::{
@@ -413,19 +413,6 @@ pub unsafe extern "C" fn test_function(message: *const gchar) {
     if let Ok(msg) = CStr::from_ptr(message).to_str() {
         println!("{msg}");
     }
-}
-
-/// Helper function to get the size of a module's CODE section from frida
-#[must_use]
-pub fn get_module_size(module_name: &str) -> usize {
-    let mut code_size = 0;
-    let code_size_ref = &mut code_size;
-    Module::enumerate_ranges(module_name, PageProtection::ReadExecute, move |details| {
-        *code_size_ref = details.memory_range().size();
-        true
-    });
-
-    code_size
 }
 
 fn pathlist_contains_module<I, P>(list: I, module: &ModuleDetails) -> bool
