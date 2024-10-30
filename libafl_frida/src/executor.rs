@@ -187,7 +187,7 @@ where
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
         // we don't add it to the INSTRUMENTED ranges.
         let mut ranges = helper.ranges().clone();
-        for module in frida_gum::Module::enumerate_modules() {
+        for module in frida_gum::Module::obtain(gum).enumerate_modules() {
             if module.base_address < Self::new as usize
                 && (Self::new as usize) < module.base_address + module.size
             {

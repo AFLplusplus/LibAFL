@@ -476,13 +476,14 @@ impl AsanRuntime {
     #[allow(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
+        let module = Module::obtain(gum);
         macro_rules! hook_func {
             //No library case
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
 
-                    let target_function = frida_gum::Module::find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -522,7 +523,7 @@ impl AsanRuntime {
                 paste::paste! {
                     log::trace!("Hooking {}:{}", $lib, stringify!($name));
 
-                    let target_function = frida_gum::Module::find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -564,7 +565,7 @@ impl AsanRuntime {
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
-                    let target_function = frida_gum::Module::find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -604,7 +605,7 @@ impl AsanRuntime {
             ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}:{}", $lib, stringify!($name));
-                    let target_function = frida_gum::Module::find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -693,7 +694,7 @@ impl AsanRuntime {
         macro_rules! hook_heap_windows {
             ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking allocator functions in {}", $libname);
-            for export in Module::enumerate_exports($libname) {
+            for export in module.enumerate_exports($libname) {
                 // log::trace!("- {}", export.name);
                 match &export.name[..] {
                     "NtGdiCreateCompatibleDC" => {
@@ -919,7 +920,7 @@ impl AsanRuntime {
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
-            for export in Module::enumerate_exports($libname) {
+            for export in module.enumerate_exports($libname) {
                 match &export.name[..] {
                     "_Znam" => {
                         hook_func!($libname, $lib_ident, _Znam, (size: usize), *mut c_void);
