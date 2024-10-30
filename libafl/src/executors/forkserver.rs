@@ -134,7 +134,9 @@ pub trait ConfigTarget {
     /// Sets the sid
     fn setsid(&mut self) -> &mut Self;
     /// Sets a mem limit
-    fn setlimit(&mut self, memlimit: u64, afl_debug: bool) -> &mut Self;
+    fn setlimit(&mut self, memlimit: u64) -> &mut Self;
+    /// Sets core dump rlimit
+    fn set_coredump(&mut self, enable: bool) -> &mut Self;
     /// Sets the stdin
     fn setstdin(&mut self, fd: RawFd, use_stdin: bool) -> &mut Self;
     /// Sets the AFL forkserver pipes
@@ -208,7 +210,7 @@ impl ConfigTarget for Command {
     }
 
     #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
-    fn setlimit(&mut self, memlimit: u64, afl_debug: bool) -> &mut Self {
+    fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
         }
@@ -222,17 +224,25 @@ impl ConfigTarget for Command {
                 rlim_max: memlimit,
             };
             #[cfg(target_os = "openbsd")]
-            let mut ret = unsafe { libc::setrlimit(libc::RLIMIT_RSS, &r) };
+            let ret = unsafe { libc::setrlimit(libc::RLIMIT_RSS, &r) };
             #[cfg(not(target_os = "openbsd"))]
-            let mut ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
+            let ret = unsafe { libc::setrlimit(libc::RLIMIT_AS, &r) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
+            Ok(())
+        };
+        // # Safety
+        // This calls our non-shady function from above.
+        unsafe { self.pre_exec(func) }
+    }
+    fn set_coredump(&mut self, enable: bool) -> &mut Self {
+        let func = move || {
             let r0 = libc::rlimit {
-                rlim_cur: if afl_debug { RLIM_INFINITY } else { 0 },
-                rlim_max: if afl_debug { RLIM_INFINITY } else { 0 },
+                rlim_cur: if enable { RLIM_INFINITY } else { 0 },
+                rlim_max: if enable { RLIM_INFINITY } else { 0 },
             };
-            ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
+            let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &r0) };
             if ret < 0 {
                 return Err(io::Error::last_os_error());
             }
@@ -417,7 +427,8 @@ impl Forkserver {
         let fsrv_handle = match command
             .env("LD_BIND_NOW", "1")
             .envs(envs)
-            .setlimit(memlimit, afl_debug)
+            .setlimit(memlimit)
+            .set_coredump(afl_debug)
             .setsid()
             .setstdin(input_filefd, use_stdin)
             .setpipe(
