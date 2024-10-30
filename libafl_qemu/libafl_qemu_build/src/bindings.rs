@@ -80,7 +80,6 @@ const WRAPPER_HEADER: &str = r#"
 #include "tcg/tcg.h"
 #include "tcg/tcg-op.h"
 #include "tcg/tcg-internal.h"
-#include "exec/helper-head.h"
 
 #include "qemu/plugin-memory.h"
 
