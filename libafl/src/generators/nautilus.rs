@@ -86,7 +86,8 @@ impl NautilusContext {
 
     /// Create a new [`NautilusContext`] from a file
     pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Result<Self, Error> {
-        if grammar_file.as_ref().extension().unwrap_or_default() == "py" {
+        let grammar_file = grammar_file.as_ref();
+        if grammar_file.extension().unwrap_or_default() == "py" {
             log::debug!("Creating NautilusContext from python grammar");
             let ctx = python_grammar_loader::load_python_grammar(
                 fs::read_to_string(grammar_file)?.as_str(),
@@ -96,7 +97,11 @@ impl NautilusContext {
         log::debug!("Creating NautilusContext from json grammar");
         let file = fs::File::open(grammar_file)?;
         let reader = BufReader::new(file);
-        let rules: Vec<Vec<String>> = serde_json::from_reader(reader)?;
+        let rules: Vec<Vec<String>> = serde_json::from_reader(reader).map_err(|err| {
+            Error::illegal_argument(format!(
+                "Error loading context from json grammar file {grammar_file:?}: {err:?}"
+            ))
+        })?;
         Ok(Self::new(tree_depth, &rules))
     }
 }

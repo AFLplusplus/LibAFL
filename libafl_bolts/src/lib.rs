@@ -532,14 +532,6 @@ impl From<postcard::Error> for Error {
     }
 }
 
-/// Stringify the json serializer error
-#[cfg(feature = "std")]
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
-        Self::serialize(format!("{err:?}"))
-    }
-}
-
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {

@@ -171,10 +171,11 @@ fn fuzz(
     logfile: PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
+    env_logger::init();
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let qemu = Qemu::init(&args).unwrap();
+    let qemu = Qemu::init(&args).expect("QEMU init failed");
     // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();
@@ -197,7 +198,8 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    unsafe { qemu.read_mem(stack_ptr, &mut ret_addr) };
+    qemu.read_mem(stack_ptr, &mut ret_addr)
+        .expect("Error while reading QEMU memory.");
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -337,7 +339,7 @@ fn fuzz(
             }
 
             unsafe {
-                qemu.write_mem(input_addr, buf);
+                qemu.write_mem_unchecked(input_addr, buf);
 
                 qemu.write_reg(Regs::Rdi, input_addr).unwrap();
                 qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
@@ -397,7 +399,7 @@ fn fuzz(
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);
             });
-        println!("We imported {} inputs from disk.", state.corpus().count());
+        println!("We imported {} input(s) from disk.", state.corpus().count());
     }
 
     let tracing = ShadowTracingStage::new(&mut executor);
