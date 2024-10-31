@@ -7,3 +7,7 @@ repos:
         name: fmt
         entry: scripts/fmt_all.sh check
         language: script
+      - id: taplo
+        name: taplo
+        entry: taplo format --check
+        language: system
