@@ -300,6 +300,8 @@ pub enum Error {
     Unknown(String, ErrorBacktrace),
     /// Error with the corpora
     InvalidCorpus(String, ErrorBacktrace),
+    /// Error specific to a frontend like QEMU or Frida
+    Frontend(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -437,6 +439,15 @@ impl Error {
         S: Into<String>,
     {
         Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
+    }
+
+    /// Error specific to some frontend, like QEMU or Frida
+    #[must_use]
+    pub fn frontend<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Frontend(arg.into(), ErrorBacktrace::new())
     }
 }
 

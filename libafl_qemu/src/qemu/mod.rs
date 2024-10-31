@@ -59,7 +59,7 @@ pub enum QemuError {
 
 impl From<QemuError> for libafl::Error {
     fn from(qemu_error: QemuError) -> Self {
-        libafl::Error::unknown(qemu_error)
+        libafl::Error::frontend(qemu_error)
     }
 }
 
