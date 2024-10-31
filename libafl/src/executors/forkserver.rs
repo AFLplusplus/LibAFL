@@ -135,7 +135,7 @@ pub trait ConfigTarget {
     fn setsid(&mut self) -> &mut Self;
     /// Sets a mem limit
     fn setlimit(&mut self, memlimit: u64) -> &mut Self;
-    /// Sets core dump rlimit
+    /// enables core dumps (rlimit = infinity)
     fn set_coredump(&mut self, enable: bool) -> &mut Self;
     /// Sets the stdin
     fn setstdin(&mut self, fd: RawFd, use_stdin: bool) -> &mut Self;
@@ -236,6 +236,7 @@ impl ConfigTarget for Command {
         // This calls our non-shady function from above.
         unsafe { self.pre_exec(func) }
     }
+
     fn set_coredump(&mut self, enable: bool) -> &mut Self {
         let func = move || {
             let r0 = libc::rlimit {
