@@ -1,23 +1,15 @@
-use std::{
-    env,
-    ffi::{CStr, CString},
-    num::NonZero,
-    os::unix::ffi::OsStrExt,
-    path::PathBuf,
-    time::Duration,
-};
+use std::{env, num::NonZero, path::PathBuf};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        command::CommandConfigurator,
+        command::{CommandConfigurator, PtraceCommandConfigurator},
         hooks::intel_pt::{IntelPTHook, Section},
     },
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{BytesInput, HasMutatorBytes},
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
@@ -26,20 +18,9 @@ use libafl::{
     state::StdState,
 };
 use libafl_bolts::{
-    core_affinity,
     intel_pt::{IntelPT, PAGE_SIZE},
     rands::StdRand,
     tuples::tuple_list,
-    Error,
-};
-use nix::{
-    sys::{
-        personality,
-        personality::Persona,
-        ptrace::traceme,
-        signal::{raise, Signal},
-    },
-    unistd::{execv, fork, ForkResult, Pid},
 };
 
 // Coverage map
@@ -125,54 +106,7 @@ pub fn main() {
         .image(&sections)
         .build();
 
-    #[derive(Debug)]
-    pub struct MyCommandConfigurator {}
-
-    impl CommandConfigurator<BytesInput, Pid> for MyCommandConfigurator {
-        fn spawn_child(&mut self, input: &BytesInput) -> Result<Pid, Error> {
-            // TODO move to new
-            let executable = PathBuf::from(env::args().next().unwrap())
-                .parent()
-                .unwrap()
-                .join("target_program")
-                .into_os_string();
-            let input = [input.bytes(), &[b'\0']].concat();
-            let arg1 = CStr::from_bytes_until_nul(&input).unwrap();
-
-            let child = match unsafe { fork() } {
-                Ok(ForkResult::Parent { child }) => child,
-                Ok(ForkResult::Child) => {
-                    traceme().unwrap();
-
-                    let cores = core_affinity::get_core_ids().unwrap();
-                    cores[0].set_affinity().unwrap();
-
-                    // Disable Address Space Layout Randomization (ASLR)
-                    let pers = personality::get().unwrap();
-                    personality::set(pers | Persona::ADDR_NO_RANDOMIZE).unwrap();
-
-                    raise(Signal::SIGSTOP).unwrap();
-
-                    execv(&CString::new(executable.as_bytes()).unwrap(), &[arg1]).unwrap();
-
-                    unreachable!("execv returns only on error and its result is unwrapped");
-                }
-                Err(e) => panic!("Fork failed {e}"),
-            };
-
-            Ok(child)
-        }
-
-        fn exec_timeout(&self) -> Duration {
-            Duration::from_secs(2)
-        }
-
-        fn exec_timeout_mut(&mut self) -> &mut Duration {
-            todo!()
-        }
-    }
-
-    let command_configurator = MyCommandConfigurator {};
+    let command_configurator = PtraceCommandConfigurator::default();
     let mut executor =
         command_configurator.into_executor_with_hooks(tuple_list!(observer), tuple_list!(hook));
 

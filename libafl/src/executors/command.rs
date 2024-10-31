@@ -5,6 +5,8 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
+#[cfg(all(feature = "std", target_os = "linux"))]
+use std::ffi::CString;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
@@ -22,7 +24,7 @@ use libafl_bolts::{
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "std", target_os = "linux"))]
 use nix::unistd::Pid;
 
 use super::HasTimeout;
@@ -77,7 +79,7 @@ pub struct StdCommandConfigurator {
     command: Command,
 }
 
-impl<I> CommandConfigurator<I, Child> for StdCommandConfigurator
+impl<I> CommandConfigurator<I> for StdCommandConfigurator
 where
     I: HasTargetBytes,
 {
@@ -157,6 +159,85 @@ where
     }
     fn exec_timeout_mut(&mut self) -> &mut Duration {
         &mut self.timeout
+    }
+}
+
+/// Linux specific configurator that leverages `Ptrace`
+///
+/// This configurator was primarly developed to be used in conjunction with
+/// [`crate::executors::hooks::intel_pt::IntelPTHook`]
+#[cfg(all(feature = "std", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PtraceCommandConfigurator {
+    command: CString,
+    input_location: InputLocation,
+}
+
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl Default for PtraceCommandConfigurator {
+    fn default() -> Self {
+        Self {
+            command: CString::new("./target_program").unwrap(),
+            input_location: InputLocation::StdIn,
+        }
+    }
+}
+
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<I> CommandConfigurator<I, Pid> for PtraceCommandConfigurator
+where
+    I: HasTargetBytes,
+{
+    fn spawn_child(&mut self, input: &I) -> Result<Pid, Error> {
+        use std::ffi::CStr;
+
+        use libafl_bolts::core_affinity;
+        use nix::{
+            sys::{
+                personality, ptrace,
+                signal::{raise, Signal},
+            },
+            unistd::{execve, fork, ForkResult},
+        };
+        let terminated_input = [input.target_bytes().as_slice(), &[0u8]].concat();
+        let arg1 = CStr::from_bytes_until_nul(&terminated_input).unwrap();
+
+        let child = match unsafe { fork() } {
+            Ok(ForkResult::Parent { child }) => child,
+            Ok(ForkResult::Child) => {
+                ptrace::traceme().unwrap();
+
+                let cores = core_affinity::get_core_ids().unwrap();
+                cores[0].set_affinity().unwrap();
+
+                // Disable Address Space Layout Randomization (ASLR) for consistent memory
+                // addresses between executions
+                let pers = personality::get().unwrap();
+                personality::set(pers | personality::Persona::ADDR_NO_RANDOMIZE).unwrap();
+
+                raise(Signal::SIGSTOP).unwrap();
+
+                execve(
+                    &CString::new(self.command.as_bytes()).unwrap(),
+                    &[arg1],
+                    &[] as &[&CStr; 0],
+                )
+                .unwrap();
+
+                unreachable!("execve returns only on error and its result is unwrapped");
+            }
+            Err(e) => panic!("Fork failed {e}"),
+        };
+
+        Ok(child)
+    }
+
+    fn exec_timeout(&self) -> Duration {
+        Duration::from_secs(2)
+    }
+
+    fn exec_timeout_mut(&mut self) -> &mut Duration {
+        todo!()
     }
 }
 
@@ -323,17 +404,21 @@ where
     }
 }
 
-// Linux specific lower level implementation, to directly handle `fork`, `exec` and use `ptrace`
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
 where
     EM: UsesState<State = S>,
-    S: State + HasExecutions,
+    S: State + HasExecutions + UsesInput,
     T: CommandConfigurator<S::Input, Pid> + Debug,
     OT: Debug + MatchName + ObserversTuple<S::Input, S>,
     Z: UsesState<State = S>,
     HT: ExecutorHooksTuple<S>,
 {
+    /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
+    /// `ptrace`
+    ///
+    /// Hooks' `pre_exec` and observers' `pre_exec_child` are called with the child process stopped
+    /// just before the `exec` return (after forking).
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
@@ -392,8 +477,8 @@ where
             }
         };
 
-        self.observers.post_exec_child_all(state, input, &res)?;
         self.hooks.post_exec_all(state, input);
+        self.observers.post_exec_child_all(state, input, &res)?;
         Ok(res)
     }
 }
@@ -736,7 +821,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     where
         OT: MatchName,
         HT: ExecutorHooksTuple<S>,
-        S: UsesInput,
+        S: UsesInput<Input = I>,
     {
         CommandExecutor {
             configurer: self,

@@ -230,7 +230,7 @@ typed-builder = { workspace = true, optional = true } # Implement the builder pa
 serde_json = { workspace = true, optional = true, default-features = false, features = [
   "alloc",
 ] }
-nix = { workspace = true, optional = true, features = ["signal", "ptrace"] }
+nix = { workspace = true, optional = true, features = ["signal", "ptrace", "personality"] }
 regex = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 libm = "0.2.8"
