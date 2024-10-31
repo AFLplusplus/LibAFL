@@ -323,6 +323,7 @@ where
     }
 }
 
+// Linux specific lower level implementation, to directly handle `fork`, `exec` and use `ptrace`
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
 where
@@ -341,7 +342,7 @@ where
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use nix::sys::{
-            ptrace::{cont, detach, setoptions, Event::PTRACE_EVENT_EXEC, Options},
+            ptrace,
             signal::Signal,
             wait::{
                 waitpid, WaitPidFlag,
@@ -358,13 +359,12 @@ where
             return Err(Error::unknown("Unexpected state of child process"));
         }
 
-        setoptions(child, Options::PTRACE_O_TRACEEXEC)?;
-        cont(child, None)?;
+        ptrace::setoptions(child, ptrace::Options::PTRACE_O_TRACEEXEC)?;
+        ptrace::cont(child, None)?;
 
         let wait_status = waitpid(child, None)?;
-        if !matches!(
-            wait_status,
-            PtraceEvent(c, Signal::SIGTRAP, e) if c == child && e == (PTRACE_EVENT_EXEC as i32)
+        if !matches!(wait_status, PtraceEvent(c, Signal::SIGTRAP, e)
+            if c == child && e == (ptrace::Event::PTRACE_EVENT_EXEC as i32)
         ) {
             return Err(Error::unknown("Unexpected state of child process"));
         }
@@ -375,9 +375,9 @@ where
         }
         self.hooks.pre_exec_all(state, input);
 
-        detach(child, None)?;
+        ptrace::detach(child, None)?;
         // TODO: use self.configurer.exec_timeout() for the waitpid
-        let res = match waitpid(child, None).expect("waiting on child failed") {
+        let res = match waitpid(child, None)? {
             Exited(pid, 0) if pid == child => ExitKind::Ok,
             Exited(pid, _) if pid == child => ExitKind::Crash,
             Signaled(pid, Signal::SIGABRT, _has_coredump) if pid == child => ExitKind::Crash,
@@ -386,7 +386,9 @@ where
             Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
             s => {
                 // TODO other cases?
-                return Err(Error::unsupported(format!("Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})")));
+                return Err(Error::unsupported(
+                    format!("Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})")
+                ));
             }
         };
 
@@ -594,38 +596,6 @@ impl CommandExecutorBuilder {
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
     {
-        let configurator = self.build_common()?;
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
-                configurator,
-                observers,
-            ),
-        )
-    }
-
-    /// Builds the `CommandExecutor` with hooks
-    pub fn build_with_hooks<OT, HT, S>(
-        &self,
-        observers: OT,
-        hooks: HT,
-    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator, HT>, Error>
-    where
-        OT: MatchName + ObserversTuple<S::Input, S>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
-        HT: ExecutorHooksTuple<S>,
-    {
-        let configurator = self.build_common()?;
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor_with_hooks::<
-                OT,
-                S,
-                HT,
-            >(configurator, observers, hooks),
-        )
-    }
-
-    fn build_common(&self) -> Result<StdCommandConfigurator, Error> {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
                 "CommandExecutor::builder: no program set!",
@@ -663,14 +633,20 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::piped());
         }
 
-        Ok(StdCommandConfigurator {
+        let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
             stdout_observer: self.stdout.clone(),
             stderr_observer: self.stderr.clone(),
             input_location: self.input_location.clone(),
             timeout: self.timeout,
             command,
-        })
+        };
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
+                configurator,
+                observers,
+            ),
+        )
     }
 }
 
@@ -738,7 +714,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C>
     where
         OT: MatchName,
     {
