@@ -174,7 +174,7 @@ fn configure_qemu(
         .arg("--disable-pa")
         .arg("--disable-parallels")
         .arg("--disable-png")
-        .arg("--disable-pvrdma")
+        // .arg("--disable-pvrdma")
         .arg("--disable-qcow1")
         .arg("--disable-qed")
         .arg("--disable-qga-vss")
