@@ -25,7 +25,7 @@ libafl = { path = "../../../libafl", features = [
   "frida_cli",
 ] } #,  "llmp_small_maps", "llmp_debug"]}
 libafl_bolts = { path = "../../../libafl_bolts" }
-frida-gum = { version = "0.14.2", features = [
+frida-gum = { version = "0.15.1", features = [
   "auto-download",
   "event-sink",
   "invocation-listener",
