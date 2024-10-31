@@ -513,6 +513,10 @@ impl Display for Error {
                 write!(f, "Invalid corpus: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
+            Self::Frontend(s, b) => {
+                write!(f, "Frontend error: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
         }
     }
 }
