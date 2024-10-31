@@ -1294,7 +1294,7 @@ where
         log::debug!(
             "[{} - {:#x}] Send message with id {}",
             self.id.0,
-            self as *const Self as u64,
+            ptr::from_ref::<Self>(self) as u64,
             mid
         );
 
@@ -1710,7 +1710,7 @@ where
             log::debug!(
                 "[{} - {:#x}] Received message with ID {}...",
                 self.id.0,
-                self as *const Self as u64,
+                ptr::from_ref::<Self>(self) as u64,
                 (*msg).message_id.0
             );
 

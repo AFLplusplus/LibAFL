@@ -195,11 +195,7 @@ where
 
         let shmem_content = self.content_mut();
         unsafe {
-            ptr::copy_nonoverlapping(
-                EXITING_MAGIC as *const u8,
-                shmem_content.buf.as_mut_ptr(),
-                len,
-            );
+            ptr::copy_nonoverlapping(EXITING_MAGIC.as_ptr(), shmem_content.buf.as_mut_ptr(), len);
         }
         shmem_content.buf_len = EXITING_MAGIC.len();
     }
