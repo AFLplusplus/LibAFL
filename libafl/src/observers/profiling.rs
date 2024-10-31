@@ -85,9 +85,12 @@ impl ProfilingObserver {
     where
         P: AsRef<Path>,
     {
-        let f = File::open(json_path)?;
+        let f = File::open(json_path.as_ref())?;
         let reader = BufReader::new(f);
-        let analysis_data: AnalysisData = serde_json::from_reader(reader)?;
+        let analysis_data: AnalysisData = serde_json::from_reader(reader).map_err(|err| {
+            let path = json_path.as_ref().to_string_lossy();
+            Error::illegal_argument(format!("Failed to read from path {path}: {err:?}"))
+        })?;
         // debug
         /*
         for record in &analysis_data.data {

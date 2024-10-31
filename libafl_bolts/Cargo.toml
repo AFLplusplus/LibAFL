@@ -44,8 +44,6 @@ document-features = ["dep:document-features"]
 
 ## Enables features that need rust's `std` lib to work, like print, env, ... support
 std = [
-  "serde_json",
-  "serde_json/std",
   "hostname",
   "nix",
   "serde/std",
@@ -143,9 +141,6 @@ ahash = { workspace = true, optional = true } # The hash function already used i
 backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.2.8" }
-serde_json = { workspace = true, optional = true, default-features = false, features = [
-  "alloc",
-] }
 miniz_oxide = { version = "0.8.0", optional = true }
 hostname = { version = "0.4.0", optional = true } # Is there really no gethostname in the stdlib?
 rand_core = { version = "0.6.4", optional = true }
