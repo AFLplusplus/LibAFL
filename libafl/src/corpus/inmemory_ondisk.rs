@@ -423,14 +423,20 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
             let mut tmpfile = File::create(&tmpfile_path)?;
 
+            let json_error =
+                |err| Error::serialize(format!("Failed to json-ify metadata: {err:?}"));
+
             let serialized = match self.meta_format.as_ref().unwrap() {
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
-                OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
-                OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
-                #[cfg(feature = "gzip")]
-                OnDiskMetadataFormat::JsonGzip => {
-                    GzipCompressor::new().compress(&serde_json::to_vec_pretty(&ondisk_meta)?)
+                OnDiskMetadataFormat::Json => {
+                    serde_json::to_vec(&ondisk_meta).map_err(json_error)?
                 }
+                OnDiskMetadataFormat::JsonPretty => {
+                    serde_json::to_vec_pretty(&ondisk_meta).map_err(json_error)?
+                }
+                #[cfg(feature = "gzip")]
+                OnDiskMetadataFormat::JsonGzip => GzipCompressor::new()
+                    .compress(&serde_json::to_vec_pretty(&ondisk_meta).map_err(json_error)?),
             };
             tmpfile.write_all(&serialized)?;
             fs::rename(&tmpfile_path, &metafile_path)?;
