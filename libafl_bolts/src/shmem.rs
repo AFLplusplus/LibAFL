@@ -1621,13 +1621,20 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
-    use std::thread;
-
     use serial_test::serial;
 
     use crate::{
-        shmem::{MmapShMemProvider, ShMem, ShMemProvider, StdShMemProvider},
-        AsSlice, AsSliceMut, Error,
+        shmem::{ShMemProvider, StdShMemProvider},
+        AsSlice, AsSliceMut,
+    };
+
+    #[cfg(unix)]
+    use {
+        crate::{
+            shmem::{MmapShMemProvider, ShMem},
+            Error,
+        },
+        std::thread,
     };
 
     #[test]
