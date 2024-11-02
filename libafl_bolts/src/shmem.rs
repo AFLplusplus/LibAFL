@@ -1652,8 +1652,10 @@ mod tests {
     #[cfg(all(unix, not(miri)))]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
-        use crate::shmem::{MmapShMemProvider, ShMem as _};
         use std::thread;
+
+        use crate::shmem::{MmapShMemProvider, ShMem as _};
+
         let mut provider = MmapShMemProvider::new()?;
         let mut shmem = provider.new_shmem_persistent(1)?;
         shmem.fill(0);
