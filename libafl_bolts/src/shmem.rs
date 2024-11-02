@@ -1631,35 +1631,29 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 #[cfg(test)]
 mod tests {
     use serial_test::serial;
-    #[cfg(unix)]
-    #[cfg_attr(miri, ignore)]
-    use {
-        crate::{
-            shmem::{MmapShMemProvider, ShMem as _},
-            Error,
-        },
-        std::thread,
-    };
 
     use crate::{
         shmem::{ShMemProvider, StdShMemProvider},
-        AsSlice, AsSliceMut,
+        AsSlice, AsSliceMut, Error,
     };
 
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
-    fn test_shmem_service() {
-        let mut provider = StdShMemProvider::new().unwrap();
-        let mut map = provider.new_shmem(1024).unwrap();
+    fn test_shmem_service() -> Result<(), Error> {
+        let mut provider = StdShMemProvider::new()?;
+        let mut map = provider.new_shmem(1024)?;
         map.as_slice_mut()[0] = 1;
-        assert!(map.as_slice()[0] == 1);
+        assert_eq!(1, map.as_slice()[0]);
+        Ok(())
     }
 
     #[test]
-    #[cfg(unix)]
+    #[cfg(all(unix, not(miri)))]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
+        use crate::shmem::{MmapShMemProvider, ShMem as _};
+        use std::thread;
         let mut provider = MmapShMemProvider::new()?;
         let mut shmem = provider.new_shmem_persistent(1)?;
         shmem.fill(0);
