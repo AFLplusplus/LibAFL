@@ -841,12 +841,14 @@ pub mod unix_shmem {
 
             /// If called, the shared memory will also be available in subprocesses.
             ///
+            /// Only available on UNIX systems at the moment.
+            ///
             /// You likely want to pass the [`crate::shmem::ShMemDescription`] and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
             ///
             /// # Errors
             ///
             /// This function will return an error if the appropriate flags could not be extracted or set.
-            #[cfg(unix)]
+            #[cfg(any(unix, doc))]
             pub fn persist_for_child_processes(self) -> Result<Self, Error> {
                 // # Safety
                 // No user-provided potentially unsafe parameters.
@@ -1624,11 +1626,9 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{MmapShMemProvider, ShMem, ShMemProvider, StdShMemProvider},
         AsSlice, AsSliceMut, Error,
     };
-
-    use super::{MmapShMemProvider, ShMem};
 
     #[test]
     #[serial]
@@ -1645,8 +1645,8 @@ mod tests {
     fn test_persist_shmem() -> Result<(), Error> {
         let mut provider = MmapShMemProvider::new()?;
         let mut shmem = provider.new_shmem(1)?.persist_for_child_processes()?;
-
         shmem.fill(0);
+
         let description = shmem.description();
 
         let handle = thread::spawn(move || -> Result<(), Error> {
