@@ -838,88 +838,6 @@ pub mod unix_shmem {
             pub fn filename_path(&self) -> &Option<[u8; MAX_MMAP_FILENAME_LEN]> {
                 &self.filename_path
             }
-
-            /// If called, the shared memory will also be available in subprocesses.
-            ///
-            /// Only available on UNIX systems at the moment.
-            ///
-            /// You likely want to pass the [`crate::shmem::ShMemDescription`] and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
-            ///
-            /// # Errors
-            ///
-            /// This function will return an error if the appropriate flags could not be extracted or set.
-            #[cfg(any(unix, doc))]
-            pub fn persist_for_child_processes(self) -> Result<Self, Error> {
-                // # Safety
-                // No user-provided potentially unsafe parameters.
-                // FFI Calls.
-                unsafe {
-                    let flags = fcntl(self.shm_fd, libc::F_GETFD);
-
-                    if flags == -1 {
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            "Failed to retrieve FD flags",
-                        ));
-                    }
-
-                    if fcntl(self.shm_fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            "Failed to set FD flags",
-                        ));
-                    }
-                }
-
-                Ok(self)
-            }
-        }
-
-        /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
-        #[cfg(unix)]
-        #[derive(Clone, Debug)]
-        pub struct MmapShMemProvider {}
-
-        unsafe impl Send for MmapShMemProvider {}
-
-        #[cfg(unix)]
-        impl Default for MmapShMemProvider {
-            fn default() -> Self {
-                Self::new().unwrap()
-            }
-        }
-
-        /// Implement [`ShMemProvider`] for [`MmapShMemProvider`].
-        #[cfg(unix)]
-        impl ShMemProvider for MmapShMemProvider {
-            type ShMem = MmapShMem;
-
-            fn new() -> Result<Self, Error> {
-                Ok(Self {})
-            }
-            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
-                let mut rand = StdRand::with_seed(crate::rands::random_seed());
-                let id = rand.next() as u32;
-                MmapShMem::new(map_size, id)
-            }
-
-            fn shmem_from_id_and_size(
-                &mut self,
-                id: ShMemId,
-                size: usize,
-            ) -> Result<Self::ShMem, Error> {
-                MmapShMem::shmem_from_id_and_size(id, size)
-            }
-
-            fn release_shmem(&mut self, shmem: &mut Self::ShMem) {
-                let fd = CStr::from_bytes_until_nul(shmem.id().as_array())
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .parse()
-                    .unwrap();
-                unsafe { close(fd) };
-            }
         }
 
         impl ShMem for MmapShMem {
@@ -974,6 +892,97 @@ pub mod unix_shmem {
                     // unlike unix common shmem we don't have refcounter.
                     // so there's no guarantee that there's no other process still using it.
                 }
+            }
+        }
+
+        /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
+        #[cfg(unix)]
+        #[derive(Clone, Debug)]
+        pub struct MmapShMemProvider {}
+
+        impl MmapShMemProvider {
+            /// Creates a new shared memory mapping, which is available in other processes.
+            ///
+            /// Only available on UNIX systems at the moment.
+            ///
+            /// You likely want to pass the [`crate::shmem::ShMemDescription`] of the returned [`ShMem`]
+            /// and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
+            ///
+            /// # Errors
+            ///
+            /// This function will return an error if the appropriate flags could not be extracted or set.
+            #[cfg(any(unix, doc))]
+            pub fn new_shmem_persistent(
+                &mut self,
+                map_size: usize,
+            ) -> Result<<Self as ShMemProvider>::ShMem, Error> {
+                let shmem = self.new_shmem(map_size)?;
+
+                let fd = shmem.shm_fd;
+
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
+                unsafe {
+                    let flags = fcntl(fd, libc::F_GETFD);
+
+                    if flags == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to retrieve FD flags",
+                        ));
+                    }
+
+                    if fcntl(fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to set FD flags",
+                        ));
+                    }
+                }
+                Ok(shmem)
+            }
+        }
+
+        unsafe impl Send for MmapShMemProvider {}
+
+        #[cfg(unix)]
+        impl Default for MmapShMemProvider {
+            fn default() -> Self {
+                Self::new().unwrap()
+            }
+        }
+
+        /// Implement [`ShMemProvider`] for [`MmapShMemProvider`].
+        #[cfg(unix)]
+        impl ShMemProvider for MmapShMemProvider {
+            type ShMem = MmapShMem;
+
+            fn new() -> Result<Self, Error> {
+                Ok(Self {})
+            }
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+                let mut rand = StdRand::with_seed(crate::rands::random_seed());
+                let id = rand.next() as u32;
+                MmapShMem::new(map_size, id)
+            }
+
+            fn shmem_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::ShMem, Error> {
+                MmapShMem::shmem_from_id_and_size(id, size)
+            }
+
+            fn release_shmem(&mut self, shmem: &mut Self::ShMem) {
+                let fd = CStr::from_bytes_until_nul(shmem.id().as_array())
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .parse()
+                    .unwrap();
+                unsafe { close(fd) };
             }
         }
 
@@ -1623,9 +1632,10 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 mod tests {
     use serial_test::serial;
     #[cfg(unix)]
+    #[cfg_attr(miri, ignore)]
     use {
         crate::{
-            shmem::{MmapShMemProvider, ShMem},
+            shmem::{MmapShMemProvider, ShMem as _},
             Error,
         },
         std::thread,
@@ -1647,10 +1657,11 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(unix, not(miri)))]
+    #[cfg(unix)]
+    #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
         let mut provider = MmapShMemProvider::new()?;
-        let mut shmem = provider.new_shmem(1)?.persist_for_child_processes()?;
+        let mut shmem = provider.new_shmem_persistent(1)?;
         shmem.fill(0);
 
         let description = shmem.description();
