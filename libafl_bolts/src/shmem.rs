@@ -1622,12 +1622,6 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 #[cfg(test)]
 mod tests {
     use serial_test::serial;
-
-    use crate::{
-        shmem::{ShMemProvider, StdShMemProvider},
-        AsSlice, AsSliceMut,
-    };
-
     #[cfg(unix)]
     use {
         crate::{
@@ -1635,6 +1629,11 @@ mod tests {
             Error,
         },
         std::thread,
+    };
+
+    use crate::{
+        shmem::{ShMemProvider, StdShMemProvider},
+        AsSlice, AsSliceMut,
     };
 
     #[test]
@@ -1648,7 +1647,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
+    #[cfg(all(unix, not(miri)))]
     fn test_persist_shmem() -> Result<(), Error> {
         let mut provider = MmapShMemProvider::new()?;
         let mut shmem = provider.new_shmem(1)?.persist_for_child_processes()?;
