@@ -846,7 +846,8 @@ pub mod unix_shmem {
             /// # Errors
             ///
             /// This function will return an error if the appropriate flags could not be extracted or set.
-            pub fn persist_for_child_processes(&self) -> Result<&Self, Error> {
+            #[cfg(unix)]
+            pub fn persist_for_child_processes(self) -> Result<Self, Error> {
                 // # Safety
                 // No user-provided potentially unsafe parameters.
                 // FFI Calls.
@@ -1618,12 +1619,16 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
+    use std::thread;
+
     use serial_test::serial;
 
     use crate::{
         shmem::{ShMemProvider, StdShMemProvider},
-        AsSlice, AsSliceMut,
+        AsSlice, AsSliceMut, Error,
     };
+
+    use super::{MmapShMemProvider, ShMem};
 
     #[test]
     #[serial]
@@ -1633,5 +1638,25 @@ mod tests {
         let mut map = provider.new_shmem(1024).unwrap();
         map.as_slice_mut()[0] = 1;
         assert!(map.as_slice()[0] == 1);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_persist_shmem() -> Result<(), Error> {
+        let mut provider = MmapShMemProvider::new()?;
+        let mut shmem = provider.new_shmem(1)?.persist_for_child_processes()?;
+
+        shmem.fill(0);
+        let description = shmem.description();
+
+        let handle = thread::spawn(move || -> Result<(), Error> {
+            let mut provider = MmapShMemProvider::new()?;
+            let mut shmem = provider.shmem_from_description(description)?;
+            shmem.as_slice_mut()[0] = 1;
+            Ok(())
+        });
+        handle.join().unwrap()?;
+        assert_eq!(1, shmem.as_slice()[0]);
+        Ok(())
     }
 }
