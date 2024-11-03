@@ -10,6 +10,7 @@ use std::{
     path::PathBuf,
     process,
     time::Duration,
+    ptr,
 };
 
 use clap::{Arg, Command};
@@ -160,7 +161,7 @@ fn fuzz(
     let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
-            edges.as_mut_ptr(),
+            ptr::NonNull::new(edges.as_mut_ptr()).expect("map ptr is null."),
         ))
         .track_indices()
     };
