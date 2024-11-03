@@ -871,7 +871,7 @@ impl<'a, T> From<&'a mut &'a mut [T]> for OwnedMutSlice<'a, T> {
 
 /// Wrap a mutable slice and convert to a Box on serialize.
 /// We use a hidden inner enum so the public API can be safe,
-/// unless the user uses the unsafe [`OwnedMutSizedSlice::from_raw_parts_mut`].
+/// unless the user uses the unsafe [`OwnedMutSizedSlice::from_raw_mut`].
 /// The variable length version is [`OwnedMutSlice`].
 #[derive(Debug)]
 pub enum OwnedMutSizedSliceInner<'a, T: 'a + Sized, const N: usize> {

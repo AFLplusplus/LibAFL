@@ -66,7 +66,7 @@ mod generators {
     fn get_mask<const IS_CONST_MAP: bool, const MAP_SIZE: usize>() -> usize {
         if IS_CONST_MAP {
             const {
-                assert!(MAP_SIZE > 0, "The size of the map should be bigger than 0.");
+                assert!(IS_CONST_MAP && MAP_SIZE > 0, "The size of a const map should be bigger than 0.");
                 MAP_SIZE.overflowing_sub(1).0
             }
         } else {
