@@ -201,7 +201,7 @@ where
     #[must_use]
     pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: ptr::NonNull<T>) -> Self {
         ConstMapObserver {
-            map: OwnedMutSizedSlice::from_raw_parts_mut(map_ptr),
+            map: OwnedMutSizedSlice::from_raw_mut(map_ptr),
             name: Cow::from(name),
             initial: T::default(),
         }
