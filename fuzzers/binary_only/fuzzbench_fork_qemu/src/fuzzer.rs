@@ -8,9 +8,8 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{self, Write},
     path::PathBuf,
-    process,
+    process, ptr,
     time::Duration,
-    ptr,
 };
 
 use clap::{Arg, Command};
