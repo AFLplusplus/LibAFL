@@ -300,6 +300,8 @@ pub enum Error {
     Unknown(String, ErrorBacktrace),
     /// Error with the corpora
     InvalidCorpus(String, ErrorBacktrace),
+    /// Error specific to a runtime like QEMU or Frida
+    Runtime(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -438,6 +440,15 @@ impl Error {
     {
         Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
     }
+
+    /// Error specific to some runtime, like QEMU or Frida
+    #[must_use]
+    pub fn runtime<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Runtime(arg.into(), ErrorBacktrace::new())
+    }
 }
 
 impl Display for Error {
@@ -500,6 +511,10 @@ impl Display for Error {
             }
             Self::InvalidCorpus(s, b) => {
                 write!(f, "Invalid corpus: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::Runtime(s, b) => {
+                write!(f, "Runtime error: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
         }

@@ -57,6 +57,18 @@ pub enum QemuError {
     RW(QemuRWError),
 }
 
+impl From<QemuError> for libafl::Error {
+    fn from(qemu_error: QemuError) -> Self {
+        libafl::Error::runtime(qemu_error)
+    }
+}
+
+impl From<QemuError> for String {
+    fn from(qemu_error: QemuError) -> Self {
+        format!("LibAFL QEMU Error: {qemu_error:?}")
+    }
+}
+
 #[derive(Debug)]
 pub enum QemuInitError {
     MultipleInstances,
