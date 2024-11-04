@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use libafl::{inputs::UsesInput, observers::VariableLengthMapObserver, HasMetadata};
+use libafl::{inputs::UsesInput, observers::VarLenMapObserver, HasMetadata};
 use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
 #[cfg(feature = "systemmode")]
@@ -31,7 +31,7 @@ pub mod child;
 pub use child::{
     EdgeCoverageChildVariant, StdEdgeCoverageChildModule, StdEdgeCoverageChildModuleBuilder,
 };
-use libafl::observers::ConstantLengthMapObserver;
+use libafl::observers::ConstLenMapObserver;
 
 /// Standard edge coverage module, adapted to most use cases
 pub type StdEdgeCoverageModule = StdEdgeCoverageFullModule;
@@ -162,7 +162,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
         map_observer: &mut O,
     ) -> EdgeCoverageModuleBuilder<AF, PF, V, true, false, 0>
     where
-        O: VariableLengthMapObserver,
+        O: VarLenMapObserver,
     {
         let map_ptr = map_observer.map_slice_mut().as_mut_ptr() as *mut u8;
         let map_max_size = map_observer.map_slice_mut().len();
@@ -190,7 +190,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
         _const_map_observer: &mut O,
     ) -> EdgeCoverageModuleBuilder<AF, PF, V, true, true, NEW_MAP_SIZE>
     where
-        O: ConstantLengthMapObserver<NEW_MAP_SIZE>,
+        O: ConstLenMapObserver<NEW_MAP_SIZE>,
     {
         EdgeCoverageModuleBuilder::<AF, PF, V, true, true, NEW_MAP_SIZE>::new(
             self.variant,

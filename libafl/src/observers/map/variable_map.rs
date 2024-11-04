@@ -15,7 +15,7 @@ use libafl_bolts::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, Observer, VariableLengthMapObserver},
+    observers::{map::MapObserver, Observer, VarLenMapObserver},
     Error,
 };
 
@@ -149,7 +149,7 @@ where
     }
 }
 
-impl<T> VariableLengthMapObserver for VariableMapObserver<'_, T>
+impl<T> VarLenMapObserver for VariableMapObserver<'_, T>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {

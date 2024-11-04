@@ -13,7 +13,7 @@ use libafl_bolts::{ownedref::OwnedMutSizedSlice, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, ConstantLengthMapObserver, Observer},
+    observers::{map::MapObserver, ConstLenMapObserver, Observer},
     Error,
 };
 
@@ -148,7 +148,7 @@ where
     }
 }
 
-impl<T, const N: usize> ConstantLengthMapObserver<N> for ConstMapObserver<'_, T, N>
+impl<T, const N: usize> ConstLenMapObserver<N> for ConstMapObserver<'_, T, N>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug + 'static,
 {
