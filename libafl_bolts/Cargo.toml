@@ -124,9 +124,9 @@ libafl_derive = { version = "0.13.2", optional = true, path = "../libafl_derive"
 static_assertions = "1.1.0"
 
 tuple_list = { version = "0.1.3" }
-hashbrown = { version = "0.14.5", features = [
+hashbrown = { version = "0.15.0", features = [
   "serde",
-  "ahash",
+  "default-hasher",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",
