@@ -15,8 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     executors::ExitKind,
     observers::{
-        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer,
-        VarLenMapObserver,
+        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, VarLenMapObserver,
     },
     Error,
 };
