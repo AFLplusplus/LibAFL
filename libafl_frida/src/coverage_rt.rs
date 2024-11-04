@@ -2,7 +2,9 @@
 use core::ptr::addr_of_mut;
 use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 
-use dynasmrt::dynasm;
+#[cfg(target_arch = "aarch64")]
+use dynasmrt::DynasmLabelApi;
+use dynasmrt::{dynasm, DynasmApi};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
 use libafl_bolts::hash_std;
 use rangemap::RangeMap;
@@ -122,13 +124,13 @@ impl CoverageRuntime {
             ;   b >end
 
             ;map_addr:
-            ;.u64 map_addr_ptr as i64
+            ;.i64 map_addr_ptr as i64
             ;previous_loc:
-            ;.u64 prev_loc_ptr as i64
+            ;.i64 prev_loc_ptr as i64
             ;loc:
-            ;.u64 h64 as i64
+            ;.i64 h64 as i64
             ;loc_shr:
-            ;.u64 (h64 >> 1) as i64
+            ;.i64 (h64 >> 1) as i64
             ;end:
         );
         let ops_vec = ops.finalize().unwrap();

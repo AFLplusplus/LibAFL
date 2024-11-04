@@ -1891,13 +1891,13 @@ impl AsanRuntime {
             // Ignore eh_frame_cie for amd64
             // See discussions https://github.com/AFLplusplus/LibAFL/pull/331
             ;->accessed_address:
-            ; .u32 0x0
+            ; .i32 0x0
             ; self_addr:
-            ; .u64 core::ptr::from_mut(self) as *mut c_void as i64
+            ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .u64 addr_of_mut!(self.regs) as i64
+            ; .i64 addr_of_mut!(self.regs) as i64
             ; trap_func:
-            ; .u64 AsanRuntime::handle_trap as *mut c_void as i64
+            ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
         );
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
@@ -1946,7 +1946,7 @@ impl AsanRuntime {
             ; mov x25, x1 // address of instrumented instruction.
             ; str x25, [x28, 0xf8]
 
-            ; .u32 0xd53b4218u32 as i32 // mrs x24, nzcv
+            ; .i32 0xd53b4218u32 as i32 // mrs x24, nzcv
             ; ldp x0, x1, [sp, 0x20]
             ; stp x0, x1, [x28]
 
@@ -1968,7 +1968,7 @@ impl AsanRuntime {
             ; ldr x1, >trap_func
             ; blr x1
 
-            ; .u32 0xd51b4218u32 as i32 // msr nzcv, x24
+            ; .i32 0xd51b4218u32 as i32 // msr nzcv, x24
             ; ldr x0, >self_regs_addr
             ; ldp x2, x3, [x0, #0x10]
             ; ldp x4, x5, [x0, #0x20]
@@ -1992,15 +1992,15 @@ impl AsanRuntime {
             ; br x1 // go back to the 'return address'
 
             ; self_addr:
-            ; .u64 core::ptr::from_mut(self) as *mut c_void as i64
+            ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .u64 addr_of_mut!(self.regs) as i64
+            ; .i64 addr_of_mut!(self.regs) as i64
             ; trap_func:
-            ; .u64 AsanRuntime::handle_trap as *mut c_void as i64
+            ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
-            ; .u64 __register_frame as *mut c_void as i64
+            ; .i64 __register_frame as *mut c_void as i64
             ; eh_frame_cie_addr:
-            ; .u64 addr_of_mut!(self.eh_frame) as i64
+            ; .i64 addr_of_mut!(self.eh_frame) as i64
         );
         self.eh_frame = [
             0x14, 0, 0x00527a01, 0x011e7c01, 0x001f0c1b, //
