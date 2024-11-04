@@ -5,7 +5,7 @@ CARGO_TARGET_DIR = { value = "./target", condition = { env_not_set = [
   "CARGO_TARGET_DIR",
 ] } }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
-PROFILE_DIR = { value = "release", condition = { env_not_set = [
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
   "PROFILE_DIR",
 ] } }
 
