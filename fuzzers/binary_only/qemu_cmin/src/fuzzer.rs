@@ -2,7 +2,7 @@
 //!
 #[cfg(feature = "i386")]
 use core::mem::size_of;
-use std::{env, io, path::PathBuf, process};
+use std::{env, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
@@ -162,7 +162,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
-            edges.as_mut_ptr(),
+            NonNull::new(edges.as_mut_ptr()).expect("The edge map pointer is null."),
         ))
     };
 
@@ -196,7 +196,7 @@ pub fn fuzz() -> Result<(), Error> {
         let len = len as GuestReg;
 
         unsafe {
-            qemu.write_mem(input_addr, buf);
+            qemu.write_mem(input_addr, buf).expect("qemu write failed.");
             qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
             qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
             qemu.write_return_address(ret_addr).unwrap();
@@ -219,7 +219,7 @@ pub fn fuzz() -> Result<(), Error> {
     };
 
     let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
-        .map_observer(edges_observer.as_mut())
+        .const_map_observer(edges_observer.as_mut())
         .build()?);
 
     let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;

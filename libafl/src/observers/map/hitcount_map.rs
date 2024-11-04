@@ -14,7 +14,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    observers::{map::MapObserver, DifferentialObserver, Observer, VariableLengthMapObserver},
+    observers::{
+        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, VarLenMapObserver,
+    },
     Error,
 };
 
@@ -230,11 +232,24 @@ where
     }
 }
 
-impl<M> VariableLengthMapObserver for HitcountsMapObserver<M>
+impl<M, const N: usize> ConstLenMapObserver<N> for HitcountsMapObserver<M>
 where
-    M: VariableLengthMapObserver + MapObserver<Entry = u8>,
+    M: ConstLenMapObserver<N> + MapObserver<Entry = u8>,
 {
-    fn map_slice(&mut self) -> &[Self::Entry] {
+    fn map_slice(&self) -> &[Self::Entry; N] {
+        self.base.map_slice()
+    }
+
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry; N] {
+        self.base.map_slice_mut()
+    }
+}
+
+impl<M> VarLenMapObserver for HitcountsMapObserver<M>
+where
+    M: VarLenMapObserver + MapObserver<Entry = u8>,
+{
+    fn map_slice(&self) -> &[Self::Entry] {
         self.base.map_slice()
     }
 
@@ -242,7 +257,7 @@ where
         self.base.map_slice_mut()
     }
 
-    fn size(&mut self) -> &usize {
+    fn size(&self) -> &usize {
         self.base.size()
     }
 
