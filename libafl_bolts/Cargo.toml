@@ -135,7 +135,7 @@ serde = { version = "1.0.210", default-features = false, features = [
   "derive",
 ] } # serialization lib
 erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
-postcard = { version = "1.0.10", optional = true } # no_std compatible serde serialization format
+postcard = { version = "1.0.10", default-features = false, optional = true } # no_std compatible serde serialization format
 num_enum = { version = "0.7.3", default-features = false }
 ahash = { version = "0.8.11", default-features = false, optional = true } # The hash function already used in hashbrown
 backtrace = { version = "0.3.74", default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
