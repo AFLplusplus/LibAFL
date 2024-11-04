@@ -680,7 +680,18 @@ pub trait AsSlice<'a> {
     fn as_slice(&'a self) -> Self::SliceRef;
 }
 
-impl<'a, T, R> AsSlice<'a> for R
+/// Can be converted to a slice
+pub trait AsSizedSlice<'a, const N: usize> {
+    /// Type of the entries of this slice
+    type Entry: 'a;
+    /// Type of the reference to this slice
+    type SliceRef: Deref<Target = [Self::Entry; N]>;
+
+    /// Convert to a slice
+    fn as_sized_slice(&'a self) -> Self::SliceRef;
+}
+
+impl<'a, T, R: ?Sized> AsSlice<'a> for R
 where
     T: 'a,
     R: Deref<Target = [T]>,
@@ -689,6 +700,19 @@ where
     type SliceRef = &'a [T];
 
     fn as_slice(&'a self) -> Self::SliceRef {
+        self
+    }
+}
+
+impl<'a, T, const N: usize, R: ?Sized> AsSizedSlice<'a, N> for R
+where
+    T: 'a,
+    R: Deref<Target = [T; N]>,
+{
+    type Entry = T;
+    type SliceRef = &'a [T; N];
+
+    fn as_sized_slice(&'a self) -> Self::SliceRef {
         self
     }
 }
@@ -702,7 +726,16 @@ pub trait AsSliceMut<'a>: AsSlice<'a> {
     fn as_slice_mut(&'a mut self) -> Self::SliceRefMut;
 }
 
-impl<'a, T, R> AsSliceMut<'a> for R
+/// Can be converted to a mutable slice
+pub trait AsSizedSliceMut<'a, const N: usize>: AsSizedSlice<'a, N> {
+    /// Type of the mutable reference to this slice
+    type SliceRefMut: DerefMut<Target = [Self::Entry; N]>;
+
+    /// Convert to a slice
+    fn as_sized_slice_mut(&'a mut self) -> Self::SliceRefMut;
+}
+
+impl<'a, T, R: ?Sized> AsSliceMut<'a> for R
 where
     T: 'a,
     R: DerefMut<Target = [T]>,
@@ -710,6 +743,18 @@ where
     type SliceRefMut = &'a mut [T];
 
     fn as_slice_mut(&'a mut self) -> Self::SliceRefMut {
+        &mut *self
+    }
+}
+
+impl<'a, T, const N: usize, R: ?Sized> AsSizedSliceMut<'a, N> for R
+where
+    T: 'a,
+    R: DerefMut<Target = [T; N]>,
+{
+    type SliceRefMut = &'a mut [T; N];
+
+    fn as_sized_slice_mut(&'a mut self) -> Self::SliceRefMut {
         &mut *self
     }
 }
