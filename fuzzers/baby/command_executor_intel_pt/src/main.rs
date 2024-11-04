@@ -1,4 +1,4 @@
-use std::{env, num::NonZero, path::PathBuf};
+use std::{env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -18,6 +18,7 @@ use libafl::{
     state::StdState,
 };
 use libafl_bolts::{
+    core_affinity,
     intel_pt::{IntelPT, PAGE_SIZE},
     rands::StdRand,
     tuples::tuple_list,
@@ -36,6 +37,11 @@ pub fn main() {
     }
     // Enable logging
     env_logger::init();
+
+    let target_path = PathBuf::from(env::args().next().unwrap())
+        .parent()
+        .unwrap()
+        .join("target_program");
 
     // Create an observation channel using the map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
@@ -78,7 +84,7 @@ pub fn main() {
 
     let mut intel_pt = IntelPT::builder().cpu(0).inherit(true).build().unwrap();
 
-    // The target is a ET_DYN elf, will be relocated with this offset
+    // The target is a ET_DYN elf, it will be relocated by the loader with this offset.
     // see https://github.com/torvalds/linux/blob/c1e939a21eb111a6d6067b38e8e04b8809b64c4e/arch/x86/include/asm/elf.h#L234C1-L239C38
     const DEFAULT_MAP_WINDOW: usize = (1 << 47) - PAGE_SIZE;
     const ELF_ET_DYN_BASE: usize = DEFAULT_MAP_WINDOW / 3 * 2 & !(PAGE_SIZE - 1);
@@ -88,14 +94,9 @@ pub fn main() {
     intel_pt
         .set_ip_filters(&[ELF_ET_DYN_BASE + 0x14000..=ELF_ET_DYN_BASE + 0x14000 + 0x40000])
         .unwrap();
-    let executable = PathBuf::from(env::args().next().unwrap())
-        .parent()
-        .unwrap()
-        .join("target_program")
-        .to_string_lossy()
-        .to_string();
+
     let sections = [Section {
-        file_path: executable,
+        file_path: target_path.to_string_lossy().to_string(),
         file_offset: 0x13000,
         size: 0x40000,
         virtual_address: (ELF_ET_DYN_BASE + 0x14000) as u64,
@@ -106,7 +107,21 @@ pub fn main() {
         .image(&sections)
         .build();
 
-    let command_configurator = PtraceCommandConfigurator::default();
+    let target_cstring = CString::from(
+        target_path
+            .as_os_str()
+            .as_bytes()
+            .iter()
+            .map(|&b| NonZero::new(b).unwrap())
+            .collect::<Vec<_>>(),
+    );
+
+    // We'll run the target on cpu 0
+    let cpu = core_affinity::get_core_ids().unwrap()[0];
+    let command_configurator = PtraceCommandConfigurator::builder()
+        .command(target_cstring)
+        .cpu(cpu)
+        .build();
     let mut executor =
         command_configurator.into_executor_with_hooks(tuple_list!(observer), tuple_list!(hook));
 

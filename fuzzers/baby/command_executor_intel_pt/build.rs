@@ -10,8 +10,6 @@ fn main() {
             "src/target_program.rs",
             "--out-dir",
             target_program_out_dir.to_str().unwrap(),
-            "-C",
-            "panic=abort",
             "-O",
         ])
         .output();

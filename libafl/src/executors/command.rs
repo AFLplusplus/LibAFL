@@ -5,27 +5,33 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
-#[cfg(all(feature = "std", target_os = "linux"))]
-use std::ffi::CString;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
+#[cfg(all(feature = "std", target_os = "linux"))]
+use std::{ffi::CString, os::fd::AsRawFd};
 #[cfg(feature = "std")]
-use std::process::Child;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     path::{Path, PathBuf},
+    process::Child,
     process::{Command, Stdio},
     time::Duration,
 };
 
+#[cfg(all(feature = "std", target_os = "linux"))]
+use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
 #[cfg(all(feature = "std", target_os = "linux"))]
+use libc::STDIN_FILENO;
+#[cfg(all(feature = "std", target_os = "linux"))]
 use nix::unistd::Pid;
+#[cfg(all(feature = "std", target_os = "linux"))]
+use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
@@ -44,7 +50,7 @@ use crate::{inputs::Input, Error};
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
 /// `File`: The target reads from the specified [`InputFile`]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
@@ -52,6 +58,7 @@ pub enum InputLocation {
         argnum: usize,
     },
     /// Deliver input via `StdIn`
+    #[default]
     StdIn,
     /// Deliver the input via the specified [`InputFile`]
     /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
@@ -167,20 +174,14 @@ where
 /// This configurator was primarly developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
 #[cfg(all(feature = "std", target_os = "linux"))]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 pub struct PtraceCommandConfigurator {
+    #[builder(setter(into))]
     command: CString,
+    #[builder(default, setter(skip))]
     input_location: InputLocation,
-}
-
-#[cfg(all(feature = "std", target_os = "linux"))]
-impl Default for PtraceCommandConfigurator {
-    fn default() -> Self {
-        Self {
-            command: CString::new("./target_program").unwrap(),
-            input_location: InputLocation::StdIn,
-        }
-    }
+    #[builder(default, setter(strip_option))]
+    cpu: Option<CoreId>,
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
@@ -191,35 +192,46 @@ where
     fn spawn_child(&mut self, input: &I) -> Result<Pid, Error> {
         use std::ffi::CStr;
 
-        use libafl_bolts::core_affinity;
         use nix::{
             sys::{
                 personality, ptrace,
                 signal::{raise, Signal},
             },
-            unistd::{execve, fork, ForkResult},
+            unistd::{dup2, execve, fork, pipe, write, ForkResult},
         };
-        let terminated_input = [input.target_bytes().as_slice(), &[0u8]].concat();
-        let arg1 = CStr::from_bytes_until_nul(&terminated_input).unwrap();
 
-        let child = match unsafe { fork() } {
-            Ok(ForkResult::Parent { child }) => child,
+        match unsafe { fork() } {
+            Ok(ForkResult::Parent { child }) => Ok(child),
             Ok(ForkResult::Child) => {
                 ptrace::traceme().unwrap();
 
-                let cores = core_affinity::get_core_ids().unwrap();
-                cores[0].set_affinity().unwrap();
+                if let Some(c) = self.cpu {
+                    c.set_affinity_forced().unwrap();
+                }
 
                 // Disable Address Space Layout Randomization (ASLR) for consistent memory
                 // addresses between executions
                 let pers = personality::get().unwrap();
                 personality::set(pers | personality::Persona::ADDR_NO_RANDOMIZE).unwrap();
 
-                raise(Signal::SIGSTOP).unwrap();
+                match self.input_location {
+                    InputLocation::Arg { .. } => {
+                        todo!()
+                    }
+                    InputLocation::StdIn => {
+                        let (pipe_read, pipe_write) = pipe().unwrap();
+                        write(pipe_write, &*input.target_bytes()).unwrap();
+                        dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
+                    }
+                    InputLocation::File { .. } => {
+                        todo!()
+                    }
+                }
 
+                raise(Signal::SIGSTOP).unwrap();
                 execve(
                     &CString::new(self.command.as_bytes()).unwrap(),
-                    &[arg1],
+                    &[] as &[&CStr; 0],
                     &[] as &[&CStr; 0],
                 )
                 .unwrap();
@@ -227,13 +239,11 @@ where
                 unreachable!("execve returns only on error and its result is unwrapped");
             }
             Err(e) => panic!("Fork failed {e}"),
-        };
-
-        Ok(child)
+        }
     }
 
     fn exec_timeout(&self) -> Duration {
-        Duration::from_secs(2)
+        todo!()
     }
 
     fn exec_timeout_mut(&mut self) -> &mut Duration {

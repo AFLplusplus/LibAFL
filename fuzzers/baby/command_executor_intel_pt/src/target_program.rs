@@ -1,8 +1,11 @@
-use std::{env::args_os, hint::black_box};
+use std::{
+    hint::black_box,
+    io::{stdin, Read},
+};
 
 fn main() {
-    let input = args_os().last().unwrap();
-    let buf = input.as_encoded_bytes();
+    let mut buf = Vec::new();
+    stdin().read_to_end(&mut buf).unwrap();
 
     if !buf.is_empty() && buf[0] == b'a' {
         let _do_something = black_box(0);
