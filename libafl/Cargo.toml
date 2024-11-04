@@ -209,12 +209,14 @@ hashbrown = { version = "0.14.5", features = [
 ], default-features = false } # A faster hashmap, nostd compatible
 num-traits = { version = "0.2.19", default-features = false }
 serde = { version = "1.0.210", features = ["alloc"] } # serialization lib
-postcard = { version = "1.0.10" } # no_std compatible serde serialization format
+postcard = { version = "1.0.10", features = [
+  "alloc",
+], default-features = false } # no_std compatible serde serialization format
 bincode = { version = "1.3.3", optional = true }
 c2rust-bitfields = { version = "0.19.0", features = ["no_std"] }
 ahash = { version = "0.8.11", default-features = false } # The hash function already used in hashbrown
 meminterval = { version = "0.4.1", features = ["serde"] }
-backtrace = { version = "0.3.74", optional = true } # Used to get the stacktrace in StacktraceObserver
+backtrace = { version = "0.3.74", default-features = false, optional = true } # Used to get the stacktrace in StacktraceObserver
 typed-builder = { version = "0.20.0", optional = true } # Implement the builder pattern at compiletime
 
 serde_json = { version = "1.0.128", optional = true, default-features = false, features = [
