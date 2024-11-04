@@ -208,7 +208,7 @@ hashbrown = { version = "0.14.5", features = [
   "ahash",
 ], default-features = false } # A faster hashmap, nostd compatible
 num-traits = { version = "0.2.19", default-features = false }
-serde = { version = "1.0.210", features = ["alloc"] } # serialization lib
+serde = { version = "1.0.210", default-features = false, features = ["alloc"] } # serialization lib
 postcard = { version = "1.0.10", features = [
   "alloc",
 ], default-features = false } # no_std compatible serde serialization format
