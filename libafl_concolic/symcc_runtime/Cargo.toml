@@ -43,13 +43,13 @@ libafl_bolts = { path = "../../libafl_bolts", version = "0.13.2", default-featur
 
 unchecked_unwrap = "4.0.0"
 ctor = "0.2.8"
-libc = { workspace = true }
+libc = { version = "0.2.59" }
 
 [build-dependencies]
-cmake = { workspace = true }
-bindgen = { workspace = true }
-regex = { workspace = true }
-which = { workspace = true }
+cmake = { version = "0.1.51" }
+bindgen = { version = "0.70.1" }
+regex = { version = "1.10.6" }
+which = { version = "6.0.3" }
 symcc_libafl = { path = "../symcc_libafl", version = "0.13.2" }
 
 [lints]

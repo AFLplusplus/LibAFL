@@ -23,7 +23,7 @@ categories = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-log = { workspace = true }
+log = { version = "0.4.22" }
 
 [lib]
 name = "deexit"

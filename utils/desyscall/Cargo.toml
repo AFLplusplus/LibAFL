@@ -22,7 +22,7 @@ libc = "0.2"
 rusty-fork = "0.3.0"
 
 [build-dependencies]
-cc = "1"
+cc = { version = "1.1.21" }
 
 [lib]
 name = "desyscall"
