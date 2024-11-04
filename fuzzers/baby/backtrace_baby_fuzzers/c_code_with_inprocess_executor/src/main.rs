@@ -1,4 +1,4 @@
-use std::{path::PathBuf, ptr};
+use std::{path::PathBuf, ptr::NonNull};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -38,7 +38,7 @@ pub fn main() {
     let observer = unsafe {
         ConstMapObserver::<u8, 3>::from_mut_ptr(
             "signals",
-            ptr::NonNull::new(array_ptr).expect("map ptr is null"),
+            NonNull::new(array_ptr).expect("map ptr is null"),
         )
     };
     // Create a stacktrace observer

@@ -8,7 +8,8 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{self, Write},
     path::PathBuf,
-    process, ptr,
+    process,
+    ptr::NonNull,
     time::Duration,
 };
 
@@ -160,7 +161,7 @@ fn fuzz(
     let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
-            ptr::NonNull::new(edges.as_mut_ptr()).expect("map ptr is null."),
+            NonNull::new(edges.as_mut_ptr()).expect("map ptr is null."),
         ))
         .track_indices()
     };
