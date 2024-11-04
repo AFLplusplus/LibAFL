@@ -1635,7 +1635,7 @@ mod tests {
 
         let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
-        let shmem_buf = shmem.as_slice_mut();
+        let shmem_buf: &mut [u8; MAP_SIZE] = shmem.as_slice_mut().try_into().unwrap();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",

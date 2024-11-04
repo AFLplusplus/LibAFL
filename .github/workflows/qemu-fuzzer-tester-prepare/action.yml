@@ -5,7 +5,7 @@ runs:
   steps:
     - name: Install QEMU deps
       shell: bash
-      run: apt-get update && apt-get install -y qemu-utils sudo python3-msgpack python3-jinja2 curl
+      run: apt-get update && apt-get install -y qemu-utils sudo python3-msgpack python3-jinja2 curl python3-dev
     - uses: dtolnay/rust-toolchain@stable
     - name: enable mult-thread for `make`
       shell: bash

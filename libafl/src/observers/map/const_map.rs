@@ -5,28 +5,26 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
+    ptr::NonNull,
 };
 
 use ahash::RandomState;
-use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named};
+use libafl_bolts::{ownedref::OwnedMutSizedSlice, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, Observer, VariableLengthMapObserver},
+    observers::{map::MapObserver, ConstLenMapObserver, Observer},
     Error,
 };
-
-// TODO: remove the size field and implement ConstantLengthMapObserver
 
 /// Use a const size to speedup `Feedback::is_interesting` when the user can
 /// know the size of the map at compile time.
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct ConstMapObserver<'a, T, const N: usize> {
-    map: OwnedMutSlice<'a, T>,
+    map: OwnedMutSizedSlice<'a, T, N>,
     initial: T,
     name: Cow<'static, str>,
-    size: usize,
 }
 
 impl<I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'_, T, N>
@@ -87,19 +85,19 @@ where
 
     #[inline]
     fn get(&self, idx: usize) -> T {
-        self.as_slice()[idx]
+        self[idx]
     }
 
     #[inline]
     fn set(&mut self, idx: usize, val: T) {
-        self.map.as_slice_mut()[idx] = val;
+        (*self)[idx] = val;
     }
 
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64 {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice();
+        let map = self.map.as_slice();
         let mut res = 0;
         for x in &map[0..cnt] {
             if *x != initial {
@@ -110,7 +108,7 @@ where
     }
 
     fn usable_count(&self) -> usize {
-        self.as_slice().len()
+        self.len()
     }
 
     #[inline]
@@ -124,7 +122,7 @@ where
         // Normal memset, see https://rust.godbolt.org/z/Trs5hv
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice_mut();
+        let map = &mut (*self);
         for x in &mut map[0..cnt] {
             *x = initial;
         }
@@ -132,14 +130,14 @@ where
     }
 
     fn to_vec(&self) -> Vec<T> {
-        self.as_slice().to_vec()
+        self.map.to_vec()
     }
 
     /// Get the number of set entries with the specified indexes
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.as_slice();
+        let map = self.map.as_slice();
         let mut res = 0;
         for i in indexes {
             if *i < cnt && map[*i] != initial {
@@ -150,37 +148,30 @@ where
     }
 }
 
-impl<T, const N: usize> VariableLengthMapObserver for ConstMapObserver<'_, T, N>
+impl<T, const N: usize> ConstLenMapObserver<N> for ConstMapObserver<'_, T, N>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug + 'static,
 {
-    fn map_slice(&mut self) -> &[Self::Entry] {
-        self.map.as_slice()
+    fn map_slice(&self) -> &[Self::Entry; N] {
+        &self.map
     }
 
-    fn map_slice_mut(&mut self) -> &mut [Self::Entry] {
-        self.map.as_slice_mut()
-    }
-
-    fn size(&mut self) -> &usize {
-        &N
-    }
-
-    fn size_mut(&mut self) -> &mut usize {
-        &mut self.size
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry; N] {
+        &mut self.map
     }
 }
 
 impl<T, const N: usize> Deref for ConstMapObserver<'_, T, N> {
     type Target = [T];
+
     fn deref(&self) -> &[T] {
-        &self.map
+        self.map.as_slice()
     }
 }
 
 impl<T, const N: usize> DerefMut for ConstMapObserver<'_, T, N> {
     fn deref_mut(&mut self) -> &mut [T] {
-        &mut self.map
+        self.map.as_mut_slice()
     }
 }
 
@@ -194,13 +185,12 @@ where
     /// Will get a pointer to the map and dereference it at any point in time.
     /// The map must not move in memory!
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
+    pub fn new(name: &'static str, map: &'a mut [T; N]) -> Self {
         assert!(map.len() >= N);
         Self {
-            map: OwnedMutSlice::from(map),
+            map: OwnedMutSizedSlice::from(map),
             name: Cow::from(name),
             initial: T::default(),
-            size: N,
         }
     }
 
@@ -208,34 +198,12 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
-    pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: *mut T) -> Self {
+    #[must_use]
+    pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: NonNull<T>) -> Self {
         ConstMapObserver {
-            map: OwnedMutSlice::from_raw_parts_mut(map_ptr, N),
+            map: OwnedMutSizedSlice::from_raw_mut(map_ptr),
             name: Cow::from(name),
             initial: T::default(),
-            size: N,
-        }
-    }
-}
-
-impl<T, const N: usize> ConstMapObserver<'_, T, N>
-where
-    T: Default + Clone,
-{
-    /// Creates a new [`MapObserver`] with an owned map
-    #[must_use]
-    pub fn owned(name: &'static str, map: Vec<T>) -> Self {
-        assert!(map.len() >= N);
-        let initial = if map.is_empty() {
-            T::default()
-        } else {
-            map[0].clone()
-        };
-        Self {
-            map: OwnedMutSlice::from(map),
-            name: Cow::from(name),
-            initial,
-            size: N,
         }
     }
 }
