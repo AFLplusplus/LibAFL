@@ -349,7 +349,7 @@ impl IntelPT {
                                     previous_block_ip = b.ip();
                                 }
                             }
-                            Err((_, e)) => {
+                            Err(e) => {
                                 if e.code() != PtErrorCode::Eos {
                                     log::trace!("PT error in block next {e:?}");
                                 }

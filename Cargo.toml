@@ -50,7 +50,7 @@ exclude = [
 version = "0.13.2"
 
 [workspace.dependencies]
-ahash = { version = "0.8.11", default-features = false } # The hash function already used in hashbrown
+ahash = { version = "0.8.11", default-features = false }     # The hash function already used in hashbrown
 backtrace = { version = "0.3.74", default-features = false } # Used to get the stacktrace in StacktraceObserver
 bindgen = "0.70.1"
 clap = "4.5.18"
@@ -58,7 +58,9 @@ cc = "1.1.21"
 cmake = "0.1.51"
 document-features = "0.2.10"
 hashbrown = { version = "0.14.5", default-features = false } # A faster hashmap, nostd compatible
-libc = "0.2.159" # For (*nix) libc
+libc = "0.2.159"                                             # For (*nix) libc
+# FIXME: move to crates.io; blocked by PR https://github.com/sum-catnip/libipt-rs/pull/5
+libipt = { git = "https://github.com/Marcondiro/libipt-rs", branch = "use_forked_sys" }
 log = "0.4.22"
 meminterval = "0.4.1"
 mimalloc = { version = "0.1.43", default-features = false }

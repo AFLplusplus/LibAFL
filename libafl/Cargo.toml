@@ -288,7 +288,7 @@ document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
-libipt = { git = "https://github.com/Marcondiro/libipt-rs", optional = true }
+libipt = { workspace = true, optional = true }
 
 [lints]
 workspace = true
