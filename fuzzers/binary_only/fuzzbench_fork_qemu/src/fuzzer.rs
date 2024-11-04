@@ -167,7 +167,7 @@ fn fuzz(
 
     let emulator_modules = tuple_list!(
         StdEdgeCoverageChildModule::builder()
-            .map_observer(edges_observer.as_mut())
+            .const_map_observer(edges_observer.as_mut())
             .build()?,
         CmpLogChildModule::default(),
     );
@@ -199,7 +199,8 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    unsafe { qemu.read_mem(stack_ptr, &mut ret_addr) };
+    qemu.read_mem(stack_ptr, &mut ret_addr)
+        .expect("qemu read failed");
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -323,7 +324,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -333,7 +334,7 @@ fn fuzz(
         }
 
         unsafe {
-            qemu.write_mem(input_addr, buf);
+            qemu.write_mem_unchecked(input_addr, buf);
 
             qemu.write_reg(Regs::Rdi, input_addr).unwrap();
             qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
@@ -394,8 +395,8 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        // dup2(null_fd, io::stdout().as_raw_fd())?;
-        // dup2(null_fd, io::stderr().as_raw_fd())?;
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
     log.replace(
