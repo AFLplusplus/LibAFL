@@ -115,6 +115,28 @@ pub fn dup(fd: RawFd) -> Result<RawFd, Error> {
     }
 }
 
+// Derived from https://github.com/RustPython/RustPython/blob/7996a10116681e9f85eda03413d5011b805e577f/stdlib/src/resource.rs#L113
+// LICENSE: MIT https://github.com/RustPython/RustPython/commit/37355d612a451fba7fef8f13a1b9fdd51310b37e
+/// Get the peak rss (Resident Set Size) of the all child processes
+/// that have terminated and been waited for
+#[cfg(all(unix, feature = "std"))]
+pub fn peak_rss_mb_child_processes() -> Result<i64, Error> {
+    use core::mem;
+    use std::io;
+
+    use libc::{rusage, RUSAGE_CHILDREN};
+
+    let rss = unsafe {
+        let mut rusage = mem::MaybeUninit::<rusage>::uninit();
+        if libc::getrusage(RUSAGE_CHILDREN, rusage.as_mut_ptr()) == -1 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(rusage.assume_init())
+        }
+    }?;
+    Ok(rss.ru_maxrss >> 10)
+}
+
 /// "Safe" wrapper around dup2
 ///
 /// # Safety

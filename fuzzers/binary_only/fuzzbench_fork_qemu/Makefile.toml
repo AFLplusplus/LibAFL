@@ -1,0 +1,115 @@
+env_scripts = ['''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''', '''
+#!@duckscript
+runs_on_ci = get_env RUN_ON_CI
+
+if ${runs_on_ci}
+    cargo_target_dir = get_env CARGO_MAKE_CRATE_TARGET_DIRECTORY
+    set_env TARGET_DIR ${cargo_target_dir}
+end
+''']
+
+# Variables
+[env]
+FUZZER_NAME = 'harness'
+PROJECT_DIR = { script = ["pwd"] }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Qemu fuzzer not supported on windows"
+'''
+
+# fuzzer
+[tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_unix]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
+
+# Harness
+[tasks.harness]
+linux_alias = "harness_unix"
+mac_alias = "harness_unix"
+windows_alias = "unsupported"
+
+[tasks.harness_unix]
+script_runner = "@shell"
+script = '''
+cc -c "${PROJECT_DIR}/libfuzzer_main.c"
+cc \
+    ./fuzz.c \
+    ./libfuzzer_main.o \
+    -o ${FUZZER_NAME} \
+    -lm -lz
+'''
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+command = "cargo"
+args = [
+  "run",
+  "--profile",
+  "${PROFILE}",
+  "./${FUZZER_NAME}",
+  "--",
+  "--libafl-in",
+  "./corpus",
+  "--libafl-out",
+  "./out",
+  "./${FUZZER_NAME}",
+]
+dependencies = ["harness"]
+
+# Run the fuzzer
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+# Short test
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+timeout 15s ${TARGET_DIR}/${PROFILE_DIR}/fuzzbench_fork_qemu ${PROJECT_DIR}/harness -- --libafl-in ${PROJECT_DIR}/../../inprocess/libfuzzer_libpng/corpus --libafl-out ${PROJECT_DIR}/out ${PROJECT_DIR}/harness | tee fuzz_stdout.log
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+'''
+dependencies = ["harness", "fuzzer"]
+
+# Clean up
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+rm -f ./${FUZZER_NAME}
+cargo clean
+'''

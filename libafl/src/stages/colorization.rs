@@ -14,10 +14,12 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::Corpus,
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::HasMutatorBytes,
+    inputs::{HasMutatorBytes, UsesInput},
     mutators::mutations::buffer_copy,
+    nonzero,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
@@ -87,11 +89,13 @@ impl<C, E, EM, O, Z> Stage<E, EM, Z> for ColorizationStage<C, E, EM, O, Z>
 where
     EM: UsesState<State = Self::State> + EventFirer,
     E: HasObservers + Executor<EM, Z>,
-    Self::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
+    E::State: HasCorpus + HasMetadata + HasRand + HasNamedMetadata,
+    E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     E::Input: HasMutatorBytes,
     O: MapObserver,
     C: AsRef<O> + Named,
     Z: UsesState<State = Self::State>,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>, //delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -165,9 +169,11 @@ where
     O: MapObserver,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, Z>,
-    <Self as UsesState>::State: HasCorpus + HasMetadata + HasRand,
+    E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
+    <E as UsesState>::State: HasCorpus + HasMetadata + HasRand,
     E::Input: HasMutatorBytes,
     Z: UsesState<State = <Self as UsesState>::State>,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>, //delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -184,20 +190,11 @@ where
         // This is the buffer we'll randomly mutate during type_replace
         let mut changed = input.clone();
 
-        // input will be consumed so clone it
-        let consumed_input = input.clone();
-
         // First, run orig_input once and get the original hash
 
         // Idea: No need to do this every time
-        let orig_hash = Self::get_raw_map_hash_run(
-            fuzzer,
-            executor,
-            state,
-            manager,
-            consumed_input,
-            observer_handle,
-        )?;
+        let orig_hash =
+            Self::get_raw_map_hash_run(fuzzer, executor, state, manager, &input, observer_handle)?;
         let changed_bytes = changed.bytes_mut();
         let input_len = changed_bytes.len();
 
@@ -235,13 +232,12 @@ where
                     );
                 }
 
-                let consumed_input = input.clone();
                 let changed_hash = Self::get_raw_map_hash_run(
                     fuzzer,
                     executor,
                     state,
                     manager,
-                    consumed_input,
+                    &input,
                     observer_handle,
                 )?;
 
@@ -328,12 +324,12 @@ where
         executor: &mut E,
         state: &mut <Self as UsesState>::State,
         manager: &mut EM,
-        input: E::Input,
+        input: &E::Input,
         observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
-        executor.observers_mut().pre_exec_all(state, &input)?;
+        executor.observers_mut().pre_exec_all(state, input)?;
 
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
 
         let observers = executor.observers();
         let observer = observers[observer_handle].as_ref();
@@ -342,7 +338,7 @@ where
 
         executor
             .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+            .post_exec_all(state, input, &exit_kind)?;
 
         // let observers = executor.observers();
         // fuzzer.process_execution(state, manager, input, observers, &exit_kind, true)?;
@@ -358,11 +354,11 @@ where
             let c = match bytes[idx] {
                 0x41..=0x46 => {
                     // 'A' + 1 + rand('F' - 'A')
-                    0x41 + 1 + state.rand_mut().below(5) as u8
+                    0x41 + 1 + state.rand_mut().below(nonzero!(5)) as u8
                 }
                 0x61..=0x66 => {
                     // 'a' + 1 + rand('f' - 'a')
-                    0x61 + 1 + state.rand_mut().below(5) as u8
+                    0x61 + 1 + state.rand_mut().below(nonzero!(5)) as u8
                 }
                 0x30 => {
                     // '0' -> '1'
@@ -374,35 +370,35 @@ where
                 }
                 0x32..=0x39 => {
                     // '2' + 1 + rand('9' - '2')
-                    0x32 + 1 + state.rand_mut().below(7) as u8
+                    0x32 + 1 + state.rand_mut().below(nonzero!(7)) as u8
                 }
                 0x47..=0x5a => {
                     // 'G' + 1 + rand('Z' - 'G')
-                    0x47 + 1 + state.rand_mut().below(19) as u8
+                    0x47 + 1 + state.rand_mut().below(nonzero!(19)) as u8
                 }
                 0x67..=0x7a => {
                     // 'g' + 1 + rand('z' - 'g')
-                    0x67 + 1 + state.rand_mut().below(19) as u8
+                    0x67 + 1 + state.rand_mut().below(nonzero!(19)) as u8
                 }
                 0x21..=0x2a => {
                     // '!' + 1 + rand('*' - '!');
-                    0x21 + 1 + state.rand_mut().below(9) as u8
+                    0x21 + 1 + state.rand_mut().below(nonzero!(9)) as u8
                 }
                 0x2c..=0x2e => {
                     // ',' + 1 + rand('.' - ',')
-                    0x2c + 1 + state.rand_mut().below(2) as u8
+                    0x2c + 1 + state.rand_mut().below(nonzero!(2)) as u8
                 }
                 0x3a..=0x40 => {
                     // ':' + 1 + rand('@' - ':')
-                    0x3a + 1 + state.rand_mut().below(6) as u8
+                    0x3a + 1 + state.rand_mut().below(nonzero!(6)) as u8
                 }
                 0x5b..=0x60 => {
                     // '[' + 1 + rand('`' - '[')
-                    0x5b + 1 + state.rand_mut().below(5) as u8
+                    0x5b + 1 + state.rand_mut().below(nonzero!(5)) as u8
                 }
                 0x7b..=0x7e => {
                     // '{' + 1 + rand('~' - '{')
-                    0x7b + 1 + state.rand_mut().below(3) as u8
+                    0x7b + 1 + state.rand_mut().below(nonzero!(3)) as u8
                 }
                 0x2b => {
                     // '+' -> '/'

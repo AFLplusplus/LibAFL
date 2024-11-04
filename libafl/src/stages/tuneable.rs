@@ -7,8 +7,10 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    corpus::Corpus,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
+    nonzero,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
         ExecutionCountRestartHelper, MutationalStage, Stage,
@@ -164,8 +166,10 @@ where
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions,
+    Z::State:
+        HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase,
     I: MutatedTransform<Z::Input, Self::State> + Clone,
+    <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, // delete me
 {
     /// Runs this (mutational) stage for the given `testcase`
     /// Exactly the same functionality as [`MutationalStage::perform_mutational`], but with added timeout support.
@@ -245,7 +249,9 @@ where
     fn iterations(&self, state: &mut Self::State) -> Result<usize, Error> {
         Ok(
             // fall back to random
-            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS),
+            1 + state
+                .rand_mut()
+                .below(nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)),
         )
     }
 }
@@ -263,8 +269,10 @@ where
     EM: UsesState<State = Self::State>,
     M: Mutator<I, Self::State>,
     Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions,
+    Z::State:
+        HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase,
     I: MutatedTransform<Self::Input, Self::State> + Clone,
+    <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, // delete me
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -298,9 +306,10 @@ where
     EM: UsesState<State = <Self as UsesState>::State>,
     M: Mutator<I, <Self as UsesState>::State>,
     Z: Evaluator<E, EM>,
-    <Self as UsesState>::State:
-        HasCorpus + HasRand + HasNamedMetadata + HasExecutions + HasMetadata,
+    <Z as UsesState>::State:
+        HasCorpus + HasRand + HasNamedMetadata + HasExecutions + HasMetadata + HasCurrentTestcase,
     I: MutatedTransform<Z::Input, <Self as UsesState>::State> + Clone,
+    <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, // delete me
 {
     fn execs_since_progress_start(
         &mut self,

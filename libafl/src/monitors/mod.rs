@@ -4,11 +4,9 @@ pub mod multi;
 pub use multi::MultiMonitor;
 
 #[cfg(all(feature = "tui_monitor", feature = "std"))]
-#[allow(missing_docs)]
 pub mod tui;
 
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
-#[allow(missing_docs)]
 pub mod prometheus;
 use alloc::string::ToString;
 
@@ -20,7 +18,7 @@ use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, fmt::Write, time::Duration};
 
 #[cfg(feature = "std")]
-pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
+pub use disk::{OnDiskJsonMonitor, OnDiskTomlMonitor};
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde::{Deserialize, Serialize};
@@ -320,8 +318,11 @@ fn prettify_float(value: f64) -> String {
         value => (value, ""),
     };
     match value {
+        value if value >= 1000000.0 => {
+            format!("{value:.2}{suffix}")
+        }
         value if value >= 1000.0 => {
-            format!("{value}{suffix}")
+            format!("{value:.1}{suffix}")
         }
         value if value >= 100.0 => {
             format!("{value:.1}{suffix}")
@@ -371,7 +372,7 @@ pub struct ClientStats {
 }
 
 impl ClientStats {
-    /// We got a new information about executions for this client, insert them.
+    /// We got new information about executions for this client, insert them.
     #[cfg(feature = "afl_exec_sec")]
     pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
         let diff = cur_time
@@ -399,7 +400,7 @@ impl ClientStats {
         self.executions = self.prev_state_executions + executions;
     }
 
-    /// We got a new information about corpus size for this client, insert them.
+    /// We got new information about corpus size for this client, insert them.
     pub fn update_corpus_size(&mut self, corpus_size: u64) {
         self.corpus_size = corpus_size;
         self.last_corpus_time = current_time();

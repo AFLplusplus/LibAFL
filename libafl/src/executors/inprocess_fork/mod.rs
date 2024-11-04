@@ -22,7 +22,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
@@ -37,10 +37,11 @@ pub(crate) type ForkHandlerFuncPtr = unsafe fn(
 
 /// The inner structure of `InProcessForkExecutor`.
 pub mod inner;
-/// A version of `InProcessForkExecutor` with a state accessible from the harness.
 pub mod stateful;
 
-/// The `InProcessForkExecutor` with no user hooks. On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
+/// The `InProcessForkExecutor` with no user hooks.
+///
+/// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
 pub type InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> =
     GenericInProcessForkExecutor<'a, H, (), OT, S, SP, EM, Z>;
@@ -49,10 +50,10 @@ impl<'a, H, OT, S, SP, EM, Z, OF> InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {
@@ -80,12 +81,14 @@ where
     }
 }
 
-/// [`GenericInProcessForkExecutor`] is an executor that forks the current process before each execution. On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
+/// [`GenericInProcessForkExecutor`] is an executor that forks the current process before each execution.
+///
+/// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
 pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
@@ -96,11 +99,10 @@ where
     inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> Debug
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: UsesInput,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S> + Debug,
@@ -124,11 +126,11 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> UsesState
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, OT, S, SP, EM, Z> UsesState
+    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
@@ -138,11 +140,11 @@ where
     type State = S;
 }
 
-impl<'a, EM, H, HT, OT, S, SP, Z> Executor<EM, Z>
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<EM, H, HT, OT, S, SP, Z> Executor<EM, Z>
+    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
     S: State + HasExecutions,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
@@ -184,10 +186,10 @@ impl<'a, H, HT, OT, S, SP, EM, Z, OF> GenericInProcessForkExecutor<'a, H, HT, OT
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<S>,
+    OF: Feedback<EM, S::Input, OT, S>,
     S: State + HasSolutions,
     Z: HasObjective<Objective = OF, State = S>,
 {
@@ -231,31 +233,18 @@ where {
     }
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> UsesObservers
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, OT, S, SP, EM, Z> HasObservers
+    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S>,
     S: State,
+    OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
 {
     type Observers = OT;
-}
-
-impl<'a, H, HT, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple<S>,
-    S: State,
-    OT: ObserversTuple<S>,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
-{
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.inner.observers()
@@ -268,7 +257,6 @@ where
 }
 
 /// signal hooks and `panic_hooks` for the child process
-
 pub mod child_signal_handlers {
     use alloc::boxed::Box;
     use core::ptr::addr_of_mut;
@@ -284,12 +272,14 @@ pub mod child_signal_handlers {
         },
         inputs::UsesInput,
         observers::ObserversTuple,
+        state::UsesState,
     };
 
     /// invokes the `post_exec_child` hook on all observer in case the child process panics
     pub fn setup_child_panic_hook<E>()
     where
-        E: HasObservers,
+        E: HasObservers + UsesState,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -324,7 +314,8 @@ pub mod child_signal_handlers {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers,
+        E: HasObservers + UsesState,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
@@ -347,7 +338,8 @@ pub mod child_signal_handlers {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers,
+        E: HasObservers + UsesState,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
@@ -363,6 +355,7 @@ pub mod child_signal_handlers {
 }
 
 #[cfg(test)]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 mod tests {
     use libafl_bolts::tuples::tuple_list;
     use serial_test::serial;
@@ -375,7 +368,6 @@ mod tests {
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
-    #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use core::marker::PhantomData;
 
@@ -391,7 +383,7 @@ mod tests {
                 hooks::inprocess_fork::InChildProcessHooks,
                 inprocess_fork::GenericInProcessForkExecutor,
             },
-            fuzzer::test::NopFuzzer,
+            fuzzer::NopFuzzer,
             state::NopState,
         };
 

@@ -2,14 +2,14 @@
 
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
+    fmt::Debug,
+    num::NonZero,
     ops::{Deref, DerefMut},
 };
 
 use libafl_bolts::{
     rands::Rand,
-    tuples::{tuple_list, tuple_list_type, Merge, NamedTuple},
+    tuples::{tuple_list, tuple_list_type, HasConstLen, NamedTuple},
     Named,
 };
 use serde::{Deserialize, Serialize};
@@ -18,17 +18,10 @@ use super::MutationId;
 use crate::{
     corpus::{Corpus, CorpusId},
     mutators::{
-        mutations::{
-            BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
-            ByteInterestingMutator, ByteNegMutator, ByteRandMutator, BytesCopyMutator,
-            BytesDeleteMutator, BytesExpandMutator, BytesInsertCopyMutator, BytesInsertMutator,
-            BytesRandInsertMutator, BytesRandSetMutator, BytesSetMutator, BytesSwapMutator,
-            CrossoverInsertMutator, CrossoverReplaceMutator, DwordAddMutator,
-            DwordInterestingMutator, QwordAddMutator, WordAddMutator, WordInterestingMutator,
-        },
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
+    nonzero,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
@@ -68,21 +61,20 @@ impl LogMutationMetadata {
 }
 
 /// A [`Mutator`] that composes multiple mutations into one.
-pub trait ComposedByMutations<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-{
+pub trait ComposedByMutations {
+    /// The mutations of this
+    type Mutations;
     /// Get the mutations
-    fn mutations(&self) -> &MT;
+    fn mutations(&self) -> &Self::Mutations;
 
     /// Get the mutations (mutable)
-    fn mutations_mut(&mut self) -> &mut MT;
+    fn mutations_mut(&mut self) -> &mut Self::Mutations;
 }
 
 /// A [`Mutator`] scheduling multiple [`Mutator`]s for an input.
-pub trait ScheduledMutator<I, MT, S>: ComposedByMutations<I, MT, S> + Mutator<I, S>
+pub trait ScheduledMutator<I, S>: ComposedByMutations + Mutator<I, S>
 where
-    MT: MutatorsTuple<I, S>,
+    Self::Mutations: MutatorsTuple<I, S>,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, input: &I) -> u64;
@@ -107,43 +99,20 @@ where
 }
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
-pub struct StdScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
+#[derive(Debug)]
+pub struct StdScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
     max_stack_pow: usize,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, MT, S> Debug for StdScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "StdScheduledMutator with {} mutations for Input type {}",
-            self.mutations.len(),
-            core::any::type_name::<I>()
-        )
-    }
-}
-
-impl<I, MT, S> Named for StdScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
+impl<MT> Named for StdScheduledMutator<MT> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<I, MT, S> Mutator<I, S> for StdScheduledMutator<I, MT, S>
+impl<I, MT, S> Mutator<I, S> for StdScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
@@ -154,11 +123,8 @@ where
     }
 }
 
-impl<I, MT, S> ComposedByMutations<I, MT, S> for StdScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
+impl<MT> ComposedByMutations for StdScheduledMutator<MT> {
+    type Mutations = MT;
     /// Get the mutations
     #[inline]
     fn mutations(&self) -> &MT {
@@ -172,27 +138,31 @@ where
     }
 }
 
-impl<I, MT, S> ScheduledMutator<I, MT, S> for StdScheduledMutator<I, MT, S>
+impl<I, MT, S> ScheduledMutator<I, S> for StdScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(self.max_stack_pow))
+        1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(self.mutations.len() != 0);
-        state.rand_mut().below(self.mutations.len()).into()
+        debug_assert_ne!(self.mutations.len(), 0);
+        // # Safety
+        // We check for empty mutations
+        state
+            .rand_mut()
+            .below(unsafe { NonZero::new(self.mutations.len()).unwrap_unchecked() })
+            .into()
     }
 }
 
-impl<I, MT, S> StdScheduledMutator<I, MT, S>
+impl<MT> StdScheduledMutator<MT>
 where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
+    MT: NamedTuple,
 {
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
     pub fn new(mutations: MT) -> Self {
@@ -203,133 +173,24 @@ where
             )),
             mutations,
             max_stack_pow: 7,
-            phantom: PhantomData,
         }
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
+    ///
+    /// # Errors
+    /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
+    #[inline]
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
-        StdScheduledMutator {
+        Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
                 mutations.names().join(", ")
             )),
             mutations,
             max_stack_pow,
-            phantom: PhantomData,
         }
     }
-}
-
-/// Tuple type of the mutations that compose the Havoc mutator without crossover mutations
-pub type HavocMutationsNoCrossoverType = tuple_list_type!(
-    BitFlipMutator,
-    ByteFlipMutator,
-    ByteIncMutator,
-    ByteDecMutator,
-    ByteNegMutator,
-    ByteRandMutator,
-    ByteAddMutator,
-    WordAddMutator,
-    DwordAddMutator,
-    QwordAddMutator,
-    ByteInterestingMutator,
-    WordInterestingMutator,
-    DwordInterestingMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesExpandMutator,
-    BytesInsertMutator,
-    BytesRandInsertMutator,
-    BytesSetMutator,
-    BytesRandSetMutator,
-    BytesCopyMutator,
-    BytesInsertCopyMutator,
-    BytesSwapMutator,
-);
-
-/// Tuple type of the mutations that compose the Havoc mutator's crossover mutations
-pub type HavocCrossoverType<I> =
-    tuple_list_type!(CrossoverInsertMutator<I>, CrossoverReplaceMutator<I>);
-
-/// Tuple type of the mutations that compose the Havoc mutator
-pub type HavocMutationsType<I> = tuple_list_type!(
-    BitFlipMutator,
-    ByteFlipMutator,
-    ByteIncMutator,
-    ByteDecMutator,
-    ByteNegMutator,
-    ByteRandMutator,
-    ByteAddMutator,
-    WordAddMutator,
-    DwordAddMutator,
-    QwordAddMutator,
-    ByteInterestingMutator,
-    WordInterestingMutator,
-    DwordInterestingMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesDeleteMutator,
-    BytesExpandMutator,
-    BytesInsertMutator,
-    BytesRandInsertMutator,
-    BytesSetMutator,
-    BytesRandSetMutator,
-    BytesCopyMutator,
-    BytesInsertCopyMutator,
-    BytesSwapMutator,
-    CrossoverInsertMutator<I>,
-    CrossoverReplaceMutator<I>,
-);
-
-/// Get the mutations that compose the Havoc mutator (only applied to single inputs)
-#[must_use]
-pub fn havoc_mutations_no_crossover() -> HavocMutationsNoCrossoverType {
-    tuple_list!(
-        BitFlipMutator::new(),
-        ByteFlipMutator::new(),
-        ByteIncMutator::new(),
-        ByteDecMutator::new(),
-        ByteNegMutator::new(),
-        ByteRandMutator::new(),
-        ByteAddMutator::new(),
-        WordAddMutator::new(),
-        DwordAddMutator::new(),
-        QwordAddMutator::new(),
-        ByteInterestingMutator::new(),
-        WordInterestingMutator::new(),
-        DwordInterestingMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesDeleteMutator::new(),
-        BytesExpandMutator::new(),
-        BytesInsertMutator::new(),
-        BytesRandInsertMutator::new(),
-        BytesSetMutator::new(),
-        BytesRandSetMutator::new(),
-        BytesCopyMutator::new(),
-        BytesInsertCopyMutator::new(),
-        BytesSwapMutator::new(),
-    )
-}
-
-/// Get the mutations that compose the Havoc mutator's crossover strategy
-#[must_use]
-pub fn havoc_crossover<I>() -> HavocCrossoverType<I> {
-    tuple_list!(
-        CrossoverInsertMutator::new(),
-        CrossoverReplaceMutator::new(),
-    )
-}
-
-/// Get the mutations that compose the Havoc mutator
-#[must_use]
-pub fn havoc_mutations<I>() -> HavocMutationsType<I> {
-    havoc_mutations_no_crossover().merge(havoc_crossover())
 }
 
 /// Get the mutations that uses the Tokens metadata
@@ -339,50 +200,24 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
 }
 
 /// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
-pub struct LoggerScheduledMutator<I, MT, S, SM>
-where
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
-{
+#[derive(Debug)]
+pub struct LoggerScheduledMutator<SM> {
     name: Cow<'static, str>,
     scheduled: SM,
     mutation_log: Vec<MutationId>,
-    phantom: PhantomData<(I, MT, S)>,
 }
 
-impl<I, MT, S, SM> Debug for LoggerScheduledMutator<I, MT, S, SM>
-where
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "LoggerScheduledMutator with {} mutations for Input type {}",
-            MT::LEN,
-            core::any::type_name::<I>()
-        )
-    }
-}
-
-impl<I, MT, S, SM> Named for LoggerScheduledMutator<I, MT, S, SM>
-where
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
-{
+impl<SM> Named for LoggerScheduledMutator<SM> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<I, MT, S, SM> Mutator<I, S> for LoggerScheduledMutator<I, MT, S, SM>
+impl<I, S, SM> Mutator<I, S> for LoggerScheduledMutator<SM>
 where
-    MT: MutatorsTuple<I, S> + NamedTuple,
     S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    SM: ScheduledMutator<I, S>,
+    SM::Mutations: MutatorsTuple<I, S> + NamedTuple,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
@@ -405,38 +240,42 @@ where
     }
 }
 
-impl<I, MT, S, SM> ComposedByMutations<I, MT, S> for LoggerScheduledMutator<I, MT, S, SM>
+impl<SM> ComposedByMutations for LoggerScheduledMutator<SM>
 where
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    SM: ComposedByMutations,
 {
+    type Mutations = SM::Mutations;
     #[inline]
-    fn mutations(&self) -> &MT {
+    fn mutations(&self) -> &SM::Mutations {
         self.scheduled.mutations()
     }
 
     #[inline]
-    fn mutations_mut(&mut self) -> &mut MT {
+    fn mutations_mut(&mut self) -> &mut SM::Mutations {
         self.scheduled.mutations_mut()
     }
 }
 
-impl<I, MT, S, SM> ScheduledMutator<I, MT, S> for LoggerScheduledMutator<I, MT, S, SM>
+impl<I, S, SM> ScheduledMutator<I, S> for LoggerScheduledMutator<SM>
 where
-    MT: MutatorsTuple<I, S> + NamedTuple,
     S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    SM: ScheduledMutator<I, S>,
+    SM::Mutations: MutatorsTuple<I, S> + NamedTuple,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(6))
+        1 << (1 + state.rand_mut().below(nonzero!(7)))
     }
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(MT::LEN != 0);
-        state.rand_mut().below(MT::LEN).into()
+        debug_assert!(<SM::Mutations as HasConstLen>::LEN != 0);
+        // # Safety
+        // In debug we check the length. Worst case we end up with an illegal MutationId and fail later.
+        state
+            .rand_mut()
+            .below(unsafe { NonZero::new(<SM::Mutations as HasConstLen>::LEN).unwrap_unchecked() })
+            .into()
     }
 
     fn scheduled_mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -455,11 +294,9 @@ where
     }
 }
 
-impl<I, MT, S, SM> LoggerScheduledMutator<I, MT, S, SM>
+impl<SM> LoggerScheduledMutator<SM>
 where
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    SM: Named,
 {
     /// Create a new [`LoggerScheduledMutator`] instance without mutations and corpus
     /// This mutator logs all mutators.
@@ -468,7 +305,6 @@ where
             name: Cow::from(format!("LoggerScheduledMutator[{}]", scheduled.name())),
             scheduled,
             mutation_log: vec![],
-            phantom: PhantomData,
         }
     }
 }
@@ -482,9 +318,8 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{BytesInput, HasMutatorBytes},
         mutators::{
-            mutations::SpliceMutator,
-            scheduled::{havoc_mutations, StdScheduledMutator},
-            Mutator,
+            havoc_mutations::havoc_mutations, mutations::SpliceMutator,
+            scheduled::StdScheduledMutator, Mutator,
         },
         state::StdState,
     };
@@ -520,19 +355,15 @@ mod tests {
         log::trace!("{:?}", input.bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        assert_eq!(input.bytes(), &[b'a', b'b', b'f']);
+        assert_eq!(input.bytes(), b"abf");
     }
 
     #[test]
     fn test_havoc() {
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus
-            .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
-            .unwrap();
-        corpus
-            .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
-            .unwrap();
+        corpus.add(Testcase::new(b"abc".to_vec().into())).unwrap();
+        corpus.add(Testcase::new(b"def".to_vec().into())).unwrap();
 
         let mut input = corpus.cloned_input_for_id(corpus.first().unwrap()).unwrap();
         let input_prior = input.clone();

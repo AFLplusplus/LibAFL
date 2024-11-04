@@ -17,7 +17,8 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
-        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        havoc_mutations::havoc_mutations,
+        scheduled::{tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
         I2SRandReplace,
     },
@@ -29,17 +30,18 @@ use libafl::{
 };
 use libafl_bolts::{
     core_affinity::Cores,
+    nonzero,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Handled, Merge},
     AsSlice,
 };
-pub use libafl_qemu::qemu::Qemu;
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
-use libafl_qemu::QemuCmpLogHelper;
-use libafl_qemu::{edges, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks};
-use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
+use libafl_qemu::modules::CmpLogModule;
+pub use libafl_qemu::qemu::Qemu;
+use libafl_qemu::{modules::edges::StdEdgeCoverageModule, Emulator, QemuExecutor};
+use libafl_targets::{edges_map_mut_ptr, CmpLogObserver, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -85,7 +87,7 @@ where
     iterations: Option<u64>,
 }
 
-impl<'a, H> Debug for QemuBytesCoverageSugar<'a, H>
+impl<H> Debug for QemuBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
@@ -113,13 +115,13 @@ where
     }
 }
 
-impl<'a, H> QemuBytesCoverageSugar<'a, H>
+impl<H> QemuBytesCoverageSugar<'_, H>
 where
     H: FnMut(&[u8]),
 {
     /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self, qemu: &Qemu) {
+    pub fn run(&mut self, qemu: Qemu) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -156,14 +158,11 @@ where
             let time_observer = time_observer.clone();
 
             // Create an observation channel using the coverage map
-            let edges_observer = unsafe {
+            let mut edges_observer = unsafe {
                 HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                     "edges",
-                    OwnedMutSlice::from_raw_parts_mut(
-                        edges_map_mut_ptr(),
-                        edges::EDGES_MAP_SIZE_IN_USE,
-                    ),
-                    addr_of_mut!(edges::MAX_EDGES_FOUND),
+                    OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
+                    addr_of_mut!(MAX_EDGES_FOUND),
                 ))
                 .track_indices()
             };
@@ -214,27 +213,40 @@ where
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // The wrapped harness function, calling out to the LLVM-style harness
-            let mut harness = |input: &BytesInput| {
-                let target = input.target_bytes();
-                let buf = target.as_slice();
-                harness_bytes(buf);
-                ExitKind::Ok
-            };
-
             if self.use_cmplog.unwrap_or(false) {
-                let mut hooks = QemuHooks::new(
-                    *qemu,
+                let modules = {
                     #[cfg(not(any(feature = "mips", feature = "hexagon")))]
-                    tuple_list!(
-                        QemuEdgeCoverageHelper::default(),
-                        QemuCmpLogHelper::default(),
-                    ),
+                    {
+                        tuple_list!(
+                            StdEdgeCoverageModule::builder()
+                                .map_observer(edges_observer.as_mut())
+                                .build()
+                                .unwrap(),
+                            CmpLogModule::default(),
+                        )
+                    }
                     #[cfg(any(feature = "mips", feature = "hexagon"))]
-                    tuple_list!(QemuEdgeCoverageHelper::default()),
-                );
+                    {
+                        tuple_list!(StdEdgeCoverageModule::builder()
+                            .map_observer(edges_observer.as_mut())
+                            .build()
+                            .unwrap())
+                    }
+                };
+
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                                   _state: &mut _,
+                                   input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
+                };
+
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let executor = QemuExecutor::new(
-                    &mut hooks,
+                    emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -248,7 +260,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(32);
+                        let mut generator = RandBytesGenerator::new(nonzero!(32));
 
                         // Generate 8 initial inputs
                         state
@@ -334,11 +346,24 @@ where
                     }
                 }
             } else {
-                let mut hooks =
-                    QemuHooks::new(*qemu, tuple_list!(QemuEdgeCoverageHelper::default()));
+                let modules = tuple_list!(StdEdgeCoverageModule::builder()
+                    .map_observer(edges_observer.as_mut())
+                    .build()
+                    .unwrap());
+
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                                   _state: &mut _,
+                                   input: &BytesInput| {
+                    let target = input.target_bytes();
+                    let buf = target.as_slice();
+                    harness_bytes(buf);
+                    ExitKind::Ok
+                };
+
+                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
                 let mut executor = QemuExecutor::new(
-                    &mut hooks,
+                    emulator,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -351,7 +376,7 @@ where
                 if state.must_load_initial_inputs() {
                     if self.input_dirs.is_empty() {
                         // Generator of printable bytearrays of max size 32
-                        let mut generator = RandBytesGenerator::new(32);
+                        let mut generator = RandBytesGenerator::new(nonzero!(32));
 
                         // Generate 8 initial inputs
                         state
@@ -477,6 +502,16 @@ pub mod pybind {
         /// Create a new [`QemuBytesCoverageSugar`]
         #[new]
         #[allow(clippy::too_many_arguments)]
+        #[pyo3(signature = (
+            input_dirs,
+            output_dir,
+            broker_port,
+            cores,
+            use_cmplog=None,
+            iterations=None,
+            tokens_file=None,
+            timeout=None
+        ))]
         fn new(
             input_dirs: Vec<PathBuf>,
             output_dir: PathBuf,
@@ -509,7 +544,7 @@ pub mod pybind {
                 .cores(&self.cores)
                 .harness(|buf| {
                     Python::with_gil(|py| -> PyResult<()> {
-                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
+                        let args = (PyBytes::new_bound(py, buf),); // TODO avoid copy
                         harness.call1(py, args)?;
                         Ok(())
                     })
@@ -520,12 +555,12 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&qemu.qemu);
+                .run(qemu.qemu);
         }
     }
 
     /// Register this class
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<QemuBytesCoverageSugar>()?;
         Ok(())
     }

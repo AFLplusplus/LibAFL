@@ -1,15 +1,20 @@
 //! The random number generators of `LibAFL`
 
+#[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::{
     debug_assert,
     fmt::Debug,
-    sync::atomic::{AtomicUsize, Ordering},
+    num::{NonZero, NonZeroUsize},
 };
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[cfg(feature = "alloc")]
 pub mod loaded_dice;
+
+#[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
+static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// Return a pseudo-random seed. For `no_std` environments, a single deterministic sequence is used.
 #[must_use]
@@ -23,10 +28,7 @@ pub fn random_seed() -> u64 {
     4
 }
 
-static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-#[allow(dead_code)]
-#[cfg(target_has_atomic = "ptr")]
+#[cfg(all(not(feature = "std"), target_has_atomic = "ptr"))]
 fn random_seed_deterministic() -> u64 {
     let mut seed = SEED_COUNTER.fetch_add(1, Ordering::Relaxed) as u64;
     splitmix64(&mut seed)
@@ -51,7 +53,8 @@ fn splitmix64(x: &mut u64) -> u64 {
     z ^ (z >> 31)
 }
 
-/// The standard rand implementation for `LibAFL`.
+/// The standard [`Rand`] implementation for `LibAFL`.
+///
 /// It is usually the right choice, with very good speed and a reasonable randomness.
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuDuoJrRand;
@@ -71,12 +74,10 @@ where
     // create iterator
     let mut iter = from.into_iter();
 
-    if iter.len() == 0 {
-        return None;
-    }
+    let len = NonZero::new(iter.len())?;
 
     // pick a random, valid index
-    let index = fast_bound(rand, iter.len());
+    let index = fast_bound(rand, len);
 
     // return the item chosen
     Some(iter.nth(index).unwrap())
@@ -90,8 +91,14 @@ where
 /// See: [An optimal algorithm for bounded random integers](https://github.com/apple/swift/pull/39143).
 #[inline]
 #[must_use]
-pub fn fast_bound(rand: u64, n: usize) -> usize {
-    debug_assert_ne!(n, 0);
+pub fn fast_bound(rand: u64, n: NonZeroUsize) -> usize {
+    let mul = u128::from(rand).wrapping_mul(u128::from(n.get() as u64));
+    (mul >> 64) as usize
+}
+
+#[inline]
+#[must_use]
+fn fast_bound_usize(rand: u64, n: usize) -> usize {
     let mul = u128::from(rand).wrapping_mul(u128::from(n as u64));
     (mul >> 64) as usize
 }
@@ -126,15 +133,26 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
 
     /// Gets a value below the given bound (exclusive)
     #[inline]
-    fn below(&mut self, upper_bound_excl: usize) -> usize {
+    fn below(&mut self, upper_bound_excl: NonZeroUsize) -> usize {
         fast_bound(self.next(), upper_bound_excl)
+    }
+
+    /// Gets a value between [0, n]
+    fn zero_upto(&mut self, n: usize) -> usize {
+        fast_bound_usize(self.next(), n)
     }
 
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     #[inline]
     fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {
         debug_assert!(lower_bound_incl <= upper_bound_incl);
-        lower_bound_incl + self.below(upper_bound_incl - lower_bound_incl + 1)
+        // # Safety
+        // We check that the upper_bound_incl <= lower_bound_incl above (alas only in debug), so the below is fine.
+        // Even if we encounter a 0 in release here, the worst-case scenario should be an invalid return value.
+        lower_bound_incl
+            + self.below(unsafe {
+                NonZero::new(upper_bound_incl - lower_bound_incl + 1).unwrap_unchecked()
+            })
     }
 
     /// Convenient variant of [`choose`].
@@ -159,17 +177,19 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         // when the Iterator is an ExactSizeIterator. This has a large performance impact on e.g.
         // seq_iter_choose_from_1000.
         if upper == Some(lower) {
-            return if lower == 0 {
-                None
-            } else {
+            return if let Some(lower) = NonZero::new(lower) {
                 iter.nth(self.below(lower))
+            } else {
+                None
             };
         }
 
         // Continue until the iterator is exhausted
         loop {
             if lower > 1 {
-                let ix = self.below(lower + consumed);
+                // # Safety
+                // lower is > 1, we don't consume more than usize elements, so this should always be non-0.
+                let ix = self.below(unsafe { NonZero::new(lower + consumed).unwrap_unchecked() });
                 let skip = if ix < lower {
                     result = iter.nth(ix);
                     lower - (ix + 1)
@@ -189,7 +209,9 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
                     return result;
                 }
                 consumed += 1;
-                if self.below(consumed) == 0 {
+                // # SAFETY
+                // `consumed` can never be 0 here. We just increased it by 1 above.
+                if self.below(unsafe { NonZero::new(consumed).unwrap_unchecked() }) == 0 {
                     result = elem;
                 }
             }
@@ -528,15 +550,18 @@ impl XkcdRand {
 
 #[cfg(test)]
 mod tests {
-    use crate::rands::{
-        Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
-        Xoshiro256PlusPlusRand,
+    use crate::{
+        nonzero,
+        rands::{
+            Rand, RomuDuoJrRand, RomuTrioRand, Sfc64Rand, StdRand, XorShift64Rand,
+            Xoshiro256PlusPlusRand,
+        },
     };
 
     fn test_single_rand<R: Rand>(rand: &mut R) {
         assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(100) < 100);
-        assert_eq!(rand.below(1), 0);
+        assert!(rand.below(nonzero!(100)) < 100);
+        assert_eq!(rand.below(nonzero!(1)), 0);
         assert_eq!(rand.between(10, 10), 10);
         assert!(rand.between(11, 20) > 10);
     }
@@ -689,7 +714,7 @@ pub mod pybind {
         }
     }
 
-    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[derive(Serialize, Deserialize, Debug)]
     enum PythonRandWrapper {
         Std(Py<PythonStdRand>),
     }
@@ -697,7 +722,7 @@ pub mod pybind {
     /// Rand Trait binding
     #[pyclass(unsendable, name = "Rand")]
     #[allow(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
+    #[derive(Serialize, Deserialize, Debug)]
     pub struct PythonRand {
         wrapper: PythonRandWrapper,
     }
@@ -730,7 +755,7 @@ pub mod pybind {
     }
 
     /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+    pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_class::<PythonStdRand>()?;
         m.add_class::<PythonRand>()?;
         Ok(())

@@ -1,13 +1,13 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 //! In comparison to the [`crate::executors::DiffExecutor`] it does not run the secondary executor in `run_target`.
 
-use core::fmt::Debug;
+use core::{fmt::Debug, time::Duration};
 
 use libafl_bolts::tuples::RefIndexable;
 
+use super::HasTimeout;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::UsesObservers,
     state::{HasExecutions, UsesState},
     Error,
 };
@@ -61,6 +61,27 @@ where
     }
 }
 
+impl<A, B> HasTimeout for CombinedExecutor<A, B>
+where
+    A: HasTimeout,
+    B: HasTimeout,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.primary.set_timeout(timeout);
+        self.secondary.set_timeout(timeout);
+    }
+
+    #[inline]
+    fn timeout(&self) -> Duration {
+        assert!(
+            self.primary.timeout() == self.secondary.timeout(),
+            "Primary and Secondary Executors have different timeouts!"
+        );
+        self.primary.timeout()
+    }
+}
+
 impl<A, B> UsesState for CombinedExecutor<A, B>
 where
     A: UsesState,
@@ -68,17 +89,12 @@ where
     type State = A::State;
 }
 
-impl<A, B> UsesObservers for CombinedExecutor<A, B>
-where
-    A: UsesObservers,
-{
-    type Observers = A::Observers;
-}
-
 impl<A, B> HasObservers for CombinedExecutor<A, B>
 where
     A: HasObservers,
 {
+    type Observers = A::Observers;
+
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.primary.observers()

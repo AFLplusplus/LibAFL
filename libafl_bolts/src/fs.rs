@@ -1,11 +1,15 @@
 //! `LibAFL` functionality for filesystem interaction
 
-#[cfg(feature = "std")]
-use alloc::borrow::ToOwned;
 use alloc::rc::Rc;
+#[cfg(feature = "std")]
+use alloc::{borrow::ToOwned, vec::Vec};
 use core::cell::RefCell;
+#[cfg(feature = "std")]
+use core::time::Duration;
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
+#[cfg(feature = "std")]
+use std::time::SystemTime;
 use std::{
     fs::{self, remove_file, File, OpenOptions},
     io::{Seek, Write},
@@ -25,6 +29,8 @@ pub fn get_unique_std_input_file() -> String {
     format!("{}_{}", INPUTFILE_STD, std::process::id())
 }
 
+/// Write a file atomically
+///
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.
 /// This way, on the majority of operating systems, the final file will never be incomplete or racey.
@@ -138,6 +144,44 @@ impl InputFile {
             Ok(())
         }
     }
+}
+
+/// Finds new files in the given directory, taking the last time we looked at this path as parameter.
+/// This method works recursively.
+/// If `last` is `None`, it'll load all file.
+#[cfg(feature = "std")]
+pub fn find_new_files_rec<P: AsRef<Path>>(
+    dir: P,
+    last_check: &Option<Duration>,
+) -> Result<Vec<PathBuf>, Error> {
+    let mut new_files = Vec::<PathBuf>::new();
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let attributes = fs::metadata(&path);
+
+        if attributes.is_err() {
+            continue;
+        }
+
+        let attr = attributes?;
+
+        if attr.is_file() && attr.len() > 0 {
+            if let Ok(time) = attr.modified() {
+                if let Some(last_check) = last_check {
+                    if time.duration_since(SystemTime::UNIX_EPOCH).unwrap() < *last_check {
+                        continue;
+                    }
+                }
+                new_files.push(path.clone());
+            }
+        } else if attr.is_dir() {
+            let dir_left_to_sync = find_new_files_rec(entry.path(), last_check)?;
+            new_files.extend(dir_left_to_sync);
+        }
+    }
+
+    Ok(new_files)
 }
 
 #[cfg(feature = "std")]

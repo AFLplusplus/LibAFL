@@ -1,21 +1,5 @@
 //! Compiler Wrapper from `LibAFL`
 
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![forbid(unexpected_cfgs)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::unreadable_literal
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -56,6 +40,7 @@
     )
 )]
 
+use core::str;
 use std::{path::Path, process::Command};
 
 pub mod ar;
@@ -339,4 +324,34 @@ pub trait CompilerWrapper: ToolWrapper {
     fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
     where
         S: AsRef<str>;
+
+    /// Finds the current `python3` version and adds `-lpython3.<version>` as linker argument.
+    /// Useful for fuzzers that need libpython, such as `nautilus`-based fuzzers.
+    fn link_libpython(&mut self) -> Result<&'_ mut Self, String> {
+        Ok(self.add_link_arg(format!("-l{}", find_python3_version()?)))
+    }
+}
+
+/// Helper function to find the current python3 version, if you need this information at link time.
+/// Example output: `python3.11`
+/// Example use: `.add_link_arg(format!("-l{}", find_python3_version()?))`
+/// Hint: you can use `link_libpython()` directly.
+fn find_python3_version() -> Result<String, String> {
+    match Command::new("python3").arg("--version").output() {
+        Ok(output) => {
+            let python_version = str::from_utf8(&output.stdout).unwrap_or_default().trim();
+            if python_version.is_empty() {
+                return Err("Empty return from python3 --version".to_string());
+            }
+            let version = python_version.split("Python 3.").nth(1).ok_or_else(|| {
+                format!("Could not find Python 3 in version string: {python_version}")
+            })?;
+            let mut version = version.split('.');
+            let version = version.next().ok_or_else(|| {
+                format!("Could not split python3 version string {python_version}")
+            })?;
+            Ok(format!("python3.{version}"))
+        }
+        Err(err) => Err(format!("Could not execute python3 --version: {err:?}")),
+    }
 }

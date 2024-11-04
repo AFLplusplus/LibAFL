@@ -97,7 +97,7 @@ use tuple_list::tuple_list;
 #[cfg(all(unix, not(miri)))]
 use crate::os::unix_signals::setup_signal_handler;
 #[cfg(unix)]
-use crate::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+use crate::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
 #[cfg(all(windows, feature = "std"))]
 use crate::os::windows_exceptions::{setup_ctrl_handler, CtrlHandler};
 #[cfg(feature = "std")]
@@ -143,6 +143,8 @@ pub const LLMP_FLAG_INITIALIZED: Flags = Flags(0x0);
 pub const LLMP_FLAG_COMPRESSED: Flags = Flags(0x1);
 /// From another broker.
 pub const LLMP_FLAG_FROM_B2B: Flags = Flags(0x2);
+/// From another machine (with the `multi_machine` mode)
+pub const LLMP_FLAG_FROM_MM: Flags = Flags(0x4);
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
@@ -571,7 +573,7 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
     // We still need space for this msg (alloc_size).
     let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
-    let next = _llmp_next_msg_ptr(last_msg);
+    let next = llmp_next_msg_ptr(last_msg);
     let next_ptr = next as *const u8;
     if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
         Ok(next)
@@ -590,8 +592,8 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 /// Will dereference the `last_msg` ptr
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
-unsafe fn _llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
-    /* DBG("_llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
+unsafe fn llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
+    /* DBG("llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
     (last_msg as *mut u8)
         .add(size_of::<LlmpMsg>())
         .add((*last_msg).buf_len_padded as usize) as *mut LlmpMsg
@@ -663,6 +665,8 @@ impl LlmpMsg {
     /// Gets the buffer from this message as slice, with the correct length.
     #[inline]
     pub fn try_as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
+        // # Safety
+        // Safe because we check if we're in a valid shmem region first.
         unsafe {
             if self.in_shmem(map) {
                 Ok(self.as_slice_unsafe())
@@ -1243,7 +1247,7 @@ where
         (*ret).buf_len_padded = buf_len_padded as u64;
         (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
 
-        (*_llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
+        (*llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
         (*ret).tag = LLMP_TAG_UNINITIALIZED;
 
         self.has_unsent_message = true;
@@ -1494,7 +1498,7 @@ where
         (*page).size_used -= old_len_padded as usize;
         (*page).size_used += buf_len_padded;
 
-        (*_llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
+        (*llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
 
         Ok(())
     }
@@ -1818,6 +1822,8 @@ where
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             Ok(match self.recv()? {
                 Some(msg) => Some((
@@ -1835,6 +1841,8 @@ where
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf_blocking_with_flags(&mut self) -> Result<(ClientId, Tag, Flags, &[u8]), Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
@@ -1849,6 +1857,8 @@ where
     /// Returns the next sender, tag, buf, looping until it becomes available
     #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(ClientId, Tag, &[u8]), Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             let msg = self.recv_blocking()?;
             Ok((
@@ -1953,6 +1963,8 @@ where
     /// Marks the containing page as `safe_to_unmap`.
     /// This indicates, that the page may safely be unmapped by the sender.
     pub fn mark_safe_to_unmap(&mut self) {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             (*self.page_mut()).receiver_joined();
         }
@@ -2175,8 +2187,8 @@ pub struct LlmpShutdownSignalHandler {
 }
 
 #[cfg(unix)]
-impl Handler for LlmpShutdownSignalHandler {
-    fn handle(
+impl SignalHandler for LlmpShutdownSignalHandler {
+    unsafe fn handle(
         &mut self,
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -2642,6 +2654,7 @@ where
     /// It is supposed that the message is never unmapped.
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
+    #[allow(clippy::too_many_lines)]
     unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
         let mut new_messages = false;
 
@@ -3028,6 +3041,9 @@ where
     #[cfg(any(unix, all(windows, feature = "std")))]
     #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
+        // Volatile read.
         unsafe { ptr::read_volatile(ptr::addr_of!(LLMP_SIGHANDLER_STATE.shutting_down)) }
     }
 
@@ -3091,6 +3107,8 @@ where
     /// Tell the broker to disconnect this client from it.
     #[cfg(feature = "std")]
     fn announce_client_exit(sender: &mut LlmpSender<SP>, client_id: u32) -> Result<(), Error> {
+        // # Safety
+        // No user-provided potentially unsafe parameters.
         unsafe {
             let msg = sender
                 .alloc_next(size_of::<LlmpClientExitInfo>())
@@ -3778,7 +3796,7 @@ mod tests {
     #[test]
     #[serial]
     #[cfg_attr(miri, ignore)]
-    pub fn test_llmp_connection() {
+    fn test_llmp_connection() {
         #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
         let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {

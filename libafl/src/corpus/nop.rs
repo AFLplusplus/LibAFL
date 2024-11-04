@@ -5,29 +5,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    inputs::{Input, UsesInput},
     Error,
 };
 
 /// A corpus which does not store any [`Testcase`]s.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct NopCorpus<I> {
     empty: Option<CorpusId>,
     phantom: PhantomData<I>,
 }
 
-impl<I> UsesInput for NopCorpus<I>
-where
-    I: Input,
-{
+impl<I> Corpus for NopCorpus<I> {
     type Input = I;
-}
-
-impl<I> Corpus for NopCorpus<I>
-where
-    I: Input,
-{
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -142,10 +131,7 @@ where
     }
 }
 
-impl<I> NopCorpus<I>
-where
-    I: Input,
-{
+impl<I> NopCorpus<I> {
     /// Creates a new [`NopCorpus`].
     #[must_use]
     pub fn new() -> Self {

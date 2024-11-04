@@ -1,4 +1,5 @@
 //! The [`InMemoryOnDiskCorpus`] stores [`Testcase`]s to disk.
+//!
 //! Additionally, _all_ of them are kept in memory.
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
@@ -23,7 +24,7 @@ use super::{
 };
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     Error, HasMetadata,
 };
 
@@ -51,11 +52,7 @@ fn try_create_new<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
+pub struct InMemoryOnDiskCorpus<I> {
     inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
@@ -63,17 +60,12 @@ where
     locking: bool,
 }
 
-impl<I> UsesInput for InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
 impl<I> Corpus for InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
+    type Input = I;
+
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -227,22 +219,19 @@ where
     fn testcase(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<core::cell::Ref<Testcase<<Self as Corpus>::Input>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as UsesInput>::Input>>, Error> {
+    ) -> Result<core::cell::RefMut<Testcase<<Self as Corpus>::Input>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
 
-impl<I> InMemoryOnDiskCorpus<I>
-where
-    I: Input,
-{
+impl<I> InMemoryOnDiskCorpus<I> {
     /// Creates an [`InMemoryOnDiskCorpus`].
     ///
     /// This corpus stores all testcases to disk, and keeps all of them in memory, as well.
@@ -387,7 +376,10 @@ where
         }
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error> {
+    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error>
+    where
+        I: Input,
+    {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             testcase.input().as_ref().unwrap().generate_name(Some(id))
@@ -413,11 +405,7 @@ where
             file_name
         };
 
-        if testcase
-            .file_path()
-            .as_ref()
-            .map_or(true, |path| !path.starts_with(&self.dir_path))
-        {
+        if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
         }
         *testcase.filename_mut() = Some(file_name);
@@ -431,7 +419,6 @@ where
             let ondisk_meta = OnDiskMetadata {
                 metadata: testcase.metadata_map(),
                 exec_time: testcase.exec_time(),
-                executions: testcase.executions(),
             };
 
             let mut tmpfile = File::create(&tmpfile_path)?;

@@ -1,4 +1,4 @@
-//! Monitor to display both cumulative and per-client monitor
+//! The [`MultiMonitor`] displays both cumulative and per-client stats.
 
 use alloc::{string::String, vec::Vec};
 use core::{

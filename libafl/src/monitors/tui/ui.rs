@@ -21,7 +21,7 @@ use super::{
 };
 
 #[derive(Default, Debug)]
-pub struct TuiUI {
+pub struct TuiUi {
     title: String,
     version: String,
     enhanced_graphics: bool,
@@ -34,13 +34,13 @@ pub struct TuiUI {
     pub should_quit: bool,
 }
 
-impl TuiUI {
+impl TuiUi {
     #[must_use]
     pub fn new(title: String, enhanced_graphics: bool) -> Self {
         Self::with_version(title, String::from("default"), enhanced_graphics)
     }
 
-    // create the TuiUI with a given `version`.
+    // create the TuiUi with a given `version`.
     #[must_use]
     pub fn with_version(title: String, version: String, enhanced_graphics: bool) -> Self {
         Self {
@@ -49,7 +49,7 @@ impl TuiUI {
             enhanced_graphics,
             show_logs: true,
             clients_idx: 1,
-            ..TuiUI::default()
+            ..TuiUi::default()
         }
     }
     pub fn on_key(&mut self, c: char) {
@@ -116,7 +116,7 @@ impl TuiUI {
             } else {
                 [Constraint::Percentage(50), Constraint::Percentage(50)].as_ref()
             })
-            .split(f.size());
+            .split(f.area());
         let top_body = body[0];
         let mid_body = body[1];
 
@@ -148,8 +148,7 @@ impl TuiUI {
             .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
             .split(left_top_layout[0]);
 
-        let mut status_bar: String = self.title.clone();
-        status_bar = status_bar + " (" + self.version.as_str() + ")";
+        let status_bar: String = format!("{} ({})", self.title, self.version.as_str());
 
         let text = vec![Line::from(Span::styled(
             &status_bar,
@@ -425,18 +424,22 @@ impl TuiUI {
         area: Rect,
         is_overall: bool,
     ) {
-        let item_geometry: ItemGeometry = if is_overall {
-            app.read().unwrap().total_item_geometry.clone()
+        let tui_context = app.read().unwrap();
+        let empty_geometry: ItemGeometry = ItemGeometry::new();
+        let item_geometry: &ItemGeometry = if is_overall {
+            &tui_context.total_item_geometry
         } else if self.clients < 2 {
-            ItemGeometry::new()
+            &empty_geometry
         } else {
-            app.read()
-                .unwrap()
-                .clients
-                .get(&self.clients_idx)
-                .unwrap()
-                .item_geometry
-                .clone()
+            let clients = &tui_context.clients;
+            let client = clients.get(&self.clients_idx);
+            let client = client.as_ref();
+            if let Some(client) = client {
+                &client.item_geometry
+            } else {
+                log::warn!("Client {} was `None`. Race condition?", &self.clients_idx);
+                &empty_geometry
+            }
         };
 
         let items = vec![
@@ -458,7 +461,7 @@ impl TuiUI {
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("stability")),
-                Cell::from(Span::raw(item_geometry.stability)),
+                Cell::from(Span::raw(&item_geometry.stability)),
             ]),
         ];
 
@@ -495,26 +498,25 @@ impl TuiUI {
         area: Rect,
         is_overall: bool,
     ) {
-        let tup: (Duration, ProcessTiming) = if is_overall {
-            let tui_context = app.read().unwrap();
-            (
-                tui_context.start_time,
-                tui_context.total_process_timing.clone(),
-            )
+        let tui_context = app.read().unwrap();
+        let empty_timing: ProcessTiming = ProcessTiming::new();
+        let tup: (Duration, &ProcessTiming) = if is_overall {
+            (tui_context.start_time, &tui_context.total_process_timing)
         } else if self.clients < 2 {
-            (current_time(), ProcessTiming::new())
+            (current_time(), &empty_timing)
         } else {
-            let client = app
-                .read()
-                .unwrap()
-                .clients
-                .get(&self.clients_idx)
-                .unwrap()
-                .clone();
-            (
-                client.process_timing.client_start_time,
-                client.process_timing,
-            )
+            let clients = &tui_context.clients;
+            let client = clients.get(&self.clients_idx);
+            let client = client.as_ref();
+            if let Some(client) = client {
+                (
+                    client.process_timing.client_start_time,
+                    &client.process_timing,
+                )
+            } else {
+                log::warn!("Client {} was `None`. Race condition?", &self.clients_idx);
+                (current_time(), &empty_timing)
+            }
         };
         let items = vec![
             Row::new(vec![
@@ -523,7 +525,7 @@ impl TuiUI {
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("exec speed")),
-                Cell::from(Span::raw(tup.1.exec_speed)),
+                Cell::from(Span::raw(&tup.1.exec_speed)),
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("last new entry")),

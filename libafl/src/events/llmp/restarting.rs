@@ -3,7 +3,7 @@
 //! When the target crashes, a watch process (the parent) will
 //! restart/refork it.
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(unix, not(miri), feature = "std"))]
 use core::ptr::addr_of_mut;
 #[cfg(feature = "std")]
@@ -35,10 +35,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-#[cfg(feature = "std")]
-use crate::events::AdaptiveSerializer;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
+#[cfg(feature = "std")]
+use crate::events::{AdaptiveSerializer, CustomBufEventResult, HasCustomBufHandlers};
 use crate::{
     events::{
         Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple, EventManagerId,
@@ -50,7 +50,7 @@ use crate::{
     inputs::UsesInput,
     monitors::Monitor,
     observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -149,7 +149,7 @@ where
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         self.llmp_mgr.serialize_observers(observers)
     }
@@ -177,7 +177,7 @@ where
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         state.on_restart()?;
 
-        // First, reset the page to 0 so the next iteration can read read from the beginning of this page
+        // First, reset the page to 0 so the next iteration can read from the beginning of this page
         self.staterestorer.reset();
         self.staterestorer.save(&(
             if self.save_state.on_restart() {
@@ -204,13 +204,14 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
-        + EvaluatorObservers<E::Observers>
+    Z: ExecutionProcessor<LlmpEventManager<EMH, S, SP>, E::Observers, State = S>
+        + EvaluatorObservers<LlmpEventManager<EMH, S, SP>, E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
@@ -227,13 +228,14 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<LlmpEventManager<EMH, S, SP>, Z>,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
-        + EvaluatorObservers<E::Observers>
+    Z: ExecutionProcessor<LlmpEventManager<EMH, S, SP>, E::Observers, State = S>
+        + EvaluatorObservers<LlmpEventManager<EMH, S, SP>, E::Observers>
         + Evaluator<E, LlmpEventManager<EMH, S, SP>>,
 {
 }
@@ -246,6 +248,20 @@ where
 {
     fn mgr_id(&self) -> EventManagerId {
         self.llmp_mgr.mgr_id()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<EMH, S, SP> HasCustomBufHandlers for LlmpRestartingEventManager<EMH, S, SP>
+where
+    S: State,
+    SP: ShMemProvider,
+{
+    fn add_custom_buf_handler(
+        &mut self,
+        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
+    ) {
+        self.llmp_mgr.add_custom_buf_handler(handler);
     }
 }
 
@@ -322,6 +338,7 @@ pub enum ManagerKind {
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
+///
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
@@ -352,6 +369,7 @@ where
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
+///
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 /// This one, additionally uses the timeobserver for the adaptive serialization
@@ -384,7 +402,9 @@ where
         .launch()
 }
 
-/// Provides a `builder` which can be used to build a [`RestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`RestartingMgr`].
+///
+/// The [`RestartingMgr`] is is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
@@ -575,7 +595,7 @@ where
                     }
                 };
 
-                // If this guy wants to fork, then ignore sigit
+                // If this guy wants to fork, then ignore sigint
                 #[cfg(any(windows, not(feature = "fork")))]
                 unsafe {
                     #[cfg(windows)]
@@ -594,7 +614,7 @@ where
                 #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = child_status.code().unwrap_or_default();
 
-                compiler_fence(Ordering::SeqCst);
+                compiler_fence(Ordering::SeqCst); // really useful?
 
                 if child_status == CTRL_C_EXIT || staterestorer.wants_to_exit() {
                     // if ctrl-c is pressed, we end up in this branch

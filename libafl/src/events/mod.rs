@@ -34,7 +34,9 @@ pub use broker_hooks::*;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal, CTRL_C_EXIT};
+use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
     current_time,
     tuples::{Handle, MatchNameRef},
@@ -68,7 +70,8 @@ pub mod multi_machine;
 #[cfg(all(unix, feature = "std"))]
 pub static mut EVENTMGR_SIGHANDLER_STATE: ShutdownSignalData = ShutdownSignalData {};
 
-/// A signal handler for catching ctrl-c.
+/// A signal handler for catching `ctrl-c`.
+///
 /// The purpose of this signal handler is solely for calling `exit()` with a specific exit code 100
 /// In this way, the restarting manager can tell that we really want to exit
 #[cfg(all(unix, feature = "std"))]
@@ -77,18 +80,18 @@ pub struct ShutdownSignalData {}
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+///
+/// # Safety
+/// This will exit the program
 #[cfg(all(unix, feature = "std"))]
-impl Handler for ShutdownSignalData {
-    fn handle(
+impl SignalHandler for ShutdownSignalData {
+    unsafe fn handle(
         &mut self,
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        // println!("in handler! {}", std::process::id());
         unsafe {
-            // println!("Exiting from the handler....");
-
             #[cfg(unix)]
             libc::_exit(CTRL_C_EXIT);
 
@@ -116,7 +119,7 @@ use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 use crate::{
-    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStage, state::UsesState,
+    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStageId, state::UsesState,
 };
 
 /// The log event severity
@@ -210,7 +213,7 @@ impl EventConfig {
         }
     }
 
-    /// Match if the currenti [`EventConfig`] matches another given config
+    /// Match if the current [`EventConfig`] matches another given config
     #[must_use]
     pub fn match_with(&self, other: &EventConfig) -> bool {
         match self {
@@ -284,8 +287,6 @@ where
         client_config: EventConfig,
         /// The time of generation of the event
         time: Duration,
-        /// The executions of this client
-        executions: u64,
         /// The original sender if, if forwarded
         forward_id: Option<ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
@@ -327,8 +328,6 @@ where
     Objective {
         /// Objective corpus size
         objective_size: usize,
-        /// The total number of executions when this objective is found
-        executions: u64,
         /// The time when this event was created
         time: Duration,
     },
@@ -398,6 +397,11 @@ where
             } => "todo",*/
         }
     }
+
+    /// Returns true if self is a new testcase, false otherwise.
+    pub fn is_new_testcase(&self) -> bool {
+        matches!(self, Event::NewTestcase { .. })
+    }
 }
 
 /// [`EventFirer`] fires an event.
@@ -437,7 +441,7 @@ pub trait EventFirer: UsesState {
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
     {
         Ok(Some(postcard::to_allocvec(observers)?))
     }
@@ -545,7 +549,7 @@ where
 /// Restartable trait
 pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
-    /// You *must* ensure that [`HasCurrentStage::on_restart`] will be invoked in this method, by you
+    /// You *must* ensure that [`HasCurrentStageId::on_restart`] will be invoked in this method, by you
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
     #[inline]
     fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -757,7 +761,7 @@ where
     #[inline]
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
     {
         self.inner.serialize_observers(observers)
     }
@@ -893,7 +897,7 @@ pub trait AdaptiveSerializer {
         percentage_threshold: usize,
     ) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<S> + Serialize,
+        OT: ObserversTuple<S::Input, S> + Serialize,
         S: UsesInput,
     {
         match self.time_ref() {
@@ -938,7 +942,7 @@ pub trait AdaptiveSerializer {
 #[cfg(test)]
 mod tests {
 
-    use core::ptr::addr_of_mut;
+    use core::ptr::{addr_of, addr_of_mut};
 
     use libafl_bolts::{current_time, tuples::tuple_list, Named};
     use tuple_list::tuple_list_type;
@@ -955,7 +959,8 @@ mod tests {
     #[test]
     fn test_event_serde() {
         let obv = unsafe {
-            StdMapObserver::from_mut_ptr("test", addr_of_mut!(MAP) as *mut u32, MAP.len())
+            let len = (*addr_of!(MAP)).len();
+            StdMapObserver::from_mut_ptr("test", addr_of_mut!(MAP) as *mut u32, len)
         };
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
@@ -968,7 +973,6 @@ mod tests {
             corpus_size: 123,
             client_config: EventConfig::AlwaysUnique,
             time: current_time(),
-            executions: 0,
             forward_id: None,
             #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
             node_id: None,

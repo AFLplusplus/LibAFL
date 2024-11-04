@@ -14,11 +14,10 @@ use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
 use libafl::{
     corpus::Testcase,
-    events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
-    inputs::{HasTargetBytes, UsesInput},
-    observers::{Observer, ObserversTuple},
+    feedbacks::{Feedback, StateInitializer},
+    inputs::HasTargetBytes,
+    observers::Observer,
     state::State,
     Error, HasMetadata,
 };
@@ -579,11 +578,8 @@ pub enum AsanErrorsObserver {
     Static,
 }
 
-impl<S> Observer<S> for AsanErrorsObserver
-where
-    S: UsesInput,
-{
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+impl<I, S> Observer<I, S> for AsanErrorsObserver {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         AsanErrors::get_mut_blocking().clear();
 
         Ok(())
@@ -609,6 +605,7 @@ impl AsanErrorsObserver {
     ///
     /// # Safety
     /// The field should not be accessed multiple times at the same time (i.e., from different threads)!
+    #[must_use]
     pub fn from_static_asan_errors() -> Self {
         Self::Static
     }
@@ -650,24 +647,23 @@ pub struct AsanErrorsFeedback<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> Feedback<S> for AsanErrorsFeedback<S>
+impl<S> StateInitializer<S> for AsanErrorsFeedback<S> {}
+
+impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for AsanErrorsFeedback<S>
 where
     S: State + Debug,
     S::Input: HasTargetBytes,
+    OT: MatchNameRef,
 {
     #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         let observer = observers
             .get(&self.observer_handle)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
@@ -680,16 +676,13 @@ where
         }
     }
 
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
         testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }

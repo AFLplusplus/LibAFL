@@ -12,6 +12,7 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
+        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
@@ -20,7 +21,8 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasCorpus, HasExecutions, HasSolutions},
+        observers::ObserversTuple,
+        state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     };
 
     /// # Safety
@@ -29,9 +31,12 @@ pub mod windows_asan_handler {
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         Z: HasObjective<Objective = OF, State = E::State>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let data = addr_of_mut!(GLOBAL_STATE);
         (*data).set_in_handler(true);
@@ -118,13 +123,15 @@ pub mod windows_exception_handler {
     use std::panic;
 
     use libafl_bolts::os::windows_exceptions::{
-        ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE, EXCEPTION_POINTERS,
+        ExceptionCode, ExceptionHandler, CRASH_EXCEPTIONS, EXCEPTION_HANDLERS_SIZE,
+        EXCEPTION_POINTERS,
     };
     use windows::Win32::System::Threading::{
         EnterCriticalSection, ExitProcess, LeaveCriticalSection, CRITICAL_SECTION,
     };
 
     use crate::{
+        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
@@ -134,7 +141,8 @@ pub mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::{Input, UsesInput},
-        state::{HasCorpus, HasExecutions, HasSolutions, State},
+        observers::ObserversTuple,
+        state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -147,9 +155,15 @@ pub mod windows_exception_handler {
     ) {
     }*/
 
-    impl Handler for InProcessExecutorHandlerData {
+    impl ExceptionHandler for InProcessExecutorHandlerData {
+        /// # Safety
+        /// Will dereference `EXCEPTION_POINTERS` and access `GLOBAL_STATE`.
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+        unsafe fn handle(
+            &mut self,
+            _code: ExceptionCode,
+            exception_pointers: *mut EXCEPTION_POINTERS,
+        ) {
             unsafe {
                 let data = addr_of_mut!(GLOBAL_STATE);
                 let in_handler = (*data).set_in_handler(true);
@@ -175,11 +189,14 @@ pub mod windows_exception_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, OF, Z>()
     where
-        E: HasObservers,
+        E: HasObservers + Executor<EM, Z>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         Z: HasObjective<Objective = OF, State = E::State>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -235,11 +252,14 @@ pub mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers + HasInProcessHooks<E::State>,
+        E: HasObservers + HasInProcessHooks<E::State> + Executor<EM, Z>,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -306,10 +326,13 @@ pub mod windows_exception_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, Z> + HasObservers,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
+        OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF, State = E::State>,
+        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {

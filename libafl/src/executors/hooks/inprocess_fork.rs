@@ -10,7 +10,7 @@ use std::intrinsics::transmute;
 
 #[cfg(not(miri))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-use libafl_bolts::os::unix_signals::{ucontext_t, Handler, Signal};
+use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
 use libc::siginfo_t;
 
 use crate::{
@@ -21,6 +21,8 @@ use crate::{
         HasObservers,
     },
     inputs::UsesInput,
+    observers::ObserversTuple,
+    state::UsesState,
     Error,
 };
 
@@ -58,9 +60,10 @@ impl<S> InChildProcessHooks<S> {
     /// Create new [`InChildProcessHooks`].
     pub fn new<E>() -> Result<Self, Error>
     where
-        E: HasObservers,
+        E: HasObservers + UsesState,
+        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
     {
-        #[cfg_attr(miri, allow(unused_variables))]
+        #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {
             let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
             // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
@@ -107,19 +110,21 @@ unsafe impl Sync for InProcessForkExecutorGlobalData {}
 unsafe impl Send for InProcessForkExecutorGlobalData {}
 
 impl InProcessForkExecutorGlobalData {
-    pub(crate) fn executor_mut<'a, E>(&self) -> &'a mut E {
+    /// # Safety
+    /// Only safe if not called twice and if the executor is not used from another borrow after this.
+    pub(crate) unsafe fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
-    pub(crate) fn state_mut<'a, S>(&self) -> &'a mut S {
+    /// # Safety
+    /// Only safe if not called twice and if the state is not used from another borrow after this.
+    pub(crate) unsafe fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
-    /*fn current_input<'a, I>(&self) -> &'a I {
-        unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
-    }*/
-
-    pub(crate) fn take_current_input<'a, I>(&mut self) -> &'a I {
+    /// # Safety
+    /// Only safe if not called concurrently.
+    pub(crate) unsafe fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = null();
         r
@@ -131,7 +136,6 @@ impl InProcessForkExecutorGlobalData {
 }
 
 /// a static variable storing the global state
-
 pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
     InProcessForkExecutorGlobalData {
         executor_ptr: null(),
@@ -141,8 +145,13 @@ pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData
         timeout_handler: null(),
     };
 
-impl Handler for InProcessForkExecutorGlobalData {
-    fn handle(&mut self, signal: Signal, info: &mut siginfo_t, context: Option<&mut ucontext_t>) {
+impl SignalHandler for InProcessForkExecutorGlobalData {
+    unsafe fn handle(
+        &mut self,
+        signal: Signal,
+        info: &mut siginfo_t,
+        context: Option<&mut ucontext_t>,
+    ) {
         match signal {
             Signal::SigUser2 | Signal::SigAlarm => unsafe {
                 if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {

@@ -102,8 +102,10 @@ impl ShMemDescription {
     }
 }
 
+/// The id describing shared memory for the current provider
+///
 /// An id associated with a given shared memory mapping ([`ShMem`]), which can be used to
-/// establish shared-mappings between proccesses.
+/// establish shared-mappings between processes.
 /// Id is a file descriptor if you use `MmapShMem` or `AshmemShMem`.
 /// That means you have to use shmem server to access to the shmem segment from other processes in these cases.
 /// On the other hand, id is a unique identifier if you use `CommonUnixShMem` or `Win32ShMem`.
@@ -193,6 +195,7 @@ impl Display for ShMemId {
 }
 
 /// A [`ShMem`] is an interface to shared maps.
+///
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
 pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
@@ -239,6 +242,7 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
 }
 
 /// A [`ShMemProvider`] provides access to shared maps.
+///
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Clone + Default + Debug {
@@ -317,6 +321,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 }
 
 /// An [`ShMemProvider`] that does not provide any [`ShMem`].
+///
 /// This is mainly for testing and type magic.
 /// The resulting [`NopShMem`] is backed by a simple byte buffer to do some simple non-shared things with.
 /// Calling [`NopShMemProvider::shmem_from_id_and_size`] will return new maps for the same id every time.
@@ -651,11 +656,11 @@ pub mod unix_shmem {
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::process;
+        use std::{io, process};
 
         use libc::{
-            c_int, c_uchar, close, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat, shmctl,
-            shmdt, shmget,
+            c_int, c_uchar, close, fcntl, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat,
+            shmctl, shmdt, shmget,
         };
 
         use crate::{
@@ -688,12 +693,17 @@ pub mod unix_shmem {
             /// Create a new [`MmapShMem`]
             /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete all `/dev/shm/libafl_*` after fuzzing
             pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
                 unsafe {
-                    let full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
+                    let mut full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
+                    // leave one byte space for the null byte.
+                    full_file_name.truncate(MAX_MMAP_FILENAME_LEN - 1);
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    filename_path
-                        .copy_from_slice(&full_file_name.as_bytes()[..MAX_MMAP_FILENAME_LEN]);
-                    filename_path[MAX_MMAP_FILENAME_LEN - 1] = 0; // Null terminate!
+                    filename_path[0..full_file_name.len()]
+                        .copy_from_slice(full_file_name.as_bytes());
+                    filename_path[full_file_name.len()] = 0; // Null terminate!
                     log::info!(
                         "{} Creating shmem {} {:#?}",
                         map_size,
@@ -758,6 +768,9 @@ pub mod unix_shmem {
 
             #[allow(clippy::unnecessary_wraps)]
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
                 unsafe {
                     /* map the shared memory segment to the address space of the process */
                     #[cfg(target_vendor = "apple")]
@@ -825,6 +838,38 @@ pub mod unix_shmem {
             pub fn filename_path(&self) -> &Option<[u8; MAX_MMAP_FILENAME_LEN]> {
                 &self.filename_path
             }
+
+            /// If called, the shared memory will also be available in subprocesses.
+            ///
+            /// You likely want to pass the [`crate::shmem::ShMemDescription`] and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
+            ///
+            /// # Errors
+            ///
+            /// This function will return an error if the appropriate flags could not be extracted or set.
+            pub fn persist_for_child_processes(&self) -> Result<&Self, Error> {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
+                unsafe {
+                    let flags = fcntl(self.shm_fd, libc::F_GETFD);
+
+                    if flags == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to retrieve FD flags",
+                        ));
+                    }
+
+                    if fcntl(self.shm_fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to set FD flags",
+                        ));
+                    }
+                }
+
+                Ok(self)
+            }
         }
 
         /// A [`ShMemProvider`] which uses [`shm_open`] and [`mmap`] to provide shared memory mappings.
@@ -884,18 +929,25 @@ pub mod unix_shmem {
             type Target = [u8];
 
             fn deref(&self) -> &[u8] {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
         impl DerefMut for MmapShMem {
             fn deref_mut(&mut self) -> &mut [u8] {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
 
         impl Drop for MmapShMem {
             fn drop(&mut self) {
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // Mutable borrow so no possible race.
                 unsafe {
                     assert!(
                         !self.map.is_null(),
@@ -1306,7 +1358,7 @@ pub mod win32_shmem {
         Error,
     };
 
-    const INVALID_HANDLE_VALUE: isize = -1;
+    const INVALID_HANDLE_VALUE: *mut c_void = -1isize as *mut c_void;
 
     /// The default [`ShMem`] impl for Windows using `shmctl` & `shmget`
     #[derive(Clone)]
@@ -1369,7 +1421,7 @@ pub mod win32_shmem {
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS.0,
                     BOOL(0),
-                    PCSTR(map_str_bytes.as_ptr() as *mut _),
+                    PCSTR(map_str_bytes.as_ptr().cast_mut()),
                 )?;
 
                 let map =

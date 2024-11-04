@@ -12,4 +12,4 @@ Beside the entities previously described, we introduce the [`Testcase`](https://
 
 The State, in the implementation, contains only owned objects that are serializable, and it is serializable itself. Some fuzzers may want to serialize their state when pausing or just, when doing in-process fuzzing, serialize on crash and deserialize in the new process to continue to fuzz with all the metadata preserved.
 
-Additionally, we group the entities that are "actions", like the `CorpusScheduler` and the `Feedbacks`, in a common place, the [`Fuzzer'](https://docs.rs/libafl/latest/libafl/fuzzer/struct.StdFuzzer.html).
+Additionally, we group the entities that are "actions", like the `CorpusScheduler` and the `Feedbacks`, in a common place, the [`Fuzzer`](https://docs.rs/libafl/latest/libafl/fuzzer/struct.StdFuzzer.html).

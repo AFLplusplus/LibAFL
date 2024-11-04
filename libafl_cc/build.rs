@@ -107,12 +107,12 @@ fn find_llvm_config() -> Result<String, String> {
 
 fn exec_llvm_config(args: &[&str]) -> String {
     let llvm_config = find_llvm_config().expect("Unexpected error");
-    match Command::new(llvm_config).args(args).output() {
+    match Command::new(&llvm_config).args(args).output() {
         Ok(output) => String::from_utf8(output.stdout)
             .expect("Unexpected llvm-config output")
             .trim()
             .to_string(),
-        Err(e) => panic!("Could not execute llvm-config: {e}"),
+        Err(e) => panic!("Could not execute {llvm_config}: {e}"),
     }
 }
 
@@ -200,26 +200,24 @@ fn build_pass(
     };
 
     match command_result {
-        Some(res) => {
-            match res {
-                Ok(s) => {
-                    if !s.success() {
-                        if required {
-                            panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
-                        } else {
-                            println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}");
-                        }
-                    }
-                }
-                Err(err) => {
+        Some(res) => match res {
+            Ok(s) => {
+                if !s.success() {
                     if required {
-                        panic!("Failed to compile required compiler pass src/{src_file} - Error: {err}");
+                        panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {s}");
                     } else {
-                        println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Error: {err}");
+                        println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {s}. You can ignore this error unless you want this compiler pass.");
                     }
                 }
             }
-        }
+            Err(err) => {
+                if required {
+                    panic!("Failed to compile required compiler pass src/{src_file} - Exit status: {err}");
+                } else {
+                    println!("cargo:warning=Skipping non-required compiler pass src/{src_file} - Reason: Exit status {err}. You can ignore this error unless you want this compiler pass.");
+                }
+            }
+        },
         None => {
             println!("cargo:warning=Skipping compiler pass src/{src_file} - Only supported on Windows or *nix.");
         }
@@ -241,7 +239,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_VERSION");
-    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE_IN_USE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_DEFAULT_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_DDG_MAP_SIZE");
     println!("cargo:rerun-if-changed=src/common-llvm.h");
@@ -314,13 +312,13 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     };
     let mut cxxflags: Vec<String> = cxxflags.split_whitespace().map(String::from).collect();
 
-    let edges_map_size_in_use: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_IN_USE")
+    let edge_map_default_size: usize = option_env!("LIBAFL_EDGES_MAP_DEFAULT_SIZE")
         .map_or(Ok(65_536), str::parse)
-        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
-    let edges_map_size_max: usize = option_env!("LIBAFL_EDGES_MAP_SIZE_MAX")
+        .expect("Could not parse LIBAFL_EDGES_MAP_DEFAULT_SIZE");
+    let edge_map_allocated_size: usize = option_env!("LIBAFL_EDGES_MAP_ALLOCATED_SIZE")
         .map_or(Ok(2_621_440), str::parse)
-        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE_IN_USE");
-    cxxflags.push(format!("-DEDGES_MAP_SIZE_IN_USE={edges_map_size_in_use}"));
+        .expect("Could not parse LIBAFL_EDGES_MAP_DEFAULT_SIZE");
+    cxxflags.push(format!("-DEDGES_MAP_DEFAULT_SIZE={edge_map_default_size}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(65_536), str::parse)
@@ -350,9 +348,9 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         pub const CLANGXX_PATH: &str = {clangcpp:?};
 
         /// The default size of the edges map the fuzzer uses
-        pub const EDGES_MAP_SIZE_IN_USE: usize = {edges_map_size_in_use};
+        pub const EDGES_MAP_DEFAULT_SIZE: usize = {edge_map_default_size};
         /// The real allocated size of the edges map
-        pub const EDGES_MAP_SIZE_MAX: usize = {edges_map_size_max};
+        pub const EDGES_MAP_ALLOCATED_SIZE: usize = {edge_map_allocated_size};
 
         /// The size of the accounting maps
         pub const ACCOUNTING_MAP_SIZE: usize = {acc_map_size};

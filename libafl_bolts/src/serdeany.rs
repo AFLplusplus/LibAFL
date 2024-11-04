@@ -23,6 +23,9 @@ pub type TypeRepr = u128;
 #[cfg(feature = "stable_anymap")]
 pub type TypeRepr = Cow<'static, str>;
 
+/// Error string when no types at all have been registered yet.
+pub(crate) const ERR_EMPTY_TYPES_REGISTER: &str = "Empty types registry. Please enable the `serdeany_autoreg` feature in libafl_bolts or register all required types manually using RegistryBuilder::register().";
+
 #[cfg(not(feature = "stable_anymap"))]
 fn type_repr<T>() -> TypeRepr
 where
@@ -115,13 +118,18 @@ pub mod serdeany_registry {
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
+    use core::{
+        any::TypeId,
+        fmt,
+        hash::BuildHasherDefault,
+        ptr::{addr_of, addr_of_mut},
+    };
 
     use hashbrown::{
         hash_map::{Values, ValuesMut},
         HashMap,
     };
-    use serde::{Deserialize, Serialize};
+    use serde::{de, Deserialize, Serialize};
 
     use crate::{
         serdeany::{
@@ -153,12 +161,13 @@ pub mod serdeany_registry {
             let id: TypeRepr = visitor.next_element()?.unwrap();
 
             let cb = unsafe {
-                REGISTRY
+                (*addr_of!(REGISTRY))
                     .deserializers
                     .as_ref()
-                    .expect("Empty types registry")
+                    .ok_or_else(||
+                        de::Error::custom(super::ERR_EMPTY_TYPES_REGISTER))?
                     .get(&id)
-                    .expect("Cannot deserialize an unregistered type")
+                    .ok_or_else(|| de::Error::custom(format_args!("Cannot deserialize the unregistered type with id {id}. Enable the `serde_autoreg` feature in libafl_bolts or register all requried types manually.")))?
                     .0
             };
             let seed = DeserializeCallbackSeed::<dyn crate::serdeany::SerdeAny> { cb };
@@ -224,7 +233,7 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny + Serialize + serde::de::DeserializeOwned,
         {
             unsafe {
-                REGISTRY.register::<T>();
+                (*addr_of_mut!(REGISTRY)).register::<T>();
             }
         }
 
@@ -233,9 +242,9 @@ pub mod serdeany_registry {
         /// # Safety
         /// This may never be called concurrently or at the same time as `register`.
         /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
-        pub fn finalize() {
+        pub unsafe fn finalize() {
             unsafe {
-                REGISTRY.finalize();
+                (*addr_of_mut!(REGISTRY)).finalize();
             }
         }
     }
@@ -362,10 +371,10 @@ pub mod serdeany_registry {
 
             assert!(
                         unsafe {
-                            REGISTRY
+                            (*addr_of!(REGISTRY))
                                 .deserializers
                                 .as_ref()
-                                .expect("Empty types registry")
+                                .expect(super::ERR_EMPTY_TYPES_REGISTER)
                                 .get(type_repr)
                                 .is_some()
                         },
@@ -625,10 +634,10 @@ pub mod serdeany_registry {
 
             assert!(
                         unsafe {
-                            REGISTRY
+                            (*addr_of!(REGISTRY))
                                 .deserializers
                                 .as_ref()
-                                .expect("Empty types registry")
+                                .expect(super::ERR_EMPTY_TYPES_REGISTER)
                                 .get(type_repr)
                                 .is_some()
                         },

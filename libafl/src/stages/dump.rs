@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId},
-    inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasRand, HasSolutions, UsesState},
     Error, HasMetadata,
@@ -46,11 +45,13 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
 where
-    CB: FnMut(&<Self::State as UsesInput>::Input, &Self::State) -> Vec<u8>,
+    CB: FnMut(&Self::Input, &Self::State) -> Vec<u8>,
     EM: UsesState,
     E: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
-    Self::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    EM::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
+    <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     fn perform(
@@ -60,6 +61,70 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
+        self.dump_state_to_disk(state)
+    }
+
+    #[inline]
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not executing the target, so restart safety is not needed
+        Ok(())
+    }
+}
+
+impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
+where
+    EM: UsesState,
+    Z: UsesState,
+    <EM as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = EM::Input>,
+    <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = EM::Input>,
+{
+    /// Create a new [`DumpToDiskStage`]
+    pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
+    where
+        A: Into<PathBuf>,
+        B: Into<PathBuf>,
+    {
+        let corpus_dir = corpus_dir.into();
+        if let Err(e) = fs::create_dir(&corpus_dir) {
+            if !corpus_dir.is_dir() {
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {corpus_dir:?}"),
+                ));
+            }
+        }
+        let solutions_dir = solutions_dir.into();
+        if let Err(e) = fs::create_dir(&solutions_dir) {
+            if !corpus_dir.is_dir() {
+                return Err(Error::os_error(
+                    e,
+                    format!("Error creating directory {solutions_dir:?}"),
+                ));
+            }
+        }
+        Ok(Self {
+            to_bytes,
+            solutions_dir,
+            corpus_dir,
+            phantom: PhantomData,
+        })
+    }
+
+    #[inline]
+    fn dump_state_to_disk(&mut self, state: &mut <Self as UsesState>::State) -> Result<(), Error>
+    where
+        CB: FnMut(
+            &<<<EM as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input,
+            &<EM as UsesState>::State,
+        ) -> Vec<u8>,
+    {
         let (mut corpus_id, mut solutions_id) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
                 (
@@ -112,56 +177,5 @@ where
         });
 
         Ok(())
-    }
-
-    #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        // Not executing the target, so restart safety is not needed
-        Ok(true)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // Not executing the target, so restart safety is not needed
-        Ok(())
-    }
-}
-
-impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
-where
-    EM: UsesState,
-    Z: UsesState,
-    <Self as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
-{
-    /// Create a new [`DumpToDiskStage`]
-    pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
-    where
-        A: Into<PathBuf>,
-        B: Into<PathBuf>,
-    {
-        let corpus_dir = corpus_dir.into();
-        if let Err(e) = fs::create_dir(&corpus_dir) {
-            if !corpus_dir.is_dir() {
-                return Err(Error::os_error(
-                    e,
-                    format!("Error creating directory {corpus_dir:?}"),
-                ));
-            }
-        }
-        let solutions_dir = solutions_dir.into();
-        if let Err(e) = fs::create_dir(&solutions_dir) {
-            if !corpus_dir.is_dir() {
-                return Err(Error::os_error(
-                    e,
-                    format!("Error creating directory {solutions_dir:?}"),
-                ));
-            }
-        }
-        Ok(Self {
-            to_bytes,
-            solutions_dir,
-            corpus_dir,
-            phantom: PhantomData,
-        })
     }
 }

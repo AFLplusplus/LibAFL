@@ -1,0 +1,106 @@
+# Variables
+[env]
+FUZZER_NAME = 'libfuzzer_stb_image'
+PROJECT_DIR = { script = ["pwd"] }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release" }
+PROFILE_DIR = { value = "release" }
+LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc', mapping = { "windows" = '.\\target\\${PROFILE_DIR}\\libafl_cc.exe' } }
+LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx', mapping = { "windows" = '.\\target\\${PROFILE_DIR}\\libafl_cxx.exe' } }
+FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libfuzzer_stb_image', mapping = { "windows" = '.\\target\\${PROFILE_DIR}\\libfuzzer_stb_image.exe' } }
+
+# Compilers
+[tasks.cxx]
+condition = { files_not_exist = ["${LIBAFL_CXX}"] }
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
+
+[tasks.cc]
+condition = { files_not_exist = ["${LIBAFL_CC}"] }
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
+
+
+# Build the fuzzer
+[tasks.fuzzer]
+script_runner = "@shell"
+script = '''
+cargo build --profile ${PROFILE}
+cp ${FUZZER} .
+'''
+dependencies = ["cc", "cxx"]
+
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "run_windows"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script = '''
+./${FUZZER_NAME} &
+sleep 0.2
+./${FUZZER_NAME}
+'''
+dependencies = ["fuzzer"]
+
+[tasks.run_windows]
+# Do nothing
+script_runner = "@shell"
+script = '''
+echo "Not integrated into cargo-make yet."
+'''
+dependencies = ["fuzzer"]
+
+
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_mac"
+windows_alias = "test_windows"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+(timeout 31s ./${FUZZER_NAME} | tee fuzz_stdout.log 2>/dev/null || true) &
+sleep 0.2
+timeout 30s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
+if grep -qa "corpus: 30" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+'''
+dependencies = ["fuzzer"]
+
+[tasks.test_mac]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+(timeout 31s ./${FUZZER_NAME} | tee fuzz_stdout.log 2>/dev/null || true) &
+sleep 0.2
+timeout 30s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
+'''
+dependencies = ["fuzzer"]
+
+[tasks.test_windows]
+# Do nothing
+script_runner = "@shell"
+script = '''
+echo "Not integrated into cargo-make yet."
+'''
+dependencies = ["fuzzer"]
+
+
+# Clean up
+[tasks.clean]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+rm -f ./${FUZZER_NAME}
+cargo clean
+'''

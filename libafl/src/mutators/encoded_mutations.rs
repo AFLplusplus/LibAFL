@@ -1,7 +1,10 @@
 //! Mutations for [`EncodedInput`]s
 //!
 use alloc::{borrow::Cow, vec::Vec};
-use core::cmp::{max, min};
+use core::{
+    cmp::{max, min},
+    num::NonZero,
+};
 
 use libafl_bolts::{
     rands::Rand,
@@ -10,12 +13,12 @@ use libafl_bolts::{
 
 use crate::{
     corpus::Corpus,
-    inputs::{EncodedInput, UsesInput},
+    inputs::EncodedInput,
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
     },
-    random_corpus_id_with_disabled,
+    nonzero, random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
@@ -123,8 +126,8 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
             Ok(MutationResult::Skipped)
         } else {
             let val = state.rand_mut().choose(input.codes_mut()).unwrap();
-            let num = 1 + state.rand_mut().below(ARITH_MAX) as u32;
-            *val = match state.rand_mut().below(2) {
+            let num = 1 + state.rand_mut().below(nonzero!(ARITH_MAX)) as u32;
+            *val = match state.rand_mut().below(nonzero!(2)) {
                 0 => val.wrapping_add(num),
                 _ => val.wrapping_sub(num),
             };
@@ -158,9 +161,16 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
         if size <= 2 {
             return Ok(MutationResult::Skipped);
         }
-
-        let off = state.rand_mut().below(size);
-        let len = state.rand_mut().below(size - off);
+        // # Safety
+        // The size is larger than 1 here (checked just above)
+        let off = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+        // # Safety
+        // The size of the offset is below size, the value is never 0.
+        let len = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size - off).unwrap_unchecked() });
         input.codes_mut().drain(off..off + len);
 
         Ok(MutationResult::Mutated)
@@ -195,11 +205,17 @@ where
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
         let size = input.codes().len();
-        if size == 0 {
+        let Some(nz) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
-        }
-        let off = state.rand_mut().below(size + 1);
-        let mut len = 1 + state.rand_mut().below(min(16, size));
+        };
+
+        // # Safety
+        // The input.codes() len should never be close to an usize, so adding 1 will always result in a non-zero value.
+        // Worst case, we will get a wrong int value as return, not too bad.
+        let off = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size + 1).unwrap_unchecked() });
+        let mut len = 1 + state.rand_mut().below(nz);
 
         if size + len > max_size {
             if max_size > size {
@@ -209,10 +225,10 @@ where
             }
         }
 
-        let from = if size == len {
-            0
+        let from = if let Some(bound) = NonZero::new(size - len) {
+            state.rand_mut().below(bound)
         } else {
-            state.rand_mut().below(size - len)
+            0
         };
 
         input.codes_mut().resize(size + len, 0);
@@ -252,11 +268,21 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
         let size = input.codes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
-        let from = state.rand_mut().below(size);
-        let to = state.rand_mut().below(size);
-        let len = 1 + state.rand_mut().below(size - max(from, to));
+        // # Safety
+        // it's larger than 1
+        let from = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+        let to = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size).unwrap_unchecked() });
+        // # Safety
+        // Both from and to are smaller than size, so size minus any of these can never be 0.
+        let len = 1 + state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size - max(from, to)).unwrap_unchecked() });
 
         unsafe {
             buffer_self_copy(input.codes_mut(), from, to, len);
@@ -285,9 +311,10 @@ impl EncodedCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverInsertMutator;
 
-impl<S> Mutator<S::Input, S> for EncodedCrossoverInsertMutator
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator
 where
-    S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus + HasMaxSize,
+    S: HasRand + HasCorpus + HasMaxSize,
+    S::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
@@ -300,7 +327,12 @@ where
             }
         }
 
+        let Some(nz) = NonZero::new(size) else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let other_size = {
+            // new scope to make the borrow checker happy
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             other_testcase.load_input(state.corpus())?.codes().len()
         };
@@ -309,10 +341,18 @@ where
             return Ok(MutationResult::Skipped);
         }
 
+        // # Safety
+        // it's larger than 1
         let max_size = state.max_size();
-        let from = state.rand_mut().below(other_size);
-        let to = state.rand_mut().below(size);
-        let mut len = 1 + state.rand_mut().below(other_size - from);
+        let from = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(other_size).unwrap_unchecked() });
+        let to = state.rand_mut().below(nz);
+        // # Safety
+        // from is smaller than other_size, other_size is larger than 2, so the subtraction is larger than 0.
+        let mut len = 1 + state
+            .rand_mut()
+            .below(unsafe { NonZero::new(other_size - from).unwrap_unchecked() });
 
         if size + len > max_size {
             if max_size > size {
@@ -355,15 +395,13 @@ impl EncodedCrossoverInsertMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverReplaceMutator;
 
-impl<S> Mutator<S::Input, S> for EncodedCrossoverReplaceMutator
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator
 where
-    S: UsesInput<Input = EncodedInput> + HasRand + HasCorpus,
+    S: HasRand + HasCorpus,
+    S::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
-        if size == 0 {
-            return Ok(MutationResult::Skipped);
-        }
 
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
@@ -382,10 +420,23 @@ where
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
+        // # Safety
+        // other_size >= 2
+        let from = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(other_size).unwrap_unchecked() });
 
-        let from = state.rand_mut().below(other_size);
-        let len = state.rand_mut().below(min(other_size - from, size));
-        let to = state.rand_mut().below(size - len);
+        // # Safety
+        // size > 0, other_size > from,
+        let len = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(min(other_size - from, size)).unwrap_unchecked() });
+
+        // # Safety
+        // size is non-zero, len is below min(size, ...), so the subtraction will always be positive.
+        let to = state
+            .rand_mut()
+            .below(unsafe { NonZero::new(size - len).unwrap_unchecked() });
 
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // no need to load the input again, it'll already be present at this point.

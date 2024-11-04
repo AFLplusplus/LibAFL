@@ -73,9 +73,11 @@ where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
     E: Executor<EM, Z, State = Self::State> + HasObservers,
-    Self::State:
+    E::Observers: ObserversTuple<BytesInput, <Self as UsesState>::State>,
+    EM::State:
         UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus + HasNamedMetadata,
     EM: UsesState,
+    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>, //delete me
     Z: UsesState<State = Self::State>,
 {
     #[inline]
@@ -109,6 +111,11 @@ where
             let input = entry.input_mut().as_mut().unwrap();
 
             let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
+
+            if payload.len() > MAX_GENERALIZED_LEN {
+                return Ok(());
+            }
+
             let original = input.clone();
             let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
@@ -309,17 +316,15 @@ where
             b'"',
         )?;
 
-        if payload.len() <= MAX_GENERALIZED_LEN {
-            // Save the modified input in the corpus
-            {
-                let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
+        // Save the modified input in the corpus
+        {
+            let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
 
-                assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
-                assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
+            assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
+            assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
 
-                let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
-                entry.metadata_map_mut().insert(meta);
-            }
+            let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
+            entry.metadata_map_mut().insert(meta);
         }
 
         Ok(())
@@ -343,9 +348,9 @@ where
     EM: UsesState,
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    OT: ObserversTuple<<Self as UsesState>::State>,
     <Self as UsesState>::State:
         UsesInput<Input = BytesInput> + HasExecutions + HasMetadata + HasCorpus,
+    OT: ObserversTuple<BytesInput, <EM as UsesState>::State>,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
@@ -371,8 +376,9 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
-        Z: UsesState<State = <Self as UsesState>::State>,
+        E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers,
+        E::Observers: ObserversTuple<BytesInput, <Self as UsesState>::State>,
+        Z: UsesState<State = EM::State>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -413,8 +419,8 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
-        Z: UsesState<State = <Self as UsesState>::State>,
+        E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers<Observers = OT>,
+        Z: UsesState<State = EM::State>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -452,8 +458,8 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = <Self as UsesState>::State>,
-        Z: UsesState<State = <Self as UsesState>::State>,
+        E: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers<Observers = OT>,
+        Z: UsesState<State = EM::State>,
     {
         let mut index = 0;
         while index < payload.len() {

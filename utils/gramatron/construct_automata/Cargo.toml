@@ -1,23 +1,36 @@
 [package]
 name = "construct_automata"
-version = "0.1.0"
+version = "0.13.2"
 edition = "2021"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
 description = "LibAFL Gramatron Gramar Construction"
 documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "libafl", "gramatron", "grammar"]
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 libafl = { path = "../../../libafl", default-features = false }
-serde_json = "1.0"
-regex = "1"
-postcard = { version = "1.0", features = ["alloc"], default-features = false } # no_std compatible serde serialization format
-clap = { version = "4.5", features = ["derive"] }
-# log = "0.4.20"
+serde_json = { workspace = true, default-features = true }
+regex = { workspace = true }
+postcard = { workspace = true, features = [
+  "alloc",
+], default-features = false } # no_std compatible serde serialization format
+clap = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

@@ -2,6 +2,7 @@
 
 use alloc::{
     borrow::{Cow, ToOwned},
+    string::ToString,
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
@@ -17,6 +18,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
+    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
@@ -97,10 +99,12 @@ where
     EM: EventFirer<State = Self::State>,
     O: MapObserver,
     C: AsRef<O>,
-    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<Self::State>,
-    Self::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions,
+    for<'de> <O as MapObserver>::Entry:
+        Serialize + Deserialize<'de> + 'static + Default + Debug + Bounded,
+    OT: ObserversTuple<Self::Input, Self::State>,
+    E::State: HasCorpus + HasMetadata + HasNamedMetadata + HasExecutions + HasCurrentTestcase,
     Z: Evaluator<E, EM, State = Self::State>,
+    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     #[allow(
@@ -206,16 +210,16 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &exit_kind)?;
 
-            if self.track_stability {
+            if self.track_stability && exit_kind != ExitKind::Timeout {
                 let map = &executor.observers()[&self.map_observer_handle]
                     .as_ref()
                     .to_vec();
 
-                let history_map = &mut state
+                let map_state = state
                     .named_metadata_map_mut()
                     .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
-                    .unwrap()
-                    .history_map;
+                    .unwrap();
+                let history_map = &mut map_state.history_map;
 
                 if history_map.len() < map_first_len {
                     history_map.resize(map_first_len, O::Entry::default());
@@ -227,6 +231,10 @@ where
                     .enumerate()
                 {
                     if *first != *cur && *history != O::Entry::max_value() {
+                        // If we just hit a history map entry that was not covered before, but is now flagged as flaky,
+                        // we need to make sure the `num_covered_map_indexes` is kept in sync.
+                        map_state.num_covered_map_indexes +=
+                            usize::from(*history == O::Entry::default());
                         *history = O::Entry::max_value();
                         unstable_entries.push(idx);
                     };
@@ -259,9 +267,15 @@ where
             let observers = executor.observers();
             let map = observers[&self.map_observer_handle].as_ref();
 
-            let mut bitmap_size = map.count_bytes();
-            assert!(bitmap_size != 0);
-            bitmap_size = bitmap_size.max(1); // just don't make it 0 because we take log2 of it later.
+            let bitmap_size = map.count_bytes();
+
+            if bitmap_size < 1 {
+                return Err(Error::invalid_corpus(
+                    "This testcase does not trigger any edges. Check your instrumentation!"
+                        .to_string(),
+                ));
+            }
+
             let psmeta = state
                 .metadata_map_mut()
                 .get_mut::<SchedulerMetadata>()
@@ -370,7 +384,7 @@ where
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
     C: AsRef<O>,
-    OT: ObserversTuple<<Self as UsesState>::State>,
+    OT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
     E: UsesState,
 {
     /// Create a new [`CalibrationStage`].

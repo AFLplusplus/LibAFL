@@ -35,7 +35,9 @@ macro_rules! rust_filter_function_declaration {
 }
 
 /// A [`Filter`] can decide for each expression whether the expression should be traced symbolically or be
-/// concretized. This allows to implement filtering mechanisms that reduce the amount of traced expressions by
+/// concretized.
+///
+/// This allows us to implement filtering mechanisms that reduce the amount of traced expressions by
 /// concretizing uninteresting expressions.
 /// If a filter concretizes an expression that would have later been used as part of another expression that
 /// is still symbolic, a concrete instead of a symbolic value is received.
@@ -78,8 +80,9 @@ pub trait Filter {
     invoke_macro_with_rust_runtime_exports!(rust_filter_function_declaration;);
 }
 
-/// A `FilterRuntime` wraps a [`Runtime`] with a [`Filter`], applying the filter before passing expressions to the inner
-/// runtime.
+/// A `FilterRuntime` wraps a [`Runtime`] with a [`Filter`].
+///
+/// It applies the filter before passing expressions to the inner runtime.
 /// It also implements [`Runtime`], allowing for composing multiple [`Filter`]'s in a chain.
 #[allow(clippy::module_name_repetitions)]
 pub struct FilterRuntime<F, RT> {

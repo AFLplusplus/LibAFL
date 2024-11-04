@@ -78,5 +78,5 @@ cargo publish "$@" --allow-dirty
 cd ../.. || exit 1
 
 cd libafl_libfuzzer
-./publish.sh "$@"
+cargo publish "$@"
 cd .. || exit 1

@@ -1,6 +1,5 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
 use alloc::string::{String, ToString};
-use core::marker::PhantomData;
 
 use libafl_bolts::{HasLen, HasRefCnt};
 
@@ -9,7 +8,7 @@ use crate::{
     feedbacks::MapIndexesMetadata,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
-        powersched::{PowerSchedule, SchedulerMetadata},
+        powersched::{BaseSchedule, SchedulerMetadata},
     },
     state::HasCorpus,
     Error, HasMetadata,
@@ -18,26 +17,28 @@ use crate::{
 /// Compute the favor factor of a [`Testcase`]. Higher is better.
 pub trait TestcaseScore<S>
 where
-    S: HasMetadata + HasCorpus,
+    S: HasCorpus,
 {
     /// Computes the favor factor of a [`Testcase`]. Higher is better.
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error>;
+    fn compute(state: &S, entry: &mut Testcase<<S::Corpus as Corpus>::Input>)
+        -> Result<f64, Error>;
 }
 
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
 #[derive(Debug, Clone)]
-pub struct LenTimeMulTestcaseScore<S> {
-    phantom: PhantomData<S>,
-}
+pub struct LenTimeMulTestcaseScore {}
 
-impl<S> TestcaseScore<S> for LenTimeMulTestcaseScore<S>
+impl<S> TestcaseScore<S> for LenTimeMulTestcaseScore
 where
-    S: HasCorpus + HasMetadata,
-    S::Input: HasLen,
+    S: HasCorpus,
+    <S::Corpus as Corpus>::Input: HasLen,
 {
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64
             * entry.load_len(state.corpus())? as f64)
@@ -52,11 +53,9 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 /// The power assigned to each corpus entry
 /// This result is used for power scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusPowerTestcaseScore<S> {
-    phantom: PhantomData<S>,
-}
+pub struct CorpusPowerTestcaseScore {}
 
-impl<S> TestcaseScore<S> for CorpusPowerTestcaseScore<S>
+impl<S> TestcaseScore<S> for CorpusPowerTestcaseScore
 where
     S: HasCorpus + HasMetadata,
 {
@@ -67,11 +66,14 @@ where
         clippy::cast_sign_loss,
         clippy::cast_lossless
     )]
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
-            if strat == PowerSchedule::COE {
+            if *strat.base() == BaseSchedule::COE {
                 let corpus = state.corpus();
                 let mut n_paths = 0;
                 let mut v = 0.0;
@@ -175,14 +177,14 @@ where
         // COE and Fast schedule are fairly different from what are described in the original thesis,
         // This implementation follows the changes made in this pull request https://github.com/AFLplusplus/AFLplusplus/pull/568
         if let Some(strat) = psmeta.strat() {
-            match strat {
-                PowerSchedule::EXPLORE => {
+            match strat.base() {
+                BaseSchedule::EXPLORE => {
                     // Nothing happens in EXPLORE
                 }
-                PowerSchedule::EXPLOIT => {
+                BaseSchedule::EXPLOIT => {
                     factor = MAX_FACTOR;
                 }
-                PowerSchedule::COE => {
+                BaseSchedule::COE => {
                     if libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()])) > fuzz_mu
                         && !favored
                     {
@@ -190,7 +192,7 @@ where
                         factor = 0.0;
                     }
                 }
-                PowerSchedule::FAST => {
+                BaseSchedule::FAST => {
                     if entry.scheduled_count() != 0 {
                         let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
 
@@ -229,11 +231,11 @@ where
                         }
                     }
                 }
-                PowerSchedule::LIN => {
+                BaseSchedule::LIN => {
                     factor = (entry.scheduled_count() as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
-                PowerSchedule::QUAD => {
+                BaseSchedule::QUAD => {
                     factor = ((entry.scheduled_count() * entry.scheduled_count()) as f64)
                         / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
                 }
@@ -241,7 +243,7 @@ where
         }
 
         if let Some(strat) = psmeta.strat() {
-            if strat != PowerSchedule::EXPLORE {
+            if *strat.base() != BaseSchedule::EXPLORE {
                 if factor > MAX_FACTOR {
                     factor = MAX_FACTOR;
                 }
@@ -252,7 +254,7 @@ where
 
         // Lower bound if the strat is not COE.
         if let Some(strat) = psmeta.strat() {
-            if strat == PowerSchedule::COE && perf_score < 1.0 {
+            if *strat.base() == BaseSchedule::COE && perf_score < 1.0 {
                 perf_score = 1.0;
             }
         }
@@ -262,6 +264,10 @@ where
             perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
+        if entry.objectives_found() > 0 && psmeta.strat().map_or(false, |s| s.avoid_crash()) {
+            perf_score *= 0.00;
+        }
+
         Ok(perf_score)
     }
 }
@@ -269,17 +275,18 @@ where
 /// The weight for each corpus entry
 /// This result is used for corpus scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusWeightTestcaseScore<S> {
-    phantom: PhantomData<S>,
-}
+pub struct CorpusWeightTestcaseScore {}
 
-impl<S> TestcaseScore<S> for CorpusWeightTestcaseScore<S>
+impl<S> TestcaseScore<S> for CorpusWeightTestcaseScore
 where
     S: HasCorpus + HasMetadata,
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
-    fn compute(state: &S, entry: &mut Testcase<S::Input>) -> Result<f64, Error> {
+    fn compute(
+        state: &S,
+        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
+    ) -> Result<f64, Error> {
         let mut weight = 1.0;
         let psmeta = state.metadata::<SchedulerMetadata>()?;
 
@@ -303,13 +310,15 @@ where
 
         let q_bitmap_size = tcmeta.bitmap_size() as f64;
 
-        if let Some(
-            PowerSchedule::FAST | PowerSchedule::COE | PowerSchedule::LIN | PowerSchedule::QUAD,
-        ) = psmeta.strat()
-        {
-            let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
-            if hits > 0 {
-                weight /= libm::log10(f64::from(hits)) + 1.0;
+        if let Some(ps) = psmeta.strat() {
+            match ps.base() {
+                BaseSchedule::FAST | BaseSchedule::COE | BaseSchedule::LIN | BaseSchedule::QUAD => {
+                    let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
+                    if hits > 0 {
+                        weight /= libm::log10(f64::from(hits)) + 1.0;
+                    }
+                }
+                _ => (),
             }
         }
 
@@ -331,6 +340,10 @@ where
         // was it fuzzed before?
         if entry.scheduled_count() == 0 {
             weight *= 2.0;
+        }
+
+        if entry.objectives_found() > 0 && psmeta.strat().map_or(false, |s| s.avoid_crash()) {
+            weight *= 0.00;
         }
 
         assert!(weight.is_normal());

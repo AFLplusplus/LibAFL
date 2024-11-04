@@ -31,7 +31,7 @@ use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{shmem::ShMemProvider, tuples::tuple_list, ClientId};
 #[cfg(feature = "std")]
 use libafl_bolts::{shmem::StdShMemProvider, staterestore::StateRestorer};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{broadcast, broadcast::error::RecvError, mpsc},
@@ -53,7 +53,8 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, UsesInput},
     monitors::Monitor,
-    state::{HasExecutions, HasLastReportTime, State, UsesState},
+    observers::ObserversTuple,
+    state::{HasExecutions, HasImported, HasLastReportTime, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -112,8 +113,9 @@ where
     }
 
     /// Run in the broker until all clients exit
+    // TODO: remove allow(clippy::needless_return) when clippy is fixed
     #[tokio::main(flavor = "current_thread")]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::needless_return)]
     pub async fn broker_loop(&mut self) -> Result<(), Error> {
         let (tx_bc, rx) = broadcast::channel(65536);
         let (tx, mut rx_mpsc) = mpsc::channel(65536);
@@ -319,8 +321,6 @@ where
         match &event {
             Event::NewTestcase {
                 corpus_size,
-                time,
-                executions,
                 forward_id,
                 ..
             } => {
@@ -332,7 +332,6 @@ where
                 monitor.client_stats_insert(id);
                 let client = monitor.client_stats_mut_for(id);
                 client.update_corpus_size(*corpus_size as u64);
-                client.update_executions(*executions, *time);
                 monitor.display(event.name(), id);
                 Ok(BrokerEventResult::Forward)
             }
@@ -385,15 +384,10 @@ where
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective {
-                objective_size,
-                executions,
-                time,
-            } => {
+            Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                client.update_executions(*executions, *time);
                 monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -591,7 +585,7 @@ where
 impl<EMH, S> TcpEventManager<EMH, S>
 where
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
 {
     /// Write the client id for a client [`EventManager`] to env vars
     pub fn to_env(&self, env_name: &str) {
@@ -609,9 +603,11 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = S>,
+        E: Executor<Self, Z, State = S> + HasObservers,
+        E::Observers: Serialize + ObserversTuple<S::Input, S>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
+        Z: ExecutionProcessor<Self, E::Observers, State = S>
+            + EvaluatorObservers<Self, E::Observers>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -642,11 +638,11 @@ where
                     {
                         state.scalability_monitor_mut().testcase_without_observers += 1;
                     }
-                    fuzzer.evaluate_input_with_observers::<E, Self>(
-                        state, executor, self, input, false,
-                    )?
+                    fuzzer
+                        .evaluate_input_with_observers::<E>(state, executor, self, input, false)?
                 };
                 if let Some(item) = _res.1 {
+                    *state.imported_mut() += 1;
                     log::info!("Added received Testcase as item #{item}");
                 }
             }
@@ -747,11 +743,13 @@ where
 
 impl<E, EMH, S, Z> EventProcessor<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    S: State + HasExecutions + HasMetadata + HasImported,
+    Z: EvaluatorObservers<Self, E::Observers, State = S>
+        + ExecutionProcessor<Self, E::Observers, State = S>,
 {
     fn process(
         &mut self,
@@ -820,11 +818,13 @@ where
 
 impl<E, EMH, S, Z> EventManager<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
+    Z: EvaluatorObservers<Self, E::Observers, State = S>
+        + ExecutionProcessor<Self, E::Observers, State = S>,
 {
 }
 
@@ -964,12 +964,14 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<TcpEventManager<EMH, S>, E::Observers, State = S>
+        + ExecutionProcessor<TcpEventManager<EMH, S>, E::Observers>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.tcp_mgr.process(fuzzer, state, executor)
@@ -983,12 +985,14 @@ where
 #[cfg(feature = "std")]
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<TcpEventManager<EMH, S>, Z>,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider + 'static,
-    Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
+    Z: EvaluatorObservers<TcpEventManager<EMH, S>, E::Observers, State = S>
+        + ExecutionProcessor<TcpEventManager<EMH, S>, E::Observers>, //CE: CustomEvent<I>,
 {
 }
 
@@ -1067,7 +1071,8 @@ pub enum TcpManagerKind {
 }
 
 /// Sets up a restarting fuzzer, using the [`StdShMemProvider`], and standard features.
-/// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
+///
+/// The [`TcpRestartingEventManager`] is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
@@ -1084,7 +1089,7 @@ pub fn setup_restarting_mgr_tcp<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
 {
     TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1096,7 +1101,9 @@ where
         .launch()
 }
 
-/// Provides a `builder` which can be used to build a [`TcpRestartingMgr`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`TcpRestartingMgr`].
+///
+/// The [`TcpRestartingMgr`] is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
@@ -1149,7 +1156,7 @@ impl<EMH, MT, S, SP> TcpRestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
     SP: ShMemProvider,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager

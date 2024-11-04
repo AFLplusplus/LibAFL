@@ -10,6 +10,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
+  MAIN_LLVM_VERSION: 18
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -19,29 +20,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest, macOS-latest ]
+        os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install mimetype
         if: runner.os == 'Linux'
-        run: sudo apt-get install libfile-mimeinfo-perl
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-      - name: Install mimetype
-        if: runner.os == 'Linux'
-        run: sudo apt-get install libfile-mimeinfo-perl
+        run: sudo apt-get update && sudo apt-get install -y libfile-mimeinfo-perl
       - name: install mdbook
-        uses: baptiste0928/cargo-install@v1.3.0
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: mdbook
       - name: install linkcheck
-        uses: baptiste0928/cargo-install@v1.3.0
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: mdbook-linkcheck
-      - uses: actions/checkout@v3
+          # NOTE: The current crates.io release of mdbook-linkcheck (v0.7.7) is broken
+          #       => https://github.com/Michael-F-Bryan/mdbook-linkcheck/pull/82#issuecomment-2241058491
+          git: https://github.com/Michael-F-Bryan/mdbook-linkcheck.git
+          rev: 8c783c5d754d83bcd50c28fb4174854b04ece990
+      - name: default nightly
+        run: rustup default nightly
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
         if: runner.os == 'Linux'
@@ -50,14 +51,15 @@ jobs:
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
-      - name: default nightly
-        run: rustup default nightly
       - name: Build libafl debug
         run: cargo build -p libafl
-      - name: Test the book
+      - name: Test the book (Linux)
         # TODO: fix books test fail with updated windows-rs
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         run: cd docs && mdbook test -L ../target/debug/deps
+      - name: Test the book (MacOS)
+        if: runner.os == 'MacOS'
+        run: cd docs && mdbook test -L ../target/debug/deps $(python3-config --ldflags | cut -d ' ' -f1)
       - name: Run tests
         run: cargo test
       - name: Test libafl no_std
@@ -67,33 +69,10 @@ jobs:
       - name: Test libafl_targets no_std
         run: cd libafl_targets && cargo test --no-default-features
 
-  llvm-tester:
-    runs-on: ubuntu-22.04
-    continue-on-error: true
-    strategy:
-      matrix:
-        llvm-version: [ "16", "17" ] # Add 18 when KyleMayes/install-llvm-action enables it
-    steps:
-      - name: Remove Dotnet & Haskell
-        run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v2
-        with: { shared-key: "llvm-tester" }
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "${{matrix.llvm-version}}"
-      - name: Build and test with llvm-${{ matrix.llvm-version }}
-        run: pwd && ls & cd libafl_cc && cargo build --release
-
   ubuntu-doc-build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
@@ -101,9 +80,9 @@ jobs:
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps
 
   ubuntu-doc-test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
       # ---- doc check ----
@@ -111,41 +90,26 @@ jobs:
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
 
   ubuntu-miri:
-    runs-on: ubuntu-22.04
-    needs: ubuntu
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/workflows/ubuntu-prepare
-      - uses: Swatinem/rust-cache@v2
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - uses: Swatinem/rust-cache@v2
       # --- miri undefined behavior test --
       - name: Run miri tests
         run: RUST_BACKTRACE=1 MIRIFLAGS="-Zmiri-disable-isolation" cargo +nightly miri test
 
   ubuntu:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - name: Remove existing clang and LLVM
-        run: sudo apt purge llvm* clang* lld* lldb* opt*
-      - name: Install and cache deps
-        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
-      - name: Add nightly clippy
-        run: rustup toolchain install nightly --component clippy --component miri --allow-downgrade
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
       # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
       - name: Check pcguard edges
         run: cargo check --features=sancov_pcguard_edges
@@ -158,42 +122,31 @@ jobs:
         run: cargo build --examples --verbose
 
   ubuntu-clippy:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Remove Dotnet & Haskell
         run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-
-      - name: Install and cache deps
-        run: sudo apt update && sudo apt install ninja-build shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
       - name: Run clippy
-        run: ./scripts/clippy.sh
+        run: LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/clippy.sh
     # --- test embedding the libafl_libfuzzer_runtime library
     # Fix me plz
     # - name: Test Build libafl_libfuzzer with embed
     #  run: cargo +nightly test --features=embed-runtime --manifest-path libafl_libfuzzer/Cargo.toml
 
   ubuntu-check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: ubuntu
     strategy:
       matrix:
         instance_idx: [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17" ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
@@ -205,14 +158,13 @@ jobs:
         run: python3 ./scripts/parallellize_cargo_check.py ${{ matrix.instance_idx }}
 
   ubuntu-concolic:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: ubuntu
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: actions/checkout@v3
+      - name: Install curl
+        run: sudo apt-get update && sudo apt-get install clang
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Install smoke test deps
@@ -221,210 +173,239 @@ jobs:
         run: ./libafl_concolic/test/smoke_test.sh
 
   python-bindings:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - name: Remove existing clang and LLVM
-        run: sudo apt purge llvm* clang*
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
       - name: Install deps
-        run: sudo apt-get install -y ninja-build python3-dev python3-pip python3-venv libz3-dev
+        run: sudo apt-get update && sudo apt-get install -y lsb-release wget software-properties-common gnupg ninja-build python3-dev python3-pip python3-venv libz3-dev
       - name: Install maturin
-        run: python3 -m pip install maturin
-      - uses: actions/checkout@v3
+        run: cargo install --locked maturin
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
       - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Run a maturin build
-        run: export LLVM_CONFIG=llvm-config-16 && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
+        run: export LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} && cd ./bindings/pylibafl && python3 -m venv .env && . .env/bin/activate && pip install --upgrade --force-reinstall . && ./test.sh
       - name: Run python test
-        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
+        run: . ./bindings/pylibafl/.env/bin/activate # && cd ./fuzzers/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep "Bye"
 
   cargo-fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: rustfmt
-      - uses: actions/checkout@v3
-      - name: Remove existing clang and LLVM
-        run: sudo apt purge llvm* clang*
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          directory: ${{ runner.temp }}/llvm
-          version: 17
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/ubuntu-prepare
+      - name: Add rustfmt nightly
+        shell: bash
+        run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "ubuntu" }
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
-  fuzzers-preflight:
+  check-md-links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - name: Install linkspector
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y npm && npm install -g @umbrelladocs/linkspector
+      - name: Run linkspector
+        shell: bash
+        run: ./scripts/check_md_links.sh
+      # TODO: Use github action once it's fixed (https://github.com/UmbrellaDocs/action-linkspector/issues/20)
+      # - name: Run linkspector
+      #   uses: umbrelladocs/action-linkspector@v1
+      #   with:
+      #     fail_on_error: 'true'
+      #     config_file: '.github/.linkspector.yml'
+
+  fuzzers-preflight:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
       - name: Fuzzer in CI Check
         run: ./scripts/check_tested_fuzzers.sh
 
   fuzzers:
     needs:
-      - ubuntu
       - fuzzers-preflight
     strategy:
       fail-fast: true
       matrix:
-        os: [ ubuntu-latest ]
+        os: [ ubuntu-24.04 ]
         fuzzer:
-          - ./fuzzers/cargo_fuzz
-          - ./fuzzers/fuzzbench_fork_qemu
-          - ./fuzzers/libfuzzer_stb_image_sugar
-          - ./fuzzers/nyx_libxml2_standalone
-          - ./fuzzers/baby_fuzzer_gramatron
-          - ./fuzzers/tinyinst_simple
-          - ./fuzzers/baby_fuzzer_with_forkexecutor
-          - ./fuzzers/baby_no_std
-          - ./fuzzers/baby_fuzzer_swap_differential
-          - ./fuzzers/baby_fuzzer_grimoire
-          - ./fuzzers/baby_fuzzer
-          - ./fuzzers/libfuzzer_libpng_launcher
-          - ./fuzzers/libfuzzer_libpng_accounting
-          - ./fuzzers/forkserver_libafl_cc
-          # - ./fuzzers/libfuzzer_libpng_tcp_manager
-          # - ./fuzzers/sqlite_centralized_multi_machine
-          - ./fuzzers/backtrace_baby_fuzzers
-          - ./fuzzers/fuzzbench_qemu
-          - ./fuzzers/nyx_libxml2_parallel
-          - ./fuzzers/frida_gdiplus
-          - ./fuzzers/libfuzzer_stb_image_concolic
-          - ./fuzzers/nautilus_sync
-          - ./fuzzers/push_harness
-          - ./fuzzers/libfuzzer_libpng_centralized
-          - ./fuzzers/baby_fuzzer_nautilus
-          - ./fuzzers/fuzzbench_text
-          - ./fuzzers/libfuzzer_libpng_cmin
-          - ./fuzzers/forkserver_simple
-          - ./fuzzers/baby_fuzzer_unicode
-          - ./fuzzers/libfuzzer_libpng_norestart
-          - ./fuzzers/baby_fuzzer_multi
-          - ./fuzzers/libafl_atheris
-          - ./fuzzers/frida_libpng
-          - ./fuzzers/fuzzbench_ctx
-          - ./fuzzers/fuzzbench_forkserver_cmplog
-          - ./fuzzers/push_stage_harness
-          - ./fuzzers/libfuzzer_libmozjpeg
-          - ./fuzzers/libfuzzer_libpng_aflpp_ui
-          - ./fuzzers/libfuzzer_libpng
-          - ./fuzzers/baby_fuzzer_wasm
-          - ./fuzzers/fuzzbench
-          - ./fuzzers/libfuzzer_stb_image
-          - ./fuzzers/fuzzbench_forkserver
-          # - ./fuzzers/libfuzzer_windows_asan
-          # - ./fuzzers/dynamic_analysis
-          - ./fuzzers/baby_fuzzer_minimizing
-          - ./fuzzers/frida_executable_libpng
-          - ./fuzzers/tutorial
-          - ./fuzzers/baby_fuzzer_tokens
-          - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
-          - ./fuzzers/backtrace_baby_fuzzers/c_code_with_fork_executor
-          - ./fuzzers/backtrace_baby_fuzzers/command_executor
-          - ./fuzzers/backtrace_baby_fuzzers/forkserver_executor
-          - ./fuzzers/backtrace_baby_fuzzers/c_code_with_inprocess_executor
-          - ./fuzzers/backtrace_baby_fuzzers/rust_code_with_fork_executor
+          # Baby
+          - ./fuzzers/baby/baby_fuzzer_swap_differential
+          - ./fuzzers/baby/tutorial
+          - ./fuzzers/baby/baby_fuzzer
+          # - ./fuzzers/baby/backtrace_baby_fuzzers
+          - ./fuzzers/baby/baby_fuzzer_unicode
+          - ./fuzzers/baby/baby_fuzzer_minimizing
+          - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_fork_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/c_code_with_inprocess_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_fork_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/command_executor
+          - ./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
+
+          # Binary-only
+          - ./fuzzers/binary_only/fuzzbench_fork_qemu
+          - ./fuzzers/binary_only/frida_executable_libpng
+          - ./fuzzers/binary_only/frida_windows_gdiplus
+          - ./fuzzers/binary_only/frida_libpng
+          - ./fuzzers/binary_only/fuzzbench_qemu
+          - ./fuzzers/binary_only/tinyinst_simple
+
+          # Forkserver
+          - ./fuzzers/forkserver/forkserver_simple
+          - ./fuzzers/forkserver/forkserver_libafl_cc
+          - ./fuzzers/forkserver/fuzzbench_forkserver
+          - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
+          - ./fuzzers/forkserver/libafl-fuzz
+          - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
+
+          # Full-system
+          - ./fuzzers/full_system/nyx_libxml2_standalone
+          - ./fuzzers/full_system/nyx_libxml2_parallel
+
+          # Structure-aware
+          - ./fuzzers/structure_aware/nautilus_sync
+          - ./fuzzers/structure_aware/baby_fuzzer_grimoire
+          - ./fuzzers/structure_aware/baby_fuzzer_gramatron
+          - ./fuzzers/structure_aware/baby_fuzzer_tokens
+          - ./fuzzers/structure_aware/baby_fuzzer_multi
+          - ./fuzzers/structure_aware/baby_fuzzer_custom_input
+          - ./fuzzers/structure_aware/baby_fuzzer_nautilus
+          - ./fuzzers/structure_aware/forkserver_simple_nautilus
+
+          # In-process
+          - ./fuzzers/fuzz_anything/cargo_fuzz
+          # - ./fuzzers/inprocess/dynamic_analysis
+          - ./fuzzers/inprocess/fuzzbench
+          - ./fuzzers/inprocess/fuzzbench_text
+          - ./fuzzers/inprocess/fuzzbench_ctx
+          - ./fuzzers/inprocess/libfuzzer_libmozjpeg
+          - ./fuzzers/inprocess/libfuzzer_libpng
+          - ./fuzzers/inprocess/libfuzzer_libpng_launcher
+          - ./fuzzers/inprocess/libfuzzer_libpng_accounting
+          - ./fuzzers/inprocess/libfuzzer_libpng_centralized
+          - ./fuzzers/inprocess/libfuzzer_libpng_cmin
+          - ./fuzzers/inprocess/libfuzzer_libpng_norestart
+          # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
+          - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
+          - ./fuzzers/inprocess/libfuzzer_stb_image
+          # - ./fuzzers/structure_aware/libfuzzer_stb_image_concolic
+          # - ./fuzzers/inprocess/libfuzzer_windows_asan
+          # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
+
+          # Fuzz Anything
+          - ./fuzzers/fuzz_anything/push_harness
+          - ./fuzzers/fuzz_anything/push_stage_harness
+          - ./fuzzers/fuzz_anything/libafl_atheris
+          - ./fuzzers/fuzz_anything/baby_no_std
+          - ./fuzzers/fuzz_anything/baby_fuzzer_wasm
+
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: read
     outputs:
       qemu: ${{ steps.filter.outputs.qemu }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             qemu:
+              - '.github/**'
+              - 'libafl/**'
+              - 'libafl_bolts/**'
+              - 'libafl_targets/**'
               - 'libafl_qemu/**'
               - 'fuzzers/*qemu*/**'
 
   fuzzers-qemu:
-    needs: changes
+    needs:
+      - changes
     if: ${{ needs.changes.outputs.qemu == 'true' }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
         fuzzer:
-          - ./fuzzers/qemu_cmin
-          - ./fuzzers/qemu_systemmode
-          - ./fuzzers/qemu_coverage
-          - ./fuzzers/qemu_launcher
+          # Binary only
+          - ./fuzzers/binary_only/qemu_cmin
+          - ./fuzzers/binary_only/qemu_coverage
+          - ./fuzzers/binary_only/qemu_launcher
+
+          # Full-system
+          - ./fuzzers/full_system/qemu_baremetal
+          # - ./fuzzers/full_system/qemu_linux_kernel
+          #- ./fuzzers/full_system/qemu_linux_process
 
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/qemu-fuzzer-tester-prepare
       - name: Build and run example QEMU fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   nostd-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
           components: rust-src
-      - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v2
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: Build aarch64-unknown-none
-        run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
       - name: run x86_64 until panic!
-        run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
+        run: cd ./fuzzers/fuzz_anything/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
       - name: no_std tests
         run: cd ./libafl && cargo test --no-default-features
 
   nostd-clippy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
           components: clippy, rust-src
-      - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v2
       - name: Add targets
         run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: libafl armv6m-none-eabi (32 bit no_std) clippy
         run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
       - name: Build no_std no_alloc bolts
         run: cd ./libafl_bolts && cargo +nightly build -Zbuild-std=core --target aarch64-unknown-none --no-default-features -v --release && cd ../
 
-  build-docker:
-    runs-on: ubuntu-latest
+  format-toml:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - name: Install taplo
+        run: curl -fsSL https://github.com/tamasfe/taplo/releases/latest/download/taplo-full-linux-x86_64.gz | gzip -d - | install -m 755 /dev/stdin /usr/local/bin/taplo
+      - uses: actions/checkout@v4
+      - name: Run taplo
+        run: taplo format --check
+
+  build-docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
       - name: Build docker
         run: docker build -t libafl .
 
@@ -433,54 +414,51 @@ jobs:
     needs:
       - common
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/frida_libpng
-        run: cd fuzzers/frida_libpng/ && cargo make test
+      - name: Build fuzzers/binary_only/frida_libpng
+        run: cd fuzzers/binary_only/frida_libpng/ && cargo make test
 
   windows-frida-libfuzzer-stb-image:
     runs-on: windows-latest
     needs:
       - common
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/libfuzzer_stb_image
-        run: cd fuzzers/libfuzzer_stb_image && cargo build --release
+      - name: Build fuzzers/inprocess/libfuzzer_stb_image
+        run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
 
   windows-frida-gdiplus:
     runs-on: windows-latest
     needs:
       - common
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Build fuzzers/frida_gdiplus
-        run: cd fuzzers/frida_gdiplus/ && cargo make test && cargo make test_cmplog
+      - name: Build fuzzers/binary_only/frida_windows_gdiplus
+        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
     needs:
       - common
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/workflows/windows-tester-prepare
       - name: install cxx bridge
         run: cargo install cxxbridge-cmd
-      - name: Build fuzzers/tinyinst_simple
-        run: cd fuzzers/tinyinst_simple/ && cargo make test
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/binary_only/tinyinst_simple
+        run: cd fuzzers/binary_only/tinyinst_simple/ && cargo make test
 
   windows-clippy:
     runs-on: windows-latest
     needs:
       - common
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: actions/checkout@v3
-      - uses: ./.github/workflows/windows-tester-prepare      
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
       - uses: Swatinem/rust-cache@v2
       - name: Run real clippy, not the fake one
         shell: pwsh
@@ -489,17 +467,14 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component clippy --allow-downgrade && rustup default nightly
       - name: Install deps
-        run: brew install z3 gtk+3
+        run: brew install z3 gtk+3 python
       - name: Install cxxbridge
         run: cargo install cxxbridge-cmd
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: MacOS Build
         run: cargo build --verbose
@@ -513,24 +488,20 @@ jobs:
   ios:
     runs-on: macOS-latest
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - uses: dtolnay/rust-toolchain@stable
       - name: install ios
         run: rustup target add aarch64-apple-ios
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build iOS
-        run: cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
+        run: PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo build --target aarch64-apple-ios && cd libafl_frida && cargo build --target aarch64-apple-ios && cd ..
 
   android:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
+      - name: Install curl
+        run: sudo apt-get update && sudo apt-get install clang
+      - uses: dtolnay/rust-toolchain@stable
       - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r25b
@@ -538,10 +509,10 @@ jobs:
         run: rustup target add aarch64-linux-android
       - name: install cargo ndk
         run: cargo install cargo-ndk
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
       - name: Build Android
-        run: cd libafl && cargo ndk -t arm64-v8a build --release
+        run: cd libafl && PYO3_CROSS_PYTHON_VERSION=$(python3 -c "print('{}.{}'.format(__import__('sys').version_info.major, __import__('sys').version_info.minor))") cargo ndk -t arm64-v8a build --release
 
     #run: cargo build --target aarch64-linux-android
     # TODO: Figure out how to properly build stuff with clang
@@ -552,36 +523,3 @@ jobs:
     #  run: clang -v
     #- name: Windows Test
     #  run: C:\Rust\.cargo\bin\cargo.exe test --verbose
-
-  freebsd:
-    runs-on: ubuntu-22.04
-    name: Simple build in FreeBSD
-    steps:
-      - uses: actions/checkout@v3
-      - name: Test in FreeBSD
-        id: test
-        uses: vmactions/freebsd-vm@v1
-        with:
-          usesh: true
-          sync: rsync
-          copyback: false
-          mem: 2048
-          release: 13.2
-          prepare: |
-            pkg install -y curl bash sudo llvm16
-            curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-          run: |
-            freebsd-version
-            . "$HOME/.cargo/env"
-            rustup toolchain install nightly
-            export LLVM_CONFIG=/usr/local/bin/llvm-config16
-            pwd
-            ls -lah
-            echo "local/bin"
-            ls -lah /usr/local/bin/
-            which llvm-config
-            chmod +x ./scripts/clippy.sh
-            bash ./scripts/shmem_limits_fbsd.sh
-            bash ./scripts/clippy.sh
-            cargo test

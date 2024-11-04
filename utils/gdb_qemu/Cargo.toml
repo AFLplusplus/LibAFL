@@ -1,6 +1,3 @@
 [workspace]
 resolver = "2"
-members = [
-    "gdb_qemu",
-    "demo",
-]
+members = ["gdb_qemu", "demo"]

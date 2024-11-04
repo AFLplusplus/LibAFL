@@ -1,4 +1,6 @@
-//! [`Mutator`]`s` mutate input during fuzzing. These can be used standalone or in combination with other mutators to explore the input space more effectively.
+//! [`Mutator`]`s` mutate input during fuzzing.
+//!
+//! These can be used standalone or in combination with other mutators to explore the input space more effectively.
 //! You can read more about mutators in the [libAFL book](https://aflplus.plus/libafl-book/core_concepts/mutator.html)
 pub mod scheduled;
 use core::fmt;
@@ -9,6 +11,8 @@ pub use mutations::*;
 pub mod token_mutations;
 use serde::{Deserialize, Serialize};
 pub use token_mutations::*;
+pub mod havoc_mutations;
+pub use havoc_mutations::*;
 pub mod encoded_mutations;
 pub use encoded_mutations::*;
 pub mod mopt_mutator;
@@ -17,6 +21,8 @@ pub mod gramatron;
 pub use gramatron::*;
 pub mod grimoire;
 pub use grimoire::*;
+pub mod mapping;
+pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 
@@ -155,12 +161,6 @@ pub trait MutatorsTuple<I, S>: HasLen {
 
         corpus_id: Option<CorpusId>,
     ) -> Result<(), Error>;
-
-    /// Gets all names of the wrapped [`Mutator`]`s`, reversed.
-    fn names_reversed(&self) -> Vec<&str>;
-
-    /// Gets all names of the wrapped [`Mutator`]`s`.
-    fn names(&self) -> Vec<&str>;
 }
 
 impl<I, S> MutatorsTuple<I, S> for () {
@@ -196,16 +196,6 @@ impl<I, S> MutatorsTuple<I, S> for () {
         _new_corpus_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         Ok(())
-    }
-
-    #[inline]
-    fn names_reversed(&self) -> Vec<&str> {
-        Vec::new()
-    }
-
-    #[inline]
-    fn names(&self) -> Vec<&str> {
-        Vec::new()
     }
 }
 
@@ -256,18 +246,6 @@ where
         } else {
             self.1.get_and_post_exec(index - 1, state, new_corpus_id)
         }
-    }
-
-    fn names_reversed(&self) -> Vec<&str> {
-        let mut ret = self.1.names_reversed();
-        ret.push(self.0.name());
-        ret
-    }
-
-    fn names(&self) -> Vec<&str> {
-        let mut ret = self.names_reversed();
-        ret.reverse();
-        ret
     }
 }
 
@@ -322,14 +300,6 @@ where
         new_corpus_id: Option<CorpusId>,
     ) -> Result<(), Error> {
         self.0.get_and_post_exec(index, state, new_corpus_id)
-    }
-
-    fn names(&self) -> Vec<&str> {
-        self.0.names()
-    }
-
-    fn names_reversed(&self) -> Vec<&str> {
-        self.0.names_reversed()
     }
 }
 
@@ -387,14 +357,6 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
             .get_mut(index)
             .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
         mutator.post_exec(state, new_corpus_id)
-    }
-
-    fn names_reversed(&self) -> Vec<&str> {
-        self.iter().rev().map(|x| x.name().as_ref()).collect()
-    }
-
-    fn names(&self) -> Vec<&str> {
-        self.iter().map(|x| x.name().as_ref()).collect()
     }
 }
 

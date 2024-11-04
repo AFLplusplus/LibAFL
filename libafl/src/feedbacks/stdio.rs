@@ -4,18 +4,15 @@ use alloc::{borrow::Cow, string::String};
 
 use libafl_bolts::{
     impl_serdeany,
-    tuples::{Handle, Handled, MatchNameRef},
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::Testcase,
-    events::EventFirer,
-    executors::ExitKind,
-    feedbacks::Feedback,
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::State,
+    feedbacks::{Feedback, StateInitializer},
+    observers::{StdErrObserver, StdOutObserver},
     Error, HasMetadata,
 };
 
@@ -35,39 +32,16 @@ pub struct StdOutToMetadataFeedback {
     o_ref: Handle<StdOutObserver>,
 }
 
-impl<S> Feedback<S> for StdOutToMetadataFeedback
-where
-    S: State,
-{
-    #[allow(clippy::wrong_self_convention)]
-    #[inline]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &S::Input,
-        _observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        Ok(false)
-    }
-
+impl StdOutToMetadataFeedback {
     /// Append to the testcase the generated metadata in case of a new corpus item.
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_stdout_observation_to_testcase<I, OT>(
         &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<S::Input>,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
+        OT: MatchName,
     {
         let observer = observers
             .get(&self.o_ref)
@@ -84,16 +58,29 @@ where
 
         Ok(())
     }
+}
 
-    /// Discard the stored metadata in case that the testcase is not added to the corpus.
-    #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        Ok(())
-    }
+impl<S> StateInitializer<S> for StdOutToMetadataFeedback {}
 
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for StdOutToMetadataFeedback
+where
+    OT: MatchName,
+{
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
+    }
+
+    /// Append to the testcase the generated metadata in case of a new corpus item.
+    #[inline]
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        observers: &OT,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
+        self.append_stdout_observation_to_testcase(observers, testcase)
     }
 }
 
@@ -130,40 +117,26 @@ pub struct StdErrToMetadataFeedback {
     o_ref: Handle<StdErrObserver>,
 }
 
-impl<S> Feedback<S> for StdErrToMetadataFeedback
+impl<S> StateInitializer<S> for StdErrToMetadataFeedback {}
+
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for StdErrToMetadataFeedback
 where
-    S: State,
+    OT: MatchName,
 {
-    #[allow(clippy::wrong_self_convention)]
-    #[inline]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &S::Input,
-        _observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
     }
 
     /// Append to the testcase the generated metadata in case of a new corpus item.
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
-    {
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         let observer = observers
             .get(&self.o_ref)
             .ok_or(Error::illegal_state("StdErrObserver is missing"))?;
@@ -178,16 +151,6 @@ where
             .insert(StdErrMetadata { stderr });
 
         Ok(())
-    }
-
-    /// Discard the stored metadata in case that the testcase is not added to the corpus.
-    #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        Ok(())
-    }
-    #[cfg(feature = "track_hit_feedbacks")]
-    fn last_result(&self) -> Result<bool, Error> {
-        Ok(false)
     }
 }
 

@@ -4,33 +4,11 @@
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
-#![forbid(unexpected_cfgs)]
-#![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
 #![cfg_attr(nightly, feature(specialization))]
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
-#![warn(clippy::cargo)]
-#![allow(ambiguous_glob_reexports)]
-#![deny(clippy::cargo_common_metadata)]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::ptr_cast_constness,
-    clippy::negative_feature_names,
-    clippy::too_many_lines
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -71,16 +49,15 @@
         while_true
     )
 )]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
 
 /// We need some sort of "[`String`]" for errors in `no_alloc`...
 /// We can only support `'static` without allocator, so let's do that.
 #[cfg(not(feature = "alloc"))]
 type String = &'static str;
 
-/// We also need a non-allocating format...
+/// A simple non-allocating "format" string wrapper for no-std.
+///
+/// Problem is that we really need a non-allocating format...
 /// This one simply returns the `fmt` string.
 /// Good enough for simple errors, for anything else, use the `alloc` feature.
 #[cfg(not(feature = "alloc"))]
@@ -131,6 +108,8 @@ pub mod serdeany;
 pub mod shmem;
 #[cfg(feature = "std")]
 pub mod staterestore;
+#[cfg(feature = "alloc")]
+pub mod subrange;
 // TODO: reenable once ahash works in no-alloc
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
@@ -234,14 +213,15 @@ pub type ErrorBacktrace = backtrace::Backtrace;
 
 #[cfg(not(feature = "errors_backtrace"))]
 #[derive(Debug, Default)]
-/// Empty struct to use when `errors_backtrace` is disabled
-pub struct ErrorBacktrace {}
+/// ZST to use when `errors_backtrace` is disabled
+pub struct ErrorBacktrace;
+
 #[cfg(not(feature = "errors_backtrace"))]
 impl ErrorBacktrace {
     /// Nop
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -255,6 +235,8 @@ fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fm
     fmt::Result::Ok(())
 }
 
+/// Returns the standard input [`Hasher`]
+///
 /// Returns the hasher for the input with a given hash, depending on features:
 /// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
 /// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
@@ -267,6 +249,8 @@ pub fn hasher_std() -> impl Hasher + Clone {
     RandomState::with_seeds(0, 0, 0, 0).build_hasher()
 }
 
+/// Hashes the input with a given hash
+///
 /// Hashes the input with a given hash, depending on features:
 /// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
 /// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
@@ -309,7 +293,7 @@ pub enum Error {
     Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
-    /// OS error, wrapping a [`std::io::Error`]
+    /// OS error, wrapping a [`io::Error`]
     #[cfg(feature = "std")]
     OsError(io::Error, String, ErrorBacktrace),
     /// Something else happened
@@ -327,12 +311,14 @@ impl Error {
     {
         Error::Serialize(arg.into(), ErrorBacktrace::new())
     }
+
     #[cfg(feature = "gzip")]
     /// Compression error
     #[must_use]
     pub fn compression() -> Self {
         Error::Compression(ErrorBacktrace::new())
     }
+
     /// Optional val was supposed to be set, but isn't.
     #[must_use]
     pub fn empty_optional<S>(arg: S) -> Self
@@ -341,6 +327,7 @@ impl Error {
     {
         Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
     }
+
     /// Key not in Map
     #[must_use]
     pub fn key_not_found<S>(arg: S) -> Self
@@ -349,6 +336,7 @@ impl Error {
     {
         Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
     }
+
     /// No elements in the current item
     #[must_use]
     pub fn empty<S>(arg: S) -> Self
@@ -357,6 +345,7 @@ impl Error {
     {
         Error::Empty(arg.into(), ErrorBacktrace::new())
     }
+
     /// End of iteration
     #[must_use]
     pub fn iterator_end<S>(arg: S) -> Self
@@ -365,6 +354,7 @@ impl Error {
     {
         Error::IteratorEnd(arg.into(), ErrorBacktrace::new())
     }
+
     /// This is not supported (yet)
     #[must_use]
     pub fn not_implemented<S>(arg: S) -> Self
@@ -373,6 +363,7 @@ impl Error {
     {
         Error::NotImplemented(arg.into(), ErrorBacktrace::new())
     }
+
     /// You're holding it wrong
     #[must_use]
     pub fn illegal_state<S>(arg: S) -> Self
@@ -381,6 +372,7 @@ impl Error {
     {
         Error::IllegalState(arg.into(), ErrorBacktrace::new())
     }
+
     /// The argument passed to this method or function is not valid
     #[must_use]
     pub fn illegal_argument<S>(arg: S) -> Self
@@ -389,11 +381,13 @@ impl Error {
     {
         Error::IllegalArgument(arg.into(), ErrorBacktrace::new())
     }
+
     /// Shutting down, not really an error.
     #[must_use]
     pub fn shutting_down() -> Self {
         Error::ShuttingDown
     }
+
     /// This operation is not supported on the current architecture or platform
     #[must_use]
     pub fn unsupported<S>(arg: S) -> Self
@@ -402,6 +396,7 @@ impl Error {
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
+
     /// OS error with additional message
     #[cfg(feature = "std")]
     #[must_use]
@@ -411,7 +406,8 @@ impl Error {
     {
         Error::OsError(err, msg.into(), ErrorBacktrace::new())
     }
-    /// OS error from [`std::io::Error::last_os_error`] with additional message
+
+    /// OS error from [`io::Error::last_os_error`] with additional message
     #[cfg(feature = "std")]
     #[must_use]
     pub fn last_os_error<S>(msg: S) -> Self
@@ -424,6 +420,7 @@ impl Error {
             ErrorBacktrace::new(),
         )
     }
+
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -432,6 +429,7 @@ impl Error {
     {
         Error::Unknown(arg.into(), ErrorBacktrace::new())
     }
+
     /// Error with corpora
     #[must_use]
     pub fn invalid_corpus<S>(arg: S) -> Self
@@ -610,9 +608,9 @@ impl From<SetLoggerError> for Error {
 }
 
 #[cfg(windows)]
-impl From<windows::core::Error> for Error {
+impl From<windows_result::Error> for Error {
     #[allow(unused_variables)]
-    fn from(err: windows::core::Error) -> Self {
+    fn from(err: windows_result::Error) -> Self {
         Self::unknown(format!("Windows API error: {err:?}"))
     }
 }
@@ -623,7 +621,7 @@ impl From<pyo3::PyErr> for Error {
         pyo3::Python::with_gil(|py| {
             if err.matches(
                 py,
-                pyo3::types::PyType::new::<pyo3::exceptions::PyKeyboardInterrupt>(py),
+                pyo3::types::PyType::new_bound::<pyo3::exceptions::PyKeyboardInterrupt>(py),
             ) {
                 Self::shutting_down()
             } else {
@@ -684,7 +682,7 @@ where
     type SliceRef = &'a [T];
 
     fn as_slice(&'a self) -> Self::SliceRef {
-        &*self
+        self
     }
 }
 
@@ -984,7 +982,7 @@ impl SimpleFdLogger {
         // The passed-in `fd` has to be a legal file descriptor to log to.
         // We also access a shared variable here.
         unsafe {
-            LIBAFL_RAWFD_LOGGER.set_fd(log_fd);
+            (*ptr::addr_of_mut!(LIBAFL_RAWFD_LOGGER)).set_fd(log_fd);
             log::set_logger(&*ptr::addr_of!(LIBAFL_RAWFD_LOGGER))?;
         }
         Ok(())
@@ -1052,11 +1050,26 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
     }));
 }
 
+/// Zero-cost way to construct [`core::num::NonZeroUsize`] at compile-time.
+#[macro_export]
+macro_rules! nonzero {
+    // TODO: Further simplify with `unwrap`/`expect` once MSRV includes
+    // https://github.com/rust-lang/rust/issues/67441
+    ($val:expr) => {
+        const {
+            match core::num::NonZero::new($val) {
+                Some(x) => x,
+                None => panic!("Value passed to `nonzero!` was zero"),
+            }
+        }
+    };
+}
+
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
 
-    use pyo3::{pymodule, types::PyModule, PyResult, Python};
+    use pyo3::{pymodule, types::PyModule, Bound, PyResult};
 
     #[macro_export]
     macro_rules! unwrap_me_body {
@@ -1188,8 +1201,8 @@ pub mod pybind {
     #[pymodule]
     #[pyo3(name = "libafl_bolts")]
     /// Register the classes to the python module
-    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-        crate::rands::pybind::register(py, m)?;
+    pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        crate::rands::pybind::register(m)?;
         Ok(())
     }
 }

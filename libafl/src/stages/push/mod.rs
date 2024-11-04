@@ -1,3 +1,5 @@
+//! [`PushStage`]`s` return inputs instead of calling an executor
+//!
 //! While normal stages call the executor over and over again, push stages turn this concept upside down:
 //! A push stage instead returns an iterator that generates a new result for each time it gets called.
 //! With the new testcase, you will have to take care about testcase execution, manually.
@@ -34,16 +36,14 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 #[derive(Clone, Debug)]
 pub struct PushStageSharedState<CS, EM, OT, Z>
 where
-    CS: Scheduler,
-    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<CS::State>,
-    CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
-        + EvaluatorObservers<OT>
-        + HasScheduler<Scheduler = CS>,
+    CS: Scheduler<Z::Input, Z::State>,
+    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
+    OT: ObserversTuple<Z::Input, Z::State>,
+    Z::State: HasRand + HasCorpus,
+    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
 {
     /// The [`crate::state::State`]
-    pub state: CS::State,
+    pub state: Z::State,
     /// The [`crate::fuzzer::Fuzzer`] instance
     pub fuzzer: Z,
     /// The [`crate::events::EventManager`]
@@ -55,17 +55,15 @@ where
 
 impl<CS, EM, OT, Z> PushStageSharedState<CS, EM, OT, Z>
 where
-    CS: Scheduler,
-    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<CS::State>,
-    CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
-        + EvaluatorObservers<OT>
-        + HasScheduler<Scheduler = CS>,
+    CS: Scheduler<Z::Input, Z::State>,
+    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
+    OT: ObserversTuple<Z::Input, Z::State>,
+    Z::State: HasRand + HasCorpus,
+    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
-    pub fn new(fuzzer: Z, state: CS::State, observers: OT, event_mgr: EM) -> Self {
+    pub fn new(fuzzer: Z, state: Z::State, observers: OT, event_mgr: EM) -> Self {
         Self {
             state,
             fuzzer,
@@ -80,13 +78,11 @@ where
 #[derive(Clone, Debug)]
 pub struct PushStageHelper<CS, EM, OT, Z>
 where
-    CS: Scheduler,
-    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<CS::State>,
-    CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
-        + EvaluatorObservers<OT>
-        + HasScheduler<Scheduler = CS>,
+    CS: Scheduler<Z::Input, Z::State>,
+    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
+    OT: ObserversTuple<Z::Input, Z::State>,
+    Z::State: HasRand + HasCorpus,
+    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -101,7 +97,7 @@ where
     pub current_corpus_id: Option<CorpusId>,
 
     /// The input we just ran
-    pub current_input: Option<<CS::State as UsesInput>::Input>, // Todo: Get rid of copy
+    pub current_input: Option<<Z::State as UsesInput>::Input>, // Todo: Get rid of copy
 
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(CS, EM, OT, Z)>,
@@ -110,13 +106,11 @@ where
 
 impl<CS, EM, OT, Z> PushStageHelper<CS, EM, OT, Z>
 where
-    CS: Scheduler,
-    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    OT: ObserversTuple<CS::State>,
-    CS::State: HasRand + HasCorpus,
-    Z: ExecutionProcessor<OT, State = CS::State>
-        + EvaluatorObservers<OT>
-        + HasScheduler<Scheduler = CS>,
+    CS: Scheduler<Z::Input, Z::State>,
+    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
+    OT: ObserversTuple<Z::Input, Z::State>,
+    Z::State: HasRand + HasCorpus,
+    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
 {
     /// Create a new [`PushStageHelper`]
     #[must_use]
@@ -179,13 +173,11 @@ where
 /// After it has finished once, we will call it agan for the next fuzzer round.
 pub trait PushStage<CS, EM, OT, Z>: Iterator
 where
-    CS: Scheduler,
-    CS::State: HasRand + HasExecutions + HasMetadata + HasCorpus + HasLastReportTime,
-    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
-    OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State>
-        + EvaluatorObservers<OT>
-        + HasScheduler<Scheduler = CS>,
+    CS: Scheduler<Z::Input, Z::State>,
+    Z::State: HasRand + HasExecutions + HasMetadata + HasCorpus + HasLastReportTime,
+    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId + ProgressReporter,
+    OT: ObserversTuple<Z::Input, Z::State>,
+    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
 {
     /// Gets the [`PushStageHelper`]
     fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, OT, Z>;
@@ -204,7 +196,7 @@ where
     fn init(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut CS::State,
+        _state: &mut Z::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
@@ -217,20 +209,20 @@ where
     fn pre_exec(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut CS::State,
+        _state: &mut Z::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-    ) -> Option<Result<<CS::State as UsesInput>::Input, Error>>;
+    ) -> Option<Result<<Z::State as UsesInput>::Input, Error>>;
 
     /// Called after the execution of a testcase finished.
     #[inline]
     fn post_exec(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut CS::State,
+        _state: &mut Z::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-        _input: <CS::State as UsesInput>::Input,
+        _input: <Z::State as UsesInput>::Input,
         _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -241,7 +233,7 @@ where
     fn deinit(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut CS::State,
+        _state: &mut Z::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
@@ -249,7 +241,7 @@ where
     }
 
     /// This is the default implementation for `next` for this stage
-    fn next_std(&mut self) -> Option<Result<<CS::State as UsesInput>::Input, Error>> {
+    fn next_std(&mut self) -> Option<Result<<Z::State as UsesInput>::Input, Error>> {
         let mut shared_state = {
             let shared_state_ref = &mut (*self.push_stage_helper_mut().shared_state).borrow_mut();
             shared_state_ref.take().unwrap()

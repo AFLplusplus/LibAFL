@@ -1,4 +1,4 @@
-//! Stage to compute/report AFL stats
+//! Stage to compute/report minimal AFL-like stats
 
 #[cfg(feature = "std")]
 use alloc::{borrow::Cow, string::ToString};
@@ -22,9 +22,9 @@ use crate::{
     monitors::{AggregatorOps, UserStats, UserStatsValue},
 };
 
-/// The [`AflStatsStage`] is a simple stage that computes and reports some stats.
+/// The [`StatsStage`] is a simple stage that computes and reports some stats.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<E, EM, Z> {
+pub struct StatsStage<E, EM, Z> {
     // the number of testcases that have been fuzzed
     has_fuzzed_size: usize,
     // the number of "favored" testcases
@@ -41,14 +41,14 @@ pub struct AflStatsStage<E, EM, Z> {
     phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<E, EM, Z> UsesState for AflStatsStage<E, EM, Z>
+impl<E, EM, Z> UsesState for StatsStage<E, EM, Z>
 where
     E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, EM, Z> Stage<E, EM, Z> for AflStatsStage<E, EM, Z>
+impl<E, EM, Z> Stage<E, EM, Z> for StatsStage<E, EM, Z>
 where
     E: UsesState,
     EM: EventFirer<State = Self::State>,
@@ -62,6 +62,33 @@ where
         state: &mut Self::State,
         _manager: &mut EM,
     ) -> Result<(), Error> {
+        self.update_and_report_afl_stats(state, _manager)
+    }
+
+    #[inline]
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
+        Ok(())
+    }
+}
+
+impl<E, EM, Z> StatsStage<E, EM, Z> {
+    fn update_and_report_afl_stats(
+        &mut self,
+        state: &mut <Self as UsesState>::State,
+        _manager: &mut EM,
+    ) -> Result<(), Error>
+    where
+        E: UsesState,
+        EM: EventFirer<State = E::State>,
+        <Self as UsesState>::State: HasCorpus + HasImported,
+    {
         let Some(corpus_id) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "state is not currently processing a corpus index",
@@ -102,7 +129,7 @@ where
                 _manager.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: Cow::from("AflStats"),
+                        name: Cow::from("Stats"),
                         value: UserStats::new(
                             UserStatsValue::String(Cow::from(json.to_string())),
                             AggregatorOps::None,
@@ -124,22 +151,10 @@ where
 
         Ok(())
     }
-
-    #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
-        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
-        Ok(true)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
-        // Not running the target so we wont't crash/timeout and, hence, don't need to restore anything
-        Ok(())
-    }
 }
 
-impl<E, EM, Z> AflStatsStage<E, EM, Z> {
-    /// create a new instance of the [`AflStatsStage`]
+impl<E, EM, Z> StatsStage<E, EM, Z> {
+    /// create a new instance of the [`StatsStage`]
     #[must_use]
     pub fn new(interval: Duration) -> Self {
         Self {
@@ -149,8 +164,8 @@ impl<E, EM, Z> AflStatsStage<E, EM, Z> {
     }
 }
 
-impl<E, EM, Z> Default for AflStatsStage<E, EM, Z> {
-    /// the default instance of the [`AflStatsStage`]
+impl<E, EM, Z> Default for StatsStage<E, EM, Z> {
+    /// the default instance of the [`StatsStage`]
     #[must_use]
     fn default() -> Self {
         Self {

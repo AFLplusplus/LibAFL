@@ -1,6 +1,6 @@
 [package]
 name = "libafl_frida"
-version.workspace = true
+version = "0.13.2"
 authors = ["s1341 <github@shmarya.net>"]
 description = "Frida backend library for LibAFL"
 documentation = "https://docs.rs/libafl_frida"
@@ -10,17 +10,22 @@ license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "frida", "instrumentation"]
 edition = "2021"
 categories = [
-    "development-tools::testing",
-    "emulators",
-    "embedded",
-    "os",
-    "no-std"
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
 ]
 
 [package.metadata.docs.rs]
 no-default-features = true # We can't use auto-download inside docs.rs (no internet)
 all-features = false
-features = ["cmplog", "serdeany_autoreg", "track_hit_feedbacks", "document-features"]
+features = [
+  "cmplog",
+  "serdeany_autoreg",
+  "track_hit_feedbacks",
+  "document-features",
+]
 
 [features]
 default = ["serdeany_autoreg", "auto-download"]
@@ -39,70 +44,78 @@ track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
 
 [build-dependencies]
-cc = { version = "1.0", features = ["parallel"] }
-
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-yaxpeax-arm = "0.2.4"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-yaxpeax-x86 = "1.2.2"
-iced-x86 = { version = "1.20.0", features = ["code_asm"], optional = true }
+cc = { workspace = true, features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", default-features = false, version = "0.13.1", features = [
-    "std",
-    "derive",
-    "frida_cli",
+libafl = { path = "../libafl", default-features = false, version = "0.13.2", features = [
+  "std",
+  "derive",
+  "frida_cli",
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.13.1", default-features = false, features = [
-    "std",
-    "derive",
-    "frida_cli"
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features = false, features = [
+  "std",
+  "derive",
+  "frida_cli",
 ] }
-libafl_targets = { path = "../libafl_targets", version = "0.13.1", features = [
-    "std",
-    "sancov_cmplog",
+libafl_targets = { path = "../libafl_targets", version = "0.13.2", features = [
+  "std",
+  "sancov_cmplog",
 ] }
 
-nix = { version = "0.29", features = ["mman"] }
-libc = "0.2"
-hashbrown = "0.14"
-rangemap = "1.3"
-frida-gum-sys = { version = "0.13.6", features = [
-    "event-sink",
-    "invocation-listener",
+nix = { workspace = true, default-features = true, features = ["mman"] }
+libc = { workspace = true }
+hashbrown = { workspace = true, default-features = true }
+rangemap = { workspace = true }
+frida-gum-sys = { version = "0.15.1", features = [
+  "event-sink",
+  "invocation-listener",
 ] }
-frida-gum = { version = "0.13.6", features = [
-    "event-sink",
-    "invocation-listener",
-    "module-names",
+frida-gum = { version = "0.15.1", features = [
+  "event-sink",
+  "invocation-listener",
+  "module-names",
+  "script",
 ] }
-dynasmrt = "2"
+dynasmrt = "2.0.0"
 
-color-backtrace = { version = "0.6", features = ["resolve-modules"] }
-termcolor = "1.1.3"
-serde = "1.0"
-backtrace = { version = "0.3", default-features = false, features = [
-    "std",
-    "serde",
+color-backtrace = { version = "0.6.1", features = ["resolve-modules"] }
+termcolor = "1.4.1"
+serde = { workspace = true, default-features = true }
+backtrace = { workspace = true, default-features = false, features = [
+  "std",
+  "serde",
 ] }
-num-traits = "0.2"
-ahash = "^0.8" # fetch the latest
-paste = "1.0"
-log = "0.4.20"
-mmap-rs = "0.6.0"
+num-traits = { workspace = true, default-features = true }
+ahash = { workspace = true, default-features = true }
+paste = { workspace = true }
+log = { workspace = true }
+mmap-rs = "0.6.1"
 bit_reverse = "0.1.8"
-yaxpeax-arch = "0.2.7"
+yaxpeax-arch = "0.3.2"
 
-document-features = { version = "0.2", optional = true } # Document all features of this crate (for `cargo doc`)
-
-[target.'cfg(windows)'.dependencies]
-winsafe = {version = "0.0.21", features = ["kernel"]}
-
+document-features = { workspace = true, optional = true } # Document all features of this crate (for `cargo doc`)
 
 [dev-dependencies]
-serial_test = { version = "3", default-features = false, features = ["logging"] }
-clap = {version = "4.5", features = ["derive"]}
-libloading = "0.8"
-mimalloc = { version = "0.1", default-features = false }
-dlmalloc ={version = "0.2.6", features = ["global"]}
+serial_test = { workspace = true, default-features = false, features = [
+  "logging",
+] }
+clap = { workspace = true, features = ["derive"] }
+libloading = "0.8.5"
+mimalloc = { workspace = true, default-features = false }
+dlmalloc = { version = "0.2.6", features = ["global"] }
+
+[lints]
+workspace = true
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+yaxpeax-arm = "0.3.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+yaxpeax-x86 = "2.0.0"
+iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winsafe = { version = "0.0.22", features = ["kernel"] }
+
+[target.'cfg(target_vendor="apple")'.dependencies]
+mach-sys = { version = "0.5.4" }

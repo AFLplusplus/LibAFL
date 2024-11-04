@@ -1,6 +1,6 @@
 [package]
 name = "libafl_sugar"
-version.workspace = true
+version = "0.13.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Sugar builders to create common fuzzers with LibAFL"
 documentation = "https://docs.rs/libafl_sugar"
@@ -10,7 +10,13 @@ license = "MIT OR Apache-2.0"
 keywords = ["fuzzing"]
 edition = "2021"
 build = "build.rs"
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -18,7 +24,9 @@ all-features = true
 [features]
 default = []
 document-features = ["dep:document-features"]
-clippy = [ "libafl_qemu/clippy" ] # special feature for clippy, don't use in normal projects
+clippy = [
+  "libafl_qemu/clippy",
+] # special feature for clippy, don't use in normal projects
 
 #! # Feature Flags
 #! ## General Features
@@ -43,25 +51,32 @@ mips = ["libafl_qemu/mips"]
 ppc = ["libafl_qemu/ppc"]
 ## build qemu for hexagon
 hexagon = ["libafl_qemu/hexagon"]
+## build qemu for riscv 32bit
+riscv32 = ["libafl_qemu/riscv32"]
+## build qemu for riscv 64bit
+riscv64 = ["libafl_qemu/riscv64"]
 
 [build-dependencies]
-pyo3-build-config = { version = "0.21", optional = true }
+pyo3-build-config = { version = "0.22.3", optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.13.1" }
-libafl_bolts = { path = "../libafl_bolts", version = "0.13.1" }
-libafl_targets = { path = "../libafl_targets", version = "0.13.1" }
+libafl = { path = "../libafl", version = "0.13.2" }
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.2" }
+libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 
 # Document all features of this crate (for `cargo doc`)
-document-features = { version = "0.2", optional = true }
+document-features = { workspace = true, optional = true }
 
-typed-builder = "0.18" # Implement the builder pattern at compiletime
-pyo3 = { version = "0.18", optional = true }
-log = "0.4.20"
+typed-builder = { workspace = true }           # Implement the builder pattern at compiletime
+pyo3 = { version = "0.22.3", optional = true }
+log = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libafl_qemu = { path = "../libafl_qemu", version = "0.13.1" }
+libafl_qemu = { path = "../libafl_qemu", version = "0.13.2" }
 
 [lib]
 name = "libafl_sugar"
 crate-type = ["cdylib", "rlib"]
+
+[lints]
+workspace = true

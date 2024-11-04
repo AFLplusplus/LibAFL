@@ -1,6 +1,6 @@
 [package]
 name = "build_and_test_fuzzers"
-version = "0.1.0"
+version = "0.13.2"
 edition = "2021"
 description = "Get diffing fuzzers from the last commit"
 repository = "https://github.com/AFLplusplus/LibAFL/"
@@ -10,5 +10,8 @@ keywords = ["ci"]
 categories = ["development-tools::testing"]
 
 [dependencies]
-cargo_toml = "0.20"
-walkdir = "2"
+cargo_toml = "0.20.5"
+walkdir = "2.5.0"
+
+[lints]
+workspace = true

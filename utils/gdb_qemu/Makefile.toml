@@ -2,16 +2,16 @@
 default_to_workspace = false
 
 [env]
-DEMO_TARGET="powerpc-unknown-linux-gnu"
-HOST_TARGET="x86_64-unknown-linux-gnu"
-PROFILE="dev"
-DEMO_DIR="${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${DEMO_TARGET}/debug"
-TARGET_DIR="${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${HOST_TARGET}/debug"
+DEMO_TARGET = "powerpc-unknown-linux-gnu"
+HOST_TARGET = "x86_64-unknown-linux-gnu"
+PROFILE = "dev"
+DEMO_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${DEMO_TARGET}/debug"
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${HOST_TARGET}/debug"
 
 [env.release]
-PROFILE="release"
-DEMO_DIR="${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${DEMO_TARGET}/release"
-TARGET_DIR="${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${HOST_TARGET}/release"
+PROFILE = "release"
+DEMO_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${DEMO_TARGET}/release"
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${HOST_TARGET}/release"
 
 [tasks.clean]
 command = "cargo"
@@ -27,55 +27,61 @@ dependencies = ["format", "clippy"]
 command = "cargo"
 args = [
   "build",
-  "-p", "demo",
-  "--profile", "${PROFILE}",
-  "--target", "powerpc-unknown-linux-gnu",
+  "-p",
+  "demo",
+  "--profile",
+  "${PROFILE}",
+  "--target",
+  "powerpc-unknown-linux-gnu",
 ]
 
 [tasks.run_demo]
 dependencies = ["demo"]
 command = "cargo"
-args = [
-  "run",
-  "-p", "demo",
-  "--target", "powerpc-unknown-linux-gnu",
-]
+args = ["run", "-p", "demo", "--target", "powerpc-unknown-linux-gnu"]
 
 [tasks.build]
 dependencies = ["format", "clippy"]
 command = "cargo"
-args = [
-  "build",
-  "-p", "gdb_qemu",
-  "--profile", "${PROFILE}",
-]
+args = ["build", "-p", "gdb_qemu", "--profile", "${PROFILE}"]
 
 [tasks.run]
 command = "cargo"
-dependencies = [ "demo" ]
+dependencies = ["demo"]
 args = [
   "run",
-  "-p", "gdb_qemu",
-  "--profile", "${PROFILE}",
+  "-p",
+  "gdb_qemu",
+  "--profile",
+  "${PROFILE}",
   "--",
-    "-p", "1234",
-    "-L", "trace",
-    "--",
-      "qemu-ppc",
-      "-L", "/usr/powerpc-linux-gnu",
-      "-g", "1234",
-      "${DEMO_DIR}/demo"
+  "-p",
+  "1234",
+  "-L",
+  "trace",
+  "--",
+  "qemu-ppc",
+  "-L",
+  "/usr/powerpc-linux-gnu",
+  "-g",
+  "1234",
+  "${DEMO_DIR}/demo",
 ]
 
 [tasks.gdb]
 command = "gdb-multiarch"
 dependencies = ["demo", "build"]
 args = [
-  "-ex", "set architecture powerpc:MPC8XX",
-  "-ex", "set pagination off",
-  "-ex", "set confirm off",
-  "-ex", "file ${DEMO_DIR}/demo",
-  "-ex", "target remote | ${TARGET_DIR}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 ${DEMO_DIR}/demo"
+  "-ex",
+  "set architecture powerpc:MPC8XX",
+  "-ex",
+  "set pagination off",
+  "-ex",
+  "set confirm off",
+  "-ex",
+  "file ${DEMO_DIR}/demo",
+  "-ex",
+  "target remote | ${TARGET_DIR}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 ${DEMO_DIR}/demo",
 ]
 
 [tasks.all]

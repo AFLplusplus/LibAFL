@@ -166,7 +166,7 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
     }
 }
 
-impl<'a, CF, MT, SP> Launcher<'a, CF, MT, SP>
+impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
     SP: ShMemProvider,
@@ -194,7 +194,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, CF, MT, SP> Launcher<'a, CF, MT, SP>
+impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
     SP: ShMemProvider,
@@ -338,7 +338,7 @@ where
 
     /// Launch the broker and the clients and fuzz
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-    #[allow(unused_mut, clippy::match_wild_err_arm)]
+    #[allow(unused_mut, clippy::match_wild_err_arm, clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
@@ -480,6 +480,8 @@ where
     }
 }
 
+/// A Launcher that minimizes re-execution of shared testcases.
+///
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -566,7 +568,7 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, MF, MT, SP> CentralizedLauncher<'a, CF, MF, MT, SP>
+impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
     SP: ShMemProvider + 'static,
@@ -610,7 +612,7 @@ where
 }
 
 #[cfg(all(unix, feature = "std", feature = "fork"))]
-impl<'a, CF, MF, MT, SP> CentralizedLauncher<'a, CF, MF, MT, SP>
+impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
     SP: ShMemProvider + 'static,
@@ -744,12 +746,12 @@ where
             }
         }
 
-        #[cfg(feature = "multi_machine")]
         // Create this after forks, to avoid problems with tokio runtime
 
         // # Safety
         // The `multi_machine_receiver_hook` needs messages to outlive the receiver.
         // The underlying memory region for incoming messages lives longer than the async thread processing them.
+        #[cfg(feature = "multi_machine")]
         let TcpMultiMachineHooks {
             sender: multi_machine_sender_hook,
             receiver: multi_machine_receiver_hook,

@@ -23,13 +23,15 @@ use libafl_bolts::{
     AsSlice,
 };
 
+use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
 use crate::{
+    corpus::Corpus,
     executors::HasObservers,
     inputs::{HasTargetBytes, UsesInput},
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers},
-    state::{HasExecutions, State, UsesState},
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
+    state::{HasCorpus, HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -105,7 +107,7 @@ where
 
                 for (i, arg) in args.enumerate() {
                     if i == *argnum {
-                        debug_assert_eq!(arg, "DUMMY");
+                        debug_assert_eq!(arg, "PLACEHOLDER");
                         #[cfg(unix)]
                         cmd.arg(OsStr::from_bytes(input.target_bytes().as_slice()));
                         // There is an issue here that the chars on Windows are 16 bit wide.
@@ -151,9 +153,13 @@ where
     fn exec_timeout(&self) -> Duration {
         self.timeout
     }
+    fn exec_timeout_mut(&mut self) -> &mut Duration {
+        &mut self.timeout
+    }
 }
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
+///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
 pub struct CommandExecutor<OT, S, T> {
@@ -208,21 +214,13 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> CommandExecutor<OT, S, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S>,
-    Z: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput<Input = I>,
+    T: CommandConfigurator<I> + Debug,
+    OT: Debug + ObserversTuple<I, S>,
 {
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        _mgr: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
@@ -282,6 +280,43 @@ where
     }
 }
 
+#[cfg(all(feature = "std", unix))]
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+where
+    EM: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput,
+    T: CommandConfigurator<S::Input> + Debug,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.execute_input_with_command(state, input)
+    }
+}
+
+// this only works on unix because of the reliance on checking the process signal for detecting OOM
+impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
+where
+    S: HasCorpus,
+    T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        *self.configurer.exec_timeout_mut() = timeout;
+    }
+
+    #[inline]
+    fn timeout(&self) -> Duration {
+        self.configurer.exec_timeout()
+    }
+}
+
 impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
 where
     S: State,
@@ -289,20 +324,14 @@ where
     type State = S;
 }
 
-impl<OT, S, T> UsesObservers for CommandExecutor<OT, S, T>
-where
-    OT: ObserversTuple<S>,
-    S: State,
-{
-    type Observers = OT;
-}
-
 impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
 where
     S: State,
     T: Debug,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
+    type Observers = OT;
+
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         RefIndexable::from(&self.observers)
     }
@@ -378,7 +407,8 @@ impl CommandExecutorBuilder {
     pub fn arg_input_arg(&mut self) -> &mut Self {
         let argnum = self.args.len();
         self.input(InputLocation::Arg { argnum });
-        // self.arg("DUMMY");
+        // Placeholder arg that gets replaced with the input name later.
+        self.arg("PLACEHOLDER");
         self
     }
 
@@ -481,7 +511,7 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
-        OT: MatchName + ObserversTuple<S>,
+        OT: MatchName + ObserversTuple<S::Input, S>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
     {
@@ -569,6 +599,9 @@ impl CommandExecutorBuilder {
 ///     fn exec_timeout(&self) -> Duration {
 ///         Duration::from_secs(5)
 ///     }
+///     fn exec_timeout_mut(&mut self) -> &mut Duration {
+///         todo!()
+///     }
 /// }
 ///
 /// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
@@ -580,7 +613,6 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator<I>: Sized {
     /// Get the stdout
@@ -597,6 +629,8 @@ pub trait CommandConfigurator<I>: Sized {
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
+    /// Set the timeout duration for execution of the child process.
+    fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
@@ -619,7 +653,7 @@ mod tests {
             command::{CommandExecutor, InputLocation},
             Executor,
         },
-        fuzzer::test::NopFuzzer,
+        fuzzer::NopFuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         state::NopState,

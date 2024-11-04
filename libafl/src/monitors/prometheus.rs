@@ -1,26 +1,31 @@
-// ===== overview for prommon =====
-// The client (i.e., the fuzzer) sets up an HTTP endpoint (/metrics).
-// The endpoint contains metrics such as execution rate.
-
-// A prometheus server (can use a precompiled binary or docker) then scrapes \
-// the endpoint at regular intervals (configurable via prometheus.yml file).
-// ====================
-//
-// == how to use it ===
-// This monitor should plug into any fuzzer similar to other monitors.
-// In your fuzzer, include:
-// ```rust,ignore
-// use libafl::monitors::PrometheusMonitor;
-// ```
-// as well as:
-// ```rust,ignore
-// let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
-// let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
-// and then like with any other monitor, pass it into the event manager like so:
-// let mut mgr = SimpleEventManager::new(mon);
-// ```
-// When using docker, you may need to point prometheus.yml to the docker0 interface or host.docker.internal
-// ====================
+//! The [`PrometheusMonitor`] logs fuzzer progress to a prometheus endpoint.
+//!
+//! ## Overview
+//!
+//! The client (i.e., the fuzzer) sets up an HTTP endpoint (/metrics).
+//! The endpoint contains metrics such as execution rate.
+//!
+//! A prometheus server (can use a precompiled binary or docker) then scrapes
+//! the endpoint at regular intervals (configurable via prometheus.yml file).
+//!
+//! ## How to use it
+//!
+//! Create a [`PrometheusMonitor`] and plug it into any fuzzer similar to other monitors.
+//! In your fuzzer:
+//!
+//! ```rust
+//! // First, include:
+//! use libafl::monitors::PrometheusMonitor;
+//!
+//! // Then, create the monitor:
+//! let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
+//! let mon = PrometheusMonitor::new(listener, |s| log::info!("{s}"));
+//!
+//! // and finally, like with any other monitor, pass it into the event manager like so:
+//! // let mgr = SimpleEventManager::new(mon);
+//! ```
+//!
+//! When using docker, you may need to point `prometheus.yml` to the `docker0` interface or `host.docker.internal`
 
 use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
@@ -194,6 +199,9 @@ impl<F> PrometheusMonitor<F>
 where
     F: FnMut(&str),
 {
+    /// Create a new [`PrometheusMonitor`].
+    /// The `listener` is the address to send logs to.
+    /// The `print_fn` is the printing function that can output the logs otherwise.
     pub fn new(listener: String, print_fn: F) -> Self {
         // Gauge's implementation of clone uses Arc
         let corpus_count = Family::<Labels, Gauge>::default();
@@ -285,9 +293,9 @@ where
     }
 }
 
-// set up an HTTP endpoint /metrics
+/// Set up an HTTP endpoint /metrics
 #[allow(clippy::too_many_arguments)]
-pub async fn serve_metrics(
+pub(crate) async fn serve_metrics(
     listener: String,
     corpus: Family<Labels, Gauge>,
     objectives: Family<Labels, Gauge>,
@@ -297,8 +305,6 @@ pub async fn serve_metrics(
     clients_count: Family<Labels, Gauge>,
     custom_stat: Family<Labels, Gauge<f64, AtomicU64>>,
 ) -> Result<(), std::io::Error> {
-    tide::log::start();
-
     let mut registry = Registry::default();
 
     registry.register("corpus_count", "Number of test cases in the corpus", corpus);
@@ -349,12 +355,16 @@ pub async fn serve_metrics(
     Ok(())
 }
 
+/// Struct used to define the labels in `prometheus`.
 #[derive(Clone, Hash, PartialEq, Eq, EncodeLabelSet, Debug)]
 pub struct Labels {
-    client: u32, // sender_id: u32, to differentiate between clients when multiple are spawned.
-    stat: Cow<'static, str>, // for custom_stat filtering.
+    /// The `sender_id` helps to differentiate between clients when multiple are spawned.
+    client: u32,
+    /// Used for `custom_stat` filtering.
+    stat: Cow<'static, str>,
 }
 
+/// The state for this monitor.
 #[derive(Clone)]
 struct State {
     registry: Arc<Registry>,

@@ -1,22 +1,6 @@
 //! Sugar API to simplify the life of users of `LibAFL` that just want to fuzz.
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![forbid(unexpected_cfgs)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::unreadable_literal
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -86,15 +70,15 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl_sugar")]
-pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    inmemory::pybind::register(py, m)?;
+pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    inmemory::pybind::register(m)?;
     #[cfg(target_os = "linux")]
     {
-        qemu::pybind::register(py, m)?;
+        qemu::pybind::register(m)?;
     }
     #[cfg(unix)]
     {
-        forkserver::pybind::register(py, m)?;
+        forkserver::pybind::register(m)?;
     }
     Ok(())
 }

@@ -11,7 +11,8 @@ use libafl_bolts::rands::Rand;
 pub use crate::common::nautilus::grammartec::newtypes::NTermId;
 use crate::{
     common::nautilus::grammartec::context::Context, generators::Generator,
-    inputs::nautilus::NautilusInput, state::HasRand, Error,
+    inputs::nautilus::NautilusInput, nautilus::grammartec::python_grammar_loader, state::HasRand,
+    Error,
 };
 
 /// The nautilus context for a generator
@@ -84,13 +85,19 @@ impl NautilusContext {
     }
 
     /// Create a new [`NautilusContext`] from a file
-    #[must_use]
-    pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Self {
-        let file = fs::File::open(grammar_file).expect("Cannot open grammar file");
+    pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Result<Self, Error> {
+        if grammar_file.as_ref().extension().unwrap_or_default() == "py" {
+            log::debug!("Creating NautilusContext from python grammar");
+            let ctx = python_grammar_loader::load_python_grammar(
+                fs::read_to_string(grammar_file)?.as_str(),
+            );
+            return Ok(Self { ctx });
+        }
+        log::debug!("Creating NautilusContext from json grammar");
+        let file = fs::File::open(grammar_file)?;
         let reader = BufReader::new(file);
-        let rules: Vec<Vec<String>> =
-            serde_json::from_reader(reader).expect("Cannot parse grammar file");
-        Self::new(tree_depth, &rules)
+        let rules: Vec<Vec<String>> = serde_json::from_reader(reader)?;
+        Ok(Self::new(tree_depth, &rules))
     }
 }
 
@@ -107,7 +114,7 @@ impl Debug for NautilusGenerator<'_> {
     }
 }
 
-impl<'a, S: HasRand> Generator<NautilusInput, S> for NautilusGenerator<'a> {
+impl<S: HasRand> Generator<NautilusInput, S> for NautilusGenerator<'_> {
     fn generate(&mut self, state: &mut S) -> Result<NautilusInput, Error> {
         let nonterm = self.nonterminal("START");
         let len = self.ctx.get_random_len_for_nt(&nonterm);

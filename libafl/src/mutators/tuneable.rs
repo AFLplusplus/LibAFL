@@ -1,15 +1,14 @@
 //! An extension to the `ScheduledMutator` which schedules multiple mutations internally.
+//!
 //! Instead of a random mutator for a random amount of iterations, we can run
 //! a specific mutator for a specified amount of iterations
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
+use core::{fmt::Debug, num::NonZero};
 
 use libafl_bolts::{
-    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand, Named,
+    impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand,
+    tuples::NamedTuple, Named,
 };
 use serde::{Deserialize, Serialize};
 
@@ -80,33 +79,14 @@ impl TuneableScheduledMutatorMetadata {
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 /// The index of the next mutation can be set.
-pub struct TuneableScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
+#[derive(Debug)]
+pub struct TuneableScheduledMutator<MT> {
     name: Cow<'static, str>,
     mutations: MT,
     max_stack_pow: usize,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, MT, S> Debug for TuneableScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "TuneableScheduledMutator with {} mutations for Input type {}",
-            self.mutations.len(),
-            core::any::type_name::<I>()
-        )
-    }
-}
-
-impl<I, MT, S> Mutator<I, S> for TuneableScheduledMutator<I, MT, S>
+impl<I, MT, S> Mutator<I, S> for TuneableScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata,
@@ -117,11 +97,8 @@ where
     }
 }
 
-impl<I, MT, S> ComposedByMutations<I, MT, S> for TuneableScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
+impl<MT> ComposedByMutations for TuneableScheduledMutator<MT> {
+    type Mutations = MT;
     /// Get the mutations
     #[inline]
     fn mutations(&self) -> &MT {
@@ -135,17 +112,13 @@ where
     }
 }
 
-impl<I, MT, S> Named for TuneableScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand,
-{
+impl<MT> Named for TuneableScheduledMutator<MT> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<I, MT, S> ScheduledMutator<I, MT, S> for TuneableScheduledMutator<I, MT, S>
+impl<I, MT, S> ScheduledMutator<I, S> for TuneableScheduledMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
     S: HasRand + HasMetadata,
@@ -159,7 +132,7 @@ where
                 iters
             } else {
                 // fall back to random
-                1 << (1 + state.rand_mut().below(self.max_stack_pow))
+                1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
             }
         } else {
             // We will sample using the mutation probabilities.
@@ -180,7 +153,6 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(self.mutations.len() != 0);
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
 
@@ -223,17 +195,20 @@ where
         }
 
         // fall back to random if no entries in either vec, the scheduling is not tuned.
-        state.rand_mut().below(self.mutations.len()).into()
+        state
+            .rand_mut()
+            .below(NonZero::new(self.mutations.len()).expect("No mutations provided!"))
+            .into()
     }
 }
 
-impl<I, MT, S> TuneableScheduledMutator<I, MT, S>
-where
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata,
-{
+impl<MT> TuneableScheduledMutator<MT> {
     /// Create a new [`TuneableScheduledMutator`] instance specifying mutations
-    pub fn new(state: &mut S, mutations: MT) -> Self {
+    pub fn new<S>(state: &mut S, mutations: MT) -> Self
+    where
+        MT: NamedTuple,
+        S: HasRand + HasMetadata,
+    {
         if !state.has_metadata::<TuneableScheduledMutatorMetadata>() {
             state.add_metadata(TuneableScheduledMutatorMetadata::default());
         }
@@ -241,36 +216,22 @@ where
             name: Cow::from(format!("TuneableMutator[{}]", mutations.names().join(", "))),
             mutations,
             max_stack_pow: 7,
-            phantom: PhantomData,
         }
     }
 }
 
-impl<S> TuneableScheduledMutator<(), (), S>
-where
-    S: HasRand + HasMetadata,
-{
-    fn metadata_mut(state: &mut S) -> &mut TuneableScheduledMutatorMetadata {
-        state
-            .metadata_map_mut()
-            .get_mut::<TuneableScheduledMutatorMetadata>()
-            .unwrap()
-    }
-
-    fn metadata(state: &S) -> &TuneableScheduledMutatorMetadata {
-        state
-            .metadata_map()
-            .get::<TuneableScheduledMutatorMetadata>()
-            .unwrap()
-    }
-
+impl<MT> TuneableScheduledMutator<MT> {
     /// Sets the next iterations count, i.e., how many times to mutate the input
     ///
     /// Using `set_mutation_ids_and_iter` to set multiple values at the same time
     /// will be faster than setting them individually
     /// as it internally only needs a single metadata lookup
-    pub fn set_iters(state: &mut S, iters: u64) {
-        let metadata = Self::metadata_mut(state);
+    pub fn set_iters<S>(&self, state: &mut S, iters: u64)
+    where
+        S: HasMetadata,
+    {
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
+
         metadata.iters = Some(iters);
         metadata.iter_probabilities_pow_cumulative.clear();
     }
@@ -284,16 +245,20 @@ where
     /// These will be applied for each call of this `mutate` function.
     ///
     /// Setting this function will unset everything previously set in `set_iters`.
-    pub fn set_iter_probabilities_pow(
+    pub fn set_iter_probabilities_pow<S>(
+        &self,
         state: &mut S,
         mut iter_probabilities_pow: Vec<f32>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        S: HasMetadata,
+    {
         if iter_probabilities_pow.len() >= 32 {
             return Err(Error::illegal_argument(
                 "Cannot stack more than 2^32 mutations",
             ));
         }
-        let metadata = Self::metadata_mut(state);
+        let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.iters = None;
 
         // we precalculate the cumulative probability to be faster when sampling later.
@@ -304,13 +269,19 @@ where
     }
 
     /// Gets the set amount of iterations
-    pub fn get_iters(state: &S) -> Option<u64> {
-        let metadata = Self::metadata(state);
+    pub fn get_iters<S>(&self, state: &S) -> Option<u64>
+    where
+        S: HasMetadata,
+    {
+        let metadata = TuneableScheduledMutatorMetadata::get(state).unwrap();
         metadata.iters
     }
 
     /// Sets the mutation ids
-    pub fn set_mutation_ids(state: &mut S, mutations: Vec<MutationId>) {
+    pub fn set_mutation_ids<S>(&self, state: &mut S, mutations: Vec<MutationId>)
+    where
+        S: HasMetadata,
+    {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids = mutations;
         metadata.next_id = 0.into();
@@ -320,10 +291,14 @@ where
     /// The `Vec` contains a probability per [`MutationId`]: between 0 and 1, and they have to add
     /// up to 1.
     /// Setting the probabilities will remove the value set through `set_mutation_ids`.
-    pub fn set_mutation_probabilities(
+    pub fn set_mutation_probabilities<S>(
+        &self,
         state: &mut S,
         mut mutation_probabilities: Vec<f32>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        S: HasMetadata,
+    {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.clear();
         metadata.next_id = 0.into();
@@ -335,7 +310,14 @@ where
     }
 
     /// mutation ids and iterations
-    pub fn set_mutation_ids_and_iters(state: &mut S, mutations: Vec<MutationId>, iters: u64) {
+    pub fn set_mutation_ids_and_iters<S>(
+        &self,
+        state: &mut S,
+        mutations: Vec<MutationId>,
+        iters: u64,
+    ) where
+        S: HasMetadata,
+    {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids = mutations;
         metadata.next_id = 0.into();
@@ -343,14 +325,23 @@ where
     }
 
     /// Appends a mutation id to the end of the mutations
-    pub fn push_mutation_id(state: &mut S, mutation_id: MutationId) {
+    pub fn push_mutation_id<S>(state: &mut S, mutation_id: MutationId)
+    where
+        S: HasMetadata,
+    {
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
         metadata.mutation_ids.push(mutation_id);
     }
 
     /// Resets this to a randomic mutational stage
-    pub fn reset(state: &mut S) {
-        let metadata = Self::metadata_mut(state);
+    pub fn reset<S>(self, state: &mut S)
+    where
+        S: HasMetadata,
+    {
+        let metadata = state
+            .metadata_map_mut()
+            .get_mut::<TuneableScheduledMutatorMetadata>()
+            .unwrap();
         metadata.mutation_ids.clear();
         metadata.next_id = 0.into();
         metadata.iters = None;
@@ -416,44 +407,36 @@ mod test {
         let input = BytesInput::new(vec![42]);
 
         // Basic tests over the probability distribution.
-        assert!(
-            TuneableScheduledMutator::set_mutation_probabilities(&mut state, vec![0.0]).is_err()
-        );
-        assert!(
-            TuneableScheduledMutator::set_mutation_probabilities(&mut state, vec![1.0; 3]).is_err()
-        );
-        assert!(TuneableScheduledMutator::set_mutation_probabilities(
-            &mut state,
-            vec![-1.0, 1.0, 1.0]
-        )
-        .is_err());
-        assert!(TuneableScheduledMutator::set_mutation_probabilities(&mut state, vec![]).is_err());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![0.0])
+            .is_err());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![1.0; 3])
+            .is_err());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![-1.0, 1.0, 1.0])
+            .is_err());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![])
+            .is_err());
 
-        assert!(TuneableScheduledMutator::set_mutation_probabilities(
-            &mut state,
-            vec![0.0, 0.0, 1.0]
-        )
-        .is_ok());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![0.0, 0.0, 1.0])
+            .is_ok());
         assert_eq!(tuneable.schedule(&mut state, &input), 2.into());
-        assert!(TuneableScheduledMutator::set_mutation_probabilities(
-            &mut state,
-            vec![0.0, 1.0, 0.0]
-        )
-        .is_ok());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![0.0, 1.0, 0.0])
+            .is_ok());
         assert_eq!(tuneable.schedule(&mut state, &input), 1.into());
-        assert!(TuneableScheduledMutator::set_mutation_probabilities(
-            &mut state,
-            vec![1.0, 0.0, 0.0]
-        )
-        .is_ok());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![1.0, 0.0, 0.0])
+            .is_ok());
         assert_eq!(tuneable.schedule(&mut state, &input), 0.into());
 
         // We should not choose a mutation with p=0.
-        assert!(TuneableScheduledMutator::set_mutation_probabilities(
-            &mut state,
-            vec![0.5, 0.0, 0.5]
-        )
-        .is_ok());
+        assert!(tuneable
+            .set_mutation_probabilities(&mut state, vec![0.5, 0.0, 0.5])
+            .is_ok());
         assert!(tuneable.schedule(&mut state, &input) != 1.into());
     }
 }

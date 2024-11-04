@@ -208,19 +208,11 @@ where
         event: &Event<S::Input>,
     ) -> Result<BrokerEventResult, Error> {
         match event {
-            Event::NewTestcase {
-                corpus_size,
-                time,
-                executions,
-                ..
-            } => {
+            Event::NewTestcase { corpus_size, .. } => {
                 monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_corpus_size(*corpus_size as u64);
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_executions(*executions, *time);
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -260,18 +252,11 @@ where
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective {
-                objective_size,
-                executions,
-                time,
-            } => {
+            Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(ClientId(0));
                 monitor
                     .client_stats_mut_for(ClientId(0))
                     .update_objective_size(*objective_size as u64);
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_executions(*executions, *time);
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -310,7 +295,9 @@ where
     }
 }
 
-/// Provides a `builder` which can be used to build a [`SimpleRestartingEventManager`], which is a combination of a
+/// Provides a `builder` which can be used to build a [`SimpleRestartingEventManager`].
+///
+/// The [`SimpleRestartingEventManager`] is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]

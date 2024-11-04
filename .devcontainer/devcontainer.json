@@ -9,7 +9,10 @@
 	"customizations": {
 		"vscode": {
 			// Add the IDs of extensions you want installed when the container is created.
-			"extensions": ["matklad.rust-analyzer", "microsoft.Docker"],
+			"extensions": [
+				"rust-lang.rust-analyzer",
+				"microsoft.Docker"
+			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
 				"rust-analyzer.cargo.noDefaultFeatures": true
@@ -20,7 +23,7 @@
 	// "forwardPorts": [],
 	// Uncomment the next line to run commands after the container is created - for example installing curl.
 	// Install development components that shouldn't be in the main Dockerfile
-	"postCreateCommand": "rustup component add --toolchain nightly rustfmt clippy llvm-tools-preview && cargo install --locked cargo-make",
+	"postCreateCommand": "rustup component add --toolchain nightly rustfmt clippy llvm-tools-preview && cargo binstall --locked cargo-make",
 	// Uncomment when using a ptrace-based debugger like C++, Go, and Rust
 	"runArgs": [
 		"--cap-add=SYS_PTRACE",

@@ -1,15 +1,10 @@
 //! Hooks for event managers, especifically these are used to hook before `handle_in_client`.
+//!
 //! This will allow user to define pre/post-processing code when the event manager receives any message from
 //! other clients
 use libafl_bolts::ClientId;
 
 use crate::{events::Event, state::State, Error};
-
-/// node hook, for multi-machine fuzzing
-// #[cfg(feature = "multi_machine")]
-// pub mod multi_machine;
-// #[cfg(feature = "multi_machine")]
-// pub use multi_machine::*;
 
 /// The `broker_hooks` that are run before and after the event manager calls `handle_in_client`
 pub trait EventManagerHook<S>

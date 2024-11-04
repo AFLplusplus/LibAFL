@@ -2,12 +2,12 @@
 default_to_workspace = false
 
 [env]
-PROFILE="dev"
-BUILD_DIR="${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/debug"
+PROFILE = "dev"
+BUILD_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/debug"
 
 [env.release]
-PROFILE="release"
-BUILD_DIR="${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/release"
+PROFILE = "release"
+BUILD_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/release"
 
 [tasks.clean]
 command = "cargo"
@@ -21,68 +21,57 @@ args = ["fmt", "--", "--emit=files"]
 [tasks.demo]
 dependencies = ["format", "clippy"]
 command = "cargo"
-args = [
-  "build",
-  "-p", "demo",
-  "--profile", "${PROFILE}",
-]
+args = ["build", "-p", "demo", "--profile", "${PROFILE}"]
 
 [tasks.run_demo]
 dependencies = ["demo"]
 command = "cargo"
-args = [
-  "run",
-  "-p", "demo",
-]
+args = ["run", "-p", "demo"]
 
 [tasks.build]
 dependencies = ["format", "clippy"]
 command = "cargo"
-args = [
-  "build",
-  "-p", "noaslr",
-  "--profile", "${PROFILE}",
-]
+args = ["build", "-p", "noaslr", "--profile", "${PROFILE}"]
 
 [tasks.buildlib]
 dependencies = ["format", "clippy"]
 command = "cargo"
-args = [
-  "build",
-  "-p", "libnoaslr",
-  "--profile", "${PROFILE}",
-]
+args = ["build", "-p", "libnoaslr", "--profile", "${PROFILE}"]
 
 [tasks.run]
 command = "cargo"
-dependencies = [ "demo" ]
-env = { "ZZZ_TEST_ZZZ" = "ZZZ TEST ZZZ"}
+dependencies = ["demo"]
+env = { "ZZZ_TEST_ZZZ" = "ZZZ TEST ZZZ" }
 args = [
   "run",
-  "-p", "noaslr",
-  "--profile", "${PROFILE}",
+  "-p",
+  "noaslr",
+  "--profile",
+  "${PROFILE}",
   "--",
-    "${BUILD_DIR}/demo",
-    "--",
-      "-f",
-      "/proc/self/maps",
-      "--",
-        "test"
+  "${BUILD_DIR}/demo",
+  "--",
+  "-f",
+  "/proc/self/maps",
+  "--",
+  "test",
 ]
 
 [tasks.runlib]
 command = "cargo"
-dependencies = [ "demo", "buildlib" ]
-env = { "LD_PRELOAD" = "${BUILD_DIR}/libnoaslr.so", "ZZZ_TEST_ZZZ" = "ZZZ TEST ZZZ"}
+dependencies = ["demo", "buildlib"]
+env = { "LD_PRELOAD" = "${BUILD_DIR}/libnoaslr.so", "ZZZ_TEST_ZZZ" = "ZZZ TEST ZZZ" }
 args = [
   "run",
-  "-p", "demo",
-  "--profile", "${PROFILE}",
+  "-p",
+  "demo",
+  "--profile",
+  "${PROFILE}",
   "--",
-    "-f",
-    "/proc/self/maps",
-    "--",
-      "test"
+  "-f",
+  "/proc/self/maps",
+  "--",
+  "test",
 ]
 
 [tasks.all]

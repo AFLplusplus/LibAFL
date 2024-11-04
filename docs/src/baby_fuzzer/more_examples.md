@@ -1,6 +1,6 @@
 # More Examples
 
-Examples can be found under `./fuzzer`.
+Examples can be found under `./fuzzers/baby`.
 
 |fuzzer name|usage|
 |  ----  | ----  |

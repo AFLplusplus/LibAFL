@@ -4,7 +4,7 @@ Multiple fuzzer instances can be spawned using different ways.
 
 ## Manually, via a TCP port
 
-The straightforward way to do Multi-Threading is to use the [`LlmpRestartingEventManager`](https://docs.rs/libafl/latest/libafl/events/llmp/struct.LlmpRestartingEventManager.html), specifically to use [`setup_restarting_mgr_std`](https://docs.rs/libafl/latest/libafl/events/llmp/fn.setup_restarting_mgr_std.html).
+The straightforward way to do Multi-Threading is to use the [`LlmpRestartingEventManager`](https://docs.rs/libafl/latest/libafl/events/llmp/restarting/struct.LlmpRestartingEventManager.html), specifically to use [`setup_restarting_mgr_std`](https://docs.rs/libafl/latest/libafl/events/llmp/restarting/fn.setup_restarting_mgr_std.html).
 It abstracts away all the pesky details about restarts on crash handling (for in-memory fuzzers) and multi-threading.
 With it, every instance you launch manually tries to connect to a TCP port on the local machine.
 

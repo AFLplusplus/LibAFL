@@ -5,18 +5,15 @@ use core::{
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
-    slice::{Iter, IterMut},
 };
 
 use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
-use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    inputs::UsesInput,
-    observers::{DifferentialObserver, Observer, ObserversTuple},
+    observers::{DifferentialObserver, Observer},
     Error,
 };
 
@@ -35,13 +32,15 @@ pub use multi_map::*;
 pub mod owned_map;
 pub use owned_map::*;
 
+/// A trait indicating tracking of observed map values after testcase execution
+///
 /// Trait marker which indicates that this [`MapObserver`] is tracked for indices or novelties.
 /// Implementors of feedbacks similar to [`crate::feedbacks::MapFeedback`] may wish to use this to
 /// ensure that edge metadata is recorded as is appropriate for the provided observer.
 ///
 /// If you get a type constraint failure for your map due to this type being unfulfilled, you must
 /// call [`CanTrack::track_indices`] or [`CanTrack::track_novelties`] **at
-/// the initialisation site of your map**.
+/// the initialization site of your map**.
 ///
 /// This trait allows various components which interact with map metadata to ensure that the
 /// information they need is actually recorded by the map feedback.
@@ -49,7 +48,7 @@ pub use owned_map::*;
 /// ```
 /// # use libafl::corpus::InMemoryCorpus;
 /// # use libafl::feedbacks::{Feedback, MapFeedbackMetadata};
-/// use libafl::feedbacks::MaxMapFeedback;
+/// use libafl::feedbacks::{MaxMapFeedback, StateInitializer};
 /// # use libafl::inputs::BytesInput;
 /// use libafl::observers::{StdMapObserver, CanTrack};
 /// use libafl::schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler};
@@ -80,8 +79,9 @@ pub use owned_map::*;
 /// #     InMemoryCorpus::<BytesInput>::new(),
 /// #     InMemoryCorpus::new(),
 /// #     &mut feedback,
-/// #     &mut ()
+/// #     &mut (),
 /// # ).unwrap();
+///
 /// # feedback.init_state(&mut state).unwrap();
 ///
 /// let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
@@ -131,18 +131,6 @@ impl<T, const ITH: bool, const NTH: bool> CanTrack for ExplicitTracking<T, ITH, 
     }
 }
 
-impl<T, const ITH: bool, const NTH: bool> AsRef<T> for ExplicitTracking<T, ITH, NTH> {
-    fn as_ref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T, const ITH: bool, const NTH: bool> AsMut<T> for ExplicitTracking<T, ITH, NTH> {
-    fn as_mut(&mut self) -> &mut T {
-        &mut self.0
-    }
-}
-
 impl<T, const ITH: bool, const NTH: bool> Named for ExplicitTracking<T, ITH, NTH>
 where
     T: Named,
@@ -152,49 +140,40 @@ where
     }
 }
 
-impl<S, T, const ITH: bool, const NTH: bool> Observer<S> for ExplicitTracking<T, ITH, NTH>
+impl<S, I, T, const ITH: bool, const NTH: bool> Observer<I, S> for ExplicitTracking<T, ITH, NTH>
 where
-    S: UsesInput,
-    T: Observer<S>,
+    T: Observer<I, S>,
 {
     fn flush(&mut self) -> Result<(), Error> {
         self.0.flush()
     }
 
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.0.pre_exec(state, input)
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        input: &S::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)
     }
 
-    fn pre_exec_child(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec_child(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.0.pre_exec_child(state, input)
     }
 
     fn post_exec_child(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)
     }
 }
 
-impl<S, T, OTA, OTB, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, S>
+impl<T, OTA, OTB, I, S, const ITH: bool, const NTH: bool> DifferentialObserver<OTA, OTB, I, S>
     for ExplicitTracking<T, ITH, NTH>
 where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-    T: DifferentialObserver<OTA, OTB, S>,
+    T: DifferentialObserver<OTA, OTB, I, S>,
 {
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         self.as_mut().pre_observe_first(observers)
@@ -210,6 +189,18 @@ where
 
     fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
         self.as_mut().post_observe_second(observers)
+    }
+}
+
+impl<T, const ITH: bool, const NTH: bool> AsRef<T> for ExplicitTracking<T, ITH, NTH> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T, const ITH: bool, const NTH: bool> AsMut<T> for ExplicitTracking<T, ITH, NTH> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.0
     }
 }
 
@@ -243,11 +234,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_index_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::CanTrack> {
+            struct TrackingEnabledCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> TrackingEnabledCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -263,7 +254,7 @@ pub mod macros {
                         SPACING, "| ",
                     )
                 };
-                const TRACKING_SANITY: bool = {
+                const TRACKING_ENABLED: bool = {
                     if !O::INDICES {
                         panic!("{}", Self::MESSAGE)
                     } else {
@@ -272,13 +263,13 @@ pub mod macros {
                 };
 
                 #[inline(always)]
-                fn check_sanity() {
-                    if !Self::TRACKING_SANITY {
+                fn check_enabled() {
+                    if !Self::TRACKING_ENABLED {
                         unreachable!("{}", Self::MESSAGE);
                     }
                 }
             }
-            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+            TrackingEnabledCheck::<$obs>::check_enabled(); // check that tracking is enabled for this map
         };
     }
 
@@ -306,11 +297,11 @@ pub mod macros {
     #[macro_export]
     macro_rules! require_novelties_tracking {
         ($name: literal, $obs: ident) => {
-            struct SanityCheck<O: $crate::observers::CanTrack> {
+            struct TrackingEnabledCheck<O: $crate::observers::CanTrack> {
                 phantom: ::core::marker::PhantomData<O>,
             }
 
-            impl<O: $crate::observers::CanTrack> SanityCheck<O> {
+            impl<O: $crate::observers::CanTrack> TrackingEnabledCheck<O> {
                 #[rustfmt::skip]
                 const MESSAGE: &'static str = {
                     const LINE_OFFSET: usize = line!().ilog10() as usize + 2;
@@ -327,7 +318,7 @@ pub mod macros {
                         SPACING, "| ",
                     )
                 };
-                const TRACKING_SANITY: bool = {
+                const TRACKING_ENABLED: bool = {
                     if !O::NOVELTIES {
                         panic!("{}", Self::MESSAGE)
                     } else {
@@ -336,13 +327,13 @@ pub mod macros {
                 };
 
                 #[inline(always)]
-                fn check_sanity() {
-                    if !Self::TRACKING_SANITY {
+                fn check_enabled() {
+                    if !Self::TRACKING_ENABLED {
                         unreachable!("{}", Self::MESSAGE);
                     }
                 }
             }
-            SanityCheck::<$obs>::check_sanity(); // check that tracking is enabled for this map
+            TrackingEnabledCheck::<$obs>::check_enabled(); // check that tracking is enabled for this map
         };
     }
 }
@@ -359,12 +350,12 @@ pub mod macros {
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver:
-    HasLen + Named + Serialize + serde::de::DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
+    HasLen + Named + Serialize + DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
     /// Type of each entry in this map
-    type Entry: Bounded + PartialEq + Default + Copy + Debug + Hash + 'static;
+    type Entry: PartialEq + Copy;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> Self::Entry;
@@ -394,6 +385,33 @@ pub trait MapObserver:
     fn how_many_set(&self, indexes: &[usize]) -> usize;
 }
 
+/// The "real" length of the underlying map could change at any point in time.
+/// Thus, the size of the map should be fetched each time it is used.
+pub trait VariableLengthMapObserver: MapObserver {
+    /// A mutable slice reference to the map.
+    /// The length of the map gives the maximum allocatable size.
+    fn map_slice(&mut self) -> &[Self::Entry];
+
+    /// A slice reference to the map.
+    /// The length of the map gives the maximum allocatable size.
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry];
+
+    /// A reference to the size of the map.
+    fn size(&mut self) -> &usize;
+
+    /// A mutable reference to the size of the map.
+    fn size_mut(&mut self) -> &mut usize;
+}
+
+/// Implementors guarantee the size of the map is constant at any point in time and equals N.
+pub trait ConstantLengthMapObserver<const N: usize>: MapObserver {
+    /// The size of the map
+    const LENGTH: usize = N;
+
+    /// A mutable slice reference to the map
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry; N];
+}
+
 impl<M> CanTrack for M
 where
     M: MapObserver,
@@ -416,147 +434,42 @@ where
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool> {
     map: OwnedMutSlice<'a, T>,
     initial: T,
     name: Cow<'static, str>,
 }
 
-impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, false>
+impl<I, S, T> Observer<I, S> for StdMapObserver<'_, T, false>
 where
-    S: UsesInput,
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+    Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
 
-impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, true>
-where
-    S: UsesInput,
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-}
+impl<I, S, T> Observer<I, S> for StdMapObserver<'_, T, true> {}
 
-impl<'a, T, const DIFFERENTIAL: bool> Named for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
-{
+impl<T, const DIFFERENTIAL: bool> Named for StdMapObserver<'_, T, DIFFERENTIAL> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
-{
+impl<T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'_, T, DIFFERENTIAL> {
     #[inline]
     fn len(&self) -> usize {
         self.map.as_slice().len()
     }
 }
 
-impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator for &'it StdMapObserver<'a, T, DIFFERENTIAL>
+impl<T, const DIFFERENTIAL: bool> Hash for StdMapObserver<'_, T, DIFFERENTIAL>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-    type Item = <Iter<'it, T> as Iterator>::Item;
-    type IntoIter = Iter<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice()[..cnt].iter()
-    }
-}
-
-impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
-    for &'it mut StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-    type Item = <IterMut<'it, T> as Iterator>::Item;
-    type IntoIter = IterMut<'it, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let cnt = self.usable_count();
-        self.as_slice_mut()[..cnt].iter_mut()
-    }
-}
-
-impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-    /// Returns an iterator over the map.
-    pub fn iter(&self) -> Iter<'_, T> {
-        <&Self as IntoIterator>::into_iter(self)
-    }
-
-    /// Returns a mutable iterator over the map.
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        <&mut Self as IntoIterator>::into_iter(self)
-    }
-}
-
-impl<'a, T, const DIFFERENTIAL: bool> Hash for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+    T: Hash,
 {
     #[inline]
     fn hash<H: Hasher>(&self, hasher: &mut H) {
@@ -564,35 +477,21 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+impl<T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn as_ref(&self) -> &Self {
         self
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize,
-{
+impl<T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn as_mut(&mut self) -> &mut Self {
         self
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
+impl<T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'_, T, DIFFERENTIAL>
 where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + Hash
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
+    T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
 {
     type Entry = T;
 
@@ -665,36 +564,20 @@ where
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
+impl<T, const DIFFERENTIAL: bool> Truncate for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn truncate(&mut self, new_len: usize) {
         self.map.truncate(new_len);
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> Deref for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-{
+impl<T, const DIFFERENTIAL: bool> Deref for StdMapObserver<'_, T, DIFFERENTIAL> {
     type Target = [T];
     fn deref(&self) -> &[T] {
         &self.map
     }
 }
 
-impl<'a, T, const DIFFERENTIAL: bool> DerefMut for StdMapObserver<'a, T, DIFFERENTIAL>
-where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-{
+impl<T, const DIFFERENTIAL: bool> DerefMut for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn deref_mut(&mut self) -> &mut [T] {
         &mut self.map
     }
@@ -702,7 +585,7 @@ where
 
 impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default,
 {
     /// Creates a new [`MapObserver`]
     ///
@@ -793,7 +676,7 @@ where
 
 impl<'a, T> StdMapObserver<'a, T, false>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default,
 {
     /// Creates a new [`MapObserver`]
     ///
@@ -851,7 +734,7 @@ where
 
 impl<'a, T> StdMapObserver<'a, T, true>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default,
 {
     /// Creates a new [`MapObserver`] in differential mode
     ///
@@ -899,18 +782,4 @@ where
     }
 }
 
-impl<'a, OTA, OTB, S, T> DifferentialObserver<OTA, OTB, S> for StdMapObserver<'a, T, true>
-where
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-    T: Bounded
-        + PartialEq
-        + Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + Debug,
-{
-}
+impl<OTA, OTB, I, S, T> DifferentialObserver<OTA, OTB, I, S> for StdMapObserver<'_, T, true> {}

@@ -6,39 +6,49 @@
 //!
 //! We suppose everyone is on the same network and the machines have the fuzzer ready to run on each machine.
 
-use std::{fs, net::SocketAddr, str::FromStr};
+use std::{fs, fs::File, io, io::BufRead, path::PathBuf};
 
+use clap::Parser;
 use petgraph::dot::Dot;
 
 use crate::graph::MultiMachineTree;
 
 pub mod graph;
 
+#[derive(Parser)]
+struct Opt {
+    #[arg(short, long)]
+    machines_file: PathBuf,
+    #[arg(long)]
+    dot_output: Option<PathBuf>,
+    #[arg(short, long)]
+    json_output: Option<PathBuf>,
+    #[arg(short, long, default_value_t = 50000)]
+    default_port: u16,
+    // #[arg(short, long)]
+    // cmd_file: PathBuf,
+}
+
 fn main() {
-    let machines = [
-        SocketAddr::from_str("0.0.0.1:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.2:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.3:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.4:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.5:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.6:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.7:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.8:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.9:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.10:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.11:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.12:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.13:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.14:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.15:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.16:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.17:50000").unwrap(),
-        SocketAddr::from_str("0.0.0.18:50000").unwrap(),
-    ];
+    let opt = Opt::parse();
+
+    let machine_file = File::open(opt.machines_file.as_path()).unwrap();
+    let machines: Vec<String> = io::BufReader::new(machine_file)
+        .lines()
+        .map(|m| m.unwrap())
+        .collect();
 
     let multi_machine_graph = MultiMachineTree::generate(&machines, 3);
 
-    let dot = Dot::new(&multi_machine_graph.graph);
+    // final graph
+    if let Some(dot_path) = opt.dot_output {
+        let dot = Dot::new(&multi_machine_graph.graph);
+        fs::write(dot_path, format!("{dot}")).unwrap();
+    }
 
-    fs::write("multi_machine.dot", format!("{dot:?}")).unwrap();
+    if let Some(json_path) = opt.json_output {
+        let cfg = multi_machine_graph.get_config(opt.default_port);
+        let cfg_json = serde_json::to_string_pretty(&cfg).unwrap();
+        fs::write(json_path, cfg_json).unwrap();
+    }
 }

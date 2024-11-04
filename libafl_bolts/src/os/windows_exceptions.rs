@@ -10,7 +10,6 @@ use core::{
 };
 use std::os::raw::{c_long, c_void};
 
-use log::info;
 use num_enum::FromPrimitive;
 pub use windows::Win32::{
     Foundation::{BOOL, NTSTATUS},
@@ -423,9 +422,13 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 79] = [
 ];
 
 #[cfg(feature = "alloc")]
-pub trait Handler {
+pub trait ExceptionHandler {
     /// Handle an exception
-    fn handle(
+    ///
+    /// # Safety
+    /// This is generally not safe to call. It should only be called through the signal it was registered for.
+    /// Signal handling is hard, don't mess with it :).
+    unsafe fn handle(
         &mut self,
         exception_code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
@@ -435,7 +438,7 @@ pub trait Handler {
 }
 
 struct HandlerHolder {
-    handler: UnsafeCell<*mut dyn Handler>,
+    handler: UnsafeCell<*mut dyn ExceptionHandler>,
 }
 
 pub const EXCEPTION_HANDLERS_SIZE: usize = 96;
@@ -460,31 +463,28 @@ unsafe fn internal_handle_exception(
         .iter()
         .position(|x| *x == exception_code)
         .unwrap();
-    match &EXCEPTION_HANDLERS[index] {
-        Some(handler_holder) => {
-            info!(
-                "{:?}: Handling exception {}",
-                std::process::id(),
-                exception_code
-            );
-            let handler = &mut **handler_holder.handler.get();
-            handler.handle(exception_code, exception_pointers);
-            EXCEPTION_CONTINUE_EXECUTION
-        }
-        None => {
-            info!(
-                "{:?}: No handler for exception {}",
-                std::process::id(),
-                exception_code
-            );
-            // Go to Default one
-            let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
-                .as_ref()
-                .unwrap();
-            let handler = &mut **handler_holder.handler.get();
-            handler.handle(exception_code, exception_pointers);
-            EXCEPTION_CONTINUE_SEARCH
-        }
+    if let Some(handler_holder) = &EXCEPTION_HANDLERS[index] {
+        log::info!(
+            "{:?}: Handling exception {}",
+            std::process::id(),
+            exception_code
+        );
+        let handler = &mut **handler_holder.handler.get();
+        handler.handle(exception_code, exception_pointers);
+        EXCEPTION_CONTINUE_EXECUTION
+    } else {
+        log::info!(
+            "{:?}: No handler for exception {}",
+            std::process::id(),
+            exception_code
+        );
+        // Go to Default one
+        let handler_holder = &EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]
+            .as_ref()
+            .unwrap();
+        let handler = &mut **handler_holder.handler.get();
+        handler.handle(exception_code, exception_pointers);
+        EXCEPTION_CONTINUE_SEARCH
     }
 }
 
@@ -512,7 +512,7 @@ pub unsafe extern "system" fn handle_exception(
 /// It is just casting into another type, nothing unsafe.
 #[must_use]
 pub const unsafe fn sig_ign() -> NativeSignalHandlerType {
-    core::mem::transmute(1u64)
+    core::mem::transmute(1usize)
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
@@ -529,7 +529,9 @@ unsafe extern "C" fn handle_signal(_signum: i32) {
 /// # Safety
 /// Exception handlers are usually ugly, handle with care!
 #[cfg(feature = "alloc")]
-pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> Result<(), Error> {
+pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
+    handler: *mut T,
+) -> Result<(), Error> {
     let exceptions = (*handler).exceptions();
     let mut catch_assertions = false;
     for exception_code in exceptions {
@@ -543,7 +545,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> 
         write_volatile(
             addr_of_mut!(EXCEPTION_HANDLERS[index]),
             Some(HandlerHolder {
-                handler: UnsafeCell::new(handler as *mut dyn Handler),
+                handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
             }),
         );
     }
@@ -551,7 +553,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: *mut T) -> 
     write_volatile(
         addr_of_mut!(EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]),
         Some(HandlerHolder {
-            handler: UnsafeCell::new(handler as *mut dyn Handler),
+            handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
         }),
     );
     compiler_fence(Ordering::SeqCst);
@@ -601,11 +603,11 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     let result = SetConsoleCtrlHandler(Some(ctrl_handler), true);
     match result {
         Ok(()) => {
-            info!("SetConsoleCtrlHandler succeeded");
+            log::info!("SetConsoleCtrlHandler succeeded");
             Ok(())
         }
         Err(err) => {
-            info!("SetConsoleCtrlHandler failed");
+            log::info!("SetConsoleCtrlHandler failed");
             Err(Error::from(err))
         }
     }
@@ -615,7 +617,7 @@ unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
     let handler = ptr::read_volatile(addr_of!(CTRL_HANDLER));
     match handler {
         Some(handler_holder) => {
-            info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
+            log::info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
             let handler = &mut *handler_holder.handler.get();
             if let Some(ctrl_handler) = handler.as_mut() {
                 (*ctrl_handler).handle(ctrl_type).into()

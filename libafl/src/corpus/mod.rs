@@ -31,7 +31,7 @@ pub use minimizer::*;
 pub use nop::NopCorpus;
 use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, Error};
+use crate::Error;
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -63,29 +63,48 @@ impl From<CorpusId> for usize {
     }
 }
 
-/// Utility macro to call `Corpus::random_id`; fetches only enabled testcases
+/// Utility macro to call `Corpus::random_id`; fetches only enabled [`Testcase`]`s`
 #[macro_export]
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
         let cnt = $corpus.count();
-        let nth = $rand.below(cnt);
+        #[cfg(debug_assertions)]
+        let nth = $rand.below(core::num::NonZero::new(cnt).expect("Corpus may not be empty!"));
+        // # Safety
+        // This is a hot path. We try to be as fast as possible here.
+        // In debug this is checked (see above.)
+        // The worst that can happen is a wrong integer to get returned.
+        // In this case, the call below will fail.
+        #[cfg(not(debug_assertions))]
+        let nth = $rand.below(unsafe { core::num::NonZero::new(cnt).unwrap_unchecked() });
         $corpus.nth(nth)
     }};
 }
 
-/// Utility macro to call `Corpus::random_id`; fetches both enabled and disabled testcases
+/// Utility macro to call `Corpus::random_id`; fetches both enabled and disabled [`Testcase`]`s`
 /// Note: use `Corpus::get_from_all` as disabled entries are inaccessible from `Corpus::get`
 #[macro_export]
 macro_rules! random_corpus_id_with_disabled {
     ($corpus:expr, $rand:expr) => {{
         let cnt = $corpus.count_all();
-        let nth = $rand.below(cnt);
+        #[cfg(debug_assertions)]
+        let nth = $rand.below(core::num::NonZero::new(cnt).expect("Corpus may not be empty!"));
+        // # Safety
+        // This is a hot path. We try to be as fast as possible here.
+        // In debug this is checked (see above.)
+        // The worst that can happen is a wrong integer to get returned.
+        // In this case, the call below will fail.
+        #[cfg(not(debug_assertions))]
+        let nth = $rand.below(unsafe { core::num::NonZero::new(cnt).unwrap_unchecked() });
         $corpus.nth_from_all(nth)
     }};
 }
 
 /// Corpus with all current [`Testcase`]s, or solutions
-pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
+pub trait Corpus: Sized {
+    /// The type of input contained in this corpus
+    type Input;
+
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -171,7 +190,10 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error>;
 
     /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
-    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error> {
+    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error>
+    where
+        Self::Input: Clone,
+    {
         let mut testcase = self.get(id)?.borrow_mut();
         Ok(testcase.load_input(self)?.clone())
     }
@@ -200,7 +222,7 @@ where
     cur_back: Option<CorpusId>,
 }
 
-impl<'a, C> Iterator for CorpusIdIterator<'a, C>
+impl<C> Iterator for CorpusIdIterator<'_, C>
 where
     C: Corpus,
 {
@@ -216,7 +238,7 @@ where
     }
 }
 
-impl<'a, C> DoubleEndedIterator for CorpusIdIterator<'a, C>
+impl<C> DoubleEndedIterator for CorpusIdIterator<'_, C>
 where
     C: Corpus,
 {

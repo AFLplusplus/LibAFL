@@ -1,4 +1,4 @@
-//! Monitors that wrap a base one and log on disk
+//! Monitors that wrap a base monitor and also log to disk using different formats like `JSON` and `TOML`.
 
 use alloc::{string::String, vec::Vec};
 use core::time::Duration;
@@ -13,9 +13,9 @@ use serde_json::json;
 
 use crate::monitors::{ClientStats, Monitor, NopMonitor};
 
-/// Wrap a monitor and log the current state of the monitor into a TOML file.
+/// Wrap a monitor and log the current state of the monitor into a Toml file.
 #[derive(Debug, Clone)]
-pub struct OnDiskTOMLMonitor<M>
+pub struct OnDiskTomlMonitor<M>
 where
     M: Monitor,
 {
@@ -25,7 +25,7 @@ where
     update_interval: Duration,
 }
 
-impl<M> Monitor for OnDiskTOMLMonitor<M>
+impl<M> Monitor for OnDiskTomlMonitor<M>
 where
     M: Monitor,
 {
@@ -59,10 +59,10 @@ where
         if cur_time - self.last_update >= self.update_interval {
             self.last_update = cur_time;
 
-            let mut file = File::create(&self.filename).expect("Failed to open the TOML file");
+            let mut file = File::create(&self.filename).expect("Failed to open the Toml file");
             write!(
                 &mut file,
-                "# This TOML is generated using the OnDiskMonitor component of LibAFL
+                "# This Toml is generated using the OnDiskMonitor component of LibAFL
 
 [global]
 run_time = \"{}\"
@@ -79,7 +79,7 @@ exec_sec = {}
                 self.total_execs(),
                 self.execs_per_sec()
             )
-            .expect("Failed to write to the TOML file");
+            .expect("Failed to write to the Toml file");
 
             for (i, client) in self.client_stats_mut().iter_mut().enumerate() {
                 let exec_sec = client.execs_per_sec(cur_time);
@@ -95,7 +95,7 @@ exec_sec = {}
 ",
                     i, client.corpus_size, client.objective_size, client.executions, exec_sec
                 )
-                .expect("Failed to write to the TOML file");
+                .expect("Failed to write to the Toml file");
 
                 for (key, val) in &client.user_monitor {
                     let k: String = key
@@ -104,7 +104,7 @@ exec_sec = {}
                         .filter(|c| c.is_alphanumeric() || *c == '_')
                         .collect();
                     writeln!(&mut file, "{k} = \"{val}\"")
-                        .expect("Failed to write to the TOML file");
+                        .expect("Failed to write to the Toml file");
                 }
             }
 
@@ -115,11 +115,11 @@ exec_sec = {}
     }
 }
 
-impl<M> OnDiskTOMLMonitor<M>
+impl<M> OnDiskTomlMonitor<M>
 where
     M: Monitor,
 {
-    /// Create new [`OnDiskTOMLMonitor`]
+    /// Create new [`OnDiskTomlMonitor`]
     #[must_use]
     pub fn new<P>(filename: P, base: M) -> Self
     where
@@ -128,7 +128,7 @@ where
         Self::with_update_interval(filename, base, Duration::from_secs(60))
     }
 
-    /// Create new [`OnDiskTOMLMonitor`] with custom update interval
+    /// Create new [`OnDiskTomlMonitor`] with custom update interval
     #[must_use]
     pub fn with_update_interval<P>(filename: P, base: M, update_interval: Duration) -> Self
     where
@@ -143,8 +143,8 @@ where
     }
 }
 
-impl OnDiskTOMLMonitor<NopMonitor> {
-    /// Create new [`OnDiskTOMLMonitor`] without a base
+impl OnDiskTomlMonitor<NopMonitor> {
+    /// Create new [`OnDiskTomlMonitor`] without a base
     #[must_use]
     pub fn nop<P>(filename: P) -> Self
     where
@@ -155,8 +155,8 @@ impl OnDiskTOMLMonitor<NopMonitor> {
 }
 
 #[derive(Debug, Clone)]
-/// Wraps a base monitor and continuously appends the current statistics to a JSON lines file.
-pub struct OnDiskJSONMonitor<F, M>
+/// Wraps a base monitor and continuously appends the current statistics to a Json lines file.
+pub struct OnDiskJsonMonitor<F, M>
 where
     F: FnMut(&mut M) -> bool,
     M: Monitor,
@@ -167,12 +167,12 @@ where
     log_record: F,
 }
 
-impl<F, M> OnDiskJSONMonitor<F, M>
+impl<F, M> OnDiskJsonMonitor<F, M>
 where
     F: FnMut(&mut M) -> bool,
     M: Monitor,
 {
-    /// Create a new [`OnDiskJSONMonitor`]
+    /// Create a new [`OnDiskJsonMonitor`]
     pub fn new<P>(filename: P, base: M, log_record: F) -> Self
     where
         P: Into<PathBuf>,
@@ -187,7 +187,7 @@ where
     }
 }
 
-impl<F, M> Monitor for OnDiskJSONMonitor<F, M>
+impl<F, M> Monitor for OnDiskJsonMonitor<F, M>
 where
     F: FnMut(&mut M) -> bool,
     M: Monitor,
@@ -225,7 +225,7 @@ where
                 "exec_sec": self.base.execs_per_sec(),
                 "client_stats": self.client_stats(),
             });
-            writeln!(&file, "{line}").expect("Unable to write JSON to file");
+            writeln!(&file, "{line}").expect("Unable to write Json to file");
         }
         self.base.display(event_msg, sender_id);
     }

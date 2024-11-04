@@ -1,6 +1,6 @@
 [package]
 name = "dump_constraints"
-version = "0.1.0"
+version = "0.13.2"
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 description = "Dump Constraints, a lib to see the constraints oof a run"
@@ -9,11 +9,20 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "libafl", "ldpreload"]
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = {path = "../../../libafl"}
-libafl_bolts = {path = "../../../libafl_bolts"}
-clap = { version = "4.5", features = ["derive"] }
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+clap = { workspace = true, features = ["derive"] }
+
+[lints]
+workspace = true

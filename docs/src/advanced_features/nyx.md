@@ -24,7 +24,7 @@ For binary-only fuzzing, Nyx uses intel-PT(Intel® Processor Trace). You can fin
 
 ## Preparing the Nyx working directory
 
-This step is used to pack the target into Nyx's kernel. Don't worry, we have a template shell script in our [example](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_parallel/setup_libxml2.sh):
+This step is used to pack the target into Nyx's kernel. Don't worry, we have a template shell script in our [example](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/full_system/nyx_libxml2_parallel/setup_libxml2.sh):
 
 the parameter's meaning is listed below:
 
@@ -49,7 +49,7 @@ python3 ./packer/packer/nyx_config_gen.py /tmp/nyx_libxml2/ Kernel || exit
 
 ## Standalone fuzzing
 
-In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_standalone/src/main.rs) you first need to run `./setup_libxml2.sh`. It will prepare your target and create your nyx work directory in `/tmp/libxml2`. After that, you can start to write your code.
+In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/full_system/nyx_libxml2_standalone/src/main.rs) you first need to run `./setup_libxml2.sh`. It will prepare your target and create your nyx work directory in `/tmp/libxml2`. After that, you can start to write your code.
 
 First, to create `Nyxhelper`:
 
@@ -71,7 +71,7 @@ Finally, use them normally and pass them into `fuzzer.fuzz_loop(&mut stages, &mu
 
 ## Parallel fuzzing
 
-In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_parallel/src/main.rs) you first need to run `./setup_libxml2.sh` as described before.
+In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/full_system/nyx_libxml2_parallel/src/main.rs) you first need to run `./setup_libxml2.sh` as described before.
 
 Parallel fuzzing relies on [`Launcher`](../message_passing/spawn_instances.md), so spawn logic should be written in the scoop of anonymous function `run_client`:
 

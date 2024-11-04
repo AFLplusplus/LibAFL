@@ -21,7 +21,9 @@ EXT_FUNC(LLVMFuzzerCustomCrossOver, size_t,
          false);
 EXT_FUNC_IMPL(LLVMFuzzerTestOneInput, int, (const uint8_t *Data, size_t Size),
               false) {
-  fprintf(stderr, "Weakly defined \"LLVMFuzzerTestOneInput\" is linked. Did you add extern \"C\" to your harness?\n");
+  fprintf(stderr,
+          "Weakly defined \"LLVMFuzzerTestOneInput\" is linked. Did you add "
+          "extern \"C\" to your harness?\n");
   abort();
   return 0;
 }

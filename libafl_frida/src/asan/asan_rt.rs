@@ -11,6 +11,7 @@ use core::{
     ptr::addr_of_mut,
 };
 use std::{
+    cell::Cell,
     ffi::{c_char, c_void},
     ptr::write_volatile,
     rc::Rc,
@@ -59,17 +60,18 @@ extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(target_vendor = "apple"))]
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
 
-/// The count of registers that need to be saved by the asan runtime
-/// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus instrumented rip, accessed memory addr and true rip
+/// The count of registers that need to be saved by the `ASan` runtime.
+///
+/// Sixteen general purpose registers are put in this order, `rax`, `rbx`, `rcx`, `rdx`, `rbp`, `rsp`, `rsi`, `rdi`, `r8-r15`, plus instrumented `rip`, accessed memory addr and true `rip`
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
-/// The registers that need to be saved by the asan runtime, as names
+/// The registers that need to be saved by the `ASan` runtime, as names
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "rax",
@@ -93,6 +95,10 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "actual rip",
 ];
 
+thread_local! {
+    static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
+}
+
 /// The count of registers that need to be saved by the asan runtime
 #[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
@@ -104,8 +110,9 @@ const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_ADDRESS_OFFSET: u32 = 28;
 
-/// The frida address sanitizer runtime, providing address sanitization.
-/// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
+/// The `FRIDA` address sanitizer runtime, providing address sanitization.
+///
+/// When executing in `ASan`, each memory access will get checked, using `FRIDA` stalker under the hood.
 /// The runtime can report memory errors that occurred during execution,
 /// even if the target would not have crashed under normal conditions.
 /// this helps finding mem errors early.
@@ -179,7 +186,6 @@ impl FridaRuntime for AsanRuntime {
         self.register_hooks(gum);
         self.generate_instrumentation_blobs();
         self.unpoison_all_existing_memory();
-
         self.register_thread();
     }
 
@@ -210,7 +216,11 @@ impl FridaRuntime for AsanRuntime {
 
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
-        self.poison(slice.as_ptr() as usize, slice.len());
+        // # Safety
+        // The ptr and length are correct.
+        unsafe {
+            self.poison(slice.as_ptr() as usize, slice.len());
+        }
         self.reset_allocations();
 
         Ok(())
@@ -276,7 +286,11 @@ impl AsanRuntime {
     }
 
     /// Make sure the specified memory is poisoned
-    pub fn poison(&mut self, address: usize, size: usize) {
+    ///
+    /// # Safety
+    /// The address needs to be a valid address, the size needs to be correct.
+    /// This will dereference at the address.
+    pub unsafe fn poison(&mut self, address: usize, size: usize) {
         Allocator::poison(self.allocator.map_to_shadow(address), size);
     }
 
@@ -313,7 +327,7 @@ impl AsanRuntime {
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
     #[allow(clippy::unused_self)]
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(not(target_vendor = "apple"))]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
         let (tls_start, tls_end) = Self::current_tls();
@@ -330,7 +344,7 @@ impl AsanRuntime {
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack mapping.
     #[allow(clippy::unused_self)]
-    #[cfg(target_os = "ios")]
+    #[cfg(target_vendor = "apple")]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
         self.allocator
@@ -339,7 +353,7 @@ impl AsanRuntime {
         log::info!("registering thread with stack {stack_start:x}:{stack_end:x}");
     }
 
-    /// Get the maximum stack size for the current stack
+    // /// Get the maximum stack size for the current stack
     // #[must_use]
     // #[cfg(target_vendor = "apple")]
     // fn max_stack_size() -> usize {
@@ -372,13 +386,17 @@ impl AsanRuntime {
     fn range_for_address(address: usize) -> (usize, usize) {
         let mut start = 0;
         let mut end = 0;
-        RangeDetails::enumerate_with_prot(PageProtection::NoAccess, &mut |range: &RangeDetails| {
+
+        RangeDetails::enumerate_with_prot(PageProtection::Read, &mut |range: &RangeDetails| {
             let range_start = range.memory_range().base_address().0 as usize;
             let range_end = range_start + range.memory_range().size();
             if range_start <= address && range_end >= address {
                 start = range_start;
                 end = range_end;
-                // I want to stop iteration here
+                return false;
+            }
+            if address < start {
+                //if the address is less than the start then we cannot find it
                 return false;
             }
             true
@@ -403,51 +421,21 @@ impl AsanRuntime {
         let stack_address = addr_of_mut!(stack_var) as usize;
         // let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
+
         unsafe {
             write_volatile(&mut stack_var, 0xfadbeef);
         }
-        let mut range = None;
-        for area in mmap_rs::MemoryAreas::open(None).unwrap() {
-            let area_ref = area.as_ref().unwrap();
-            if area_ref.start() <= stack_address && stack_address <= area_ref.end() {
-                range = Some((area_ref.end() - 1024 * 1024, area_ref.end()));
-                break;
-            }
-        }
-        if let Some((start, end)) = range {
-            //     #[cfg(unix)]
-            //     {
-            //         let max_start = end - Self::max_stack_size();
-            //
-            //         let flags = ANONYMOUS_FLAG | MapFlags::MAP_FIXED | MapFlags::MAP_PRIVATE;
-            //         #[cfg(not(target_vendor = "apple"))]
-            //         let flags = flags | MapFlags::MAP_STACK;
-            //
-            //         if start != max_start {
-            //             let mapping = unsafe {
-            //                 mmap(
-            //                     NonZeroUsize::new(max_start),
-            //                     NonZeroUsize::new(start - max_start).unwrap(),
-            //                     ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-            //                     flags,
-            //                     -1,
-            //                     0,
-            //                 )
-            //             };
-            //             assert!(mapping.unwrap() as usize == max_start);
-            //         }
-            //         (max_start, end)
-            //     }
-            //     #[cfg(windows)]
-            (start, end)
-        } else {
-            panic!("Couldn't find stack mapping!");
-        }
+
+        let range = Self::range_for_address(stack_address);
+
+        assert_ne!(range.0, 0, "Couldn't find stack mapping!");
+
+        (range.1 - 1024 * 1024, range.1)
     }
 
     /// Determine the tls start, end for the currently running thread
     #[must_use]
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(not(target_vendor = "apple"))]
     fn current_tls() -> (usize, usize) {
         let tls_address = unsafe { tls_ptr() } as usize;
 
@@ -488,13 +476,14 @@ impl AsanRuntime {
     #[allow(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
+        let module = Module::obtain(gum);
         macro_rules! hook_func {
             //No library case
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
 
-                    let target_function = frida_gum::Module::find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -506,22 +495,18 @@ impl AsanRuntime {
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
-                        let original = [<$name:snake:upper _PTR>].get().unwrap();
-                        if this.hooks_enabled {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
-                        } else {
+                     let original = [<$name:snake:upper _PTR>].get().unwrap();
 
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
-                            let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
-                            ret
-                        }
+                     if !ASAN_IN_HOOK.get() && this.hooks_enabled {
+                        ASAN_IN_HOOK.set(true);
+                        let ret = this.[<hook_ $name>](*original, $($param),*);
+                        ASAN_IN_HOOK.set(false);
+                        ret
+                    } else {
+                        let ret = (original)($($param),*);
+                        ret
                     }
+                 }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
                     let _ = interceptor.replace(
@@ -538,7 +523,7 @@ impl AsanRuntime {
                 paste::paste! {
                     log::trace!("Hooking {}:{}", $lib, stringify!($name));
 
-                    let target_function = frida_gum::Module::find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -551,18 +536,13 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        if this.hooks_enabled {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        if !ASAN_IN_HOOK.get() && this.hooks_enabled {
+                            ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            ASAN_IN_HOOK.set(false);
                             ret
                         } else {
-
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
                     }
@@ -585,7 +565,7 @@ impl AsanRuntime {
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
-                    let target_function = frida_gum::Module::find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -598,18 +578,15 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
-
-                        if this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
+                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
+                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
+                            ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            ASAN_IN_HOOK.set(false);
                             ret
                         } else {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
 
@@ -628,7 +605,7 @@ impl AsanRuntime {
             ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}:{}", $lib, stringify!($name));
-                    let target_function = frida_gum::Module::find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -641,18 +618,15 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-
-                        if this.hooks_enabled && this.[<hook_check_ $name>]($($param),*){
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
+                        //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
+                        //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
+                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
+                            ASAN_IN_HOOK.set(true);
                             let ret = this.[<hook_ $name>](*original, $($param),*);
-                            this.hooks_enabled = previous_hook_state;
+                            ASAN_IN_HOOK.set(false);
                             ret
                         } else {
-                            let previous_hook_state = this.hooks_enabled;
-                            this.hooks_enabled = false;
                             let ret = (original)($($param),*);
-                            this.hooks_enabled = previous_hook_state;
                             ret
                         }
 
@@ -720,7 +694,7 @@ impl AsanRuntime {
         macro_rules! hook_heap_windows {
             ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking allocator functions in {}", $libname);
-            for export in Module::enumerate_exports($libname) {
+            for export in module.enumerate_exports($libname) {
                 // log::trace!("- {}", export.name);
                 match &export.name[..] {
                     "NtGdiCreateCompatibleDC" => {
@@ -946,7 +920,7 @@ impl AsanRuntime {
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
-            for export in Module::enumerate_exports($libname) {
+            for export in module.enumerate_exports($libname) {
                 match &export.name[..] {
                     "_Znam" => {
                         hook_func!($libname, $lib_ident, _Znam, (size: usize), *mut c_void);
@@ -1766,14 +1740,14 @@ impl AsanRuntime {
         macro_rules! shadow_check {
             ($ops:ident, $width:expr) => {dynasm!($ops
                 ; .arch aarch64
-//              ; brk #0xe
+                //; brk #0xe
                 ; stp x2, x3, [sp, #-0x10]!
                 ; mov x1, xzr
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
                 ; mov x2, #1
-                ; add x1, x1, x2, lsl #shadow_bit
+                ; add x1, x1, x2, lsl #shadow_bit //x1 contains the offset of the shadow byte
                 ; ldr w1, [x1, #0] //w1 contains our shadow check
                 ; and x0, x0, #7 //x0 is the offset for unaligned accesses
                 ; rev32 x1, x1

@@ -1,15 +1,25 @@
 [package]
 name = "symcc_libafl"
-version.workspace = true
+version = "0.13.2"
 edition = "2021"
-authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = [
+  "Julius Hohnerlein <julihoh@users.noreply.github.com>",
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
 description = "Meta package for symcc_runtime"
 documentation = "https://docs.rs/symcc_libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -24,6 +34,9 @@ build = ["which", "cmake"]
 clone = ["which"]
 
 [dependencies]
-which = { version = "6.0", optional = true }
-cmake = { version = "0.1", optional = true }
-log = "0.4.20"
+which = { workspace = true, optional = true }
+cmake = { workspace = true, optional = true }
+log = { workspace = true }
+
+[lints]
+workspace = true

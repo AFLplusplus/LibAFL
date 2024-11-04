@@ -33,7 +33,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     struct W<'a, T: ?Sized, U: ?Sized>(&'a Cell<bool>, PhantomData<fn() -> (&'a T, &'a U)>);
 
     // default implementation: if the types are unequal, we will use the clone implementation
-    impl<'a, T: ?Sized, U: ?Sized> Clone for W<'a, T, U> {
+    impl<T: ?Sized, U: ?Sized> Clone for W<'_, T, U> {
         #[inline]
         fn clone(&self) -> Self {
             // indicate that the types are unequal
@@ -46,7 +46,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 
     // specialized implementation: Copy is only implemented if the types are the same
     #[allow(clippy::mismatching_type_param_order)]
-    impl<'a, T: ?Sized> Copy for W<'a, T, T> {}
+    impl<T: ?Sized> Copy for W<'_, T, T> {}
 
     let detected = Cell::new(true);
     // [].clone() is *specialized* in core.
@@ -417,12 +417,19 @@ where
 pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&Cow<'static, str>>;
+
+    /// Gets all the names
+    fn names(&self) -> Vec<Cow<'static, str>>;
 }
 
 #[cfg(feature = "alloc")]
 impl NamedTuple for () {
     fn name(&self, _index: usize) -> Option<&Cow<'static, str>> {
         None
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        Vec::new()
     }
 }
 
@@ -447,6 +454,13 @@ where
         } else {
             self.1.name(index - 1)
         }
+    }
+
+    fn names(&self) -> Vec<Cow<'static, str>> {
+        let first = self.0.name().clone();
+        let mut last = self.1.names();
+        last.insert(0, first);
+        last
     }
 }
 
@@ -596,7 +610,6 @@ pub struct RefIndexable<RM, M>(RM, PhantomData<M>);
 impl<RM, M> From<RM> for RefIndexable<RM, M>
 where
     RM: Deref<Target = M>,
-    M: MatchName,
 {
     fn from(value: RM) -> Self {
         RefIndexable(value, PhantomData)
@@ -657,54 +670,32 @@ where
 
 /// Allows prepending of values to a tuple
 pub trait Prepend<T> {
-    /// The Resulting [`TupleList`], of an [`Prepend::prepend()`] call,
-    /// including the prepended entry.
-    type PreprendResult;
-
     /// Prepend a value to this tuple, returning a new tuple with prepended value.
     #[must_use]
-    fn prepend(self, value: T) -> (T, Self::PreprendResult);
+    fn prepend(self, value: T) -> (T, Self);
 }
 
 /// Implement prepend for tuple list.
 impl<Tail, T> Prepend<T> for Tail {
-    type PreprendResult = Self;
-
-    fn prepend(self, value: T) -> (T, Self::PreprendResult) {
+    fn prepend(self, value: T) -> (T, Self) {
         (value, self)
     }
 }
 
 /// Append to a tuple
-pub trait Append<T> {
-    /// The Resulting [`TupleList`], of an [`Append::append()`] call,
-    /// including the appended entry.
-    type AppendResult;
-
+pub trait Append<T>
+where
+    Self: Sized,
+{
     /// Append Value and return the tuple
     #[must_use]
-    fn append(self, value: T) -> Self::AppendResult;
+    fn append(self, value: T) -> (Self, T);
 }
 
-/// Implement append for an empty tuple list.
-impl<T> Append<T> for () {
-    type AppendResult = (T, ());
-
-    fn append(self, value: T) -> Self::AppendResult {
-        (value, ())
-    }
-}
-
-/// Implement append for non-empty tuple list.
-impl<Head, Tail, T> Append<T> for (Head, Tail)
-where
-    Tail: Append<T>,
-{
-    type AppendResult = (Head, Tail::AppendResult);
-
-    fn append(self, value: T) -> Self::AppendResult {
-        let (head, tail) = self;
-        (head, tail.append(value))
+/// Implement append for tuple list.
+impl<Head, T> Append<T> for Head {
+    fn append(self, value: T) -> (Self, T) {
+        (self, value)
     }
 }
 
@@ -846,22 +837,6 @@ macro_rules! tuple_for_each_mut {
     };
 }
 
-#[cfg(test)]
-#[cfg(feature = "std")]
-#[test]
-#[allow(clippy::items_after_statements)]
-pub fn test_macros() {
-    let mut t = tuple_list!(1, "a");
-
-    tuple_for_each!(f1, std::fmt::Display, t, |x| {
-        log::info!("{x}");
-    });
-
-    tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
-        log::info!("{x}");
-    });
-}
-
 /*
 
 // Define trait and implement it for several primitive types.
@@ -965,5 +940,21 @@ mod test {
         // this won't compile if the mapped type is not correct
         #[allow(clippy::no_effect_underscore_binding)]
         let _type_assert: tuple_list_type!(W<A>, W<B>, W<C>) = mapped;
+    }
+
+    /// Function that tests the tuple macros
+    #[test]
+    #[cfg(feature = "std")]
+    #[allow(clippy::items_after_statements)]
+    fn test_macros() {
+        let mut t = tuple_list!(1, "a");
+
+        tuple_for_each!(f1, std::fmt::Display, t, |x| {
+            log::info!("{x}");
+        });
+
+        tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
+            log::info!("{x}");
+        });
     }
 }

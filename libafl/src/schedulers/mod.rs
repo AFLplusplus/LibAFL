@@ -29,30 +29,27 @@ pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 pub mod tuneable;
 use libafl_bolts::{
     rands::Rand,
-    tuples::{Handle, MatchNameRef},
+    tuples::{Handle, MatchName, MatchNameRef},
 };
 pub use tuneable::*;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    inputs::UsesInput,
-    observers::{MapObserver, ObserversTuple},
+    observers::MapObserver,
     random_corpus_id,
-    state::{HasCorpus, HasRand, State, UsesState},
+    state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
 
 /// The scheduler also implements `on_remove` and `on_replace` if it implements this stage.
-pub trait RemovableScheduler: Scheduler
-where
-    Self::State: HasCorpus,
-{
+pub trait RemovableScheduler<I, S> {
     /// Removed the given entry from the corpus at the given index
+    /// When you remove testcases, make sure that that testcase is not currently fuzzed one!
     fn on_remove(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
+        _testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -60,21 +57,105 @@ where
     /// Replaced the given testcase at the given idx
     fn on_replace(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _id: CorpusId,
-        _prev: &Testcase<<Self::State as UsesInput>::Input>,
+        _prev: &Testcase<I>,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-/// Defines the common metadata operations for the AFL-style schedulers
-pub trait AflScheduler<C, O, S>: Scheduler
+/// Called when a [`Testcase`] is evaluated
+pub fn on_add_metadata_default<CS, S>(
+    scheduler: &mut CS,
+    state: &mut S,
+    id: CorpusId,
+) -> Result<(), Error>
 where
-    Self::State: HasCorpus + HasMetadata + HasTestcase,
-    O: MapObserver,
-    C: AsRef<O>,
+    CS: AflScheduler,
+    S: HasTestcase + HasCorpus,
 {
+    let current_id = *state.corpus().current();
+
+    let mut depth = match current_id {
+        Some(parent_idx) => state
+            .testcase(parent_idx)?
+            .metadata::<SchedulerTestcaseMetadata>()?
+            .depth(),
+        None => 0,
+    };
+
+    // TODO increase perf_score when finding new things like in AFL
+    // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
+
+    // Attach a `SchedulerTestcaseMetadata` to the queue entry.
+    depth += 1;
+    let mut testcase = state.testcase_mut(id)?;
+    testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
+        depth,
+        scheduler.last_hash(),
+    ));
+    testcase.set_parent_id_optional(current_id);
+    Ok(())
+}
+
+/// Called when a [`Testcase`] is evaluated
+pub fn on_evaluation_metadata_default<CS, O, OT, S>(
+    scheduler: &mut CS,
+    state: &mut S,
+    observers: &OT,
+) -> Result<(), Error>
+where
+    CS: AflScheduler,
+    CS::MapObserverRef: AsRef<O>,
+    S: HasMetadata,
+    O: MapObserver,
+    OT: MatchName,
+{
+    let observer = observers
+        .get(scheduler.map_observer_handle())
+        .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+        .as_ref();
+
+    let mut hash = observer.hash_simple() as usize;
+
+    let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
+
+    hash %= psmeta.n_fuzz().len();
+    // Update the path frequency
+    psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
+
+    scheduler.set_last_hash(hash);
+
+    Ok(())
+}
+
+/// Called when choosing the next [`Testcase`]
+pub fn on_next_metadata_default<S>(state: &mut S) -> Result<(), Error>
+where
+    S: HasCorpus + HasTestcase,
+{
+    let current_id = *state.corpus().current();
+
+    if let Some(id) = current_id {
+        let mut testcase = state.testcase_mut(id)?;
+        let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
+
+        if tcmeta.handicap() >= 4 {
+            tcmeta.set_handicap(tcmeta.handicap() - 4);
+        } else if tcmeta.handicap() > 0 {
+            tcmeta.set_handicap(tcmeta.handicap() - 1);
+        }
+    }
+
+    Ok(())
+}
+
+/// Defines the common metadata operations for the AFL-style schedulers
+pub trait AflScheduler {
+    /// The type of [`MapObserver`] that this scheduler will use as reference
+    type MapObserverRef;
+
     /// Return the last hash
     fn last_hash(&self) -> usize;
 
@@ -82,121 +163,48 @@ where
     fn set_last_hash(&mut self, value: usize);
 
     /// Get the observer map observer name
-    fn map_observer_handle(&self) -> &Handle<C>;
+    fn map_observer_handle(&self) -> &Handle<Self::MapObserverRef>;
+}
 
-    /// Called when a [`Testcase`] is added to the corpus
-    fn on_add_metadata(&self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
-        let current_id = *state.corpus().current();
-
-        let mut depth = match current_id {
-            Some(parent_idx) => state
-                .testcase(parent_idx)?
-                .metadata::<SchedulerTestcaseMetadata>()?
-                .depth(),
-            None => 0,
-        };
-
-        // TODO increase perf_score when finding new things like in AFL
-        // https://github.com/google/AFL/blob/master/afl-fuzz.c#L6547
-
-        // Attach a `SchedulerTestcaseMetadata` to the queue entry.
-        depth += 1;
-        let mut testcase = state.testcase_mut(id)?;
-        testcase.add_metadata(SchedulerTestcaseMetadata::with_n_fuzz_entry(
-            depth,
-            self.last_hash(),
-        ));
-        testcase.set_parent_id_optional(current_id);
-        Ok(())
-    }
-
-    /// Called when a [`Testcase`] is evaluated
-    fn on_evaluation_metadata<OT>(
-        &mut self,
-        state: &mut Self::State,
-        _input: &<Self::State as UsesInput>::Input,
-        observers: &OT,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<Self::State>,
-    {
-        let observer = observers
-            .get(self.map_observer_handle())
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-            .as_ref();
-
-        let mut hash = observer.hash_simple() as usize;
-
-        let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
-
-        hash %= psmeta.n_fuzz().len();
-        // Update the path frequency
-        psmeta.n_fuzz_mut()[hash] = psmeta.n_fuzz()[hash].saturating_add(1);
-
-        self.set_last_hash(hash);
-
-        Ok(())
-    }
-
-    /// Called when choosing the next [`Testcase`]
-    fn on_next_metadata(
-        &mut self,
-        state: &mut Self::State,
-        _next_id: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        let current_id = *state.corpus().current();
-
-        if let Some(id) = current_id {
-            let mut testcase = state.testcase_mut(id)?;
-            let tcmeta = testcase.metadata_mut::<SchedulerTestcaseMetadata>()?;
-
-            if tcmeta.handicap() >= 4 {
-                tcmeta.set_handicap(tcmeta.handicap() - 4);
-            } else if tcmeta.handicap() > 0 {
-                tcmeta.set_handicap(tcmeta.handicap() - 1);
-            }
-        }
-
-        Ok(())
-    }
+/// Trait for Schedulers which track queue cycles
+pub trait HasQueueCycles {
+    /// The amount of cycles the scheduler has completed.
+    fn queue_cycles(&self) -> u64;
 }
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler: UsesState
-where
-    Self::State: HasCorpus,
-{
+pub trait Scheduler<I, S> {
     /// Called when a [`Testcase`] is added to the corpus
-    fn on_add(&mut self, _state: &mut Self::State, _id: CorpusId) -> Result<(), Error>;
+    fn on_add(&mut self, _state: &mut S, _id: CorpusId) -> Result<(), Error>;
     // Add parent_id here if it has no inner
 
     /// An input has been evaluated
     fn on_evaluation<OT>(
         &mut self,
-        _state: &mut Self::State,
-        _input: &<Self::State as UsesInput>::Input,
+        _state: &mut S,
+        _input: &I,
         _observers: &OT,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<Self::State>,
+        OT: MatchName,
     {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error>;
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error>;
     // Increment corpus.current() here if it has no inner
 
     /// Set current fuzzed corpus id and `scheduled_count`
     fn set_current_scheduled(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         next_id: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        *state.corpus_mut().current_mut() = next_id;
-        Ok(())
-    }
+    ) -> Result<(), Error>;
+
+    //    *state.corpus_mut().current_mut() = next_id;
+    //    Ok(())
 }
 
 /// Feed the fuzzer simply with a random testcase on request
@@ -205,18 +213,11 @@ pub struct RandScheduler<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> UsesState for RandScheduler<S>
+impl<I, S> Scheduler<I, S> for RandScheduler<S>
 where
-    S: State + HasTestcase,
+    S: HasCorpus + HasRand,
 {
-    type State = S;
-}
-
-impl<S> Scheduler for RandScheduler<S>
-where
-    S: HasCorpus + HasRand + HasTestcase + State,
-{
-    fn on_add(&mut self, state: &mut Self::State, id: CorpusId) -> Result<(), Error> {
+    fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id
         let current_id = *state.corpus().current();
         state
@@ -229,7 +230,7 @@ where
     }
 
     /// Gets the next entry at random
-    fn next(&mut self, state: &mut Self::State) -> Result<CorpusId, Error> {
+    fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(
                 "No entries in corpus. This often implies the target is not properly instrumented."
@@ -237,9 +238,18 @@ where
             ))
         } else {
             let id = random_corpus_id!(state.corpus(), state.rand_mut());
-            self.set_current_scheduled(state, Some(id))?;
+            <Self as Scheduler<I, S>>::set_current_scheduled(self, state, Some(id))?;
             Ok(id)
         }
+    }
+
+    fn set_current_scheduled(
+        &mut self,
+        state: &mut S,
+        next_id: Option<CorpusId>,
+    ) -> Result<(), Error> {
+        *state.corpus_mut().current_mut() = next_id;
+        Ok(())
     }
 }
 
@@ -260,5 +270,6 @@ impl<S> Default for RandScheduler<S> {
 }
 
 /// A [`StdScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s.
+///
 /// The current `Std` is a [`RandScheduler`], although this may change in the future, if another [`Scheduler`] delivers better results.
 pub type StdScheduler<S> = RandScheduler<S>;

@@ -256,6 +256,8 @@ impl TimerStruct {
     #[cfg(all(unix, not(target_os = "linux")))]
     /// Set up timer
     pub fn set_timer(&mut self) {
+        // # Safety
+        // Safe because the variables are all alive at this time and don't contain pointers.
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, core::ptr::null_mut());
         }
@@ -310,22 +312,25 @@ impl TimerStruct {
     }
 
     #[cfg(all(unix, not(target_os = "linux")))]
-    /// Disalarm timer
+    /// Disable the timer
     pub fn unset_timer(&mut self) {
+        // # Safety
+        // No user-provided values.
         unsafe {
             let mut itimerval_zero: Itimerval = core::mem::zeroed();
             setitimer(ITIMER_REAL, &mut itimerval_zero, core::ptr::null_mut());
         }
     }
 
-    /// Disalarm timer
+    /// Disable the timer
     #[cfg(target_os = "linux")]
     #[allow(unused_variables)]
     pub fn unset_timer(&mut self) {
+        // # Safety
+        // Just API calls, no user-provided inputs
         if self.batch_mode {
             unsafe {
                 let elapsed = current_time().saturating_sub(self.tmout_start_time);
-                let elapsed_since_signal = current_time().saturating_sub(self.tmout_start_time);
                 // elapsed may be > than tmout in case of received but ingored signal
                 if elapsed > self.exec_tmout
                     || self.exec_tmout.saturating_sub(elapsed) < self.avg_exec_time * self.avg_mul_k
@@ -338,8 +343,7 @@ impl TimerStruct {
                         self.executions = 0;
                     }
                     // readjust K
-                    if elapsed_since_signal > self.exec_tmout * self.avg_mul_k && self.avg_mul_k > 1
-                    {
+                    if elapsed > self.exec_tmout * self.avg_mul_k && self.avg_mul_k > 1 {
                         self.avg_mul_k -= 1;
                     }
                 } else {
@@ -356,8 +360,10 @@ impl TimerStruct {
     }
 
     #[cfg(windows)]
-    /// Disalarm
+    /// Disable the timer
     pub fn unset_timer(&mut self) {
+        // # Safety
+        // The value accesses are guarded by a critical section.
         unsafe {
             let data = addr_of_mut!(GLOBAL_STATE);
 

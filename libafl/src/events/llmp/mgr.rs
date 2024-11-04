@@ -1,5 +1,5 @@
-/// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
-/// using low-level message passing, [`llmp`].
+//! An [`crate::events::EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
+//! using low-level message passing, [`libafl_bolts::llmp`].
 
 #[cfg(feature = "std")]
 use alloc::string::ToString;
@@ -15,7 +15,7 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     current_time,
-    llmp::{LlmpClient, LlmpClientDescription},
+    llmp::{LlmpClient, LlmpClientDescription, LLMP_FLAG_FROM_MM},
     shmem::{NopShMemProvider, ShMemProvider},
     tuples::Handle,
     ClientId,
@@ -40,7 +40,7 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
     observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasLastReportTime, NopState, State, UsesState},
+    state::{HasExecutions, HasImported, HasLastReportTime, NopState, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -167,10 +167,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         })
     }
 
-    /// Create an LLMP event manager on a port
-    ///
-    /// If the port is not yet bound, it will act as a broker; otherwise, it
-    /// will act as a client.
+    /// Create an LLMP event manager on a port.
+    /// It expects a broker to exist on this port.
     #[cfg(feature = "std")]
     pub fn build_on_port<S, SP>(
         self,
@@ -389,7 +387,7 @@ where
 impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
 {
     // Handle arriving events in the client
@@ -403,10 +401,11 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z> + HasObservers<State = S>,
+        E: Executor<Self, Z, State = S> + HasObservers,
+        E::Observers: ObserversTuple<S::Input, S> + Serialize,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<E::Observers, State = S>
-            + EvaluatorObservers<E::Observers>
+        Z: ExecutionProcessor<Self, E::Observers, State = S>
+            + EvaluatorObservers<Self, E::Observers>
             + Evaluator<E, Self>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
@@ -450,11 +449,12 @@ where
                         {
                             state.scalability_monitor_mut().testcase_without_observers += 1;
                         }
-                        fuzzer.evaluate_input_with_observers::<E, Self>(
+                        fuzzer.evaluate_input_with_observers::<E>(
                             state, executor, self, input, false,
                         )?
                     };
                     if let Some(item) = res.1 {
+                        *state.imported_mut() += 1;
                         log::debug!("Added received Testcase {evt_name} as item #{item}");
                     } else {
                         log::debug!("Testcase {evt_name} was discarded");
@@ -553,7 +553,7 @@ where
 
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
-        OT: ObserversTuple<Self::State> + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         const SERIALIZE_TIME_FACTOR: u32 = 2;
         const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
@@ -585,12 +585,13 @@ where
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata,
+    S: State + HasExecutions + HasMetadata + HasImported,
     SP: ShMemProvider,
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: ExecutionProcessor<E::Observers, State = S>
-        + EvaluatorObservers<E::Observers>
+    Z: ExecutionProcessor<Self, E::Observers, State = S>
+        + EvaluatorObservers<Self, E::Observers>
         + Evaluator<E, Self>,
 {
     fn process(
@@ -602,7 +603,7 @@ where
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         let mut count = 0;
-        while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
+        while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert!(
                 tag != _LLMP_TAG_EVENT_TO_BROKER,
                 "EVENT_TO_BROKER parcel should not have arrived in the client!"
@@ -616,7 +617,7 @@ where
             #[cfg(feature = "llmp_compression")]
             let compressed;
             #[cfg(feature = "llmp_compression")]
-            let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+            let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
                 compressed = self.compressor.decompress(msg)?;
                 &compressed
             } else {
@@ -624,6 +625,13 @@ where
             };
             let event: Event<S::Input> = postcard::from_bytes(event_bytes)?;
             log::debug!("Received event in normal llmp {}", event.name_detailed());
+
+            // If the message comes from another machine, do not
+            // consider other events than new testcase.
+            if !event.is_new_testcase() && (flags & LLMP_FLAG_FROM_MM == LLMP_FLAG_FROM_MM) {
+                continue;
+            }
+
             self.handle_in_client(fuzzer, executor, state, client_id, event)?;
             count += 1;
         }
@@ -637,13 +645,14 @@ where
 
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpEventManager<EMH, S, SP>
 where
-    E: HasObservers<State = S> + Executor<Self, Z>,
+    E: HasObservers + Executor<Self, Z, State = S>,
+    E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<E::Observers, State = S>
-        + EvaluatorObservers<E::Observers>
+    Z: ExecutionProcessor<Self, E::Observers, State = S>
+        + EvaluatorObservers<Self, E::Observers>
         + Evaluator<E, Self>,
 {
 }

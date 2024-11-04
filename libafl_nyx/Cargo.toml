@@ -1,6 +1,6 @@
 [package]
 name = "libafl_nyx"
-version.workspace = true
+version = "0.13.2"
 edition = "2021"
 authors = ["syheliel <syheliel@gmail.com>"]
 description = "libafl using nyx, only avaliable on linux"
@@ -9,15 +9,35 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libnyx = { git = "https://github.com/nyx-fuzz/libnyx.git", rev = "6833d236dfe785a8a23d8c8d79e74c99fa635004" }
-libafl = { path = "../libafl", version = "0.13.1", features = ["std", "libafl_derive", "frida_cli" ]}
-libafl_bolts = { path = "../libafl_bolts", version = "0.13.1", features = ["std", "libafl_derive", "frida_cli" ]}
-libafl_targets = { path = "../libafl_targets", version = "0.13.1", features = ["std", "sancov_cmplog"] }
+libafl = { path = "../libafl", version = "0.13.2", features = [
+  "std",
+  "libafl_derive",
+  "frida_cli",
+] }
+libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", features = [
+  "std",
+  "libafl_derive",
+  "frida_cli",
+] }
+libafl_targets = { path = "../libafl_targets", version = "0.13.2", features = [
+  "std",
+  "sancov_cmplog",
+] }
 
-nix = { version = "0.29", features = ["fs"] }
-typed-builder = "0.18"
+nix = { workspace = true, default-features = true, features = ["fs"] }
+typed-builder = { workspace = true }
+
+[lints]
+workspace = true

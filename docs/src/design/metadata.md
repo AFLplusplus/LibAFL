@@ -27,7 +27,7 @@ Metadata objects are primarly intended to be used inside [`SerdeAnyMap`](https:/
 
 With these maps, the user can retrieve instances by type (and name). Internally, the instances are stored as SerdeAny trait objects.
 
-Structs that want to have a set of metadata must implement the [`HasMetadata`](https://docs.rs/libafl/latest/libafl/state/trait.HasMetadata.html) trait.
+Structs that want to have a set of metadata must implement the [`HasMetadata`](https://docs.rs/libafl/latest/libafl/common/trait.HasMetadata.html) trait.
 
 By default, Testcase and State implement it and hold a SerdeAnyMap testcase.
 

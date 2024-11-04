@@ -6,6 +6,7 @@ use libafl::observers::concolic::SymExpr;
 use crate::{RSymExpr, Runtime};
 
 /// Traces the expressions according to the format described in [`libafl::observers::concolic::serialization_format`].
+///
 /// The format can be read from elsewhere to perform processing of the expressions outside of the runtime.
 pub struct TracingRuntime {
     writer: StdShMemMessageFileWriter,

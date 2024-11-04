@@ -1,7 +1,8 @@
-//! [`GramatronRandomMutator`] ist a random mutator using grammar automatons to perform grammar-aware fuzzing.
+//! [`GramatronRandomMutator`] is a random mutator using grammar automatons to perform grammar-aware fuzzing.
+//!
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
 use alloc::{borrow::Cow, vec::Vec};
-use core::cmp::max;
+use core::{cmp::max, num::NonZero};
 
 use hashbrown::HashMap;
 use libafl_bolts::{
@@ -11,11 +12,11 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasTestcase},
+    corpus::Corpus,
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
-    random_corpus_id,
+    nonzero, random_corpus_id,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
@@ -31,7 +32,7 @@ where
     generator: &'a GramatronGenerator<'a, S>,
 }
 
-impl<'a, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, S>
+impl<S> Mutator<GramatronInput, S> for GramatronRandomMutator<'_, S>
 where
     S: HasRand + HasMetadata,
 {
@@ -41,7 +42,12 @@ where
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
         if !input.terminals().is_empty() {
-            let size = state.rand_mut().below(input.terminals().len() + 1);
+            // # Safety
+            // We can assume that the count of terminals + 1 will never wrap around (otherwise it will break somewhere else).
+            // So len + 1 is always non-zero.
+            let size = state
+                .rand_mut()
+                .below(unsafe { NonZero::new(input.terminals().len() + 1).unwrap_unchecked() });
             input.terminals_mut().truncate(size);
         }
         if self.generator.append_generated_terminals(input, state) > 0 {
@@ -52,7 +58,7 @@ where
     }
 }
 
-impl<'a, S> Named for GramatronRandomMutator<'a, S>
+impl<S> Named for GramatronRandomMutator<'_, S>
 where
     S: HasRand + HasMetadata,
 {
@@ -104,22 +110,23 @@ impl GramatronIdxMapMetadata {
 #[derive(Default, Debug)]
 pub struct GramatronSpliceMutator;
 
-impl<S> Mutator<S::Input, S> for GramatronSpliceMutator
+impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata + HasTestcase,
+    S: HasRand + HasCorpus + HasMetadata,
+    S::Corpus: Corpus<Input = GramatronInput>,
 {
     fn mutate(
         &mut self,
         state: &mut S,
         input: &mut GramatronInput,
     ) -> Result<MutationResult, Error> {
-        if input.terminals().is_empty() {
+        let Some(terminals_len) = NonZero::new(input.terminals().len()) else {
             return Ok(MutationResult::Skipped);
-        }
+        };
 
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
 
-        let insert_at = state.rand_mut().below(input.terminals().len());
+        let insert_at = state.rand_mut().below(terminals_len);
 
         let rand_num = state.rand_mut().next();
 
@@ -215,8 +222,12 @@ where
         let chosen = *state.rand_mut().choose(&self.states).unwrap();
         let chosen_nums = self.counters.get(&chosen).unwrap().0;
 
+        let Some(minus_one) = NonZero::new(chosen_nums - 1) else {
+            return Ok(MutationResult::Skipped);
+        };
+
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut first = state.rand_mut().below(chosen_nums - 1) as i64;
+        let mut first = state.rand_mut().below(minus_one) as i64;
         #[allow(clippy::cast_sign_loss, clippy::pedantic)]
         let mut second = state
             .rand_mut()
@@ -248,7 +259,7 @@ where
 
         input.terminals_mut().truncate(idx_1);
 
-        for _ in 0..state.rand_mut().below(RECUR_THRESHOLD) {
+        for _ in 0..state.rand_mut().below(nonzero!(RECUR_THRESHOLD)) {
             input.terminals_mut().extend_from_slice(&self.feature);
         }
 
