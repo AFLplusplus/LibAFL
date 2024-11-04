@@ -64,7 +64,7 @@ libafl_targets = { path = "../libafl_targets", version = "0.13.2", features = [
 
 nix = { version = "0.29.0", default-features = true, features = ["mman"] }
 libc = { version = "0.2.59" }
-hashbrown = { version = "0.14.5", default-features = true }
+hashbrown = { version = "0.15.1", default-features = true }
 rangemap = { version = "1.5.1" }
 frida-gum-sys = { version = "0.15.1", features = [
   "event-sink",
