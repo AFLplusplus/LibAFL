@@ -74,18 +74,18 @@ libafl = { path = "../libafl", version = "0.13.2", default-features = false, fea
 ] }
 libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features = false, features = [
 ] }
-libc = { workspace = true }
-hashbrown = { workspace = true, default-features = true }
+libc = { version = "0.2.59" }
+hashbrown = { version = "0.14.5", default-features = true }
 once_cell = "1.19.0"
-log = { workspace = true }
-rustversion = { workspace = true }
+log = { version = "0.4.22" }
+rustversion = { version = "1.0.17" }
 
-rangemap = { workspace = true }
-serde = { workspace = true, default-features = false, features = [
+rangemap = { version = "1.5.1" }
+serde = { version = "1.0.210", default-features = false, features = [
   "alloc",
 ] } # serialization lib
-meminterval = { workspace = true, features = ["serde"], optional = true }
-ahash = { workspace = true, default-features = false, optional = true }
+meminterval = { version = "0.4.1", features = ["serde"], optional = true }
+ahash = { version = "0.8.11", default-features = false, optional = true }
 
 [lints]
 workspace = true

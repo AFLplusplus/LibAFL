@@ -121,7 +121,6 @@ pub mod serdeany_registry {
     use core::{
         any::TypeId,
         fmt,
-        hash::BuildHasherDefault,
         ptr::{addr_of, addr_of_mut},
     };
 
@@ -344,7 +343,7 @@ pub mod serdeany_registry {
             '_,
             TypeRepr,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            foldhash::fast::RandomState,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -647,7 +646,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            foldhash::fast::RandomState,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -665,7 +664,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            foldhash::fast::RandomState,
         >
         where
             T: crate::serdeany::SerdeAny,

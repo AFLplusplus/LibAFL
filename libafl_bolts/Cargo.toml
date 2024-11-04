@@ -117,63 +117,67 @@ llmp_debug = ["alloc", "std"]
 llmp_small_maps = ["alloc"]
 
 [build-dependencies]
-rustversion = { workspace = true }
+rustversion = { version = "1.0.17" }
 
 [dependencies]
 libafl_derive = { version = "0.13.2", optional = true, path = "../libafl_derive" }
 static_assertions = "1.1.0"
 
 tuple_list = { version = "0.1.3" }
-hashbrown = { workspace = true, features = [
+hashbrown = { version = "0.15.0", features = [
   "serde",
-  "ahash",
+  "default-hasher",
+  "raw-entry",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",
 ], optional = true } # xxh3 hashing for rust
-serde = { workspace = true, default-features = false, features = [
+serde = { version = "1.0.210", default-features = false, features = [
   "derive",
 ] } # serialization lib
 erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
-postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
-num_enum = { workspace = true, default-features = false }
-ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
-backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
+postcard = { version = "1.0.10", features = [
+  "alloc",
+], default-features = false, optional = true } # no_std compatible serde serialization format
+num_enum = { version = "0.7.3", default-features = false }
+ahash = { version = "0.8.11", default-features = false, optional = true } # The hash function already used in hashbrown
+foldhash = { version = "0.1.3", default-features = false } # After hashbrown 0.15.0
+backtrace = { version = "0.3.74", default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.2.8" }
 miniz_oxide = { version = "0.8.0", optional = true }
 hostname = { version = "0.4.0", optional = true } # Is there really no gethostname in the stdlib?
 rand_core = { version = "0.6.4", optional = true }
-nix = { workspace = true, optional = true, default-features = false, features = [
+nix = { version = "0.29.0", optional = true, default-features = false, features = [
   "signal",
   "socket",
   "poll",
 ] }
-uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
-clap = { workspace = true, features = [
+uuid = { version = "1.10.0", optional = true, features = ["serde", "v4"] }
+clap = { version = "4.5.18", features = [
   "derive",
   "wrap_help",
 ], optional = true } # CLI parsing, for libafl_bolts::cli / the `cli` feature
-log = { workspace = true }
+log = { version = "0.4.22" }
 pyo3 = { version = "0.22.3", optional = true, features = ["serde", "macros"] }
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
-serial_test = { workspace = true, optional = true, default-features = false, features = [
+serial_test = { version = "3.1.1", optional = true, default-features = false, features = [
   "logging",
 ] }
 
 # Document all features of this crate (for `cargo doc`)
-document-features = { workspace = true, optional = true }
+document-features = { version = "0.2.10", optional = true }
 
 [lints]
 workspace = true
 
 [target.'cfg(unix)'.dependencies]
-libc = { workspace = true }                                            # For (*nix) libc
+libc = { version = "0.2.59" }                                          # For (*nix) libc
 uds = { version = "0.4.2", optional = true, default-features = false }
 
 [target.'cfg(windows)'.dependencies]
-windows = { workspace = true, features = [
+windows = { version = "0.58.0", features = [
   "Win32_Foundation",
   "Win32_System_Threading",
   "Win32_System_Diagnostics_Debug",
@@ -186,7 +190,7 @@ windows = { workspace = true, features = [
 windows-result = "0.2.0"
 
 [target.'cfg(windows)'.build-dependencies]
-windows = { workspace = true }
+windows = { version = "0.58.0" }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 mach = "0.3.2"
