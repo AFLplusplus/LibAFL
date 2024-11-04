@@ -7,7 +7,7 @@ repos:
         name: fmt
         entry: scripts/fmt_all.sh check
         language: script
-      - id: taplo
-        name: taplo
-        entry: taplo format --check
-        language: system
+- repo: https://github.com/ComPWA/taplo-pre-commit
+  rev: v0.9.3
+  hooks:
+    - id: taplo-format

@@ -220,7 +220,7 @@ where
                     }
                     InputLocation::StdIn => {
                         let (pipe_read, pipe_write) = pipe().unwrap();
-                        write(pipe_write, &*input.target_bytes()).unwrap();
+                        write(pipe_write, &input.target_bytes()).unwrap();
                         dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
                     }
                     InputLocation::File { .. } => {
