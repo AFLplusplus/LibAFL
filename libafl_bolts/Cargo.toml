@@ -140,6 +140,7 @@ postcard = { version = "1.0.10", features = [
 ], default-features = false, optional = true } # no_std compatible serde serialization format
 num_enum = { version = "0.7.3", default-features = false }
 ahash = { version = "0.8.11", default-features = false, optional = true } # The hash function already used in hashbrown
+foldhash = { version = "0.1.3", default-features = false } # After hashbrown 0.15.0
 backtrace = { version = "0.3.74", default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.2.8" }

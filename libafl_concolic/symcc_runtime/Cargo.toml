@@ -49,7 +49,7 @@ libc = { version = "0.2.59" }
 cmake = { version = "0.1.51" }
 bindgen = { version = "0.70.1" }
 regex = { version = "1.10.6" }
-which = { version = "6.0.3" }
+which = { version = "7.0.0" }
 symcc_libafl = { path = "../symcc_libafl", version = "0.13.2" }
 
 [lints]

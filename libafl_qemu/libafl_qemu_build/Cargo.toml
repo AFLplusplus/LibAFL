@@ -31,7 +31,7 @@ paranoid_debug = [
 
 [dependencies]
 bindgen = { version = "0.70.1" }
-which = { version = "6.0.3" }
+which = { version = "7.0.0" }
 json = "0.12.4"
 shell-words = "1.1.0"
 pkg-config = "0.3.31"
