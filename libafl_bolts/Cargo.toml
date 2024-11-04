@@ -127,6 +127,7 @@ tuple_list = { version = "0.1.3" }
 hashbrown = { version = "0.15.0", features = [
   "serde",
   "default-hasher",
+  "raw-entry",
 ], default-features = false, optional = true } # A faster hashmap, nostd compatible
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",
