@@ -2,7 +2,7 @@
 //!
 #[cfg(feature = "i386")]
 use core::mem::size_of;
-use std::{env, io, path::PathBuf, process, ptr::NonNull, fmt::Write};
+use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
