@@ -4,7 +4,7 @@
 //! on linux hosts
 use std::{
     borrow::ToOwned,
-    ffi::CString,
+    ffi::{CStr, CString},
     format, fs,
     ops::RangeInclusive,
     os::{
@@ -414,12 +414,21 @@ impl IntelPT {
             reasons.push("Failed to read CPU Extended Features".to_owned());
         }
 
+        match linux_version() {
+            // https://docs.rs/perf-event-open-sys/4.0.0/perf_event_open_sys/#kernel-versions
+            Ok(ver) if ver >= (5, 19, 4) => {}
+            Ok((major, minor, patch)) => reasons.push(format!(
+                "Kernel version {major}.{minor}.{patch} is older than 5.19.4 and might not work."
+            )),
+            Err(()) => reasons.push("Failed to retrieve kernel version".to_owned()),
+        }
+
         if let Err(e) = &*PERF_EVENT_TYPE {
             reasons.push(e.clone());
         }
 
         if let Err(e) = &*NR_ADDR_FILTERS {
-            reasons.push(e.to_string());
+            reasons.push(e.clone());
         }
 
         // official way of knowing if perf_event_open() support is enabled
@@ -757,6 +766,35 @@ fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_
             "IntelPT: Failed to mmap perf aux buffer",
         )),
         mmap_addr => Ok(mmap_addr),
+    }
+}
+
+fn linux_version() -> Result<(usize, usize, usize), ()> {
+    let mut uname_data = libc::utsname {
+        sysname: [0; 65],
+        nodename: [0; 65],
+        release: [0; 65],
+        version: [0; 65],
+        machine: [0; 65],
+        domainname: [0; 65],
+    };
+
+    if unsafe { libc::uname(&mut uname_data) } != 0 {
+        return Err(());
+    }
+
+    let release = unsafe { CStr::from_ptr(uname_data.release.as_ptr()) };
+    let mut parts = release
+        .to_bytes()
+        .split(|&c| c == b'.' || c == b'-')
+        .take(3)
+        .map(|s| String::from_utf8_lossy(s).parse::<usize>());
+    if let (Some(Ok(major)), Some(Ok(minor)), Some(Ok(patch))) =
+        (parts.next(), parts.next(), parts.next())
+    {
+        Ok((major, minor, patch))
+    } else {
+        Err(())
     }
 }
 

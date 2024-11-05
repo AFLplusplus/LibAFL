@@ -107,7 +107,7 @@ regex = ["std", "dep:regex"]
 ## Enables deduplication based on `libcasr` for `StacktraceObserver`
 casr = ["libcasr", "std", "regex"]
 
-## Intel Processor Trace Observer
+## Intel Processor Trace
 intel_pt = [
   "std",
   "libafl_bolts/intel_pt",
