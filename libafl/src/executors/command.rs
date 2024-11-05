@@ -8,7 +8,10 @@ use core::{
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(all(feature = "std", target_os = "linux"))]
-use std::{ffi::CString, os::fd::AsRawFd};
+use std::{
+    ffi::{CStr, CString},
+    os::fd::AsRawFd,
+};
 #[cfg(feature = "std")]
 use std::{
     ffi::{OsStr, OsString},
@@ -177,7 +180,11 @@ where
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 pub struct PtraceCommandConfigurator {
     #[builder(setter(into))]
-    command: CString,
+    path: CString,
+    #[builder(default)]
+    args: Vec<CString>,
+    #[builder(default)]
+    env: Vec<CString>,
     #[builder(default, setter(skip))]
     input_location: InputLocation,
     #[builder(default, setter(strip_option))]
@@ -190,8 +197,6 @@ where
     I: HasTargetBytes,
 {
     fn spawn_child(&mut self, input: &I) -> Result<Pid, Error> {
-        use std::ffi::CStr;
-
         use nix::{
             sys::{
                 personality, ptrace,
@@ -215,8 +220,21 @@ where
                 personality::set(pers | personality::Persona::ADDR_NO_RANDOMIZE).unwrap();
 
                 match self.input_location {
-                    InputLocation::Arg { .. } => {
-                        todo!()
+                    InputLocation::Arg { argnum } => {
+                        // self.args[argnum] will be overwritten if already present.
+                        assert!(
+                            argnum <= self.args.len(),
+                            "If you want to fuzz arg {argnum}, you have to specify the other {} (static) args.",
+                            argnum
+                        );
+                        let terminated_input = [&input.target_bytes() as &[u8], &[b'\0']].concat();
+                        let cstring_input =
+                            CString::from(CStr::from_bytes_until_nul(&terminated_input).unwrap());
+                        if argnum == self.args.len() {
+                            self.args.push(cstring_input);
+                        } else {
+                            self.args[argnum] = cstring_input;
+                        }
                     }
                     InputLocation::StdIn => {
                         let (pipe_read, pipe_write) = pipe().unwrap();
@@ -229,12 +247,7 @@ where
                 }
 
                 raise(Signal::SIGSTOP).unwrap();
-                execve(
-                    &CString::new(self.command.as_bytes()).unwrap(),
-                    &[] as &[&CStr; 0],
-                    &[] as &[&CStr; 0],
-                )
-                .unwrap();
+                execve(&self.path, &self.args, &self.env).unwrap();
 
                 unreachable!("execve returns only on error and its result is unwrapped");
             }

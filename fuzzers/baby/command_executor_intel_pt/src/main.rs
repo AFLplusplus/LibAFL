@@ -43,6 +43,10 @@ pub fn main() {
         .unwrap()
         .join("target_program");
 
+    // We'll run the target on cpu 0
+    let cpu = core_affinity::get_core_ids().unwrap()[0];
+    log::debug!("Using core {} for fuzzing", cpu.0);
+
     // Create an observation channel using the map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
 
@@ -82,7 +86,7 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut intel_pt = IntelPT::builder().cpu(0).inherit(true).build().unwrap();
+    let mut intel_pt = IntelPT::builder().cpu(cpu.0).inherit(true).build().unwrap();
 
     // The target is a ET_DYN elf, it will be relocated by the loader with this offset.
     // see https://github.com/torvalds/linux/blob/c1e939a21eb111a6d6067b38e8e04b8809b64c4e/arch/x86/include/asm/elf.h#L234C1-L239C38
@@ -116,10 +120,8 @@ pub fn main() {
             .collect::<Vec<_>>(),
     );
 
-    // We'll run the target on cpu 0
-    let cpu = core_affinity::get_core_ids().unwrap()[0];
     let command_configurator = PtraceCommandConfigurator::builder()
-        .command(target_cstring)
+        .path(target_cstring)
         .cpu(cpu)
         .build();
     let mut executor =
