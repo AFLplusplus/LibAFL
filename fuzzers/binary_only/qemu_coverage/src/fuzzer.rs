@@ -3,7 +3,7 @@
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 use core::time::Duration;
-use std::{env, fs::DirEntry, io, path::PathBuf, process};
+use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
@@ -56,8 +56,10 @@ impl From<Version> for Str {
             ("Cargo Target Triple", env!("VERGEN_CARGO_TARGET_TRIPLE")),
         ]
         .iter()
-        .map(|(k, v)| format!("{k:25}: {v}\n"))
-        .collect::<String>();
+        .fold(String::new(), |mut output, (k, v)| {
+            let _ = writeln!(output, "{k:25}: {v}");
+            output
+        });
 
         format!("\n{version:}").into()
     }

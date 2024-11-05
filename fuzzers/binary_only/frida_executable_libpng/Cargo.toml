@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "frida_executable_fuzzer"
-crate_type = ["cdylib"]
+crate-type = ["cdylib"]
 
 [features]
 default = ["std"]

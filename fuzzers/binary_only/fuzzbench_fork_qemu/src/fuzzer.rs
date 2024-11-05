@@ -39,7 +39,6 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
-    os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -199,7 +198,7 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    unsafe { qemu.read_mem(stack_ptr, &mut ret_addr) };
+    qemu.read_mem(stack_ptr, &mut ret_addr);
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -224,8 +223,6 @@ fn fuzz(
         File::from_raw_fd(new_fd)
     };
     #[cfg(unix)]
-    let file_null = File::open("/dev/null")?;
-
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::with_user_monitor(|s| {
         #[cfg(unix)]
@@ -323,7 +320,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -393,7 +390,6 @@ fn fuzz(
     // Remove target output (logs still survive)
     #[cfg(unix)]
     {
-        let null_fd = file_null.as_raw_fd();
         // dup2(null_fd, io::stdout().as_raw_fd())?;
         // dup2(null_fd, io::stderr().as_raw_fd())?;
     }

@@ -104,7 +104,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
-                let asan = AsanRuntime::new(&options);
+                let asan = AsanRuntime::new(options);
 
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
