@@ -103,24 +103,6 @@ pub struct IntelPT {
     ip_filters: Vec<RangeInclusive<usize>>,
 }
 
-/// Builder for [`IntelPT`]
-#[derive(Debug, Clone, PartialEq)]
-pub struct IntelPTBuilder {
-    pid: Option<i32>,
-    cpu: i32,
-    exclude_kernel: bool,
-    exclude_hv: bool,
-    inherit: bool,
-    perf_buffer_size: usize,
-    perf_aux_buffer_size: usize,
-}
-
-impl From<PtError> for Error {
-    fn from(err: PtError) -> Self {
-        Self::unknown(err.to_string())
-    }
-}
-
 impl IntelPT {
     /// Create a default builder
     ///
@@ -515,6 +497,18 @@ impl Drop for IntelPT {
     }
 }
 
+/// Builder for [`IntelPT`]
+#[derive(Debug, Clone, PartialEq)]
+pub struct IntelPTBuilder {
+    pid: Option<i32>,
+    cpu: i32,
+    exclude_kernel: bool,
+    exclude_hv: bool,
+    inherit: bool,
+    perf_buffer_size: usize,
+    perf_aux_buffer_size: usize,
+}
+
 impl Default for IntelPTBuilder {
     /// Create a default builder for [`IntelPT`]
     ///
@@ -710,6 +704,25 @@ impl IntelPTBuilder {
     }
 }
 
+/// Perf event config for `IntelPT`
+///
+/// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
+#[bitfield(u64, default = 0)]
+struct PtConfig {
+    /// Disable call return address compression. AKA DisRETC in Intel SDM.
+    #[bit(11, rw)]
+    noretcomp: bool,
+    /// Indicates the frequency of PSB packets. AKA PSBFreq in Intel SDM.
+    #[bits(24..=27, rw)]
+    psb_period: u4,
+}
+
+impl From<PtError> for Error {
+    fn from(err: PtError) -> Self {
+        Self::unknown(err.to_string())
+    }
+}
+
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     let type_ = match &*PERF_EVENT_TYPE {
         Ok(t) => Ok(*t),
@@ -801,19 +814,6 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
 #[inline]
 const fn next_page_aligned_addr(address: u64) -> u64 {
     (address + PAGE_SIZE as u64 - 1) & !(PAGE_SIZE as u64 - 1)
-}
-
-/// Perf event config for `IntelPT`
-///
-/// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
-#[bitfield(u64, default = 0)]
-struct PtConfig {
-    /// Disable call return address compression. AKA DisRETC in Intel SDM.
-    #[bit(11, rw)]
-    noretcomp: bool,
-    /// Indicates the frequency of PSB packets. AKA PSBFreq in Intel SDM.
-    #[bits(24..=27, rw)]
-    psb_period: u4,
 }
 
 // copy pasted from libafl_qemu/src/modules/edges.rs
