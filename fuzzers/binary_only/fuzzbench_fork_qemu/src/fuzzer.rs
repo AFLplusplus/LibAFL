@@ -226,6 +226,8 @@ fn fuzz(
         File::from_raw_fd(new_fd)
     };
     #[cfg(unix)]
+    let file_null = File::open("/dev/null")?;
+
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::with_user_monitor(|s| {
         #[cfg(unix)]
