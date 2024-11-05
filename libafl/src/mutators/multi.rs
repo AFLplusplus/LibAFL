@@ -135,6 +135,9 @@ where
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if id == *cur {
+                if input.names().is_empty() {
+                    return Ok(MutationResult::Skipped);
+                }
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
@@ -264,6 +267,9 @@ where
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if id == *cur {
+                if input.names().is_empty() {
+                    return Ok(MutationResult::Skipped);
+                }
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
