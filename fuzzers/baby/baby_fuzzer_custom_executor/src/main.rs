@@ -3,7 +3,7 @@ use std::ptr::write_volatile;
 use std::{
     marker::PhantomData,
     path::PathBuf,
-    ptr::{addr_of, write},
+    ptr::{addr_of, addr_of_mut, write},
 };
 
 #[cfg(feature = "tui")]
@@ -25,11 +25,11 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasExecutions, State, StdState, UsesState},
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
-static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
+static mut SIGNALS_PTR: *mut u8 = addr_of_mut!(SIGNALS) as _;
 static SIGNALS_LEN: usize = unsafe { (*addr_of!(SIGNALS)).len() };
 
 /// Assign a signal to the signals map
@@ -146,7 +146,7 @@ pub fn main() {
     let mut executor = WithObservers::new(executor, tuple_list!(observer));
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state
