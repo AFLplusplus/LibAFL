@@ -104,7 +104,7 @@ libafl_derive = { path = "../libafl_derive", version = "0.13.2" }
 serde = { version = "1.0.210", default-features = false, features = [
   "alloc",
 ] } # serialization lib
-hashbrown = { version = "0.14.5", default-features = true, features = [
+hashbrown = { version = "0.15.1", default-features = true, features = [
   "serde",
 ] } # A faster hashmap, nostd compatible
 num-traits = { version = "0.2.19", default-features = true }
