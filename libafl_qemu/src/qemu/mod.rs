@@ -361,10 +361,9 @@ impl CPU {
         unsafe { libafl_qemu_num_regs(self.ptr) }
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
+    pub fn read_reg<R>(&self, reg: R) -> Result<GuestReg, QemuRWError>
     where
         R: Into<i32> + Clone,
-        T: From<GuestReg>,
     {
         unsafe {
             let reg_id = reg.clone().into();
@@ -826,9 +825,8 @@ impl Qemu {
             .write_reg(reg, val)
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
+    pub fn read_reg<R>(&self, reg: R) -> Result<GuestReg, QemuRWError>
     where
-        T: Num + PartialOrd + Copy + From<GuestReg>,
         R: Into<i32> + Clone,
     {
         self.current_cpu()
