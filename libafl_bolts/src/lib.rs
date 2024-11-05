@@ -300,6 +300,8 @@ pub enum Error {
     Unknown(String, ErrorBacktrace),
     /// Error with the corpora
     InvalidCorpus(String, ErrorBacktrace),
+    /// Error specific to a runtime like QEMU or Frida
+    Runtime(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -438,6 +440,15 @@ impl Error {
     {
         Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
     }
+
+    /// Error specific to some runtime, like QEMU or Frida
+    #[must_use]
+    pub fn runtime<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Runtime(arg.into(), ErrorBacktrace::new())
+    }
 }
 
 impl Display for Error {
@@ -502,6 +513,10 @@ impl Display for Error {
                 write!(f, "Invalid corpus: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
+            Self::Runtime(s, b) => {
+                write!(f, "Runtime error: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
         }
     }
 }
@@ -528,14 +543,6 @@ impl From<BorrowMutError> for Error {
 #[cfg(feature = "alloc")]
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
-        Self::serialize(format!("{err:?}"))
-    }
-}
-
-/// Stringify the json serializer error
-#[cfg(feature = "std")]
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
         Self::serialize(format!("{err:?}"))
     }
 }
@@ -673,7 +680,18 @@ pub trait AsSlice<'a> {
     fn as_slice(&'a self) -> Self::SliceRef;
 }
 
-impl<'a, T, R> AsSlice<'a> for R
+/// Can be converted to a slice
+pub trait AsSizedSlice<'a, const N: usize> {
+    /// Type of the entries of this slice
+    type Entry: 'a;
+    /// Type of the reference to this slice
+    type SliceRef: Deref<Target = [Self::Entry; N]>;
+
+    /// Convert to a slice
+    fn as_sized_slice(&'a self) -> Self::SliceRef;
+}
+
+impl<'a, T, R: ?Sized> AsSlice<'a> for R
 where
     T: 'a,
     R: Deref<Target = [T]>,
@@ -682,6 +700,19 @@ where
     type SliceRef = &'a [T];
 
     fn as_slice(&'a self) -> Self::SliceRef {
+        self
+    }
+}
+
+impl<'a, T, const N: usize, R: ?Sized> AsSizedSlice<'a, N> for R
+where
+    T: 'a,
+    R: Deref<Target = [T; N]>,
+{
+    type Entry = T;
+    type SliceRef = &'a [T; N];
+
+    fn as_sized_slice(&'a self) -> Self::SliceRef {
         self
     }
 }
@@ -695,7 +726,16 @@ pub trait AsSliceMut<'a>: AsSlice<'a> {
     fn as_slice_mut(&'a mut self) -> Self::SliceRefMut;
 }
 
-impl<'a, T, R> AsSliceMut<'a> for R
+/// Can be converted to a mutable slice
+pub trait AsSizedSliceMut<'a, const N: usize>: AsSizedSlice<'a, N> {
+    /// Type of the mutable reference to this slice
+    type SliceRefMut: DerefMut<Target = [Self::Entry; N]>;
+
+    /// Convert to a slice
+    fn as_sized_slice_mut(&'a mut self) -> Self::SliceRefMut;
+}
+
+impl<'a, T, R: ?Sized> AsSliceMut<'a> for R
 where
     T: 'a,
     R: DerefMut<Target = [T]>,
@@ -703,6 +743,18 @@ where
     type SliceRefMut = &'a mut [T];
 
     fn as_slice_mut(&'a mut self) -> Self::SliceRefMut {
+        &mut *self
+    }
+}
+
+impl<'a, T, const N: usize, R: ?Sized> AsSizedSliceMut<'a, N> for R
+where
+    T: 'a,
+    R: DerefMut<Target = [T; N]>,
+{
+    type SliceRefMut = &'a mut [T; N];
+
+    fn as_sized_slice_mut(&'a mut self) -> Self::SliceRefMut {
         &mut *self
     }
 }

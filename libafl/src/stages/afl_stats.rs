@@ -1,3 +1,5 @@
+//! Stage to compute and report AFL++ stats
+use alloc::{string::String, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use std::{
     borrow::Cow,
@@ -8,37 +10,46 @@ use std::{
     process,
 };
 
-use libafl::{
-    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
-    events::EventFirer,
-    executors::HasObservers,
-    inputs::UsesInput,
-    mutators::Tokens,
-    observers::MapObserver,
-    schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
-    stages::{calibrate::UnstableEntriesMetadata, Stage},
-    state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
-    Error, HasMetadata, HasNamedMetadata, HasScheduler, SerdeAny,
-};
+#[cfg(unix)]
+use libafl_bolts::os::peak_rss_mb_child_processes;
 use libafl_bolts::{
     core_affinity::CoreId,
     current_time,
-    os::peak_rss_mb_child_processes,
     tuples::{Handle, Handled, MatchNameRef},
     Named,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{fuzzer::fuzzer_target_mode, Opt};
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
+use crate::{
+    corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
+    events::EventFirer,
+    executors::HasObservers,
+    mutators::Tokens,
+    observers::MapObserver,
+    schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
+    stages::{calibrate::UnstableEntriesMetadata, Stage},
+    state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
+    std::string::ToString,
+    Error, HasMetadata, HasNamedMetadata, HasScheduler,
+};
+/// AFL++'s default stats update interval
+pub const AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS: u64 = 60;
 
-#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+/// `CalibrationTime` - Use in conjunction with `TimeTrackingFeedback`
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CalibrationTime(pub Duration);
 impl From<Duration> for CalibrationTime {
     fn from(value: Duration) -> Self {
         Self(value)
     }
 }
-#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+
+libafl_bolts::impl_serdeany!(CalibrationTime);
+
+/// `SyncTime` - Use in conjunction with `TimeTrackingFeedback`
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SyncTime(pub Duration);
 impl From<Duration> for SyncTime {
     fn from(value: Duration) -> Self {
@@ -46,7 +57,10 @@ impl From<Duration> for SyncTime {
     }
 }
 
-#[derive(Debug, SerdeAny, Serialize, Deserialize)]
+libafl_bolts::impl_serdeany!(SyncTime);
+
+/// `FuzzTime` - Use in conjunction with `TimeTrackingFeedback`
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FuzzTime(pub Duration);
 impl From<Duration> for FuzzTime {
     fn from(value: Duration) -> Self {
@@ -54,12 +68,15 @@ impl From<Duration> for FuzzTime {
     }
 }
 
+libafl_bolts::impl_serdeany!(FuzzTime);
+
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<C, O, E, EM, Z> {
+pub struct AflStatsStage<C, E, EM, O, Z> {
     map_observer_handle: Handle<C>,
-    fuzzer_dir: PathBuf,
+    stats_file_path: PathBuf,
+    plot_file_path: Option<PathBuf>,
     start_time: u64,
     // the number of testcases that have been fuzzed
     has_fuzzed_size: usize,
@@ -90,14 +107,15 @@ pub struct AflStatsStage<C, O, E, EM, Z> {
     /// full command line used for the fuzzing session
     command_line: Cow<'static, str>,
     /// Amount of tokens provided by the user. Used to determine autotokens count.
-    provided_tokens: usize,
+    dict_count: usize,
     /// autotokens are enabled
     autotokens_enabled: bool,
     /// The core we are bound to
     core_id: CoreId,
-    phantom: PhantomData<(C, O, E, EM, Z)>,
+    phantom_data: PhantomData<(O, E, EM, Z)>,
 }
 
+/// AFL++'s `fuzzer_stats`
 #[derive(Debug, Clone)]
 pub struct AFLFuzzerStats<'a> {
     /// unix time indicating the start time of afl-fuzz
@@ -196,7 +214,7 @@ pub struct AFLFuzzerStats<'a> {
     /// full command line used for the fuzzing session
     command_line: &'a str,
 }
-
+/// AFL++'s `plot_data`
 #[derive(Debug, Clone)]
 pub struct AFLPlotData<'a> {
     relative_time: &'a u64,
@@ -216,7 +234,7 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<C, O, E, EM, Z> UsesState for AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> UsesState for AflStatsStage<C, E, EM, O, Z>
 where
     E: UsesState,
     EM: EventFirer<State = E::State>,
@@ -225,7 +243,7 @@ where
     type State = E::State;
 }
 
-impl<C, O, E, EM, Z> Stage<E, EM, Z> for AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> Stage<E, EM, Z> for AflStatsStage<C, E, EM, O, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -243,6 +261,7 @@ where
     <Z as HasScheduler>::Scheduler: HasQueueCycles,
     <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
 {
+    #[allow(clippy::too_many_lines)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -256,7 +275,7 @@ where
             ));
         };
         let testcase = state.corpus().get(corpus_idx)?.borrow();
-        // NOTE: scheduled_count represents the amount of fuzzing iterations a
+        // NOTE: scheduled_count represents the amount of fuzz runs a
         // testcase has had. Since this stage is kept at the very end of stage list,
         // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero
         // since the scheduled count is incremented after all stages have been run.
@@ -264,13 +283,16 @@ where
             // New testcase!
             self.cycles_wo_finds = 0;
             self.update_last_find();
-            self.maybe_update_last_crash(&testcase, state);
-            self.maybe_update_last_hang(&testcase, state);
+            #[cfg(feature = "track_hit_feedbacks")]
+            {
+                self.maybe_update_last_crash(&testcase, state);
+                self.maybe_update_last_hang(&testcase, state);
+            }
             self.update_has_fuzzed_size();
             self.maybe_update_is_favored_size(&testcase);
         }
         self.maybe_update_slowest_exec(&testcase);
-        self.maybe_update_max_depth(&testcase)?;
+        self.maybe_update_max_depth(&testcase);
 
         // See if we actually need to run the stage, if not, avoid dynamic value computation.
         if !self.check_interval() {
@@ -302,7 +324,7 @@ where
             state
                 .metadata::<Tokens>()?
                 .len()
-                .saturating_sub(self.provided_tokens)
+                .saturating_sub(self.dict_count)
         } else {
             0
         };
@@ -350,7 +372,10 @@ where
             execs_since_crash: total_executions - self.execs_at_last_objective,
             exec_timeout: self.exec_timeout,
             slowest_exec_ms: self.slowest_exec.as_millis(),
+            #[cfg(unix)]
             peak_rss_mb: peak_rss_mb_child_processes()?,
+            #[cfg(not(unix))]
+            peak_rss_mb: 0, // TODO for Windows
             cpu_affinity: self.core_id.0,
             total_edges: map_size as u64,
             edges_found: filled_entries_in_map,
@@ -381,18 +406,22 @@ where
             execs_done: &stats.execs_done,
         };
         self.write_fuzzer_stats(&stats)?;
-        self.write_plot_data(&plot_data)?;
+        if self.plot_file_path.is_some() {
+            self.write_plot_data(&plot_data)?;
+        }
         Ok(())
     }
+
     fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
         Ok(true)
     }
+
     fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<C, O, E, EM, Z> AflStatsStage<C, O, E, EM, Z>
+impl<C, E, EM, O, Z> AflStatsStage<C, E, EM, O, Z>
 where
     E: UsesState + HasObservers,
     EM: EventFirer<State = E::State>,
@@ -401,101 +430,41 @@ where
     C: AsRef<O> + Named,
     O: MapObserver,
 {
-    /// create a new instance of the [`AflStatsStage`]
-    #[allow(clippy::too_many_arguments)]
+    /// Builder for `AflStatsStage`
     #[must_use]
-    pub fn new(
-        opt: &Opt,
-        fuzzer_dir: PathBuf,
-        map_observer: &C,
-        provided_tokens: usize,
-        autotokens_enabled: bool,
-        core_id: CoreId,
-    ) -> Self {
-        Self::create_plot_data_file(&fuzzer_dir).unwrap();
-        Self::create_fuzzer_stats_file(&fuzzer_dir).unwrap();
-        Self {
-            map_observer_handle: map_observer.handle(),
-            start_time: current_time().as_secs(),
-            stats_report_interval: Duration::from_secs(opt.stats_interval),
-            has_fuzzed_size: 0,
-            is_favored_size: 0,
-            cycles_done: 0,
-            cycles_wo_finds: 0,
-            execs_at_last_objective: 0,
-            last_crash: current_time(),
-            last_find: current_time(),
-            last_hang: current_time(),
-            max_depth: 0,
-            saved_hangs: 0,
-            saved_crashes: 0,
-            slowest_exec: Duration::from_secs(0),
-            last_report_time: current_time(),
-            pid: process::id(),
-            exec_timeout: opt.hang_timeout,
-            target_mode: fuzzer_target_mode(opt),
-            afl_banner: Cow::Owned(opt.executable.display().to_string()),
-            afl_version: Cow::Borrowed("libafl-fuzz-0.0.1"),
-            command_line: get_run_cmdline(),
-            fuzzer_dir,
-            provided_tokens,
-            core_id,
-            autotokens_enabled,
-            phantom: PhantomData,
-        }
-    }
-
-    fn create_plot_data_file(fuzzer_dir: &Path) -> Result<(), Error> {
-        let path = fuzzer_dir.join("plot_data");
-        if path.exists() {
-            // check if it contains any data
-            let file = File::open(path)?;
-            if BufReader::new(file).lines().next().is_none() {
-                std::fs::write(fuzzer_dir.join("plot_data"), AFLPlotData::get_header())?;
-            }
-        } else {
-            std::fs::write(fuzzer_dir.join("plot_data"), AFLPlotData::get_header())?;
-        }
-        Ok(())
-    }
-
-    fn create_fuzzer_stats_file(fuzzer_dir: &Path) -> Result<(), Error> {
-        let path = fuzzer_dir.join("fuzzer_stats");
-        if !path.exists() {
-            _ = OpenOptions::new().append(true).create(true).open(path)?;
-        }
-        Ok(())
+    pub fn builder() -> AflStatsStageBuilder<C, E, EM, O, Z> {
+        AflStatsStageBuilder::new()
     }
 
     fn write_fuzzer_stats(&self, stats: &AFLFuzzerStats) -> Result<(), Error> {
-        let tmp_file = self.fuzzer_dir.join(".fuzzer_stats_tmp");
-        let stats_file = self.fuzzer_dir.join("fuzzer_stats");
+        let tmp_file = self
+            .stats_file_path
+            .parent()
+            .expect("fuzzer_stats file must have a parent!")
+            .join(".fuzzer_stats_tmp");
         std::fs::write(&tmp_file, stats.to_string())?;
-        _ = std::fs::copy(&tmp_file, &stats_file)?;
+        _ = std::fs::copy(&tmp_file, &self.stats_file_path)?;
         std::fs::remove_file(tmp_file)?;
         Ok(())
     }
 
     fn write_plot_data(&self, plot_data: &AFLPlotData) -> Result<(), Error> {
-        let plot_file = self.fuzzer_dir.join("plot_data");
-        let mut file = OpenOptions::new().append(true).open(&plot_file)?;
+        let mut file = OpenOptions::new().append(true).open(
+            self.plot_file_path
+                .as_ref()
+                .expect("invariant; should never occur"),
+        )?;
         writeln!(file, "{plot_data}")?;
         Ok(())
     }
 
-    fn maybe_update_is_favored_size(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-    ) {
+    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<E::Input>) {
         if testcase.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-    ) {
+    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<E::Input>) {
         if let Some(exec_time) = testcase.exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
@@ -507,48 +476,35 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+    fn maybe_update_max_depth(&mut self, testcase: &Testcase<E::Input>) {
         if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
             }
-        } else {
-            return Err(Error::illegal_state(
-                "testcase must have scheduler metdata?",
-            ));
         }
-        Ok(())
     }
 
     fn update_last_find(&mut self) {
         self.last_find = current_time();
     }
 
-    fn maybe_update_last_crash(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-        state: &E::State,
-    ) {
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn maybe_update_last_crash(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
+        #[cfg(feature = "track_hit_feedbacks")]
         if testcase
             .hit_objectives()
-            .contains(&Cow::Borrowed("CrashFeedback"))
+            .contains(&Cow::Borrowed(CRASH_FEEDBACK_NAME))
         {
             self.last_crash = current_time();
             self.execs_at_last_objective = *state.executions();
         }
     }
 
-    fn maybe_update_last_hang(
-        &mut self,
-        testcase: &Testcase<<<E as UsesState>::State as UsesInput>::Input>,
-        state: &E::State,
-    ) {
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn maybe_update_last_hang(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
         if testcase
             .hit_objectives()
-            .contains(&Cow::Borrowed("TimeoutFeedback"))
+            .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
         {
             self.last_hang = current_time();
             self.execs_at_last_objective = *state.executions();
@@ -658,8 +614,190 @@ impl Display for AFLFuzzerStats<'_> {
         Ok(())
     }
 }
-/// Get the command used to invoke libafl-fuzz
+/// Get the command used to invoke the fuzzer
+#[must_use]
 pub fn get_run_cmdline() -> Cow<'static, str> {
     let args: Vec<String> = std::env::args().collect();
     Cow::Owned(args.join(" "))
+}
+
+/// The Builder for `AflStatsStage`
+#[derive(Debug)]
+pub struct AflStatsStageBuilder<C, E, EM, O, Z> {
+    stats_file_path: Option<PathBuf>,
+    plot_file_path: Option<PathBuf>,
+    core_id: Option<CoreId>,
+    map_observer_handle: Option<Handle<C>>,
+    uses_autotokens: bool,
+    report_interval: Duration,
+    dict_count: usize,
+    exec_timeout: u64,
+    banner: String,
+    version: String,
+    target_mode: String,
+    phantom_data: PhantomData<(O, E, EM, Z)>,
+}
+
+impl<C, E, EM, O, Z> AflStatsStageBuilder<C, E, EM, O, Z>
+where
+    E: UsesState + HasObservers,
+    EM: EventFirer<State = E::State>,
+    Z: UsesState<State = E::State>,
+    E::State: HasImported + HasCorpus + HasMetadata + HasExecutions,
+    C: AsRef<O> + Named,
+    O: MapObserver,
+{
+    fn new() -> Self {
+        Self {
+            report_interval: Duration::from_secs(AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS),
+            stats_file_path: None,
+            plot_file_path: None,
+            core_id: None,
+            map_observer_handle: None,
+            uses_autotokens: false,
+            dict_count: 0,
+            exec_timeout: 0,
+            banner: String::default(),
+            version: String::default(),
+            target_mode: String::default(),
+            phantom_data: PhantomData,
+        }
+    }
+
+    /// The file path to which we will write the fuzzer stats
+    #[must_use]
+    pub fn stats_file(mut self, path: PathBuf) -> Self {
+        self.stats_file_path = Some(path);
+        self
+    }
+    /// The file path to which we will write the plot data
+    #[must_use]
+    pub fn plot_file(mut self, path: PathBuf) -> Self {
+        self.plot_file_path = Some(path);
+        self
+    }
+    /// The core we are bound to
+    #[must_use]
+    pub fn core_id(mut self, core_id: CoreId) -> Self {
+        self.core_id = Some(core_id);
+        self
+    }
+    /// The interval with which we report stats
+    #[must_use]
+    pub fn report_interval(mut self, interval: Duration) -> Self {
+        self.report_interval = interval;
+        self
+    }
+    /// Our `MapObserver`
+    #[must_use]
+    pub fn map_observer(mut self, map_observer: &C) -> Self {
+        self.map_observer_handle = Some(map_observer.handle());
+        self
+    }
+    /// If we use autotokens provided by the target
+    #[must_use]
+    pub fn uses_autotokens(mut self, uses: bool) -> Self {
+        self.uses_autotokens = uses;
+        self
+    }
+    /// The tokens utilized by the fuzzer
+    #[must_use]
+    pub fn tokens(mut self, tokens: &Tokens) -> Self {
+        self.dict_count = tokens.len();
+        self
+    }
+    /// AFL++ Banner (typically the target)
+    #[must_use]
+    pub fn banner(mut self, banner: String) -> Self {
+        self.banner = banner;
+        self
+    }
+    /// Version of the fuzzer
+    #[must_use]
+    pub fn version(mut self, version: String) -> Self {
+        self.version = version;
+        self
+    }
+    /// The "timeout" value used in `TimeoutFeedback`
+    #[must_use]
+    pub fn exec_timeout(mut self, timeout: u64) -> Self {
+        self.exec_timeout = timeout;
+        self
+    }
+    /// Used in the UI (optional)
+    /// default, persistent, qemu, unicorn, non-instrumented etc
+    #[must_use]
+    pub fn target_mode(mut self, target_mode: String) -> Self {
+        self.target_mode = target_mode;
+        self
+    }
+
+    fn create_plot_data_file(path: &Path) -> Result<(), Error> {
+        if path.exists() {
+            // check if it contains any data
+            let file = File::open(path)?;
+            if BufReader::new(file).lines().next().is_none() {
+                std::fs::write(path, AFLPlotData::get_header())?;
+            }
+        } else {
+            std::fs::write(path, AFLPlotData::get_header())?;
+        }
+        Ok(())
+    }
+
+    fn create_fuzzer_stats_file(path: &Path) -> Result<(), Error> {
+        if !path.exists() {
+            _ = OpenOptions::new().append(true).create(true).open(path)?;
+        }
+        Ok(())
+    }
+    /// Build [`AflStatsStage`]
+    /// Will error if:
+    /// Cannot create the stats file
+    /// Cannot create the plot file (if provided)
+    /// No `MapObserver` supplied to the builder
+    /// No `stats_file_path` provieded
+    pub fn build(self) -> Result<AflStatsStage<C, E, EM, O, Z>, Error> {
+        if self.stats_file_path.is_none() {
+            return Err(Error::illegal_argument("Must set `stats_file_path`"));
+        }
+        let stats_file_path = self.stats_file_path.unwrap();
+        if self.map_observer_handle.is_none() {
+            return Err(Error::illegal_argument("Must set `map_observer`"));
+        }
+        if let Some(ref plot_file) = self.plot_file_path {
+            Self::create_plot_data_file(plot_file)?;
+        }
+        Self::create_fuzzer_stats_file(&stats_file_path)?;
+        Ok(AflStatsStage {
+            stats_file_path,
+            plot_file_path: self.plot_file_path,
+            map_observer_handle: self.map_observer_handle.unwrap(),
+            start_time: current_time().as_secs(),
+            stats_report_interval: self.report_interval,
+            has_fuzzed_size: 0,
+            is_favored_size: 0,
+            cycles_done: 0,
+            cycles_wo_finds: 0,
+            execs_at_last_objective: 0,
+            last_crash: current_time(),
+            last_find: current_time(),
+            last_hang: current_time(),
+            max_depth: 0,
+            saved_hangs: 0,
+            saved_crashes: 0,
+            slowest_exec: Duration::from_secs(0),
+            last_report_time: current_time(),
+            pid: process::id(),
+            exec_timeout: self.exec_timeout,
+            target_mode: Cow::Owned(self.target_mode),
+            afl_banner: Cow::Owned(self.banner),
+            afl_version: Cow::Owned(self.version),
+            command_line: get_run_cmdline(),
+            dict_count: self.dict_count,
+            core_id: self.core_id.unwrap_or(CoreId(0)),
+            autotokens_enabled: self.uses_autotokens,
+            phantom_data: PhantomData,
+        })
+    }
 }

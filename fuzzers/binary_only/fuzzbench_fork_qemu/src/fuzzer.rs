@@ -9,6 +9,7 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process,
+    ptr::NonNull,
     time::Duration,
 };
 
@@ -39,6 +40,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
+    os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -159,14 +161,14 @@ fn fuzz(
     let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
-            edges.as_mut_ptr(),
+            NonNull::new(edges.as_mut_ptr()).expect("map ptr is null."),
         ))
         .track_indices()
     };
 
     let emulator_modules = tuple_list!(
         StdEdgeCoverageChildModule::builder()
-            .map_observer(edges_observer.as_mut())
+            .const_map_observer(edges_observer.as_mut())
             .build()?,
         CmpLogChildModule::default(),
     );
@@ -198,7 +200,8 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    let _ = qemu.read_mem(stack_ptr, &mut ret_addr);
+    qemu.read_mem(stack_ptr, &mut ret_addr)
+        .expect("qemu read failed");
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -330,7 +333,7 @@ fn fuzz(
         }
 
         unsafe {
-            let _ = qemu.write_mem(input_addr, buf);
+            qemu.write_mem(input_addr, buf).expect("qemu write failed.");
 
             qemu.write_reg(Regs::Rdi, input_addr).unwrap();
             qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
@@ -390,8 +393,9 @@ fn fuzz(
     // Remove target output (logs still survive)
     #[cfg(unix)]
     {
-        // dup2(null_fd, io::stdout().as_raw_fd())?;
-        // dup2(null_fd, io::stderr().as_raw_fd())?;
+        let null_fd = file_null.as_raw_fd();
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
     log.replace(

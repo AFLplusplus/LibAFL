@@ -121,7 +121,6 @@ pub mod serdeany_registry {
     use core::{
         any::TypeId,
         fmt,
-        hash::BuildHasherDefault,
         ptr::{addr_of, addr_of_mut},
     };
 
@@ -266,22 +265,6 @@ pub mod serdeany_registry {
         }
     }
 
-    /*
-    #[cfg(feature = "anymap_debug")]
-    impl fmt::Debug for SerdeAnyMap {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            let json = serde_json::to_string(&self);
-            write!(f, "SerdeAnyMap: [{:?}]", json)
-        }
-    }
-
-    #[cfg(not(feature = "anymap_debug"))]
-    impl fmt::Debug for SerdeAnyMap {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "SerdeAnymap with {} elements", self.len())
-        }
-    }*/
-
     #[allow(unused_qualifications)]
     impl SerdeAnyMap {
         /// Get an element from the map.
@@ -360,7 +343,7 @@ pub mod serdeany_registry {
             '_,
             TypeRepr,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            foldhash::fast::RandomState,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -663,7 +646,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            foldhash::fast::RandomState,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -681,7 +664,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            BuildHasherDefault<ahash::AHasher>,
+            foldhash::fast::RandomState,
         >
         where
             T: crate::serdeany::SerdeAny,

@@ -23,13 +23,15 @@ use libafl_bolts::{
     AsSlice,
 };
 
+use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
 use crate::{
+    corpus::Corpus,
     executors::HasObservers,
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::{HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -151,6 +153,9 @@ where
     fn exec_timeout(&self) -> Duration {
         self.timeout
     }
+    fn exec_timeout_mut(&mut self) -> &mut Duration {
+        &mut self.timeout
+    }
 }
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
@@ -209,21 +214,13 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> CommandExecutor<OT, S, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    Z: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput<Input = I>,
+    T: CommandConfigurator<I> + Debug,
+    OT: Debug + ObserversTuple<I, S>,
 {
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        _mgr: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
@@ -280,6 +277,43 @@ where
             obs.observe_stderr(&stderr);
         }
         res
+    }
+}
+
+#[cfg(all(feature = "std", unix))]
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+where
+    EM: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput,
+    T: CommandConfigurator<S::Input> + Debug,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.execute_input_with_command(state, input)
+    }
+}
+
+// this only works on unix because of the reliance on checking the process signal for detecting OOM
+impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
+where
+    S: HasCorpus,
+    T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
+{
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        *self.configurer.exec_timeout_mut() = timeout;
+    }
+
+    #[inline]
+    fn timeout(&self) -> Duration {
+        self.configurer.exec_timeout()
     }
 }
 
@@ -565,6 +599,9 @@ impl CommandExecutorBuilder {
 ///     fn exec_timeout(&self) -> Duration {
 ///         Duration::from_secs(5)
 ///     }
+///     fn exec_timeout_mut(&mut self) -> &mut Duration {
+///         todo!()
+///     }
 /// }
 ///
 /// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
@@ -592,6 +629,8 @@ pub trait CommandConfigurator<I>: Sized {
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
+    /// Set the timeout duration for execution of the child process.
+    fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>

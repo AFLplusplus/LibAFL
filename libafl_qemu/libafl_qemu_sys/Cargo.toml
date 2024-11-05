@@ -33,6 +33,8 @@ aarch64 = [] # build qemu for aarch64
 mips = []    # build qemu for mips (el, use with the 'be' feature of mips be)
 ppc = []     # build qemu for powerpc
 hexagon = [] # build qemu for hexagon
+riscv32 = [] # build qemu for riscv 32bit
+riscv64 = [] # build qemu for riscv 64bit
 
 be = []
 
@@ -56,17 +58,17 @@ paranoid_debug = [
 ] # Will perform as many checks as possible. The target will be greatly slowed down.
 
 [dependencies]
-paste = { workspace = true }
-num_enum = { workspace = true, default-features = true }
-libc = { workspace = true }
-strum = { workspace = true }
-strum_macros = { workspace = true }
-pyo3 = { workspace = true, optional = true }
+paste = { version = "1.0.15" }
+num_enum = { version = "0.7.3", default-features = true }
+libc = { version = "0.2.59" }
+strum = { version = "0.26.3" }
+strum_macros = { version = "0.26.4" }
+pyo3 = { version = "0.22.3", optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.13.2" }
-pyo3-build-config = { workspace = true, optional = true }
-rustversion = { workspace = true }
+pyo3-build-config = { version = "0.22.3", optional = true }
+rustversion = { version = "1.0.17" }
 
 [lints]
 workspace = true

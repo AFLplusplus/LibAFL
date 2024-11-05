@@ -32,6 +32,34 @@ pub struct StdOutToMetadataFeedback {
     o_ref: Handle<StdOutObserver>,
 }
 
+impl StdOutToMetadataFeedback {
+    /// Append to the testcase the generated metadata in case of a new corpus item.
+    #[inline]
+    fn append_stdout_observation_to_testcase<I, OT>(
+        &mut self,
+        observers: &OT,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error>
+    where
+        OT: MatchName,
+    {
+        let observer = observers
+            .get(&self.o_ref)
+            .ok_or(Error::illegal_state("StdOutObserver is missing"))?;
+        let buffer = observer
+            .stdout
+            .as_ref()
+            .ok_or(Error::illegal_state("StdOutObserver has no stdout"))?;
+        let stdout = String::from_utf8_lossy(buffer).into_owned();
+
+        testcase
+            .metadata_map_mut()
+            .insert(StdOutMetadata { stdout });
+
+        Ok(())
+    }
+}
+
 impl<S> StateInitializer<S> for StdOutToMetadataFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for StdOutToMetadataFeedback
@@ -52,20 +80,7 @@ where
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
-        let observer = observers
-            .get(&self.o_ref)
-            .ok_or(Error::illegal_state("StdOutObserver is missing"))?;
-        let buffer = observer
-            .stdout
-            .as_ref()
-            .ok_or(Error::illegal_state("StdOutObserver has no stdout"))?;
-        let stdout = String::from_utf8_lossy(buffer).into_owned();
-
-        testcase
-            .metadata_map_mut()
-            .insert(StdOutMetadata { stdout });
-
-        Ok(())
+        self.append_stdout_observation_to_testcase(observers, testcase)
     }
 }
 

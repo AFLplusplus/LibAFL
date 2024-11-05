@@ -108,7 +108,7 @@ pub fn main() {
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let context = NautilusContext::from_file(15, opt.grammar);
+    let context = NautilusContext::from_file(15, opt.grammar).unwrap();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

@@ -5,7 +5,7 @@ CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = [
 ] } }
 FUZZER_NAME = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "frida_windows_gdiplus", mapping = { "linux" = "frida_windows_gdiplus", "macos" = "frida_windows_gdiplus", "windows" = "frida_windows_gdiplus.exe" } }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
-PROFILE_DIR = { value = "release", condition = { env_not_set = [
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
   "PROFILE_DIR",
 ] } }
 
