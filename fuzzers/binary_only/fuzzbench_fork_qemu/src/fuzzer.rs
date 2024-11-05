@@ -333,7 +333,10 @@ fn fuzz(
         }
 
         unsafe {
-            qemu.write_mem(input_addr, buf).expect("qemu write failed.");
+            // # Safety
+            // The input buffer size is checked above. We use `write_mem_unchecked` for performance reasons
+            // For better error handling, use `write_mem` and handle the returned Result
+            qemu.write_mem_unchecked(input_addr, buf);
 
             qemu.write_reg(Regs::Rdi, input_addr).unwrap();
             qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
