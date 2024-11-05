@@ -1,8 +1,10 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use libafl::{
-    corpus::Testcase, events::EventFirer, executors::ExitKind, feedbacks::Feedback,
-    observers::ObserversTuple, state::State, Error,
+    corpus::Testcase,
+    executors::ExitKind,
+    feedbacks::{Feedback, StateInitializer},
+    Error,
 };
 use libafl_bolts::Named;
 
@@ -13,64 +15,57 @@ use crate::Opt;
 /// then, essentially becomes benign
 #[allow(clippy::module_name_repetitions, clippy::struct_excessive_bools)]
 #[derive(Debug)]
-pub struct SeedFeedback<A, S>
-where
-    A: Feedback<S>,
-    S: State,
-{
+pub struct SeedFeedback<A, S> {
     /// Inner [`Feedback`]
     pub inner: A,
     ignore_timeouts: bool,
     ignore_seed_issues: bool,
     exit_on_seed_issues: bool,
-    phantom: PhantomData<S>,
     done_loading_seeds: bool,
+    phantom: PhantomData<S>,
 }
-impl<A, S> SeedFeedback<A, S>
-where
-    A: Feedback<S>,
-    S: State,
-{
+impl<A, S> SeedFeedback<A, S> {
     pub fn new(inner: A, opt: &Opt) -> Self {
         Self {
             inner,
             ignore_timeouts: opt.ignore_timeouts,
             ignore_seed_issues: opt.ignore_seed_issues,
             exit_on_seed_issues: opt.exit_on_seed_issues,
-            phantom: PhantomData,
             done_loading_seeds: false,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<A, S> Feedback<S> for SeedFeedback<A, S>
+impl<A, S> StateInitializer<S> for SeedFeedback<A, S>
 where
-    A: Feedback<S>,
-    S: State,
+    A: StateInitializer<S>,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.init_state(state)?;
         Ok(())
     }
-    fn is_interesting<EM, OT>(
+}
+
+impl<A, EM, I, OT, S> Feedback<EM, I, OT, S> for SeedFeedback<A, S>
+where
+    A: Feedback<EM, I, OT, S>,
+{
+    fn is_interesting(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &S::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         if !self.done_loading_seeds {
             match exit_kind {
                 ExitKind::Timeout => {
                     if !self.ignore_timeouts {
                         if !self.ignore_seed_issues || self.exit_on_seed_issues {
                             return Err(Error::invalid_corpus(
-                                "input led to a timeout; use AFL_IGNORE_SEED_ISSUES=true",
+                                "input led to a timeout; use AFL_IGNORE_SEED_ISSUES=1",
                             ));
                         }
                         return Ok(false);
@@ -93,17 +88,13 @@ where
     }
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata<EM, OT>(
+    fn append_metadata(
         &mut self,
         state: &mut S,
         manager: &mut EM,
         observers: &OT,
-        testcase: &mut Testcase<S::Input>,
-    ) -> Result<(), Error>
-    where
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S>,
-    {
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         self.inner
             .append_metadata(state, manager, observers, testcase)?;
         Ok(())
@@ -111,7 +102,7 @@ where
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.inner.discard_metadata(state, input)?;
         Ok(())
     }
@@ -128,11 +119,7 @@ where
     }
 }
 
-impl<S, A> Named for SeedFeedback<A, S>
-where
-    A: Feedback<S>,
-    S: State,
-{
+impl<A, S> Named for SeedFeedback<A, S> {
     #[inline]
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("SeedFeedback");
@@ -140,11 +127,7 @@ where
     }
 }
 
-impl<S, A> SeedFeedback<A, S>
-where
-    A: Feedback<S>,
-    S: State,
-{
+impl<A, S> SeedFeedback<A, S> {
     pub fn done_loading_seeds(&mut self) {
         self.done_loading_seeds = true;
     }

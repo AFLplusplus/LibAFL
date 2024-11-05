@@ -4,7 +4,7 @@
 //! a specific mutator for a specified amount of iterations
 
 use alloc::{borrow::Cow, vec::Vec};
-use core::fmt::Debug;
+use core::{fmt::Debug, num::NonZero};
 
 use libafl_bolts::{
     impl_serdeany, math::calculate_cumulative_distribution_in_place, rands::Rand,
@@ -132,7 +132,7 @@ where
                 iters
             } else {
                 // fall back to random
-                1 << (1 + state.rand_mut().below(self.max_stack_pow))
+                1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
             }
         } else {
             // We will sample using the mutation probabilities.
@@ -153,7 +153,6 @@ where
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(self.mutations.len() != 0);
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
 
@@ -196,7 +195,10 @@ where
         }
 
         // fall back to random if no entries in either vec, the scheduling is not tuned.
-        state.rand_mut().below(self.mutations.len()).into()
+        state
+            .rand_mut()
+            .below(NonZero::new(self.mutations.len()).expect("No mutations provided!"))
+            .into()
     }
 }
 

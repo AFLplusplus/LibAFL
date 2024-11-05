@@ -16,7 +16,7 @@ use libafl::{
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::HasTargetBytes,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     state::{HasExecutions, State, UsesState},
     Error,
 };
@@ -34,26 +34,26 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     'b: 'a,
 {
     base: InProcessExecutor<'a, H, OT, S>,
     // thread_id for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
-    stalker: Stalker<'a>,
+    stalker: Stalker,
     /// User provided callback for instrumentation
     helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     followed: bool,
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<H, OT, RT, S> Debug for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: State,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S> + Debug,
+    OT: ObserversTuple<S::Input, S> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
@@ -64,14 +64,13 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, Z>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<EM, H, OT, RT, S, Z> Executor<EM, Z> for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
     Z: UsesState<State = S>,
 {
@@ -121,33 +120,24 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> UsesObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<H, OT, RT, S> UsesState for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
-    S: State,
-    S::Input: HasTargetBytes,
-{
-    type Observers = OT;
-}
-
-impl<'a, 'b, 'c, H, OT, RT, S> UsesState for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
-where
-    H: FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     S: State,
     S::Input: HasTargetBytes,
 {
     type State = S;
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> HasObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<H, OT, RT, S> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
     S: State,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
 {
+    type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.base.observers()
@@ -164,7 +154,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: State,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
@@ -197,7 +187,7 @@ where
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
         // we don't add it to the INSTRUMENTED ranges.
         let mut ranges = helper.ranges().clone();
-        for module in frida_gum::Module::enumerate_modules() {
+        for module in frida_gum::Module::obtain(gum).enumerate_modules() {
             if module.base_address < Self::new as usize
                 && (Self::new as usize) < module.base_address + module.size
             {
@@ -241,7 +231,7 @@ where
     H: FnMut(&S::Input) -> ExitKind,
     S: State + HasSolutions + HasCorpus + HasExecutions,
     S::Input: HasTargetBytes,
-    OT: ObserversTuple<S>,
+    OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
     <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me

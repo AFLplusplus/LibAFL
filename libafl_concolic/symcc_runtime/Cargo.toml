@@ -32,9 +32,6 @@ all-features = true
 no-cpp-runtime = []
 
 [dependencies]
-unchecked_unwrap = "4"
-ctor = "0.2"
-libc = "0.2"
 libafl = { path = "../../libafl", version = "0.13.2", default-features = false, features = [
   "std",
   "serdeany_autoreg",
@@ -44,9 +41,16 @@ libafl_bolts = { path = "../../libafl_bolts", version = "0.13.2", default-featur
   "serdeany_autoreg",
 ] }
 
+unchecked_unwrap = "4.0.0"
+ctor = "0.2.8"
+libc = { version = "0.2.59" }
+
 [build-dependencies]
-cmake = "0.1"
-bindgen = "0.69.4"
-regex = "1"
-which = "6.0"
+cmake = { version = "0.1.51" }
+bindgen = { version = "0.70.1" }
+regex = { version = "1.10.6" }
+which = { version = "7.0.0" }
 symcc_libafl = { path = "../symcc_libafl", version = "0.13.2" }
+
+[lints]
+workspace = true

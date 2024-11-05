@@ -11,6 +11,7 @@ use std::{
     io::{self, Read, Write},
     path::PathBuf,
     process,
+    ptr::addr_of_mut,
 };
 
 use clap::{Arg, Command};
@@ -176,7 +177,7 @@ fn run_testcases(filenames: &[&str]) {
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
-    if libfuzzer_initialize(&args) == -1 {
+    if unsafe { libfuzzer_initialize(&args) } == -1 {
         println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
@@ -191,7 +192,9 @@ fn run_testcases(filenames: &[&str]) {
         let mut buffer = vec![];
         file.read_to_end(&mut buffer).expect("Buffer overflow");
 
-        libfuzzer_test_one_input(&buffer);
+        unsafe {
+            libfuzzer_test_one_input(&buffer);
+        }
     }
 }
 
@@ -250,7 +253,8 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let func_list = unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut FUNCTION_LIST)) };
+    let func_list =
+        unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut *addr_of_mut!(FUNCTION_LIST))) };
     let profiling_observer = ProfilingObserver::new("concatenated.json", func_list)?;
     let callhook = CallHook::new();
 
@@ -296,7 +300,7 @@ fn fuzz(
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
-    if libfuzzer_initialize(&args) == -1 {
+    if unsafe { libfuzzer_initialize(&args) } == -1 {
         println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
@@ -331,7 +335,9 @@ fn fuzz(
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
-        libfuzzer_test_one_input(buf);
+        unsafe {
+            libfuzzer_test_one_input(buf);
+        }
         ExitKind::Ok
     };
 

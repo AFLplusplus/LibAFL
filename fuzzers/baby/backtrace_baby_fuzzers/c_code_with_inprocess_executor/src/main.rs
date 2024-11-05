@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, ptr::NonNull};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -16,7 +16,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 use libc::c_uchar;
 extern crate libc;
 
@@ -35,7 +35,12 @@ pub fn main() {
         libafl::executors::ExitKind::Ok
     };
     // Create an observation channel using the signals map
-    let observer = unsafe { ConstMapObserver::<u8, 3>::from_mut_ptr("signals", array_ptr) };
+    let observer = unsafe {
+        ConstMapObserver::<u8, 3>::from_mut_ptr(
+            "signals",
+            NonNull::new(array_ptr).expect("map ptr is null"),
+        )
+    };
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::owned(
         "BacktraceObserver",
@@ -89,7 +94,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

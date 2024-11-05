@@ -2,7 +2,10 @@ use alloc::vec::Vec;
 use std::fmt;
 
 use hashbrown::HashMap;
-use libafl_bolts::rands::{loaded_dice::LoadedDiceSampler, Rand};
+use libafl_bolts::{
+    rands::{loaded_dice::LoadedDiceSampler, Rand},
+    Error,
+};
 
 use crate::common::nautilus::grammartec::{
     context::Context,
@@ -32,7 +35,8 @@ impl RecursionInfo {
     pub fn new(t: &Tree, n: NTermId, ctx: &Context) -> Option<Self> {
         let (recursive_parents, node_by_offset, depth_by_offset) =
             RecursionInfo::find_parents(t, n, ctx)?;
-        let sampler = RecursionInfo::build_sampler(&depth_by_offset);
+        let sampler = RecursionInfo::build_sampler(&depth_by_offset)
+            .expect("Sampler depth_by_offset invalid");
         Some(Self {
             recursive_parents,
             sampler,
@@ -79,7 +83,7 @@ impl RecursionInfo {
     }
 
     #[allow(clippy::cast_precision_loss)]
-    fn build_sampler(depths: &[usize]) -> LoadedDiceSampler {
+    fn build_sampler(depths: &[usize]) -> Result<LoadedDiceSampler, Error> {
         let mut weights = depths.iter().map(|x| *x as f64).collect::<Vec<_>>();
         let norm: f64 = weights.iter().sum();
         assert!(norm > 0.0);

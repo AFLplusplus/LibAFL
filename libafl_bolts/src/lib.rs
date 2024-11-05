@@ -4,33 +4,11 @@
 #![doc = include_str!("../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
-#![forbid(unexpected_cfgs)]
-#![allow(incomplete_features)]
 #![no_std]
 // For `type_eq`
 #![cfg_attr(nightly, feature(specialization))]
 // For `std::simd`
 #![cfg_attr(nightly, feature(portable_simd))]
-#![warn(clippy::cargo)]
-#![allow(ambiguous_glob_reexports)]
-#![deny(clippy::cargo_common_metadata)]
-#![deny(rustdoc::broken_intra_doc_links)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![allow(
-    clippy::unreadable_literal,
-    clippy::type_repetition_in_bounds,
-    clippy::missing_errors_doc,
-    clippy::cast_possible_truncation,
-    clippy::used_underscore_binding,
-    clippy::ptr_as_ptr,
-    clippy::missing_panics_doc,
-    clippy::missing_docs_in_private_items,
-    clippy::module_name_repetitions,
-    clippy::ptr_cast_constness,
-    clippy::negative_feature_names,
-    clippy::too_many_lines
-)]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
@@ -71,9 +49,6 @@
         while_true
     )
 )]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
 
 /// We need some sort of "[`String`]" for errors in `no_alloc`...
 /// We can only support `'static` without allocator, so let's do that.
@@ -238,14 +213,15 @@ pub type ErrorBacktrace = backtrace::Backtrace;
 
 #[cfg(not(feature = "errors_backtrace"))]
 #[derive(Debug, Default)]
-/// Empty struct to use when `errors_backtrace` is disabled
-pub struct ErrorBacktrace {}
+/// ZST to use when `errors_backtrace` is disabled
+pub struct ErrorBacktrace;
+
 #[cfg(not(feature = "errors_backtrace"))]
 impl ErrorBacktrace {
     /// Nop
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
@@ -324,6 +300,8 @@ pub enum Error {
     Unknown(String, ErrorBacktrace),
     /// Error with the corpora
     InvalidCorpus(String, ErrorBacktrace),
+    /// Error specific to a runtime like QEMU or Frida
+    Runtime(String, ErrorBacktrace),
 }
 
 impl Error {
@@ -462,6 +440,15 @@ impl Error {
     {
         Error::InvalidCorpus(arg.into(), ErrorBacktrace::new())
     }
+
+    /// Error specific to some runtime, like QEMU or Frida
+    #[must_use]
+    pub fn runtime<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Runtime(arg.into(), ErrorBacktrace::new())
+    }
 }
 
 impl Display for Error {
@@ -526,6 +513,10 @@ impl Display for Error {
                 write!(f, "Invalid corpus: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
+            Self::Runtime(s, b) => {
+                write!(f, "Runtime error: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
         }
     }
 }
@@ -552,14 +543,6 @@ impl From<BorrowMutError> for Error {
 #[cfg(feature = "alloc")]
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
-        Self::serialize(format!("{err:?}"))
-    }
-}
-
-/// Stringify the json serializer error
-#[cfg(feature = "std")]
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
         Self::serialize(format!("{err:?}"))
     }
 }
@@ -632,9 +615,9 @@ impl From<SetLoggerError> for Error {
 }
 
 #[cfg(windows)]
-impl From<windows::core::Error> for Error {
+impl From<windows_result::Error> for Error {
     #[allow(unused_variables)]
-    fn from(err: windows::core::Error) -> Self {
+    fn from(err: windows_result::Error) -> Self {
         Self::unknown(format!("Windows API error: {err:?}"))
     }
 }
@@ -697,7 +680,18 @@ pub trait AsSlice<'a> {
     fn as_slice(&'a self) -> Self::SliceRef;
 }
 
-impl<'a, T, R> AsSlice<'a> for R
+/// Can be converted to a slice
+pub trait AsSizedSlice<'a, const N: usize> {
+    /// Type of the entries of this slice
+    type Entry: 'a;
+    /// Type of the reference to this slice
+    type SliceRef: Deref<Target = [Self::Entry; N]>;
+
+    /// Convert to a slice
+    fn as_sized_slice(&'a self) -> Self::SliceRef;
+}
+
+impl<'a, T, R: ?Sized> AsSlice<'a> for R
 where
     T: 'a,
     R: Deref<Target = [T]>,
@@ -706,7 +700,20 @@ where
     type SliceRef = &'a [T];
 
     fn as_slice(&'a self) -> Self::SliceRef {
-        &*self
+        self
+    }
+}
+
+impl<'a, T, const N: usize, R: ?Sized> AsSizedSlice<'a, N> for R
+where
+    T: 'a,
+    R: Deref<Target = [T; N]>,
+{
+    type Entry = T;
+    type SliceRef = &'a [T; N];
+
+    fn as_sized_slice(&'a self) -> Self::SliceRef {
+        self
     }
 }
 
@@ -719,7 +726,16 @@ pub trait AsSliceMut<'a>: AsSlice<'a> {
     fn as_slice_mut(&'a mut self) -> Self::SliceRefMut;
 }
 
-impl<'a, T, R> AsSliceMut<'a> for R
+/// Can be converted to a mutable slice
+pub trait AsSizedSliceMut<'a, const N: usize>: AsSizedSlice<'a, N> {
+    /// Type of the mutable reference to this slice
+    type SliceRefMut: DerefMut<Target = [Self::Entry; N]>;
+
+    /// Convert to a slice
+    fn as_sized_slice_mut(&'a mut self) -> Self::SliceRefMut;
+}
+
+impl<'a, T, R: ?Sized> AsSliceMut<'a> for R
 where
     T: 'a,
     R: DerefMut<Target = [T]>,
@@ -727,6 +743,18 @@ where
     type SliceRefMut = &'a mut [T];
 
     fn as_slice_mut(&'a mut self) -> Self::SliceRefMut {
+        &mut *self
+    }
+}
+
+impl<'a, T, const N: usize, R: ?Sized> AsSizedSliceMut<'a, N> for R
+where
+    T: 'a,
+    R: DerefMut<Target = [T; N]>,
+{
+    type SliceRefMut = &'a mut [T; N];
+
+    fn as_sized_slice_mut(&'a mut self) -> Self::SliceRefMut {
         &mut *self
     }
 }
@@ -1072,6 +1100,21 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
         mem::forget(f);
     }));
+}
+
+/// Zero-cost way to construct [`core::num::NonZeroUsize`] at compile-time.
+#[macro_export]
+macro_rules! nonzero {
+    // TODO: Further simplify with `unwrap`/`expect` once MSRV includes
+    // https://github.com/rust-lang/rust/issues/67441
+    ($val:expr) => {
+        const {
+            match core::num::NonZero::new($val) {
+                Some(x) => x,
+                None => panic!("Value passed to `nonzero!` was zero"),
+            }
+        }
+    };
 }
 
 #[cfg(feature = "python")]

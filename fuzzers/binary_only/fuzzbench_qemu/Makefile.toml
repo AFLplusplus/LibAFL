@@ -1,30 +1,17 @@
 # Variables
 [env]
-FUZZER_NAME = 'libpng_harness'
+FUZZER_NAME = 'harness'
 PROJECT_DIR = { script = ["pwd"] }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
-PROFILE_DIR = { value = "release", condition = { env_not_set = [
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
   "PROFILE_DIR",
 ] } }
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
 
 [tasks.unsupported]
 script_runner = "@shell"
 script = '''
 echo "Qemu fuzzer not supported on windows"
-'''
-
-# libpng
-[tasks.libpng]
-linux_alias = "libpng_unix"
-mac_alias = "libpng_unix"
-windows_alias = "unsupported"
-
-[tasks.libpng_unix]
-condition = { files_not_exist = ["./libpng-1.6.37"] }
-script_runner = "@shell"
-script = '''
-wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
-tar -xvf v1.6.37.tar.gz
 '''
 
 # fuzzer
@@ -46,20 +33,13 @@ windows_alias = "unsupported"
 [tasks.harness_unix]
 script_runner = "@shell"
 script = '''
-cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-cd "${PROJECT_DIR}"
-make -C libpng-1.6.37
 cc -c "${PROJECT_DIR}/libfuzzer_main.c"
-# Build the libpng harness    
-c++ \
-    ../../inprocess/libfuzzer_libpng/harness.cc \
-    ./libpng-1.6.37/.libs/libpng16.a \
+cc \
+    ./fuzz.c \
     ./libfuzzer_main.o \
-    -I./libpng-1.6.37/ \
     -o ${FUZZER_NAME} \
     -lm -lz
 '''
-dependencies = ["libpng"]
 
 # Run the fuzzer
 [tasks.run]
@@ -81,7 +61,7 @@ args = [
   "./out",
   "./${FUZZER_NAME}",
 ]
-dependencies = ["harness", "fuzzer"]
+dependencies = ["harness"]
 
 # Run the fuzzer
 [tasks.test]
@@ -93,7 +73,13 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner = "@shell"
 script = '''
-echo "This test is skipped. QEMU-based fuzzer doesn't work on Github runners"
+timeout 15s ${TARGET_DIR}/${PROFILE_DIR}/fuzzbench_qemu ${PROJECT_DIR}/harness -- --libafl-in ${PROJECT_DIR}/../../inprocess/libfuzzer_libpng/corpus --libafl-out ${PROJECT_DIR}/out ${PROJECT_DIR}/harness | tee fuzz_stdout.log
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
 '''
 dependencies = ["harness", "fuzzer"]
 
@@ -108,7 +94,6 @@ windows_alias = "unsupported"
 clear = true
 script_runner = "@shell"
 script = '''
-rm -f ./${FUZZER_NAME} libfuzzer_main.o
-make -C libpng-1.6.37 clean
+rm -f ./${FUZZER_NAME}
 cargo clean
 '''

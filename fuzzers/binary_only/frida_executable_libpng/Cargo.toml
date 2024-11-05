@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "frida_executable_fuzzer"
-crate_type = ["cdylib"]
+crate-type = ["cdylib"]
 
 [features]
 default = ["std"]
@@ -18,29 +18,31 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../../libafl/", features = [
+libafl = { path = "../../../libafl", features = [
   "std",
   "llmp_compression",
   "llmp_bind_public",
   "frida_cli",
 ] } #,  "llmp_small_maps", "llmp_debug"]}
-libafl_bolts = { path = "../../../libafl_bolts/" }
-frida-gum = { version = "0.13.6", features = [
+libafl_bolts = { path = "../../../libafl_bolts" }
+frida-gum = { version = "0.15.1", features = [
   "auto-download",
   "event-sink",
   "invocation-listener",
+  "script",
 ] }
 libafl_frida = { path = "../../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../../libafl_targets", features = [
   "sancov_cmplog",
 ] }
-libc = "0.2"
-libloading = "0.7"
-num-traits = "0.2"
-rangemap = "1.3"
-clap = { version = "4.5", features = ["derive"] }
-serde = "1.0"
-mimalloc = { version = "*", default-features = false }
+libc = "0.2.159"
+libloading = "0.8.5"
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+num-traits = "0.2.19"
+rangemap = "1.5.1"
+clap = { version = "4.5.18", features = ["derive"] }
+serde = "1.0.210"
+mimalloc = { version = "0.1.43", default-features = false }
 
-backtrace = "0.3"
-color-backtrace = "0.5"
+backtrace = "0.3.74"
+color-backtrace = "0.6.1"

@@ -23,14 +23,18 @@ features = ["x86_64", "usermode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
+default = ["usermode", "x86_64"]
+
 # The following architecture features are mutually exclusive.
-x86_64 = []  # build qemu for x86_64 (default)
+x86_64 = []  # build qemu for x86_64
 i386 = []    # build qemu for i386
 arm = []     # build qemu for arm
 aarch64 = [] # build qemu for aarch64
 mips = []    # build qemu for mips (el, use with the 'be' feature of mips be)
 ppc = []     # build qemu for powerpc
 hexagon = [] # build qemu for hexagon
+riscv32 = [] # build qemu for riscv 32bit
+riscv64 = [] # build qemu for riscv 64bit
 
 be = []
 
@@ -54,14 +58,17 @@ paranoid_debug = [
 ] # Will perform as many checks as possible. The target will be greatly slowed down.
 
 [dependencies]
-paste = "1"
-num_enum = "0.7"
-libc = "0.2"
-strum = "0.26"
-strum_macros = "0.26"
-pyo3 = { version = "0.22", optional = true }
+paste = { version = "1.0.15" }
+num_enum = { version = "0.7.3", default-features = true }
+libc = { version = "0.2.59" }
+strum = { version = "0.26.3" }
+strum_macros = { version = "0.26.4" }
+pyo3 = { version = "0.22.3", optional = true }
 
 [build-dependencies]
 libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.13.2" }
-pyo3-build-config = { version = "0.22", optional = true }
-rustversion = "1.0"
+pyo3-build-config = { version = "0.22.3", optional = true }
+rustversion = { version = "1.0.17" }
+
+[lints]
+workspace = true

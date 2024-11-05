@@ -4,14 +4,24 @@ members = [
   "libafl",
   "libafl_bolts",
   "libafl_cc",
+  "libafl_concolic/symcc_runtime",
+  "libafl_concolic/symcc_libafl",
   "libafl_derive",
+  "libafl_frida",
+  "libafl_libfuzzer",
+  "libafl_nyx",
   "libafl_targets",
+  "libafl_tinyinst",
+  "libafl_qemu",
+  "libafl_qemu/libafl_qemu_build",
+  "libafl_qemu/libafl_qemu_sys",
   "libafl_sugar",
   "libafl_concolic/test/dump_constraints",
   "libafl_concolic/test/runtime_test",
   "utils/build_and_test_fuzzers",
   "utils/deexit",
   "utils/libafl_benches",
+  "utils/libafl_jumper",
   "utils/gramatron/construct_automata",
 ]
 default-members = [
@@ -25,6 +35,7 @@ default-members = [
 exclude = [
   "bindings",
   "fuzzers",
+  "libafl_libfuzzer_runtime",
   "utils/noaslr",
   "utils/gdb_qemu",
   "utils/libafl_fmt",
@@ -32,24 +43,60 @@ exclude = [
   "utils/multi_machine_generator",
   "scripts",
   # additional crates
-  "libafl_concolic/symcc_runtime",
-  "libafl_concolic/symcc_libafl",
-  "libafl_frida",
-  "libafl_libfuzzer",
-  "libafl_libfuzzer_runtime",
-  "libafl_nyx",
-  "libafl_qemu",
-  "libafl_tinyinst",
-  "libafl_qemu/libafl_qemu_build",
-  "libafl_qemu/libafl_qemu_sys",
   "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 
 [workspace.package]
 version = "0.13.2"
 
+[workspace.lints.rust]
+# Forbid
+unexpected_cfgs = "forbid"
+
+# Allow
+incomplete_features = "allow"
+ambiguous_glob_reexports = "allow"
+
+
+[workspace.lints.clippy]
+# Deny
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+cargo_common_metadata = "deny"
+
+# Warn
+cargo = { level = "warn", priority = -1 }
+negative_feature_names = "warn"
+
+# Allow
+unreadable_literal = "allow"
+type_repetition_in_bounds = "allow"
+missing_errors_doc = "allow"
+cast_possible_truncation = "allow"
+used_underscore_binding = "allow"
+ptr_as_ptr = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+unsafe_derive_deserialize = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+
+
+[workspace.lints.rustdoc]
+# Deny
+broken_intra_doc_links = "deny"
+
+
 [profile.release]
 lto = true
 codegen-units = 1
 opt-level = 3
 debug = true
+
+[profile.release-abort]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+abort = true

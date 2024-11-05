@@ -14,9 +14,9 @@ include = ["/src", "/Cargo.toml", "/build.rs", "/runtime"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-cc = "1.0"
-rustversion = "1.0"
-toml = { version = "0.8.14", features = ["preserve_order"] }
+cc = { version = "1.1.21" }
+rustversion = "1.0.17"
+toml = { version = "0.8.19", features = ["preserve_order"] }
 
 [features]
 default = ["fork"]
@@ -43,10 +43,13 @@ libafl-libfuzzer-use-version = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
-document-features = { version = "0.2", optional = true }
+document-features = { version = "0.2.10", optional = true }
 
 [package.metadata.docs.rs]
 features = ["document-features"]
 all-features = true
 
 rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true

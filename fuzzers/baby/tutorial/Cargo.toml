@@ -18,25 +18,26 @@ opt-level = 3
 debug = true
 
 [build-dependencies]
-cc = { version = "1.0", features = ["parallel"] }
-which = "6.0"
+cc = { version = "1.1.21", features = ["parallel"] }
+which = { version = "7.0.0" }
 
 [dependencies]
-libafl = { path = "../../../libafl/", features = ["default", "rand_trait"] }
-libafl_bolts = { path = "../../../libafl_bolts/" }
-libafl_targets = { path = "../../../libafl_targets/", features = [
+libafl = { path = "../../../libafl", features = ["default", "rand_trait"] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_targets = { path = "../../../libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
   "sancov_cmplog",
 ] }
-serde = { version = "1.0", default-features = false, features = [
+serde = { version = "1.0.210", default-features = false, features = [
   "alloc",
 ] } # serialization lib
-lain = { version = "0.5", features = [
+lain = { version = "0.5.5", features = [
   "serde_support",
 ], git = "https://github.com/AFLplusplus/lain.git", rev = "208e927bcf411f62f8a1f51ac2d9f9423a1ec5d3" } # We're using a lain fork compatible with libafl's rand version
 # TODO Include it only when building cc
-libafl_cc = { path = "../../../libafl_cc/" }
+libafl_cc = { path = "../../../libafl_cc" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
 
 [lib]
 name = "tutorial"

@@ -63,7 +63,12 @@ script_runner = "@shell"
 script = '''
 rm -rf libafl_unix_shmem_server || true
 timeout 31s ./${FUZZER_NAME} 2>/dev/null | tee fuzz_stdout.log || true
-echo "The test is skipped. See https://github.com/AFLplusplus/LibAFL/issues/1176"
+if [ -z "$(grep "corpus: 30" fuzz_stdout.log)" ]; then
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+else
+    echo "Fuzzer is working"
+fi
 '''
 dependencies = ["fuzzer"]
 

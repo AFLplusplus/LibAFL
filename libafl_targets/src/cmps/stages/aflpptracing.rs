@@ -25,7 +25,7 @@ where
 {
     name: Cow<'static, str>,
     tracer_executor: TE,
-    cmplog_observer_handle: Handle<AFLppCmpLogObserver<'a, <Self as UsesState>::State>>,
+    cmplog_observer_handle: Handle<AFLppCmpLogObserver<'a>>,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, Z)>,
 }
@@ -58,6 +58,7 @@ where
         + UsesInput<Input = BytesInput>
         + HasNamedMetadata
         + HasCurrentTestcase,
+    TE::Observers: MatchNameRef + ObserversTuple<BytesInput, TE::State>,
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
     <Self::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>, //delete me
@@ -147,10 +148,7 @@ where
     TE: UsesState,
 {
     /// With cmplog observer
-    pub fn new(
-        tracer_executor: TE,
-        observer_handle: Handle<AFLppCmpLogObserver<'a, TE::State>>,
-    ) -> Self {
+    pub fn new(tracer_executor: TE, observer_handle: Handle<AFLppCmpLogObserver<'a>>) -> Self {
         let observer_name = observer_handle.name().clone();
         Self {
             name: Cow::Owned(

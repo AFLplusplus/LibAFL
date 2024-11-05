@@ -33,7 +33,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     struct W<'a, T: ?Sized, U: ?Sized>(&'a Cell<bool>, PhantomData<fn() -> (&'a T, &'a U)>);
 
     // default implementation: if the types are unequal, we will use the clone implementation
-    impl<'a, T: ?Sized, U: ?Sized> Clone for W<'a, T, U> {
+    impl<T: ?Sized, U: ?Sized> Clone for W<'_, T, U> {
         #[inline]
         fn clone(&self) -> Self {
             // indicate that the types are unequal
@@ -46,7 +46,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 
     // specialized implementation: Copy is only implemented if the types are the same
     #[allow(clippy::mismatching_type_param_order)]
-    impl<'a, T: ?Sized> Copy for W<'a, T, T> {}
+    impl<T: ?Sized> Copy for W<'_, T, T> {}
 
     let detected = Cell::new(true);
     // [].clone() is *specialized* in core.

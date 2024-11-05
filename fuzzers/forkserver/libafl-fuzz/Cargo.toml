@@ -12,7 +12,7 @@ categories = ["development-tools::testing"]
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5", features = ["derive", "env"] }
+clap = { version = "4.5.18", features = ["derive", "env"] }
 env_logger = "0.11.3"
 libafl = { path = "../../../libafl", features = [
   "std",
@@ -26,8 +26,9 @@ libafl_bolts = { path = "../../../libafl_bolts", features = [
   "errors_backtrace",
 ] }
 libafl_targets = { path = "../../../libafl_targets" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
 memmap2 = "0.9.4"
-nix = { version = "0.29", features = ["fs"] }
+nix = { version = "0.29.0", features = ["fs"] }
 regex = "1.10.5"
 serde = { version = "1.0.117", features = ["derive"] }
 

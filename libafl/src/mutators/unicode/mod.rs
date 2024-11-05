@@ -3,6 +3,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{Ordering, Reverse},
+    num::NonZero,
     ops::Range,
 };
 
@@ -12,6 +13,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
     inputs::{BytesInput, HasMutatorBytes},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
+    nonzero,
     stages::{
         extract_metadata,
         mutational::{MutatedTransform, MutatedTransformPost},
@@ -68,7 +70,9 @@ fn choose_start<R: Rand>(
     bytes: &[u8],
     meta: &UnicodeIdentificationMetadata,
 ) -> Option<(usize, usize)> {
-    let idx = rand.below(bytes.len());
+    let bytes_len = NonZero::new(bytes.len())?;
+
+    let idx = rand.below(bytes_len);
     let mut options = Vec::new();
     for (start, range) in meta.ranges() {
         if idx
@@ -82,12 +86,15 @@ fn choose_start<R: Rand>(
     match options.len() {
         0 => None,
         1 => Some((options[0].0, options[0].1.len())),
-        _ => {
+        options_len => {
+            // # Safety
+            // options.len() is checked above.
+            let options_len_squared =
+                unsafe { NonZero::new(options_len * options_len).unwrap_unchecked() };
             // bias towards longer strings
             options.sort_by_cached_key(|(_, entries)| entries.count_ones());
             let selected =
-                libafl_bolts::math::integer_sqrt(rand.below(options.len() * options.len()) as u64)
-                    as usize;
+                libafl_bolts::math::integer_sqrt(rand.below(options_len_squared) as u64) as usize;
             Some((options[selected].0, options[selected].1.len()))
         }
     }
@@ -135,7 +142,8 @@ fn choose_category_range<R: Rand>(
     string: &str,
 ) -> (Range<usize>, &'static [(u32, u32)]) {
     let chars = string.char_indices().collect::<Vec<_>>();
-    let idx = rand.below(chars.len());
+    let chars_len = NonZero::new(chars.len()).expect("Got empty string in choose_category_range");
+    let idx = rand.below(chars_len);
     let c = chars[idx].1;
 
     // figure out the categories for this char
@@ -161,7 +169,8 @@ fn choose_category_range<R: Rand>(
                 .sum::<usize>(),
         )
     });
-    let options = categories.len() * categories.len();
+    let options = NonZero::new(categories.len() * categories.len())
+        .expect("Empty categories in choose_category_range");
     let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options) as u64) as usize;
 
     let selected = categories[selected_idx];
@@ -179,7 +188,8 @@ fn choose_category_range<R: Rand>(
 
 fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize>, (u32, u32)) {
     let chars = string.char_indices().collect::<Vec<_>>();
-    let idx = rand.below(chars.len());
+    let idx =
+        rand.below(NonZero::new(chars.len()).expect("Empty string in choose_subcategory_range"));
     let c = chars[idx].1;
 
     // figure out the categories for this char
@@ -198,7 +208,8 @@ fn choose_subcategory_range<R: Rand>(rand: &mut R, string: &str) -> (Range<usize
     // see reasoning for selection pattern in choose_category_range
 
     subcategories.sort_by_key(|&(min, max)| Reverse(max - min + 1));
-    let options = subcategories.len() * subcategories.len();
+    let options = NonZero::new(subcategories.len() * subcategories.len())
+        .expect("Emtpy subcategories in choose_subcategory_range");
     let selected_idx = libafl_bolts::math::integer_sqrt(rand.below(options) as u64) as usize;
     let selected = subcategories[selected_idx];
 
@@ -223,7 +234,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     range: Range<usize>,
     char_gen: F,
 ) -> MutationResult {
-    let temp_range = rand_range(state, range.end - range.start, MAX_CHARS);
+    let temp_range = rand_range(state, range.end - range.start, nonzero!(MAX_CHARS));
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
     let range = match core::str::from_utf8(&input.0.bytes()[range.clone()]) {
         Ok(_) => range,
@@ -240,7 +251,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
         return MutationResult::Skipped;
     }
 
-    let replace_len = state.rand_mut().below(MAX_CHARS);
+    let replace_len = state.rand_mut().below(nonzero!(MAX_CHARS));
     let orig_len = range.end - range.start;
     if input.0.len() - orig_len + replace_len > state.max_size() {
         return MutationResult::Skipped;
@@ -305,7 +316,10 @@ where
                 .map(|&(start, end)| end as usize - start as usize + 1)
                 .sum();
             let char_gen = |state: &mut S| loop {
-                let mut selected = state.rand_mut().below(options);
+                // Should this skip the mutation instead of expecting?
+                let mut selected = state.rand_mut().below(
+                    NonZero::new(options).expect("Empty category in UnicodeCatgoryRandMutator"),
+                );
                 for &(min, max) in category {
                     if let Some(next_selected) =
                         selected.checked_sub(max as usize - min as usize + 1)
@@ -360,6 +374,9 @@ where
             );
 
             let options = subcategory.1 as usize - subcategory.0 as usize + 1;
+            let Some(options) = NonZero::new(options) else {
+                return Ok(MutationResult::Skipped);
+            };
             let char_gen = |state: &mut S| loop {
                 let selected = state.rand_mut().below(options);
                 if let Some(new_c) = char::from_u32(selected as u32 + subcategory.0) {
@@ -394,15 +411,14 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let tokens_len = {
-            let Some(meta) = state.metadata_map().get::<Tokens>() else {
-                return Ok(MutationResult::Skipped);
-            };
-            if meta.tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.tokens().len()
+        let Some(meta) = state.metadata_map().get::<Tokens>() else {
+            return Ok(MutationResult::Skipped);
         };
+
+        let Some(tokens_len) = NonZero::new(meta.tokens().len()) else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let token_idx = state.rand_mut().below(tokens_len);
 
         let bytes = input.0.bytes();
@@ -454,15 +470,14 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let tokens_len = {
-            let Some(meta) = state.metadata_map().get::<Tokens>() else {
-                return Ok(MutationResult::Skipped);
-            };
-            if meta.tokens().is_empty() {
-                return Ok(MutationResult::Skipped);
-            }
-            meta.tokens().len()
+        let Some(meta) = state.metadata_map().get::<Tokens>() else {
+            return Ok(MutationResult::Skipped);
         };
+
+        let Some(tokens_len) = NonZero::new(meta.tokens().len()) else {
+            return Ok(MutationResult::Skipped);
+        };
+
         let token_idx = state.rand_mut().below(tokens_len);
 
         let bytes = input.0.bytes();

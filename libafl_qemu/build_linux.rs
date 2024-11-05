@@ -16,17 +16,19 @@ void __libafl_qemu_testfile() {}
 #[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
-    println!(r#"cargo::rustc-check-cfg=cfg(emulation_mode, values("usermode", "systemmode"))"#);
     println!(
-        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "x86_64"))"#
+        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "riscv32", "riscv64", "x86_64"))"#
     );
 
     let emulation_mode = if cfg!(feature = "usermode") {
-        "usermode".to_string()
+        "usermode"
     } else if cfg!(feature = "systemmode") {
-        "systemmode".to_string()
+        "systemmode"
     } else {
-        env::var("EMULATION_MODE").unwrap_or_else(|_| "usermode".to_string())
+        unreachable!(
+            "The macros `assert_unique_feature` and `assert_at_least_one_feature` in \
+            `libafl_qemu_sys/build_linux.rs` should panic before this code is reached."
+        );
     };
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
@@ -57,22 +59,22 @@ pub fn build() {
     let libafl_qemu_impl_hdr = libafl_runtime_dir.join(libafl_qemu_impl_hdr_name);
 
     let libafl_runtime_testfile = out_dir.join("runtime_test.c");
-    fs::write(&libafl_runtime_testfile, LIBAFL_QEMU_RUNTIME_TEST).expect("Could not write runtime test file");
+    fs::write(&libafl_runtime_testfile, LIBAFL_QEMU_RUNTIME_TEST)
+        .expect("Could not write runtime test file");
 
     let mut runtime_test_cc_compiler = cc::Build::new();
 
-    runtime_test_cc_compiler.cpp(false)
+    runtime_test_cc_compiler
+        .cpp(false)
         .include(&libafl_runtime_dir)
         .file(&libafl_runtime_testfile);
 
-    runtime_test_cc_compiler.try_compile("runtime_test").unwrap();
+    runtime_test_cc_compiler
+        .try_compile("runtime_test")
+        .unwrap();
 
     let runtime_bindings_file = out_dir.join("libafl_qemu_bindings.rs");
     let stub_runtime_bindings_file = src_dir.join("runtime/libafl_qemu_stub_bindings.rs");
-
-    println!("cargo::rustc-check-cfg=cfg(emulation_mode, values(\"usermode\", \"systemmode\"))");
-    println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
-    println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=build_linux.rs");
@@ -90,6 +92,10 @@ pub fn build() {
         "mips".to_string()
     } else if cfg!(feature = "ppc") {
         "ppc".to_string()
+    } else if cfg!(feature = "riscv32") {
+        "riscv32".to_string()
+    } else if cfg!(feature = "riscv64") {
+        "riscv64".to_string()
     } else if cfg!(feature = "hexagon") {
         "hexagon".to_string()
     } else {
@@ -97,9 +103,9 @@ pub fn build() {
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\"))");
+    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))");
 
-    let cross_cc = if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
+    let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
         let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
             println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
@@ -162,12 +168,12 @@ pub fn build() {
 
     maybe_generate_stub_bindings(
         &cpu_target,
-        &emulation_mode,
+        emulation_mode,
         stub_runtime_bindings_file.as_path(),
-        runtime_bindings_file.as_path()
+        runtime_bindings_file.as_path(),
     );
 
-    if (emulation_mode == "usermode") && (qemu_asan || qemu_asan_guest) {
+    if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
         println!("cargo:rerun-if-changed={}", qasan_dir.display());

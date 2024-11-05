@@ -21,15 +21,16 @@ unsafe extern "C" fn unhandled_exception_filter_detour(
 }
 /// Initialize the hooks
 pub fn initialize(gum: &Gum) {
+    let module = Module::obtain(gum);
     let is_processor_feature_present =
-        Module::find_export_by_name(Some("kernel32.dll"), "IsProcessorFeaturePresent");
+        module.find_export_by_name(Some("kernel32.dll"), "IsProcessorFeaturePresent");
     let is_processor_feature_present = is_processor_feature_present.unwrap();
     assert!(
         !is_processor_feature_present.is_null(),
         "IsProcessorFeaturePresent not found"
     );
     let unhandled_exception_filter =
-        Module::find_export_by_name(Some("kernel32.dll"), "UnhandledExceptionFilter");
+        module.find_export_by_name(Some("kernel32.dll"), "UnhandledExceptionFilter");
     let unhandled_exception_filter = unhandled_exception_filter.unwrap();
     assert!(
         !unhandled_exception_filter.is_null(),

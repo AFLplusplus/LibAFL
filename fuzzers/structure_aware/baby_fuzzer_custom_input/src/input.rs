@@ -1,3 +1,4 @@
+use core::num::NonZeroUsize;
 use std::{
     borrow::Cow,
     hash::{DefaultHasher, Hash, Hasher},
@@ -5,10 +6,9 @@ use std::{
 
 use libafl::{
     corpus::CorpusId,
-    generators::Generator,
+    generators::{Generator, RandBytesGenerator},
     inputs::{BytesInput, HasTargetBytes, Input, MutVecInput},
     mutators::{MutationResult, Mutator},
-    prelude::RandBytesGenerator,
     state::HasRand,
     Error, SerdeAny,
 };
@@ -61,13 +61,15 @@ impl CustomInput {
 
 /// A generator for [`CustomInput`] used in this example
 pub struct CustomInputGenerator {
-    pub max_len: usize,
+    pub bytes_generator: RandBytesGenerator,
 }
 
 impl CustomInputGenerator {
     /// Creates a new [`CustomInputGenerator`]
-    pub fn new(max_len: usize) -> Self {
-        Self { max_len }
+    pub fn new(max_len: NonZeroUsize) -> Self {
+        Self {
+            bytes_generator: RandBytesGenerator::new(max_len),
+        }
     }
 }
 
@@ -76,7 +78,7 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<CustomInput, Error> {
-        let mut generator = RandBytesGenerator::new(self.max_len);
+        let generator = &mut self.bytes_generator;
 
         let byte_array = generator.generate(state).unwrap().target_bytes().into();
         let optional_byte_array = state
@@ -98,12 +100,9 @@ pub struct ToggleOptionalByteArrayMutator<G> {
     generator: G,
 }
 
-impl<S> ToggleOptionalByteArrayMutator<RandBytesGenerator<S>>
-where
-    S: HasRand,
-{
+impl ToggleOptionalByteArrayMutator<RandBytesGenerator> {
     /// Creates a new [`ToggleOptionalByteArrayMutator`]
-    pub fn new(length: usize) -> Self {
+    pub fn new(length: NonZeroUsize) -> Self {
         Self {
             generator: RandBytesGenerator::new(length),
         }

@@ -1,17 +1,14 @@
-#![forbid(unexpected_cfgs)]
-#![allow(clippy::missing_panics_doc)]
-
 // #[rustversion::nightly]
 // use std::io::{BufRead, BufReader};
 use std::{
     collections::hash_map,
-    env, fs,
-    fs::File,
+    env,
+    fs::{self, File},
     hash::Hasher,
     io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     process::Command,
-    ptr::addr_of_mut,
+    sync::{LazyLock, Mutex},
 };
 
 //#[rustversion::nightly]
@@ -30,25 +27,21 @@ use crate::build::QEMU_REVISION;
 
 const LLVM_VERSION_MAX: i32 = 33;
 
-static mut CARGO_RPATH: Option<Vec<String>> = None;
+static CARGO_RPATH: LazyLock<Mutex<Vec<String>>> = LazyLock::new(Mutex::default);
 static CARGO_RPATH_SEPARATOR: &str = "|";
 
+// Add to the list of `rpath`s.
+// Later, print the `cargo::rpath` using [`cargo_propagate_rpath`]
 pub fn cargo_add_rpath(rpath: &str) {
-    unsafe {
-        if let Some(rpaths) = &mut *addr_of_mut!(CARGO_RPATH) {
-            rpaths.push(rpath.to_string());
-        } else {
-            CARGO_RPATH = Some(vec![rpath.to_string()]);
-        }
-    }
+    CARGO_RPATH.lock().unwrap().push(rpath.to_string());
 }
 
+// Print the `rpath`, set via [`cargo_add_rpath`] as `cargo::rpath`
 pub fn cargo_propagate_rpath() {
-    unsafe {
-        if let Some(cargo_cmds) = &mut *addr_of_mut!(CARGO_RPATH) {
-            let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);
-            println!("cargo:rpath={rpath}");
-        }
+    let cargo_cmds = CARGO_RPATH.lock().unwrap();
+    if !cargo_cmds.is_empty() {
+        let rpath = cargo_cmds.join(CARGO_RPATH_SEPARATOR);
+        println!("cargo:rpath={rpath}");
     }
 }
 
@@ -230,6 +223,7 @@ fn qemu_bindgen_clang_args(
     let target_arch_dir = match cpu_target {
         "x86_64" => format!("-I{}/target/i386", qemu_dir.display()),
         "aarch64" => format!("-I{}/target/arm", qemu_dir.display()),
+        "riscv32" | "riscv64" => format!("-I{}/target/riscv", qemu_dir.display()),
         _ => format!("-I{}/target/{cpu_target}", qemu_dir.display()),
     };
 

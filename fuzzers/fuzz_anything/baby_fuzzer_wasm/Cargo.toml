@@ -11,8 +11,9 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-js-sys = "0.3"
-wasm-bindgen = "0.2.63"
+js-sys = "0.3.70"
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+wasm-bindgen = "0.2.93"
 
 libafl = { path = "../../../libafl", default-features = false }
 libafl_bolts = { path = "../../../libafl_bolts", default-features = false }
@@ -21,9 +22,9 @@ libafl_bolts = { path = "../../../libafl_bolts", default-features = false }
 # logging them with `console.error`. This is great for development, but requires
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
-console_error_panic_hook = { version = "0.1.6", optional = true }
+console_error_panic_hook = { version = "0.1.7", optional = true }
 
-web-sys = { version = "0.3", features = [
+web-sys = { version = "0.3.70", features = [
   'console',
   'Window',
   'Performance',
@@ -31,7 +32,7 @@ web-sys = { version = "0.3", features = [
 ] }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.13"
+wasm-bindgen-test = "0.3.43"
 
 [profile.release]
 opt-level = 3

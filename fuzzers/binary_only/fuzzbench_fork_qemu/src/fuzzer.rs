@@ -9,6 +9,7 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process,
+    ptr::NonNull,
     time::Duration,
 };
 
@@ -39,7 +40,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
-    os::{dup2, unix_signals::Signal},
+    os::dup2,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -50,11 +51,12 @@ use libafl_qemu::{
     filter_qemu_args,
     modules::{
         cmplog::{CmpLogChildModule, CmpLogMap, CmpLogObserver},
-        edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
+        edges::StdEdgeCoverageChildModule,
     },
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
 };
+use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -148,10 +150,26 @@ fn fuzz(
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
+
+    let mut shmem_provider = StdShMemProvider::new()?;
+
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
+    let edges = edges_shmem.as_slice_mut();
+    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
+
+    // Create an observation channel using the coverage map
+    let mut edges_observer = unsafe {
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
+            "edges",
+            NonNull::new(edges.as_mut_ptr()).expect("map ptr is null."),
+        ))
+        .track_indices()
+    };
 
     let emulator_modules = tuple_list!(
-        StdEdgeCoverageChildModule::builder().build(),
+        StdEdgeCoverageChildModule::builder()
+            .const_map_observer(edges_observer.as_mut())
+            .build()?,
         CmpLogChildModule::default(),
     );
 
@@ -182,7 +200,8 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    unsafe { qemu.read_mem(stack_ptr, &mut ret_addr) };
+    qemu.read_mem(stack_ptr, &mut ret_addr)
+        .expect("qemu read failed");
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -218,12 +237,6 @@ fn fuzz(
         writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
     });
 
-    let mut shmem_provider = StdShMemProvider::new()?;
-
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
-
     let mut cmp_shmem = shmem_provider.uninit_on_shmem::<CmpLogMap>().unwrap();
     let cmplog = cmp_shmem.as_slice_mut();
 
@@ -245,15 +258,6 @@ fn fuzz(
                 panic!("Failed to setup the restarter: {err}");
             }
         },
-    };
-
-    // Create an observation channel using the coverage map
-    let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
-            "edges",
-            edges.as_mut_ptr(),
-        ))
-        .track_indices()
     };
 
     // Create an observation channel to keep track of the execution time
@@ -321,7 +325,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -331,7 +335,10 @@ fn fuzz(
         }
 
         unsafe {
-            qemu.write_mem(input_addr, buf);
+            // # Safety
+            // The input buffer size is checked above. We use `write_mem_unchecked` for performance reasons
+            // For better error handling, use `write_mem` and handle the returned Result
+            qemu.write_mem_unchecked(input_addr, buf);
 
             qemu.write_reg(Regs::Rdi, input_addr).unwrap();
             qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
@@ -339,16 +346,17 @@ fn fuzz(
             qemu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
             match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {}
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
+                Ok(QemuExitReason::Breakpoint(_)) => ExitKind::Ok,
+                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
+                    signal.handle();
+                    panic!("Unexpected signal: {signal:?}");
                 }
-                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                _ => panic!("Unexpected QEMU exit."),
+                Err(QemuExitError::UnexpectedExit) => ExitKind::Crash,
+                _ => {
+                    panic!("Unexpected QEMU exit.")
+                }
             }
         }
-
-        ExitKind::Ok
     };
 
     let executor = QemuForkExecutor::new(

@@ -5,7 +5,7 @@ CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set 
   "CARGO_TARGET_DIR",
 ] } }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
-PROFILE_DIR = { value = "release", condition = { env_not_set = [
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
   "PROFILE_DIR",
 ] } }
 LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
@@ -63,7 +63,7 @@ script_runner = "@shell"
 script = '''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
 cd "${PROJECT_DIR}"
-cp ../../structure-aware/baby_fuzzer_nautilus/grammar.json .
+cp ../../structure_aware/baby_fuzzer_nautilus/grammar.json .
 make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc" CXX="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
 '''
 dependencies = ["libpng", "cxx", "cc"]

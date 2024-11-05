@@ -4,7 +4,7 @@ CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set 
   "CARGO_TARGET_DIR",
 ] } }
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
-PROFILE_DIR = { value = "release", condition = { env_not_set = [
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
   "PROFILE_DIR",
 ] } }
 FUZZER_NAME = 'libafl-fuzz'
@@ -12,7 +12,7 @@ FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
-AFL_VERSION = "8b35dd49be5f846e945f6d6a9414623d195a99cb"
+AFL_VERSION = "78b7e14c73baacf1d88b3c03955e78f5080d17ba"
 AFL_DIR = { value = "${PROJECT_DIR}/AFLplusplus" }
 AFL_CC_PATH = { value = "${AFL_DIR}/afl-clang-fast" }
 CC = { value = "clang" }
@@ -25,12 +25,16 @@ if [ ! -d "$AFL_DIR" ]; then
 	cd ${AFL_DIR}
 	git checkout ${AFL_VERSION}
 	LLVM_CONFIG=${LLVM_CONFIG} make 
+fi
+'''
+[tasks.build_frida_mode]
+script_runner = '@shell'
+script = '''
+	cd ${AFL_DIR}
 	cd frida_mode
 	LLVM_CONFIG=${LLVM_CONFIG} make
 	cd ../..
-fi
 '''
-
 [tasks.build_qemuafl]
 script_runner = "@shell"
 script = '''
@@ -77,7 +81,7 @@ script = '''
 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
 
 export LIBAFL_DEBUG_OUTPUT=1 
-export AFL_CORES=1 
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1 
 
 timeout 5 ${FUZZER} -i ./test/seeds -o ./test/output ./test/out-instr || true
@@ -109,7 +113,7 @@ script_runner = "@shell"
 script = '''
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
-AFL_CORES=1 timeout 5 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
+LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=0 timeout 10 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
 test -n "$( ls ${PROJECT_DIR}/test/output-cmplog/fuzzer_main/hangs/id:0000* ${PROJECT_DIR}/test/output-cmplog/fuzzer_main/crashes/id:0000*)" || {
 	echo "No crashes found"
 	exit 1
@@ -123,7 +127,7 @@ script = '''
 ${CC} -no-pie ./test/test-instr.c -o ./test/out-frida
 
 export AFL_PATH=${AFL_DIR} 
-export AFL_CORES=1 
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1 
 
 timeout 5 ${FUZZER} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida -- ./test/out-frida || true
@@ -162,7 +166,7 @@ test -n "$RUNTIME" -a -n "$RUNTIME_PERSISTENT" && {
 
 unset AFL_FRIDA_PERSISTENT_ADDR
 '''
-dependencies = ["build_afl", "build_libafl_fuzz"]
+dependencies = ["build_afl", "build_frida_mode", "build_libafl_fuzz"]
 
 [tasks.test_qemu]
 script_runner = "@shell"
@@ -171,7 +175,7 @@ ${CC} -pie -fPIE ./test/test-instr.c -o ./test/out-qemu
 ${CC} -o ./test/out-qemu-cmpcov ./test/test-cmpcov.c
 
 export AFL_PATH=${AFL_DIR}
-export AFL_CORES=1
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1
 
 timeout 5 ${FUZZER} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu -- ./test/out-qemu || true
@@ -202,7 +206,7 @@ dependencies = ["build_afl", "build_qemuafl", "build_libafl_fuzz"]
 script_runner = "@shell"
 script = '''
 export AFL_PATH=${AFL_DIR}
-export AFL_CORES=1
+export AFL_CORES=0
 export AFL_STATS_INTERVAL=1
 
 # TODO: test unicorn persistent mode once it's fixed on AFL++

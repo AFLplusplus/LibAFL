@@ -21,6 +21,7 @@ use libafl_bolts::shmem::StdShMemProvider;
 #[cfg(target_vendor = "apple")]
 use libafl_bolts::shmem::UnixShMemProvider;
 use libafl_bolts::{
+    nonzero,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider},
     tuples::tuple_list,
@@ -41,7 +42,10 @@ pub fn main() {
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_map = shmem.as_slice_mut();
+    let shmem_map: &mut [u8; MAP_SIZE] = shmem
+        .as_slice_mut()
+        .try_into()
+        .expect("could not convert slice to sized slice.");
 
     // Create an observation channel using the signals map
     let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
@@ -97,7 +101,7 @@ pub fn main() {
         .unwrap();
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(3);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

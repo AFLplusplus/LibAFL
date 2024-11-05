@@ -35,7 +35,7 @@ fn signals_set(idx: usize) {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let context = NautilusContext::from_file(15, "grammar.json");
+    let context = NautilusContext::from_file(15, "grammar.json").unwrap();
     let mut bytes = vec![];
 
     // The closure that we want to fuzz
@@ -76,13 +76,9 @@ pub fn main() {
     )
     .unwrap();
 
-    if state
-        .metadata_map()
-        .get::<NautilusChunksMetadata>()
-        .is_none()
-    {
-        state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
-    }
+    let _ = state.metadata_or_insert_with::<NautilusChunksMetadata>(|| {
+        NautilusChunksMetadata::new("/tmp/".into())
+    });
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{s}"));
@@ -139,9 +135,11 @@ pub fn main() {
     */
 
     // Generate 8 initial inputs
-    state
-        .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-        .expect("Failed to generate the initial corpus");
+    if state.must_load_initial_inputs() {
+        state
+            .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+            .expect("Failed to generate the initial corpus");
+    }
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::with_max_stack_pow(

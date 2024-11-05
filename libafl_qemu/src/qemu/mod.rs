@@ -18,8 +18,6 @@ use std::{
 };
 
 use libafl_bolts::os::unix_signals::Signal;
-#[cfg(emulation_mode = "usermode")]
-use libafl_qemu_sys::{guest_base, VerifyAccess};
 use libafl_qemu_sys::{
     libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
     libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
@@ -36,14 +34,14 @@ use crate::{GuestAddrKind, GuestReg, Regs};
 pub mod config;
 use config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
 
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 mod usermode;
-#[cfg(emulation_mode = "usermode")]
+#[cfg(feature = "usermode")]
 pub use usermode::*;
 
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 mod systemmode;
-#[cfg(emulation_mode = "systemmode")]
+#[cfg(feature = "systemmode")]
 #[allow(unused_imports)]
 pub use systemmode::*;
 
@@ -51,6 +49,25 @@ mod hooks;
 pub use hooks::*;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
+
+#[derive(Debug)]
+pub enum QemuError {
+    Init(QemuInitError),
+    Exit(QemuExitError),
+    RW(QemuRWError),
+}
+
+impl From<QemuError> for libafl::Error {
+    fn from(qemu_error: QemuError) -> Self {
+        libafl::Error::runtime(qemu_error)
+    }
+}
+
+impl From<QemuError> for String {
+    fn from(qemu_error: QemuError) -> Self {
+        format!("LibAFL QEMU Error: {qemu_error:?}")
+    }
+}
 
 #[derive(Debug)]
 pub enum QemuInitError {
@@ -92,6 +109,7 @@ pub enum QemuRWErrorCause {
     WrongArgument(i32),
     CurrentCpuNotFound,
     Reg(i32),
+    WrongMemoryLocation(GuestAddr, usize), // addr, size
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +124,19 @@ impl QemuRWError {
     #[must_use]
     pub fn new(kind: QemuRWErrorKind, cause: QemuRWErrorCause, cpu: Option<CPUStatePtr>) -> Self {
         Self { kind, cause, cpu }
+    }
+
+    pub fn wrong_mem_location(
+        kind: QemuRWErrorKind,
+        cpu: CPUStatePtr,
+        addr: GuestAddr,
+        size: usize,
+    ) -> Self {
+        Self::new(
+            kind,
+            QemuRWErrorCause::WrongMemoryLocation(addr, size),
+            Some(cpu),
+        )
     }
 
     #[must_use]
@@ -155,10 +186,10 @@ static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
 
 unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
     unsafe {
-        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Qemu, &'r str) -> bool>);
+        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(Qemu, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let qemu = Qemu::get_unchecked();
-        closure(&qemu, cmd)
+        closure(qemu, cmd)
     }
 }
 
@@ -323,32 +354,36 @@ impl CPU {
         }
     }
 
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
-        unsafe { (addr as usize + guest_base) as *mut T }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
-        unsafe { (addr as usize - guest_base) as GuestAddr }
-    }
-
-    #[cfg(emulation_mode = "usermode")]
-    #[must_use]
-    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
-        unsafe {
-            // TODO add support for tagged GuestAddr
-            libafl_qemu_sys::page_check_range(addr, size as GuestAddr, kind.into())
-        }
-    }
-
     // TODO expose tlb_set_dirty and tlb_reset_dirty
 
     #[must_use]
     pub fn num_regs(&self) -> i32 {
         unsafe { libafl_qemu_num_regs(self.ptr) }
+    }
+
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
+    where
+        R: Into<i32> + Clone,
+        T: From<GuestReg>,
+    {
+        unsafe {
+            let reg_id = reg.clone().into();
+            let mut val = MaybeUninit::uninit();
+            let success = libafl_qemu_read_reg(self.ptr, reg_id, val.as_mut_ptr() as *mut u8);
+            if success == 0 {
+                Err(QemuRWError {
+                    kind: QemuRWErrorKind::Write,
+                    cause: QemuRWErrorCause::Reg(reg.into()),
+                    cpu: Some(self.ptr),
+                })
+            } else {
+                #[cfg(feature = "be")]
+                return Ok(GuestReg::from_be(val.assume_init()).into());
+
+                #[cfg(not(feature = "be"))]
+                return Ok(GuestReg::from_le(val.assume_init()).into());
+            }
+        }
     }
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), QemuRWError>
@@ -376,28 +411,53 @@ impl CPU {
         }
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
-    where
-        R: Into<i32> + Clone,
-        T: From<GuestReg>,
-    {
-        unsafe {
-            let reg_id = reg.clone().into();
-            let mut val = MaybeUninit::uninit();
-            let success = libafl_qemu_read_reg(self.ptr, reg_id, val.as_mut_ptr() as *mut u8);
-            if success == 0 {
-                Err(QemuRWError {
-                    kind: QemuRWErrorKind::Write,
-                    cause: QemuRWErrorCause::Reg(reg.into()),
-                    cpu: Some(self.ptr),
-                })
-            } else {
-                #[cfg(feature = "be")]
-                return Ok(GuestReg::from_be(val.assume_init()).into());
+    /// Read a value from a guest address, taking into account the potential MMU / MPU.
+    pub fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) -> Result<(), QemuRWError> {
+        // TODO use gdbstub's target_cpu_memory_rw_debug
+        let ret = unsafe {
+            libafl_qemu_sys::cpu_memory_rw_debug(
+                self.ptr,
+                addr as GuestVirtAddr,
+                buf.as_mut_ptr() as *mut _,
+                buf.len(),
+                false,
+            )
+        };
 
-                #[cfg(not(feature = "be"))]
-                return Ok(GuestReg::from_le(val.assume_init()).into());
-            }
+        if ret != 0 {
+            Err(QemuRWError::wrong_mem_location(
+                QemuRWErrorKind::Read,
+                self.ptr,
+                addr,
+                buf.len(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Write a value to a guest address, taking into account the potential MMU / MPU.
+    pub fn write_mem(&self, addr: GuestAddr, buf: &[u8]) -> Result<(), QemuRWError> {
+        // TODO use gdbstub's target_cpu_memory_rw_debug
+        let ret = unsafe {
+            libafl_qemu_sys::cpu_memory_rw_debug(
+                self.ptr,
+                addr as GuestVirtAddr,
+                buf.as_ptr() as *mut _,
+                buf.len(),
+                true,
+            )
+        };
+
+        if ret != 0 {
+            Err(QemuRWError::wrong_mem_location(
+                QemuRWErrorKind::Write,
+                self.ptr,
+                addr,
+                buf.len(),
+            ))
+        } else {
+            Ok(())
         }
     }
 
@@ -552,10 +612,10 @@ impl Qemu {
         argv.push(ptr::null()); // argv is always null terminated.
 
         unsafe {
-            libafl_qemu_init(argc, argv.as_ptr() as *mut *mut i8);
+            libafl_qemu_init(argc, argv.as_ptr() as *mut *mut ::std::os::raw::c_char);
         }
 
-        #[cfg(emulation_mode = "systemmode")]
+        #[cfg(feature = "systemmode")]
         unsafe {
             libafl_qemu_sys::syx_snapshot_init(true);
             libc::atexit(qemu_cleanup_atexit);
@@ -667,7 +727,7 @@ impl Qemu {
                 },
                 libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
 
-                #[cfg(emulation_mode = "systemmode")]
+                #[cfg(feature = "systemmode")]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
 
                 _ => return Err(QemuExitError::UnknownKind),
@@ -707,21 +767,48 @@ impl Qemu {
         unsafe { libafl_page_from_addr(addr) }
     }
 
-    //#[must_use]
-    /*pub fn page_size() -> GuestUsize {
-        unsafe { libafl_page_size }
-    }*/
-
-    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
+    /// Read a value from a guest address, taking into account the potential indirections with the current CPU.
+    pub fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) -> Result<(), QemuRWError> {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
-            .write_mem(addr, buf);
+            .read_mem(addr, buf)
     }
 
-    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
+    /// Write a value to a guest address, taking into account the potential indirections with the current CPU.
+    pub fn write_mem(&self, addr: GuestAddr, buf: &[u8]) -> Result<(), QemuRWError> {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
-            .read_mem(addr, buf);
+            .write_mem(addr, buf)
+    }
+
+    /// Read a value from a guest address.
+    ///
+    /// # Safety
+    /// In usermode, this will read from a translated guest address.
+    /// This may only be safely used for valid guest addresses.
+    ///
+    /// In any case, no check will be performed on the correctness of the operation.
+    ///
+    /// Please refer to [`CPU::read_mem`] for more details.
+    pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .read_mem_unchecked(addr, buf);
+    }
+
+    /// Write a value to a guest address.
+    ///
+    /// # Safety
+    /// In usermode, this will write to a translated guest address.
+    ///
+    /// In any case, no check will be performed on the correctness of the operation.
+    ///
+    /// This may only be safely used for valid guest addresses.
+    /// Please refer to [`CPU::write_mem`] for more details.
+    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .write_mem_unchecked(addr, buf);
     }
 
     #[must_use]
@@ -750,12 +837,26 @@ impl Qemu {
     }
 
     pub fn set_breakpoint(&self, addr: GuestAddr) {
+        // Remove thumb bit encoded in addresses.
+        // Since ARMv7, instructions are (half-)word aligned, so this is safe.
+        // For ARMv6 and before, this could be wrong since SCTLR.U could be 0.
+        // TODO: check precisely for architecture before doing this.
+        #[cfg(target_arch = "arm")]
+        let addr = { addr & !1 };
+
         unsafe {
             libafl_qemu_set_breakpoint(addr.into());
         }
     }
 
     pub fn remove_breakpoint(&self, addr: GuestAddr) {
+        // Remove thumb bit encoded in addresses.
+        // Since ARMv7, instructions are (half-)word aligned, so this is safe.
+        // For ARMv6 and before, this could be wrong since SCTLR.U could be 0.
+        // TODO: check precisely for architecture before doing this.
+        #[cfg(target_arch = "arm")]
+        let addr = { addr & !1 };
+
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
         }
@@ -779,12 +880,13 @@ impl Qemu {
     }
 
     #[must_use]
-    pub fn remove_hook(&self, id: impl HookId, invalidate_block: bool) -> bool {
+    pub fn remove_hook(&self, id: &impl HookId, invalidate_block: bool) -> bool {
         id.remove(invalidate_block)
     }
 
-    // # Safety
-    // Calling this multiple times concurrently will access static variables and is unsafe.
+    /// # Safety
+    ///
+    /// Calling this multiple times concurrently will access static variables and is unsafe.
     #[allow(clippy::type_complexity)]
     pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         let fat: Box<FatPtr> = Box::new(transmute::<
@@ -929,7 +1031,7 @@ impl QemuMemoryChunk {
 
     /// Returns the number of bytes effectively read.
     /// output will get chunked at `size` bytes.
-    pub fn read(&self, qemu: Qemu, output: &mut [u8]) -> GuestReg {
+    pub fn read(&self, qemu: Qemu, output: &mut [u8]) -> Result<GuestReg, QemuRWError> {
         let max_len: usize = self.size.try_into().unwrap();
 
         let output_sliced = if output.len() > max_len {
@@ -939,32 +1041,31 @@ impl QemuMemoryChunk {
         };
 
         match self.addr {
-            GuestAddrKind::Physical(hwaddr) => unsafe {
-                #[cfg(emulation_mode = "usermode")]
+            GuestAddrKind::Physical(hwaddr) => {
+                #[cfg(feature = "usermode")]
                 {
                     // For now the default behaviour is to fall back to virtual addresses
-                    qemu.read_mem(hwaddr.try_into().unwrap(), output_sliced);
+                    qemu.read_mem(hwaddr.try_into().unwrap(), output_sliced)?;
                 }
-                #[cfg(emulation_mode = "systemmode")]
-                {
+                #[cfg(feature = "systemmode")]
+                unsafe {
                     qemu.read_phys_mem(hwaddr, output_sliced);
                 }
-            },
+            }
             GuestAddrKind::Virtual(vaddr) => unsafe {
                 self.cpu
                     .as_ref()
                     .unwrap()
-                    .read_mem(vaddr.try_into().unwrap(), output_sliced);
+                    .read_mem_unchecked(vaddr.try_into().unwrap(), output_sliced);
             },
         };
 
-        output_sliced.len().try_into().unwrap()
+        Ok(output_sliced.len().try_into().unwrap())
     }
 
     /// Returns the number of bytes effectively written.
     /// Input will get chunked at `size` bytes.
-    #[must_use]
-    pub fn write(&self, qemu: Qemu, input: &[u8]) -> GuestReg {
+    pub fn write(&self, qemu: Qemu, input: &[u8]) -> Result<GuestReg, QemuRWError> {
         let max_len: usize = self.size.try_into().unwrap();
 
         let input_sliced = if input.len() > max_len {
@@ -974,26 +1075,26 @@ impl QemuMemoryChunk {
         };
 
         match self.addr {
-            GuestAddrKind::Physical(hwaddr) => unsafe {
-                #[cfg(emulation_mode = "usermode")]
+            GuestAddrKind::Physical(hwaddr) => {
+                #[cfg(feature = "usermode")]
                 {
                     // For now the default behaviour is to fall back to virtual addresses
-                    qemu.write_mem(hwaddr.try_into().unwrap(), input_sliced);
+                    qemu.write_mem(hwaddr.try_into().unwrap(), input_sliced)?;
                 }
-                #[cfg(emulation_mode = "systemmode")]
-                {
+                #[cfg(feature = "systemmode")]
+                unsafe {
                     qemu.write_phys_mem(hwaddr, input_sliced);
                 }
-            },
-            GuestAddrKind::Virtual(vaddr) => unsafe {
+            }
+            GuestAddrKind::Virtual(vaddr) => {
                 self.cpu
                     .as_ref()
                     .unwrap()
-                    .write_mem(vaddr.try_into().unwrap(), input_sliced);
-            },
+                    .write_mem(vaddr.try_into().unwrap(), input_sliced)?;
+            }
         };
 
-        input_sliced.len().try_into().unwrap()
+        Ok(input_sliced.len().try_into().unwrap())
     }
 }
 
@@ -1038,16 +1139,16 @@ pub mod pybind {
         }
 
         fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-            unsafe {
-                self.qemu.write_mem(addr, buf);
-            }
+            self.qemu
+                .write_mem(addr, buf)
+                .expect("Write to memory failed.");
         }
 
         fn read_mem(&self, addr: GuestAddr, size: usize) -> Vec<u8> {
             let mut buf = vec![0; size];
-            unsafe {
-                self.qemu.read_mem(addr, &mut buf);
-            }
+            self.qemu
+                .read_mem(addr, &mut buf)
+                .expect("Read to memory failed.");
             buf
         }
 
@@ -1083,7 +1184,9 @@ pub mod pybind {
             self.qemu.flush_jit();
         }
 
-        fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
+        /// # Safety
+        /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
+        unsafe fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
                 let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
                 let idx = hooks.len();
@@ -1097,7 +1200,9 @@ pub mod pybind {
             }
         }
 
-        fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
+        /// # Safety
+        /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
+        unsafe fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
             unsafe {
                 let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
                 hooks.retain(|(a, _)| *a != addr);

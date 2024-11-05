@@ -64,6 +64,9 @@ COPY scripts/dummy.rs libafl_qemu/libafl_qemu_sys/src/lib.rs
 COPY libafl_sugar/Cargo.toml libafl_sugar/
 COPY scripts/dummy.rs libafl_sugar/src/lib.rs
 
+COPY bindings/pylibafl/Cargo.toml bindings/pylibafl/Cargo.toml
+COPY bindings/pylibafl/src bindings/pylibafl/src
+
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
 COPY libafl_cc/build.rs libafl_cc/build.rs
 COPY libafl_cc/src libafl_cc/src

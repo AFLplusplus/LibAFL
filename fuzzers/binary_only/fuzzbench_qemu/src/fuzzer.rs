@@ -38,7 +38,7 @@ use libafl::{
 };
 use libafl_bolts::{
     current_time,
-    os::{dup2, unix_signals::Signal},
+    os::dup2,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
@@ -50,9 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::{
-        edges_map_mut_ptr, StdEdgeCoverageModule, EDGES_MAP_SIZE_IN_USE, MAX_EDGES_FOUND,
-    },
+    modules::edges::StdEdgeCoverageModule,
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
@@ -64,6 +62,7 @@ use libafl_qemu::{
     QemuShutdownCause,
     Regs,
 };
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -172,10 +171,11 @@ fn fuzz(
     logfile: PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
+    env_logger::init();
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let qemu = Qemu::init(&args).unwrap();
+    let qemu = Qemu::init(&args).expect("QEMU init failed");
     // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();
@@ -198,7 +198,10 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    unsafe { qemu.read_mem(stack_ptr, &mut ret_addr) };
+
+    qemu.read_mem(stack_ptr, &mut ret_addr)
+        .expect("Error while reading QEMU memory.");
+
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -253,10 +256,10 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges_observer = unsafe {
+    let mut edges_observer = unsafe {
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
-            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_SIZE_IN_USE),
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
             addr_of_mut!(MAX_EDGES_FOUND),
         ))
         .track_indices()
@@ -338,7 +341,10 @@ fn fuzz(
             }
 
             unsafe {
-                qemu.write_mem(input_addr, buf);
+                // # Safety
+                // The input buffer size is checked above. We use `write_mem_unchecked` for performance reasons
+                // For better error handling, use `write_mem` and handle the returned Result
+                qemu.write_mem_unchecked(input_addr, buf);
 
                 qemu.write_reg(Regs::Rdi, input_addr).unwrap();
                 qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
@@ -347,9 +353,9 @@ fn fuzz(
 
                 match qemu.run() {
                     Ok(QemuExitReason::Breakpoint(_)) => {}
-                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
-                        Signal::SigInterrupt,
-                    ))) => process::exit(0),
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(signal))) => {
+                        signal.handle();
+                    }
                     Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
                     _ => panic!("Unexpected QEMU exit."),
                 }
@@ -359,7 +365,10 @@ fn fuzz(
         };
 
     let modules = tuple_list!(
-        StdEdgeCoverageModule::builder().build(),
+        StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()
+            .unwrap(),
         CmpLogModule::default(),
         // QemuAsanHelper::default(asan),
         //QemuSnapshotHelper::new()
@@ -395,7 +404,7 @@ fn fuzz(
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);
             });
-        println!("We imported {} inputs from disk.", state.corpus().count());
+        println!("We imported {} input(s) from disk.", state.corpus().count());
     }
 
     let tracing = ShadowTracingStage::new(&mut executor);

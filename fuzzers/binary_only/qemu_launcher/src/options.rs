@@ -39,7 +39,7 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Log file")]
     pub log: Option<String>,
 
-    #[arg(long, help = "Timeout in milli-seconds", default_value = "1000", value_parser = FuzzerOptions::parse_timeout)]
+    #[arg(long, help = "Timeout in milliseconds", default_value = "1000", value_parser = FuzzerOptions::parse_timeout)]
     pub timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
@@ -48,10 +48,10 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Cpu cores to use", default_value = "all", value_parser = Cores::from_cmdline)]
     pub cores: Cores,
 
-    #[arg(long, help = "Cpu cores to use for ASAN", value_parser = Cores::from_cmdline)]
+    #[arg(long, help = "Cpu cores to use for ASan", value_parser = Cores::from_cmdline)]
     pub asan_cores: Option<Cores>,
 
-    #[arg(long, help = "Cpu cores to use for ASAN", value_parser = Cores::from_cmdline)]
+    #[arg(long, help = "Cpu cores to use for ASan", value_parser = Cores::from_cmdline)]
     pub asan_guest_cores: Option<Cores>,
 
     #[arg(long, help = "Cpu cores to use for CmpLog", value_parser = Cores::from_cmdline)]
@@ -63,7 +63,7 @@ pub struct FuzzerOptions {
     #[clap(long, help = "Enable AFL++ style output", conflicts_with = "verbose")]
     pub tui: bool,
 
-    #[arg(long = "iterations", help = "Maximum numer of iterations")]
+    #[arg(long = "iterations", help = "Maximum number of iterations")]
     pub iterations: Option<u64>,
 
     #[arg(long = "include", help="Include address ranges", value_parser = FuzzerOptions::parse_ranges)]
@@ -71,6 +71,18 @@ pub struct FuzzerOptions {
 
     #[arg(long = "exclude", help="Exclude address ranges", value_parser = FuzzerOptions::parse_ranges, conflicts_with="include")]
     pub exclude: Option<Vec<Range<GuestAddr>>>,
+
+    #[arg(
+        short = 'd',
+        help = "Write a DrCov Trace for the current input. Requires -r."
+    )]
+    pub drcov: Option<PathBuf>,
+
+    #[arg(
+        short = 'r',
+        help = "An input to rerun, instead of starting to fuzz. Will ignore all other settings apart from -d."
+    )]
+    pub rerun_input: Option<PathBuf>,
 
     #[arg(last = true, help = "Arguments passed to the target")]
     pub args: Vec<String>,
@@ -181,6 +193,15 @@ impl FuzzerOptions {
                     .exit();
                 }
             }
+        }
+
+        if self.drcov.is_some() && self.rerun_input.is_none() {
+            let mut cmd = FuzzerOptions::command();
+            cmd.error(
+                ErrorKind::ValueValidation,
+                "The `drcov` option is only supported with `rerun_input`.".to_string(),
+            )
+            .exit();
         }
     }
 }

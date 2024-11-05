@@ -3,6 +3,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
+    num::NonZero,
     ops::{Deref, DerefMut},
 };
 
@@ -20,6 +21,7 @@ use crate::{
         token_mutations::{TokenInsert, TokenReplace},
         MutationResult, Mutator, MutatorsTuple,
     },
+    nonzero,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
 };
@@ -143,13 +145,18 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(self.max_stack_pow))
+        1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
-        debug_assert!(self.mutations.len() != 0);
-        state.rand_mut().below(self.mutations.len()).into()
+        debug_assert_ne!(self.mutations.len(), 0);
+        // # Safety
+        // We check for empty mutations
+        state
+            .rand_mut()
+            .below(unsafe { NonZero::new(self.mutations.len()).unwrap_unchecked() })
+            .into()
     }
 }
 
@@ -170,8 +177,12 @@ where
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
+    ///
+    /// # Errors
+    /// Will return [`Error::IllegalArgument`] for `max_stack_pow` of 0.
+    #[inline]
     pub fn with_max_stack_pow(mutations: MT, max_stack_pow: usize) -> Self {
-        StdScheduledMutator {
+        Self {
             name: Cow::from(format!(
                 "StdScheduledMutator[{}]",
                 mutations.names().join(", ")
@@ -253,15 +264,17 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(6))
+        1 << (1 + state.rand_mut().below(nonzero!(7)))
     }
 
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, _: &I) -> MutationId {
         debug_assert!(<SM::Mutations as HasConstLen>::LEN != 0);
+        // # Safety
+        // In debug we check the length. Worst case we end up with an illegal MutationId and fail later.
         state
             .rand_mut()
-            .below(<SM::Mutations as HasConstLen>::LEN)
+            .below(unsafe { NonZero::new(<SM::Mutations as HasConstLen>::LEN).unwrap_unchecked() })
             .into()
     }
 

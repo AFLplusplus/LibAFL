@@ -232,7 +232,54 @@
         : "x0", "x1", "x2"                                                                  \
     );   \
         return ret;                                                                                 \
+      }                                         \
+  #elif defined(__riscv) \
+    #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
+          libafl_word action) {                                                                     \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                        \
+        "mv a0, %1\n"                                                                            \
+        ".word " XSTRINGIFY(opcode) "\n"                                              \
+        "mv a0, a0\n"                                                                            \
+        : "=r"(ret)                                                                               \
+        : "r"(action)                                                                             \
+        : "a0"                                                                                    \
+    ); \
+        return ret;                                                                               \
+      }                                                                                             \
+                                                                                                    \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(                                 \
+          libafl_word action, libafl_word arg1) {                                                   \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                      \
+        "mv a0, %1\n"                                                                      \
+        "mv a1, %2\n"                                                                      \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
+        "mv %0, a0\n"                                                                      \
+        : "=r"(ret)                                                                         \
+        : "r"(action), "r"(arg1)                                                            \
+        : "a0", "a1"                                                                        \
+    );   \
+        return ret;                                                                                 \
+      }                                                                                             \
+                                                                                                    \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(                                 \
+          libafl_word action, libafl_word arg1, libafl_word arg2) {                                 \
+        libafl_word ret;                                                                            \
+        __asm__ volatile (                                                                      \
+        "mv a0, %1\n"                                                                      \
+        "mv a1, %2\n"                                                                      \
+        "mv a2, %3\n"                                                                      \
+        ".word " XSTRINGIFY(opcode) "\n"                                        \
+        "mv %0, a0\n"                                                                      \
+        : "=r"(ret)                                                                         \
+        : "r"(action), "r"(arg1), "r"(arg2)                                                 \
+        : "a0", "a1", "a2"                                                                  \
+    );   \
+        return ret;                                                                                 \
       }
+
   #else
     #warning "LibAFL QEMU Runtime does not support your architecture yet, please leave an issue."
   #endif

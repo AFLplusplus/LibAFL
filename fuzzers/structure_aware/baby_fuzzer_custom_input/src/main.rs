@@ -2,7 +2,10 @@ mod input;
 
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{path::PathBuf, ptr::write};
+use std::{
+    path::PathBuf,
+    ptr::{addr_of_mut, write},
+};
 
 use input::{
     CustomInput, CustomInputGenerator, ToggleBooleanMutator, ToggleOptionalByteArrayMutator,
@@ -23,7 +26,7 @@ use libafl::{
     state::StdState,
 };
 use libafl_bolts::{
-    current_nanos,
+    current_nanos, nonzero,
     rands::StdRand,
     tuples::{tuple_list, Merge, Prepend},
 };
@@ -37,8 +40,9 @@ use {
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
-static mut SIGNALS: [u8; 16] = [0; 16];
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+const SIGNALS_LEN: usize = 16;
+static mut SIGNALS: [u8; SIGNALS_LEN] = [0; 16];
+static mut SIGNALS_PTR: *mut u8 = addr_of_mut!(SIGNALS) as _;
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -78,7 +82,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -127,7 +131,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = CustomInputGenerator::new(1);
+    let mut generator = CustomInputGenerator::new(nonzero!(1));
 
     // Generate 8 initial inputs
     state
@@ -178,7 +182,7 @@ pub fn main() {
         // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
         .merge(optional_mapped_mutators)
         // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
-        .prepend(ToggleOptionalByteArrayMutator::new(1))
+        .prepend(ToggleOptionalByteArrayMutator::new(nonzero!(1)))
         // Finally, a custom mutator that toggles the boolean part of the input
         .prepend(ToggleBooleanMutator);
 

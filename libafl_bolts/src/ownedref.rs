@@ -10,13 +10,67 @@ use core::{
     clone::Clone,
     fmt::Debug,
     ops::{Deref, DerefMut, RangeBounds},
+    ptr::NonNull,
     slice,
     slice::SliceIndex,
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{shmem::ShMem, AsSlice, AsSliceMut, IntoOwned, Truncate};
+use crate::{
+    shmem::ShMem, AsSizedSlice, AsSizedSliceMut, AsSlice, AsSliceMut, IntoOwned, Truncate,
+};
+
+/// Constant size array visitor for serde deserialization.
+/// Mostly taken from <https://github.com/serde-rs/serde/issues/1937#issuecomment-812137971>
+mod arrays {
+    use alloc::{boxed::Box, fmt, vec::Vec};
+    use core::{convert::TryInto, marker::PhantomData};
+
+    use serde::{
+        de::{SeqAccess, Visitor},
+        Deserialize, Deserializer,
+    };
+
+    struct ArrayVisitor<T, const N: usize>(PhantomData<T>);
+
+    impl<'de, T, const N: usize> Visitor<'de> for ArrayVisitor<T, N>
+    where
+        T: Deserialize<'de>,
+    {
+        type Value = Box<[T; N]>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str(&format!("an array of length {N}"))
+        }
+
+        #[inline]
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            // can be optimized using MaybeUninit
+            let mut data = Vec::with_capacity(N);
+            for _ in 0..N {
+                match (seq.next_element())? {
+                    Some(val) => data.push(val),
+                    None => return Err(serde::de::Error::invalid_length(N, &self)),
+                }
+            }
+            match data.try_into() {
+                Ok(arr) => Ok(arr),
+                Err(_) => unreachable!(),
+            }
+        }
+    }
+    pub fn deserialize<'de, D, T, const N: usize>(deserializer: D) -> Result<Box<[T; N]>, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Deserialize<'de>,
+    {
+        deserializer.deserialize_tuple(N, ArrayVisitor::<T, N>(PhantomData))
+    }
+}
 
 /// Private part of the unsafe marker, making sure this cannot be initialized directly.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -39,13 +93,13 @@ impl UnsafeMarker {
     }
 }
 
-impl<'a, T> Truncate for &'a [T] {
+impl<T> Truncate for &[T] {
     fn truncate(&mut self, len: usize) {
         *self = &self[..len];
     }
 }
 
-impl<'a, T> Truncate for &'a mut [T] {
+impl<T> Truncate for &mut [T] {
     fn truncate(&mut self, len: usize) {
         let mut value = core::mem::take(self);
         value = unsafe { value.get_unchecked_mut(..len) };
@@ -68,7 +122,7 @@ where
 }
 
 /// Special case, &\[u8] is a fat pointer containing the size implicitly.
-impl<'a> Clone for OwnedRef<'a, [u8]> {
+impl Clone for OwnedRef<'_, [u8]> {
     fn clone(&self) -> Self {
         match self {
             Self::RefRaw(_, _) => panic!("Cannot clone"),
@@ -124,7 +178,7 @@ where
     }
 }
 
-impl<'a, T> OwnedRef<'a, T>
+impl<T> OwnedRef<'_, T>
 where
     T: Sized + 'static,
 {
@@ -175,7 +229,7 @@ where
     }
 }
 
-impl<'a> AsRef<[u8]> for OwnedRef<'a, [u8]> {
+impl AsRef<[u8]> for OwnedRef<'_, [u8]> {
     #[must_use]
     fn as_ref(&self) -> &[u8] {
         match self {
@@ -186,7 +240,7 @@ impl<'a> AsRef<[u8]> for OwnedRef<'a, [u8]> {
     }
 }
 
-impl<'a, T> AsRef<T> for OwnedRef<'a, T>
+impl<T> AsRef<T> for OwnedRef<'_, T>
 where
     T: Sized,
 {
@@ -200,7 +254,7 @@ where
     }
 }
 
-impl<'a, T> IntoOwned for OwnedRef<'a, T>
+impl<T> IntoOwned for OwnedRef<'_, T>
 where
     T: Sized + Clone,
 {
@@ -259,7 +313,7 @@ where
     }
 }
 
-impl<'a, T> OwnedRefMut<'a, T>
+impl<T> OwnedRefMut<'_, T>
 where
     T: Sized + 'static,
 {
@@ -306,7 +360,7 @@ where
     }
 }
 
-impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
+impl<T: ?Sized> AsRef<T> for OwnedRefMut<'_, T> {
     #[must_use]
     fn as_ref(&self) -> &T {
         match self {
@@ -317,7 +371,7 @@ impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
     }
 }
 
-impl<'a, T: Sized> AsMut<T> for OwnedRefMut<'a, T> {
+impl<T: ?Sized> AsMut<T> for OwnedRefMut<'_, T> {
     #[must_use]
     fn as_mut(&mut self) -> &mut T {
         match self {
@@ -328,7 +382,7 @@ impl<'a, T: Sized> AsMut<T> for OwnedRefMut<'a, T> {
     }
 }
 
-impl<'a, T> IntoOwned for OwnedRefMut<'a, T>
+impl<T> IntoOwned for OwnedRefMut<'_, T>
 where
     T: Sized + Clone,
 {
@@ -471,7 +525,7 @@ impl<'a, T> OwnedSlice<'a, T> {
     }
 }
 
-impl<'a, 'it, T> IntoIterator for &'it OwnedSlice<'a, T> {
+impl<'it, T> IntoIterator for &'it OwnedSlice<'_, T> {
     type Item = <Iter<'it, T> as Iterator>::Item;
     type IntoIter = Iter<'it, T>;
 
@@ -481,7 +535,7 @@ impl<'a, 'it, T> IntoIterator for &'it OwnedSlice<'a, T> {
 }
 
 /// Create a new [`OwnedSlice`] from a vector
-impl<'a, T> From<Vec<T>> for OwnedSlice<'a, T> {
+impl<T> From<Vec<T>> for OwnedSlice<'_, T> {
     fn from(vec: Vec<T>) -> Self {
         Self {
             inner: OwnedSliceInner::Owned(vec),
@@ -513,7 +567,7 @@ impl<'a, T> From<OwnedMutSlice<'a, T>> for OwnedSlice<'a, T> {
         Self {
             inner: match mut_slice.inner {
                 OwnedMutSliceInner::RefRaw(ptr, len, unsafe_marker) => {
-                    OwnedSliceInner::RefRaw(ptr as _, len, unsafe_marker)
+                    OwnedSliceInner::RefRaw(ptr.cast_const(), len, unsafe_marker)
                 }
                 OwnedMutSliceInner::Ref(r) => OwnedSliceInner::Ref(r as _),
                 OwnedMutSliceInner::Owned(v) => OwnedSliceInner::Owned(v),
@@ -522,7 +576,7 @@ impl<'a, T> From<OwnedMutSlice<'a, T>> for OwnedSlice<'a, T> {
     }
 }
 
-impl<'a, T: Sized> Deref for OwnedSlice<'a, T> {
+impl<T: Sized> Deref for OwnedSlice<'_, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -534,7 +588,7 @@ impl<'a, T: Sized> Deref for OwnedSlice<'a, T> {
     }
 }
 
-impl<'a, T> IntoOwned for OwnedSlice<'a, T>
+impl<T> IntoOwned for OwnedSlice<'_, T>
 where
     T: Sized + Clone,
 {
@@ -623,7 +677,7 @@ pub struct OwnedMutSlice<'a, T: 'a + Sized> {
     inner: OwnedMutSliceInner<'a, T>,
 }
 
-impl<'a, 'it, T> IntoIterator for &'it mut OwnedMutSlice<'a, T> {
+impl<'it, T> IntoIterator for &'it mut OwnedMutSlice<'_, T> {
     type Item = <IterMut<'it, T> as Iterator>::Item;
     type IntoIter = IterMut<'it, T>;
 
@@ -632,7 +686,7 @@ impl<'a, 'it, T> IntoIterator for &'it mut OwnedMutSlice<'a, T> {
     }
 }
 
-impl<'a, 'it, T> IntoIterator for &'it OwnedMutSlice<'a, T> {
+impl<'it, T> IntoIterator for &'it OwnedMutSlice<'_, T> {
     type Item = <Iter<'it, T> as Iterator>::Item;
     type IntoIter = Iter<'it, T>;
 
@@ -705,7 +759,7 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
     }
 }
 
-impl<'a, T: Sized> Deref for OwnedMutSlice<'a, T> {
+impl<T: Sized> Deref for OwnedMutSlice<'_, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -717,7 +771,7 @@ impl<'a, T: Sized> Deref for OwnedMutSlice<'a, T> {
     }
 }
 
-impl<'a, T: Sized> DerefMut for OwnedMutSlice<'a, T> {
+impl<T: Sized> DerefMut for OwnedMutSlice<'_, T> {
     fn deref_mut(&mut self) -> &mut [T] {
         match &mut self.inner {
             OwnedMutSliceInner::RefRaw(rr, len, _) => unsafe {
@@ -729,7 +783,7 @@ impl<'a, T: Sized> DerefMut for OwnedMutSlice<'a, T> {
     }
 }
 
-impl<'a, T> IntoOwned for OwnedMutSlice<'a, T>
+impl<T> IntoOwned for OwnedMutSlice<'_, T>
 where
     T: Sized + Clone,
 {
@@ -765,7 +819,7 @@ impl<'a, T: 'a + Clone> Clone for OwnedMutSlice<'a, T> {
 }
 
 /// Create a new [`OwnedMutSlice`] from a vector
-impl<'a, T> From<Vec<T>> for OwnedMutSlice<'a, T> {
+impl<T> From<Vec<T>> for OwnedMutSlice<'_, T> {
     fn from(vec: Vec<T>) -> Self {
         Self {
             inner: OwnedMutSliceInner::Owned(vec),
@@ -811,6 +865,213 @@ impl<'a, T> From<&'a mut &'a mut [T]> for OwnedMutSlice<'a, T> {
     fn from(r: &'a mut &'a mut [T]) -> Self {
         Self {
             inner: OwnedMutSliceInner::Ref(r),
+        }
+    }
+}
+
+/// Wrap a mutable slice and convert to a Box on serialize.
+/// We use a hidden inner enum so the public API can be safe,
+/// unless the user uses the unsafe [`OwnedMutSizedSlice::from_raw_mut`].
+/// The variable length version is [`OwnedMutSlice`].
+#[derive(Debug)]
+pub enum OwnedMutSizedSliceInner<'a, T: 'a + Sized, const N: usize> {
+    /// A raw ptr to a memory location of length N
+    RefRaw(*mut [T; N], UnsafeMarker),
+    /// A ptr to a mutable slice of the type
+    Ref(&'a mut [T; N]),
+    /// An owned [`Box`] of the type
+    Owned(Box<[T; N]>),
+}
+
+impl<'a, T: 'a + Sized + Serialize, const N: usize> Serialize
+    for OwnedMutSizedSliceInner<'a, T, N>
+{
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            OwnedMutSizedSliceInner::RefRaw(rr, _) => unsafe { &**rr }.serialize(se),
+            OwnedMutSizedSliceInner::Ref(r) => (*r).serialize(se),
+            OwnedMutSizedSliceInner::Owned(b) => (*b).serialize(se),
+        }
+    }
+}
+
+impl<'de, 'a, T: 'a + Sized, const N: usize> Deserialize<'de> for OwnedMutSizedSliceInner<'a, T, N>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        arrays::deserialize(deserializer).map(OwnedMutSizedSliceInner::Owned)
+    }
+}
+
+/// Wrap a mutable slice of constant size N and convert to a Box on serialize
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OwnedMutSizedSlice<'a, T: 'a + Sized, const N: usize> {
+    inner: OwnedMutSizedSliceInner<'a, T, N>,
+}
+
+impl<'it, T, const N: usize> IntoIterator for &'it mut OwnedMutSizedSlice<'_, T, N> {
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_sized_slice_mut().iter_mut()
+    }
+}
+
+impl<'it, T, const N: usize> IntoIterator for &'it OwnedMutSizedSlice<'_, T, N> {
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_sized_slice().iter()
+    }
+}
+
+impl<'a, T: 'a + Sized, const N: usize> OwnedMutSizedSlice<'a, T, N> {
+    /// Create a new [`OwnedMutSizedSlice`] from a raw pointer
+    ///
+    /// # Safety
+    ///
+    /// The pointer must be valid and point to a map of the size `size_of<T>() * N`
+    /// The content will be dereferenced in subsequent operations.
+    #[must_use]
+    pub unsafe fn from_raw_mut(ptr: NonNull<T>) -> OwnedMutSizedSlice<'a, T, N> {
+        Self {
+            inner: OwnedMutSizedSliceInner::RefRaw(
+                ptr.as_ptr() as *mut [T; N],
+                UnsafeMarker::new(),
+            ),
+        }
+    }
+
+    /// Returns an iterator over the slice.
+    pub fn iter(&self) -> Iter<'_, T> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+
+    /// Returns a mutable iterator over the slice.
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
+impl<T: Sized, const N: usize> Deref for OwnedMutSizedSlice<'_, T, N> {
+    type Target = [T; N];
+
+    fn deref(&self) -> &Self::Target {
+        match &self.inner {
+            OwnedMutSizedSliceInner::RefRaw(rr, _) => unsafe { &**rr },
+            OwnedMutSizedSliceInner::Ref(r) => r,
+            OwnedMutSizedSliceInner::Owned(v) => v,
+        }
+    }
+}
+
+impl<T: Sized, const N: usize> DerefMut for OwnedMutSizedSlice<'_, T, N> {
+    fn deref_mut(&mut self) -> &mut [T; N] {
+        match &mut self.inner {
+            OwnedMutSizedSliceInner::RefRaw(rr, _) => unsafe { &mut **rr },
+            OwnedMutSizedSliceInner::Ref(r) => r,
+            OwnedMutSizedSliceInner::Owned(v) => v,
+        }
+    }
+}
+
+impl<T, const N: usize> IntoOwned for OwnedMutSizedSlice<'_, T, N>
+where
+    T: Sized + Clone,
+{
+    #[must_use]
+    fn is_owned(&self) -> bool {
+        match self.inner {
+            OwnedMutSizedSliceInner::RefRaw(..) | OwnedMutSizedSliceInner::Ref(_) => false,
+            OwnedMutSizedSliceInner::Owned(_) => true,
+        }
+    }
+
+    #[must_use]
+    fn into_owned(self) -> Self {
+        let slice: Box<[T; N]> = match self.inner {
+            OwnedMutSizedSliceInner::RefRaw(rr, _) => unsafe { Box::from((*rr).clone()) },
+            OwnedMutSizedSliceInner::Ref(r) => Box::from(r.clone()),
+            OwnedMutSizedSliceInner::Owned(v) => v,
+        };
+        Self {
+            inner: OwnedMutSizedSliceInner::Owned(slice),
+        }
+    }
+}
+
+impl<'a, T: 'a + Clone, const N: usize> Clone for OwnedMutSizedSlice<'a, T, N> {
+    fn clone(&self) -> Self {
+        let slice: Box<[T; N]> = match &self.inner {
+            OwnedMutSizedSliceInner::RefRaw(rr, _) => unsafe { Box::from((**rr).clone()) },
+            OwnedMutSizedSliceInner::Ref(r) => Box::from((*r).clone()),
+            OwnedMutSizedSliceInner::Owned(v) => v.clone(),
+        };
+
+        Self {
+            inner: OwnedMutSizedSliceInner::Owned(slice),
+        }
+    }
+}
+
+/// Create a new [`OwnedMutSizedSlice`] from a sized slice
+impl<T, const N: usize> From<Box<[T; N]>> for OwnedMutSizedSlice<'_, T, N> {
+    fn from(s: Box<[T; N]>) -> Self {
+        Self {
+            inner: OwnedMutSizedSliceInner::Owned(s),
+        }
+    }
+}
+
+/// Create a Boxed slice from an [`OwnedMutSizedSlice`], or return the owned boxed sized slice.
+impl<'a, T, const N: usize> From<OwnedMutSizedSlice<'a, T, N>> for Box<[T; N]>
+where
+    T: Clone,
+{
+    fn from(slice: OwnedMutSizedSlice<'a, T, N>) -> Self {
+        let slice = slice.into_owned();
+        match slice.inner {
+            OwnedMutSizedSliceInner::Owned(b) => b,
+            _ => panic!("Could not own slice!"),
+        }
+    }
+}
+
+/// Create a new [`OwnedMutSizedSlice`] from a reference to a boxed sized slice
+#[allow(clippy::mut_mut)] // This makes use in some iterators easier
+impl<'a, T, const N: usize> From<&'a mut Box<[T; N]>> for OwnedMutSizedSlice<'a, T, N> {
+    fn from(r: &'a mut Box<[T; N]>) -> Self {
+        Self {
+            inner: OwnedMutSizedSliceInner::Ref((*r).as_mut()),
+        }
+    }
+}
+
+/// Create a new [`OwnedMutSizedSlice`] from a reference to ref to a slice
+impl<'a, T, const N: usize> From<&'a mut [T; N]> for OwnedMutSizedSlice<'a, T, N> {
+    fn from(r: &'a mut [T; N]) -> Self {
+        Self {
+            inner: OwnedMutSizedSliceInner::Ref(r),
+        }
+    }
+}
+
+/// Create a new [`OwnedMutSizedSlice`] from a reference to ref to a slice
+#[allow(clippy::mut_mut)] // This makes use in some iterators easier
+impl<'a, T, const N: usize> From<&'a mut &'a mut [T; N]> for OwnedMutSizedSlice<'a, T, N> {
+    fn from(r: &'a mut &'a mut [T; N]) -> Self {
+        Self {
+            inner: OwnedMutSizedSliceInner::Ref(r),
         }
     }
 }
@@ -904,6 +1165,24 @@ impl<T: Sized> OwnedMutPtr<T> {
     /// It must outlive this `OwnedPtr` type and remain valid.
     pub unsafe fn from_raw_mut(ptr: *mut T) -> Self {
         Self::Ptr(ptr)
+    }
+
+    /// Get a pointer to the inner object
+    #[must_use]
+    pub fn as_ptr(&self) -> *const T {
+        match self {
+            OwnedMutPtr::Ptr(ptr) => *ptr,
+            OwnedMutPtr::Owned(owned) => &**owned,
+        }
+    }
+
+    /// Get a mutable pointer to the inner object
+    #[must_use]
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        match self {
+            OwnedMutPtr::Ptr(ptr) => *ptr,
+            OwnedMutPtr::Owned(owned) => &mut **owned,
+        }
     }
 }
 

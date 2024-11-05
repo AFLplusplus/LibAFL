@@ -216,7 +216,11 @@ impl FridaRuntime for AsanRuntime {
 
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
-        self.poison(slice.as_ptr() as usize, slice.len());
+        // # Safety
+        // The ptr and length are correct.
+        unsafe {
+            self.poison(slice.as_ptr() as usize, slice.len());
+        }
         self.reset_allocations();
 
         Ok(())
@@ -282,7 +286,11 @@ impl AsanRuntime {
     }
 
     /// Make sure the specified memory is poisoned
-    pub fn poison(&mut self, address: usize, size: usize) {
+    ///
+    /// # Safety
+    /// The address needs to be a valid address, the size needs to be correct.
+    /// This will dereference at the address.
+    pub unsafe fn poison(&mut self, address: usize, size: usize) {
         Allocator::poison(self.allocator.map_to_shadow(address), size);
     }
 
@@ -468,13 +476,14 @@ impl AsanRuntime {
     #[allow(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
+        let module = Module::obtain(gum);
         macro_rules! hook_func {
             //No library case
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
 
-                    let target_function = frida_gum::Module::find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -514,7 +523,7 @@ impl AsanRuntime {
                 paste::paste! {
                     log::trace!("Hooking {}:{}", $lib, stringify!($name));
 
-                    let target_function = frida_gum::Module::find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -556,7 +565,7 @@ impl AsanRuntime {
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}", stringify!($name));
-                    let target_function = frida_gum::Module::find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -596,7 +605,7 @@ impl AsanRuntime {
             ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
                     log::trace!("Hooking {}:{}", $lib, stringify!($name));
-                    let target_function = frida_gum::Module::find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -685,7 +694,7 @@ impl AsanRuntime {
         macro_rules! hook_heap_windows {
             ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking allocator functions in {}", $libname);
-            for export in Module::enumerate_exports($libname) {
+            for export in module.enumerate_exports($libname) {
                 // log::trace!("- {}", export.name);
                 match &export.name[..] {
                     "NtGdiCreateCompatibleDC" => {
@@ -911,7 +920,7 @@ impl AsanRuntime {
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
-            for export in Module::enumerate_exports($libname) {
+            for export in module.enumerate_exports($libname) {
                 match &export.name[..] {
                     "_Znam" => {
                         hook_func!($libname, $lib_ident, _Znam, (size: usize), *mut c_void);
@@ -1882,13 +1891,13 @@ impl AsanRuntime {
             // Ignore eh_frame_cie for amd64
             // See discussions https://github.com/AFLplusplus/LibAFL/pull/331
             ;->accessed_address:
-            ; .dword 0x0
+            ; .i32 0x0
             ; self_addr:
-            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
+            ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword addr_of_mut!(self.regs) as i64
+            ; .i64 addr_of_mut!(self.regs) as i64
             ; trap_func:
-            ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+            ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
         );
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
@@ -1937,7 +1946,7 @@ impl AsanRuntime {
             ; mov x25, x1 // address of instrumented instruction.
             ; str x25, [x28, 0xf8]
 
-            ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
+            ; .i32 0xd53b4218u32 as i32 // mrs x24, nzcv
             ; ldp x0, x1, [sp, 0x20]
             ; stp x0, x1, [x28]
 
@@ -1959,7 +1968,7 @@ impl AsanRuntime {
             ; ldr x1, >trap_func
             ; blr x1
 
-            ; .dword 0xd51b4218u32 as i32 // msr nzcv, x24
+            ; .i32 0xd51b4218u32 as i32 // msr nzcv, x24
             ; ldr x0, >self_regs_addr
             ; ldp x2, x3, [x0, #0x10]
             ; ldp x4, x5, [x0, #0x20]
@@ -1983,15 +1992,15 @@ impl AsanRuntime {
             ; br x1 // go back to the 'return address'
 
             ; self_addr:
-            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
+            ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword addr_of_mut!(self.regs) as i64
+            ; .i64 addr_of_mut!(self.regs) as i64
             ; trap_func:
-            ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+            ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
-            ; .qword __register_frame as *mut c_void as i64
+            ; .i64 __register_frame as *mut c_void as i64
             ; eh_frame_cie_addr:
-            ; .qword addr_of_mut!(self.eh_frame) as i64
+            ; .i64 addr_of_mut!(self.eh_frame) as i64
         );
         self.eh_frame = [
             0x14, 0, 0x00527a01, 0x011e7c01, 0x001f0c1b, //

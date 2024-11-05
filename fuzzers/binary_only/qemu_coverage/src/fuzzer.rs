@@ -3,7 +3,7 @@
 #[cfg(feature = "i386")]
 use core::mem::size_of;
 use core::time::Duration;
-use std::{env, fs::DirEntry, io, path::PathBuf, process};
+use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
@@ -56,8 +56,10 @@ impl From<Version> for Str {
             ("Cargo Target Triple", env!("VERGEN_CARGO_TARGET_TRIPLE")),
         ]
         .iter()
-        .map(|(k, v)| format!("{k:25}: {v}\n"))
-        .collect::<String>();
+        .fold(String::new(), |mut output, (k, v)| {
+            let _ = writeln!(output, "{k:25}: {v}");
+            output
+        });
 
         format!("\n{version:}").into()
     }
@@ -156,7 +158,7 @@ pub fn fuzz() {
 
     let reset = |buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
         unsafe {
-            qemu.write_mem(input_addr, buf);
+            let _ = qemu.write_mem(input_addr, buf);
             qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
             qemu.write_reg(Regs::Sp, stack_ptr)?;
             qemu.write_return_address(ret_addr)?;
@@ -233,11 +235,11 @@ pub fn fuzz() {
             let core = core_id.0;
             cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
-            let emulator_modules = tuple_list!(DrCovModule::new(
-                StdAddressFilter::default(),
-                cov_path,
-                false,
-            ));
+            let emulator_modules = tuple_list!(DrCovModule::builder()
+                .filter(StdAddressFilter::default())
+                .filename(cov_path)
+                .full_trace(false)
+                .build());
 
             let emulator = Emulator::empty()
                 .qemu(qemu)

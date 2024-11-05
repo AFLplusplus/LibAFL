@@ -25,6 +25,7 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{
+    nonzero,
     rands::StdRand,
     shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
     tuples::tuple_list,
@@ -83,6 +84,7 @@ pub fn main() {
     #[derive(Debug)]
     struct MyExecutor {
         shmem_id: ShMemId,
+        timeout: Duration,
     }
 
     impl CommandConfigurator<BytesInput> for MyExecutor {
@@ -105,14 +107,19 @@ pub fn main() {
         }
 
         fn exec_timeout(&self) -> Duration {
-            Duration::from_secs(5)
+            self.timeout
+        }
+        fn exec_timeout_mut(&mut self) -> &mut Duration {
+            &mut self.timeout
         }
     }
 
-    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
+    let timeout = Duration::from_secs(5);
+    let mut executor =
+        MyExecutor { shmem_id, timeout }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

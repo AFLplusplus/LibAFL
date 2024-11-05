@@ -33,7 +33,7 @@ use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
-    feedbacks::Feedback,
+    feedbacks::StateInitializer,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, NopInput, UsesInput},
@@ -235,7 +235,7 @@ pub struct LoadConfig<'a, I, S, Z> {
 }
 
 #[cfg(feature = "std")]
-impl<'a, I, S, Z> Debug for LoadConfig<'a, I, S, Z> {
+impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "LoadConfig {{}}")
     }
@@ -1161,8 +1161,8 @@ where
         objective: &mut O,
     ) -> Result<Self, Error>
     where
-        F: Feedback<Self>,
-        O: Feedback<Self>,
+        F: StateInitializer<Self>,
+        O: StateInitializer<Self>,
         C: Serialize + DeserializeOwned,
         SC: Serialize + DeserializeOwned,
     {

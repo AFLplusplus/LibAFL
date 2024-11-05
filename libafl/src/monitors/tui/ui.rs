@@ -116,7 +116,7 @@ impl TuiUi {
             } else {
                 [Constraint::Percentage(50), Constraint::Percentage(50)].as_ref()
             })
-            .split(f.size());
+            .split(f.area());
         let top_body = body[0];
         let mid_body = body[1];
 

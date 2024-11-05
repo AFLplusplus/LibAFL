@@ -2,7 +2,7 @@
 //!
 #[cfg(feature = "i386")]
 use core::mem::size_of;
-use std::{env, io, path::PathBuf, process};
+use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
@@ -27,11 +27,11 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    elf::EasyElf,
-    modules::edges::{StdEdgeCoverageChildModule, EDGES_MAP_PTR, EDGES_MAP_SIZE_IN_USE},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError,
-    QemuExitReason, QemuForkExecutor, QemuShutdownCause, Regs,
+    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, CallingConvention,
+    Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason,
+    QemuForkExecutor, QemuShutdownCause, Regs,
 };
+use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 
 #[derive(Default)]
 pub struct Version;
@@ -52,8 +52,10 @@ impl From<Version> for Str {
             ("Cargo Target Triple", env!("VERGEN_CARGO_TARGET_TRIPLE")),
         ]
         .iter()
-        .map(|(k, v)| format!("{k:25}: {v}\n"))
-        .collect::<String>();
+        .fold(String::new(), |mut output, (k, v)| {
+            let _ = writeln!(output, "{k:25}: {v}");
+            output
+        });
 
         format!("\n{version:}").into()
     }
@@ -155,14 +157,14 @@ pub fn fuzz() -> Result<(), Error> {
         },
     };
 
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE_IN_USE).unwrap();
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
     let edges = edges_shmem.as_slice_mut();
     unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
-    let edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE_IN_USE>::from_mut_ptr(
+    let mut edges_observer = unsafe {
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
-            edges.as_mut_ptr(),
+            NonNull::new(edges.as_mut_ptr()).expect("The edge map pointer is null."),
         ))
     };
 
@@ -185,7 +187,7 @@ pub fn fuzz() -> Result<(), Error> {
     let scheduler = QueueScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut harness = |input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -196,7 +198,8 @@ pub fn fuzz() -> Result<(), Error> {
         let len = len as GuestReg;
 
         unsafe {
-            qemu.write_mem(input_addr, buf);
+            qemu.write_mem(input_addr, buf).expect("qemu write failed.");
+
             qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
             qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
             qemu.write_return_address(ret_addr).unwrap();
@@ -218,7 +221,9 @@ pub fn fuzz() -> Result<(), Error> {
         ExitKind::Ok
     };
 
-    let modules = tuple_list!(StdEdgeCoverageChildModule::builder().build());
+    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
+        .const_map_observer(edges_observer.as_mut())
+        .build()?);
 
     let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 

@@ -1,6 +1,6 @@
 //! [`Klo-routines`](https://github.com/andreafioraldi/klo-routines/) based fuzzer.
 //! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
-use std::path::PathBuf;
+use std::{path::PathBuf, ptr::addr_of_mut};
 
 use klo_routines::{yield_, KloRoutine};
 use libafl::{
@@ -18,7 +18,7 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -39,8 +39,12 @@ fn input_generator() {
         ExitKind::Ok
     };
 
+    let signals_ptr = unsafe { addr_of_mut!(SIGNALS) };
+    let signals_len = unsafe { *signals_ptr }.len();
+
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
+    let observer =
+        unsafe { StdMapObserver::from_mut_ptr("signals", addr_of_mut!(SIGNALS) as _, signals_len) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -89,7 +93,7 @@ fn input_generator() {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(32);
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

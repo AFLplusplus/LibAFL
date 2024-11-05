@@ -18,11 +18,11 @@ opt-level = 3
 debug = true
 
 [build-dependencies]
-cc = { version = "1.0", features = ["parallel"] }
-which = "6.0"
+cc = { version = "1.1.21", features = ["parallel"] }
+which = { version = "7.0.0" }
 
 [dependencies]
-libafl = { path = "../../../libafl/", features = [
+libafl = { path = "../../../libafl", features = [
   "std",
   "derive",
   "rand_trait",
@@ -32,18 +32,20 @@ libafl = { path = "../../../libafl/", features = [
   "regex",
   "scalability_introspection",
 ] }
-libafl_bolts = { path = "../../../libafl_bolts/", features = [
+libafl_bolts = { path = "../../../libafl_bolts", features = [
   "errors_backtrace",
 ] }
-libafl_targets = { path = "../../../libafl_targets/", features = [
+libafl_targets = { path = "../../../libafl_targets", features = [
   "sancov_pcguard_hitcounts",
   "libfuzzer",
 ] }
 # TODO Include it only when building cc
-libafl_cc = { path = "../../../libafl_cc/" }
-clap = { version = "4.5", features = ["derive"] }
-mimalloc = { version = "*", default-features = false }
-env_logger = "0.10"
+libafl_cc = { path = "../../../libafl_cc" }
+
+clap = { version = "4.5.18", features = ["derive"] }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+mimalloc = { version = "0.1.43", default-features = false }
+env_logger = "0.11.5"
 
 [lib]
 name = "libfuzzer_libpng"
