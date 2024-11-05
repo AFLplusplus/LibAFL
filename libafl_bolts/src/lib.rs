@@ -451,6 +451,17 @@ impl Error {
     }
 }
 
+impl core::error::Error for Error {
+    #[cfg(feature = "std")]
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        if let Self::OsError(err, _, _) = self {
+            Some(err)
+        } else {
+            None
+        }
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -637,12 +648,6 @@ impl From<pyo3::PyErr> for Error {
         })
     }
 }
-
-#[cfg(all(not(nightly), feature = "std"))]
-impl std::error::Error for Error {}
-
-#[cfg(nightly)]
-impl core::error::Error for Error {}
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
