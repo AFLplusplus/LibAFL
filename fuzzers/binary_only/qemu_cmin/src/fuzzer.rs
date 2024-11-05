@@ -198,7 +198,7 @@ pub fn fuzz() -> Result<(), Error> {
         let len = len as GuestReg;
 
         unsafe {
-            qemu.write_mem(input_addr, buf);
+            let _ = qemu.write_mem(input_addr, buf);
             qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
             qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
             qemu.write_return_address(ret_addr).unwrap();

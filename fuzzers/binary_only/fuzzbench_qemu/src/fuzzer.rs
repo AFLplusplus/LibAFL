@@ -197,7 +197,7 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
-    qemu.read_mem(stack_ptr, &mut ret_addr);
+    let _ = qemu.read_mem(stack_ptr, &mut ret_addr);
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -337,7 +337,7 @@ fn fuzz(
             }
 
             unsafe {
-                qemu.write_mem(input_addr, buf);
+                let _ = qemu.write_mem(input_addr, buf);
 
                 qemu.write_reg(Regs::Rdi, input_addr).unwrap();
                 qemu.write_reg(Regs::Rsi, len as GuestReg).unwrap();
