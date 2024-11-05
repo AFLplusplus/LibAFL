@@ -198,8 +198,10 @@ fn fuzz(
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
+
     qemu.read_mem(stack_ptr, &mut ret_addr)
         .expect("Error while reading QEMU memory.");
+
     let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {stack_ptr:#x}");
@@ -339,6 +341,9 @@ fn fuzz(
             }
 
             unsafe {
+                // # Safety
+                // The input buffer size is checked above. We use `write_mem_unchecked` for performance reasons
+                // For better error handling, use `write_mem` and handle the returned Result
                 qemu.write_mem_unchecked(input_addr, buf);
 
                 qemu.write_reg(Regs::Rdi, input_addr).unwrap();
