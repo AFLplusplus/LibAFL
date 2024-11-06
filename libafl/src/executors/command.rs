@@ -266,7 +266,7 @@ where
 
     /// Use [`PTraceCommandConfigurator::builder().timeout`] instead
     fn exec_timeout_mut(&mut self) -> &mut Duration {
-        panic!("Use [`PTraceCommandConfigurator::builder().timeout`] instead")
+        unimplemented!("Use [`PTraceCommandConfigurator::builder().timeout`] instead")
     }
 }
 
