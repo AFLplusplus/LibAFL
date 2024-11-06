@@ -128,7 +128,7 @@ impl IntelPT {
         let c_str_filter = unsafe { CString::from_vec_unchecked(str_filter.into_bytes()) };
         match unsafe { SET_FILTER(self.fd.as_raw_fd(), c_str_filter.into_raw()) } {
             -1 => {
-                let availability = match Self::availability() {
+                let availability = match availability() {
                     Ok(()) => String::new(),
                     Err(reasons) => format!(" Possible reasons: {reasons}"),
                 };
@@ -173,7 +173,7 @@ impl IntelPT {
     pub fn enable_tracing(&mut self) -> Result<(), Error> {
         match unsafe { ENABLE(self.fd.as_raw_fd(), 0) } {
             -1 => {
-                let availability = match Self::availability() {
+                let availability = match availability() {
                     Ok(()) => String::new(),
                     Err(reasons) => format!(" Possible reasons: {reasons}"),
                 };
@@ -358,131 +358,6 @@ impl IntelPT {
         self.previous_decode_head = head;
         Ok(())
     }
-
-    /// Check if Intel PT is available on the current system.
-    ///
-    /// Returns `Ok(())` if Intel PT is available and has the features used by `LibAFL`, otherwise
-    /// returns an `Err` containing a description of the reasons.
-    ///
-    /// If you use this with QEMU check out [`Self::availability_in_qemu()`] instead.
-    ///
-    /// Due to the numerous factors that can affect `IntelPT` availability, this function was
-    /// developed on a best-effort basis.
-    /// The outcome of these checks does not fully guarantee whether `IntelPT` will function or not.
-    pub fn availability() -> Result<(), String> {
-        let mut reasons = Vec::new();
-        if cfg!(not(target_os = "linux")) {
-            reasons.push("Only linux hosts are supported at the moment".to_owned());
-        }
-        if cfg!(not(target_arch = "x86_64")) {
-            reasons.push("Only x86_64 is supported".to_owned());
-        }
-
-        let cpuid = CpuId::new();
-        if let Some(vendor) = cpuid.get_vendor_info() {
-            if vendor.as_str() != "GenuineIntel" && vendor.as_str() != "GenuineIotel" {
-                reasons.push("Only Intel CPUs are supported".to_owned());
-            }
-        } else {
-            reasons.push("Failed to read CPU vendor".to_owned());
-        }
-
-        if let Some(ef) = cpuid.get_extended_feature_info() {
-            if !ef.has_processor_trace() {
-                reasons.push("Intel PT is not supported by the CPU".to_owned());
-            }
-        } else {
-            reasons.push("Failed to read CPU Extended Features".to_owned());
-        }
-
-        match linux_version() {
-            // https://docs.rs/perf-event-open-sys/4.0.0/perf_event_open_sys/#kernel-versions
-            Ok(ver) if ver >= (5, 19, 4) => {}
-            Ok((major, minor, patch)) => reasons.push(format!(
-                "Kernel version {major}.{minor}.{patch} is older than 5.19.4 and might not work."
-            )),
-            Err(()) => reasons.push("Failed to retrieve kernel version".to_owned()),
-        }
-
-        if let Err(e) = &*PERF_EVENT_TYPE {
-            reasons.push(e.clone());
-        }
-
-        if let Err(e) = &*NR_ADDR_FILTERS {
-            reasons.push(e.clone());
-        }
-
-        // official way of knowing if perf_event_open() support is enabled
-        // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
-        let perf_event_support_path = "/proc/sys/kernel/perf_event_paranoid";
-        if !Path::new(perf_event_support_path).exists() {
-            reasons.push(format!(
-                "perf_event_open() support is not enabled: {perf_event_support_path} not found"
-            ));
-        }
-
-        // TODO check also the value of perf_event_paranoid, check which values are required by pt
-        // https://www.kernel.org/doc/Documentation/sysctl/kernel.txt
-        // also, looks like it is distribution dependent
-        // https://askubuntu.com/questions/1400874/what-does-perf-paranoia-level-four-do
-        // CAP_SYS_ADMIN might make this check useless
-
-        match caps::read(None, CapSet::Permitted) {
-            Ok(current_capabilities) => {
-                let required_caps = [
-                    Capability::CAP_IPC_LOCK,
-                    Capability::CAP_SYS_PTRACE,
-                    Capability::CAP_SYS_ADMIN, // TODO: CAP_PERFMON doesn't look to be enough!?
-                    Capability::CAP_SYSLOG,
-                ];
-
-                for rc in required_caps {
-                    if !current_capabilities.contains(&rc) {
-                        reasons.push(format!("Required capability {rc} missing"));
-                    }
-                }
-            }
-            Err(e) => reasons.push(format!("Failed to read linux capabilities: {e}")),
-        };
-
-        if reasons.is_empty() {
-            Ok(())
-        } else {
-            Err(reasons.join("; "))
-        }
-    }
-
-    /// Check if Intel PT is available on the current system and can be used in combination with
-    /// QEMU.
-    ///
-    /// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
-    pub fn availability_in_qemu() -> Result<(), String> {
-        let mut reasons = match Self::availability() {
-            Err(s) => vec![s],
-            Ok(()) => Vec::new(),
-        };
-
-        let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
-        if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
-            match s.trim().parse::<i32>().map(TryInto::try_into) {
-                Ok(Ok(KvmPTMode::System)) => (),
-                Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
-                    "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
-                    KvmPTMode::System,
-                    KvmPTMode::System as i32
-                )),
-                _ => reasons.push(format!(
-                    "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
-                )),
-            }
-        };
-
-        if reasons.is_empty() {
-            Ok(())
-        } else {
-            Err(reasons.join("; "))
-        }
-    }
 }
 
 impl Drop for IntelPT {
@@ -557,7 +432,7 @@ impl IntelPTBuilder {
             )
         } {
             -1 => {
-                let availability = match IntelPT::availability() {
+                let availability = match availability() {
                     Ok(()) => String::new(),
                     Err(reasons) => format!(" Possible reasons: {reasons}"),
                 };
@@ -725,6 +600,131 @@ impl From<PtError> for Error {
 /// Number of address filters available on the running CPU
 pub fn nr_addr_filters() -> Result<u32, String> {
     NR_ADDR_FILTERS.clone()
+}
+
+/// Check if Intel PT is available on the current system.
+///
+/// Returns `Ok(())` if Intel PT is available and has the features used by `LibAFL`, otherwise
+/// returns an `Err` containing a description of the reasons.
+///
+/// If you use this with QEMU check out [`Self::availability_in_qemu()`] instead.
+///
+/// Due to the numerous factors that can affect `IntelPT` availability, this function was
+/// developed on a best-effort basis.
+/// The outcome of these checks does not fully guarantee whether `IntelPT` will function or not.
+pub fn availability() -> Result<(), String> {
+    let mut reasons = Vec::new();
+    if cfg!(not(target_os = "linux")) {
+        reasons.push("Only linux hosts are supported at the moment".to_owned());
+    }
+    if cfg!(not(target_arch = "x86_64")) {
+        reasons.push("Only x86_64 is supported".to_owned());
+    }
+
+    let cpuid = CpuId::new();
+    if let Some(vendor) = cpuid.get_vendor_info() {
+        if vendor.as_str() != "GenuineIntel" && vendor.as_str() != "GenuineIotel" {
+            reasons.push("Only Intel CPUs are supported".to_owned());
+        }
+    } else {
+        reasons.push("Failed to read CPU vendor".to_owned());
+    }
+
+    if let Some(ef) = cpuid.get_extended_feature_info() {
+        if !ef.has_processor_trace() {
+            reasons.push("Intel PT is not supported by the CPU".to_owned());
+        }
+    } else {
+        reasons.push("Failed to read CPU Extended Features".to_owned());
+    }
+
+    match linux_version() {
+        // https://docs.rs/perf-event-open-sys/4.0.0/perf_event_open_sys/#kernel-versions
+        Ok(ver) if ver >= (5, 19, 4) => {}
+        Ok((major, minor, patch)) => reasons.push(format!(
+            "Kernel version {major}.{minor}.{patch} is older than 5.19.4 and might not work."
+        )),
+        Err(()) => reasons.push("Failed to retrieve kernel version".to_owned()),
+    }
+
+    if let Err(e) = &*PERF_EVENT_TYPE {
+        reasons.push(e.clone());
+    }
+
+    if let Err(e) = &*NR_ADDR_FILTERS {
+        reasons.push(e.clone());
+    }
+
+    // official way of knowing if perf_event_open() support is enabled
+    // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+    let perf_event_support_path = "/proc/sys/kernel/perf_event_paranoid";
+    if !Path::new(perf_event_support_path).exists() {
+        reasons.push(format!(
+            "perf_event_open() support is not enabled: {perf_event_support_path} not found"
+        ));
+    }
+
+    // TODO check also the value of perf_event_paranoid, check which values are required by pt
+    // https://www.kernel.org/doc/Documentation/sysctl/kernel.txt
+    // also, looks like it is distribution dependent
+    // https://askubuntu.com/questions/1400874/what-does-perf-paranoia-level-four-do
+    // CAP_SYS_ADMIN might make this check useless
+
+    match caps::read(None, CapSet::Permitted) {
+        Ok(current_capabilities) => {
+            let required_caps = [
+                Capability::CAP_IPC_LOCK,
+                Capability::CAP_SYS_PTRACE,
+                Capability::CAP_SYS_ADMIN, // TODO: CAP_PERFMON doesn't look to be enough!?
+                Capability::CAP_SYSLOG,
+            ];
+
+            for rc in required_caps {
+                if !current_capabilities.contains(&rc) {
+                    reasons.push(format!("Required capability {rc} missing"));
+                }
+            }
+        }
+        Err(e) => reasons.push(format!("Failed to read linux capabilities: {e}")),
+    };
+
+    if reasons.is_empty() {
+        Ok(())
+    } else {
+        Err(reasons.join("; "))
+    }
+}
+
+/// Check if Intel PT is available on the current system and can be used in combination with
+/// QEMU.
+///
+/// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
+pub fn availability_in_qemu() -> Result<(), String> {
+    let mut reasons = match availability() {
+        Err(s) => vec![s],
+        Ok(()) => Vec::new(),
+    };
+
+    let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
+    if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
+        match s.trim().parse::<i32>().map(TryInto::try_into) {
+            Ok(Ok(KvmPTMode::System)) => (),
+            Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
+                "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
+                KvmPTMode::System,
+                KvmPTMode::System as i32
+            )),
+            _ => reasons.push(format!(
+                "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
+            )),
+        }
+    };
+
+    if reasons.is_empty() {
+        Ok(())
+    } else {
+        Err(reasons.join("; "))
+    }
 }
 
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
