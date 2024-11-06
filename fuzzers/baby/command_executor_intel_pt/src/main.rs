@@ -1,4 +1,6 @@
-use std::{env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf};
+use std::{
+    env, ffi::CString, num::NonZero, os::unix::ffi::OsStrExt, path::PathBuf, time::Duration,
+};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -123,6 +125,7 @@ pub fn main() {
     let command_configurator = PtraceCommandConfigurator::builder()
         .path(target_cstring)
         .cpu(cpu)
+        .timeout(Duration::from_secs(2))
         .build();
     let mut executor =
         command_configurator.into_executor_with_hooks(tuple_list!(observer), tuple_list!(hook));

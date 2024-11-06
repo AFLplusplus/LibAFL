@@ -172,7 +172,7 @@ where
     }
 }
 
-/// Linux specific configurator that leverages `Ptrace`
+/// Linux specific [`CommandConfigurator`] that leverages `Ptrace`
 ///
 /// This configurator was primarly developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
@@ -189,6 +189,8 @@ pub struct PtraceCommandConfigurator {
     input_location: InputLocation,
     #[builder(default, setter(strip_option))]
     cpu: Option<CoreId>,
+    #[builder(default = 5 * 60, setter(transform = |t: Duration| t.as_secs() as u32))]
+    timeout: u32,
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
@@ -202,7 +204,7 @@ where
                 personality, ptrace,
                 signal::{raise, Signal},
             },
-            unistd::{dup2, execve, fork, pipe, write, ForkResult},
+            unistd::{alarm, dup2, execve, fork, pipe, write, ForkResult},
         };
 
         match unsafe { fork() } {
@@ -245,9 +247,13 @@ where
                     }
                 }
 
+                // After this STOP, the process is traced with PTrace (no hooks yet)
                 raise(Signal::SIGSTOP).unwrap();
-                execve(&self.path, &self.args, &self.env).unwrap();
 
+                alarm::set(self.timeout);
+
+                // Just before this returns, hooks are enabled
+                execve(&self.path, &self.args, &self.env).unwrap();
                 unreachable!("execve returns only on error and its result is unwrapped");
             }
             Err(e) => panic!("Fork failed {e}"),
@@ -255,11 +261,12 @@ where
     }
 
     fn exec_timeout(&self) -> Duration {
-        todo!()
+        Duration::from_secs(u64::from(self.timeout))
     }
 
+    /// Use [`PtraceCommandConfigurator::builder().timeout`] instead
     fn exec_timeout_mut(&mut self) -> &mut Duration {
-        todo!()
+        panic!("Use [`PtraceCommandConfigurator::builder().timeout`] instead")
     }
 }
 
@@ -483,12 +490,13 @@ where
         self.hooks.pre_exec_all(state, input);
 
         ptrace::detach(child, None)?;
-        // TODO: use self.configurer.exec_timeout() for the waitpid
         let res = match waitpid(child, None)? {
             Exited(pid, 0) if pid == child => ExitKind::Ok,
             Exited(pid, _) if pid == child => ExitKind::Crash,
+            Signaled(pid, Signal::SIGALRM, _has_coredump) if pid == child => ExitKind::Timeout,
             Signaled(pid, Signal::SIGABRT, _has_coredump) if pid == child => ExitKind::Crash,
             Signaled(pid, Signal::SIGKILL, _has_coredump) if pid == child => ExitKind::Oom,
+            Stopped(pid, Signal::SIGALRM) if pid == child => ExitKind::Timeout,
             Stopped(pid, Signal::SIGABRT) if pid == child => ExitKind::Crash,
             Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
             s => {
