@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Info of a binary's section that can be used during `Intel PT` traces decoding
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Section {
     /// Path of the binary
     pub file_path: String,
@@ -59,6 +59,8 @@ where
     }
 }
 
+// It would be nice to have this as a `From<IntoIter<Section>>`, but Rust's orphan rule doesn't like
+// this
 fn sections_to_image(
     sections: &[Section],
 ) -> Result<(Image<'static>, SectionCache<'static>), Error> {

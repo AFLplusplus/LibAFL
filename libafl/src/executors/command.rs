@@ -172,13 +172,13 @@ where
     }
 }
 
-/// Linux specific [`CommandConfigurator`] that leverages `Ptrace`
+/// Linux specific [`CommandConfigurator`] that leverages `ptrace`
 ///
 /// This configurator was primarly developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
 #[cfg(all(feature = "std", target_os = "linux"))]
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
-pub struct PtraceCommandConfigurator {
+pub struct PTraceCommandConfigurator {
     #[builder(setter(into))]
     path: CString,
     #[builder(default)]
@@ -194,7 +194,7 @@ pub struct PtraceCommandConfigurator {
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
-impl<I> CommandConfigurator<I, Pid> for PtraceCommandConfigurator
+impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator
 where
     I: HasTargetBytes,
 {
@@ -243,7 +243,7 @@ where
                         dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
                     }
                     InputLocation::File { out_file } => {
-                        out_file.write_buf(input.target_bytes().as_slice())?;
+                        out_file.write_buf(input.target_bytes().as_slice()).unwrap();
                     }
                 }
 
@@ -252,11 +252,11 @@ where
 
                 alarm::set(self.timeout);
 
-                // Just before this returns, hooks are enabled
+                // Just before this returns, hooks pre_execs are called
                 execve(&self.path, &self.args, &self.env).unwrap();
                 unreachable!("execve returns only on error and its result is unwrapped");
             }
-            Err(e) => panic!("Fork failed {e}"),
+            Err(e) => Err(Error::unknown(format!("Fork failed: {e}"))),
         }
     }
 
@@ -264,9 +264,9 @@ where
         Duration::from_secs(u64::from(self.timeout))
     }
 
-    /// Use [`PtraceCommandConfigurator::builder().timeout`] instead
+    /// Use [`PTraceCommandConfigurator::builder().timeout`] instead
     fn exec_timeout_mut(&mut self) -> &mut Duration {
-        panic!("Use [`PtraceCommandConfigurator::builder().timeout`] instead")
+        panic!("Use [`PTraceCommandConfigurator::builder().timeout`] instead")
     }
 }
 

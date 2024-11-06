@@ -41,8 +41,7 @@ pub const PAGE_SIZE: usize = 4096;
 
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
-/// Number of address filters available on the running CPU
-pub static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
+static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     // This info is available in two different files, use the second path as fail-over
     let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
     let path2 = format!("{PT_EVENT_PATH}/caps/num_address_ranges");
@@ -721,6 +720,11 @@ impl From<PtError> for Error {
     fn from(err: PtError) -> Self {
         Self::unknown(err.to_string())
     }
+}
+
+/// Number of address filters available on the running CPU
+pub fn nr_addr_filters() -> Result<u32, String> {
+    NR_ADDR_FILTERS.clone()
 }
 
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {

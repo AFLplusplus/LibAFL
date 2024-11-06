@@ -6,7 +6,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        command::{CommandConfigurator, PtraceCommandConfigurator},
+        command::{CommandConfigurator, PTraceCommandConfigurator},
         hooks::intel_pt::{IntelPTHook, Section},
     },
     feedbacks::{CrashFeedback, MaxMapFeedback},
@@ -122,7 +122,7 @@ pub fn main() {
             .collect::<Vec<_>>(),
     );
 
-    let command_configurator = PtraceCommandConfigurator::builder()
+    let command_configurator = PTraceCommandConfigurator::builder()
         .path(target_cstring)
         .cpu(cpu)
         .timeout(Duration::from_secs(2))
