@@ -45,14 +45,14 @@ pub fn main() {
         .unwrap()
         .join("target_program");
 
-    // We'll run the target on cpu 0
+    // We'll run the target on cpu (aka core) 0
     let cpu = core_affinity::get_core_ids().unwrap()[0];
     log::debug!("Using core {} for fuzzing", cpu.0);
 
     // Create an observation channel using the map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", MAP_PTR, MAP_SIZE) };
 
-    // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
+    // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
@@ -95,17 +95,19 @@ pub fn main() {
     const DEFAULT_MAP_WINDOW: usize = (1 << 47) - PAGE_SIZE;
     const ELF_ET_DYN_BASE: usize = DEFAULT_MAP_WINDOW / 3 * 2 & !(PAGE_SIZE - 1);
 
-    // Set the filter and image of our target.
+    // Set the instruction pointer (IP) filter and memory image of our target.
     // These information can be retrieved from `readelf -l` (for example)
+    let code_memory_addresses = ELF_ET_DYN_BASE + 0x14000..=ELF_ET_DYN_BASE + 0x14000 + 0x40000;
+
     intel_pt
-        .set_ip_filters(&[ELF_ET_DYN_BASE + 0x14000..=ELF_ET_DYN_BASE + 0x14000 + 0x40000])
+        .set_ip_filters(&[code_memory_addresses.clone()])
         .unwrap();
 
     let sections = [Section {
         file_path: target_path.to_string_lossy().to_string(),
         file_offset: 0x13000,
-        size: 0x40000,
-        virtual_address: (ELF_ET_DYN_BASE + 0x14000) as u64,
+        size: (*code_memory_addresses.end() - *code_memory_addresses.start() + 1) as u64,
+        virtual_address: *code_memory_addresses.start() as u64,
     }];
 
     let hook = unsafe { IntelPTHook::builder().map_ptr(MAP_PTR).map_len(MAP_SIZE) }
