@@ -51,10 +51,10 @@ where
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         self.intel_pt.disable_tracing().unwrap();
 
-        let mut slice = unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) };
+        let slice = unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) };
         let _ = self
             .intel_pt
-            .decode_traces_into_map(&mut self.image.0, &mut slice)
+            .decode_traces_into_map(&mut self.image.0, slice)
             .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
     }
 }

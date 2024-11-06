@@ -185,7 +185,7 @@ pub struct PtraceCommandConfigurator {
     args: Vec<CString>,
     #[builder(default)]
     env: Vec<CString>,
-    #[builder(default, setter(skip))]
+    #[builder(default)]
     input_location: InputLocation,
     #[builder(default, setter(strip_option))]
     cpu: Option<CoreId>,
@@ -219,21 +219,20 @@ where
                 let pers = personality::get().unwrap();
                 personality::set(pers | personality::Persona::ADDR_NO_RANDOMIZE).unwrap();
 
-                match self.input_location {
+                match &mut self.input_location {
                     InputLocation::Arg { argnum } => {
                         // self.args[argnum] will be overwritten if already present.
                         assert!(
-                            argnum <= self.args.len(),
-                            "If you want to fuzz arg {argnum}, you have to specify the other {} (static) args.",
-                            argnum
+                            *argnum <= self.args.len(),
+                            "If you want to fuzz arg {argnum}, you have to specify the other {argnum} (static) args."
                         );
-                        let terminated_input = [&input.target_bytes() as &[u8], &[b'\0']].concat();
+                        let terminated_input = [&input.target_bytes() as &[u8], &[0]].concat();
                         let cstring_input =
                             CString::from(CStr::from_bytes_until_nul(&terminated_input).unwrap());
-                        if argnum == self.args.len() {
+                        if *argnum == self.args.len() {
                             self.args.push(cstring_input);
                         } else {
-                            self.args[argnum] = cstring_input;
+                            self.args[*argnum] = cstring_input;
                         }
                     }
                     InputLocation::StdIn => {
@@ -241,8 +240,8 @@ where
                         write(pipe_write, &input.target_bytes()).unwrap();
                         dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
                     }
-                    InputLocation::File { .. } => {
-                        todo!()
+                    InputLocation::File { out_file } => {
+                        out_file.write_buf(input.target_bytes().as_slice())?;
                     }
                 }
 
