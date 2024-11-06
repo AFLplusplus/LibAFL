@@ -171,7 +171,7 @@ impl Allocator {
     #[must_use]
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
-        log::info!("alloc {size}");
+        // log::info!("alloc {size}");
         let mut is_malloc_zero = false;
         let size = if size == 0 {
             is_malloc_zero = true;
@@ -202,10 +202,10 @@ impl Allocator {
             }
             metadata
         } else {
-            log::info!(
-                "Mapping {:x}, size {rounded_up_size:x}",
-                self.current_mapping_addr
-            );
+            // log::info!(
+            //     "Mapping {:x}, size {rounded_up_size:x}",
+            //     self.current_mapping_addr
+            // );
             let mapping = match MmapOptions::new(rounded_up_size)
                 .unwrap()
                 .with_address(self.current_mapping_addr)
@@ -252,18 +252,14 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        log::trace!(
-            "serving address: {:#x}, size: {:#x}",
-            address as usize,
-            size
-        );
+        // log::info!("serving address: {address:?}, size: {size:x}");
         address
     }
 
     /// Releases the allocation at the given address.
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        log::info!("releasing {:?}", ptr);
+        // log::info!("releasing {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
                 AsanErrors::get_mut_blocking()
@@ -572,7 +568,20 @@ impl Allocator {
         map_to_shadow!(self, start)
     }
 
-    /// Checks if the current address is one of ours - is this address in the allocator region
+    /// Is this a valid and mapped shadow address?
+    pub fn valid_shadow(&self, start: usize, size: usize) -> bool {
+        let range_to_check = start..(start + size);
+        let valid = self
+            .shadow_pages
+            .overlapping(&range_to_check)
+            .any(|r| r.start <= start && r.end >= start + size);
+
+        if !valid {
+            log::error!("Not a valid shadow: {:#x}!", start);
+        }
+        valid
+    }
+    /// Checks if the currennt address is one of ours
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))

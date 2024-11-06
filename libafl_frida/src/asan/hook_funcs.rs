@@ -1085,7 +1085,7 @@ impl AsanRuntime {
         _file_offset_low: u32,
         size: usize,
     ) -> *const c_void {
-        log::info!("hook_MapViewOfFile size {:?}", size);
+        log::trace!("hook_MapViewOfFile size {:?}", size);
         let ret = original(
             _handle,
             _desired_access,
@@ -1121,11 +1121,11 @@ impl AsanRuntime {
                 log::error!("Failed to query virtual memory");
             } else {
                 size = mem_info.RegionSize;
-                log::info!("Size of mapped memory: {} bytes", size);
             }
         }
 
         self.unpoison(ret as usize, size);
+        log::trace!("hook_MapViewOfFile returns {:p}", ret);
         ret
     }
 
@@ -1137,7 +1137,7 @@ impl AsanRuntime {
         original: extern "C" fn(ptr: *const c_void) -> bool,
         ptr: *const c_void,
     ) -> bool {
-        log::info!("hook_UnmapViewOfFile {:p}", ptr);
+        log::trace!("hook_UnmapViewOfFile {:p}", ptr);
 
         let mut size = 0;
         // We need to get the mapping size before poisoning it
@@ -1164,12 +1164,12 @@ impl AsanRuntime {
             log::error!("Failed to query virtual memory for poisoning");
         } else {
             size = mem_info.RegionSize;
-            log::info!("Size of mapped memory: {} bytes", size);
         }
 
         let ret = original(ptr);
 
         if size > 0 {
+            log::trace!("hook_UnmapViewOfFile poisons {} bytes at {:p} ", size, ptr);
             self.poison(ptr as usize, size);
         }
 

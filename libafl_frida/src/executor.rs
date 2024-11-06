@@ -1,7 +1,7 @@
 use core::fmt::{self, Debug, Formatter};
 #[cfg(all(windows, not(test)))]
 use std::process::abort;
-use std::{ffi::c_void, marker::PhantomData};
+use std::{cell::RefCell, ffi::c_void, marker::PhantomData, rc::Rc};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
@@ -30,34 +30,34 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use crate::windows_hooks::initialize;
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC> {
+pub struct FridaInProcessExecutor<'a, 'b, H, OT, RT, S, TC> {
     base: InProcessExecutor<'a, H, OT, S>,
     /// `thread_id` for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker,
     /// User provided callback for instrumentation
-    helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+    helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
     target_bytes_converter: TC,
     followed: bool,
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<H, OT, RT, S, TC> Debug for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
+impl<H, OT, RT, S, TC> Debug for FridaInProcessExecutor<'_, '_, H, OT, RT, S, TC>
 where
     OT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
             .field("base", &self.base)
-            .field("helper", &self.helper)
+            .field("helper", &self.helper.borrow_mut())
             .field("followed", &self.followed)
             .finish_non_exhaustive()
     }
 }
 
 impl<EM, H, OT, RT, S, TC, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
+    for FridaInProcessExecutor<'_, '_, H, OT, RT, S, TC>
 where
     EM: UsesState<State = S>,
     H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
@@ -76,11 +76,12 @@ where
         input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         let target_bytes = self.target_bytes_converter.to_target_bytes(input);
-        self.helper.pre_exec(target_bytes.as_slice())?;
-        if self.helper.stalker_enabled() {
+        self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
+        if self.helper.borrow_mut().stalker_enabled() {
             if !(self.followed) {
                 self.followed = true;
-                let transformer = self.helper.transformer();
+                let helper_binding = self.helper.borrow_mut();
+                let transformer = helper_binding.transformer();
                 if let Some(thread_id) = self.thread_id {
                     self.stalker.follow::<NoneEventSink>(
                         thread_id.try_into().unwrap(),
@@ -99,7 +100,7 @@ where
             self.stalker.activate(NativePointer(ptr as *mut c_void));
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
-        if self.helper.stalker_enabled() {
+        if self.helper.borrow_mut().stalker_enabled() {
             self.stalker.deactivate();
         }
 
@@ -112,12 +113,12 @@ where
                 abort();
             }
         }
-        self.helper.post_exec(target_bytes.as_slice())?;
+        self.helper.borrow_mut().post_exec(target_bytes.as_slice())?;
         res
     }
 }
 
-impl<H, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC> {
+impl<H, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, H, OT, RT, S, TC> {
     type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -130,11 +131,10 @@ impl<H, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S>
+impl<'a, 'b, H, OT, RT, S>
     FridaInProcessExecutor<
         'a,
         'b,
-        'c,
         H,
         OT,
         RT,
@@ -149,7 +149,7 @@ where
     pub fn new(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
-        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(
             gum,
@@ -164,7 +164,7 @@ where
     pub fn on_thread(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
-        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
         thread_id: u32,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(
@@ -185,15 +185,12 @@ where
     pub fn with_target_bytes_converter(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
-        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
         thread_id: Option<u32>,
         target_bytes_converter: TC,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
-        // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
-        // we don't add it to the INSTRUMENTED ranges.
-        // Without stalkering the fuzzer, we can't hook the calls into the harness and thus are not transforming it
-        let mut ranges = helper.ranges().clone();
+        let ranges = helper.borrow_mut().ranges().clone();
         for module in frida_gum::Module::obtain(gum).enumerate_modules() {
             if module.base_address < Self::with_target_bytes_converter as usize
                 && (Self::with_target_bytes_converter as usize as u64)
@@ -215,8 +212,11 @@ where
             }
         }
 
-        log::info!("disable_excludes: {:}", helper.disable_excludes);
-        if !helper.disable_excludes {
+        log::info!(
+            "disable_excludes: {:}",
+            helper.borrow_mut().disable_excludes
+        );
+        if !helper.borrow_mut().disable_excludes {
             for range in ranges.gaps(&(0..u64::MAX)) {
                 log::info!("excluding range: {:x}-{:x}", range.start, range.end);
                 stalker.exclude(&MemoryRange::new(
@@ -244,8 +244,8 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, OT, RT, S, TC> HasInProcessHooks<S>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
+impl<'a, 'b,  H, OT, RT, S, TC> HasInProcessHooks<S>
+    for FridaInProcessExecutor<'a, 'b, H, OT, RT, S, TC>
 where
     H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
     S: HasSolutions

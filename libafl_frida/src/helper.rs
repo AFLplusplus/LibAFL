@@ -656,6 +656,7 @@ where
         let mut first = true;
         let mut basic_block_start = 0;
         let mut basic_block_size = 0;
+        // let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
         for instruction in basic_block {
             let instr = instruction.instr();
             let instr_size = instr.bytes().len();

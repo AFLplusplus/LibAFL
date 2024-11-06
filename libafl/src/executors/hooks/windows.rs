@@ -132,8 +132,7 @@ pub mod windows_exception_handler {
 
     use crate::{
         corpus::Corpus,
-        events::{EventFirer, EventRestarter},
-        executors::{
+        events::{EventFirer, EventRestarter}, executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
@@ -520,7 +519,17 @@ pub mod windows_exception_handler {
 
             // Make sure we don't crash in the crash handler forever.
             if is_crash {
-                let input = data.take_current_input::<<S::Corpus as Corpus>::Input>();
+                log::warning!("Running observers and exiting!");
+                // // I want to disable the hooks before doing anything, especially before taking a stack dump
+                let input = data.take_current_input::<<S::Corpus as Corpus>::Input>();                // log::set_max_level(log::LevelFilter::Trace);
+                run_observers_and_save_state::<E, EM, OF, S, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
                 {
                     let mut bsod = Vec::new();
                     {
@@ -532,14 +541,6 @@ pub mod windows_exception_handler {
                     }
                     log::error!("{}", std::str::from_utf8(&bsod).unwrap());
                 }
-                run_observers_and_save_state::<E, EM, OF, S, Z>(
-                    executor,
-                    state,
-                    input,
-                    fuzzer,
-                    event_mgr,
-                    ExitKind::Crash,
-                );
             } else {
                 // This is not worth saving
             }

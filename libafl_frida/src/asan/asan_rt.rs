@@ -114,11 +114,12 @@ thread_local! {
 }
 
 /// RAII guard to set and reset the `ASAN_IN_HOOK` properly
-struct AsanInHookGuard;
+#[derive(Debug)]
+pub struct AsanInHookGuard;
 
 impl AsanInHookGuard {
-    // Constructor to save the current last error
-    fn new() -> Self {
+    /// Constructor to save the current last error
+    pub fn new() -> Self {
         ASAN_IN_HOOK.set(true);
         AsanInHookGuard
     }
@@ -128,7 +129,11 @@ impl Drop for AsanInHookGuard {
         ASAN_IN_HOOK.set(false);
     }
 }
-
+impl Default for AsanInHookGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 /// The Lock below is a simple spinlock that uses the thread id as the lock value.
 /// This is a simple way to prevent reentrancy in the hooks when we don't have TLS.
 /// This is not a perfect solution, as it is global so it orders all threads without TLS.
@@ -518,7 +523,10 @@ impl AsanRuntime {
     /// The address needs to be a valid address, the size needs to be correct.
     /// This will dereference at the address.
     pub unsafe fn poison(&mut self, address: usize, size: usize) {
-        Allocator::poison(self.allocator_mut().map_to_shadow(address), size);
+        let start = self.allocator_mut().map_to_shadow(address);
+        if self.allocator_mut().valid_shadow(start, size){
+            Allocator::poison(start, size);
+        }
     }
 
     /// Add a stalked address to real address mapping.
@@ -543,13 +551,13 @@ impl AsanRuntime {
 
     /// Enable all function hooks
     pub fn enable_hooks(&mut self) {
-        log::warn!("Enabling hooks");
+        log::info!("Enabling hooks");
         self.hooks_enabled = true;
     }
     /// Disable all function hooks
     pub fn disable_hooks(&mut self) {
         self.hooks_enabled = false;
-        log::warn!("Disabling hooks");
+        log::info!("Disabling hooks");
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
@@ -1137,14 +1145,14 @@ impl AsanRuntime {
                             *const c_void
                         );
                     }
-                    // "UnmapViewOfFile" => {
-                    //     hook_func!(
-                    //         $libname, $lib_ident,
-                    //         UnmapViewOfFile,
-                    //         (ptr: *const c_void),
-                    //         bool
-                    //     );
-                    // }
+                    "UnmapViewOfFile" => {
+                        hook_func!(
+                            $libname, $lib_ident,
+                            UnmapViewOfFile,
+                            (ptr: *const c_void),
+                            bool
+                        );
+                    }
                     "LoadLibraryExW" => {
                         hook_func!(
                             $libname, $lib_ident,
