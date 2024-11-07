@@ -345,10 +345,13 @@ where
 
 #[allow(clippy::too_many_arguments)]
 fn syscall_hook<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>, // our instantiated QemuHooks
+    /// Our instantiated [`EmulatorModules`]
+    emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
-    syscall: i32,  // syscall number
-    x0: GuestAddr, // registers ...
+    /// Syscall number
+    syscall: i32,
+    /// Registers
+    x0: GuestAddr,
     x1: GuestAddr,
     _x2: GuestAddr,
     _x3: GuestAddr,
