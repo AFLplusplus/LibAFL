@@ -1212,7 +1212,7 @@ mod tests {
                     proc,
                     cur,
                     proc,
-                    std::ptr::addr_of_mut!(out),
+                    &raw mut (out),
                     0,
                     true,
                     DUPLICATE_SAME_ACCESS,
@@ -1237,7 +1237,7 @@ mod tests {
         } else if cfg!(target_arch = "aarch64") {
             c.ctx.ContextFlags = CONTEXT_FULL_ARM64;
         }
-        unsafe { GetThreadContext(thread, std::ptr::addr_of_mut!(c.ctx)).unwrap() };
+        unsafe { GetThreadContext(thread, &raw mut (c.ctx)).unwrap() };
 
         let mut writer = BufWriter::new(stdout());
         dump_registers(&mut writer, &c.ctx).unwrap();

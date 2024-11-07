@@ -1,4 +1,4 @@
-use core::{cell::UnsafeCell, fmt::Debug, ptr::addr_of_mut};
+use core::{cell::UnsafeCell, fmt::Debug};
 
 use capstone::prelude::*;
 use libafl::{
@@ -452,7 +452,7 @@ where
 
     #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut (NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
@@ -547,7 +547,7 @@ impl FullBacktraceCollector {
     /// # Safety
     /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
     pub unsafe fn new() -> Self {
-        unsafe { (*addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
+        unsafe { (*&raw mut (CALLSTACKS)) = Some(ThreadLocal::new()) };
         Self {}
     }
 
@@ -557,7 +557,7 @@ impl FullBacktraceCollector {
         // While it is racey, it might be fine if multiple clear the vecs concurrently.
         // TODO: This should probably be rewritten in a safer way.
         unsafe {
-            for tls in (*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().iter_mut() {
+            for tls in (*&raw mut (CALLSTACKS)).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
             }
         }
@@ -568,7 +568,7 @@ impl FullBacktraceCollector {
         // This accesses the global [`CALLSTACKS`] variable.
         // However, the actual variable access is behind a `ThreadLocal` class.
         unsafe {
-            if let Some(c) = (*addr_of_mut!(CALLSTACKS)).as_mut() {
+            if let Some(c) = (*&raw mut (CALLSTACKS)).as_mut() {
                 Some(&*c.get_or_default().get())
             } else {
                 None
@@ -591,7 +591,7 @@ impl CallTraceCollector for FullBacktraceCollector {
     {
         // TODO handle Thumb
         unsafe {
-            (*(*addr_of_mut!(CALLSTACKS))
+            (*(*&raw mut (CALLSTACKS))
                 .as_mut()
                 .unwrap()
                 .get_or_default()
@@ -612,7 +612,7 @@ impl CallTraceCollector for FullBacktraceCollector {
         S: Unpin + UsesInput,
     {
         unsafe {
-            let v = &mut *(*addr_of_mut!(CALLSTACKS))
+            let v = &mut *(*&raw mut (CALLSTACKS))
                 .as_mut()
                 .unwrap()
                 .get_or_default()

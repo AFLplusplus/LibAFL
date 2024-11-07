@@ -1,6 +1,4 @@
 #[cfg(feature = "systemmode")]
-use std::ptr::addr_of_mut;
-
 #[cfg(feature = "usermode")]
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
@@ -105,7 +103,7 @@ where
 
     #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut (NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
@@ -170,7 +168,7 @@ where
 
     #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut (NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 

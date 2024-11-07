@@ -1,6 +1,7 @@
 //! The hook for `InProcessExecutor`
+#[cfg(all(target_os = "linux", feature = "std"))]
+use core::mem::zeroed;
 #[cfg(any(unix, feature = "std"))]
-use core::ptr::addr_of_mut;
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
@@ -9,8 +10,6 @@ use core::{
     ptr::{self, null_mut},
     time::Duration,
 };
-#[cfg(all(target_os = "linux", feature = "std"))]
-use core::{mem::zeroed, ptr::addr_of};
 
 #[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
@@ -151,7 +150,7 @@ where
                     libc::timer_settime(
                         self.timer_mut().timerid,
                         0,
-                        addr_of!(disarmed),
+                        &raw const (disarmed),
                         null_mut(),
                     );
                 }
@@ -173,7 +172,7 @@ where
                     libc::timer_settime(
                         self.timer_mut().timerid,
                         0,
-                        addr_of!(self.timer_mut().itimerspec),
+                        &raw const (self.timer_mut().itimerspec),
                         null_mut(),
                     );
                 }
@@ -204,7 +203,7 @@ where
     fn pre_exec(&mut self, state: &mut S, input: &S::Input) {
         #[cfg(feature = "std")]
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut (GLOBAL_STATE);
             (*data).crash_handler = self.crash_handler;
             (*data).timeout_handler = self.timeout_handler;
         }
@@ -246,7 +245,7 @@ where
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
         // This unsafe is needed in stable but not in nightly. Remove in the future(?)
         #[allow(unused_unsafe)]
-        let data = unsafe { addr_of_mut!(GLOBAL_STATE) };
+        let data = unsafe { &raw mut (GLOBAL_STATE) };
         #[cfg(feature = "std")]
         unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
         // # Safety
@@ -288,7 +287,7 @@ where
         let ret;
         #[cfg(feature = "std")]
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut (GLOBAL_STATE);
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,

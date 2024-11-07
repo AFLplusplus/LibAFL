@@ -1,6 +1,6 @@
 //! [`Klo-routines`](https://github.com/andreafioraldi/klo-routines/) based fuzzer.
 //! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
-use std::{path::PathBuf, ptr::addr_of_mut};
+use std::path::PathBuf;
 
 use klo_routines::{yield_, KloRoutine};
 use libafl::{
@@ -39,12 +39,12 @@ fn input_generator() {
         ExitKind::Ok
     };
 
-    let signals_ptr = unsafe { addr_of_mut!(SIGNALS) };
+    let signals_ptr = unsafe { &raw mut (SIGNALS) };
     let signals_len = unsafe { *signals_ptr }.len();
 
     // Create an observation channel using the signals map
     let observer =
-        unsafe { StdMapObserver::from_mut_ptr("signals", addr_of_mut!(SIGNALS) as _, signals_len) };
+        unsafe { StdMapObserver::from_mut_ptr("signals", &raw mut (SIGNALS) as _, signals_len) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

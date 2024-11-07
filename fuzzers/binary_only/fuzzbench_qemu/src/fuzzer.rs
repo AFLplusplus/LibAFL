@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
+use core::{cell::RefCell, ptr::time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -260,7 +260,7 @@ fn fuzz(
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
             OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
-            addr_of_mut!(MAX_EDGES_FOUND),
+            &raw mut (MAX_EDGES_FOUND),
         ))
         .track_indices()
     };

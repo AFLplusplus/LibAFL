@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, mem::MaybeUninit, ptr::addr_of_mut, sync::Mutex};
+use std::{cell::UnsafeCell, mem::MaybeUninit, ptr::sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
 use libafl::inputs::UsesInput;
@@ -717,7 +717,7 @@ where
     }
 
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        unsafe { addr_of_mut!(NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut (NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 

@@ -6,7 +6,6 @@
 
 use alloc::boxed::Box;
 #[cfg(any(unix, feature = "std"))]
-use core::ptr::addr_of_mut;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -510,7 +509,7 @@ where
         + ExecutionProcessor<EM, E::Observers>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
-    let data = addr_of_mut!(GLOBAL_STATE);
+    let data = &raw mut (GLOBAL_STATE);
     let in_handler = (*data).set_in_handler(true);
 
     if (*data).is_valid() {

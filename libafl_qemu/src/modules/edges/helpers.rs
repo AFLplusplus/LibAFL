@@ -48,7 +48,7 @@ impl QemuEdgesMapMetadata {
 }
 
 mod generators {
-    use std::{cmp::max, ptr, ptr::addr_of};
+    use std::{cmp::max, ptr};
 
     use hashbrown::hash_map::Entry;
     use libafl::{inputs::UsesInput, HasMetadata};
@@ -95,7 +95,10 @@ mod generators {
         {
             unsafe {
                 assert!(LIBAFL_QEMU_EDGES_MAP_MASK_MAX > 0);
-                assert_ne!(*addr_of!(LIBAFL_QEMU_EDGES_MAP_SIZE_PTR), ptr::null_mut());
+                assert_ne!(
+                    *&raw const (LIBAFL_QEMU_EDGES_MAP_SIZE_PTR),
+                    ptr::null_mut()
+                );
             }
 
             #[cfg(feature = "usermode")]

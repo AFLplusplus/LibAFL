@@ -2,10 +2,7 @@
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
-    use core::{
-        ptr::addr_of_mut,
-        sync::atomic::{compiler_fence, Ordering},
-    };
+    use core::ptr::sync::atomic::{compiler_fence, Ordering};
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, CRITICAL_SECTION,
@@ -38,7 +35,7 @@ pub mod windows_asan_handler {
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
-        let data = addr_of_mut!(GLOBAL_STATE);
+        let data = &raw mut (GLOBAL_STATE);
         (*data).set_in_handler(true);
         // Have we set a timer_before?
         if (*data).ptp_timer.is_some() {
@@ -114,8 +111,7 @@ pub mod windows_exception_handler {
         ffi::c_void,
         mem::transmute,
         ptr,
-        ptr::addr_of_mut,
-        sync::atomic::{compiler_fence, Ordering},
+        ptr::sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
     use std::io::Write;
@@ -165,7 +161,7 @@ pub mod windows_exception_handler {
             exception_pointers: *mut EXCEPTION_POINTERS,
         ) {
             unsafe {
-                let data = addr_of_mut!(GLOBAL_STATE);
+                let data = &raw mut (GLOBAL_STATE);
                 let in_handler = (*data).set_in_handler(true);
                 if !(*data).crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute((*data).crash_handler);
@@ -200,7 +196,7 @@ pub mod windows_exception_handler {
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut (GLOBAL_STATE);
             let in_handler = (*data).set_in_handler(true);
             // Have we set a timer_before?
             if (*data).ptp_timer.is_some() {

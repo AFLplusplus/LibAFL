@@ -11,7 +11,7 @@
  *
  */
 
-use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path, ptr::addr_of_mut};
+use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
 
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
@@ -339,7 +339,7 @@ where
     }
 
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        unsafe { addr_of_mut!(NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut (NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 

@@ -61,7 +61,7 @@ macro_rules! extern_c_checked {
 
             #[cfg_attr(nightly, used(linker))]
             #[allow(unused_unsafe)]
-            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+            static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const ($c_var) } };
         }
 
         extern "C" {
@@ -81,7 +81,7 @@ macro_rules! extern_c_checked {
 
             #[cfg_attr(nightly, used(linker))]
             #[allow(unused_unsafe)]
-            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: core::ptr::addr_of!($c_var) } };
+            static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const ($c_var) } };
         }
 
         extern "C" {

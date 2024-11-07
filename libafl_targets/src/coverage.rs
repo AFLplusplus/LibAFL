@@ -7,15 +7,6 @@
     feature = "sancov_ctx"
 ))]
 use alloc::borrow::Cow;
-#[cfg(any(
-    feature = "sancov_pcguard_edges",
-    feature = "sancov_pcguard_hitcounts",
-    feature = "sancov_ngram4",
-    feature = "sancov_ctx"
-))]
-#[cfg(not(feature = "pointer_maps"))]
-use core::ptr::addr_of;
-use core::ptr::addr_of_mut;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::{mutators::Tokens, Error};
@@ -73,6 +64,7 @@ pub use __ddg_area_ptr as DDG_MAP_PTR;
 pub fn autotokens() -> Result<Tokens, Error> {
     // # Safety
     // All values are checked before dereferencing.
+
     unsafe {
         if __token_start.is_null() || __token_stop.is_null() {
             Ok(Tokens::default())
@@ -172,7 +164,7 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
             assert!(!EDGES_MAP_PTR.is_null());
             EDGES_MAP_PTR
         } else {
-            addr_of_mut!(EDGES_MAP) as *mut u8
+            &raw mut (EDGES_MAP) as *mut u8
         }
     }
 }
@@ -196,7 +188,7 @@ pub fn edges_max_num() -> usize {
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
-                (*addr_of!(EDGES_MAP)).len()
+                (*&raw const (EDGES_MAP)).len()
             }
         }
     }

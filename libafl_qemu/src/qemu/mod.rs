@@ -5,8 +5,7 @@
 
 use core::{
     cmp::{Ordering, PartialOrd},
-    fmt,
-    ptr::{self, addr_of_mut},
+    fmt, ptr,
 };
 use std::{
     ffi::{c_void, CString},
@@ -399,7 +398,7 @@ impl CPU {
         let val = GuestReg::to_le(val.into());
 
         let success =
-            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, ptr::addr_of!(val) as *mut u8) };
+            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, &raw const (val) as *mut u8) };
         if success == 0 {
             Err(QemuRWError {
                 kind: QemuRWErrorKind::Write,
@@ -894,7 +893,7 @@ impl Qemu {
             FatPtr,
         >(callback));
         libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
-        (*addr_of_mut!(GDB_COMMANDS)).push(fat);
+        (*&raw mut (GDB_COMMANDS)).push(fat);
     }
 
     pub fn gdb_reply(&self, output: &str) {
@@ -1108,7 +1107,7 @@ pub mod pybind {
 
     extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
         let obj = unsafe {
-            let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+            let hooks = &mut *&raw mut (PY_GENERIC_HOOKS);
             &hooks[idx as usize].1
         };
         Python::with_gil(|py| {
@@ -1188,7 +1187,7 @@ pub mod pybind {
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
         unsafe fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
-                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+                let hooks = &mut *&raw mut (PY_GENERIC_HOOKS);
                 let idx = hooks.len();
                 hooks.push((addr, hook));
                 self.qemu.hooks().add_instruction_hooks(
@@ -1204,7 +1203,7 @@ pub mod pybind {
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
         unsafe fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
             unsafe {
-                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+                let hooks = &mut *&raw mut (PY_GENERIC_HOOKS);
                 hooks.retain(|(a, _)| *a != addr);
             }
             self.qemu.hooks().remove_instruction_hooks_at(addr, true)

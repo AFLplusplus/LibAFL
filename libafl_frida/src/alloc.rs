@@ -1,5 +1,4 @@
 #[cfg(target_vendor = "apple")]
-use std::ptr::addr_of_mut;
 #[cfg(any(
     windows,
     target_os = "linux",
@@ -604,11 +603,11 @@ impl Allocator {
                 kr = unsafe {
                     mach_vm_region_recurse(
                         task,
-                        addr_of_mut!(address),
-                        addr_of_mut!(size),
-                        addr_of_mut!(depth),
-                        addr_of_mut!(info) as vm_region_recurse_info_t,
-                        addr_of_mut!(info_count),
+                        &raw mut (address),
+                        &raw mut (size),
+                        &raw mut (depth),
+                        &raw mut (info) as vm_region_recurse_info_t,
+                        &raw mut (info_count),
                     )
                 };
 

@@ -1,9 +1,6 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{
-    path::PathBuf,
-    ptr::{addr_of, addr_of_mut, write},
-};
+use std::{path::PathBuf, ptr::write};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -27,8 +24,8 @@ use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 64] = [0; 64];
-static mut SIGNALS_PTR: *mut u8 = addr_of_mut!(SIGNALS).cast();
-static mut SIGNALS_LEN: usize = unsafe { (*addr_of!(SIGNALS)).len() };
+static mut SIGNALS_PTR: *mut u8 = &raw mut (SIGNALS).cast();
+static mut SIGNALS_LEN: usize = unsafe { (*&raw const (SIGNALS)).len() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {

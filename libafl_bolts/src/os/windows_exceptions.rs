@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
-    ptr::{self, addr_of, addr_of_mut, write_volatile},
+    ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 use std::os::raw::{c_long, c_void};
@@ -543,7 +543,7 @@ pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
             .position(|x| *x == exception_code)
             .unwrap();
         write_volatile(
-            addr_of_mut!(EXCEPTION_HANDLERS[index]),
+            &raw mut (EXCEPTION_HANDLERS[index]),
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
             }),
@@ -551,7 +551,7 @@ pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
     }
 
     write_volatile(
-        addr_of_mut!(EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]),
+        &raw mut (EXCEPTION_HANDLERS[EXCEPTION_HANDLERS_SIZE - 1]),
         Some(HandlerHolder {
             handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
         }),
@@ -592,7 +592,7 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     handler: *mut T,
 ) -> Result<(), Error> {
     write_volatile(
-        addr_of_mut!(CTRL_HANDLER),
+        &raw mut (CTRL_HANDLER),
         Some(CtrlHandlerHolder {
             handler: UnsafeCell::new(handler as *mut dyn CtrlHandler),
         }),
@@ -614,7 +614,7 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
 }
 
 unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
-    let handler = ptr::read_volatile(addr_of!(CTRL_HANDLER));
+    let handler = ptr::read_volatile(&raw const (CTRL_HANDLER));
     match handler {
         Some(handler_holder) => {
             log::info!("{:?}: Handling ctrl {}", std::process::id(), ctrl_type);
