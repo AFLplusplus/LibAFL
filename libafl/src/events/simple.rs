@@ -1,7 +1,6 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
 use alloc::{boxed::Box, vec::Vec};
-#[cfg(all(unix, not(miri), feature = "std"))]
 use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use core::{
