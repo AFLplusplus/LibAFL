@@ -1276,8 +1276,10 @@ mod tests {
         use std::{io::stdout, os::fd::AsRawFd};
 
         unsafe { LIBAFL_RAWFD_LOGGER.fd = stdout().as_raw_fd() };
+
+        let libafl_rawfd_logger_fd = &raw const LIBAFL_RAWFD_LOGGER;
         unsafe {
-            log::set_logger(&*&raw const LIBAFL_RAWFD_LOGGER).unwrap();
+            log::set_logger(&*libafl_rawfd_logger_fd).unwrap();
         }
         log::set_max_level(log::LevelFilter::Debug);
         log::info!("Test");
