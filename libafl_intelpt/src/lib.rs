@@ -1,7 +1,15 @@
-//! Intel Processor Trace (PT)  low level code
+//! Intel Processor Trace (PT) low level code
 //!
 //! This module interacts with the linux kernel (specifically with perf) and therefore it only works
 //! on linux hosts
+
+// Just in case this crate will have real no_std support in the future
+#![no_std]
+#![cfg(feature = "std")]
+
+#[macro_use]
+extern crate std;
+
 use std::{
     borrow::ToOwned,
     ffi::{CStr, CString},
@@ -21,6 +29,7 @@ use std::{
 use arbitrary_int::u4;
 use bitbybit::bitfield;
 use caps::{CapSet, Capability};
+use libafl_bolts::Error;
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
     ConfigBuilder, Cpu, Image, PtError, PtErrorCode,
@@ -33,8 +42,6 @@ use perf_event_open_sys::{
     perf_event_open,
 };
 use raw_cpuid::CpuId;
-
-use crate::{ownedref::OwnedRefMut, Error};
 
 /// Size of a memory page
 pub const PAGE_SIZE: usize = 4096;
@@ -237,6 +244,8 @@ impl IntelPT {
     where
         T: SaturatingAdd + From<u8>,
     {
+        use libafl_bolts::ownedref::OwnedRefMut;
+
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
         if head < tail {
@@ -288,15 +297,17 @@ impl IntelPT {
             }
         };
 
-        let mut config = ConfigBuilder::new(data.as_mut())?;
+        let mut config = ConfigBuilder::new(data.as_mut()).map_err(error_from_pt_error)?;
         config.filter(self.ip_filters_to_addr_filter());
         if let Some(cpu) = &*CURRENT_CPU {
             config.cpu(*cpu);
         }
         let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
         config.flags(flags);
-        let mut decoder = BlockDecoder::new(&config.finish())?;
-        decoder.set_image(Some(image))?;
+        let mut decoder = BlockDecoder::new(&config.finish()).map_err(error_from_pt_error)?;
+        decoder
+            .set_image(Some(image))
+            .map_err(error_from_pt_error)?;
 
         let mut previous_block_ip = 0;
         let mut status;
@@ -320,7 +331,7 @@ impl IntelPT {
                         match decoder.next() {
                             Ok((b, s)) => {
                                 status = s;
-                                let offset = decoder.offset()?;
+                                let offset = decoder.offset().map_err(error_from_pt_error)?;
 
                                 if !b.speculative() && skip < offset {
                                     let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
@@ -354,8 +365,8 @@ impl IntelPT {
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
         // might not contain a PSB packet.
-        decoder.sync_backward()?;
-        let offset = decoder.sync_offset()?;
+        decoder.sync_backward().map_err(error_from_pt_error)?;
+        let offset = decoder.sync_offset().map_err(error_from_pt_error)?;
         unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
         Ok(())
@@ -390,7 +401,7 @@ impl Default for IntelPTBuilder {
     ///
     /// The default configuration corresponds to:
     /// ```rust
-    /// use libafl_bolts::intel_pt::{IntelPTBuilder, PAGE_SIZE};
+    /// use libafl_intelpt::{IntelPTBuilder, PAGE_SIZE};
     /// let builder = unsafe { std::mem::zeroed::<IntelPTBuilder>() }
     ///     .pid(None)
     ///     .all_cpus()
@@ -591,12 +602,6 @@ struct PtConfig {
     /// Indicates the frequency of PSB packets. AKA PSBFreq in Intel SDM.
     #[bits(24..=27, rw)]
     psb_period: u4,
-}
-
-impl From<PtError> for Error {
-    fn from(err: PtError) -> Self {
-        Self::unknown(err.to_string())
-    }
 }
 
 /// Number of address filters available on the running CPU
@@ -849,6 +854,11 @@ const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
 }
 
+#[inline]
+fn error_from_pt_error(err: PtError) -> Error {
+    Error::unknown(err.to_string())
+}
+
 #[cfg(test)]
 mod test {
     use std::{arch::asm, process};
@@ -956,7 +966,7 @@ mod test {
     /// ```
     #[test]
     fn intel_pt_trace_fork() {
-        if let Err(reason) = IntelPT::availability() {
+        if let Err(reason) = availability() {
             // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
             println!("Intel PT is not available, skipping test. Reasons:");
             println!("{reason}");

@@ -8,6 +8,7 @@ members = [
   "libafl_concolic/symcc_libafl",
   "libafl_derive",
   "libafl_frida",
+  "libafl_intelpt",
   "libafl_libfuzzer",
   "libafl_nyx",
   "libafl_targets",
@@ -48,6 +49,7 @@ exclude = [
 
 [workspace.package]
 version = "0.13.2"
+license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 ahash = { version = "0.8.11", default-features = false }     # The hash function already used in hashbrown

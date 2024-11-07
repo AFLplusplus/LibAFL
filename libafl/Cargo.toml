@@ -110,7 +110,7 @@ casr = ["libcasr", "std", "regex"]
 ## Intel Processor Trace
 intel_pt = [
   "std",
-  "libafl_bolts/intel_pt",
+  "dep:libafl_intelpt",
   "dep:libipt",
   "dep:nix",
   "dep:num_enum",
@@ -210,6 +210,7 @@ libafl_bolts = { version = "0.13.2", path = "../libafl_bolts", default-features 
   "alloc",
 ] }
 libafl_derive = { version = "0.13.2", path = "../libafl_derive", optional = true }
+libafl_intelpt = { path = "../libafl_intelpt", optional = true }
 
 rustversion = { workspace = true }
 tuple_list = { version = "0.1.3" }
