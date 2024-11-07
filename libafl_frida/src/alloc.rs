@@ -603,11 +603,11 @@ impl Allocator {
                 kr = unsafe {
                     mach_vm_region_recurse(
                         task,
-                        &raw mut (address),
-                        &raw mut (size),
-                        &raw mut (depth),
-                        &raw mut (info) as vm_region_recurse_info_t,
-                        &raw mut (info_count),
+                        &raw mut address,
+                        &raw mut size,
+                        &raw mut depth,
+                        &raw mut info as vm_region_recurse_info_t,
+                        &raw mut info_count,
                     )
                 };
 

@@ -4,7 +4,6 @@
 //! restart/refork it.
 
 use alloc::{boxed::Box, vec::Vec};
-#[cfg(all(unix, not(miri), feature = "std"))]
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 #[cfg(feature = "std")]

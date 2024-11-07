@@ -1,5 +1,4 @@
 //! The struct `TimerStruct` will absorb all the difference in timeout implementation in various system.
-#[cfg(any(windows, target_os = "linux", unix))]
 use core::time::Duration;
 #[cfg(target_os = "linux")]
 use core::{mem::zeroed, ptr::null_mut};
@@ -266,7 +265,7 @@ impl TimerStruct {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
 
-            write_volatile(&raw mut ((*data).ptp_timer), Some(*self.ptp_timer()));
+            write_volatile(&raw mut (*data).ptp_timer, Some(*self.ptp_timer()));
             write_volatile(
                 &raw mut (*data).critical,
                 &raw mut (*self.critical_mut()) as *mut c_void,
@@ -332,7 +331,7 @@ impl TimerStruct {
                     || self.exec_tmout.saturating_sub(elapsed) < self.avg_exec_time * self.avg_mul_k
                 {
                     let disarmed: libc::itimerspec = zeroed();
-                    libc::timer_settime(self.timerid, 0, &raw const (disarmed), null_mut());
+                    libc::timer_settime(self.timerid, 0, &raw const disarmed, null_mut());
                     // set timer the next exec
                     if self.executions > 0 {
                         self.avg_exec_time = elapsed / self.executions;
@@ -350,7 +349,7 @@ impl TimerStruct {
             unsafe {
                 let disarmed: libc::itimerspec = zeroed();
                 #[cfg(not(miri))]
-                libc::timer_settime(self.timerid, 0, &raw const (disarmed), null_mut());
+                libc::timer_settime(self.timerid, 0, &raw const disarmed, null_mut());
             }
         }
     }

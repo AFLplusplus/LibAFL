@@ -1212,7 +1212,7 @@ mod tests {
                     proc,
                     cur,
                     proc,
-                    &raw mut (out),
+                    &raw mut out,
                     0,
                     true,
                     DUPLICATE_SAME_ACCESS,

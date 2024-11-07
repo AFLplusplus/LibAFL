@@ -1,6 +1,5 @@
 #![allow(clippy::missing_transmute_annotations)]
 
-#[cfg(feature = "usermode")]
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
@@ -76,7 +75,7 @@ where
     unsafe {
         let emulator_modules = EmulatorModules::<ET, S>::emulator_modules_mut().unwrap();
 
-        for crash_hook in &mut (*&raw mut (emulator_modules.hooks.crash_hooks)) {
+        for crash_hook in &mut (*&raw mut emulator_modules.hooks.crash_hooks) {
             match crash_hook {
                 HookRepr::Function(ptr) => {
                     let func: CrashHookFn<ET, S> = transmute(*ptr);

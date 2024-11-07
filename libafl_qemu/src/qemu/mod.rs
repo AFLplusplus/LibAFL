@@ -397,8 +397,7 @@ impl CPU {
         #[cfg(not(feature = "be"))]
         let val = GuestReg::to_le(val.into());
 
-        let success =
-            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, &raw const (val) as *mut u8) };
+        let success = unsafe { libafl_qemu_write_reg(self.ptr, reg_id, &raw const val as *mut u8) };
         if success == 0 {
             Err(QemuRWError {
                 kind: QemuRWErrorKind::Write,
@@ -893,7 +892,7 @@ impl Qemu {
             FatPtr,
         >(callback));
         libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
-        (*&raw mut (GDB_COMMANDS)).push(fat);
+        (*&raw mut GDB_COMMANDS).push(fat);
     }
 
     pub fn gdb_reply(&self, output: &str) {

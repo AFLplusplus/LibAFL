@@ -97,7 +97,7 @@ pub fn merge(
         }
     }
 
-    let edges = unsafe { core::mem::take(&mut *&raw mut (COUNTERS_MAPS)) };
+    let edges = unsafe { core::mem::take(&mut *&raw mut COUNTERS_MAPS) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");

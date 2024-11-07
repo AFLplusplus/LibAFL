@@ -291,7 +291,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32
         }
         #[cfg(not(feature = "pointer_maps"))]
         {
-            let edges_map_len = (*&raw const (EDGES_MAP)).len();
+            let edges_map_len = (*&raw const EDGES_MAP).len();
             MAX_EDGES_FOUND = MAX_EDGES_FOUND.wrapping_add(1);
             assert!((MAX_EDGES_FOUND <= edges_map_len), "The number of edges reported by SanitizerCoverage exceed the size of the edges map ({edges_map_len}). Use the LIBAFL_EDGES_MAP_DEFAULT_SIZE env to increase it at compile time.");
         }
@@ -316,7 +316,7 @@ unsafe extern "C" fn __sanitizer_cov_pcs_init(pcs_beg: *const usize, pcs_end: *c
         "Unaligned PC Table - start: {pcs_beg:x?} end: {pcs_end:x?}"
     );
 
-    let pc_tables = &mut *&raw mut (PC_TABLES);
+    let pc_tables = &mut *&raw mut PC_TABLES;
     pc_tables.push(slice::from_raw_parts(pcs_beg as *const PcTableEntry, len));
 }
 

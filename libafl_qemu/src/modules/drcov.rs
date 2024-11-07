@@ -1,4 +1,3 @@
-#[cfg(feature = "systemmode")]
 use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};

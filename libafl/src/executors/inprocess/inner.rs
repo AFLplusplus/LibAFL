@@ -101,10 +101,10 @@ where
         unsafe {
             let data = &raw mut GLOBAL_STATE;
             write_volatile(
-                &raw mut ((*data).current_input_ptr),
+                &raw mut (*data).current_input_ptr,
                 ptr::from_ref(input) as *const c_void,
             );
-            write_volatile(&raw mut ((*data).executor_ptr), executor_ptr);
+            write_volatile(&raw mut (*data).executor_ptr, executor_ptr);
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(
@@ -112,11 +112,11 @@ where
                 ptr::from_mut(state) as *mut c_void,
             );
             write_volatile(
-                &raw mut ((*data).event_mgr_ptr),
+                &raw mut (*data).event_mgr_ptr,
                 ptr::from_mut(mgr) as *mut c_void,
             );
             write_volatile(
-                &raw mut ((*data).fuzzer_ptr),
+                &raw mut (*data).fuzzer_ptr,
                 ptr::from_mut(fuzzer) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);
@@ -135,7 +135,7 @@ where
         unsafe {
             let data = &raw mut GLOBAL_STATE;
 
-            write_volatile(&raw mut ((*data).current_input_ptr), null());
+            write_volatile(&raw mut (*data).current_input_ptr, null());
             compiler_fence(Ordering::SeqCst);
         }
     }

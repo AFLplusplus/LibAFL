@@ -1,4 +1,3 @@
-#[cfg(feature = "systemmode")]
 #[cfg(feature = "usermode")]
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;

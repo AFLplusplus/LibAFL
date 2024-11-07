@@ -1892,7 +1892,7 @@ impl AsanRuntime {
             ; self_addr:
             ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .i64 &raw mut (self.regs) as i64
+            ; .i64 &raw mut self.regs as i64
             ; trap_func:
             ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
         );
@@ -1991,13 +1991,13 @@ impl AsanRuntime {
             ; self_addr:
             ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .i64 &raw mut (self.regs) as i64
+            ; .i64 &raw mut self.regs as i64
             ; trap_func:
             ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
             ; .i64 __register_frame as *mut c_void as i64
             ; eh_frame_cie_addr:
-            ; .i64 &raw mut (self.eh_frame) as i64
+            ; .i64 &raw mut self.eh_frame as i64
         );
         self.eh_frame = [
             0x14, 0, 0x00527a01, 0x011e7c01, 0x001f0c1b, //

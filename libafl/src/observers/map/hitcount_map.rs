@@ -45,7 +45,7 @@ fn init_count_class_16() {
     // Calling this from multiple threads may be racey and hence leak 65k mem or even create a broken lookup vec.
     // We can live with that.
     unsafe {
-        let count_class_lookup_16 = &raw mut (COUNT_CLASS_LOOKUP_16);
+        let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
         let count_class_lookup_16 = &mut *count_class_lookup_16;
 
         if !count_class_lookup_16.is_empty() {
@@ -127,7 +127,7 @@ where
         let map16 = unsafe {
             slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
         };
-        let count_class_lookup_16 = &raw mut (COUNT_CLASS_LOOKUP_16);
+        let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
 
         // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
         #[allow(clippy::unused_enumerate_index)]

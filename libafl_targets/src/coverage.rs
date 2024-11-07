@@ -188,7 +188,7 @@ pub fn edges_max_num() -> usize {
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
-                (*&raw const (EDGES_MAP)).len()
+                (*&raw const EDGES_MAP).len()
             }
         }
     }

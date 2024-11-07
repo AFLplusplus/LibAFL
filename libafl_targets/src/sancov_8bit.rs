@@ -13,7 +13,7 @@ pub static mut COUNTERS_MAPS: Vec<OwnedMutSlice<'static, u8>> = Vec::new();
 /// You are responsible for ensuring there is no multi-mutability!
 #[must_use]
 pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
-    let counter_maps = &*&raw const (COUNTERS_MAPS);
+    let counter_maps = &*&raw const COUNTERS_MAPS;
     counter_maps
         .iter()
         .map(|counters| {
@@ -34,7 +34,7 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
-        let counter_maps = &mut *&raw mut (COUNTERS_MAPS);
+        let counter_maps = &mut *&raw mut COUNTERS_MAPS;
         for existing in counter_maps {
             let range = existing.as_slice_mut().as_mut_ptr()
                 ..=existing
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop
             }
         }
 
-        let counter_maps = &mut *&raw mut (COUNTERS_MAPS);
+        let counter_maps = &mut *&raw mut COUNTERS_MAPS;
         // we didn't overlap; keep going
         counter_maps.push(OwnedMutSlice::from_raw_parts_mut(
             start,
@@ -161,7 +161,7 @@ mod observers {
 
     impl<const DIFFERENTIAL: bool> Hash for CountersMultiMapObserver<DIFFERENTIAL> {
         fn hash<H: Hasher>(&self, hasher: &mut H) {
-            for map in unsafe { &*&raw const (COUNTERS_MAPS) } {
+            for map in unsafe { &*&raw const COUNTERS_MAPS } {
                 let slice = map.as_slice();
                 let ptr = slice.as_ptr();
                 let map_size = slice.len() / size_of::<u8>();
@@ -211,7 +211,7 @@ mod observers {
         fn count_bytes(&self) -> u64 {
             let initial = self.initial();
             let mut res = 0;
-            for map in unsafe { &*&raw const (COUNTERS_MAPS) } {
+            for map in unsafe { &*&raw const COUNTERS_MAPS } {
                 for x in map.as_slice() {
                     if *x != initial {
                         res += 1;
@@ -228,7 +228,7 @@ mod observers {
 
         fn reset_map(&mut self) -> Result<(), Error> {
             let initial = self.initial();
-            for map in unsafe { &mut *&raw mut (COUNTERS_MAPS) } {
+            for map in unsafe { &mut *&raw mut COUNTERS_MAPS } {
                 for x in map.as_slice_mut() {
                     *x = initial;
                 }
@@ -269,7 +269,7 @@ mod observers {
         fn maybe_differential(name: &'static str) -> Self {
             let mut idx = 0;
             let mut intervals = IntervalTree::new();
-            for (v, x) in unsafe { &*&raw const (COUNTERS_MAPS) }.iter().enumerate() {
+            for (v, x) in unsafe { &*&raw const COUNTERS_MAPS }.iter().enumerate() {
                 let l = x.as_slice().len();
                 intervals.insert(idx..(idx + l), v);
                 idx += l;
@@ -305,7 +305,7 @@ mod observers {
             let mut idx = 0;
             let mut v = 0;
             let mut intervals = IntervalTree::new();
-            unsafe { &mut *&raw mut (COUNTERS_MAPS) }
+            unsafe { &mut *&raw mut COUNTERS_MAPS }
                 .iter_mut()
                 .for_each(|m| {
                     let l = m.as_slice_mut().len();
@@ -330,7 +330,7 @@ mod observers {
 
         fn as_iter(&'it self) -> Self::IntoIter {
             unsafe {
-                let counters_maps = &*&raw const (COUNTERS_MAPS);
+                let counters_maps = &*&raw const COUNTERS_MAPS;
                 counters_maps.iter().flatten()
             }
         }
@@ -342,7 +342,7 @@ mod observers {
 
         fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
             unsafe {
-                let counters_maps = &mut *&raw mut (COUNTERS_MAPS);
+                let counters_maps = &mut *&raw mut COUNTERS_MAPS;
                 counters_maps.iter_mut().flatten()
             }
         }
@@ -353,7 +353,7 @@ mod observers {
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
-            unsafe { &*&raw const (COUNTERS_MAPS) }.iter().flatten()
+            unsafe { &*&raw const COUNTERS_MAPS }.iter().flatten()
         }
     }
 
@@ -364,9 +364,7 @@ mod observers {
         type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
-            unsafe { &mut *&raw mut (COUNTERS_MAPS) }
-                .iter_mut()
-                .flatten()
+            unsafe { &mut *&raw mut COUNTERS_MAPS }.iter_mut().flatten()
         }
     }
 

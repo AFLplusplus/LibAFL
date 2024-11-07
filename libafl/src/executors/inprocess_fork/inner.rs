@@ -226,11 +226,11 @@ where
         unsafe {
             let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
-                &raw mut ((*data).executor_ptr),
+                &raw mut (*data).executor_ptr,
                 ptr::from_ref(self) as *const c_void,
             );
             write_volatile(
-                &raw mut ((*data).current_input_ptr),
+                &raw mut (*data).current_input_ptr,
                 ptr::from_ref(input) as *const c_void,
             );
             write_volatile(

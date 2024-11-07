@@ -5,7 +5,6 @@
 #![allow(clippy::needless_pass_by_value)]
 
 use alloc::boxed::Box;
-#[cfg(any(unix, feature = "std"))]
 use core::{
     borrow::BorrowMut,
     ffi::c_void,

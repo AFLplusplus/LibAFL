@@ -643,7 +643,7 @@ mod apple {
             let result = thread_policy_set(
                 pthread_mach_thread_np(pthread_self()),
                 THREAD_AFFINITY_POLICY as _,
-                &raw mut (info) as thread_policy_t,
+                &raw mut info as thread_policy_t,
                 THREAD_AFFINITY_POLICY_COUNT,
             );
 

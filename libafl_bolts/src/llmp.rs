@@ -1148,7 +1148,7 @@ where
         let last_msg = self.last_msg_sent;
         assert!((*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
                 "PROGRAM ABORT : BUG: EOP does not fit in page! page {page:?}, size_current {:?}, size_total {:?}",
-                &raw const ((*page).size_used), &raw const ((*page).size_total));
+                &raw const (*page).size_used, &raw const (*page).size_total);
 
         let ret: *mut LlmpMsg = if last_msg.is_null() {
             (*page).messages.as_mut_ptr()
@@ -1240,7 +1240,7 @@ where
             MessageId((*last_msg).message_id.0 + 1)
         } else {
             /* Oops, wrong usage! */
-            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", &raw const ((*page).current_msg_id), (*last_msg).message_id);
+            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", &raw const (*page).current_msg_id, (*last_msg).message_id);
         };
 
         (*ret).buf_len = buf_len as u64;
@@ -2195,7 +2195,7 @@ impl SignalHandler for LlmpShutdownSignalHandler {
         _context: Option<&mut ucontext_t>,
     ) {
         unsafe {
-            ptr::write_volatile(&raw mut (self.shutting_down), true);
+            ptr::write_volatile(&raw mut self.shutting_down, true);
         }
     }
 

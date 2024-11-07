@@ -1,7 +1,6 @@
 //! The hook for `InProcessExecutor`
 #[cfg(all(target_os = "linux", feature = "std"))]
 use core::mem::zeroed;
-#[cfg(any(unix, feature = "std"))]
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
@@ -150,7 +149,7 @@ where
                     libc::timer_settime(
                         self.timer_mut().timerid,
                         0,
-                        &raw const (disarmed),
+                        &raw const disarmed,
                         null_mut(),
                     );
                 }
@@ -172,7 +171,7 @@ where
                     libc::timer_settime(
                         self.timer_mut().timerid,
                         0,
-                        &raw const (self.timer_mut().itimerspec),
+                        &raw const self.timer_mut().itimerspec,
                         null_mut(),
                     );
                 }
