@@ -112,23 +112,23 @@ pub struct Launcher<'a, CF, MT, SP> {
     #[builder(default = 1)]
     overcommit: usize,
     /// A file name to write all client output to
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(unix)]
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
     /// The time in milliseconds to delay between child launches
     #[builder(default = 10)]
     launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
     /// `stdout_file`.
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(unix)]
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
@@ -175,17 +175,10 @@ where
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
-    pub fn launch<S>(&mut self) -> Result<(), Error>
-    where
-        S: State + HasExecutions,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
-    {
-        Self::launch_with_hooks(self, tuple_list!())
-    }
-
-    /// Launch the broker and the clients and fuzz
-    #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+    #[cfg(all(
+        feature = "std",
+        any(windows, not(feature = "fork"), all(unix, feature = "fork"))
+    ))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
@@ -203,9 +196,8 @@ where
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
-    #[allow(clippy::similar_names)]
-    #[allow(clippy::too_many_lines)]
+    #[cfg(all(unix, feature = "fork"))]
+    #[allow(clippy::similar_names, clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
@@ -293,7 +285,6 @@ where
         }
 
         if self.spawn_broker {
-            #[cfg(feature = "std")]
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
@@ -337,7 +328,7 @@ where
     }
 
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+    #[cfg(any(windows, not(feature = "fork")))]
     #[allow(unused_mut, clippy::match_wild_err_arm, clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
@@ -381,7 +372,7 @@ where
                 log::info!("spawning on cores: {:?}", self.cores);
 
                 let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
-                #[cfg(all(feature = "std", unix))]
+                #[cfg(unix)]
                 {
                     // Set own stdout and stderr as set by the user
                     if !debug_output {
@@ -446,7 +437,6 @@ where
         }
 
         if self.spawn_broker {
-            #[cfg(feature = "std")]
             log::info!("I am broker!!.");
 
             let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
@@ -622,8 +612,7 @@ where
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
     /// - `secondary_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
-    #[allow(clippy::similar_names)]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::similar_names, clippy::too_many_lines)]
     pub fn launch_generic<EM, EMB, S>(
         &mut self,
         main_inner_mgr_builder: EMB,
