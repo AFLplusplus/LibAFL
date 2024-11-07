@@ -199,7 +199,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
       - name: Installing black
-        run: "python3 -m pip install black"
+        run: python3 -m pip install black
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
