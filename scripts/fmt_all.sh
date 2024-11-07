@@ -11,12 +11,18 @@ else
   cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- --verbose || exit 1
 fi
 
-if command -v black > /dev/null; then
+if python3 -m black --version > /dev/null; then
+  BLACK_COMMAND="python3 -m black"
+elif command -v black > /dev/null; then
+  BLACK_COMMAND="black"
+fi
+
+if [ -n "$BLACK_COMMAND" ]; then
   echo "[*] Formatting python files"
   if [ "$1" = "check" ]; then
-    black --check --diff "$LIBAFL_DIR" || exit 1
+    $BLACK_COMMAND --check --diff "$LIBAFL_DIR" || exit 1
   else
-    black "$LIBAFL_DIR" || exit 1
+    $BLACK_COMMAND "$LIBAFL_DIR" || exit 1
   fi
 else
   echo -e "\n\033[1;33mWarning\033[0m: python black not found. Formatting skipped for python.\n"

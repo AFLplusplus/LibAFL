@@ -31,7 +31,7 @@ for mname, module in cfg.items():
     fnname2SG = dict()
     # First, add all the intra-procedural edges
 
-    for (fname, v) in module["edges"].items():
+    for fname, v in module["edges"].items():
 
         if fname not in fname2id:
             GG.add_node(f_ids, label=fname)
@@ -51,8 +51,8 @@ for mname, module in cfg.items():
                 G.add_edge(node_id_list[src], node_id_list[item])
 
     # Next, build inter-procedural edges
-    for (fname, calls) in module["calls"].items():
-        for (idx, target_fns) in calls.items():
+    for fname, calls in module["calls"].items():
+        for idx, target_fns in calls.items():
             # G.nodes isn't sorted
 
             src = sorted(fnname2SG[fname].nodes())[0] + int(idx)
