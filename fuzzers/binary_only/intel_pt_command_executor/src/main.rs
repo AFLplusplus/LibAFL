@@ -19,12 +19,8 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libafl_bolts::{
-    core_affinity,
-    intel_pt::{IntelPT, PAGE_SIZE},
-    rands::StdRand,
-    tuples::tuple_list,
-};
+use libafl_bolts::{core_affinity, rands::StdRand, tuples::tuple_list};
+use libafl_intelpt::{IntelPT, PAGE_SIZE};
 
 // Coverage map
 const MAP_SIZE: usize = 4096;
