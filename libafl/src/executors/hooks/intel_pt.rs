@@ -59,8 +59,8 @@ where
     }
 }
 
-// It would be nice to have this as a `From<IntoIter<Section>>`, but Rust's orphan rule doesn't like
-// this
+// It would be nice to have this as a `TryFrom<IntoIter<Section>>`, but Rust's orphan rule doesn't
+// like this (and `TryFromIter` is not a thing atm)
 fn sections_to_image(
     sections: &[Section],
 ) -> Result<(Image<'static>, SectionCache<'static>), Error> {
