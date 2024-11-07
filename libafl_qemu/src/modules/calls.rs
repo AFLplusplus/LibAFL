@@ -547,8 +547,9 @@ impl FullBacktraceCollector {
     /// # Safety
     /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
     pub unsafe fn new() -> Self {
-        unsafe { (*&raw mut CALLSTACKS) = Some(ThreadLocal::new()) };
-        Self {}
+        let callstacks_ptr = &raw mut CALLSTACKS;
+        unsafe { (*callstacks_ptr) = Some(ThreadLocal::new()) };
+        Self
     }
 
     pub fn reset(&mut self) {
@@ -556,8 +557,9 @@ impl FullBacktraceCollector {
         // This accesses the global [`CALLSTACKS`] variable.
         // While it is racey, it might be fine if multiple clear the vecs concurrently.
         // TODO: This should probably be rewritten in a safer way.
+        let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe {
-            for tls in (*&raw mut CALLSTACKS).as_mut().unwrap().iter_mut() {
+            for tls in (*callstacks_ptr).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
             }
         }
@@ -567,8 +569,9 @@ impl FullBacktraceCollector {
         // # Safety
         // This accesses the global [`CALLSTACKS`] variable.
         // However, the actual variable access is behind a `ThreadLocal` class.
+        let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe {
-            if let Some(c) = (*&raw mut CALLSTACKS).as_mut() {
+            if let Some(c) = (*callstacks_ptr).as_mut() {
                 Some(&*c.get_or_default().get())
             } else {
                 None
@@ -589,14 +592,11 @@ impl CallTraceCollector for FullBacktraceCollector {
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
+        let callstacks_ptr = &raw mut CALLSTACKS;
         // TODO handle Thumb
         unsafe {
-            (*(*&raw mut CALLSTACKS)
-                .as_mut()
-                .unwrap()
-                .get_or_default()
-                .get())
-            .push(pc + call_len as GuestAddr);
+            (*(*callstacks_ptr).as_mut().unwrap().get_or_default().get())
+                .push(pc + call_len as GuestAddr);
         }
     }
 
@@ -611,12 +611,9 @@ impl CallTraceCollector for FullBacktraceCollector {
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
+        let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe {
-            let v = &mut *(*&raw mut CALLSTACKS)
-                .as_mut()
-                .unwrap()
-                .get_or_default()
-                .get();
+            let v = &mut *(*callstacks_ptr).as_mut().unwrap().get_or_default().get();
             if !v.is_empty() {
                 // if *v.last().unwrap() == ret_addr {
                 //    v.pop();

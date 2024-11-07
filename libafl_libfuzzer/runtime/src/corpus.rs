@@ -84,10 +84,10 @@ where
         Ok(())
     }
     #[inline]
-    fn _get<'a>(
+    fn _get(
         &'a self,
         id: CorpusId,
-        corpus: &'a TestcaseStorageMap<I>,
+        corpus: &TestcaseStorageMap<I>,
     ) -> Result<&RefCell<Testcase<I>>, Error> {
         self.touch(id, corpus)?;
         corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)"))

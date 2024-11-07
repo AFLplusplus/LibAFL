@@ -75,7 +75,9 @@ where
     unsafe {
         let emulator_modules = EmulatorModules::<ET, S>::emulator_modules_mut().unwrap();
 
-        for crash_hook in &mut (*&raw mut emulator_modules.hooks.crash_hooks) {
+        let crash_hooks_ptr = &raw mut emulator_modules.hooks.crash_hooks;
+
+        for crash_hook in &mut (*crash_hooks_ptr) {
             match crash_hook {
                 HookRepr::Function(ptr) => {
                     let func: CrashHookFn<ET, S> = transmute(*ptr);

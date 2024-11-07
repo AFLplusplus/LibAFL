@@ -892,7 +892,8 @@ impl Qemu {
             FatPtr,
         >(callback));
         libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
-        (*&raw mut GDB_COMMANDS).push(fat);
+        let commands_ptr = &raw mut GDB_COMMANDS;
+        (*commands_ptr).push(fat);
     }
 
     pub fn gdb_reply(&self, output: &str) {

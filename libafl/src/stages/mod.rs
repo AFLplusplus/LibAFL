@@ -205,6 +205,8 @@ where
             }
             Some(idx) if idx == StageId(Self::LEN) => {
                 // perform the stage, but don't set it
+
+                #[allow(clippy::similar_names)]
                 let stage = &mut self.0;
 
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
@@ -218,6 +220,7 @@ where
             _ => {
                 state.set_current_stage_id(StageId(Self::LEN))?;
 
+                #[allow(clippy::similar_names)]
                 let stage = &mut self.0;
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
 
@@ -820,6 +823,7 @@ mod test {
             }
         }
 
+        #[allow(clippy::similar_names)]
         let mut state = StdState::nop()?;
         let stage = StageWithOneTry;
 

@@ -1,7 +1,6 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{boxed::Box, vec::Vec};
-#[cfg(all(unix, feature = "std", not(miri)))]
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
