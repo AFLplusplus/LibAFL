@@ -549,7 +549,7 @@ impl FullBacktraceCollector {
     pub unsafe fn new() -> Self {
         let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe { (*callstacks_ptr) = Some(ThreadLocal::new()) };
-        Self
+        Self {}
     }
 
     pub fn reset(&mut self) {
