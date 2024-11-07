@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, mem::MaybeUninit, ptr::sync::Mutex};
+use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
 use libafl::inputs::UsesInput;

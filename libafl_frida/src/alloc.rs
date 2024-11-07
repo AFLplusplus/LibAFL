@@ -1,4 +1,3 @@
-#[cfg(target_vendor = "apple")]
 #[cfg(any(
     windows,
     target_os = "linux",

@@ -2,7 +2,7 @@
 #[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
-    use core::ptr::sync::atomic::{compiler_fence, Ordering};
+    use core::sync::atomic::{compiler_fence, Ordering};
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, CRITICAL_SECTION,
@@ -111,7 +111,7 @@ pub mod windows_exception_handler {
         ffi::c_void,
         mem::transmute,
         ptr,
-        ptr::sync::atomic::{compiler_fence, Ordering},
+        sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
     use std::io::Write;
