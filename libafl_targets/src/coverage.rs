@@ -4,6 +4,7 @@
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
 use alloc::borrow::Cow;
@@ -85,6 +86,7 @@ pub static mut __afl_map_size: usize = EDGES_MAP_DEFAULT_SIZE;
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
 use libafl::observers::StdMapObserver;
@@ -92,6 +94,7 @@ use libafl::observers::StdMapObserver;
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
 use libafl_bolts::ownedref::OwnedMutSlice;
@@ -108,6 +111,7 @@ use libafl_bolts::ownedref::OwnedMutSlice;
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
 pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
@@ -145,6 +149,7 @@ pub unsafe fn edges_map_mut_slice<'a>() -> OwnedMutSlice<'a, u8> {
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
 pub unsafe fn std_edges_map_observer<'a, S>(name: S) -> StdMapObserver<'a, u8, false>
@@ -174,6 +179,7 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
     feature = "sancov_pcguard_edges",
     feature = "sancov_pcguard_hitcounts",
     feature = "sancov_ngram4",
+    feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
 #[must_use]
@@ -188,7 +194,8 @@ pub fn edges_max_num() -> usize {
             }
             #[cfg(not(feature = "pointer_maps"))]
             {
-                (*&raw const EDGES_MAP).len()
+                let edges_map_ptr = &raw const EDGES_MAP;
+                (*edges_map_ptr).len()
             }
         }
     }
