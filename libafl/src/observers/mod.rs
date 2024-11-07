@@ -414,8 +414,9 @@ mod tests {
 
     #[test]
     fn test_observer_serde() {
+        let map_ptr = &raw const MAP;
         let obv = tuple_list!(TimeObserver::new("time"), unsafe {
-            let len = (*&raw const MAP).len();
+            let len = (*map_ptr).len();
             StdMapObserver::from_ownedref(
                 "map",
                 OwnedMutSlice::from_raw_parts_mut(&raw mut MAP as *mut u32, len),
