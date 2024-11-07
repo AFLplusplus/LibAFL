@@ -734,6 +734,12 @@ pub fn availability_in_qemu() -> Result<(), String> {
     }
 }
 
+/// Convert [`PtError`] into [`Error`]
+#[inline]
+pub fn error_from_pt_error(err: PtError) -> Error {
+    Error::unknown(err.to_string())
+}
+
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     let type_ = match &*PERF_EVENT_TYPE {
         Ok(t) => Ok(*t),
@@ -852,11 +858,6 @@ fn smp_rmb() {
 #[inline]
 const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
-}
-
-#[inline]
-fn error_from_pt_error(err: PtError) -> Error {
-    Error::unknown(err.to_string())
 }
 
 #[cfg(test)]

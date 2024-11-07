@@ -3,7 +3,7 @@ use std::{
     string::{String, ToString},
 };
 
-use libafl_bolts::intel_pt::IntelPT;
+use libafl_intelpt::{error_from_pt_error, IntelPT};
 use libipt::{Asid, Image, SectionCache};
 use serde::Serialize;
 use typed_builder::TypedBuilder;
@@ -64,8 +64,8 @@ where
 fn sections_to_image(
     sections: &[Section],
 ) -> Result<(Image<'static>, SectionCache<'static>), Error> {
-    let mut image_cache = SectionCache::new(Some("image_cache"))?;
-    let mut image = Image::new(Some("image"))?;
+    let mut image_cache = SectionCache::new(Some("image_cache")).map_err(error_from_pt_error)?;
+    let mut image = Image::new(Some("image")).map_err(error_from_pt_error)?;
 
     for s in sections {
         let isid = image_cache.add_file(&s.file_path, s.file_offset, s.size, s.virtual_address);
