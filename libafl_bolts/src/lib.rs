@@ -1268,9 +1268,6 @@ pub mod pybind {
 mod tests {
 
     #[cfg(all(feature = "std", unix))]
-    use core::ptr;
-
-    #[cfg(all(feature = "std", unix))]
     use crate::LIBAFL_RAWFD_LOGGER;
 
     #[test]
