@@ -144,10 +144,10 @@ where
             let mut timerid: libc::timer_t = null_mut();
             // creates a new per-process interval timer
             // we can't do this from the parent, timerid is unique to each process.
-            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut (timerid));
+            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
 
             // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-            let _: i32 = libc::timer_settime(timerid, 0, &raw mut (self.itimerspec), null_mut());
+            let _: i32 = libc::timer_settime(timerid, 0, &raw mut self.itimerspec, null_mut());
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -224,7 +224,7 @@ where
         input: &<Self as UsesInput>::Input,
     ) {
         unsafe {
-            let data = &raw mut (FORK_EXECUTOR_GLOBAL_DATA);
+            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
                 &raw mut ((*data).executor_ptr),
                 ptr::from_ref(self) as *const c_void,

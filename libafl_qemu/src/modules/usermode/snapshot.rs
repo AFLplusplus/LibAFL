@@ -717,7 +717,7 @@ where
     }
 
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        unsafe { &raw mut (NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut NOP_ADDRESS_FILTER.as_mut().unwrap().get_mut() }
     }
 }
 

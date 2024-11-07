@@ -83,8 +83,8 @@ impl CoverageRuntime {
     #[allow(clippy::cast_possible_wrap)]
     pub fn generate_inline_code(&mut self, h64: u64) -> Box<[u8]> {
         let mut borrow = self.0.borrow_mut();
-        let prev_loc_ptr = &raw mut (borrow.previous_pc);
-        let map_addr_ptr = &raw mut (borrow.map);
+        let prev_loc_ptr = &raw mut borrow.previous_pc;
+        let map_addr_ptr = &raw mut borrow.map;
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
             ;   .arch aarch64
@@ -141,8 +141,8 @@ impl CoverageRuntime {
     #[cfg(target_arch = "x86_64")]
     pub fn generate_inline_code(&mut self, h64: u64) -> Box<[u8]> {
         let mut borrow = self.0.borrow_mut();
-        let prev_loc_ptr = &raw mut (borrow.previous_pc);
-        let map_addr_ptr = &raw mut (borrow.map);
+        let prev_loc_ptr = &raw mut borrow.previous_pc;
+        let map_addr_ptr = &raw mut borrow.map;
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         dynasm!(ops
             ;   .arch x64

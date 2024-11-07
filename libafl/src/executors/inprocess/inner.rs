@@ -99,7 +99,7 @@ where
         executor_ptr: *const c_void,
     ) {
         unsafe {
-            let data = &raw mut (GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
             write_volatile(
                 &raw mut ((*data).current_input_ptr),
                 ptr::from_ref(input) as *const c_void,
@@ -133,7 +133,7 @@ where
         _input: &<Self as UsesInput>::Input,
     ) {
         unsafe {
-            let data = &raw mut (GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
 
             write_volatile(&raw mut ((*data).current_input_ptr), null());
             compiler_fence(Ordering::SeqCst);

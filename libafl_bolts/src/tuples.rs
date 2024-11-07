@@ -242,7 +242,7 @@ where
 {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            unsafe { (&raw const (self.0) as *const T).as_ref() }
+            unsafe { (&raw const self.0 as *const T).as_ref() }
         } else {
             self.1.match_first_type::<T>()
         }
@@ -250,7 +250,7 @@ where
 
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            unsafe { (&raw mut (self.0) as *mut T).as_mut() }
+            unsafe { (&raw mut self.0 as *mut T).as_mut() }
         } else {
             self.1.match_first_type_mut::<T>()
         }
@@ -397,7 +397,7 @@ where
     fn match_type<T: 'static, FN: FnMut(&T)>(&self, f: &mut FN) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            f(unsafe { (&raw const (self.0) as *const T).as_ref() }.unwrap());
+            f(unsafe { (&raw const self.0 as *const T).as_ref() }.unwrap());
         }
         self.1.match_type::<T, FN>(f);
     }
@@ -405,7 +405,7 @@ where
     fn match_type_mut<T: 'static, FN: FnMut(&mut T)>(&mut self, f: &mut FN) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            f(unsafe { (&raw mut (self.0) as *mut T).as_mut() }.unwrap());
+            f(unsafe { (&raw mut self.0 as *mut T).as_mut() }.unwrap());
         }
         self.1.match_type_mut::<T, FN>(f);
     }
@@ -493,7 +493,7 @@ where
 {
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         if type_eq::<Head, T>() && name == self.0.name() {
-            unsafe { (&raw const (self.0) as *const T).as_ref() }
+            unsafe { (&raw const self.0 as *const T).as_ref() }
         } else {
             self.1.match_name::<T>(name)
         }
@@ -501,7 +501,7 @@ where
 
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
         if type_eq::<Head, T>() && name == self.0.name() {
-            unsafe { (&raw mut (self.0) as *mut T).as_mut() }
+            unsafe { (&raw mut self.0 as *mut T).as_mut() }
         } else {
             self.1.match_name_mut::<T>(name)
         }

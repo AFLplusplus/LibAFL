@@ -358,7 +358,7 @@ impl AsanRuntime {
     //         rlim_cur: 0,
     //         rlim_max: 0,
     //     };
-    //     assert!(unsafe { getrlimit(RLIMIT_STACK, &raw mut (stack_rlimit)) } == 0);
+    //     assert!(unsafe { getrlimit(RLIMIT_STACK, &raw mut stack_rlimit) } == 0);
     //
     //     stack_rlimit.rlim_cur as usize
     // }
@@ -371,7 +371,7 @@ impl AsanRuntime {
     //         rlim_cur: 0,
     //         rlim_max: 0,
     //     };
-    //     assert!(unsafe { getrlimit64(RLIMIT_STACK, &raw mut (stack_rlimit)) } == 0);
+    //     assert!(unsafe { getrlimit64(RLIMIT_STACK, &raw mut stack_rlimit) } == 0);
     //
     //     stack_rlimit.rlim_cur as usize
     // }
@@ -415,7 +415,7 @@ impl AsanRuntime {
     #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let mut stack_var = 0xeadbeef;
-        let stack_address = &raw mut (stack_var) as usize;
+        let stack_address = &raw mut stack_var as usize;
         // let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
 

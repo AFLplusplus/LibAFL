@@ -164,7 +164,7 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
             assert!(!EDGES_MAP_PTR.is_null());
             EDGES_MAP_PTR
         } else {
-            &raw mut (EDGES_MAP) as *mut u8
+            &raw mut EDGES_MAP as *mut u8
         }
     }
 }

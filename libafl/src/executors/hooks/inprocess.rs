@@ -203,7 +203,7 @@ where
     fn pre_exec(&mut self, state: &mut S, input: &S::Input) {
         #[cfg(feature = "std")]
         unsafe {
-            let data = &raw mut (GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
             (*data).crash_handler = self.crash_handler;
             (*data).timeout_handler = self.timeout_handler;
         }
@@ -245,7 +245,7 @@ where
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
         // This unsafe is needed in stable but not in nightly. Remove in the future(?)
         #[allow(unused_unsafe)]
-        let data = unsafe { &raw mut (GLOBAL_STATE) };
+        let data = unsafe { &raw mut GLOBAL_STATE };
         #[cfg(feature = "std")]
         unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
         // # Safety
@@ -287,7 +287,7 @@ where
         let ret;
         #[cfg(feature = "std")]
         unsafe {
-            let data = &raw mut (GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
             crate::executors::hooks::windows::windows_exception_handler::setup_panic_hook::<
                 E,
                 EM,

@@ -192,7 +192,7 @@ mod observers {
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
-            unsafe { (*&raw const (COUNTERS_MAPS[*i])).as_slice()[j] }
+            unsafe { (*&raw const COUNTERS_MAPS[*i]).as_slice()[j] }
         }
 
         #[inline]

@@ -477,11 +477,11 @@ pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
     let mut ss: stack_t = mem::zeroed();
     ss.ss_size = SIGNAL_STACK_SIZE;
     ss.ss_sp = SIGNAL_STACK_PTR;
-    sigaltstack(&raw mut (ss), ptr::null_mut() as _);
+    sigaltstack(&raw mut ss, ptr::null_mut() as _);
 
     let mut sa: sigaction = mem::zeroed();
-    sigemptyset(&raw mut (sa.sa_mask));
-    sigaddset(&raw mut (sa.sa_mask), SIGALRM);
+    sigemptyset(&raw mut sa.sa_mask);
+    sigaddset(&raw mut sa.sa_mask, SIGALRM);
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = handle_signal as usize;
     let signals = unsafe { (*handler).signals() };

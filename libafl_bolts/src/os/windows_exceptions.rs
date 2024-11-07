@@ -543,7 +543,7 @@ pub unsafe fn setup_exception_handler<T: 'static + ExceptionHandler>(
             .position(|x| *x == exception_code)
             .unwrap();
         write_volatile(
-            &raw mut (EXCEPTION_HANDLERS[index]),
+            &raw mut EXCEPTION_HANDLERS[index],
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn ExceptionHandler),
             }),

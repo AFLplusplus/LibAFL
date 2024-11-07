@@ -186,7 +186,7 @@ unsafe fn update_ngram(pos: usize) -> usize {
     let mut reduced = pos;
     #[cfg(feature = "sancov_ngram4")]
     {
-        let prev_array_4 = &mut *&raw mut (PREV_ARRAY_4);
+        let prev_array_4 = &mut *&raw mut PREV_ARRAY_4;
         *prev_array_4 = prev_array_4.rotate_elements_right::<1>();
         prev_array_4.shl_assign(SHR_4);
         prev_array_4.as_mut_array()[0] = pos as u32;
@@ -194,7 +194,7 @@ unsafe fn update_ngram(pos: usize) -> usize {
     }
     #[cfg(feature = "sancov_ngram8")]
     {
-        let prev_array_8 = &mut *&raw mut (PREV_ARRAY_8);
+        let prev_array_8 = &mut *&raw mut PREV_ARRAY_8;
         *prev_array_8 = prev_array_8.rotate_elements_right::<1>();
         prev_array_8.shl_assign(SHR_8);
         prev_array_8.as_mut_array()[0] = pos as u32;
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
     }
     #[cfg(not(feature = "pointer_maps"))]
     {
-        let edges_map = &mut *&raw mut (EDGES_MAP);
+        let edges_map = &mut *&raw mut EDGES_MAP;
         #[cfg(feature = "sancov_pcguard_edges")]
         {
             *(edges_map).get_unchecked_mut(pos) = 1;
@@ -274,7 +274,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard_init(mut start: *mut u32, stop: *mut u32) {
     #[cfg(feature = "pointer_maps")]
     if EDGES_MAP_PTR.is_null() {
-        EDGES_MAP_PTR = &raw mut (EDGES_MAP) as *mut u8;
+        EDGES_MAP_PTR = &raw mut EDGES_MAP as *mut u8;
     }
 
     if start == stop || *start != 0 {
@@ -347,7 +347,7 @@ pub fn sanitizer_cov_pc_table<'a>() -> impl Iterator<Item = &'a [PcTableEntry]> 
     // SAFETY: Once PCS_BEG and PCS_END have been initialized, will not be written to again. So
     // there's no TOCTOU issue.
     unsafe {
-        let pc_tables = &*&raw const (PC_TABLES);
+        let pc_tables = &*&raw const PC_TABLES;
         pc_tables.iter().copied()
     }
 }

@@ -13,7 +13,7 @@ use core::{any::TypeId, mem::size_of, ptr::read_unaligned};
 pub const fn pack_type_id(id: u128) -> TypeId {
     // TypeId size of other sizes is not yet supported"
     static_assertions::const_assert!(size_of::<TypeId>() == 16);
-    unsafe { *(&raw const (id) as *const TypeId) }
+    unsafe { *(&raw const id as *const TypeId) }
 }
 
 /// Unpack a `type_id` to an `u128`
@@ -28,7 +28,7 @@ pub const fn unpack_type_id(id: TypeId) -> u128 {
     // see any.rs, it's alway u128 hence 16 bytes.
     // TypeId size of other sizes is not yet supported"
     static_assertions::const_assert!(size_of::<TypeId>() == 16);
-    let ret: u128 = unsafe { read_unaligned::<u128>(&raw const (id) as *const u128) };
+    let ret: u128 = unsafe { read_unaligned::<u128>(&raw const id as *const u128) };
     ret
 }
 

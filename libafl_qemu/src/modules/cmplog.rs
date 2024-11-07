@@ -103,7 +103,7 @@ where
 
     #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { &raw mut (NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut NOP_PAGE_FILTER.as_mut().unwrap().get_mut() }
     }
 }
 
@@ -168,7 +168,7 @@ where
 
     #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { &raw mut (NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { &raw mut NOP_PAGE_FILTER.as_mut().unwrap().get_mut() }
     }
 }
 

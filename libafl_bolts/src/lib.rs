@@ -1280,7 +1280,7 @@ mod tests {
 
         unsafe { LIBAFL_RAWFD_LOGGER.fd = stdout().as_raw_fd() };
         unsafe {
-            log::set_logger(&*&raw const (LIBAFL_RAWFD_LOGGER)).unwrap();
+            log::set_logger(&*&raw const LIBAFL_RAWFD_LOGGER).unwrap();
         }
         log::set_max_level(log::LevelFilter::Debug);
         log::info!("Test");

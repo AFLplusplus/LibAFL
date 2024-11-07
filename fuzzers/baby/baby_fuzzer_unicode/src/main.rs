@@ -24,7 +24,7 @@ use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 64] = [0; 64];
-static mut SIGNALS_PTR: *mut u8 = &raw mut (SIGNALS).cast();
+static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS.cast();
 static mut SIGNALS_LEN: usize = unsafe { (*&raw const (SIGNALS)).len() };
 
 /// Assign a signal to the signals map

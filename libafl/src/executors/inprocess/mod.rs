@@ -509,7 +509,7 @@ where
         + ExecutionProcessor<EM, E::Observers>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
-    let data = &raw mut (GLOBAL_STATE);
+    let data = &raw mut GLOBAL_STATE;
     let in_handler = (*data).set_in_handler(true);
 
     if (*data).is_valid() {
