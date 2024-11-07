@@ -308,9 +308,11 @@ where
                 &mut [0; 512]
             };
             #[cfg(feature = "systemmode")]
-            unsafe {
-                qemu.read_mem(pc, code)
-            }; // TODO handle faults
+            if let Err(err) = qemu.read_mem(pc, code) {
+                // TODO handle faults
+                log::error!("gen_block_calls: Failed to read mem at pc {pc:#x}: {err:?}");
+                return;
+            }
 
             let mut iaddr = pc;
 
@@ -347,9 +349,13 @@ where
                     code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
                 }
                 #[cfg(feature = "systemmode")]
-                unsafe {
-                    qemu.read_mem(pc, code);
-                } // TODO handle faults
+                if let Err(err) = qemu.read_mem(pc, code) {
+                    // TODO handle faults
+                    log::error!(
+                        "gen_block_calls error 2: Failed to read mem at pc {pc:#x}: {err:?}"
+                    );
+                    return;
+                }
             }
         }
 
@@ -452,7 +458,7 @@ where
 
     #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { &raw mut NOP_PAGE_FILTER.as_mut().unwrap().get_mut() }
+        unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
