@@ -108,6 +108,9 @@ pub struct Launcher<'a, CF, MT, SP> {
     broker_port: u16,
     /// The list of cores to run on
     cores: &'a Cores,
+    /// The number of clients to spawn on each core
+    #[builder(default = 1)]
+    overcommit: usize,
     /// A file name to write all client output to
     #[cfg(all(unix, feature = "std"))]
     #[builder(default = None)]
@@ -221,8 +224,7 @@ where
             ));
         }
 
-        let core_ids = get_core_ids().unwrap();
-        let num_cores = core_ids.len();
+        let core_ids = get_core_ids()?;
         let mut handles = vec![];
 
         log::info!("spawning on cores: {:?}", self.cores);
@@ -234,61 +236,59 @@ where
             .stderr_file
             .map(|filename| File::create(filename).unwrap());
 
-        #[cfg(feature = "std")]
         let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn clients
         let mut index = 0_u64;
-        for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
+        for (id, bind_to) in core_ids.iter().enumerate() {
             if self.cores.ids.iter().any(|&x| x == id.into()) {
-                index += 1;
-                self.shmem_provider.pre_fork()?;
-                // # Safety
-                // Fork is safe in general, apart from potential side effects to the OS and other threads
-                match unsafe { fork() }? {
-                    ForkResult::Parent(child) => {
-                        self.shmem_provider.post_fork(false)?;
-                        handles.push(child.pid);
-                        #[cfg(feature = "std")]
-                        log::info!("child spawned and bound to core {id}");
-                    }
-                    ForkResult::Child => {
-                        // # Safety
-                        // A call to `getpid` is safe.
-                        log::info!("{:?} PostFork", unsafe { libc::getpid() });
-                        self.shmem_provider.post_fork(true)?;
+                for _ in 0..self.overcommit {
+                    index += 1;
+                    self.shmem_provider.pre_fork()?;
+                    // # Safety
+                    // Fork is safe in general, apart from potential side effects to the OS and other threads
+                    match unsafe { fork() }? {
+                        ForkResult::Parent(child) => {
+                            self.shmem_provider.post_fork(false)?;
+                            handles.push(child.pid);
+                            log::info!("child spawned and bound to core {id}");
+                        }
+                        ForkResult::Child => {
+                            // # Safety
+                            // A call to `getpid` is safe.
+                            log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                            self.shmem_provider.post_fork(true)?;
 
-                        #[cfg(feature = "std")]
-                        std::thread::sleep(Duration::from_millis(index * self.launch_delay));
+                            std::thread::sleep(Duration::from_millis(index * self.launch_delay));
 
-                        #[cfg(feature = "std")]
-                        if !debug_output {
-                            if let Some(file) = &self.opened_stdout_file {
-                                dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                if let Some(stderr) = &self.opened_stderr_file {
-                                    dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                } else {
-                                    dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                            if !debug_output {
+                                if let Some(file) = &self.opened_stdout_file {
+                                    dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                    if let Some(stderr) = &self.opened_stderr_file {
+                                        dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    } else {
+                                        dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    }
                                 }
                             }
+
+                            // Fuzzer client. keeps retrying the connection to broker till the broker starts
+                            let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
+                                .shmem_provider(self.shmem_provider.clone())
+                                .broker_port(self.broker_port)
+                                .kind(ManagerKind::Client {
+                                    cpu_core: Some(*bind_to),
+                                })
+                                .configuration(self.configuration)
+                                .serialize_state(self.serialize_state)
+                                .hooks(hooks);
+                            let builder = builder.time_ref(self.time_ref.clone());
+                            let (state, mgr) = builder.build().launch()?;
+
+                            return (self.run_client.take().unwrap())(state, mgr, *bind_to);
                         }
-
-                        // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
-                            .shmem_provider(self.shmem_provider.clone())
-                            .broker_port(self.broker_port)
-                            .kind(ManagerKind::Client {
-                                cpu_core: Some(*bind_to),
-                            })
-                            .configuration(self.configuration)
-                            .serialize_state(self.serialize_state)
-                            .hooks(hooks);
-                        let builder = builder.time_ref(self.time_ref.clone());
-                        let (state, mgr) = builder.build().launch()?;
-
-                        return (self.run_client.take().unwrap())(state, mgr, *bind_to);
-                    }
-                };
+                    };
+                }
             }
         }
 
@@ -404,32 +404,34 @@ where
                 //spawn clients
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
                     if self.cores.ids.iter().any(|&x| x == id.into()) {
-                        // Forward own stdio to child processes, if requested by user
-                        let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
-                        #[cfg(all(feature = "std", unix))]
-                        {
-                            if self.stdout_file.is_some() || self.stderr_file.is_some() {
-                                stdout = Stdio::inherit();
-                                stderr = Stdio::inherit();
-                            };
+                        for _ in 0..self.overcommit {
+                            // Forward own stdio to child processes, if requested by user
+                            let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
+                            #[cfg(unix)]
+                            {
+                                if self.stdout_file.is_some() || self.stderr_file.is_some() {
+                                    stdout = Stdio::inherit();
+                                    stderr = Stdio::inherit();
+                                };
+                            }
+
+                            std::thread::sleep(Duration::from_millis(
+                                id as u64 * self.launch_delay,
+                            ));
+
+                            std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                            let mut child = startable_self()?;
+                            let child = (if debug_output {
+                                &mut child
+                            } else {
+                                child.stdout(stdout);
+                                child.stderr(stderr)
+                            })
+                            .spawn()?;
+                            handles.push(child);
                         }
-
-                        #[cfg(feature = "std")]
-                        std::thread::sleep(Duration::from_millis(id as u64 * self.launch_delay));
-
-                        std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
-                        let mut child = startable_self()?;
-                        let child = (if debug_output {
-                            &mut child
-                        } else {
-                            child.stdout(stdout);
-                            child.stderr(stderr)
-                        })
-                        .spawn()?;
-                        handles.push(child);
                     }
                 }
-
                 handles
             }
             Err(_) => panic!("Env variables are broken, received non-unicode!"),
