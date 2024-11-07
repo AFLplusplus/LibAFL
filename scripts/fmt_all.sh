@@ -14,7 +14,7 @@ fi
 if command -v black > /dev/null; then
   echo "[*] Formatting python files"
   if [ "$1" = "check" ]; then
-    black --check "$LIBAFL_DIR" || exit 1
+    black --check --diff "$LIBAFL_DIR" || exit 1
   else
     black "$LIBAFL_DIR" || exit 1
   fi
