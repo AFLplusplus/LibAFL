@@ -14,9 +14,9 @@ fi
 if command -v black > /dev/null; then
   echo "[*] Formatting python files"
   if [ "$1" = "check" ]; then
-    black --check "$SCRIPT_DIR" || exit 1
+    black --check "$LIBAFL_DIR" || exit 1
   else
-    black "$SCRIPT_DIR" || exit 1
+    black "$LIBAFL_DIR" || exit 1
   fi
 else
   echo -e "\n\033[1;33mWarning\033[0m: python black not found. Formatting skipped for python.\n"
