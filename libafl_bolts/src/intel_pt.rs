@@ -261,6 +261,8 @@ impl IntelPT {
         let head_wrap = wrap_aux_pointer(head, self.perf_aux_buffer_size);
         let tail_wrap = wrap_aux_pointer(tail, self.perf_aux_buffer_size);
 
+        // after reading the data_head value, user space should issue an rmb()
+        // https://manpages.debian.org/bookworm/manpages-dev/perf_event_open.2.en.html#data_head
         smp_rmb();
 
         let mut data = if head_wrap >= tail_wrap {
