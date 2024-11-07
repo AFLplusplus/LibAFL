@@ -1,4 +1,4 @@
-# Baby fuzzer
+# Baby fuzzer with Intel PT tracing
 
 This is a minimalistic example about how to create a libafl based fuzzer with Intel PT tracing.
 

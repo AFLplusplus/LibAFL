@@ -1,0 +1,27 @@
+[tasks.build_target]
+command = "rustc"
+args = [
+  "src/target_program.rs",
+  "--out-dir",
+  "target/${CARGO_MAKE_CARGO_PROFILE}",
+  "-O",
+]
+
+[tasks.build_fuzzer]
+command = "cargo"
+args = ["build", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+
+[tasks.build]
+dependencies = ["build_fuzzer", "build_target"]
+
+[tasks.setcap]
+script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep target/${CARGO_MAKE_CARGO_PROFILE}/${CARGO_MAKE_CRATE_NAME}"
+dependencies = ["build_fuzzer"]
+
+[tasks.run]
+command = "cargo"
+args = ["run", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+dependencies = ["build", "setcap"]
+
+[tasks.default]
+alias = "run"
