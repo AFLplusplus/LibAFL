@@ -83,7 +83,9 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().between(self.min_size.get(), self.max_size.get());
+        let mut size = state
+            .rand_mut()
+            .between(self.min_size.get(), self.max_size.get());
         size = max(size, 1);
         let random_bytes: Vec<u8> = (0..size)
             .map(|_| state.rand_mut().below(nonzero!(256)) as u8)
@@ -112,7 +114,9 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state.rand_mut().between(self.min_size.get(), self.max_size.get());
+        let mut size = state
+            .rand_mut()
+            .between(self.min_size.get(), self.max_size.get());
         size = max(size, 1);
         let printables = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz \t\n!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".as_bytes();
         let random_bytes: Vec<u8> = (0..size)
