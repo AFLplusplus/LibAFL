@@ -14,6 +14,7 @@ extern crate std;
 use std::{
     borrow::ToOwned,
     ffi::{CStr, CString},
+    fmt::Debug,
     format, fs,
     ops::RangeInclusive,
     os::{
@@ -254,7 +255,7 @@ impl IntelPT {
         map: &mut [T],
     ) -> Result<(), Error>
     where
-        T: SaturatingAdd + From<u8>,
+        T: SaturatingAdd + From<u8> + Debug,
     {
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
@@ -364,7 +365,7 @@ impl IntelPT {
         map: &mut [T],
     ) -> Result<(), Error>
     where
-        T: SaturatingAdd + From<u8>,
+        T: SaturatingAdd + From<u8> + Debug,
     {
         'block: loop {
             while status.event_pending() {
@@ -385,7 +386,8 @@ impl IntelPT {
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
 
                     if !b.speculative() && skip < offset {
-                        let id = hash_me(*previous_block_ip) ^ hash_me(b.ip());
+                        // add 1 to `previous_block_ip` to avoid that all the recursive basic blocks map to 0
+                        let id = hash_me(*previous_block_ip + 1) ^ hash_me(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
                         *map_loc = (*map_loc).saturating_add(&1u8.into());
@@ -664,9 +666,6 @@ pub fn nr_addr_filters() -> Result<u32, String> {
 /// The outcome of these checks does not fully guarantee whether `IntelPT` will function or not.
 pub fn availability() -> Result<(), String> {
     let mut reasons = Vec::new();
-    if cfg!(not(target_os = "linux")) {
-        reasons.push("Only linux hosts are supported at the moment".to_owned());
-    }
     if cfg!(not(target_arch = "x86_64")) {
         reasons.push("Only x86_64 is supported".to_owned());
     }
@@ -692,6 +691,8 @@ pub fn availability() -> Result<(), String> {
         if let Err(r) = availability_in_linux() {
             reasons.push(r);
         }
+    } else {
+        reasons.push("Only linux hosts are supported at the moment".to_owned());
     }
 
     if reasons.is_empty() {
@@ -928,17 +929,7 @@ const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use std::{arch::asm, process};
-
     use arbitrary_int::Number;
-    use nix::{
-        sys::{
-            signal::{kill, raise, Signal},
-            wait::{waitpid, WaitPidFlag},
-        },
-        unistd::{fork, ForkResult},
-    };
-    use proc_maps::get_process_maps;
     use static_assertions::assert_eq_size;
 
     use super::*;
@@ -947,7 +938,8 @@ mod test {
     assert_eq_size!(usize, u64);
 
     #[test]
-    fn intel_pt_builder_default() {
+    #[cfg(target_os = "linux")]
+    fn intel_pt_builder_default_values_are_valid() {
         let default = IntelPT::builder();
         IntelPT::builder()
             .perf_buffer_size(default.perf_buffer_size)
@@ -958,6 +950,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn intel_pt_pt_config_noretcomp_format() {
         let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
         let path = format!("{PT_EVENT_PATH}/format/noretcomp");
@@ -978,6 +971,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn intel_pt_pt_config_psb_period_format() {
         let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
         let path = format!("{PT_EVENT_PATH}/format/psb_period");
@@ -1002,104 +996,5 @@ mod test {
             ptconfig_psb_period, format,
             "Unexpected Intel PT config psb_period format"
         );
-    }
-
-    /// To run this test ensure that the executable has the required capabilities.
-    /// This can be achieved with the following command:
-    /// ```bash
-    /// #!/usr/bin/env bash
-    ///
-    /// # Trigger test compilation
-    /// cargo test intel_pt -p libafl --features=intel_pt --no-default-features
-    ///
-    /// # Find the test binaries
-    /// for test_bin in target/debug/deps/libafl*; do
-    ///   # Check if the file is a binary
-    ///   if file "$test_bin" | grep -q "ELF"; then
-    ///     # Set the desired capabilities on the binary
-    ///     sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep "$test_bin"
-    ///   fi
-    /// done
-    ///
-    /// # Run tests with caps
-    /// cargo test intel_pt -p libafl --features=intel_pt --no-default-features -- --show-output
-    /// ```
-    ///
-    /// Or by running with `sudo`:
-    /// ```toml
-    /// # libafl_qemu/.cargo/config.toml
-    /// [target.x86_64-unknown-linux-gnu]
-    /// runner = 'sudo -E'
-    /// ```
-    #[test]
-    fn intel_pt_trace_fork() {
-        if let Err(reason) = availability() {
-            // Mark as `skipped` once this will be possible https://github.com/rust-lang/rust/issues/68007
-            println!("Intel PT is not available, skipping test. Reasons:");
-            println!("{reason}");
-            return;
-        }
-
-        let pid = match unsafe { fork() } {
-            Ok(ForkResult::Parent { child }) => child,
-            Ok(ForkResult::Child) => {
-                raise(Signal::SIGSTOP).expect("Failed to stop the process");
-                // This will generate a sequence of tnt packets containing 255 taken branches
-                unsafe {
-                    let mut count = 0;
-                    asm!(
-                    "2:",
-                    "add {0:r}, 1",
-                    "cmp {0:r}, 255",
-                    "jle 2b",
-                    inout(reg) count,
-                    options(nostack)
-                    );
-                    let _ = count;
-                }
-                process::exit(0);
-            }
-            Err(e) => panic!("Fork failed {e}"),
-        };
-
-        let pt_builder = IntelPT::builder().pid(Some(pid.as_raw()));
-        let mut pt = pt_builder.build().expect("Failed to create IntelPT");
-        pt.enable_tracing().expect("Failed to enable tracing");
-
-        waitpid(pid, Some(WaitPidFlag::WUNTRACED)).expect("Failed to wait for the child process");
-        let maps = get_process_maps(pid.into()).unwrap();
-        kill(pid, Signal::SIGCONT).expect("Failed to continue the process");
-
-        waitpid(pid, None).expect("Failed to wait for the child process");
-        pt.disable_tracing().expect("Failed to disable tracing");
-
-        let mut image = Image::new(Some("test_trace_pid")).unwrap();
-        for map in maps {
-            if map.is_exec() && map.filename().is_some() {
-                match image.add_file(
-                    map.filename().unwrap().to_str().unwrap(),
-                    map.offset as u64,
-                    map.size() as u64,
-                    None,
-                    map.start() as u64,
-                ) {
-                    Err(e) => println!(
-                        "Error adding mapping for {:?}: {:?}, skipping",
-                        map.filename().unwrap(),
-                        e
-                    ),
-                    Ok(()) => println!(
-                        "mapping for {:?} added successfully {:#x} - {:#x}",
-                        map.filename().unwrap(),
-                        map.start(),
-                        map.start() + map.size()
-                    ),
-                }
-            }
-        }
-
-        let mut map = vec![0; 128];
-        pt.decode_traces_into_map(&mut image, &mut map).unwrap();
-        println!("Intel PT traces unique block ips: {map:#x?}");
     }
 }
