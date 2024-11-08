@@ -464,10 +464,10 @@ impl IntelPTBuilder {
 
         // the first perf_buff page is a metadata page
         let buff_metadata = perf_buffer.cast::<perf_event_mmap_page>();
-        let aux_offset = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_offset) };
-        let aux_size = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_size) };
-        let data_offset = unsafe { ptr::addr_of_mut!((*buff_metadata).data_offset) };
-        let data_size = unsafe { ptr::addr_of_mut!((*buff_metadata).data_size) };
+        let aux_offset = unsafe { &raw mut (*buff_metadata).aux_offset };
+        let aux_size = unsafe { &raw mut (*buff_metadata).aux_size };
+        let data_offset = unsafe { &raw mut (*buff_metadata).data_offset };
+        let data_size = unsafe { &raw mut (*buff_metadata).data_size };
 
         unsafe {
             aux_offset.write_volatile(next_page_aligned_addr(
@@ -480,8 +480,8 @@ impl IntelPTBuilder {
             setup_perf_aux_buffer(&fd, aux_size.read_volatile(), aux_offset.read_volatile())?
         };
 
-        let aux_head = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_head) };
-        let aux_tail = unsafe { ptr::addr_of_mut!((*buff_metadata).aux_tail) };
+        let aux_head = unsafe { &raw mut (*buff_metadata).aux_head };
+        let aux_tail = unsafe { &raw mut (*buff_metadata).aux_tail };
 
         let ip_filters = Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize);
 
@@ -736,6 +736,7 @@ pub fn availability_in_qemu() -> Result<(), String> {
 
 /// Convert [`PtError`] into [`Error`]
 #[inline]
+#[must_use]
 pub fn error_from_pt_error(err: PtError) -> Error {
     Error::unknown(err.to_string())
 }
