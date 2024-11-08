@@ -6,6 +6,7 @@
 // Just in case this crate will have real no_std support in the future
 #![no_std]
 #![cfg(feature = "std")]
+#![cfg(feature = "libipt")]
 
 #[macro_use]
 extern crate std;
@@ -30,7 +31,7 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
-use libafl_bolts::Error;
+use libafl_bolts::{ownedref::OwnedRefMut, Error};
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
     ConfigBuilder, Cpu, Image, PtError, PtErrorCode,
@@ -255,8 +256,6 @@ impl IntelPT {
     where
         T: SaturatingAdd + From<u8>,
     {
-        use libafl_bolts::ownedref::OwnedRefMut;
-
         let head = unsafe { self.aux_head.read_volatile() };
         let tail = unsafe { self.aux_tail.read_volatile() };
         if head < tail {
@@ -292,20 +291,7 @@ impl IntelPT {
             }
         } else {
             // Head pointer wrapped, the trace is split
-            unsafe {
-                let first_ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
-                let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
-                let second_ptr = self.perf_aux_buffer as *mut u8;
-                let second_len = head_wrap as usize;
-                OwnedRefMut::Owned(
-                    [
-                        slice::from_raw_parts(first_ptr, first_len),
-                        slice::from_raw_parts(second_ptr, second_len),
-                    ]
-                    .concat()
-                    .into_boxed_slice(),
-                )
-            }
+            unsafe { self.join_split_trace(head_wrap, tail_wrap) }
         };
 
         let mut config = ConfigBuilder::new(data.as_mut()).map_err(error_from_pt_error)?;
@@ -381,6 +367,22 @@ impl IntelPT {
         unsafe { self.aux_tail.write_volatile(tail + offset) };
         self.previous_decode_head = head;
         Ok(())
+    }
+
+    #[inline]
+    unsafe fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> OwnedRefMut<[u8]> {
+        let first_ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
+        let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
+        let second_ptr = self.perf_aux_buffer as *mut u8;
+        let second_len = head_wrap as usize;
+        OwnedRefMut::Owned(
+            [
+                slice::from_raw_parts(first_ptr, first_len),
+                slice::from_raw_parts(second_ptr, second_len),
+            ]
+            .concat()
+            .into_boxed_slice(),
+        )
     }
 }
 
