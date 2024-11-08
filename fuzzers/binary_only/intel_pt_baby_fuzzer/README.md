@@ -6,10 +6,10 @@ It runs on a single core until a crash occurs and then exits.
 
 The tested program is a simple Rust function without any instrumentation.
 
-After building this example with `cargo build --release`, you need to give to the executable the necessary capabilities 
-with `sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ./target/release/baby_fuzzer_intel_pt`.
+After building this example with `cargo build`, you need to give to the executable the necessary capabilities with 
+`sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ./target/debug/baby_fuzzer_intel_pt`.
 
-You can run this example using `cargo run --release`, and you can enable the TUI feature by running
-`cargo run --release --features tui`.
+You can run this example using `cargo run`, and you can enable the TUI feature by building and running with 
+`--features tui`.
 
 This fuzzer is compatible with Linux hosts only having an Intel PT compatible CPU.
