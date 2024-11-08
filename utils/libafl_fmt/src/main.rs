@@ -84,7 +84,7 @@ use tokio::{process::Command, task::JoinSet};
 use walkdir::{DirEntry, WalkDir};
 use which::which;
 
-const REF_LLVM_VERSION: u32 = 18;
+const REF_LLVM_VERSION: u32 = 19;
 
 fn is_workspace_toml(path: &Path) -> bool {
     for line in read_to_string(path).unwrap().lines() {
@@ -254,7 +254,6 @@ async fn main() -> io::Result<()> {
     let unspecified_clang_format = "clang-format";
 
     let (clang, warning) = if which(&reference_clang_format).is_ok() {
-        // can't use 18 for ci.
         (Some(reference_clang_format.as_str()), None)
     } else if which(unspecified_clang_format).is_ok() {
         let version = Command::new(unspecified_clang_format)
