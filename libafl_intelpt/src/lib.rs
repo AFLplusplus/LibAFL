@@ -1,6 +1,6 @@
 //! Intel Processor Trace (PT) low level code
 //!
-//! This module interacts with the linux kernel (specifically with perf) and therefore it only works
+//! This crate interacts with the linux kernel (specifically with perf) and therefore it only works
 //! on linux hosts
 
 // Just in case this crate will have real no_std support in the future
