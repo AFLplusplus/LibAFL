@@ -118,7 +118,7 @@ pub mod serdeany_registry {
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
+    use core::{any::TypeId, fmt};
 
     use hashbrown::{
         hash_map::{Values, ValuesMut},
