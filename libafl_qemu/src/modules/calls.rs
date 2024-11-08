@@ -311,7 +311,7 @@ where
             if let Err(err) = qemu.read_mem(pc, code) {
                 // TODO handle faults
                 log::error!("gen_block_calls: Failed to read mem at pc {pc:#x}: {err:?}");
-                return;
+                return None;
             }
 
             let mut iaddr = pc;
@@ -354,7 +354,7 @@ where
                     log::error!(
                         "gen_block_calls error 2: Failed to read mem at pc {pc:#x}: {err:?}"
                     );
-                    return;
+                    return None;
                 }
             }
         }
