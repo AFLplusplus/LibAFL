@@ -34,7 +34,7 @@ use caps::{CapSet, Capability};
 use libafl_bolts::{ownedref::OwnedRefMut, Error};
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
-    ConfigBuilder, Cpu, Image, PtError, PtErrorCode,
+    ConfigBuilder, Cpu, Image, PtError, PtErrorCode, Status,
 };
 use num_enum::TryFromPrimitive;
 use num_traits::{Euclid, SaturatingAdd};
@@ -312,44 +312,13 @@ impl IntelPT {
             match decoder.sync_forward() {
                 Ok(s) => {
                     status = s;
-                    'block: loop {
-                        while status.event_pending() {
-                            match decoder.event() {
-                                Ok((_, s)) => {
-                                    status = s;
-                                }
-                                Err(e) => {
-                                    log::trace!("PT error in event {e:?}");
-                                    break 'block;
-                                }
-                            };
-                        }
-
-                        match decoder.next() {
-                            Ok((b, s)) => {
-                                status = s;
-                                let offset = decoder.offset().map_err(error_from_pt_error)?;
-
-                                if !b.speculative() && skip < offset {
-                                    let id = hash_me(previous_block_ip) ^ hash_me(b.ip());
-                                    // SAFETY: the index is < map.len() since the modulo operation is applied
-                                    let map_loc =
-                                        unsafe { map.get_unchecked_mut(id as usize % map.len()) };
-                                    *map_loc = (*map_loc).saturating_add(&1u8.into());
-
-                                    previous_block_ip = b.ip();
-                                }
-                            }
-                            Err(e) => {
-                                if e.code() != PtErrorCode::Eos {
-                                    log::trace!("PT error in block next {e:?}");
-                                }
-                            }
-                        }
-                        if status.eos() {
-                            break 'block;
-                        }
-                    }
+                    Self::decode_blocks(
+                        &mut decoder,
+                        &mut status,
+                        &mut previous_block_ip,
+                        skip,
+                        map,
+                    )?;
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
@@ -370,6 +339,7 @@ impl IntelPT {
     }
 
     #[inline]
+    #[must_use]
     unsafe fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> OwnedRefMut<[u8]> {
         let first_ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
         let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
@@ -383,6 +353,57 @@ impl IntelPT {
             .concat()
             .into_boxed_slice(),
         )
+    }
+
+    #[inline]
+    fn decode_blocks<T>(
+        decoder: &mut BlockDecoder<()>,
+        status: &mut Status,
+        previous_block_ip: &mut u64,
+        skip: u64,
+        map: &mut [T],
+    ) -> Result<(), Error>
+    where
+        T: SaturatingAdd + From<u8>,
+    {
+        'block: loop {
+            while status.event_pending() {
+                match decoder.event() {
+                    Ok((_, s)) => {
+                        *status = s;
+                    }
+                    Err(e) => {
+                        log::trace!("PT error in event {e:?}");
+                        break 'block;
+                    }
+                };
+            }
+
+            match decoder.next() {
+                Ok((b, s)) => {
+                    *status = s;
+                    let offset = decoder.offset().map_err(error_from_pt_error)?;
+
+                    if !b.speculative() && skip < offset {
+                        let id = hash_me(*previous_block_ip) ^ hash_me(b.ip());
+                        // SAFETY: the index is < map.len() since the modulo operation is applied
+                        let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
+                        *map_loc = (*map_loc).saturating_add(&1u8.into());
+
+                        *previous_block_ip = b.ip();
+                    }
+                }
+                Err(e) => {
+                    if e.code() != PtErrorCode::Eos {
+                        log::trace!("PT error in block next {e:?}");
+                    }
+                }
+            }
+            if status.eos() {
+                break 'block;
+            }
+        }
+        Ok(())
     }
 }
 
