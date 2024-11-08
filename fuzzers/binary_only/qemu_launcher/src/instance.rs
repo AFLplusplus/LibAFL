@@ -1,4 +1,4 @@
-use core::{fmt::Debug, ptr::addr_of_mut};
+use core::fmt::Debug;
 use std::{fs, marker::PhantomData, ops::Range, process, time::Duration};
 
 #[cfg(feature = "simplemgr")]
@@ -117,7 +117,7 @@ impl<M: Monitor> Instance<'_, M> {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
                 OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
-                addr_of_mut!(MAX_EDGES_FOUND),
+                &raw mut MAX_EDGES_FOUND,
             ))
             .track_indices()
         };
