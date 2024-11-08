@@ -28,6 +28,7 @@ use std::{
 
 use arbitrary_int::u4;
 use bitbybit::bitfield;
+#[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
 use libafl_bolts::Error;
 use libipt::{
@@ -36,6 +37,7 @@ use libipt::{
 };
 use num_enum::TryFromPrimitive;
 use num_traits::{Euclid, SaturatingAdd};
+#[cfg(target_os = "linux")]
 use perf_event_open_sys::{
     bindings::{perf_event_attr, perf_event_mmap_page, PERF_FLAG_FD_CLOEXEC},
     ioctls::{DISABLE, ENABLE, SET_FILTER},
@@ -46,8 +48,10 @@ use raw_cpuid::CpuId;
 /// Size of a memory page
 pub const PAGE_SIZE: usize = 4096;
 
+#[cfg(target_os = "linux")]
 const PT_EVENT_PATH: &str = "/sys/bus/event_source/devices/intel_pt";
 
+#[cfg(target_os = "linux")]
 static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     // This info is available in two different files, use the second path as fail-over
     let path = format!("{PT_EVENT_PATH}/nr_addr_filters");
@@ -73,6 +77,7 @@ static CURRENT_CPU: LazyLock<Option<Cpu>> = LazyLock::new(|| {
         .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
 });
 
+#[cfg(target_os = "linux")]
 static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     let path = format!("{PT_EVENT_PATH}/type");
     let s = fs::read_to_string(&path)
@@ -86,6 +91,7 @@ static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
 ///
 /// Check out <https://github.com/torvalds/linux/blob/c2ee9f594da826bea183ed14f2cc029c719bf4da/arch/x86/kvm/vmx/capabilities.h#L373-L381>
 /// for more details
+#[cfg(target_os = "linux")]
 #[derive(TryFromPrimitive, Debug)]
 #[repr(i32)]
 pub enum KvmPTMode {
@@ -99,9 +105,13 @@ pub enum KvmPTMode {
 #[derive(Debug)]
 pub struct IntelPT {
     fd: OwnedFd,
+    #[cfg(target_os = "linux")]
     perf_buffer: *mut c_void,
+    #[cfg(target_os = "linux")]
     perf_aux_buffer: *mut c_void,
+    #[cfg(target_os = "linux")]
     perf_buffer_size: usize,
+    #[cfg(target_os = "linux")]
     perf_aux_buffer_size: usize,
     aux_head: *mut u64,
     aux_tail: *mut u64,
@@ -109,6 +119,7 @@ pub struct IntelPT {
     ip_filters: Vec<RangeInclusive<usize>>,
 }
 
+#[cfg(target_os = "linux")]
 impl IntelPT {
     /// Create a default builder
     ///
@@ -374,17 +385,22 @@ impl IntelPT {
 }
 
 impl Drop for IntelPT {
+    #[cfg(target_os = "linux")]
     fn drop(&mut self) {
         unsafe {
             let ret = libc::munmap(self.perf_aux_buffer, self.perf_aux_buffer_size);
-            debug_assert_eq!(ret, 0, "Intel PT: Failed to unmap perf aux buffer");
+            assert_eq!(ret, 0, "Intel PT: Failed to unmap perf aux buffer");
             let ret = libc::munmap(self.perf_buffer, self.perf_buffer_size);
-            debug_assert_eq!(ret, 0, "Intel PT: Failed to unmap perf buffer");
+            assert_eq!(ret, 0, "Intel PT: Failed to unmap perf buffer");
         }
     }
+
+    #[cfg(not(target_os = "linux"))]
+    fn drop(&mut self) {}
 }
 
 /// Builder for [`IntelPT`]
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntelPTBuilder {
     pid: Option<i32>,
@@ -396,6 +412,7 @@ pub struct IntelPTBuilder {
     perf_aux_buffer_size: usize,
 }
 
+#[cfg(target_os = "linux")]
 impl Default for IntelPTBuilder {
     /// Create a default builder for [`IntelPT`]
     ///
@@ -425,6 +442,7 @@ impl Default for IntelPTBuilder {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl IntelPTBuilder {
     /// Build the [`IntelPT`] struct
     pub fn build(&self) -> Result<IntelPT, Error> {
@@ -594,6 +612,7 @@ impl IntelPTBuilder {
 /// Perf event config for `IntelPT`
 ///
 /// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
+#[cfg(target_os = "linux")]
 #[bitfield(u64, default = 0)]
 struct PtConfig {
     /// Disable call return address compression. AKA DisRETC in Intel SDM.
@@ -605,6 +624,7 @@ struct PtConfig {
 }
 
 /// Number of address filters available on the running CPU
+#[cfg(target_os = "linux")]
 pub fn nr_addr_filters() -> Result<u32, String> {
     NR_ADDR_FILTERS.clone()
 }
@@ -645,6 +665,62 @@ pub fn availability() -> Result<(), String> {
         reasons.push("Failed to read CPU Extended Features".to_owned());
     }
 
+    if cfg!(target_os = "linux") {
+        if let Err(r) = availability_in_linux() {
+            reasons.push(r);
+        }
+    }
+
+    if reasons.is_empty() {
+        Ok(())
+    } else {
+        Err(reasons.join("; "))
+    }
+}
+
+/// Check if Intel PT is available on the current system and can be used in combination with
+/// QEMU.
+///
+/// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
+#[cfg(target_os = "linux")]
+pub fn availability_in_qemu_kvm() -> Result<(), String> {
+    let mut reasons = match availability() {
+        Err(s) => vec![s],
+        Ok(()) => Vec::new(),
+    };
+
+    let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
+    if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
+        match s.trim().parse::<i32>().map(TryInto::try_into) {
+            Ok(Ok(KvmPTMode::System)) => (),
+            Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
+                "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
+                KvmPTMode::System,
+                KvmPTMode::System as i32
+            )),
+            _ => reasons.push(format!(
+                "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
+            )),
+        }
+    };
+
+    if reasons.is_empty() {
+        Ok(())
+    } else {
+        Err(reasons.join("; "))
+    }
+}
+
+/// Convert [`PtError`] into [`Error`]
+#[inline]
+#[must_use]
+pub fn error_from_pt_error(err: PtError) -> Error {
+    Error::unknown(err.to_string())
+}
+
+#[cfg(target_os = "linux")]
+fn availability_in_linux() -> Result<(), String> {
+    let mut reasons = Vec::new();
     match linux_version() {
         // https://docs.rs/perf-event-open-sys/4.0.0/perf_event_open_sys/#kernel-versions
         Ok(ver) if ver >= (5, 19, 4) => {}
@@ -702,45 +778,7 @@ pub fn availability() -> Result<(), String> {
     }
 }
 
-/// Check if Intel PT is available on the current system and can be used in combination with
-/// QEMU.
-///
-/// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
-pub fn availability_in_qemu() -> Result<(), String> {
-    let mut reasons = match availability() {
-        Err(s) => vec![s],
-        Ok(()) => Vec::new(),
-    };
-
-    let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
-    if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
-        match s.trim().parse::<i32>().map(TryInto::try_into) {
-            Ok(Ok(KvmPTMode::System)) => (),
-            Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
-                "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
-                KvmPTMode::System,
-                KvmPTMode::System as i32
-            )),
-            _ => reasons.push(format!(
-                "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
-            )),
-        }
-    };
-
-    if reasons.is_empty() {
-        Ok(())
-    } else {
-        Err(reasons.join("; "))
-    }
-}
-
-/// Convert [`PtError`] into [`Error`]
-#[inline]
-#[must_use]
-pub fn error_from_pt_error(err: PtError) -> Error {
-    Error::unknown(err.to_string())
-}
-
+#[cfg(target_os = "linux")]
 fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     let type_ = match &*PERF_EVENT_TYPE {
         Ok(t) => Ok(*t),
@@ -765,6 +803,7 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
     Ok(attr)
 }
 
+#[cfg(target_os = "linux")]
 fn setup_perf_buffer(fd: &OwnedFd, perf_buffer_size: usize) -> Result<*mut c_void, Error> {
     match unsafe {
         libc::mmap(
@@ -781,6 +820,7 @@ fn setup_perf_buffer(fd: &OwnedFd, perf_buffer_size: usize) -> Result<*mut c_voi
     }
 }
 
+#[cfg(target_os = "linux")]
 fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_void, Error> {
     match unsafe {
         libc::mmap(
@@ -800,6 +840,7 @@ fn setup_perf_aux_buffer(fd: &OwnedFd, size: u64, offset: u64) -> Result<*mut c_
     }
 }
 
+#[cfg(target_os = "linux")]
 fn linux_version() -> Result<(usize, usize, usize), ()> {
     let mut uname_data = libc::utsname {
         sysname: [0; 65],
@@ -856,6 +897,7 @@ fn smp_rmb() {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[inline]
 const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)

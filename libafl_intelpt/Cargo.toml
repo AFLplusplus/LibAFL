@@ -16,11 +16,12 @@ std = ["libafl_bolts/std"]
 
 libipt = ["std", "dep:libipt"]
 
+[dev-dependencies]
+static_assertions = { workspace = true }
 
 [target.'cfg(target_os = "linux" )'.dev-dependencies]
 nix = { workspace = true }
 proc-maps = "0.4.0"
-static_assertions = { workspace = true }
 
 [dependencies]
 arbitrary-int = { version = "1.2.7" }
