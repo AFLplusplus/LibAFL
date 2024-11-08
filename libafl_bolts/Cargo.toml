@@ -19,7 +19,6 @@ categories = [
   "os",
   "no-std",
 ]
-rust-version = "1.80.0"
 
 [package.metadata.docs.rs]
 features = ["document-features"]
@@ -137,7 +136,6 @@ serde = { workspace = true, default-features = false, features = [
 erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
 postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
 num_enum = { workspace = true, default-features = false }
-num-traits = { workspace = true, default-features = false }
 ahash = { workspace = true, optional = true } # The hash function already used in hashbrown
 backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
