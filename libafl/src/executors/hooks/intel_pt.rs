@@ -1,3 +1,4 @@
+use core::fmt::Debug;
 use std::{
     ptr::slice_from_raw_parts_mut,
     string::{String, ToString},
@@ -5,6 +6,7 @@ use std::{
 
 use libafl_intelpt::{error_from_pt_error, IntelPT};
 use libipt::{Asid, Image, SectionCache};
+use num_traits::SaturatingAdd;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
@@ -29,18 +31,19 @@ pub struct Section {
 
 /// Hook to enable Intel Processor Trace (PT) tracing
 #[derive(Debug, TypedBuilder)]
-pub struct IntelPTHook {
+pub struct IntelPTHook<T> {
     #[builder(default = IntelPT::builder().build().unwrap())]
     intel_pt: IntelPT,
     #[builder(setter(transform = |sections: &[Section]| sections_to_image(sections).unwrap()))]
     image: (Image<'static>, SectionCache<'static>),
-    map_ptr: *mut u8,
+    map_ptr: *mut T,
     map_len: usize,
 }
 
-impl<S> ExecutorHook<S> for IntelPTHook
+impl<S, T> ExecutorHook<S> for IntelPTHook<T>
 where
     S: UsesInput + Serialize,
+    T: SaturatingAdd + From<u8> + Debug,
 {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
 
