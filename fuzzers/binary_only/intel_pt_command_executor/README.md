@@ -13,7 +13,7 @@ Processor Trace (PT) to compute code coverage.
 
 To compile and run the fuzzer (and the target program) execute the following command:
 ```sh
-cargo make --profile release
+cargo make
 ```
 
 > **Note**: This command may prompt you for your password to assign capabilities required for Intel PT. If you'd prefer
