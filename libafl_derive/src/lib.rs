@@ -94,6 +94,9 @@ pub fn libafl_serdeany_derive(input: TokenStream) -> TokenStream {
 ///     }
 /// }
 /// ```
+///
+/// # Panics
+/// Panics for any non-structs.
 #[proc_macro_derive(Display)]
 pub fn libafl_display(input: TokenStream) -> TokenStream {
     let DeriveInput { ident, data, .. } = parse_macro_input!(input as DeriveInput);

@@ -1,9 +1,6 @@
 //! In-memory fuzzer with `QEMU`-based binary-only instrumentation
 //!
-use core::{
-    fmt::{self, Debug, Formatter},
-    ptr::addr_of_mut,
-};
+use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 
 use libafl::{
@@ -162,7 +159,7 @@ where
                 HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                     "edges",
                     OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
-                    addr_of_mut!(MAX_EDGES_FOUND),
+                    &raw mut MAX_EDGES_FOUND,
                 ))
                 .track_indices()
             };

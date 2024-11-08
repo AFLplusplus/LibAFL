@@ -942,8 +942,6 @@ pub trait AdaptiveSerializer {
 #[cfg(test)]
 mod tests {
 
-    use core::ptr::{addr_of, addr_of_mut};
-
     use libafl_bolts::{current_time, tuples::tuple_list, Named};
     use tuple_list::tuple_list_type;
 
@@ -958,9 +956,10 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
+        let map_ptr = &raw const MAP;
         let obv = unsafe {
-            let len = (*addr_of!(MAP)).len();
-            StdMapObserver::from_mut_ptr("test", addr_of_mut!(MAP) as *mut u32, len)
+            let len = (*map_ptr).len();
+            StdMapObserver::from_mut_ptr("test", &raw mut MAP as *mut u32, len)
         };
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();
