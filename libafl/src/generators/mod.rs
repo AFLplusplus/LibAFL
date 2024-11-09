@@ -83,9 +83,7 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state
-            .rand_mut()
-            .between(self.min_size.get(), self.max_size.get());
+        let mut size = state.rand_mut().between(self.min_size.get(), self.max_size.get());
         size = max(size, 1);
         let random_bytes: Vec<u8> = (0..size)
             .map(|_| state.rand_mut().below(nonzero!(256)) as u8)
@@ -97,7 +95,12 @@ where
 impl RandBytesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
+        Self { min_size: nonzero!(1), max_size }
+    }
+
+    /// Returns a new [`RandBytesGenerator`], generating from `min_size` up to `max_size` random bytes.
+    pub fn with_min_size(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
         Self { min_size, max_size }
     }
 }
@@ -114,9 +117,7 @@ where
     S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
-        let mut size = state
-            .rand_mut()
-            .between(self.min_size.get(), self.max_size.get());
+        let mut size = state.rand_mut().between(self.min_size.get(), self.max_size.get());
         size = max(size, 1);
         let printables = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz \t\n!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~".as_bytes();
         let random_bytes: Vec<u8> = (0..size)
@@ -129,7 +130,61 @@ where
 impl RandPrintablesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
+        Self { min_size: nonzero!(1), max_size }
+    }
+
+     /// Returns a new [`RandPrintablesGenerator`], generating from `min_size` up to `max_size` random bytes.
+    pub fn with_min_size(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
         Self { min_size, max_size }
     }
 }
+
+
+#[cfg(test)]
+mod test{
+    use core::num::NonZeroUsize;
+
+    use crate::{generators::Generator, inputs::NopInput, state::NopState};
+
+    use super::RandBytesGenerator;
+
+    #[test]
+    fn test_bytes_old(){
+        let mut dummy_state: NopState<NopInput> = NopState::new();
+        let mut gen = RandBytesGenerator::new(NonZeroUsize::new(3).unwrap());
+        for _i in 1..10 {
+            println!("{:?}",gen.generate(&mut dummy_state));
+        }
+    }
+
+    
+    #[test]
+    fn test_bytes_with_min(){
+        let mut dummy_state: NopState<NopInput> = NopState::new();
+        let mut gen = RandBytesGenerator::with_min_size(NonZeroUsize::new(2).unwrap(), NonZeroUsize::new(3).unwrap());
+        for _i in 1..10 {
+            println!("{:?}",gen.generate(&mut dummy_state));
+        }
+    }
+
+    #[test]
+    fn test_printables_old(){
+        let mut dummy_state: NopState<NopInput> = NopState::new();
+        let mut gen = RandBytesGenerator::new(NonZeroUsize::new(1).unwrap());
+        for _i in 1..10 {
+            println!("{:?}",gen.generate(&mut dummy_state));
+        }
+    }
+
+    #[test]
+    fn test_printables_with_min(){
+        let mut dummy_state: NopState<NopInput> = NopState::new();
+        let mut gen = RandBytesGenerator::with_min_size(NonZeroUsize::new(1).unwrap(), NonZeroUsize::new(1).unwrap());
+        for _i in 1..10 {
+            println!("{:?}",gen.generate(&mut dummy_state));
+        }
+    }
+
+}
+
