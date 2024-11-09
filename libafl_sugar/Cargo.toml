@@ -65,11 +65,11 @@ libafl_bolts = { path = "../libafl_bolts", version = "0.13.2" }
 libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 
 # Document all features of this crate (for `cargo doc`)
-document-features = { version = "0.2.10", optional = true }
+document-features = { workspace = true, optional = true }
 
-typed-builder = { version = "0.20.0" }         # Implement the builder pattern at compiletime
+typed-builder = { workspace = true }           # Implement the builder pattern at compiletime
 pyo3 = { version = "0.22.3", optional = true }
-log = { version = "0.4.22" }
+log = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libafl_qemu = { path = "../libafl_qemu", version = "0.13.2" }

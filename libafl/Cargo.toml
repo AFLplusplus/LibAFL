@@ -189,7 +189,7 @@ nautilus = [
 rustversion = "1.0.17"
 
 [dev-dependencies]
-serde_json = { version = "1.0.128", default-features = false, features = [
+serde_json = { workspace = true, default-features = false, features = [
   "alloc",
 ] }
 # clippy-suggested optimised byte counter
@@ -201,32 +201,28 @@ libafl_bolts = { version = "0.13.2", path = "../libafl_bolts", default-features 
 ] }
 libafl_derive = { version = "0.13.2", path = "../libafl_derive", optional = true }
 
-rustversion = { version = "1.0.17" }
+rustversion = { workspace = true }
 tuple_list = { version = "0.1.3" }
-hashbrown = { version = "0.15.0", features = [
+hashbrown = { workspace = true, features = [
   "serde",
-  "default-hasher",
+  "ahash",
 ], default-features = false } # A faster hashmap, nostd compatible
-num-traits = { version = "0.2.19", default-features = false }
-serde = { version = "1.0.210", default-features = false, features = [
-  "alloc",
-] } # serialization lib
-postcard = { version = "1.0.10", features = [
-  "alloc",
-], default-features = false } # no_std compatible serde serialization format
+num-traits = { workspace = true, default-features = false }
+serde = { workspace = true, features = ["alloc"] } # serialization lib
+postcard = { workspace = true } # no_std compatible serde serialization format
 bincode = { version = "1.3.3", optional = true }
 c2rust-bitfields = { version = "0.19.0", features = ["no_std"] }
-ahash = { version = "0.8.11", default-features = false } # The hash function already used in hashbrown
-meminterval = { version = "0.4.1", features = ["serde"] }
-backtrace = { version = "0.3.74", default-features = false, optional = true } # Used to get the stacktrace in StacktraceObserver
-typed-builder = { version = "0.20.0", optional = true } # Implement the builder pattern at compiletime
+ahash = { workspace = true } # The hash function already used in hashbrown
+meminterval = { workspace = true, features = ["serde"] }
+backtrace = { workspace = true, optional = true } # Used to get the stacktrace in StacktraceObserver
+typed-builder = { workspace = true, optional = true } # Implement the builder pattern at compiletime
 
-serde_json = { version = "1.0.128", optional = true, default-features = false, features = [
+serde_json = { workspace = true, optional = true, default-features = false, features = [
   "alloc",
 ] }
-nix = { version = "0.29.0", default-features = true, optional = true }
-regex = { version = "1.10.6", optional = true }
-uuid = { version = "1.10.0", optional = true, features = ["serde", "v4"] }
+nix = { workspace = true, default-features = true, optional = true }
+regex = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 libm = "0.2.8"
 ratatui = { version = "0.29.0", default-features = false, features = [
   'crossterm',
@@ -237,7 +233,7 @@ prometheus-client = { version = "0.22.3", optional = true } # For the prometheus
 tide = { version = "0.16.0", optional = true }
 async-std = { version = "1.13.0", features = ["attributes"], optional = true }
 futures = { version = "0.3.30", optional = true }
-log = { version = "0.4.22" }
+log = { workspace = true }
 tokio = { version = "1.40.0", optional = true, features = [
   "sync",
   "net",
@@ -268,24 +264,24 @@ pyo3 = { version = "0.22.3", features = ["gil-refs"], optional = true }
 regex-syntax = { version = "0.8.4", optional = true }                   # For nautilus
 
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
-serial_test = { version = "3.1.1", optional = true, default-features = false, features = [
+serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
 ] }
 
 # Document all features of this crate (for `cargo doc`)
-document-features = { version = "0.2.10", optional = true }
+document-features = { workspace = true, optional = true }
 # Optional
-clap = { version = "4.5.18", optional = true }
+clap = { workspace = true, optional = true }
 
 [lints]
 workspace = true
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.59" }                # For (*nix) libc
-z3 = { version = "0.12.1", optional = true } # for concolic mutation
+libc = { workspace = true }                # For (*nix) libc
+z3 = { workspace = true, optional = true } # for concolic mutation
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58.0", features = [
+windows = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_System_Threading",
   "Win32_System_Diagnostics_Debug",
@@ -296,4 +292,4 @@ windows = { version = "0.58.0", features = [
 ] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows = { version = "0.58.0" }
+windows = { workspace = true }
