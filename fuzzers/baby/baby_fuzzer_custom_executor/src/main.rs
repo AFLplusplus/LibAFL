@@ -142,7 +142,11 @@ pub fn main() {
     let mut executor = WithObservers::new(executor, tuple_list!(observer));
 
     // Generator of printable bytearrays of max size 32
+<<<<<<< HEAD
     let mut generator = RandPrintablesGenerator::new(nonzero!(1), nonzero!(32));
+=======
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
+>>>>>>> parent of 9daad894 (Updated all references to RAND generators)
 
     // Generate 8 initial inputs
     state

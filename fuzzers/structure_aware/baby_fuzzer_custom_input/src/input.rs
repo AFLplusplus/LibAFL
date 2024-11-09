@@ -12,7 +12,7 @@ use libafl::{
     state::HasRand,
     Error, SerdeAny,
 };
-use libafl_bolts::{rands::Rand, Named, nonzero};
+use libafl_bolts::{rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 /// The custom [`Input`] type used in this example, consisting of a byte array part, a byte array that is not always present, and a boolean
@@ -68,7 +68,7 @@ impl CustomInputGenerator {
     /// Creates a new [`CustomInputGenerator`]
     pub fn new(max_len: NonZeroUsize) -> Self {
         Self {
-            bytes_generator: RandBytesGenerator::new(nonzero!(1), max_len),
+            bytes_generator: RandBytesGenerator::new(max_len),
         }
     }
 }
@@ -104,7 +104,7 @@ impl ToggleOptionalByteArrayMutator<RandBytesGenerator> {
     /// Creates a new [`ToggleOptionalByteArrayMutator`]
     pub fn new(length: NonZeroUsize) -> Self {
         Self {
-            generator: RandBytesGenerator::new(nonzero!(1), length),
+            generator: RandBytesGenerator::new(length),
         }
     }
 }

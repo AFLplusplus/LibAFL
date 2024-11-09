@@ -119,7 +119,7 @@ pub fn main() {
         MyExecutor { shmem_id, timeout }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(nonzero!(1), nonzero!(32));
+    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
     state

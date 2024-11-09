@@ -241,7 +241,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         if state.must_load_initial_inputs() {
             if input_dirs.is_empty() {
                 // Generator of printable bytearrays of max size 32
-                let mut generator = RandBytesGenerator::new(nonzero!(1), nonzero!(32));
+                let mut generator = RandBytesGenerator::new(nonzero!(32));
 
                 // Generate 8 initial inputs
                 state
