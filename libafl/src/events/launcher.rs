@@ -406,7 +406,9 @@ where
                 let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
-                    .kind(ManagerKind::Client { client_id })
+                    .kind(ManagerKind::Client {
+                        client_id: client_id.clone(),
+                    })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
                     .hooks(hooks);
