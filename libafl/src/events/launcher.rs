@@ -19,7 +19,6 @@ use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
 };
-use serde::{Deserialize, Serialize};
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use std::boxed::Box;
 #[cfg(feature = "std")]
@@ -50,6 +49,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
