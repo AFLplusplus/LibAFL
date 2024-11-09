@@ -4,9 +4,14 @@ use alloc::{
     borrow::{Cow, ToOwned},
     string::ToString,
 };
-use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
+use core::{
+    borrow::BorrowMut,
+    fmt::Debug,
+    hash::{BuildHasher, Hash},
+    marker::PhantomData,
+};
 
-use ahash::RandomState;
+use foldhash::fast::FixedState;
 use libafl_bolts::{
     tuples::{Handle, Handled, MatchName, MatchNameRef},
     HasLen, Named,
@@ -102,7 +107,7 @@ where
         let mut base = state.current_input_cloned()?;
         // potential post operation if base is replaced by a shorter input
         let mut base_post = None;
-        let base_hash = RandomState::with_seeds(0, 0, 0, 0).hash_one(&base);
+        let base_hash = FixedState::with_seed(1337).hash_one(&base);
         mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
         fuzzer.execute_input(state, executor, manager, &base)?;
@@ -181,7 +186,7 @@ where
             i = next_i;
         }
 
-        let new_hash = RandomState::with_seeds(0, 0, 0, 0).hash_one(&base);
+        let new_hash = FixedState::with_seed(1337).hash_one(&base);
         if base_hash != new_hash {
             let exit_kind = fuzzer.execute_input(state, executor, manager, &base)?;
             let observers = executor.observers();

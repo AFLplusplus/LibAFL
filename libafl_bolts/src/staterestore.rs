@@ -15,7 +15,7 @@ use std::{
     ptr::read_volatile,
 };
 
-use ahash::RandomState;
+use foldhash::fast::FixedState;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -120,7 +120,7 @@ where
 
         if size_of::<StateShMemContent>() + serialized.len() > self.shmem.len() {
             // generate a filename
-            let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+            let mut hasher = FixedState::with_seed(1337).build_hasher();
             // Using the last few k as randomness for a filename, hoping it's unique.
             hasher.write(&serialized[serialized.len().saturating_sub(4096)..]);
 

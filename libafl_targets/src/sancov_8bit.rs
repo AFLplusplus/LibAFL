@@ -84,7 +84,7 @@ mod observers {
         slice::{from_raw_parts, Iter, IterMut},
     };
 
-    use ahash::RandomState;
+    use foldhash::fast::FixedState;
     use libafl::{
         observers::{DifferentialObserver, MapObserver, Observer},
         Error,
@@ -233,7 +233,7 @@ mod observers {
 
         #[inline]
         fn hash_simple(&self) -> u64 {
-            RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+            FixedState::with_seed(1337).hash_one(self)
         }
 
         fn reset_map(&mut self) -> Result<(), Error> {

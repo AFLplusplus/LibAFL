@@ -4,11 +4,11 @@ use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 use core::{
     cell::{Ref, RefCell, RefMut},
     fmt::Debug,
-    hash::{Hash, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
+use foldhash::fast::FixedState;
 use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -77,7 +77,7 @@ impl<T> Named for ValueObserver<'_, T> {
 
 impl<T: Hash> ObserverWithHashField for ValueObserver<'_, T> {
     fn hash(&self) -> Option<u64> {
-        Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(self.value.as_ref()))
+        Some(FixedState::with_seed(1337).hash_one(self.value.as_ref()))
     }
 }
 
@@ -156,7 +156,7 @@ where
     T: Hash,
 {
     fn hash(&self) -> Option<u64> {
-        Some(RandomState::with_seeds(1, 2, 3, 4).hash_one(&*self.value.as_ref().borrow()))
+        Some(FixedState::with_seed(1337).hash_one(&*self.value.as_ref().borrow()))
     }
 }
 
@@ -311,7 +311,7 @@ where
     /// Panics if the contained value is already mutably borrowed (calls
     /// [`RefCell::borrow`]).
     fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+        FixedState::with_seed(1337).hash_one(self)
     }
 
     /// Panics if the contained value is already mutably borrowed (calls

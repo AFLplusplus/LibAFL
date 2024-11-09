@@ -13,7 +13,7 @@ use core::{
     hash::{BuildHasher, Hasher},
 };
 
-use ahash::RandomState;
+use foldhash::fast::FixedState;
 use hashbrown::HashMap;
 use libafl_bolts::{Error, HasLen};
 #[cfg(feature = "regex")]
@@ -204,7 +204,7 @@ impl Input for EncodedInput {
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        let mut hasher = FixedState::with_seed(1337).build_hasher();
         for code in &self.codes {
             hasher.write(&code.to_le_bytes());
         }

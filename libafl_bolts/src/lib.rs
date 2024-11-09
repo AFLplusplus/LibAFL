@@ -110,7 +110,7 @@ pub mod shmem;
 pub mod staterestore;
 #[cfg(feature = "alloc")]
 pub mod subrange;
-// TODO: reenable once ahash works in no-alloc
+// TODO: reenable once/if foldhash works in no-alloc
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 pub mod tuples;
 
@@ -158,10 +158,6 @@ use std::{
     panic,
 };
 
-// There's a bug in ahash that doesn't let it build in `alloc` without once_cell right now.
-// TODO: re-enable once <https://github.com/tkaitchuck/aHash/issues/155> is resolved.
-#[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
-use ahash::RandomState;
 use log::SetLoggerError;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "xxh3")]
@@ -238,13 +234,12 @@ fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fm
 /// Returns the hasher for the input with a given hash, depending on features:
 /// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
 /// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
 #[must_use]
 pub fn hasher_std() -> impl Hasher + Clone {
     #[cfg(feature = "xxh3")]
     return xxhash_rust::xxh3::Xxh3::new();
     #[cfg(not(feature = "xxh3"))]
-    RandomState::with_seeds(0, 0, 0, 0).build_hasher()
+    FixedState::with_seed(1337).build_hasher()
 }
 
 /// Hashes the input with a given hash

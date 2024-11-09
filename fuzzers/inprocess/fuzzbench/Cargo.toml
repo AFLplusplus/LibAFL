@@ -25,7 +25,7 @@ strip = true
 
 [build-dependencies]
 cc = { version = "1.0.106", features = ["parallel"] }
-which = { version = "7.0.0" }
+which = "6.0.3"
 
 [dependencies]
 libafl = { path = "../../../libafl" }

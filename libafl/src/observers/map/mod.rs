@@ -3,11 +3,11 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
-    hash::{Hash, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
+use foldhash::fast::FixedState;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -528,7 +528,7 @@ where
 
     #[inline]
     fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+        FixedState::with_seed(1337).hash_one(self)
     }
 
     #[inline]

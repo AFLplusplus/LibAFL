@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use ahash::RandomState;
+use foldhash::fast::FixedState;
 use frida_gum::ModuleMap;
 use libafl::{
     inputs::{HasTargetBytes, Input},
@@ -55,11 +55,11 @@ impl FridaRuntime for DrCovRuntime {
             return Ok(());
         }
 
-        let mut input_hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        let mut input_hasher = FixedState::with_seed(1337).build_hasher();
         input_hasher.write(input.target_bytes().as_slice());
         let input_hash = input_hasher.finish();
 
-        let mut coverage_hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        let mut coverage_hasher = FixedState::with_seed(1337).build_hasher();
         for bb in &self.drcov_basic_blocks {
             coverage_hasher.write_usize(bb.start);
             coverage_hasher.write_usize(bb.end);

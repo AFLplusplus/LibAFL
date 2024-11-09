@@ -27,7 +27,7 @@ libafl_bolts = { path = "../../libafl_bolts", default-features = false, features
 ] } # libafl_bolts
 
 criterion = "0.5.1" # Benchmarking
-ahash = { version = "0.8.11", default-features = false } # The hash function already used in hashbrown
+foldhash = { workspace = true, default-features = false } # The hash function already used in hashbrown
 rustc-hash = { version = "2.0.0", default-features = false } # yet another hash
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",

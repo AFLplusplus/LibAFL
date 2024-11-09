@@ -29,8 +29,8 @@ use core::{
     time::Duration,
 };
 
-use ahash::RandomState;
 pub use broker_hooks::*;
+use foldhash::fast::FixedState;
 #[cfg(feature = "std")]
 pub use launcher::*;
 #[cfg(all(unix, feature = "std"))]
@@ -197,7 +197,7 @@ impl EventConfig {
     /// Create a new [`EventConfig`] from a name hash
     #[must_use]
     pub fn from_name(name: &str) -> Self {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher(); //AHasher::new_with_keys(0, 0);
+        let mut hasher = FixedState::with_seed(1337).build_hasher(); //AHasher::new_with_keys(0, 0);
         hasher.write(name.as_bytes());
         EventConfig::FromName {
             name_hash: hasher.finish(),

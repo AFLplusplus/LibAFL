@@ -23,9 +23,10 @@ fn criterion_benchmark(c: &mut Criterion) {
     /*c.bench_function("const_xxh3", |b| {
         b.iter(|| const_xxh3::xxh3_64_with_seed(black_box(&bench_vec), 0))
     });*/
-    c.bench_function("ahash", |b| {
+    c.bench_function("foldhash", |b| {
         b.iter(|| {
-            let mut hasher = ahash::RandomState::with_seeds(123, 456, 789, 123).build_hasher();
+            let mut hasher =
+                foldhash::fast::FixedState::with_seeds(123, 456, 789, 123).build_hasher();
             hasher.write(black_box(&bench_vec));
             black_box(hasher.finish());
         });

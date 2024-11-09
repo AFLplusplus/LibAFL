@@ -5,7 +5,7 @@ use core::{
     hash::{BuildHasher, Hasher},
 };
 
-use ahash::RandomState;
+use foldhash::fast::FixedState;
 use libafl_bolts::{Error, HasLen};
 use serde::{Deserialize, Serialize};
 
@@ -45,7 +45,7 @@ impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        let mut hasher = FixedState::with_seed(1337).build_hasher();
         for term in &self.terms {
             hasher.write(term.symbol.as_bytes());
         }
