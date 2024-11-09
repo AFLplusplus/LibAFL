@@ -11,8 +11,9 @@
 #[macro_use]
 extern crate std;
 
+use std::{borrow::ToOwned, string::{String, ToString}, vec::Vec,};
+#[cfg(target_os = "linux")]
 use std::{
-    borrow::ToOwned,
     ffi::{CStr, CString},
     fmt::Debug,
     format, fs,
@@ -23,21 +24,26 @@ use std::{
     },
     path::Path,
     ptr, slice,
-    string::{String, ToString},
     sync::LazyLock,
-    vec::Vec,
 };
-
+#[cfg(target_os = "linux")]
 use arbitrary_int::u4;
+#[cfg(target_os = "linux")]
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
-use libafl_bolts::{ownedref::OwnedRefMut, Error};
+use libafl_bolts::Error;
+#[cfg(target_os = "linux")]
+use libafl_bolts::ownedref::OwnedRefMut;
+use libipt::PtError;
+#[cfg(target_os = "linux")]
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
-    ConfigBuilder, Cpu, Image, PtError, PtErrorCode, Status,
+    ConfigBuilder, Cpu, Image, PtErrorCode, Status,
 };
+#[cfg(target_os = "linux")]
 use num_enum::TryFromPrimitive;
+#[cfg(target_os = "linux")]
 use num_traits::{Euclid, SaturatingAdd};
 #[cfg(target_os = "linux")]
 use perf_event_open_sys::{
@@ -72,6 +78,7 @@ static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     s2.trim().parse::<u32>().map_err(|_| err)
 });
 
+#[cfg(target_os = "linux")]
 static CURRENT_CPU: LazyLock<Option<Cpu>> = LazyLock::new(|| {
     let cpuid = CpuId::new();
     cpuid
@@ -104,16 +111,13 @@ pub enum KvmPTMode {
 }
 
 /// Intel Processor Trace (PT)
+#[cfg(target_os = "linux")]
 #[derive(Debug)]
 pub struct IntelPT {
     fd: OwnedFd,
-    #[cfg(target_os = "linux")]
     perf_buffer: *mut c_void,
-    #[cfg(target_os = "linux")]
     perf_aux_buffer: *mut c_void,
-    #[cfg(target_os = "linux")]
     perf_buffer_size: usize,
-    #[cfg(target_os = "linux")]
     perf_aux_buffer_size: usize,
     aux_head: *mut u64,
     aux_tail: *mut u64,
@@ -409,8 +413,8 @@ impl IntelPT {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl Drop for IntelPT {
-    #[cfg(target_os = "linux")]
     fn drop(&mut self) {
         unsafe {
             let ret = libc::munmap(self.perf_aux_buffer, self.perf_aux_buffer_size);
@@ -419,9 +423,6 @@ impl Drop for IntelPT {
             assert_eq!(ret, 0, "Intel PT: Failed to unmap perf buffer");
         }
     }
-
-    #[cfg(not(target_os = "linux"))]
-    fn drop(&mut self) {}
 }
 
 /// Builder for [`IntelPT`]
@@ -687,13 +688,12 @@ pub fn availability() -> Result<(), String> {
         reasons.push("Failed to read CPU Extended Features".to_owned());
     }
 
-    if cfg!(target_os = "linux") {
-        if let Err(r) = availability_in_linux() {
-            reasons.push(r);
-        }
-    } else {
-        reasons.push("Only linux hosts are supported at the moment".to_owned());
+    #[cfg(target_os = "linux")]
+    if let Err(r) = availability_in_linux() {
+        reasons.push(r);
     }
+    #[cfg(not(target_os = "linux"))]
+    reasons.push("Only linux hosts are supported at the moment".to_owned());
 
     if reasons.is_empty() {
         Ok(())
@@ -706,27 +706,31 @@ pub fn availability() -> Result<(), String> {
 /// QEMU.
 ///
 /// If you don't use this with QEMU check out [`IntelPT::availability()`] instead.
-#[cfg(target_os = "linux")]
 pub fn availability_in_qemu_kvm() -> Result<(), String> {
     let mut reasons = match availability() {
         Err(s) => vec![s],
         Ok(()) => Vec::new(),
     };
 
-    let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
-    if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
-        match s.trim().parse::<i32>().map(TryInto::try_into) {
-            Ok(Ok(KvmPTMode::System)) => (),
-            Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
-                "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
-                KvmPTMode::System,
-                KvmPTMode::System as i32
-            )),
-            _ => reasons.push(format!(
-                "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
-            )),
-        }
-    };
+    #[cfg(target_os = "linux")]
+    {
+        let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
+        if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
+            match s.trim().parse::<i32>().map(TryInto::try_into) {
+                Ok(Ok(KvmPTMode::System)) => (),
+                Ok(Ok(KvmPTMode::HostGuest)) => reasons.push(format!(
+                    "KVM Intel PT mode must be set to {:?} `{}` to be used with libafl_qemu",
+                    KvmPTMode::System,
+                    KvmPTMode::System as i32
+                )),
+                _ => reasons.push(format!(
+                    "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
+                )),
+            }
+        };
+    }
+    #[cfg(not(target_os = "linux"))]
+    reasons.push("Only linux hosts are supported at the moment".to_owned());
 
     if reasons.is_empty() {
         Ok(())
@@ -894,6 +898,7 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[inline]
 const fn next_page_aligned_addr(address: u64) -> u64 {
     (address + PAGE_SIZE as u64 - 1) & !(PAGE_SIZE as u64 - 1)
@@ -901,6 +906,7 @@ const fn next_page_aligned_addr(address: u64) -> u64 {
 
 // copy pasted from libafl_qemu/src/modules/edges.rs
 // adapted from https://xorshift.di.unimi.it/splitmix64.c
+#[cfg(target_os = "linux")]
 #[inline]
 #[must_use]
 const fn hash_me(mut x: u64) -> u64 {
@@ -913,6 +919,7 @@ const fn hash_me(mut x: u64) -> u64 {
     x ^ (x.overflowing_shr(31).0)
 }
 
+#[cfg(target_os = "linux")]
 #[inline]
 fn smp_rmb() {
     // SAFETY: just a memory barrier
@@ -929,6 +936,7 @@ const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
 
 #[cfg(test)]
 mod test {
+    #[cfg(target_os = "linux")]
     use arbitrary_int::Number;
     use static_assertions::assert_eq_size;
 
@@ -936,6 +944,24 @@ mod test {
 
     // Only 64-bit systems are supported, ensure we can use usize and u64 interchangeably
     assert_eq_size!(usize, u64);
+
+    /// Quick way to check if your machine is compatible with Intl PT's features used by libafl
+    ///
+    /// Simply run `cargo test intel_pt_check_availability -- --show-output`
+    #[test]
+    fn intel_pt_check_availability() {
+        print!("Intel PT availability:\t\t\t");
+        match availability() {
+            Ok(()) => println!("✔"),
+            Err(e) => println!("❌\tReasons: {e}"),
+        }
+
+        print!("Intel PT availability in QEMU/KVM:\t");
+        match availability_in_qemu_kvm() {
+            Ok(()) => println!("✔"),
+            Err(e) => println!("❌\tReasons: {e}"),
+        }
+    }
 
     #[test]
     #[cfg(target_os = "linux")]
