@@ -192,7 +192,8 @@ pub fn fuzz() {
         };
 
     let mut run_client =
-        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
+        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, client_id| {
+            let core_id = client_id.core_id();
             let core_idx = options
                 .cores
                 .position(core_id)

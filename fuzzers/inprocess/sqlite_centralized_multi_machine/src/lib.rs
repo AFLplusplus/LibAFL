@@ -10,7 +10,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{
         centralized::CentralizedEventManager, launcher::CentralizedLauncher,
-        multi_machine::NodeDescriptor, EventConfig,
+        multi_machine::NodeDescriptor, ClientId, EventConfig,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -30,7 +30,7 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
+    core_affinity::Cores,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -157,7 +157,7 @@ pub extern "C" fn libafl_main() {
 
     let mut secondary_run_client = |state: Option<_>,
                                     mut mgr: CentralizedEventManager<_, _, _, _>,
-                                    _core_id: CoreId| {
+                                    _client_id: ClientId| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
@@ -274,13 +274,11 @@ pub extern "C" fn libafl_main() {
         Ok(())
     };
 
-    let mut main_run_client = secondary_run_client.clone(); // clone it just for borrow checker
+    let mut main_run_client = secondary_run_client; // clone it just for borrow checker
 
-    let parent_addr: Option<SocketAddr> = if let Some(parent_str) = opt.parent_addr {
-        Some(SocketAddr::from_str(parent_str.as_str()).expect("Wrong parent address"))
-    } else {
-        None
-    };
+    let parent_addr: Option<SocketAddr> = opt
+        .parent_addr
+        .map(|parent_str| SocketAddr::from_str(parent_str.as_str()).expect("Wrong parent address"));
 
     let mut node_description = NodeDescriptor::builder().parent_addr(parent_addr).build();
 

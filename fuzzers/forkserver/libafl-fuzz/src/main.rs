@@ -79,13 +79,13 @@ mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
 use libafl::{
-    events::{CentralizedLauncher, EventConfig},
+    events::{launcher::ClientId, CentralizedLauncher, EventConfig},
     monitors::MultiMonitor,
     schedulers::powersched::BaseSchedule,
     Error,
 };
 use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
+    core_affinity::Cores,
     shmem::{ShMemProvider, StdShMemProvider},
 };
 use nix::sys::signal::Signal;
@@ -130,21 +130,29 @@ fn main() {
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .main_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
-            println!("run primary client on core {}", core_id.0);
+        .main_run_client(|state: Option<_>, mgr: _, client_id: ClientId| {
+            println!(
+                "run primary client with id {} on core {}",
+                client_id.id(),
+                client_id.core_id().0
+            );
             let fuzzer_dir = opt.output_dir.join("fuzzer_main");
             let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            let res = run_client(state, mgr, &fuzzer_dir, core_id, &opt, true);
+            let res = run_client(state, mgr, &fuzzer_dir, client_id.core_id(), &opt, true);
             let _ = remove_main_node_file(&fuzzer_dir);
             res
         })
-        .secondary_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
-            println!("run secondary client on core {}", core_id.0);
+        .secondary_run_client(|state: Option<_>, mgr: _, client_id: ClientId| {
+            println!(
+                "run secondary client with id {} on core {}",
+                client_id.id(),
+                client_id.core_id().0
+            );
             let fuzzer_dir = opt
                 .output_dir
-                .join(format!("fuzzer_secondary_{}", core_id.0));
+                .join(format!("fuzzer_secondary_{}", client_id.id()));
             let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            run_client(state, mgr, &fuzzer_dir, core_id, &opt, false)
+            run_client(state, mgr, &fuzzer_dir, client_id.core_id(), &opt, false)
         })
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))

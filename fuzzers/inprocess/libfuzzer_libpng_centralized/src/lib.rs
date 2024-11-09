@@ -8,7 +8,9 @@ use std::{env, net::SocketAddr, path::PathBuf};
 use clap::{self, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
-    events::{centralized::CentralizedEventManager, launcher::CentralizedLauncher, EventConfig},
+    events::{
+        centralized::CentralizedEventManager, launcher::CentralizedLauncher, ClientId, EventConfig,
+    },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -27,7 +29,7 @@ use libafl::{
     Error, HasMetadata,
 };
 use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
+    core_affinity::Cores,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
@@ -138,7 +140,7 @@ pub extern "C" fn libafl_main() {
 
     let mut secondary_run_client = |state: Option<_>,
                                     mut mgr: CentralizedEventManager<_, _, _, _>,
-                                    _core_id: CoreId| {
+                                    _client_id: ClientId| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();

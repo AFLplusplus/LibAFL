@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
-    events::{launcher::Launcher, EventConfig},
+    events::{launcher::Launcher, ClientId, EventConfig},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
     monitors::MultiMonitor,
@@ -14,7 +14,7 @@ use libafl::{
     Error, Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
+    core_affinity::Cores,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
@@ -31,10 +31,10 @@ fn main() {
     let parent_cpu_id = cores.ids.first().expect("unable to get first core id");
 
     // region: fuzzer start function
-    let mut run_client = |state: Option<_>, mut restarting_mgr, core_id: CoreId| {
+    let mut run_client = |state: Option<_>, mut restarting_mgr, client_id: ClientId| {
         // nyx stuff
         let settings = NyxSettings::builder()
-            .cpu_id(core_id.0)
+            .cpu_id(client_id.core_id().0)
             .parent_cpu_id(Some(parent_cpu_id.0))
             .build();
         let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();

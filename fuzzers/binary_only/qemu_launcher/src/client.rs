@@ -2,6 +2,7 @@ use std::env;
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::ClientId,
     inputs::BytesInput,
     monitors::Monitor,
     state::StdState,
@@ -61,8 +62,9 @@ impl Client<'_> {
         &self,
         state: Option<ClientState>,
         mgr: ClientMgr<M>,
-        core_id: CoreId,
+        client_id: ClientId,
     ) -> Result<(), Error> {
+        let core_id = client_id.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);
         log::debug!("ARGS: {:#?}", args);
@@ -123,7 +125,7 @@ impl Client<'_> {
             .qemu(qemu)
             .harness(harness)
             .mgr(mgr)
-            .core_id(core_id)
+            .client_id(client_id)
             .extra_tokens(extra_tokens);
 
         if self.options.rerun_input.is_some() && self.options.drcov.is_some() {
