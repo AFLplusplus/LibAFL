@@ -78,12 +78,13 @@ use std::{
 };
 
 use clap::Parser;
+use colored::Colorize;
 use regex::RegexSet;
 use tokio::{process::Command, task::JoinSet};
 use walkdir::{DirEntry, WalkDir};
 use which::which;
 
-const REF_LLVM_VERSION: u32 = 18;
+const REF_LLVM_VERSION: u32 = 19;
 
 fn is_workspace_toml(path: &Path) -> bool {
     for line in read_to_string(path).unwrap().lines() {
@@ -249,20 +250,29 @@ async fn main() -> io::Result<()> {
         tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
     }
 
-    let ref_clang_format = format!("clang-format-{REF_LLVM_VERSION}");
+    let reference_clang_format = format!("clang-format-{REF_LLVM_VERSION}");
+    let unspecified_clang_format = "clang-format";
 
-    let (clang, warning) = if which(ref_clang_format.clone()).is_ok() {
-        // can't use 18 for ci.
-        (Some(ref_clang_format), None)
-    } else if which("clang-format").is_ok() {
+    let (clang, warning) = if which(&reference_clang_format).is_ok() {
+        (Some(reference_clang_format.as_str()), None)
+    } else if which(unspecified_clang_format).is_ok() {
+        let version = Command::new(unspecified_clang_format)
+            .arg("--version")
+            .output()
+            .await?
+            .stdout;
+
         (
-            Some("clang-format".to_string()),
-            Some("using clang-format, could provide a different result from clang-format-17"),
+            Some(unspecified_clang_format),
+            Some(format!(
+                "using {}, could provide a different result from clang-format-17",
+                from_utf8(&version).unwrap().replace('\n', "")
+            )),
         )
     } else {
         (
             None,
-            Some("clang-format not found. Skipping C formatting..."),
+            Some("clang-format not found. Skipping C formatting...".to_string()),
         )
     };
     // println!("Using {:#?} to format...", clang);
@@ -277,7 +287,12 @@ async fn main() -> io::Result<()> {
             .collect();
 
         for c_file in c_files_to_fmt {
-            tokio_joinset.spawn(run_clang_fmt(c_file, clang.clone(), cli.check, cli.verbose));
+            tokio_joinset.spawn(run_clang_fmt(
+                c_file,
+                clang.to_string(),
+                cli.check,
+                cli.verbose,
+            ));
         }
     }
 
@@ -292,7 +307,7 @@ async fn main() -> io::Result<()> {
     }
 
     if let Some(warning) = warning {
-        println!("Warning: {warning}");
+        println!("\n{}: {}\n", "Warning".yellow().bold(), warning);
     }
 
     if cli.check {
