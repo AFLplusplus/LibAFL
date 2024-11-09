@@ -11,7 +11,7 @@ use std::{
 const NAMESPACE: &str = "🐇";
 #[cfg(not(feature = "rabbit"))]
 const NAMESPACE: &str = "__libafl";
-const NAMESPACE_LEN: usize = NAMESPACE.as_bytes().len();
+const NAMESPACE_LEN: usize = NAMESPACE.len();
 
 #[allow(clippy::too_many_lines)]
 fn main() -> Result<(), Box<dyn Error>> {

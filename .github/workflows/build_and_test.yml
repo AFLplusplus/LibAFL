@@ -248,6 +248,7 @@ jobs:
           - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/command_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
+          - ./fuzzers/baby/baby_fuzzer_custom_executor
 
           # Binary-only
           - ./fuzzers/binary_only/fuzzbench_fork_qemu

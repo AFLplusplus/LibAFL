@@ -6,7 +6,7 @@ use core::mem::size_of;
 #[cfg(feature = "alloc")]
 use core::{
     cell::UnsafeCell,
-    ptr::{self, addr_of_mut, write_volatile},
+    ptr::{self, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 use core::{
@@ -477,23 +477,23 @@ pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
     let mut ss: stack_t = mem::zeroed();
     ss.ss_size = SIGNAL_STACK_SIZE;
     ss.ss_sp = SIGNAL_STACK_PTR;
-    sigaltstack(addr_of_mut!(ss), ptr::null_mut() as _);
+    sigaltstack(&raw mut ss, ptr::null_mut() as _);
 
     let mut sa: sigaction = mem::zeroed();
-    sigemptyset(addr_of_mut!(sa.sa_mask));
-    sigaddset(addr_of_mut!(sa.sa_mask), SIGALRM);
+    sigemptyset(&raw mut sa.sa_mask);
+    sigaddset(&raw mut sa.sa_mask, SIGALRM);
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = handle_signal as usize;
     let signals = unsafe { (*handler).signals() };
     for sig in signals {
         write_volatile(
-            addr_of_mut!(SIGNAL_HANDLERS[sig as usize]),
+            &raw mut SIGNAL_HANDLERS[sig as usize],
             Some(HandlerHolder {
                 handler: UnsafeCell::new(handler as *mut dyn SignalHandler),
             }),
         );
 
-        if sigaction(sig as i32, addr_of_mut!(sa), ptr::null_mut()) < 0 {
+        if sigaction(sig as i32, &raw mut sa, ptr::null_mut()) < 0 {
             #[cfg(feature = "std")]
             {
                 let err_str = CString::new(format!("Failed to setup {sig} handler")).unwrap();

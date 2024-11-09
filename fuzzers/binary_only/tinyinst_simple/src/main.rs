@@ -1,4 +1,4 @@
-use std::{path::PathBuf, ptr::addr_of_mut, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
@@ -37,7 +37,7 @@ fn main() {
     // use file to pass testcases
     // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
-    let coverage = unsafe { OwnedMutPtr::Ptr(addr_of_mut!(COVERAGE)) };
+    let coverage = OwnedMutPtr::Ptr(&raw mut COVERAGE);
     let observer = ListObserver::new("cov", coverage);
     let mut feedback = ListFeedback::new(&observer);
     #[cfg(windows)]
@@ -62,18 +62,17 @@ fn main() {
     let monitor = SimpleMonitor::new(|x| println!("{x}"));
 
     let mut mgr = SimpleEventManager::new(monitor);
-    let mut executor = unsafe {
-        TinyInstExecutor::builder()
-            .tinyinst_args(tinyinst_args)
-            .program_args(args)
-            .use_shmem()
-            .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
-            .timeout(Duration::new(5, 0))
-            .shmem_provider(&mut shmem_provider)
-            .coverage_ptr(addr_of_mut!(COVERAGE))
-            .build(tuple_list!(observer))
-            .unwrap()
-    };
+    let mut executor = TinyInstExecutor::builder()
+        .tinyinst_args(tinyinst_args)
+        .program_args(args)
+        .use_shmem()
+        .persistent("test.exe".to_string(), "fuzz".to_string(), 1, 10000)
+        .timeout(Duration::new(5, 0))
+        .shmem_provider(&mut shmem_provider)
+        .coverage_ptr(&raw mut COVERAGE)
+        .build(tuple_list!(observer))
+        .unwrap();
+
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
     fuzzer

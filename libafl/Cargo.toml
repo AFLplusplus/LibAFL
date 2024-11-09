@@ -240,7 +240,7 @@ nix = { workspace = true, optional = true, features = [
 regex = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true, features = ["serde", "v4"] }
 libm = "0.2.8"
-ratatui = { version = "0.28.1", default-features = false, features = [
+ratatui = { version = "0.29.0", default-features = false, features = [
   'crossterm',
 ], optional = true } # Commandline rendering, for TUI Monitor
 crossterm = { version = "0.28.1", optional = true }

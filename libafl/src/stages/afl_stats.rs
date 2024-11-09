@@ -328,6 +328,7 @@ where
         } else {
             0
         };
+        #[allow(clippy::similar_names)]
         let stats = AFLFuzzerStats {
             start_time: self.start_time,
             last_update: self.last_report_time.as_secs(),

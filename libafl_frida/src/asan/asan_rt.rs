@@ -6,10 +6,7 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use core::{
-    fmt::{self, Debug, Formatter},
-    ptr::addr_of_mut,
-};
+use core::fmt::{self, Debug, Formatter};
 use std::{
     cell::Cell,
     ffi::{c_char, c_void},
@@ -361,7 +358,7 @@ impl AsanRuntime {
     //         rlim_cur: 0,
     //         rlim_max: 0,
     //     };
-    //     assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
+    //     assert!(unsafe { getrlimit(RLIMIT_STACK, &raw mut stack_rlimit) } == 0);
     //
     //     stack_rlimit.rlim_cur as usize
     // }
@@ -374,7 +371,7 @@ impl AsanRuntime {
     //         rlim_cur: 0,
     //         rlim_max: 0,
     //     };
-    //     assert!(unsafe { getrlimit64(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
+    //     assert!(unsafe { getrlimit64(RLIMIT_STACK, &raw mut stack_rlimit) } == 0);
     //
     //     stack_rlimit.rlim_cur as usize
     // }
@@ -418,7 +415,7 @@ impl AsanRuntime {
     #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let mut stack_var = 0xeadbeef;
-        let stack_address = addr_of_mut!(stack_var) as usize;
+        let stack_address = &raw mut stack_var as usize;
         // let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
 
@@ -1891,13 +1888,13 @@ impl AsanRuntime {
             // Ignore eh_frame_cie for amd64
             // See discussions https://github.com/AFLplusplus/LibAFL/pull/331
             ;->accessed_address:
-            ; .dword 0x0
+            ; .i32 0x0
             ; self_addr:
-            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
+            ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword addr_of_mut!(self.regs) as i64
+            ; .i64 &raw mut self.regs as i64
             ; trap_func:
-            ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+            ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
         );
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
@@ -1946,7 +1943,7 @@ impl AsanRuntime {
             ; mov x25, x1 // address of instrumented instruction.
             ; str x25, [x28, 0xf8]
 
-            ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
+            ; .i32 0xd53b4218u32 as i32 // mrs x24, nzcv
             ; ldp x0, x1, [sp, 0x20]
             ; stp x0, x1, [x28]
 
@@ -1968,7 +1965,7 @@ impl AsanRuntime {
             ; ldr x1, >trap_func
             ; blr x1
 
-            ; .dword 0xd51b4218u32 as i32 // msr nzcv, x24
+            ; .i32 0xd51b4218u32 as i32 // msr nzcv, x24
             ; ldr x0, >self_regs_addr
             ; ldp x2, x3, [x0, #0x10]
             ; ldp x4, x5, [x0, #0x20]
@@ -1992,15 +1989,15 @@ impl AsanRuntime {
             ; br x1 // go back to the 'return address'
 
             ; self_addr:
-            ; .qword core::ptr::from_mut(self) as *mut c_void as i64
+            ; .i64 core::ptr::from_mut(self) as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword addr_of_mut!(self.regs) as i64
+            ; .i64 &raw mut self.regs as i64
             ; trap_func:
-            ; .qword AsanRuntime::handle_trap as *mut c_void as i64
+            ; .i64 AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
-            ; .qword __register_frame as *mut c_void as i64
+            ; .i64 __register_frame as *mut c_void as i64
             ; eh_frame_cie_addr:
-            ; .qword addr_of_mut!(self.eh_frame) as i64
+            ; .i64 &raw mut self.eh_frame as i64
         );
         self.eh_frame = [
             0x14, 0, 0x00527a01, 0x011e7c01, 0x001f0c1b, //
