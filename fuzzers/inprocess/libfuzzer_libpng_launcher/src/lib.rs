@@ -56,10 +56,19 @@ struct Opt {
     short,
     long,
     value_parser = Cores::from_cmdline,
-    help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+    help = "Spawn clients in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
     name = "CORES"
     )]
     cores: Cores,
+
+    #[arg(
+        short,
+        long,
+        help = "Spawn n clients on each core, this is useful if clients don't fully load a client, e.g. because they `sleep` often.",
+        name = "OVERCOMMIT",
+        default_value = "1"
+    )]
+    overcommit: usize,
 
     #[arg(
         short = 'p',
@@ -256,6 +265,7 @@ pub extern "C" fn libafl_main() {
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
+        .overcommit(opt.overcommit)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
