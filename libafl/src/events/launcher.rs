@@ -12,68 +12,52 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
-use alloc::string::ToString;
-#[cfg(feature = "std")]
-use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
+    time::Duration,
 };
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use std::boxed::Box;
-#[cfg(feature = "std")]
-use std::net::SocketAddr;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use std::process::Stdio;
-use std::string::String;
-#[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::unix::io::AsRawFd};
+use std::{net::SocketAddr, string::String};
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::Broker;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::Brokers;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::LlmpBroker;
-#[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::dup2;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use libafl_bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::{
-    core_affinity::get_core_ids,
-    os::{fork, ForkResult},
-};
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
+#[cfg(all(unix, feature = "fork"))]
+use {
+    crate::{
+        events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
+        inputs::UsesInput,
+        state::UsesState,
+    },
+    alloc::string::ToString,
+    libafl_bolts::{
+        core_affinity::get_core_ids,
+        llmp::{Broker, Brokers, LlmpBroker},
+        os::{fork, ForkResult},
+    },
+    std::boxed::Box,
+};
+#[cfg(unix)]
+use {
+    libafl_bolts::os::dup2,
+    std::{fs::File, os::unix::io::AsRawFd},
+};
+#[cfg(any(windows, not(feature = "fork")))]
+use {libafl_bolts::os::startable_self, std::process::Stdio};
 
-use super::EventManagerHooksTuple;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use super::StdLlmpEventHook;
-#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
-use crate::events::multi_machine::NodeDescriptor;
-#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
-use crate::events::multi_machine::TcpMultiMachineHooks;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::inputs::UsesInput;
-use crate::observers::TimeObserver;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::state::UsesState;
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "fork", feature = "multi_machine"))]
+use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
 use crate::{
     events::{
         llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
-        EventConfig,
+        EventConfig, EventManagerHooksTuple,
     },
     monitors::Monitor,
+    observers::TimeObserver,
     state::{HasExecutions, State},
     Error,
 };
@@ -115,14 +99,12 @@ impl ClientId {
 
     /// Create a string representation safe for environment variables
     #[must_use]
-    #[cfg(feature = "std")]
     pub fn to_safe_string(&self) -> String {
         format!("{}_{}", self.id, self.core_id.0)
     }
 
     /// Parse the string created by [`Self::to_safe_string`].
     #[must_use]
-    #[cfg(feature = "std")]
     pub fn from_safe_string(input: &str) -> Self {
         let mut iter = input.split('_');
         let id = iter.next().unwrap().parse().unwrap();
@@ -134,12 +116,6 @@ impl ClientId {
 /// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
 ///
 /// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
-#[cfg(feature = "std")]
-#[allow(
-    clippy::type_complexity,
-    missing_debug_implementations,
-    clippy::ignored_unit_patterns
-)]
 #[derive(TypedBuilder)]
 pub struct Launcher<'a, CF, MT, SP> {
     /// The `ShmemProvider` to use
@@ -206,7 +182,7 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
             .field("core", &self.cores)
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr);
-        #[cfg(all(unix, feature = "std"))]
+        #[cfg(unix)]
         {
             dbg_struct
                 .field("stdout_file", &self.stdout_file)
@@ -223,11 +199,7 @@ where
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(
-        feature = "std",
-        any(windows, not(feature = "fork"), all(unix, feature = "fork"))
-    ))]
-    #[allow(unused_mut, clippy::match_wild_err_arm)]
+    #[cfg(any(windows, not(feature = "fork"), all(unix, feature = "fork")))]
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
         S: State + HasExecutions,
@@ -237,7 +209,6 @@ where
     }
 }
 
-#[cfg(feature = "std")]
 impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
@@ -245,7 +216,6 @@ where
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "fork"))]
-    #[allow(clippy::similar_names, clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
@@ -383,7 +353,6 @@ where
 
     /// Launch the broker and the clients and fuzz
     #[cfg(any(windows, not(feature = "fork")))]
-    #[allow(unused_mut, clippy::match_wild_err_arm, clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
@@ -537,9 +506,8 @@ where
 ///
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 #[derive(TypedBuilder)]
-#[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
@@ -577,7 +545,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     #[builder(default = 10)]
     launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
@@ -585,7 +553,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
@@ -605,7 +573,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     serialize_state: LlmpShouldSaveState,
 }
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -624,7 +592,7 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
 /// The standard inner manager of centralized
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
@@ -666,7 +634,7 @@ where
     }
 }
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
@@ -675,7 +643,6 @@ where
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
     /// - `secondary_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
-    #[allow(clippy::similar_names, clippy::too_many_lines)]
     pub fn launch_generic<EM, EMB, S>(
         &mut self,
         main_inner_mgr_builder: EMB,
@@ -738,7 +705,6 @@ where
                         ForkResult::Parent(child) => {
                             self.shmem_provider.post_fork(false)?;
                             handles.push(child.pid);
-                            #[cfg(feature = "std")]
                             log::info!(
                                 "child with client id {index} spawned and bound to core {id}"
                             );
