@@ -259,7 +259,6 @@ where
 /// signal hooks and `panic_hooks` for the child process
 pub mod child_signal_handlers {
     use alloc::boxed::Box;
-    use core::ptr::addr_of_mut;
     use std::panic;
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal};
@@ -284,7 +283,7 @@ pub mod child_signal_handlers {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
             old_hook(panic_info);
-            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
+            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             if !data.is_null() && (*data).is_valid() {
                 let executor = (*data).executor_mut::<E>();
                 let mut observers = executor.observers_mut();

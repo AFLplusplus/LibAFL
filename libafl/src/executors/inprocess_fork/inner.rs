@@ -2,7 +2,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, addr_of_mut, null_mut, write_volatile},
+    ptr::{self, null_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
@@ -144,10 +144,10 @@ where
             let mut timerid: libc::timer_t = null_mut();
             // creates a new per-process interval timer
             // we can't do this from the parent, timerid is unique to each process.
-            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
+            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
 
             // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-            let _: i32 = libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+            let _: i32 = libc::timer_settime(timerid, 0, &raw mut self.itimerspec, null_mut());
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -224,17 +224,17 @@ where
         input: &<Self as UsesInput>::Input,
     ) {
         unsafe {
-            let data = addr_of_mut!(FORK_EXECUTOR_GLOBAL_DATA);
+            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
-                addr_of_mut!((*data).executor_ptr),
+                &raw mut (*data).executor_ptr,
                 ptr::from_ref(self) as *const c_void,
             );
             write_volatile(
-                addr_of_mut!((*data).current_input_ptr),
+                &raw mut (*data).current_input_ptr,
                 ptr::from_ref(input) as *const c_void,
             );
             write_volatile(
-                addr_of_mut!((*data).state_ptr),
+                &raw mut ((*data).state_ptr),
                 ptr::from_mut(state) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);

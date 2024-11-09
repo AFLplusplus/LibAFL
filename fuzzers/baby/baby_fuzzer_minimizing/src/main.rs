@@ -86,7 +86,7 @@ pub fn main() -> Result<(), Error> {
     .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
-    let mut generator = RandPrintablesGenerator::new(nonzero!(32));
+    let mut generator = RandPrintablesGenerator::new(nonzero!(1), nonzero!(32));
 
     // Generate 8 initial inputs
     state

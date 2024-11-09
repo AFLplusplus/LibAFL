@@ -40,10 +40,12 @@ for task in output[
     print("Running ", task)
     print(os.environ)
 
-    if ("utils/libafl_jumper/Cargo.toml" in task
-            and "--no-default-features" in task
-            and "--features" not in task):
-         # ignore libafl_jumper no std
+    if (
+        "utils/libafl_jumper/Cargo.toml" in task
+        and "--no-default-features" in task
+        and "--features" not in task
+    ):
+        # ignore libafl_jumper no std
         continue
 
     if "libafl_frida" in task:

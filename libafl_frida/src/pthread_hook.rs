@@ -63,9 +63,16 @@ impl PreviousHook {
 unsafe impl Sync for PreviousHook {}
 
 // TODO: This could use a RwLock as well
+/// The previous hook
 static mut PREVIOUS_HOOK: PreviousHook = PreviousHook(std::ptr::null());
 
+/// The currently set hook
 static CURRENT_HOOK: RwLock<Option<PthreadIntrospectionHook>> = RwLock::new(None);
+
+/// Get the pointer to the previous hook, mut
+fn previous_hook_ptr_mut() -> *mut PreviousHook {
+    &raw mut PREVIOUS_HOOK
+}
 
 extern "C" fn pthread_introspection_hook(
     event: libc::c_uint,
@@ -76,7 +83,7 @@ extern "C" fn pthread_introspection_hook(
     if let Some(ref hook) = *CURRENT_HOOK.read().unwrap() {
         hook(event.try_into().unwrap(), thread, addr, size);
     }
-    unsafe { PREVIOUS_HOOK.dispatch(event, thread, addr, size) };
+    unsafe { (*previous_hook_ptr_mut()).dispatch(event, thread, addr, size) };
 }
 
 /// Closure type for `pthread_introspection` hooks.
@@ -159,7 +166,7 @@ where
     // Allow because we're sure this isn't from a different code generation unit.
     if !(prev).is_null() && prev != pthread_introspection_hook as _ {
         unsafe {
-            PREVIOUS_HOOK.set(prev as *const pthread_introspection_hook_t);
+            (*previous_hook_ptr_mut()).set(prev as *const pthread_introspection_hook_t);
         }
     }
 }
@@ -176,7 +183,9 @@ where
 /// # Safety
 /// Potential data race when if called at the same time as `install` or `reset` from another thread
 pub unsafe fn reset() {
-    unsafe { PREVIOUS_HOOK.reset() };
+    unsafe {
+        (*previous_hook_ptr_mut()).reset();
+    };
 }
 
 /// The following tests fail if they are not run sequentially.
