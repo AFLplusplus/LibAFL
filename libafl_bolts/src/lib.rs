@@ -143,9 +143,9 @@ pub mod bolts_prelude {
 use alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, vec::Vec};
-#[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
+use foldhash::fast::FixedState;
+#[cfg(not(feature = "xxh3"))]
 use core::hash::BuildHasher;
-#[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};

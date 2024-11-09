@@ -55,7 +55,7 @@ std = [
 ]
 
 ## Enables all features that allocate in `no_std`
-alloc = ["serde/alloc", "hashbrown", "postcard", "erased-serde/alloc", "foldhash"]
+alloc = ["serde/alloc", "hashbrown", "postcard", "erased-serde/alloc"]
 
 ## Provide the `#[derive(SerdeAny)]` macro.
 derive = ["libafl_derive"]
@@ -136,7 +136,7 @@ serde = { workspace = true, default-features = false, features = [
 erased-serde = { version = "0.4.5", default-features = false, optional = true } # erased serde
 postcard = { workspace = true, optional = true } # no_std compatible serde serialization format
 num_enum = { workspace = true, default-features = false }
-foldhash = { workspace = true, optional = true } # The hash function already used in hashbrown
+foldhash = { workspace = true } #, optional = true } # The hash function already used in hashbrown
 backtrace = { workspace = true, default-features = true, optional = true } # Used to get the stacktrace in StacktraceObserver
 
 ctor = { optional = true, version = "0.2.8" }
