@@ -95,7 +95,12 @@ where
 impl RandBytesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
+        Self { min_size: nonzero!(1), max_size }
+    }
+
+    /// Returns a new [`RandBytesGenerator`], generating from `min_size` up to `max_size` random bytes.
+    pub fn with_min_size(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
         Self { min_size, max_size }
     }
 }
@@ -125,7 +130,12 @@ where
 impl RandPrintablesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
-    pub fn new(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
+    pub fn new(max_size: NonZeroUsize) -> Self {
+        Self { min_size: nonzero!(1), max_size }
+    }
+
+     /// Returns a new [`RandPrintablesGenerator`], generating from `min_size` up to `max_size` random bytes.
+    pub fn with_min_size(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
         Self { min_size, max_size }
     }
 }
@@ -140,18 +150,37 @@ mod test{
     use super::RandBytesGenerator;
 
     #[test]
-    fn test_bytes(){
+    fn test_bytes_old(){
         let mut dummy_state: NopState<NopInput> = NopState::new();
-        let mut gen = RandBytesGenerator::new(NonZeroUsize::new(2).unwrap(), NonZeroUsize::new(3).unwrap());
+        let mut gen = RandBytesGenerator::new(NonZeroUsize::new(3).unwrap());
+        for _i in 1..10 {
+            println!("{:?}",gen.generate(&mut dummy_state));
+        }
+    }
+
+    
+    #[test]
+    fn test_bytes_with_min(){
+        let mut dummy_state: NopState<NopInput> = NopState::new();
+        let mut gen = RandBytesGenerator::with_min_size(NonZeroUsize::new(2).unwrap(), NonZeroUsize::new(3).unwrap());
         for _i in 1..10 {
             println!("{:?}",gen.generate(&mut dummy_state));
         }
     }
 
     #[test]
-    fn test_printables(){
+    fn test_printables_old(){
         let mut dummy_state: NopState<NopInput> = NopState::new();
-        let mut gen = RandBytesGenerator::new(NonZeroUsize::new(1).unwrap(), NonZeroUsize::new(1).unwrap());
+        let mut gen = RandBytesGenerator::new(NonZeroUsize::new(1).unwrap());
+        for _i in 1..10 {
+            println!("{:?}",gen.generate(&mut dummy_state));
+        }
+    }
+
+    #[test]
+    fn test_printables_with_min(){
+        let mut dummy_state: NopState<NopInput> = NopState::new();
+        let mut gen = RandBytesGenerator::with_min_size(NonZeroUsize::new(1).unwrap(), NonZeroUsize::new(1).unwrap());
         for _i in 1..10 {
             println!("{:?}",gen.generate(&mut dummy_state));
         }
