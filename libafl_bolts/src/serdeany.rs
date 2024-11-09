@@ -118,7 +118,7 @@ pub mod serdeany_registry {
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{any::TypeId, fmt};
+    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
         hash_map::{Values, ValuesMut},
@@ -342,7 +342,7 @@ pub mod serdeany_registry {
             '_,
             TypeRepr,
             Box<dyn SerdeAny + 'static>,
-            foldhash::fast::RandomState,
+            BuildHasherDefault<ahash::AHasher>,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -646,7 +646,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            foldhash::fast::RandomState,
+            BuildHasherDefault<ahash::AHasher>,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -664,7 +664,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            foldhash::fast::RandomState,
+            BuildHasherDefault<ahash::AHasher>,
         >
         where
             T: crate::serdeany::SerdeAny,
