@@ -244,11 +244,14 @@ async fn main() -> io::Result<()> {
         .map(DirEntry::into_path)
         .collect();
 
-    let mut tokio_joinset = JoinSet::new();
-
-    for project in rust_projects_to_fmt {
-        tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
-    }
+    println!(
+        "Using {}",
+        get_version_string("cargo", &["+nightly"]).await?
+    ); // cargo version
+    println!(
+        "Using {}",
+        get_version_string("cargo", &["+nightly", "fmt"]).await?
+    ); // rustfmt version
 
     let reference_clang_format = format!("clang-format-{REF_LLVM_VERSION}");
     let unspecified_clang_format = "clang-format";
@@ -256,7 +259,7 @@ async fn main() -> io::Result<()> {
     let (clang, warning) = if which(&reference_clang_format).is_ok() {
         println!(
             "Using the reference clang-format with version: {}",
-            get_version_string(&reference_clang_format).await?
+            get_version_string(&reference_clang_format, &[]).await?
         );
 
         (Some(reference_clang_format.as_str()), None)
@@ -265,7 +268,7 @@ async fn main() -> io::Result<()> {
             Some(unspecified_clang_format),
             Some(format!(
                 "using {}, could provide a different result from {}",
-                get_version_string(unspecified_clang_format).await?,
+                get_version_string(unspecified_clang_format, &[]).await?,
                 reference_clang_format
             )),
         )
@@ -275,6 +278,12 @@ async fn main() -> io::Result<()> {
             Some("clang-format not found. Skipping C formatting...".to_string()),
         )
     };
+
+    let mut tokio_joinset = JoinSet::new();
+
+    for project in rust_projects_to_fmt {
+        tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
+    }
 
     if let Some(clang) = clang {
         let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
@@ -319,7 +328,12 @@ async fn main() -> io::Result<()> {
     Ok(())
 }
 
-async fn get_version_string(path: &str) -> Result<String, io::Error> {
-    let version = Command::new(path).arg("--version").output().await?.stdout;
+async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Error> {
+    let version = Command::new(path)
+        .args(args)
+        .arg("--version")
+        .output()
+        .await?
+        .stdout;
     Ok(from_utf8(&version).unwrap().replace('\n', ""))
 }
