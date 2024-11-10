@@ -256,28 +256,32 @@ async fn main() -> io::Result<()> {
     let reference_clang_format = format!("clang-format-{REF_LLVM_VERSION}");
     let unspecified_clang_format = "clang-format";
 
-    let (clang, warning) = if which(&reference_clang_format).is_ok() {
-        println!(
-            "Using the reference clang-format with version: {}",
-            get_version_string(&reference_clang_format, &[]).await?
-        );
-
-        (Some(reference_clang_format.as_str()), None)
+    let (clang, version, warning) = if which(&reference_clang_format).is_ok() {
+        (
+            Some(reference_clang_format.as_str()),
+            Some(get_version_string(&reference_clang_format, &[]).await?),
+            None,
+        )
     } else if which(unspecified_clang_format).is_ok() {
+        let version = get_version_string(unspecified_clang_format, &[]).await?;
         (
             Some(unspecified_clang_format),
+            Some(version.clone()),
             Some(format!(
-                "using {}, could provide a different result from {}",
-                get_version_string(unspecified_clang_format, &[]).await?,
-                reference_clang_format
+                "using {version}, could provide a different result from {reference_clang_format}"
             )),
         )
     } else {
         (
             None,
+            None,
             Some("clang-format not found. Skipping C formatting...".to_string()),
         )
     };
+
+    if let Some(version) = &version {
+        println!("Using {version}");
+    }
 
     let mut tokio_joinset = JoinSet::new();
 
