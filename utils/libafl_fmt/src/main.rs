@@ -244,16 +244,28 @@ async fn main() -> io::Result<()> {
         .map(DirEntry::into_path)
         .collect();
 
+    // cargo version
     println!(
         "Using {}",
         get_version_string("cargo", &["+nightly"]).await?
-    ); // cargo version
+    );
+
+    // rustfmt version
     println!(
         "Using {}",
         get_version_string("cargo", &["+nightly", "fmt"]).await?
-    ); // rustfmt version
+    );
 
-    let reference_clang_format = format!("clang-format-{REF_LLVM_VERSION}");
+    let reference_clang_format = format!(
+        "clang-format-{}",
+        std::env::var("MAIN_LLVM_VERSION")
+            .inspect(|e| {
+                println!(
+                    "Overriding clang-format version from the default {REF_LLVM_VERSION} to {e} using env variable MAIN_LLVM_VERSION"
+                );
+            })
+            .unwrap_or(REF_LLVM_VERSION.to_string())
+    );
     let unspecified_clang_format = "clang-format";
 
     let (clang, version, warning) = if which(&reference_clang_format).is_ok() {
@@ -319,9 +331,7 @@ async fn main() -> io::Result<()> {
         }
     }
 
-    if let Some(warning) = warning {
-        println!("\n{}: {}\n", "Warning".yellow().bold(), warning);
-    }
+    let _ = warning.map(print_warning);
 
     if cli.check {
         println!("[*] Check finished successfully.");
@@ -340,4 +350,9 @@ async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Err
         .await?
         .stdout;
     Ok(from_utf8(&version).unwrap().replace('\n', ""))
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn print_warning(warning: String) {
+    println!("\n{} {}\n", "Warning:".yellow().bold(), warning);
 }
