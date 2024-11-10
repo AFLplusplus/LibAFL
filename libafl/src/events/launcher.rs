@@ -423,6 +423,7 @@ where
                     if self.cores.ids.iter().any(|&x| x == core_i.into()) {
                         for overcommit_i in 0..self.overcommit {
                             // Forward own stdio to child processes, if requested by user
+                            #[allow(unused_mut)]
                             let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
                             #[cfg(unix)]
                             {

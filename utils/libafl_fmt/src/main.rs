@@ -255,7 +255,7 @@ async fn main() -> io::Result<()> {
 
     let (clang, warning) = if which(&reference_clang_format).is_ok() {
         println!(
-            "Using {}",
+            "Using the reference clang-format with version: {}",
             get_version_string(&reference_clang_format).await?
         );
 
@@ -275,7 +275,7 @@ async fn main() -> io::Result<()> {
             Some("clang-format not found. Skipping C formatting...".to_string()),
         )
     };
-    // println!("Using {:#?} to format...", clang);
+
     if let Some(clang) = clang {
         let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
             .into_iter()
