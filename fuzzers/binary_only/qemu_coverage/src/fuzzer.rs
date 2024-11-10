@@ -8,7 +8,9 @@ use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, NopCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{
+        launcher::Launcher, ClientId, EventConfig, EventRestarter, LlmpRestartingEventManager,
+    },
     executors::ExitKind,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
@@ -192,7 +194,7 @@ pub fn fuzz() {
         };
 
     let mut run_client =
-        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, client_id| {
+        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, client_id: ClientId| {
             let core_id = client_id.core_id();
             let core_idx = options
                 .cores
