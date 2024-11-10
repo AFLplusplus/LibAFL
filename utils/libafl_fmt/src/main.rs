@@ -254,19 +254,19 @@ async fn main() -> io::Result<()> {
     let unspecified_clang_format = "clang-format";
 
     let (clang, warning) = if which(&reference_clang_format).is_ok() {
+        println!(
+            "Using {}",
+            get_version_string(&reference_clang_format).await?
+        );
+
         (Some(reference_clang_format.as_str()), None)
     } else if which(unspecified_clang_format).is_ok() {
-        let version = Command::new(unspecified_clang_format)
-            .arg("--version")
-            .output()
-            .await?
-            .stdout;
-
         (
             Some(unspecified_clang_format),
             Some(format!(
-                "using {}, could provide a different result from clang-format-17",
-                from_utf8(&version).unwrap().replace('\n', "")
+                "using {}, could provide a different result from {}",
+                get_version_string(unspecified_clang_format).await?,
+                reference_clang_format
             )),
         )
     } else {
@@ -317,4 +317,9 @@ async fn main() -> io::Result<()> {
     }
 
     Ok(())
+}
+
+async fn get_version_string(path: &str) -> Result<String, io::Error> {
+    let version = Command::new(path).arg("--version").output().await?.stdout;
+    Ok(from_utf8(&version).unwrap().replace('\n', ""))
 }
