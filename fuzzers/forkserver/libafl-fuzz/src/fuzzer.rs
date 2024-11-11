@@ -540,7 +540,7 @@ fn base_forkserver_builder<'a>(
         executor = executor.envs(target_env);
     }
     if opt.frida_mode {
-        executor = executor.kill_signal(nix::sys::signal::Signal::SIGKILL)
+        executor = executor.kill_signal(nix::sys::signal::Signal::SIGKILL);
     }
     if let Some(kill_signal) = opt.kill_signal {
         executor = executor.kill_signal(kill_signal);
