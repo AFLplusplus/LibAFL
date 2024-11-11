@@ -2,7 +2,7 @@
 #[cfg(unix)]
 pub mod unix_signal_handler {
     use alloc::{boxed::Box, string::String, vec::Vec};
-    use core::{mem::transmute, ptr::addr_of_mut};
+    use core::mem::transmute;
     use std::{io::Write, panic};
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
@@ -51,7 +51,7 @@ pub mod unix_signal_handler {
             context: Option<&mut ucontext_t>,
         ) {
             unsafe {
-                let data = addr_of_mut!(GLOBAL_STATE);
+                let data = &raw mut GLOBAL_STATE;
                 let in_handler = (*data).set_in_handler(true);
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
@@ -91,7 +91,7 @@ pub mod unix_signal_handler {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
             old_hook(panic_info);
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
             let in_handler = (*data).set_in_handler(true);
             if (*data).is_valid() {
                 // We are fuzzing!

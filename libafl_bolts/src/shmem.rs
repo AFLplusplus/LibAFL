@@ -1340,6 +1340,184 @@ pub mod unix_shmem {
             }
         }
     }
+
+    /// Module containing `memfd` shared memory support, usable on Linux and Android.
+    #[cfg(all(unix, feature = "std", not(target_vendor = "apple")))]
+    pub mod memfd {
+        use alloc::string::ToString;
+        use core::{
+            ops::{Deref, DerefMut},
+            ptr, slice,
+        };
+        use std::{ffi::CString, os::fd::IntoRawFd};
+
+        use libc::{
+            c_void, close, fstat, ftruncate, mmap, munmap, MAP_SHARED, PROT_READ, PROT_WRITE,
+        };
+        use nix::sys::memfd::{memfd_create, MemFdCreateFlag};
+
+        use crate::{
+            shmem::{ShMem, ShMemId, ShMemProvider},
+            Error,
+        };
+
+        /// An memfd based impl for linux/android
+        #[cfg(unix)]
+        #[derive(Clone, Debug)]
+        pub struct MemfdShMem {
+            id: ShMemId,
+            map: *mut u8,
+            map_size: usize,
+        }
+
+        impl MemfdShMem {
+            /// Create a new shared memory mapping, using shmget/shmat
+            pub fn new(map_size: usize) -> Result<Self, Error> {
+                unsafe {
+                    let c_str = CString::new("libAFL").unwrap();
+                    let Ok(fd) = memfd_create(&c_str, MemFdCreateFlag::empty()) else {
+                        return Err(Error::last_os_error("Failed to create memfd".to_string()));
+                    };
+                    let fd = fd.into_raw_fd();
+
+                    #[allow(clippy::cast_possible_wrap)]
+                    if ftruncate(fd, map_size as i64) == -1 {
+                        close(fd);
+                        return Err(Error::last_os_error(format!(
+                            "Failed to ftruncate memfd to {map_size}"
+                        )));
+                    }
+                    let map = mmap(
+                        ptr::null_mut(),
+                        map_size,
+                        PROT_READ | PROT_WRITE,
+                        MAP_SHARED,
+                        fd,
+                        0,
+                    );
+                    if map == usize::MAX as *mut c_void {
+                        close(fd);
+                        return Err(Error::unknown(
+                            "Failed to map the memfd mapping".to_string(),
+                        ));
+                    }
+                    Ok(Self {
+                        id: ShMemId::from_int(fd),
+                        map: map as *mut u8,
+                        map_size,
+                    })
+                }
+            }
+
+            fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+                let fd = i32::from(id);
+                unsafe {
+                    let mut stat = std::mem::zeroed();
+                    if fstat(fd, &mut stat) == -1 {
+                        return Err(Error::unknown(
+                            "Failed to map the memfd mapping".to_string(),
+                        ));
+                    }
+                    #[allow(clippy::cast_sign_loss)]
+                    if stat.st_size as usize != map_size {
+                        return Err(Error::unknown(
+                            "The mapping's size differs from the requested size".to_string(),
+                        ));
+                    }
+                    let map = mmap(
+                        ptr::null_mut(),
+                        map_size,
+                        PROT_READ | PROT_WRITE,
+                        MAP_SHARED,
+                        fd,
+                        0,
+                    );
+                    if map == usize::MAX as *mut c_void {
+                        return Err(Error::last_os_error(format!(
+                            "mmap() failed for map with fd {fd:?}"
+                        )));
+                    }
+                    Ok(Self {
+                        id: ShMemId::from_int(fd),
+                        map: map as *mut u8,
+                        map_size,
+                    })
+                }
+            }
+        }
+
+        #[cfg(unix)]
+        impl ShMem for MemfdShMem {
+            fn id(&self) -> ShMemId {
+                self.id
+            }
+        }
+
+        impl Deref for MemfdShMem {
+            type Target = [u8];
+
+            fn deref(&self) -> &[u8] {
+                unsafe { slice::from_raw_parts(self.map, self.map_size) }
+            }
+        }
+
+        impl DerefMut for MemfdShMem {
+            fn deref_mut(&mut self) -> &mut [u8] {
+                unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+            }
+        }
+
+        /// [`Drop`] implementation for [`MemfdShMem`], which cleans up the mapping.
+        #[cfg(unix)]
+        impl Drop for MemfdShMem {
+            #[allow(trivial_numeric_casts)]
+            fn drop(&mut self) {
+                let fd = i32::from(self.id);
+
+                unsafe {
+                    munmap(self.map as *mut _, self.map_size);
+                    close(fd);
+                }
+            }
+        }
+
+        /// A [`ShMemProvider`] which uses memfd to provide shared memory mappings.
+        #[cfg(unix)]
+        #[derive(Clone, Debug)]
+        pub struct MemfdShMemProvider {}
+
+        unsafe impl Send for MemfdShMemProvider {}
+
+        #[cfg(unix)]
+        impl Default for MemfdShMemProvider {
+            fn default() -> Self {
+                Self::new().unwrap()
+            }
+        }
+
+        /// Implement [`ShMemProvider`] for [`MemfdShMemProvider`]
+        #[cfg(unix)]
+        impl ShMemProvider for MemfdShMemProvider {
+            type ShMem = MemfdShMem;
+
+            fn new() -> Result<Self, Error> {
+                Ok(Self {})
+            }
+
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+                let mapping = MemfdShMem::new(map_size)?;
+                Ok(mapping)
+            }
+
+            fn shmem_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::ShMem, Error> {
+                MemfdShMem::shmem_from_id_and_size(id, size)
+            }
+        }
+    }
 }
 
 /// Then `win32` implementation for shared memory.

@@ -20,7 +20,7 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.1.21", features = ["parallel"] }
-which = { version = "7.0.0" }
+which = "6.0.3"
 
 [dependencies]
 # no llmp compression for now, better perfs.

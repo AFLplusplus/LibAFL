@@ -13,7 +13,6 @@ use alloc::{
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
-    ptr::addr_of,
 };
 #[cfg(target_vendor = "apple")]
 use std::fs;
@@ -694,7 +693,7 @@ where
             let copied_poll_fds: Vec<PollFd> = poll_fds.clone();
             for poll_fd in copied_poll_fds {
                 let revents = poll_fd.revents().expect("revents should not be None");
-                let raw_polled_fd = unsafe { *((addr_of!(poll_fd)) as *const libc::pollfd) }.fd;
+                let raw_polled_fd = unsafe { *((&raw const poll_fd) as *const libc::pollfd) }.fd;
                 if revents.contains(PollFlags::POLLHUP) {
                     poll_fds.remove(poll_fds.iter().position(|item| *item == poll_fd).unwrap());
                     self.clients.remove(&raw_polled_fd);

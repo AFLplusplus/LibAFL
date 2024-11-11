@@ -118,11 +118,7 @@ pub mod serdeany_registry {
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{
-        any::TypeId,
-        fmt,
-        ptr::{addr_of, addr_of_mut},
-    };
+    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
         hash_map::{Values, ValuesMut},
@@ -159,8 +155,9 @@ pub mod serdeany_registry {
         {
             let id: TypeRepr = visitor.next_element()?.unwrap();
 
+            let registry = &raw const REGISTRY;
             let cb = unsafe {
-                (*addr_of!(REGISTRY))
+                (*registry)
                     .deserializers
                     .as_ref()
                     .ok_or_else(||
@@ -231,8 +228,9 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny + Serialize + serde::de::DeserializeOwned,
         {
+            let registry = &raw mut REGISTRY;
             unsafe {
-                (*addr_of_mut!(REGISTRY)).register::<T>();
+                (*registry).register::<T>();
             }
         }
 
@@ -242,8 +240,9 @@ pub mod serdeany_registry {
         /// This may never be called concurrently or at the same time as `register`.
         /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
         pub unsafe fn finalize() {
+            let registry = &raw mut REGISTRY;
             unsafe {
-                (*addr_of_mut!(REGISTRY)).finalize();
+                (*registry).finalize();
             }
         }
     }
@@ -343,7 +342,7 @@ pub mod serdeany_registry {
             '_,
             TypeRepr,
             Box<dyn SerdeAny + 'static>,
-            foldhash::fast::RandomState,
+            BuildHasherDefault<ahash::AHasher>,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -352,9 +351,10 @@ pub mod serdeany_registry {
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
 
+            let registry = &raw const REGISTRY;
             assert!(
                         unsafe {
-                            (*addr_of!(REGISTRY))
+                            (*registry)
                                 .deserializers
                                 .as_ref()
                                 .expect(super::ERR_EMPTY_TYPES_REGISTER)
@@ -614,10 +614,10 @@ pub mod serdeany_registry {
             let type_repr = type_repr::<T>();
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
-
+            let registry = &raw const REGISTRY;
             assert!(
                         unsafe {
-                            (*addr_of!(REGISTRY))
+                            (*registry)
                                 .deserializers
                                 .as_ref()
                                 .expect(super::ERR_EMPTY_TYPES_REGISTER)
@@ -646,7 +646,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            foldhash::fast::RandomState,
+            BuildHasherDefault<ahash::AHasher>,
         >
         where
             T: crate::serdeany::SerdeAny,
@@ -664,7 +664,7 @@ pub mod serdeany_registry {
             '_,
             String,
             Box<dyn SerdeAny + 'static>,
-            foldhash::fast::RandomState,
+            BuildHasherDefault<ahash::AHasher>,
         >
         where
             T: crate::serdeany::SerdeAny,

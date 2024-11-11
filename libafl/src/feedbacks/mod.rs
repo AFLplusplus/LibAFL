@@ -828,7 +828,7 @@ impl ExitKindLogic for GenericDiffLogic {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExitKindFeedback<L> {
     #[cfg(feature = "track_hit_feedbacks")]
-    // The previous run's result of `Self::is_interesting`
+    /// The previous run's result of [`Self::is_interesting`]
     last_result: Option<bool>,
     name: Cow<'static, str>,
     phantom: PhantomData<fn() -> L>,

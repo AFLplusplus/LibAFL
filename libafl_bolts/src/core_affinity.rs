@@ -595,8 +595,6 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 #[cfg(target_vendor = "apple")]
 mod apple {
     use alloc::vec::Vec;
-    #[cfg(target_arch = "x86_64")]
-    use core::ptr::addr_of_mut;
     use std::thread::available_parallelism;
 
     #[cfg(target_arch = "x86_64")]
@@ -645,7 +643,7 @@ mod apple {
             let result = thread_policy_set(
                 pthread_mach_thread_np(pthread_self()),
                 THREAD_AFFINITY_POLICY as _,
-                addr_of_mut!(info) as thread_policy_t,
+                &raw mut info as thread_policy_t,
                 THREAD_AFFINITY_POLICY_COUNT,
             );
 
