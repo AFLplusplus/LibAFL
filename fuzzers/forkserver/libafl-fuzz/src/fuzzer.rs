@@ -49,13 +49,14 @@ use libafl_bolts::{
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
-    executor::find_afl_binary,
+    executor::{find_afl_binary, SupportedExecutors},
     feedback::{
         filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
         seed::SeedFeedback,
@@ -94,10 +95,38 @@ where
     shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
     let shmem_buf = shmem.as_slice_mut();
 
-    // Create an observation channel to keep track of edges hit.
-    let edges_observer = unsafe {
-        HitcountsMapObserver::new(StdMapObserver::new("edges", shmem_buf)).track_indices()
+    // If we are in Nyx Mode, we need to use a different map observer.
+    #[cfg(target_os = "linux")]
+    let (nyx_helper, edges_observer) = {
+        if opt.nyx_mode {
+            // main node is the first core id in CentralizedLauncher
+            let cores = opt.cores.clone().expect("invariant; should never occur");
+            let main_node_core_id = match cores.ids.len() {
+                1 => None,
+                _ => Some(cores.ids.first().expect("invariant; should never occur").0),
+            };
+            let nyx_settings = NyxSettings::builder()
+                .cpu_id(core_id.0)
+                .parent_cpu_id(main_node_core_id)
+                .build();
+            let nyx_helper = NyxHelper::new(opt.executable.clone(), nyx_settings).unwrap();
+            let observer = unsafe {
+                StdMapObserver::from_mut_ptr(
+                    "edges",
+                    nyx_helper.bitmap_buffer,
+                    nyx_helper.bitmap_size,
+                )
+            };
+            (Some(nyx_helper), observer)
+        } else {
+            let observer = unsafe { StdMapObserver::new("edges", shmem_buf) };
+            (None, observer)
+        }
     };
+    #[cfg(not(target_os = "linux"))]
+    let edges_observer = { unsafe { StdMapObserver::new("edges", shmem_buf) } };
+
+    let edges_observer = HitcountsMapObserver::new(edges_observer).track_indices();
 
     // Create a MapFeedback for coverage guided fuzzin'
     let map_feedback = MaxMapFeedback::new(&edges_observer);
@@ -261,23 +290,58 @@ where
         std::env::set_var("LD_PRELOAD", &preload);
         std::env::set_var("DYLD_INSERT_LIBRARIES", &preload);
     }
+    #[cfg(target_os = "linux")]
+    let mut executor = {
+        if opt.nyx_mode {
+            SupportedExecutors::Nyx(NyxExecutor::builder().build(
+                nyx_helper.unwrap(),
+                (edges_observer, tuple_list!(time_observer)),
+            ))
+        } else {
+            // Create the base Executor
+            let mut executor_builder =
+                base_forkserver_builder(opt, &mut shmem_provider, fuzzer_dir);
+            // Set a custom exit code to be interpreted as a Crash if configured.
+            if let Some(crash_exitcode) = opt.crash_exitcode {
+                executor_builder = executor_builder.crash_exitcode(crash_exitcode);
+            }
 
-    // Create the base Executor
-    let mut executor_builder = base_executor_builder(opt, &mut shmem_provider, fuzzer_dir);
-    // Set a custom exit code to be interpreted as a Crash if configured.
-    if let Some(crash_exitcode) = opt.crash_exitcode {
-        executor_builder = executor_builder.crash_exitcode(crash_exitcode);
-    }
+            // Enable autodict if configured
+            if !opt.no_autodict {
+                executor_builder = executor_builder.autotokens(&mut tokens);
+            };
 
-    // Enable autodict if configured
-    if !opt.no_autodict {
-        executor_builder = executor_builder.autotokens(&mut tokens);
+            // Finalize and build our Executor
+            SupportedExecutors::Forkserver(
+                executor_builder
+                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
+                    .unwrap(),
+                PhantomData,
+            )
+        }
     };
+    #[cfg(not(target_os = "linux"))]
+    let executor = {
+        // Create the base Executor
+        let mut executor_builder = base_forkserver_builder(opt, &mut shmem_provider, fuzzer_dir);
+        // Set a custom exit code to be interpreted as a Crash if configured.
+        if let Some(crash_exitcode) = opt.crash_exitcode {
+            executor_builder = executor_builder.crash_exitcode(crash_exitcode);
+        }
 
-    // Finalize and build our Executor
-    let mut executor = executor_builder
-        .build_dynamic_map(edges_observer, tuple_list!(time_observer))
-        .unwrap();
+        // Enable autodict if configured
+        if !opt.no_autodict {
+            executor_builder = executor_builder.autotokens(&mut tokens);
+        };
+
+        // Finalize and build our Executor
+        SupportedExecutors::Forkserver(
+            executor_builder
+                .build_dynamic_map(edges_observer, tuple_list!(time_observer))
+                .unwrap(),
+            PhantomData,
+        )
+    };
 
     let queue_dir = fuzzer_dir.join("queue");
     if opt.auto_resume {
@@ -383,7 +447,7 @@ where
 
         // Create the CmpLog executor.
         // Cmplog has 25% execution overhead so we give it double the timeout
-        let cmplog_executor = base_executor_builder(opt, &mut shmem_provider, fuzzer_dir)
+        let cmplog_executor = base_forkserver_builder(opt, &mut shmem_provider, fuzzer_dir)
             .timeout(Duration::from_millis(opt.hang_timeout * 2))
             .program(cmplog_executable_path)
             .build(tuple_list!(cmplog_observer))
@@ -458,7 +522,7 @@ where
     // TODO: serialize state when exiting.
 }
 
-fn base_executor_builder<'a>(
+fn base_forkserver_builder<'a>(
     opt: &'a Opt,
     shmem_provider: &'a mut UnixShMemProvider,
     fuzzer_dir: &Path,

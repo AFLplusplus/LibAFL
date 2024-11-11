@@ -1,5 +1,5 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
-use std::{fmt::Debug, fs::File, path::Path};
+use std::{fmt::Debug, fs::File, path::Path, time::Duration};
 
 use libafl::Error;
 use libnyx::{NyxConfig, NyxProcess, NyxProcessRole};
@@ -9,6 +9,8 @@ use crate::settings::NyxSettings;
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
     pub nyx_stdout: File,
+
+    pub timeout: Duration,
 
     pub bitmap_size: usize,
     pub bitmap_buffer: *mut u8,
@@ -66,7 +68,11 @@ impl NyxHelper {
         let bitmap_size = nyx_process.bitmap_buffer_size();
         let bitmap_buffer = nyx_process.bitmap_buffer_mut().as_mut_ptr();
 
+        let mut timeout = Duration::from_secs(settings.timeout_secs as u64);
+        timeout += Duration::from_micros(settings.timeout_micro_secs as u64);
+
         Ok(Self {
+            timeout,
             nyx_process,
             nyx_stdout,
             bitmap_size,
