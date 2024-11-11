@@ -539,6 +539,9 @@ fn base_forkserver_builder<'a>(
     if let Some(target_env) = &opt.target_env {
         executor = executor.envs(target_env);
     }
+    if opt.frida_mode {
+        executor = executor.kill_signal(nix::sys::signal::Signal::SIGKILL)
+    }
     if let Some(kill_signal) = opt.kill_signal {
         executor = executor.kill_signal(kill_signal);
     }
