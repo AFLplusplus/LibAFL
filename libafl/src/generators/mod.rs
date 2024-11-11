@@ -105,6 +105,7 @@ impl RandBytesGenerator {
     }
 
     /// Returns a new [`RandBytesGenerator`], generating from `min_size` up to `max_size` random bytes.
+    #[must_use]
     pub fn with_min_size(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
         Self { min_size, max_size }
     }
@@ -145,6 +146,7 @@ impl RandPrintablesGenerator {
     }
 
     /// Returns a new [`RandPrintablesGenerator`], generating from `min_size` up to `max_size` random bytes.
+    #[must_use]
     pub fn with_min_size(min_size: NonZeroUsize, max_size: NonZeroUsize) -> Self {
         Self { min_size, max_size }
     }
