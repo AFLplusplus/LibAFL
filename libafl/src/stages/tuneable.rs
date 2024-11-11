@@ -296,7 +296,7 @@ where
     }
 
     fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        self.restart_helper.clear_progress(state)
+        self.restart_helper.clear_progress(state, &self.name)
     }
 }
 
