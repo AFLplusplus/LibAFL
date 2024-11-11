@@ -244,38 +244,63 @@ async fn main() -> io::Result<()> {
         .map(DirEntry::into_path)
         .collect();
 
+    // cargo version
+    println!(
+        "Using {}",
+        get_version_string("cargo", &["+nightly"]).await?
+    );
+
+    // rustfmt version
+    println!(
+        "Using {}",
+        get_version_string("cargo", &["+nightly", "fmt"]).await?
+    );
+
+    let reference_clang_format = format!(
+        "clang-format-{}",
+        std::env::var("MAIN_LLVM_VERSION")
+            .inspect(|e| {
+                println!(
+                    "Overriding clang-format version from the default {REF_LLVM_VERSION} to {e} using env variable MAIN_LLVM_VERSION"
+                );
+            })
+            .unwrap_or(REF_LLVM_VERSION.to_string())
+    );
+    let unspecified_clang_format = "clang-format";
+
+    let (clang, version, warning) = if which(&reference_clang_format).is_ok() {
+        (
+            Some(reference_clang_format.as_str()),
+            Some(get_version_string(&reference_clang_format, &[]).await?),
+            None,
+        )
+    } else if which(unspecified_clang_format).is_ok() {
+        let version = get_version_string(unspecified_clang_format, &[]).await?;
+        (
+            Some(unspecified_clang_format),
+            Some(version.clone()),
+            Some(format!(
+                "using {version}, could provide a different result from {reference_clang_format}"
+            )),
+        )
+    } else {
+        (
+            None,
+            None,
+            Some("clang-format not found. Skipping C formatting...".to_string()),
+        )
+    };
+
+    if let Some(version) = &version {
+        println!("Using {version}");
+    }
+
     let mut tokio_joinset = JoinSet::new();
 
     for project in rust_projects_to_fmt {
         tokio_joinset.spawn(run_cargo_fmt(project, cli.check, cli.verbose));
     }
 
-    let reference_clang_format = format!("clang-format-{REF_LLVM_VERSION}");
-    let unspecified_clang_format = "clang-format";
-
-    let (clang, warning) = if which(&reference_clang_format).is_ok() {
-        (Some(reference_clang_format.as_str()), None)
-    } else if which(unspecified_clang_format).is_ok() {
-        let version = Command::new(unspecified_clang_format)
-            .arg("--version")
-            .output()
-            .await?
-            .stdout;
-
-        (
-            Some(unspecified_clang_format),
-            Some(format!(
-                "using {}, could provide a different result from clang-format-17",
-                from_utf8(&version).unwrap().replace('\n', "")
-            )),
-        )
-    } else {
-        (
-            None,
-            Some("clang-format not found. Skipping C formatting...".to_string()),
-        )
-    };
-    // println!("Using {:#?} to format...", clang);
     if let Some(clang) = clang {
         let c_files_to_fmt: Vec<PathBuf> = WalkDir::new(&libafl_root_dir)
             .into_iter()
@@ -306,9 +331,7 @@ async fn main() -> io::Result<()> {
         }
     }
 
-    if let Some(warning) = warning {
-        println!("\n{}: {}\n", "Warning".yellow().bold(), warning);
-    }
+    let _ = warning.map(print_warning);
 
     if cli.check {
         println!("[*] Check finished successfully.");
@@ -317,4 +340,19 @@ async fn main() -> io::Result<()> {
     }
 
     Ok(())
+}
+
+async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Error> {
+    let version = Command::new(path)
+        .args(args)
+        .arg("--version")
+        .output()
+        .await?
+        .stdout;
+    Ok(from_utf8(&version).unwrap().replace('\n', ""))
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn print_warning(warning: String) {
+    println!("\n{} {}\n", "Warning:".yellow().bold(), warning);
 }
