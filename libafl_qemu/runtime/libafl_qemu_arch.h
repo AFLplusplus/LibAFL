@@ -232,8 +232,8 @@
         : "x0", "x1", "x2"                                                                  \
     );   \
         return ret;                                                                                 \
-      }                                         \
-  #elif defined(__riscv) \
+      }
+  #elif defined(__riscv)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
