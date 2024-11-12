@@ -709,7 +709,8 @@ impl Monitor for SimplePrintingMonitor {
             // Print the client performance monitor.
             println!(
                 "Client {:03}:\n{}",
-                sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
+                sender_id.id(),
+                self.client_stats[sender_id.id() as usize].introspection_monitor
             );
             // Separate the spacing just a bit
             println!();
@@ -794,7 +795,8 @@ where
             // Print the client performance monitor.
             let fmt = format!(
                 "Client {:03}:\n{}",
-                sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
+                sender_id.id(),
+                self.client_stats[sender_id.id() as usize].introspection_monitor
             );
             (self.print_fn)(&fmt);
 
