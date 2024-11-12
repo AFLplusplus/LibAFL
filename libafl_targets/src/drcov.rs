@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use hashbrown::HashSet;
 use libafl::Error;
 use rangemap::RangeMap;
 
@@ -26,7 +27,7 @@ pub struct DrCovBasicBlock {
 
 /// A (Raw) Basic Block List Entry.
 /// This is only relevant in combination with a [`DrCovReader`] or a [`DrCovWriter`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
 pub struct DrCovBasicBlockEntry {
     /// Start of this basic block
@@ -193,7 +194,7 @@ impl<'a> DrCovWriter<'a> {
 }
 
 /// An entry in the `DrCov` module list.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DrCovModuleEntry {
     /// The index of this module
     pub id: u16,
@@ -251,15 +252,6 @@ fn parse_hex_to_u64(str: &str) -> Result<u64, ParseIntError> {
 }
 
 impl DrCovReader {
-    /// Creates a [`DrCovReader`] pre-filled with data.
-    /// Rather pointless, use [`Self::read`] to actually read a file from disk.
-    fn from_data(modules: Vec<DrCovModuleEntry>, basic_blocks: Vec<DrCovBasicBlockEntry>) -> Self {
-        Self {
-            module_entries: modules,
-            basic_block_entries: basic_blocks,
-        }
-    }
-
     /// Parse a `drcov` file to memory.
     pub fn read<P: AsRef<Path> + ?Sized>(file: &P) -> Result<Self, Error> {
         let f = File::open(file)?;
@@ -389,6 +381,18 @@ impl DrCovReader {
         })
     }
 
+    /// Creates a [`DrCovReader`] pre-filled with data.
+    /// Rather pointless, use [`Self::read`] to actually read a file from disk.
+    pub fn from_data(
+        modules: Vec<DrCovModuleEntry>,
+        basic_blocks: Vec<DrCovBasicBlockEntry>,
+    ) -> Self {
+        Self {
+            module_entries: modules,
+            basic_block_entries: basic_blocks,
+        }
+    }
+
     /// Get a list of traversed [`DrCovBasicBlock`] nodes
     #[must_use]
     pub fn basic_blocks(&self) -> Vec<DrCovBasicBlock> {
@@ -396,7 +400,7 @@ impl DrCovReader {
 
         for basic_block in &self.basic_block_entries {
             let bb_id = basic_block.mod_id;
-            if let Some(module) = self.module_entries.iter().find(|module| module.id == bb_id) {
+            if let Some(module) = self.module_by_id(bb_id) {
                 let start = module.base + u64::from(basic_block.start);
                 let end = start + u64::from(basic_block.size);
                 ret.push(DrCovBasicBlock::new(start, end));
@@ -431,6 +435,7 @@ impl DrCovReader {
     }
 
     /// Gets a list of all basic blocks, as absolute addresses, for u64 targets.
+    /// Useful for example for [`JmpScare`](https://github.com/fgsect/JMPscare) and other analyses.
     #[must_use]
     pub fn basic_block_addresses_u64(&self) -> Vec<u64> {
         self.basic_blocks().iter().map(|x| x.start).collect()
@@ -446,6 +451,72 @@ impl DrCovReader {
         }
         Ok(ret)
     }
+
+    /// Merges the contents of another [`DrCovReader`] instance into this one.
+    /// Useful to merge multiple coverage files of a fuzzing run into one drcov file.
+    /// Similar to [drcov-merge](https://github.com/vanhauser-thc/drcov-merge).
+    ///
+    /// If `unique` is set to 1, each block will end up in the resulting DrCovReader at most once.
+    ///
+    /// Will return an `Error` if the individual modules are not mergable.
+    /// In this case, the module list may already have been changed.
+    pub fn merge(&mut self, other: &DrCovReader, unique: bool) -> Result<(), Error> {
+        for module in &other.module_entries {
+            if let Some(own_module) = self.module_by_id(module.id) {
+                // Module exists, make sure it's the same.
+                if own_module.base != module.base || own_module.end != module.end {
+                    return Err(Error::illegal_argument(format!("Module id of file to merge doesn't fit! Own modules: {:#x?}, other modules: {:#x?}", self.module_entries, other.module_entries)));
+                }
+            } else {
+                // We don't know the module. Insert as new module.
+                self.module_entries.push(module.clone());
+            }
+        }
+
+        if unique {
+            self.make_unique();
+        }
+        let mut blocks = HashSet::new();
+
+        for block in &self.basic_block_entries {
+            blocks.insert(*block);
+        }
+
+        for block in &other.basic_block_entries {
+            if !blocks.contains(block) {
+                blocks.insert(*block);
+                self.basic_block_entries.push(*block);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Remove blocks that exist more than once in the trace, in-place.
+    pub fn make_unique(&mut self) {
+        let mut blocks = HashSet::new();
+        let new_vec = self
+            .basic_block_entries
+            .iter()
+            .filter(|x| {
+                if blocks.contains(x) {
+                    false
+                } else {
+                    blocks.insert(*x);
+                    true
+                }
+            })
+            .cloned()
+            .collect();
+        drop(blocks);
+
+        self.basic_block_entries = new_vec;
+    }
+
+    /// Returns the module for a given `id`, or [`None`].
+    pub fn module_by_id(&self, id: u16) -> Option<&DrCovModuleEntry> {
+        self.module_entries.iter().find(|module| module.id == id)
+    }
 }
 
 #[cfg(test)]
@@ -453,13 +524,14 @@ mod test {
     use std::{
         env::temp_dir,
         fs,
+        path::PathBuf,
         string::{String, ToString},
     };
 
     use rangemap::RangeMap;
 
-    use super::{DrCovReader, DrCovWriter};
-    use crate::drcov::DrCovBasicBlock;
+    use super::{DrCovModuleEntry, DrCovReader, DrCovWriter};
+    use crate::drcov::{DrCovBasicBlock, DrCovBasicBlockEntry};
 
     #[test]
     fn test_write_read_drcov() {
@@ -502,5 +574,36 @@ mod test {
         assert_eq!(reader.basic_blocks().len(), 4);
 
         fs::remove_file(&drcov_tmp_file).unwrap();
+    }
+
+    #[test]
+    fn test_merge() {
+        let modules = vec![DrCovModuleEntry {
+            id: 0,
+            base: 0,
+            end: 0x4242,
+            entry: 0,
+            checksum: 0,
+            timestamp: 0,
+            path: PathBuf::new(),
+        }];
+        let basic_blocks1 = vec![DrCovBasicBlockEntry {
+            mod_id: 0,
+            start: 0,
+            size: 42,
+        }];
+
+        let mut basic_blocks2 = basic_blocks1.clone();
+        basic_blocks2.push(DrCovBasicBlockEntry {
+            mod_id: 0,
+            start: 4200,
+            size: 42,
+        });
+
+        let mut first = DrCovReader::from_data(modules.clone(), basic_blocks1);
+        let second = DrCovReader::from_data(modules, basic_blocks2);
+
+        first.merge(&second, true).unwrap();
+        assert_eq!(first.basic_block_entries.len(), 2);
     }
 }
