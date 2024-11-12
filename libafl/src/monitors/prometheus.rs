@@ -115,42 +115,42 @@ where
         let corpus_size = self.corpus_size();
         self.corpus_count
             .get_or_create(&Labels {
-                client: sender_id.0,
+                client: sender_id.id(),
                 stat: Cow::from(""),
             })
             .set(corpus_size.try_into().unwrap());
         let objective_size = self.objective_size();
         self.objective_count
             .get_or_create(&Labels {
-                client: sender_id.0,
+                client: sender_id.id(),
                 stat: Cow::from(""),
             })
             .set(objective_size.try_into().unwrap());
         let total_execs = self.total_execs();
         self.executions
             .get_or_create(&Labels {
-                client: sender_id.0,
+                client: sender_id.id(),
                 stat: Cow::from(""),
             })
             .set(total_execs.try_into().unwrap());
         let execs_per_sec = self.execs_per_sec();
         self.exec_rate
             .get_or_create(&Labels {
-                client: sender_id.0,
+                client: sender_id.id(),
                 stat: Cow::from(""),
             })
             .set(execs_per_sec);
         let run_time = (current_time() - self.start_time).as_secs();
         self.runtime
             .get_or_create(&Labels {
-                client: sender_id.0,
+                client: sender_id.id(),
                 stat: Cow::from(""),
             })
             .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
         let total_clients = self.client_stats_count().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.clients_count
             .get_or_create(&Labels {
-                client: sender_id.0,
+                client: sender_id.id(),
                 stat: Cow::from(""),
             })
             .set(total_clients);
@@ -159,7 +159,7 @@ where
         let fmt = format!(
             "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
-            sender_id.0,
+            sender_id.id(),
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats_count(),
             self.corpus_size(),
@@ -187,7 +187,7 @@ where
             };
             self.custom_stat
                 .get_or_create(&Labels {
-                    client: sender_id.0,
+                    client: sender_id.id(),
                     stat: key.clone(),
                 })
                 .set(value);

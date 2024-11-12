@@ -80,7 +80,7 @@ where
     phantom: PhantomData<I>,
 }
 
-const UNDEFINED_CLIENT_ID: ClientId = ClientId(0xffffffff);
+const UNDEFINED_CLIENT_ID: ClientId = ClientId::new(0xffffffff);
 
 impl<I, MT> TcpEventBroker<I, MT>
 where
@@ -148,20 +148,20 @@ where
                 read.read_exact(&mut this_client_id)
                     .await
                     .expect("Socket closed?");
-                let this_client_id = ClientId(u32::from_le_bytes(this_client_id));
+                let this_client_id = ClientId::new(u32::from_le_bytes(this_client_id));
 
                 let (this_client_id, is_old) = if this_client_id == UNDEFINED_CLIENT_ID {
                     if reached_max {
                         (UNDEFINED_CLIENT_ID, false) // Dumb id
                     } else {
                         // ClientIds for this broker start at 0.
-                        (ClientId(recv_handles.len().try_into().unwrap()), false)
+                        (ClientId::new(recv_handles.len().try_into().unwrap()), false)
                     }
                 } else {
                     (this_client_id, true)
                 };
 
-                let this_client_id_bytes = this_client_id.0.to_le_bytes();
+                let this_client_id_bytes = this_client_id.id().to_le_bytes();
 
                 // Protocol: Send the client id for this node;
                 write.write_all(&this_client_id_bytes).await.unwrap();
@@ -207,7 +207,7 @@ where
                     }
                 };
 
-                let client_idx = this_client_id.0 as usize;
+                let client_idx = this_client_id.id() as usize;
 
                 // Keep all handles around.
                 if is_old {
@@ -282,7 +282,7 @@ where
             let mut client_id_buf = [0_u8; 4];
             client_id_buf.copy_from_slice(&buf[..4]);
 
-            let client_id = ClientId(u32::from_le_bytes(client_id_buf));
+            let client_id = ClientId::new(u32::from_le_bytes(client_id_buf));
 
             // cut off the ID.
             let event_bytes = &buf[4..];
@@ -499,13 +499,13 @@ where
     ) -> Result<TcpEventManager<EMH, S>, Error> {
         let mut tcp = TcpStream::connect(addr)?;
 
-        let mut our_client_id_buf = client_id.0.to_le_bytes();
+        let mut our_client_id_buf = client_id.id().to_le_bytes();
         tcp.write_all(&our_client_id_buf)
             .expect("Cannot write to the broker");
 
         tcp.read_exact(&mut our_client_id_buf)
             .expect("Cannot read from the broker");
-        let client_id = ClientId(u32::from_le_bytes(our_client_id_buf));
+        let client_id = ClientId::new(u32::from_le_bytes(our_client_id_buf));
 
         log::info!("Our client id: {client_id:?}");
 
@@ -546,7 +546,7 @@ where
         env_name: &str,
         configuration: EventConfig,
     ) -> Result<TcpEventManager<EMH, S>, Error> {
-        let this_id = ClientId(str::parse::<u32>(&env::var(env_name)?)?);
+        let this_id = ClientId::new(str::parse::<u32>(&env::var(env_name)?)?);
         Self::build_from_client(self, addr, this_id, configuration)
     }
 }
@@ -587,7 +587,7 @@ where
 {
     /// Write the client id for a client [`EventManager`] to env vars
     pub fn to_env(&self, env_name: &str) {
-        env::set_var(env_name, format!("{}", self.client_id.0));
+        env::set_var(env_name, format!("{}", self.client_id.id()));
     }
 
     // Handle arriving events in the client
@@ -714,7 +714,7 @@ where
 
         let size = u32::try_from(serialized.len())?;
         self.tcp.write_all(&size.to_le_bytes())?;
-        self.tcp.write_all(&self.client_id.0.to_le_bytes())?;
+        self.tcp.write_all(&self.client_id.id().to_le_bytes())?;
         self.tcp.write_all(&serialized)?;
 
         self.last_sent = libafl_bolts::current_time();
@@ -774,7 +774,7 @@ where
                     let mut client_id_buf = [0_u8; 4];
                     client_id_buf.copy_from_slice(&buf[..4]);
 
-                    let other_client_id = ClientId(u32::from_le_bytes(client_id_buf));
+                    let other_client_id = ClientId::new(u32::from_le_bytes(client_id_buf));
 
                     self.tcp.set_nonblocking(true).expect("set to non-blocking");
                     if self_id == other_client_id {
@@ -853,7 +853,7 @@ where
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId(self.client_id.0 as usize)
+        EventManagerId(self.client_id.id() as usize)
     }
 }
 
