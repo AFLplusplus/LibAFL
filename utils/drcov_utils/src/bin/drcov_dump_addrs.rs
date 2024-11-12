@@ -7,7 +7,7 @@ use libafl_targets::drcov::DrCovReader;
 #[clap(author, version, about, long_about = None)]
 #[allow(clippy::module_name_repetitions)]
 #[command(
-    name = "dump_drcov_addrs",
+    name = "drcov_dump_addrs",
     about,
     long_about = "Writes a list of all addresses from a DrCovFile"
 )]
