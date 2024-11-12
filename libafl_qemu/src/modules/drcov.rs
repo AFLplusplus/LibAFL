@@ -171,8 +171,8 @@ impl<F> DrCovModule<F> {
                             match lengths.get(pc) {
                                 Some(block_length) => {
                                     drcov_vec.push(DrCovBasicBlock::new(
-                                        *pc as usize,
-                                        *pc as usize + *block_length as usize,
+                                        *pc as u64,
+                                        *pc as u64 + *block_length as u64,
                                     ));
                                 }
                                 None => {
@@ -218,8 +218,8 @@ impl<F> DrCovModule<F> {
                     match lengths.get(pc) {
                         Some(block_length) => {
                             drcov_vec.push(DrCovBasicBlock::new(
-                                *pc as usize,
-                                *pc as usize + *block_length as usize,
+                                *pc as u64,
+                                *pc as u64 + *block_length as u64,
                             ));
                         }
                         None => {

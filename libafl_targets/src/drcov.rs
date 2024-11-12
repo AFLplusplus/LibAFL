@@ -232,8 +232,6 @@ fn parse_hex_to_u64(str: &str) -> Result<u64, ParseIntError> {
     u64::from_str_radix(&str[2..], 16)
 }
 
-
-
 impl DrCovReader {
     /// Creates a [`DrCovReader`] pre-filled with data.
     /// Rather pointless, use [`Self::read`] to actually read a file from disk.
