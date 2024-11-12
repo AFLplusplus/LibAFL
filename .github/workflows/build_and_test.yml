@@ -239,8 +239,6 @@ jobs:
           - ./fuzzers/baby/baby_fuzzer_swap_differential
           - ./fuzzers/baby/tutorial
           - ./fuzzers/baby/baby_fuzzer
-          - ./fuzzers/baby/baby_fuzzer_intel_pt
-          - ./fuzzers/baby/command_executor_intel_pt
           # - ./fuzzers/baby/backtrace_baby_fuzzers
           - ./fuzzers/baby/baby_fuzzer_unicode
           - ./fuzzers/baby/baby_fuzzer_minimizing
@@ -258,6 +256,8 @@ jobs:
           - ./fuzzers/binary_only/frida_windows_gdiplus
           - ./fuzzers/binary_only/frida_libpng
           - ./fuzzers/binary_only/fuzzbench_qemu
+          - ./fuzzers/binary_only/intel_pt_baby_fuzzer
+          - ./fuzzers/binary_only/intel_pt_command_executor
           - ./fuzzers/binary_only/tinyinst_simple
 
           # Forkserver

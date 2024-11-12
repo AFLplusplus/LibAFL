@@ -11,7 +11,11 @@
 #[macro_use]
 extern crate std;
 
-use std::{borrow::ToOwned, string::{String, ToString}, vec::Vec,};
+use std::{
+    borrow::ToOwned,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(target_os = "linux")]
 use std::{
     ffi::{CStr, CString},
@@ -26,15 +30,16 @@ use std::{
     ptr, slice,
     sync::LazyLock,
 };
+
 #[cfg(target_os = "linux")]
 use arbitrary_int::u4;
 #[cfg(target_os = "linux")]
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
-use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
 use libafl_bolts::ownedref::OwnedRefMut;
+use libafl_bolts::Error;
 use libipt::PtError;
 #[cfg(target_os = "linux")]
 use libipt::{
