@@ -1,8 +1,8 @@
 [package]
-name = "dump_drcov_addrs"
+name = "drcov_utils"
 edition = "2021"
 version.workspace = true
-description = "Writes a list of all addresses from a DrCovFile"
+description = "Utility functions to work with DrCov coverage files"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 license = "MIT OR Apache-2.0"
 categories = ["development-tools"]
