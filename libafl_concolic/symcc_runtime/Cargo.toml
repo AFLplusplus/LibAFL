@@ -1,6 +1,6 @@
 [package]
 name = "symcc_runtime"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = [
   "Julius Hohnerlein <julihoh@users.noreply.github.com>",
