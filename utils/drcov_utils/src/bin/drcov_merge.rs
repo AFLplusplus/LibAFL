@@ -12,7 +12,7 @@ use libafl_targets::drcov::DrCovReader;
     long_about = "Merges multiple DrCov coverage files into one"
 )]
 pub struct Opt {
-    #[arg(short, long, help = "DrCovFiles to merge", required=true)]
+    #[arg(short, long, help = "DrCovFiles to merge", required = true)]
     pub inputs: Vec<PathBuf>,
     #[arg(short, long, help = "Output DrCov file")]
     pub output: PathBuf,

@@ -383,6 +383,7 @@ impl DrCovReader {
 
     /// Creates a [`DrCovReader`] pre-filled with data.
     /// Rather pointless, use [`Self::read`] to actually read a file from disk.
+    #[must_use]
     pub fn from_data(
         modules: Vec<DrCovModuleEntry>,
         basic_blocks: Vec<DrCovBasicBlockEntry>,
@@ -456,7 +457,7 @@ impl DrCovReader {
     /// Useful to merge multiple coverage files of a fuzzing run into one drcov file.
     /// Similar to [drcov-merge](https://github.com/vanhauser-thc/drcov-merge).
     ///
-    /// If `unique` is set to 1, each block will end up in the resulting DrCovReader at most once.
+    /// If `unique` is set to 1, each block will end up in the resulting [`DrCovReader`] at most once.
     ///
     /// Will return an `Error` if the individual modules are not mergable.
     /// In this case, the module list may already have been changed.
@@ -506,7 +507,7 @@ impl DrCovReader {
                     true
                 }
             })
-            .cloned()
+            .copied()
             .collect();
         drop(blocks);
 
@@ -514,6 +515,7 @@ impl DrCovReader {
     }
 
     /// Returns the module for a given `id`, or [`None`].
+    #[must_use]
     pub fn module_by_id(&self, id: u16) -> Option<&DrCovModuleEntry> {
         self.module_entries.iter().find(|module| module.id == id)
     }
