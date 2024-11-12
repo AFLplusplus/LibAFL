@@ -106,7 +106,7 @@ macro_rules! define_std_command_manager {
                 #[deny(unreachable_patterns)]
                 fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError> {
                     let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
-                    let cmd_id = qemu.read_reg::<Regs, GuestReg>(arch_regs_map[ExitArgs::Cmd])? as c_uint;
+                    let cmd_id = qemu.read_reg(arch_regs_map[ExitArgs::Cmd])? as c_uint;
 
                     match cmd_id {
                         // <StartPhysCommandParser as NativeCommandParser<S>>::COMMAND_ID => Ok(StdCommandManagerCommands::StartPhysCommandParserCmd(<StartPhysCommandParser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?)),

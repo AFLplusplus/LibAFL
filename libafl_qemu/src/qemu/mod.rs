@@ -321,15 +321,15 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
 }
 
 pub trait ArchExtras {
-    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>;
+    fn read_return_address(&self) -> Result<GuestReg, QemuRWError>;
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>;
+    fn read_function_argument(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+    ) -> Result<GuestReg, QemuRWError>;
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
@@ -906,17 +906,14 @@ impl Qemu {
 }
 
 impl ArchExtras for Qemu {
-    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError {
                 kind: QemuRWErrorKind::Read,
                 cause: QemuRWErrorCause::CurrentCpuNotFound,
                 cpu: None,
             })?
-            .read_return_address::<T>()
+            .read_return_address()
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
@@ -928,13 +925,14 @@ impl ArchExtras for Qemu {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_function_argument(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+    ) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
-            .read_function_argument::<T>(conv, idx)
+            .read_function_argument(conv, idx)
     }
 
     fn write_function_argument<T>(

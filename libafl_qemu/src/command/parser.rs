@@ -283,7 +283,7 @@ where
     ) -> Result<Self::OutputCommand, CommandError> {
         let buf_addr: GuestAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
         let str_size: usize = qemu
-            .read_reg::<Regs, GuestAddr>(arch_regs_map[ExitArgs::Arg2])?
+            .read_reg(arch_regs_map[ExitArgs::Arg2])?
             .try_into()
             .unwrap(); // without null byte
         let cpu = qemu.current_cpu().unwrap();
