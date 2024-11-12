@@ -153,7 +153,15 @@ impl<'a> DrCovWriter<'a> {
     ) -> Vec<DrCovBasicBlockEntry> {
         let mut ret = Vec::with_capacity(basic_blocks.len());
         for block in basic_blocks {
-            let (range, (id, _)) = self.module_mapping.get_key_value(&block.start).unwrap();
+            let (range, (id, _)) = self
+                .module_mapping
+                .get_key_value(&block.start)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Could not read module at addr {:?}. Module list: {:?}.",
+                        block.start, self.module_mapping
+                    )
+                });
             let basic_block = DrCovBasicBlockEntry {
                 start: (block.start - range.start) as u32,
                 size: (block.end - block.start) as u16,
