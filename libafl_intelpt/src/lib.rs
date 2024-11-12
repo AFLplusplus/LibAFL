@@ -5,6 +5,7 @@
 
 // Just in case this crate will have real no_std support in the future
 #![no_std]
+#![cfg(target_arch = "x86_64")]
 #![cfg(feature = "std")]
 #![cfg(feature = "libipt")]
 
@@ -672,9 +673,6 @@ pub fn nr_addr_filters() -> Result<u32, String> {
 /// The outcome of these checks does not fully guarantee whether `IntelPT` will function or not.
 pub fn availability() -> Result<(), String> {
     let mut reasons = Vec::new();
-    if cfg!(not(target_arch = "x86_64")) {
-        reasons.push("Only x86_64 is supported".to_owned());
-    }
 
     let cpuid = CpuId::new();
     if let Some(vendor) = cpuid.get_vendor_info() {
