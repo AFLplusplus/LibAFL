@@ -1,0 +1,16 @@
+[package]
+name = "dump_drcov_addrs"
+edition = "2021"
+version.workspace = true
+description = "Writes a list of all addresses from a DrCovFile"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+license = "MIT OR Apache-2.0"
+categories = ["development-tools"]
+keywords = ["fuzzing", "libafl", "drcov"]
+
+[dependencies]
+libafl_targets = { path = "../../libafl_targets" }
+clap = { workspace = true, features = [ "derive", "wrap_help", ]}
+
+[lints]
+workspace = true
