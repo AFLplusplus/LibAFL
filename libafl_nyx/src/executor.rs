@@ -137,10 +137,10 @@ impl<S, OT> HasTimeout for NyxExecutor<S, OT> {
     fn set_timeout(&mut self, timeout: std::time::Duration) {
         let micros = 1000000;
         let mut timeout_secs = timeout.as_secs();
-        let mut timeout_micros = timeout.as_micros() - (timeout.as_secs() * micros) as u128;
+        let mut timeout_micros = timeout.as_micros() - u128::from(timeout.as_secs() * micros);
         // since timeout secs is a u8 -> convert any overflow into micro secs
         if timeout_secs > 255 {
-            timeout_micros = ((timeout_secs - 255) * micros) as u128;
+            timeout_micros = u128::from((timeout_secs - 255) * micros);
             timeout_secs = 255;
         }
 

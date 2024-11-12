@@ -68,16 +68,10 @@ impl NyxHelper {
         let bitmap_size = nyx_process.bitmap_buffer_size();
         let bitmap_buffer = nyx_process.bitmap_buffer_mut().as_mut_ptr();
 
-        let mut timeout = Duration::from_secs(settings.timeout_secs as u64);
-        timeout += Duration::from_micros(settings.timeout_micro_secs as u64);
+        let mut timeout = Duration::from_secs(u64::from(settings.timeout_secs));
+        timeout += Duration::from_micros(u64::from(settings.timeout_micro_secs));
 
-        Ok(Self {
-            timeout,
-            nyx_process,
-            nyx_stdout,
-            bitmap_size,
-            bitmap_buffer,
-        })
+        Ok(Self { nyx_process, nyx_stdout, timeout, bitmap_size, bitmap_buffer })
     }
 
     /// Set a timeout for Nyx.
