@@ -57,6 +57,11 @@ impl From<DrCovBasicBlockEntry> for [u8; 8] {
         // The value is a c struct.
         // Casting its pointer to bytes should be safe.
         // The resulting pointer needs to be less aligned.
+        assert_eq!(
+            size_of::<DrCovBasicBlockEntry>(),
+            size_of::<[u8; 8]>(),
+            "`DrCovBasicBlockEntry` size changed!"
+        );
         unsafe { std::slice::from_raw_parts(&raw const (value) as *const u8, 8) }
             .try_into()
             .unwrap()
@@ -68,7 +73,12 @@ impl From<&DrCovBasicBlockEntry> for &[u8] {
         // # Safety
         // The value is a c struct.
         // Casting its pointer to bytes should be safe.
-        unsafe { std::slice::from_raw_parts(&raw const (value) as *const u8, 8) }
+        unsafe {
+            std::slice::from_raw_parts(
+                &raw const (value) as *const u8,
+                size_of::<DrCovBasicBlockEntry>(),
+            )
+        }
     }
 }
 

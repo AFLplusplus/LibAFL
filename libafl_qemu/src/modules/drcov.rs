@@ -288,7 +288,7 @@ where
                 .mappings()
                 .filter_map(|m| {
                     m.path()
-                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                        .map(|p| ((m.start() as u64)..(m.end() as u64), p.to_string()))
                         .filter(|(_, p)| !p.is_empty())
                 })
                 .enumerate()

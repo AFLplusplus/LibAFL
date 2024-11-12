@@ -20,6 +20,6 @@ fn main() {
     let opts = Opt::parse();
     let drcov = DrCovReader::read(&opts.input).unwrap();
     for line in drcov.basic_block_addresses_u64() {
-        println!("0x{line:#x}")
+        println!("0x{line:#x}");
     }
 }
