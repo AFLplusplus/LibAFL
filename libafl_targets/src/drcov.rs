@@ -62,7 +62,7 @@ impl From<DrCovBasicBlockEntry> for [u8; 8] {
             size_of::<[u8; 8]>(),
             "`DrCovBasicBlockEntry` size changed!"
         );
-        unsafe { std::slice::from_raw_parts(&raw const (value) as *const u8, 8) }
+        unsafe { std::slice::from_raw_parts(ptr::from_ref(&value).cast::<u8>(), 8) }
             .try_into()
             .unwrap()
     }
@@ -75,7 +75,7 @@ impl From<&DrCovBasicBlockEntry> for &[u8] {
         // Casting its pointer to bytes should be safe.
         unsafe {
             std::slice::from_raw_parts(
-                &raw const (value) as *const u8,
+                ptr::from_ref(value).cast::<u8>(),
                 size_of::<DrCovBasicBlockEntry>(),
             )
         }
