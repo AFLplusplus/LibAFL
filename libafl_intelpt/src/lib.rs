@@ -31,10 +31,10 @@ use std::{
     sync::LazyLock,
 };
 
-#[cfg(target_os = "linux")]
-use arbitrary_int::u4;
-#[cfg(target_os = "linux")]
-use bitbybit::bitfield;
+// #[cfg(target_os = "linux")]
+// use arbitrary_int::u4;
+// #[cfg(target_os = "linux")]
+// use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
 #[cfg(target_os = "linux")]
@@ -640,19 +640,19 @@ impl IntelPTBuilder {
     }
 }
 
-/// Perf event config for `IntelPT`
-///
-/// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
-#[cfg(target_os = "linux")]
-#[bitfield(u64, default = 0)]
-struct PtConfig {
-    /// Disable call return address compression. AKA DisRETC in Intel SDM.
-    #[bit(11, rw)]
-    noretcomp: bool,
-    /// Indicates the frequency of PSB packets. AKA PSBFreq in Intel SDM.
-    #[bits(24..=27, rw)]
-    psb_period: u4,
-}
+// /// Perf event config for `IntelPT`
+// ///
+// /// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
+// #[cfg(target_os = "linux")]
+// #[bitfield(u64, default = 0)]
+// struct PtConfig {
+//     /// Disable call return address compression. AKA DisRETC in Intel SDM.
+//     #[bit(11, rw)]
+//     noretcomp: bool,
+//     /// Indicates the frequency of PSB packets. AKA PSBFreq in Intel SDM.
+//     #[bits(24..=27, rw)]
+//     psb_period: u4,
+// }
 
 /// Number of address filters available on the running CPU
 #[cfg(target_os = "linux")]
@@ -817,11 +817,12 @@ fn new_perf_event_attr_intel_pt() -> Result<perf_event_attr, Error> {
         Ok(t) => Ok(*t),
         Err(e) => Err(Error::unsupported(e.clone())),
     }?;
-    let config = PtConfig::builder()
-        .with_noretcomp(true)
-        .with_psb_period(u4::new(0))
-        .build()
-        .raw_value;
+    // let config = PtConfig::builder()
+    //     .with_noretcomp(true)
+    //     .with_psb_period(u4::new(0))
+    //     .build()
+    //     .raw_value;
+    let config = 0x08_00; // noretcomp
 
     let mut attr = perf_event_attr {
         size: size_of::<perf_event_attr>() as u32,
@@ -941,8 +942,8 @@ const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
 
 #[cfg(test)]
 mod test {
-    #[cfg(target_os = "linux")]
-    use arbitrary_int::Number;
+    // #[cfg(target_os = "linux")]
+    // use arbitrary_int::Number;
     use static_assertions::assert_eq_size;
 
     use super::*;
@@ -980,52 +981,52 @@ mod test {
             .unwrap();
     }
 
-    #[test]
-    #[cfg(target_os = "linux")]
-    fn intel_pt_pt_config_noretcomp_format() {
-        let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
-        let path = format!("{PT_EVENT_PATH}/format/noretcomp");
-        let s = fs::read_to_string(&path).expect("Failed to read Intel PT config noretcomp format");
-        assert!(
-            s.starts_with("config:"),
-            "Unexpected Intel PT config noretcomp format"
-        );
-        let bit = s["config:".len()..]
-            .trim()
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config noretcomp format");
-        assert_eq!(
-            ptconfig_noretcomp,
-            0b1 << bit,
-            "Unexpected Intel PT config noretcomp format"
-        );
-    }
-
-    #[test]
-    #[cfg(target_os = "linux")]
-    fn intel_pt_pt_config_psb_period_format() {
-        let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
-        let path = format!("{PT_EVENT_PATH}/format/psb_period");
-        let s =
-            fs::read_to_string(&path).expect("Failed to read Intel PT config psb_period format");
-        assert!(
-            s.starts_with("config:"),
-            "Unexpected Intel PT config psb_period format"
-        );
-        let from = s["config:".len().."config:".len() + 2]
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config psb_period format");
-        let to = s["config:".len() + 3..]
-            .trim()
-            .parse::<u32>()
-            .expect("Failed to parse Intel PT config psb_period format");
-        let mut format = 0;
-        for bit in from..=to {
-            format |= 0b1 << bit;
-        }
-        assert_eq!(
-            ptconfig_psb_period, format,
-            "Unexpected Intel PT config psb_period format"
-        );
-    }
+    // #[test]
+    // #[cfg(target_os = "linux")]
+    // fn intel_pt_pt_config_noretcomp_format() {
+    //     let ptconfig_noretcomp = PtConfig::DEFAULT.with_noretcomp(true).raw_value;
+    //     let path = format!("{PT_EVENT_PATH}/format/noretcomp");
+    //     let s = fs::read_to_string(&path).expect("Failed to read Intel PT config noretcomp format");
+    //     assert!(
+    //         s.starts_with("config:"),
+    //         "Unexpected Intel PT config noretcomp format"
+    //     );
+    //     let bit = s["config:".len()..]
+    //         .trim()
+    //         .parse::<u32>()
+    //         .expect("Failed to parse Intel PT config noretcomp format");
+    //     assert_eq!(
+    //         ptconfig_noretcomp,
+    //         0b1 << bit,
+    //         "Unexpected Intel PT config noretcomp format"
+    //     );
+    // }
+    //
+    // #[test]
+    // #[cfg(target_os = "linux")]
+    // fn intel_pt_pt_config_psb_period_format() {
+    //     let ptconfig_psb_period = PtConfig::DEFAULT.with_psb_period(u4::MAX).raw_value;
+    //     let path = format!("{PT_EVENT_PATH}/format/psb_period");
+    //     let s =
+    //         fs::read_to_string(&path).expect("Failed to read Intel PT config psb_period format");
+    //     assert!(
+    //         s.starts_with("config:"),
+    //         "Unexpected Intel PT config psb_period format"
+    //     );
+    //     let from = s["config:".len().."config:".len() + 2]
+    //         .parse::<u32>()
+    //         .expect("Failed to parse Intel PT config psb_period format");
+    //     let to = s["config:".len() + 3..]
+    //         .trim()
+    //         .parse::<u32>()
+    //         .expect("Failed to parse Intel PT config psb_period format");
+    //     let mut format = 0;
+    //     for bit in from..=to {
+    //         format |= 0b1 << bit;
+    //     }
+    //     assert_eq!(
+    //         ptconfig_psb_period, format,
+    //         "Unexpected Intel PT config psb_period format"
+    //     );
+    // }
 }

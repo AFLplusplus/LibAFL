@@ -8,4 +8,4 @@ for test_bin in ../target/debug/deps/integration_tests_linux-*; do
   fi
 done
 
-cargo test intel_pt_trace_fork -- --show-output
+cargo test intel_pt_trace_fork
