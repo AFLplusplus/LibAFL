@@ -1,15 +1,16 @@
 {
   "name": "baby_fuzzer_wasm",
+  "type": "module",
   "collaborators": [
     "Addison Crump <research@addisoncrump.info>"
   ],
-  "version": "0.1.0",
+  "version": "0.13.2",
   "files": [
     "baby_fuzzer_wasm_bg.wasm",
     "baby_fuzzer_wasm.js",
     "baby_fuzzer_wasm.d.ts"
   ],
-  "module": "baby_fuzzer_wasm.js",
+  "main": "baby_fuzzer_wasm.js",
   "types": "baby_fuzzer_wasm.d.ts",
   "sideEffects": [
     "./snippets/*"

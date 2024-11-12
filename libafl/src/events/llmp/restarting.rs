@@ -4,39 +4,35 @@
 //! restart/refork it.
 
 use alloc::{boxed::Box, vec::Vec};
-#[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
-#[cfg(feature = "std")]
-use core::time::Duration;
 use core::{marker::PhantomData, num::NonZeroUsize};
-#[cfg(feature = "std")]
-use std::net::SocketAddr;
 
-#[cfg(feature = "std")]
-use libafl_bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", not(miri)))]
-use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
-#[cfg(feature = "std")]
-use libafl_bolts::{
-    llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider, staterestore::StateRestorer,
-};
 use libafl_bolts::{
     llmp::{Broker, LlmpBroker},
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "std")]
-use typed_builder::TypedBuilder;
-
 #[cfg(all(unix, feature = "std", not(miri)))]
-use crate::events::EVENTMGR_SIGHANDLER_STATE;
+use {
+    crate::events::EVENTMGR_SIGHANDLER_STATE, libafl_bolts::os::unix_signals::setup_signal_handler,
+};
 #[cfg(feature = "std")]
-use crate::events::{AdaptiveSerializer, CustomBufEventResult, HasCustomBufHandlers};
+use {
+    crate::events::{AdaptiveSerializer, CustomBufEventResult, HasCustomBufHandlers},
+    core::sync::atomic::{compiler_fence, Ordering},
+    core::time::Duration,
+    libafl_bolts::{
+        core_affinity::CoreId, llmp::LlmpConnection, os::CTRL_C_EXIT, shmem::StdShMemProvider,
+        staterestore::StateRestorer, ClientId,
+    },
+    std::net::SocketAddr,
+    typed_builder::TypedBuilder,
+};
+
 use crate::{
     events::{
         Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple, EventManagerId,
@@ -317,6 +313,11 @@ where
                 .save(&(None::<S>, &self.llmp_mgr.describe()?))?;
         }
         Ok(())
+    }
+
+    /// The id derived from the underlying LLMP client
+    pub fn id(&self) -> ClientId {
+        self.llmp_mgr.id()
     }
 }
 

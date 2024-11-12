@@ -220,6 +220,7 @@ impl CentralizedEventManagerBuilder {
         })
     }
 }
+
 impl<EM, EMH, S, SP> UsesState for CentralizedEventManager<EM, EMH, S, SP>
 where
     EM: UsesState,
@@ -480,6 +481,11 @@ where
     /// Know if this instance is main or secondary
     pub fn is_main(&self) -> bool {
         self.is_main
+    }
+
+    /// The id derived from the underlying LLMP client
+    pub fn id(&self) -> ClientId {
+        self.client.sender().id()
     }
 }
 

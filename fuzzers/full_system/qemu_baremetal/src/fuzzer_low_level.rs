@@ -26,7 +26,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
-    AsSlice,
+    AsSlice, ClientId,
 };
 use libafl_qemu::{
     config, elf::EasyElf, executor::QemuExecutor, modules::edges::StdEdgeCoverageModuleBuilder,
@@ -80,7 +80,7 @@ pub fn fuzz() {
         .expect("Symbol or env BREAKPOINT not found");
     println!("Breakpoint address = {breakpoint:#x}");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_id: &ClientId, _core_id| {
         let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
 
         // Create an observation channel using the coverage map

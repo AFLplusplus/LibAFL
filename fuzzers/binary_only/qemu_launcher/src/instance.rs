@@ -36,6 +36,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     tuples::{tuple_list, Merge, Prepend},
+    ClientId,
 };
 use libafl_qemu::{
     elf::EasyElf,
@@ -67,6 +68,7 @@ pub struct Instance<'a, M: Monitor> {
     qemu: Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
+    client_id: &'a ClientId,
     #[builder(default)]
     extra_tokens: Vec<String>,
     #[builder(default=PhantomData)]
@@ -161,10 +163,10 @@ impl<M: Monitor> Instance<'_, M> {
                     // RNG
                     StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
-                    InMemoryOnDiskCorpus::no_meta(self.options.queue_dir(self.core_id))?,
+                    InMemoryOnDiskCorpus::no_meta(self.options.queue_dir(self.client_id))?,
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
-                    OnDiskCorpus::new(self.options.crashes_dir(self.core_id))?,
+                    OnDiskCorpus::new(self.options.crashes_dir(self.client_id))?,
                     // States of the feedbacks.
                     // The feedbacks can report the data that should persist in the State.
                     &mut feedback,

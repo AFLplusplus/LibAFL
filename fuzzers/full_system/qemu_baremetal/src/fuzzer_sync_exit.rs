@@ -25,6 +25,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
+    ClientId,
 };
 use libafl_qemu::{emu::Emulator, executor::QemuExecutor, modules::edges::StdEdgeCoverageModule};
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
@@ -43,7 +44,7 @@ pub fn fuzz() {
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_id: &ClientId, _core_id| {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
 

@@ -30,7 +30,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
+    AsSlice, ClientId,
 };
 #[cfg(unix)]
 use libafl_frida::asan::{
@@ -93,7 +93,10 @@ unsafe fn fuzz(
 
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<_>, mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
+    let mut run_client = |state: Option<_>,
+                          mgr: LlmpRestartingEventManager<_, _, _>,
+                          _client_id: &ClientId,
+                          core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         // println!("{:?}", mgr.mgr_id());

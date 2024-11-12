@@ -38,7 +38,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
+    AsSlice, ClientId,
 };
 use libafl_targets::{extra_counters, CmpLogObserver};
 
@@ -130,7 +130,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
 
     // TODO: we need to handle Atheris calls to `exit` on errors somhow.
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_id: &ClientId, _core_id| {
         // Create an observation channel using the coverage map
         let edges = unsafe { extra_counters() };
         println!("edges: {:?}", edges);

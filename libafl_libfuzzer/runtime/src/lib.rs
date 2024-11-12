@@ -74,7 +74,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
 };
-use libafl_bolts::AsSlice;
+use libafl_bolts::{AsSlice, ClientId};
 use libc::_exit;
 use mimalloc::MiMalloc;
 
@@ -144,6 +144,7 @@ macro_rules! fuzz_with {
                 rands::StdRand,
                 tuples::{Merge, tuple_list},
                 AsSlice,
+                ClientId,
         };
         use libafl::{
             corpus::Corpus,
@@ -173,7 +174,7 @@ macro_rules! fuzz_with {
         use libafl_bolts::nonzero;
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
-        use core::num::NonZeroUsize;
+
         use crate::{
             CustomMutationStatus,
             corpus::{ArtifactCorpus, LibfuzzerCorpus},
@@ -184,7 +185,7 @@ macro_rules! fuzz_with {
 
         let edge_maker = &$edge_maker;
 
-        let closure = |mut state: Option<_>, mut mgr, _cpu_id| {
+        let run_client = |mut state: Option<_>, mut mgr, _client_id: &ClientId, _core_id| {
             let mutator_status = CustomMutationStatus::new();
             let grimoire_metadata = should_use_grimoire(&mut state, &$options, &mutator_status)?;
             let grimoire = grimoire_metadata.should();
@@ -517,7 +518,7 @@ macro_rules! fuzz_with {
         };
 
         #[allow(clippy::redundant_closure_call)]
-        $and_then(closure)
+        $and_then(run_client)
     }};
 
     ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
@@ -571,9 +572,9 @@ pub fn start_fuzzing_single<F, S, EM>(
     mgr: EM,
 ) -> Result<(), Error>
 where
-    F: FnMut(Option<S>, EM, usize) -> Result<(), Error>,
+    F: FnMut(Option<S>, EM, &ClientId, usize) -> Result<(), Error>,
 {
-    fuzz_single(initial_state, mgr, 0)
+    fuzz_single(initial_state, mgr, &ClientId::new(0), 0)
 }
 
 extern "C" {

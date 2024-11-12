@@ -13,65 +13,51 @@
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
 use alloc::string::ToString;
-#[cfg(feature = "std")]
-use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
+    time::Duration,
 };
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use std::boxed::Box;
-#[cfg(feature = "std")]
 use std::net::SocketAddr;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use std::process::Stdio;
-#[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::unix::io::AsRawFd};
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::Broker;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::Brokers;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::LlmpBroker;
-#[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::dup2;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use libafl_bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::{
-    core_affinity::get_core_ids,
-    os::{fork, ForkResult},
-};
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
+    ClientId,
 };
-#[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
+#[cfg(all(unix, feature = "fork"))]
+use {
+    crate::{
+        events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
+        inputs::UsesInput,
+        state::UsesState,
+    },
+    libafl_bolts::{
+        core_affinity::get_core_ids,
+        llmp::{Broker, Brokers, LlmpBroker},
+        os::{fork, ForkResult},
+    },
+    std::boxed::Box,
+};
+#[cfg(unix)]
+use {
+    libafl_bolts::os::dup2,
+    std::{fs::File, os::unix::io::AsRawFd},
+};
+#[cfg(any(windows, not(feature = "fork")))]
+use {libafl_bolts::os::startable_self, std::process::Stdio};
 
-use super::EventManagerHooksTuple;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use super::StdLlmpEventHook;
-#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
-use crate::events::multi_machine::NodeDescriptor;
-#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
-use crate::events::multi_machine::TcpMultiMachineHooks;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::inputs::UsesInput;
-use crate::observers::TimeObserver;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::state::UsesState;
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "fork", feature = "multi_machine"))]
+use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
 use crate::{
     events::{
         llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
-        EventConfig,
+        EventConfig, EventManagerHooksTuple,
     },
     monitors::Monitor,
+    observers::TimeObserver,
     state::{HasExecutions, State},
     Error,
 };
@@ -86,7 +72,6 @@ const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
 /// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
 ///
 /// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
-#[cfg(feature = "std")]
 #[allow(
     clippy::type_complexity,
     missing_debug_implementations,
@@ -158,7 +143,7 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
             .field("core", &self.cores)
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr);
-        #[cfg(all(unix, feature = "std"))]
+        #[cfg(unix)]
         {
             dbg_struct
                 .field("stdout_file", &self.stdout_file)
@@ -175,21 +160,22 @@ where
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(
-        feature = "std",
-        any(windows, not(feature = "fork"), all(unix, feature = "fork"))
-    ))]
+    #[cfg(any(windows, not(feature = "fork"), all(unix, feature = "fork")))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
         S: State + HasExecutions,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            LlmpRestartingEventManager<(), S, SP>,
+            &ClientId,
+            CoreId,
+        ) -> Result<(), Error>,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
 }
 
-#[cfg(feature = "std")]
 impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
@@ -202,7 +188,12 @@ where
     where
         S: State + HasExecutions,
         EMH: EventManagerHooksTuple<S> + Clone + Copy,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            LlmpRestartingEventManager<EMH, S, SP>,
+            &ClientId,
+            CoreId,
+        ) -> Result<(), Error>,
     {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
@@ -277,7 +268,9 @@ where
                             let builder = builder.time_ref(self.time_ref.clone());
                             let (state, mgr) = builder.build().launch()?;
 
-                            return (self.run_client.take().unwrap())(state, mgr, *bind_to);
+                            let id = mgr.id();
+
+                            return (self.run_client.take().unwrap())(state, mgr, &id, *bind_to);
                         }
                     };
                 }
@@ -334,7 +327,12 @@ where
     where
         S: State + HasExecutions,
         EMH: EventManagerHooksTuple<S> + Clone + Copy,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            LlmpRestartingEventManager<EMH, S, SP>,
+            &ClientId,
+            CoreId,
+        ) -> Result<(), Error>,
     {
         use libafl_bolts::core_affinity;
 
@@ -359,7 +357,9 @@ where
 
                 let (state, mgr) = builder.build().launch()?;
 
-                return (self.run_client.take().unwrap())(state, mgr, CoreId(core_id));
+                let id = mgr.id();
+
+                return (self.run_client.take().unwrap())(state, mgr, &id, CoreId(core_id));
             }
             Err(std::env::VarError::NotPresent) => {
                 // I am a broker
@@ -476,7 +476,7 @@ where
 ///
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
@@ -513,7 +513,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     #[builder(default = 10)]
     launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
@@ -521,7 +521,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
@@ -541,7 +541,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     serialize_state: LlmpShouldSaveState,
 }
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -559,7 +559,7 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
 /// The standard inner manager of centralized
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
@@ -573,11 +573,13 @@ where
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            &ClientId,
             CoreId,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
             CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            &ClientId,
             CoreId,
         ) -> Result<(), Error>,
     {
@@ -603,7 +605,7 @@ where
     }
 }
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
@@ -621,12 +623,18 @@ where
     where
         S: State,
         S::Input: Send + Sync + 'static,
-        CF: FnOnce(Option<S>, CentralizedEventManager<EM, (), S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            CentralizedEventManager<EM, (), S, SP>,
+            &ClientId,
+            CoreId,
+        ) -> Result<(), Error>,
         EM: UsesState<State = S>,
         EMB: FnOnce(&Self, CoreId) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, (), S, SP>, // No broker_hooks for centralized EM
+            &ClientId,
             CoreId,
         ) -> Result<(), Error>,
         <<EM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
@@ -671,7 +679,7 @@ where
                     ForkResult::Parent(child) => {
                         self.shmem_provider.post_fork(false)?;
                         handles.push(child.pid);
-                        #[cfg(feature = "std")]
+
                         log::info!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
@@ -711,7 +719,9 @@ where
                                 self.time_obs.clone(),
                             )?;
 
-                            self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
+                            let id = c_mgr.id();
+
+                            self.main_run_client.take().unwrap()(state, c_mgr, &id, *bind_to)?;
                             Err(Error::shutting_down())
                         } else {
                             // Secondary clients
@@ -729,7 +739,9 @@ where
                                 self.time_obs.clone(),
                             )?;
 
-                            self.secondary_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
+                            let id = c_mgr.id();
+
+                            self.secondary_run_client.take().unwrap()(state, c_mgr, &id, *bind_to)?;
                             Err(Error::shutting_down())
                         }
                     }?,

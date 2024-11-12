@@ -31,7 +31,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
+    AsSlice, ClientId,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 use mimalloc::MiMalloc;
@@ -138,6 +138,7 @@ pub extern "C" fn libafl_main() {
 
     let mut secondary_run_client = |state: Option<_>,
                                     mut mgr: CentralizedEventManager<_, _, _, _>,
+                                    _client_id: &ClientId,
                                     _core_id: CoreId| {
         // Create an observation channel using the coverage map
         let edges_observer =

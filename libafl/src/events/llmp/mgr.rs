@@ -1,18 +1,8 @@
 //! An [`crate::events::EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
 //! using low-level message passing, [`libafl_bolts::llmp`].
-
-#[cfg(feature = "std")]
-use alloc::string::ToString;
 use alloc::{boxed::Box, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
-#[cfg(feature = "std")]
-use std::net::TcpStream;
 
-#[cfg(feature = "llmp_compression")]
-use libafl_bolts::{
-    compress::GzipCompressor,
-    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
-};
 use libafl_bolts::{
     current_time,
     llmp::{LlmpClient, LlmpClientDescription, LLMP_FLAG_FROM_MM},
@@ -20,15 +10,25 @@ use libafl_bolts::{
     tuples::Handle,
     ClientId,
 };
-#[cfg(feature = "std")]
-use libafl_bolts::{
-    llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
-    IP_LOCALHOST,
-};
 use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "llmp_compression")]
-use crate::events::llmp::COMPRESS_THRESHOLD;
+use {
+    crate::events::llmp::COMPRESS_THRESHOLD,
+    libafl_bolts::{
+        compress::GzipCompressor,
+        llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
+    },
+};
+#[cfg(feature = "std")]
+use {
+    alloc::string::ToString,
+    libafl_bolts::{
+        llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
+        IP_LOCALHOST,
+    },
+    std::net::TcpStream,
+};
+
 use crate::{
     events::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
@@ -381,6 +381,11 @@ where
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
+    }
+
+    /// The id derived from the underlying LLMP client
+    pub fn id(&self) -> ClientId {
+        self.llmp.sender().id()
     }
 }
 

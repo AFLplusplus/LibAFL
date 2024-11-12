@@ -28,7 +28,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSliceMut,
+    AsSliceMut, ClientId,
 };
 use typed_builder::TypedBuilder;
 
@@ -121,6 +121,7 @@ impl ForkserverBytesCoverageSugar<'_> {
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,
+                              _client_id: &ClientId,
                               _core_id| {
             let time_observer = time_observer.clone();
 

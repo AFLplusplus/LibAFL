@@ -3,7 +3,10 @@ use std::{env, ops::Range, path::PathBuf};
 
 use clap::{error::ErrorKind, CommandFactory, Parser};
 use libafl::Error;
-use libafl_bolts::core_affinity::{CoreId, Cores};
+use libafl_bolts::{
+    core_affinity::{CoreId, Cores},
+    ClientId,
+};
 use libafl_qemu::GuestAddr;
 
 use crate::version::Version;
@@ -144,20 +147,20 @@ impl FuzzerOptions {
         PathBuf::from(&self.input)
     }
 
-    pub fn output_dir(&self, core_id: CoreId) -> PathBuf {
+    pub fn output_dir(&self, client_id: &ClientId) -> PathBuf {
         let mut dir = PathBuf::from(&self.output);
-        dir.push(format!("cpu_{:03}", core_id.0));
+        dir.push(format!("client_{:03}", client_id.id()));
         dir
     }
 
-    pub fn queue_dir(&self, core_id: CoreId) -> PathBuf {
-        let mut dir = self.output_dir(core_id).clone();
+    pub fn queue_dir(&self, client_id: &ClientId) -> PathBuf {
+        let mut dir = self.output_dir(client_id).clone();
         dir.push("queue");
         dir
     }
 
-    pub fn crashes_dir(&self, core_id: CoreId) -> PathBuf {
-        let mut dir = self.output_dir(core_id).clone();
+    pub fn crashes_dir(&self, client_id: &ClientId) -> PathBuf {
+        let mut dir = self.output_dir(client_id).clone();
         dir.push("crashes");
         dir
     }

@@ -14,7 +14,9 @@ use libafl::{
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-use libafl_bolts::{core_affinity::CoreId, current_time, llmp::LlmpBroker, tuples::tuple_list};
+use libafl_bolts::{
+    core_affinity::CoreId, current_time, llmp::LlmpBroker, tuples::tuple_list, ClientId,
+};
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
@@ -124,6 +126,7 @@ impl Fuzzer {
                         .unwrap(),
                     StateRestorer::new(shmem_provider.new_shmem(0x1000).unwrap()),
                 )),
+                &ClientId::new(0),
                 CoreId(0),
             );
         }
@@ -138,7 +141,14 @@ impl Fuzzer {
             .broker_port(self.options.port)
             .configuration(EventConfig::from_build_id())
             .monitor(monitor)
-            .run_client(|s, m, c| client.run(s, MonitorTypedEventManager::<_, M>::new(m), c))
+            .run_client(|state, mgr, client_id: &ClientId, core_id| {
+                client.run(
+                    state,
+                    MonitorTypedEventManager::<_, M>::new(mgr),
+                    client_id,
+                    core_id,
+                )
+            })
             .cores(&self.options.cores)
             .stdout_file(stdout)
             .stderr_file(stdout)

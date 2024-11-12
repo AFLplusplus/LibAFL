@@ -31,6 +31,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
+    ClientId,
 };
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
 
@@ -134,7 +135,7 @@ pub extern "C" fn libafl_main() {
     // to disconnect the event coverter from the broker later
     // call detach_from_broker( port)
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_id: &ClientId, _core_id| {
         let mut bytes = vec![];
 
         // The closure that we want to fuzz

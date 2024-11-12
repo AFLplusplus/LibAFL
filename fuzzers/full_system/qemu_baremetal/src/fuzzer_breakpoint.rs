@@ -26,6 +26,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
+    ClientId,
 };
 use libafl_qemu::{
     breakpoint::Breakpoint,
@@ -83,7 +84,7 @@ pub fn fuzz() {
         .expect("Symbol or env BREAKPOINT not found");
     println!("Breakpoint address = {breakpoint:#x}");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_id: &ClientId, _core_id| {
         let args: Vec<String> = env::args().collect();
 
         // The wrapped harness function, calling out to the LLVM-style harness

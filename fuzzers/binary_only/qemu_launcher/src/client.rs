@@ -7,7 +7,7 @@ use libafl::{
     state::StdState,
     Error,
 };
-use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
+use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list, ClientId};
 #[cfg(feature = "injections")]
 use libafl_qemu::modules::injections::InjectionModule;
 use libafl_qemu::{
@@ -61,6 +61,7 @@ impl Client<'_> {
         &self,
         state: Option<ClientState>,
         mgr: ClientMgr<M>,
+        client_id: &ClientId,
         core_id: CoreId,
     ) -> Result<(), Error> {
         let mut args = self.args()?;
@@ -124,6 +125,7 @@ impl Client<'_> {
             .harness(harness)
             .mgr(mgr)
             .core_id(core_id)
+            .client_id(client_id)
             .extra_tokens(extra_tokens);
 
         if self.options.rerun_input.is_some() && self.options.drcov.is_some() {

@@ -32,7 +32,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSlice,
+    AsSlice, ClientId,
 };
 #[cfg(not(any(feature = "mips", feature = "hexagon")))]
 use libafl_qemu::modules::CmpLogModule;
@@ -151,6 +151,7 @@ where
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,
+                              _client_id: &ClientId,
                               _core_id| {
             let time_observer = time_observer.clone();
 

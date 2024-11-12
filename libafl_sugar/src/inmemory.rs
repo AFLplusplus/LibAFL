@@ -32,7 +32,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Handled, Merge},
-    AsSlice,
+    AsSlice, ClientId,
 };
 use libafl_targets::{edges_map_mut_ptr, CmpLogObserver};
 use typed_builder::TypedBuilder;
@@ -149,6 +149,7 @@ where
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _>,
+                              _client_id: &ClientId,
                               _core_id| {
             let time_observer = time_observer.clone();
 

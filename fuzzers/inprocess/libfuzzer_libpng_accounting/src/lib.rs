@@ -31,7 +31,7 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
+    AsSlice, ClientId,
 };
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, ACCOUNTING_MEMOP_MAP, EDGES_MAP,
@@ -137,7 +137,7 @@ pub extern "C" fn libafl_main() {
 
     let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut restarting_mgr, _client_id: &ClientId, _core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe {
             StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_FOUND)
