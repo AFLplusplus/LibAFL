@@ -23,6 +23,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = [
+  "usermode",
   "fork",
   "build_libgasan",
   "build_libqasan",
