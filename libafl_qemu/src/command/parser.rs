@@ -52,7 +52,7 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(InputCommand::new(
@@ -81,7 +81,7 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(InputCommand::new(
@@ -109,7 +109,7 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let input_phys_addr: GuestPhysAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(StartCommand::new(QemuMemoryChunk::phys(
@@ -138,7 +138,7 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let input_virt_addr: GuestVirtAddr = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
         let max_input_size: GuestReg = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])?;
 
         Ok(StartCommand::new(QemuMemoryChunk::virt(
@@ -237,7 +237,7 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let client_version = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?;
+        let client_version = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])?.into();
 
         Ok(VersionCommand::new(client_version))
     }
