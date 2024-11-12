@@ -1,6 +1,6 @@
 [package]
 name = "libafl_bolts"
-version = "0.13.2"
+version.workspace = true
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
