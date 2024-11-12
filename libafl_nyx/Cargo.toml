@@ -1,6 +1,6 @@
 [package]
 name = "libafl_nyx"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = ["syheliel <syheliel@gmail.com>"]
 description = "libafl using nyx, only avaliable on linux"
