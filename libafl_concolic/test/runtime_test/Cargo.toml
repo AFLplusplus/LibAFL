@@ -1,6 +1,6 @@
 [package]
 name = "runtime_test"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 description = "Runtime test of LibAFL fuzzing with symbolicc execution"

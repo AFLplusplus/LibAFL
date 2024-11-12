@@ -1,6 +1,6 @@
 [package]
 name = "libafl_tinyinst"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = [
   "elbiazo <eric.l.biazo@gmail.com>",
