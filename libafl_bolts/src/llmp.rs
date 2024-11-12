@@ -984,14 +984,14 @@ where
         Ok(if client_id_str == _NULL_ENV_STR {
             None
         } else {
-            Some(ClientId(client_id_str.parse()?))
+            Some(ClientId::new(client_id_str.parse()?))
         })
     }
 
     /// Writes the `id` to an env var
     #[cfg(feature = "std")]
     fn client_id_to_env(env_name: &str, id: ClientId) {
-        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{}", id.0));
+        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{}", id.id()));
     }
 
     /// Reattach to a vacant `out_shmem`, to with a previous sender stored the information in an env before.
@@ -1293,7 +1293,7 @@ where
 
         log::debug!(
             "[{} - {:#x}] Send message with id {}",
-            self.id.0,
+            self.id.id(),
             self as *const Self as u64,
             mid
         );
@@ -1644,7 +1644,7 @@ where
         };
 
         Ok(Self {
-            id: ClientId(0),
+            id: ClientId::new(0),
             current_recv_shmem,
             last_msg_recvd,
             shmem_provider,
@@ -1709,7 +1709,7 @@ where
 
             log::debug!(
                 "[{} - {:#x}] Received message with ID {}...",
-                self.id.0,
+                self.id.id(),
                 self as *const Self as u64,
                 (*msg).message_id.0
             );
@@ -2662,11 +2662,11 @@ where
         loop {
             // log::trace!("{:#?}", self.llmp_clients);
             let msg = {
-                let pos = if (client_id.0 as usize) < self.inner.llmp_clients.len()
-                    && self.inner.llmp_clients[client_id.0 as usize].id == client_id
+                let pos = if (client_id.id() as usize) < self.inner.llmp_clients.len()
+                    && self.inner.llmp_clients[client_id.id() as usize].id == client_id
                 {
                     // Fast path when no client before this one was removed
-                    client_id.0 as usize
+                    client_id.id() as usize
                 } else {
                     self.inner
                         .llmp_clients
@@ -2710,7 +2710,7 @@ where
                         )));
                     }
                     let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
-                    let client_id = ClientId((*exitinfo).client_id);
+                    let client_id = ClientId::new((*exitinfo).client_id);
                     log::info!("Client exit message received!, we are removing clients whose client_group_id is {:#?}", client_id);
 
                     self.inner.clients_to_remove.push(client_id);
@@ -2740,7 +2740,7 @@ where
                             new_page.mark_safe_to_unmap();
 
                             let _new_client = self.inner.add_client(LlmpReceiver {
-                                id: ClientId(0), // will be auto-filled
+                                id: ClientId::new(0), // will be auto-filled
                                 current_recv_shmem: new_page,
                                 last_msg_recvd: ptr::null_mut(),
                                 shmem_provider: self.inner.shmem_provider.clone(),
@@ -2761,11 +2761,11 @@ where
                 }
                 // handle all other messages
                 _ => {
-                    let pos = if (client_id.0 as usize) < self.inner.llmp_clients.len()
-                        && self.inner.llmp_clients[client_id.0 as usize].id == client_id
+                    let pos = if (client_id.id() as usize) < self.inner.llmp_clients.len()
+                        && self.inner.llmp_clients[client_id.id() as usize].id == client_id
                     {
                         // Fast path when no client before this one was removed
-                        client_id.0 as usize
+                        client_id.id() as usize
                     } else {
                         self.inner
                             .llmp_clients
@@ -2843,10 +2843,10 @@ where
     ) -> Result<Self, Error> {
         Ok(LlmpBrokerInner {
             llmp_out: LlmpSender {
-                id: ClientId(0),
+                id: ClientId::new(0),
                 last_msg_sent: ptr::null_mut(),
                 out_shmems: vec![LlmpSharedMap::new(
-                    ClientId(0),
+                    ClientId::new(0),
                     shmem_provider.new_shmem(next_shmem_size(0))?,
                 )],
                 keep_pages_forever,
@@ -2870,7 +2870,7 @@ where
     #[must_use]
     #[inline]
     pub fn peek_next_client_id(&self) -> ClientId {
-        ClientId(
+        ClientId::new(
             self.num_clients_seen
                 .try_into()
                 .expect("More than u32::MAX clients!"),
@@ -2936,7 +2936,7 @@ where
         client_page.mark_safe_to_unmap();
 
         self.add_client(LlmpReceiver {
-            id: ClientId(0), // Will be auto-filled
+            id: ClientId::new(0), // Will be auto-filled
             current_recv_shmem: client_page,
             last_msg_recvd: ptr::null_mut(),
             shmem_provider: self.shmem_provider.clone(),
@@ -3284,7 +3284,7 @@ where
         match request {
             TcpRequest::ClientQuit { client_id } => {
                 // todo search the ancestor_id and remove it.
-                match Self::announce_client_exit(sender, client_id.0) {
+                match Self::announce_client_exit(sender, client_id.id()) {
                     Ok(()) => (),
                     Err(e) => log::info!("Error announcing client exit: {e:?}"),
                 }
@@ -3303,7 +3303,7 @@ where
                 ) {
                     log::info!("An error occurred sending via tcp {e}");
                 };
-                current_client_id.0 += 1;
+                (*current_client_id.id_mut()) += 1;
             }
             TcpRequest::RemoteBrokerHello { hostname } => {
                 log::info!("B2B new client: {hostname}");
@@ -3312,7 +3312,7 @@ where
                 if send_tcp_msg(
                     &mut stream,
                     &TcpResponse::RemoteBrokerAccepted {
-                        broker_id: BrokerId(current_client_id.0),
+                        broker_id: BrokerId(current_client_id.id()),
                     },
                 )
                 .is_err()
@@ -3327,7 +3327,7 @@ where
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
                         log::info!("B2B: Error announcing client {shmem_description:?}");
                     };
-                    current_client_id.0 += 1;
+                    (*current_client_id.id_mut()) += 1;
                 }
             }
         };
@@ -3366,7 +3366,7 @@ where
             // Create a new ShMemProvider for this background thread.
             let mut shmem_provider_bg = SP::new().unwrap();
 
-            let mut current_client_id = ClientId(llmp_tcp_id.0 + 1);
+            let mut current_client_id = ClientId::new(llmp_tcp_id.id() + 1);
 
             let mut tcp_incoming_sender = LlmpSender {
                 id: llmp_tcp_id,
@@ -3606,7 +3606,7 @@ where
             },
 
             receiver: LlmpReceiver {
-                id: ClientId(0),
+                id: ClientId::new(0),
                 current_recv_shmem: initial_broker_shmem,
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider,
@@ -3748,7 +3748,7 @@ where
         );
 
         // We'll set `sender_id` later
-        let mut ret = Self::new(shmem_provider, map, ClientId(0))?;
+        let mut ret = Self::new(shmem_provider, map, ClientId::new(0))?;
 
         // Now sender contains 1 shmem, that must be shared back with the broker.
         let client_hello_req = TcpRequest::LocalClientHello {

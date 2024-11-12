@@ -83,7 +83,7 @@ where
     }
 
     fn on_timeout(&mut self) -> Result<(), Error> {
-        self.monitor.display("Broker Heartbeat", ClientId(0));
+        self.monitor.display("Broker Heartbeat", ClientId::new(0));
         Ok(())
     }
 }

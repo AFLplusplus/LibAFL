@@ -457,7 +457,7 @@ impl Monitor for TuiMonitor {
         let client = self.client_stats_mut_for(sender_id);
         let exec_sec = client.execs_per_sec_pretty(cur_time);
 
-        let sender = format!("#{}", sender_id.0);
+        let sender = format!("#{}", sender_id.id());
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
@@ -476,10 +476,10 @@ impl Monitor for TuiMonitor {
         }
 
         {
-            let client = &self.client_stats()[sender_id.0 as usize];
+            let client = &self.client_stats()[sender_id.id() as usize];
             let mut ctx = self.context.write().unwrap();
             ctx.clients
-                .entry(sender_id.0 as usize)
+                .entry(sender_id.id() as usize)
                 .or_default()
                 .grab_data(client, exec_sec);
             while ctx.client_logs.len() >= DEFAULT_LOGS_NUMBER {

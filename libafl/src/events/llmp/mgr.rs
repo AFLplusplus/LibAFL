@@ -684,6 +684,6 @@ where
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
-        EventManagerId(self.llmp.sender().id().0 as usize)
+        EventManagerId(self.llmp.sender().id().id() as usize)
     }
 }

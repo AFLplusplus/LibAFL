@@ -64,7 +64,7 @@ where
     }
 
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
-        let sender = format!("#{}", sender_id.0);
+        let sender = format!("#{}", sender_id.id());
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {

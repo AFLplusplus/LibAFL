@@ -552,7 +552,7 @@ pub trait Monitor {
     /// The client monitor for a specific id, creating new if it doesn't exist
     fn client_stats_insert(&mut self, client_id: ClientId) {
         let total_client_stat_count = self.client_stats().len();
-        for _ in total_client_stat_count..=(client_id.0) as usize {
+        for _ in total_client_stat_count..=(client_id.id()) as usize {
             self.client_stats_mut().push(ClientStats {
                 enabled: false,
                 last_window_time: Duration::from_secs(0),
@@ -572,12 +572,12 @@ pub trait Monitor {
 
     /// Get mutable reference to client stats
     fn client_stats_mut_for(&mut self, client_id: ClientId) -> &mut ClientStats {
-        &mut self.client_stats_mut()[client_id.0 as usize]
+        &mut self.client_stats_mut()[client_id.id() as usize]
     }
 
     /// Get immutable reference to client stats
     fn client_stats_for(&self, client_id: ClientId) -> &ClientStats {
-        &self.client_stats()[client_id.0 as usize]
+        &self.client_stats()[client_id.id() as usize]
     }
 
     /// Aggregate the results in case there're multiple clients
@@ -684,7 +684,7 @@ impl Monitor for SimplePrintingMonitor {
     }
 
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
-        let mut userstats = self.client_stats()[sender_id.0 as usize]
+        let mut userstats = self.client_stats()[sender_id.id() as usize]
             .user_monitor
             .iter()
             .map(|(key, value)| format!("{key}: {value}"))
@@ -693,7 +693,7 @@ impl Monitor for SimplePrintingMonitor {
         println!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",
             event_msg,
-            sender_id.0,
+            sender_id.id(),
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats_count(),
             self.corpus_size(),
@@ -769,7 +769,7 @@ where
         let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
-            sender_id.0,
+            sender_id.id(),
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats_count(),
             self.corpus_size(),

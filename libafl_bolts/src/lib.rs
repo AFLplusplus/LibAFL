@@ -167,12 +167,34 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "xxh3")]
 use xxhash_rust::xxh3::xxh3_64;
 
-/// The client ID == the sender id.
+/// Sender ID for an LLMP client
 #[repr(transparent)]
 #[derive(
     Debug, Default, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
 )]
-pub struct ClientId(pub u32);
+pub struct ClientId {
+    id: u32,
+}
+
+impl ClientId {
+    /// Create a new [`ClientId`]
+    #[must_use]
+    pub fn new(id: u32) -> Self {
+        Self { id }
+    }
+
+    /// Get the underlying id
+    #[must_use]
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Get the underlying id
+    #[must_use]
+    pub fn id_mut(&mut self) -> &mut u32 {
+        &mut self.id
+    }
+}
 
 use core::{
     array::TryFromSliceError,

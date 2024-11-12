@@ -291,7 +291,7 @@ where
             // Forward to main only if new tc or heartbeat
             let should_be_forwarded = match &mut event {
                 Event::NewTestcase { forward_id, .. } => {
-                    *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
+                    *forward_id = Some(ClientId::new(self.inner.mgr_id().0 as u32));
                     is_tc = true;
                     true
                 }

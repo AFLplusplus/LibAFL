@@ -773,8 +773,8 @@ mod tests {
 
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
-            LlmpSharedMap::new(ClientId(0), shmem_provider.new_shmem(1024).unwrap()),
-            ClientId(0),
+            LlmpSharedMap::new(ClientId::new(0), shmem_provider.new_shmem(1024).unwrap()),
+            ClientId::new(0),
         )
         .unwrap();
 
