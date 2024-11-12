@@ -4,7 +4,7 @@ authors = [
   "Dominik Maier <domenukk@gmail.com>",
 ]
 name = "libafl_benches"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 description = "LibAFL Benchmarks"
 documentation = "https://docs.rs/libafl"

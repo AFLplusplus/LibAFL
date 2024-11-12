@@ -1,6 +1,6 @@
 [package]
 name = "dump_constraints"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 description = "Dump Constraints, a lib to see the constraints oof a run"
