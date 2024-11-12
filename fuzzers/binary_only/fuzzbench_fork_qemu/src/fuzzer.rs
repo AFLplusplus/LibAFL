@@ -196,7 +196,7 @@ fn fuzz(
         }
     }
 
-    println!("Break at {:#x}", qemu.read_reg::<_, u64>(Regs::Pc).unwrap());
+    println!("Break at {:#x}", qemu.read_reg(Regs::Pc).unwrap());
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
