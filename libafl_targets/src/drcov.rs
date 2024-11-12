@@ -489,6 +489,7 @@ mod test {
 
         let reader = DrCovReader::read(&drcov_tmp_file).unwrap();
 
+        assert_eq!(reader.basic_block_entries.len(), 4);
         assert_eq!(reader.module_map().len(), 3);
         assert_eq!(reader.basic_blocks().len(), 4);
 
@@ -496,6 +497,7 @@ mod test {
         reader.write(&drcov_tmp_file).unwrap();
         let reader = DrCovReader::read(&drcov_tmp_file).unwrap();
 
+        assert_eq!(reader.basic_block_entries.len(), 4);
         assert_eq!(reader.module_map().len(), 3);
         assert_eq!(reader.basic_blocks().len(), 4);
 
