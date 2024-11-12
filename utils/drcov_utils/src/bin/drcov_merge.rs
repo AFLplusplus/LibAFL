@@ -27,9 +27,7 @@ pub struct Opt {
 fn main() {
     let opts = Opt::parse();
 
-    if opts.inputs.len() < 2 {
-        panic!("Need at least two inputs to merge anything.");
-    }
+    assert!(!(opts.inputs.len() < 2), "Need at least two inputs to merge anything.");
 
     let mut inputs = opts.inputs.iter();
 
