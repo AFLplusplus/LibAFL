@@ -22,7 +22,8 @@ members = [
   "utils/deexit",
   "utils/libafl_benches",
   "utils/libafl_jumper",
-  "utils/gramatron/construct_automata", "utils/dump_drcov_addrs",
+  "utils/gramatron/construct_automata",
+  "utils/dump_drcov_addrs",
 ]
 default-members = [
   "libafl",
