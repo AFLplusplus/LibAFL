@@ -179,7 +179,7 @@ pub struct ClientId {
 impl ClientId {
     /// Create a new [`ClientId`]
     #[must_use]
-    pub fn new(id: u32) -> Self {
+    pub const fn new(id: u32) -> Self {
         Self { id }
     }
 
