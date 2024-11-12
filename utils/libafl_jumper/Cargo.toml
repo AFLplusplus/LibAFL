@@ -13,7 +13,7 @@ default = ["std"]
 std = []
 
 [build-dependencies]
-cc = { version = "1.1.21" }
+cc = "1"
 
 [dependencies]
 hex = { version = "0.4", default-features = false }

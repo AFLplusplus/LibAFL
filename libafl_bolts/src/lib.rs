@@ -147,8 +147,6 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::Hasher;
-#[cfg(all(unix, feature = "std"))]
-use core::ptr;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
@@ -1038,9 +1036,11 @@ impl SimpleFdLogger {
         // # Safety
         // The passed-in `fd` has to be a legal file descriptor to log to.
         // We also access a shared variable here.
+        let logger = &raw mut LIBAFL_RAWFD_LOGGER;
         unsafe {
-            (*ptr::addr_of_mut!(LIBAFL_RAWFD_LOGGER)).set_fd(log_fd);
-            log::set_logger(&*ptr::addr_of!(LIBAFL_RAWFD_LOGGER))?;
+            let logger = &mut *logger;
+            logger.set_fd(log_fd);
+            log::set_logger(logger)?;
         }
         Ok(())
     }
@@ -1268,9 +1268,6 @@ pub mod pybind {
 mod tests {
 
     #[cfg(all(feature = "std", unix))]
-    use core::ptr;
-
-    #[cfg(all(feature = "std", unix))]
     use crate::LIBAFL_RAWFD_LOGGER;
 
     #[test]
@@ -1279,8 +1276,10 @@ mod tests {
         use std::{io::stdout, os::fd::AsRawFd};
 
         unsafe { LIBAFL_RAWFD_LOGGER.fd = stdout().as_raw_fd() };
+
+        let libafl_rawfd_logger_fd = &raw const LIBAFL_RAWFD_LOGGER;
         unsafe {
-            log::set_logger(&*ptr::addr_of!(LIBAFL_RAWFD_LOGGER)).unwrap();
+            log::set_logger(&*libafl_rawfd_logger_fd).unwrap();
         }
         log::set_max_level(log::LevelFilter::Debug);
         log::info!("Test");

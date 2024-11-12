@@ -402,8 +402,6 @@ impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for TimeObserver {}
 #[cfg(test)]
 mod tests {
 
-    use core::ptr::{addr_of, addr_of_mut};
-
     use libafl_bolts::{
         ownedref::OwnedMutSlice,
         tuples::{tuple_list, tuple_list_type},
@@ -416,11 +414,12 @@ mod tests {
 
     #[test]
     fn test_observer_serde() {
+        let map_ptr = &raw const MAP;
         let obv = tuple_list!(TimeObserver::new("time"), unsafe {
-            let len = (*addr_of!(MAP)).len();
+            let len = (*map_ptr).len();
             StdMapObserver::from_ownedref(
                 "map",
-                OwnedMutSlice::from_raw_parts_mut(addr_of_mut!(MAP) as *mut u32, len),
+                OwnedMutSlice::from_raw_parts_mut(&raw mut MAP as *mut u32, len),
             )
         });
         let vec = postcard::to_allocvec(&obv).unwrap();

@@ -218,7 +218,7 @@ impl CmpLogRuntime {
                 ; stp x26, x27, [sp, #-0x10]!
                 ; stp x28, x29, [sp, #-0x10]!
                 ; stp x30, xzr, [sp, #-0x10]!
-                ; .dword 0xd53b4218u32 as i32 // mrs x24, nzcv
+                ; .u32 0xd53b4218_u32 // mrs x24, nzcv
                 // jump to rust based population of the lists
                 ; mov x2, x0
                 ; adr x3, >done
@@ -226,7 +226,7 @@ impl CmpLogRuntime {
                 ; ldr x0, >self_addr
                 ; blr x4
                 // restore the reg state before returning to the caller
-                ; .dword 0xd51b4218u32 as i32 // msr nzcv, x24
+                ; .u32 0xd51b4218_u32 // msr nzcv, x24
                 ; ldp x30, xzr, [sp], #0x10
                 ; ldp x28, x29, [sp], #0x10
                 ; ldp x26, x27, [sp], #0x10
@@ -244,9 +244,9 @@ impl CmpLogRuntime {
                 ; ldp x2, x3, [sp], #0x10
                 ; b >done
                 ; self_addr:
-                ; .qword core::ptr::from_mut(self) as *mut c_void as i64
+                ; .u64 core::ptr::from_mut(self) as *mut c_void as u64
                 ; populate_lists:
-                ; .qword  CmpLogRuntime::populate_lists as *mut c_void as i64
+                ; .u64 CmpLogRuntime::populate_lists as *mut c_void as u64
                 ; done:
             );};
         }
