@@ -168,6 +168,7 @@ impl<F> DrCovModule<F> {
                             continue 'pcs_full;
                         }
                         if *idm == *id {
+                            #[allow(clippy::unnecessary_cast)]
                             match lengths.get(pc) {
                                 Some(block_length) => {
                                     drcov_vec.push(DrCovBasicBlock::new(
@@ -215,6 +216,7 @@ impl<F> DrCovModule<F> {
                     if !module_found {
                         continue 'pcs;
                     }
+                    #[allow(clippy::unnecessary_cast)]
                     match lengths.get(pc) {
                         Some(block_length) => {
                             drcov_vec.push(DrCovBasicBlock::new(
@@ -288,7 +290,7 @@ where
                 .mappings()
                 .filter_map(|m| {
                     m.path()
-                        .map(|p| ((m.start() as u64)..(m.end() as u64), p.to_string()))
+                        .map(|p| ((m.start())..(m.end()), p.to_string()))
                         .filter(|(_, p)| !p.is_empty())
                 })
                 .enumerate()
