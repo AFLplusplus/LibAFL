@@ -40,7 +40,7 @@ libafl_bolts::impl_serdeany!(DrCovMetadata);
 #[derive(Debug)]
 pub struct DrCovModuleBuilder<F> {
     filter: Option<F>,
-    module_mapping: Option<RangeMap<usize, (u16, String)>>,
+    module_mapping: Option<RangeMap<u64, (u16, String)>>,
     filename: Option<PathBuf>,
     full_trace: Option<bool>,
 }
@@ -68,7 +68,7 @@ where
     }
 
     #[must_use]
-    pub fn module_mapping(self, module_mapping: RangeMap<usize, (u16, String)>) -> Self {
+    pub fn module_mapping(self, module_mapping: RangeMap<u64, (u16, String)>) -> Self {
         Self {
             filter: self.filter,
             module_mapping: Some(module_mapping),
@@ -101,7 +101,7 @@ where
 #[derive(Debug)]
 pub struct DrCovModule<F> {
     filter: F,
-    module_mapping: Option<RangeMap<usize, (u16, String)>>,
+    module_mapping: Option<RangeMap<u64, (u16, String)>>,
     filename: PathBuf,
     full_trace: bool,
     drcov_len: usize,
@@ -124,7 +124,7 @@ impl<F> DrCovModule<F> {
     pub fn new(
         filter: F,
         filename: PathBuf,
-        module_mapping: Option<RangeMap<usize, (u16, String)>>,
+        module_mapping: Option<RangeMap<u64, (u16, String)>>,
         full_trace: bool,
     ) -> Self {
         if full_trace {
@@ -282,7 +282,7 @@ where
 
             let qemu = emulator_modules.qemu();
 
-            let mut module_mapping: RangeMap<usize, (u16, String)> = RangeMap::new();
+            let mut module_mapping: RangeMap<u64, (u16, String)> = RangeMap::new();
 
             for (i, (r, p)) in qemu
                 .mappings()
