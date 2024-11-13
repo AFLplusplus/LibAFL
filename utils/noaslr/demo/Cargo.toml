@@ -1,6 +1,6 @@
 [package]
 name = "noaslr_demo"
-version = "0.13.2"
+version = "0.14.0"
 edition = "2021"
 
 [build-dependencies]
