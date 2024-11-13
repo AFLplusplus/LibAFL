@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_windows_asan"
-version = "0.13.2"
+version = "0.14.0"
 authors = ["Max Ammann <max@maxammann.org>"]
 edition = "2021"
 categories = ["development-tools::testing"]
