@@ -1,7 +1,8 @@
 use std::{
     borrow::Cow,
     fs::File,
-    io::{self, BufRead, BufReader},
+    io,
+    io::{BufRead, BufReader},
     path::Path,
 };
 
@@ -164,6 +165,7 @@ pub fn create_dir_if_not_exists(path: &Path) -> io::Result<()> {
     }
 }
 
+#[cfg(not(feature = "fuzzbench"))]
 pub fn remove_main_node_file(output_dir: &Path) -> Result<(), Error> {
     for entry in std::fs::read_dir(output_dir)?.filter_map(Result::ok) {
         let path = entry.path();
