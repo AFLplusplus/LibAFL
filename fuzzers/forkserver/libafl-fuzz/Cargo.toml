@@ -36,3 +36,4 @@ libafl_nyx = { path = "../../../libafl_nyx" }
 [features]
 default = ["track_hit_feedbacks"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
+fuzzbench = []

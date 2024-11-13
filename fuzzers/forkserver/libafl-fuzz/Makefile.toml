@@ -65,6 +65,7 @@ script = "echo done"
 dependencies = [
   "build_afl",
   "test_instr",
+  "test_instr_fuzzbench",
   "test_cmplog",
   "test_frida",
   "test_qemu",
@@ -74,6 +75,10 @@ dependencies = [
 [tasks.build_libafl_fuzz]
 script_runner = "@shell"
 script = "cargo build --profile ${PROFILE}"
+
+[tasks.build_libafl_fuzz_fuzzbench]
+script_runner = "@shell"
+script = "cargo build --profile ${PROFILE} --features fuzzbench"
 
 [tasks.test_instr]
 script_runner = "@shell"
@@ -107,6 +112,39 @@ test -d "./test/output/fuzzer_main/crashes" || {
 }
 '''
 dependencies = ["build_afl", "build_libafl_fuzz"]
+
+[tasks.test_instr_fuzzbench]
+script_runner = "@shell"
+script = '''
+AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
+
+export LIBAFL_DEBUG_OUTPUT=1 
+export AFL_CORES=0
+export AFL_STATS_INTERVAL=1 
+
+timeout 5 ${FUZZER} -i ./test/seeds -o ./test/output-fuzzbench ./test/out-instr || true
+test -n "$( ls ./test/output-fuzzbench/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
+	echo "No new corpus entries found"
+	exit 1
+}
+test -n "$( ls ./test/output-fuzzbench/fuzzer_main/fuzzer_stats 2>/dev/null )" || {
+	echo "No fuzzer_stats file found"
+	exit 1
+}
+test -n "$( ls ./test/output-fuzzbench/fuzzer_main/plot_data 2>/dev/null )" || {
+	echo "No plot_data found"
+	exit 1
+}
+test -d "./test/output-fuzzbench/fuzzer_main/hangs" || {
+	echo "No hangs directory found"
+	exit 1
+}
+test -d "./test/output-fuzzbench/fuzzer_main/crashes" || {
+	echo "No crashes directory found"
+	exit 1
+}
+'''
+dependencies = ["build_afl", "build_libafl_fuzz_fuzzbench"]
 
 [tasks.test_cmplog]
 script_runner = "@shell"
