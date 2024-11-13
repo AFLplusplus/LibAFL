@@ -71,23 +71,27 @@ mod feedback;
 mod scheduler;
 mod stages;
 use clap::Parser;
-use corpus::{check_autoresume, create_dir_if_not_exists, remove_main_node_file};
+use corpus::{check_autoresume, create_dir_if_not_exists};
+#[cfg(not(feature = "fuzzbench"))]
+use corpus::remove_main_node_file;
 mod corpus;
 mod executor;
 mod fuzzer;
 mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
-use libafl::{
-    events::{CentralizedLauncher, EventConfig},
-    monitors::MultiMonitor,
-    schedulers::powersched::BaseSchedule,
-    Error,
-};
-use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
-    shmem::{ShMemProvider, StdShMemProvider},
-};
+#[cfg(feature = "fuzzbench")]
+use libafl::events::SimpleEventManager;
+#[cfg(not(feature = "fuzzbench"))]
+use libafl::events::{CentralizedLauncher, EventConfig};
+#[cfg(not(feature = "fuzzbench"))]
+use libafl::monitors::MultiMonitor;
+#[cfg(feature = "fuzzbench")]
+use libafl::monitors::SimpleMonitor;
+use libafl::{schedulers::powersched::BaseSchedule, Error};
+use libafl_bolts::core_affinity::{CoreId, Cores};
+#[cfg(not(feature = "fuzzbench"))]
+use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use nix::sys::signal::Signal;
 
 const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
@@ -107,10 +111,14 @@ fn main() {
     executor::check_binary(&mut opt, SHMEM_ENV_VAR).expect("binary to be valid");
 
     // Create the shared memory map provider for LLMP
+    #[cfg(not(feature = "fuzzbench"))]
     let shmem_provider = StdShMemProvider::new().unwrap();
 
     // Create our Monitor
+    #[cfg(not(feature = "fuzzbench"))]
     let monitor = MultiMonitor::new(|s| println!("{s}"));
+    #[cfg(feature = "fuzzbench")]
+    let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
     opt.auto_resume = if opt.auto_resume {
         true
@@ -126,7 +134,8 @@ fn main() {
     // Currently, we will error if we don't find our assigned dir.
     // This will also not work if we use core 1-8 and then later, 16-24
     // since fuzzer names are using core_ids
-    match CentralizedLauncher::builder()
+    #[cfg(not(feature = "fuzzbench"))]
+    let res = CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
@@ -149,8 +158,16 @@ fn main() {
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
         .build()
-        .launch()
-    {
+        .launch();
+    #[cfg(feature = "fuzzbench")]
+    let res = {
+        let fuzzer_dir = opt.output_dir.join("fuzzer_main");
+        let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+        let mgr = SimpleEventManager::new(monitor);
+        let res = run_client(None, mgr, &fuzzer_dir, CoreId(0), &opt, true);
+        res
+    };
+    match res {
         Ok(()) => unreachable!(),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {err:?}"),

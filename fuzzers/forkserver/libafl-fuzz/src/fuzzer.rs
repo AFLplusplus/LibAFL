@@ -7,12 +7,15 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "fuzzbench")]
+use libafl::events::SimpleEventManager;
+#[cfg(not(feature = "fuzzbench"))]
+use libafl::events::{CentralizedEventManager, LlmpRestartingEventManager};
+#[cfg(feature = "fuzzbench")]
+use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{
-        CentralizedEventManager, EventManagerHooksTuple, LlmpRestartingEventManager,
-        ProgressReporter,
-    },
+    events::ProgressReporter,
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
@@ -39,6 +42,8 @@ use libafl::{
     },
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
+#[cfg(not(feature = "fuzzbench"))]
+use libafl_bolts::shmem::StdShMemProvider;
 use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos, current_time,
@@ -69,23 +74,47 @@ use crate::{
 pub type LibaflFuzzState =
     StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
 
-pub fn run_client<EMH, SP>(
-    state: Option<LibaflFuzzState>,
-    mut restarting_mgr: CentralizedEventManager<
-        LlmpRestartingEventManager<(), LibaflFuzzState, SP>,
-        EMH,
-        LibaflFuzzState,
-        SP,
-    >,
-    fuzzer_dir: &Path,
-    core_id: CoreId,
-    opt: &Opt,
-    is_main_node: bool,
-) -> Result<(), Error>
-where
-    EMH: EventManagerHooksTuple<LibaflFuzzState> + Copy + Clone,
-    SP: ShMemProvider,
-{
+#[cfg(not(feature = "fuzzbench"))]
+type LibaflFuzzManager = CentralizedEventManager<
+    LlmpRestartingEventManager<(), LibaflFuzzState, StdShMemProvider>,
+    (),
+    LibaflFuzzState,
+    StdShMemProvider,
+>;
+#[cfg(feature = "fuzzbench")]
+type LibaflFuzzManager<F> = SimpleEventManager<SimpleMonitor<F>, LibaflFuzzState>;
+
+macro_rules! define_run_client {
+    ($state: ident, $mgr: ident, $fuzzer_dir: ident, $core_id: ident, $opt:ident, $is_main_node: ident, $body:block) => {
+        #[cfg(not(feature = "fuzzbench"))]
+        pub fn run_client(
+            $state: Option<LibaflFuzzState>,
+            mut $mgr: LibaflFuzzManager,
+            $fuzzer_dir: &Path,
+            $core_id: CoreId,
+            $opt: &Opt,
+            $is_main_node: bool,
+        ) -> Result<(), Error> {
+            $body
+        }
+        #[cfg(feature = "fuzzbench")]
+        pub fn run_client<F>(
+            $state: Option<LibaflFuzzState>,
+            mut $mgr: LibaflFuzzManager<F>,
+            $fuzzer_dir: &Path,
+            $core_id: CoreId,
+            $opt: &Opt,
+            $is_main_node: bool,
+        ) -> Result<(), Error>
+        where
+            F: FnMut(&str),
+        {
+            $body
+        }
+    };
+}
+
+define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     // Create the shared memory map for comms with the forkserver
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
     let mut shmem = shmem_provider
@@ -318,7 +347,7 @@ where
             .load_initial_inputs_multicore(
                 &mut fuzzer,
                 &mut executor,
-                &mut restarting_mgr,
+                &mut mgr,
                 &[queue_dir],
                 &core_id,
                 opt.cores.as_ref().expect("invariant; should never occur"),
@@ -432,7 +461,7 @@ where
             &mut stages,
             &mut executor,
             &mut state,
-            &mut restarting_mgr,
+            &mut mgr,
         )?;
     } else {
         // The order of the stages matter!
@@ -451,12 +480,12 @@ where
             &mut stages,
             &mut executor,
             &mut state,
-            &mut restarting_mgr,
+            &mut mgr,
         )?;
     }
     Ok(())
     // TODO: serialize state when exiting.
-}
+});
 
 fn base_executor_builder<'a>(
     opt: &'a Opt,

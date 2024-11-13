@@ -35,3 +35,4 @@ serde = { version = "1.0.117", features = ["derive"] }
 [features]
 default = ["track_hit_feedbacks"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
+fuzzbench = []

@@ -1,9 +1,6 @@
-use std::{
-    borrow::Cow,
-    fs::File,
-    io::{self, BufRead, BufReader},
-    path::Path,
-};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::{borrow::Cow, io, path::Path};
 
 use libafl::{
     corpus::{Corpus, CorpusId, Testcase},
@@ -17,8 +14,8 @@ use nix::{
     fcntl::{Flock, FlockArg},
 };
 
-use crate::{fuzzer::LibaflFuzzState, OUTPUT_GRACE};
-
+use crate::fuzzer::LibaflFuzzState;
+use crate::OUTPUT_GRACE;
 pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> String {
     let id = id.0;
     let is_seed = state.must_load_initial_inputs();
@@ -164,6 +161,7 @@ pub fn create_dir_if_not_exists(path: &Path) -> io::Result<()> {
     }
 }
 
+#[cfg(not(feature = "fuzzbench"))]
 pub fn remove_main_node_file(output_dir: &Path) -> Result<(), Error> {
     for entry in std::fs::read_dir(output_dir)?.filter_map(Result::ok) {
         let path = entry.path();
