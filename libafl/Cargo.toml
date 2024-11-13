@@ -37,7 +37,6 @@ default = [
   "gzip",
   "regex",
   "serdeany_autoreg",
-  "tui_monitor",
   "libafl_bolts/xxh3",
 ]
 document-features = ["dep:document-features"]
