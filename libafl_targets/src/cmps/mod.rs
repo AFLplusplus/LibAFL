@@ -478,6 +478,7 @@ impl HasLen for AFLppCmpLogMap {
 
 impl AFLppCmpLogMap {
     #[must_use]
+    #[allow(clippy::cast_ptr_alignment)]
     /// Instantiate a new boxed zeroed `AFLppCmpLogMap`. This should be used to create a new
     /// map, because it is so large it cannot be allocated on the stack with default
     /// runtime configuration.
@@ -524,6 +525,7 @@ impl Serialize for AFLppCmpLogMap {
 }
 
 impl<'de> Deserialize<'de> for AFLppCmpLogMap {
+    #[allow(clippy::cast_ptr_alignment)]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
