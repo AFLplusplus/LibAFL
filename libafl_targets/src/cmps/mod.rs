@@ -442,7 +442,7 @@ pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
 #[cfg(feature = "cmplog_extended_instrumentation")]
 #[allow(clippy::large_stack_arrays)]
 pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
-    headers: [AFLppCmpLogHeader { data: [0; 2] }; CMPLOG_MAP_W],
+    headers: [AFLppCmpLogHeader::new_with_raw_value(0); CMPLOG_MAP_W],
     vals: AFLppCmpLogVals {
         operands: [[AFLppCmpLogOperands {
             v0: 0,
@@ -463,7 +463,7 @@ pub use libafl_cmplog_map as CMPLOG_MAP;
 pub use libafl_cmplog_map_extended as CMPLOG_MAP_EXTENDED;
 
 #[derive(Debug, Clone)]
-#[repr(C, packed)]
+#[repr(C)]
 /// Comparison map compatible with AFL++ cmplog instrumentation
 pub struct AFLppCmpLogMap {
     headers: [AFLppCmpLogHeader; CMPLOG_MAP_W],
@@ -540,11 +540,11 @@ impl CmpMap for AFLppCmpLogMap {
     }
 
     fn executions_for(&self, idx: usize) -> usize {
-        self.headers[idx].hits() as usize
+        self.headers[idx].hits().value() as usize
     }
 
     fn usable_executions_for(&self, idx: usize) -> usize {
-        if self.headers[idx]._type() == CMPLOG_KIND_INS {
+        if self.headers[idx].type_().value() == CMPLOG_KIND_INS {
             if self.executions_for(idx) < CMPLOG_MAP_H {
                 self.executions_for(idx)
             } else {
@@ -558,9 +558,10 @@ impl CmpMap for AFLppCmpLogMap {
     }
 
     fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
-        if self.headers[idx]._type() == CMPLOG_KIND_INS {
+        let header = self.headers[idx];
+        if header.type_().value() == CMPLOG_KIND_INS {
             unsafe {
-                match self.headers[idx].shape() {
+                match self.headers[idx].shape().value() {
                     0 => Some(CmpValues::U8((
                         self.vals.operands[idx][execution].v0 as u8,
                         self.vals.operands[idx][execution].v1 as u8,
@@ -600,7 +601,7 @@ impl CmpMap for AFLppCmpLogMap {
 
     fn reset(&mut self) -> Result<(), Error> {
         // For performance, we reset just the headers
-        self.headers.fill(AFLppCmpLogHeader { data: [0; 2] });
+        self.headers.fill(AFLppCmpLogHeader::new_with_raw_value(0));
 
         Ok(())
     }

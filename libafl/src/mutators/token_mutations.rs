@@ -1410,7 +1410,7 @@ where
                         None => input_len - cmp_buf_idx,
                     };
 
-                    let hshape = (header.shape() + 1) as usize;
+                    let hshape = (header.shape().value() + 1) as usize;
 
                     match (&orig_val[cmp_h_idx], &new_val[cmp_h_idx]) {
                         (CmpValues::U8(_orig), CmpValues::U8(_new)) => {
@@ -1506,7 +1506,7 @@ where
                         }
                         (CmpValues::U16(orig), CmpValues::U16(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
-                            let attribute: u8 = header.attribute() as u8;
+                            let attribute: u8 = header.attribute().value();
 
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
                                 // Compare v0 against v1
@@ -1594,7 +1594,7 @@ where
                         }
                         (CmpValues::U32(orig), CmpValues::U32(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
-                            let attribute = header.attribute() as u8;
+                            let attribute = header.attribute().value();
 
                             let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
@@ -1687,7 +1687,7 @@ where
                         }
                         (CmpValues::U64(orig), CmpValues::U64(new)) => {
                             let (orig_v0, orig_v1, new_v0, new_v1) = (orig.0, orig.1, new.0, new.1);
-                            let attribute = header.attribute() as u8;
+                            let attribute = header.attribute().value();
 
                             let mut cmp_found = false;
                             if new_v0 != orig_v0 && orig_v0 != orig_v1 {
