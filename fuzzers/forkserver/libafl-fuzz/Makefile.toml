@@ -226,6 +226,36 @@ test -n "$( ls ./test/output-unicorn-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/
 '''
 dependencies = ["build_libafl_fuzz", "build_afl", "build_unicorn_mode"]
 
+[tasks.test_nyx_mode]
+script_runner = "@shell"
+script = '''
+export AFL_PATH=${AFL_DIR}
+export AFL_CORES=0
+export AFL_STATS_INTERVAL=1
+export AFL_DEBUG=1
+export LIBAFL_DEBUG_OUTPUT=1
+AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-instr.c -o ./test/out-instr
+rm -rf ./test/nyx-test
+cd ../../../libafl_nyx
+rm -rf packer
+git clone https://github.com/nyx-fuzz/packer.git
+python3 packer/packer/nyx_packer.py \
+        ../fuzzers/forkserver/libafl-fuzz/test/out-instr \
+        ../fuzzers/forkserver/libafl-fuzz/test/out-nyx \
+        afl \
+        instrumentation \
+        --fast_reload_mode \
+        --purge
+python3 packer/packer/nyx_config_gen.py ../fuzzers/forkserver/libafl-fuzz/test/out-nyx Kernel
+cd ../fuzzers/forkserver/libafl-fuzz/
+timeout 15s ${FUZZER} -i ./test/seeds_nyx -o ./test/output-nyx  -X -- ./test/out-nyx
+test -n "$( ls ./test/output-nyx/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
+	echo "No new corpus entries found for Nyx mode!"
+	exit 1
+}
+'''
+dependencies = ["build_afl", "build_libafl_fuzz"]
+
 [tasks.clean]
 linux_alias = "clean_unix"
 mac_alias = "clean_unix"

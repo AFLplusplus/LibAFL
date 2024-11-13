@@ -305,7 +305,7 @@ struct Opt {
     #[arg(short = 'Q')]
     qemu_mode: bool,
     #[cfg(target_os = "linux")]
-    #[clap(skip)]
+    #[arg(short = 'X')]
     nyx_mode: bool,
     /// use unicorn-based instrumentation (Unicorn mode)
     #[arg(short = 'U')]
