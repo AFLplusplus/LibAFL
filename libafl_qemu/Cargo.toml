@@ -80,6 +80,8 @@ slirp = [
   "libafl_qemu_sys/slirp",
 ] # build qemu with host libslirp (for user networking)
 
+intel_pt = ["systemmode", "x86_64", "libafl/intel_pt", "dep:libafl_intelpt"]
+
 # Requires the binary's build.rs to call `build_libafl_qemu`
 shared = ["libafl_qemu_sys/shared"]
 
@@ -100,6 +102,7 @@ libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features 
 libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
 libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.13.2", default-features = false }
 libafl_derive = { path = "../libafl_derive", version = "0.13.2" }
+libafl_intelpt = { path = "../libafl_intelpt", optional = true }
 
 serde = { workspace = true, default-features = false, features = [
   "alloc",
