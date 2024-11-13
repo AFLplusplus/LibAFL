@@ -71,7 +71,13 @@ impl NyxHelper {
         let mut timeout = Duration::from_secs(u64::from(settings.timeout_secs));
         timeout += Duration::from_micros(u64::from(settings.timeout_micro_secs));
 
-        Ok(Self { nyx_process, nyx_stdout, timeout, bitmap_size, bitmap_buffer })
+        Ok(Self {
+            nyx_process,
+            nyx_stdout,
+            timeout,
+            bitmap_size,
+            bitmap_buffer,
+        })
     }
 
     /// Set a timeout for Nyx.
