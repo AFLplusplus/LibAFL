@@ -944,12 +944,9 @@ impl<'a, T: 'a + Sized, const N: usize> OwnedMutSizedSlice<'a, T, N> {
     /// The pointer must be valid and point to a map of the size `size_of<T>() * N`
     /// The content will be dereferenced in subsequent operations.
     #[must_use]
-    pub unsafe fn from_raw_mut(ptr: NonNull<T>) -> OwnedMutSizedSlice<'a, T, N> {
+    pub unsafe fn from_raw_mut(ptr: NonNull<[T; N]>) -> OwnedMutSizedSlice<'a, T, N> {
         Self {
-            inner: OwnedMutSizedSliceInner::RefRaw(
-                ptr.as_ptr() as *mut [T; N],
-                UnsafeMarker::new(),
-            ),
+            inner: OwnedMutSizedSliceInner::RefRaw(ptr.as_ptr(), UnsafeMarker::new()),
         }
     }
 
