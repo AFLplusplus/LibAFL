@@ -92,10 +92,7 @@ impl Regs {
 pub type GuestReg = u32;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
         self.read_reg(Regs::Lr)
     }
 
@@ -106,10 +103,11 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Lr, val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_function_argument(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+    ) -> Result<GuestReg, QemuRWError> {
         QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
         // Note that 64 bit values may be passed in two registers (and may have padding), then this mapping is off.
