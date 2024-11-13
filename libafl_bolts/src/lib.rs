@@ -1124,7 +1124,7 @@ macro_rules! nonzero {
 
 /// Get a [`core::ptr::NonNull`] to a global static mut (or similar).
 /// 
-/// The same as [`core::ptr::addr_of_mut`] or `&raw mut`, but wrapped in NonNull.
+/// The same as [`core::ptr::addr_of_mut`] or `&raw mut`, but wrapped in said [`NonNull`](core::ptr::NonNull).
 #[macro_export]
 macro_rules! nonnull_raw_mut {
     ($val:expr) => {

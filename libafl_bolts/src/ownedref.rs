@@ -947,7 +947,7 @@ impl<'a, T: 'a + Sized, const N: usize> OwnedMutSizedSlice<'a, T, N> {
     pub unsafe fn from_raw_mut(ptr: NonNull<[T; N]>) -> OwnedMutSizedSlice<'a, T, N> {
         Self {
             inner: OwnedMutSizedSliceInner::RefRaw(
-                ptr.as_ptr() as *mut [T; N],
+                ptr.as_ptr(),
                 UnsafeMarker::new(),
             ),
         }
