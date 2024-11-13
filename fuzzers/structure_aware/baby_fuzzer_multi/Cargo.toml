@@ -10,7 +10,7 @@ edition = "2021"
 
 [features]
 default = ["std"]
-tui = []
+tui = ["libafl/tui_monitor"]
 std = []
 
 [profile.dev]
@@ -26,7 +26,6 @@ debug = true
 [dependencies]
 libafl = { path = "../../../libafl", features = [
   "multipart_inputs",
-  "tui_monitor",
 ] }
 libafl_bolts = { path = "../../../libafl_bolts" }
 log = { version = "0.4.22", features = ["release_max_level_info"] }

@@ -1122,6 +1122,18 @@ macro_rules! nonzero {
     };
 }
 
+/// Get a [`core::ptr::NonNull`] to a global static mut (or similar).
+/// 
+/// The same as [`core::ptr::addr_of_mut`] or `&raw mut`, but wrapped in NonNull.
+#[macro_export]
+macro_rules! nonnull_raw_mut {
+    ($val:expr) => {
+        // # Safety
+        // The pointer to a value will never be null (unless we're on an archaic OS in a CTF challenge).
+        unsafe { core::ptr::NonNull::new(&raw mut $val).unwrap_unchecked() }
+    };
+}
+
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {

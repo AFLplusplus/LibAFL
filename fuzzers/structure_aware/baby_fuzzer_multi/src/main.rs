@@ -1,6 +1,6 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{path::PathBuf, ptr::write};
+use std::path::PathBuf;
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -15,25 +15,24 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, MultipartInput},
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
-    observers::StdMapObserver,
+    observers::ConstMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
     Evaluator,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
+use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 128] = [0; 128];
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+static mut SIGNALS_PTR: *mut [u8; 128] = &raw mut SIGNALS;
 
 /// "Coverage" map for count, just to help things along
 static mut LAST_COUNT: [usize; 1] = [usize::MAX];
-static mut LAST_COUNT_PTR: *mut usize = unsafe { LAST_COUNT.as_mut_ptr() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    unsafe { write(SIGNALS_PTR.add(idx), 1) };
+    unsafe { (*SIGNALS_PTR)[idx] = 1 };
 }
 
 /// Assign a count to the count "map"
@@ -83,9 +82,9 @@ pub fn main() {
 
     // Create an observation channel using the signals map
     let signals_observer =
-        unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+        unsafe { ConstMapObserver::from_mut_ptr("signals", nonnull_raw_mut!(SIGNALS)) };
     let mut count_observer =
-        unsafe { StdMapObserver::from_mut_ptr("count", LAST_COUNT_PTR, LAST_COUNT.len()) };
+        unsafe { ConstMapObserver::from_mut_ptr("count", nonnull_raw_mut!(LAST_COUNT)) };
     *count_observer.initial_mut() = usize::MAX; // we are minimising!
 
     // Feedback to rate the interestingness of an input
