@@ -199,11 +199,16 @@ where
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
     #[must_use]
-    pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: NonNull<T>) -> Self {
+    pub unsafe fn from_mut_ptr(name: &'static str, map_ptr: NonNull<[T; N]>) -> Self {
         ConstMapObserver {
             map: OwnedMutSizedSlice::from_raw_mut(map_ptr),
             name: Cow::from(name),
             initial: T::default(),
         }
+    }
+
+    /// Gets the initial value for this map, mutably
+    pub fn initial_mut(&mut self) -> &mut T {
+        &mut self.initial
     }
 }

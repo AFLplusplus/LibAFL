@@ -159,9 +159,11 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     let mut edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
             "edges",
-            NonNull::new(edges.as_mut_ptr()).expect("map ptr is null."),
+            NonNull::new(edges.as_mut_ptr())
+                .expect("map ptr is null.")
+                .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
         ))
         .track_indices()
     };
@@ -196,7 +198,7 @@ fn fuzz(
         }
     }
 
-    println!("Break at {:#x}", qemu.read_reg::<_, u64>(Regs::Pc).unwrap());
+    println!("Break at {:#x}", qemu.read_reg(Regs::Pc).unwrap());
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];

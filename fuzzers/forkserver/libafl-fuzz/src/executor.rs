@@ -1,10 +1,17 @@
 use std::{
     fs::File,
+    marker::PhantomData,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
 
-use libafl::Error;
+use libafl::{
+    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    observers::ObserversTuple,
+    state::{State, UsesState},
+    Error,
+};
+use libafl_bolts::tuples::RefIndexable;
 use memmap2::{Mmap, MmapOptions};
 use nix::libc::{S_IRUSR, S_IXUSR};
 
@@ -243,4 +250,88 @@ fn check_file_found(file: &Path, perm: u32) -> bool {
         return metadata.permissions().mode() & perm != 0;
     }
     false
+}
+
+pub enum SupportedExecutors<S, OT, FSV, NYX> {
+    Forkserver(FSV, PhantomData<(S, OT)>),
+    #[cfg(target_os = "linux")]
+    Nyx(NYX),
+}
+
+impl<S, OT, FSV, NYX> UsesState for SupportedExecutors<S, OT, FSV, NYX>
+where
+    S: State,
+{
+    type State = S;
+}
+
+impl<S, OT, FSV, NYX, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV, NYX>
+where
+    S: State,
+    Z: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    FSV: Executor<EM, Z, State = S>,
+    NYX: Executor<EM, Z, State = S>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S::Input,
+    ) -> Result<ExitKind, Error> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
+            #[cfg(target_os = "linux")]
+            Self::Nyx(nyx) => nyx.run_target(fuzzer, state, mgr, input),
+        }
+    }
+}
+
+impl<S, OT, FSV, NYX> HasObservers for SupportedExecutors<S, OT, FSV, NYX>
+where
+    OT: ObserversTuple<S::Input, S>,
+    S: State,
+    FSV: HasObservers<Observers = OT>,
+    NYX: HasObservers<Observers = OT>,
+{
+    type Observers = OT;
+    #[inline]
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers(),
+            #[cfg(target_os = "linux")]
+            Self::Nyx(nyx) => nyx.observers(),
+        }
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers_mut(),
+            #[cfg(target_os = "linux")]
+            Self::Nyx(nyx) => nyx.observers_mut(),
+        }
+    }
+}
+
+impl<S, OT, FSV, NYX> HasTimeout for SupportedExecutors<S, OT, FSV, NYX>
+where
+    FSV: HasTimeout,
+    NYX: HasTimeout,
+{
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
+            #[cfg(target_os = "linux")]
+            Self::Nyx(nyx) => nyx.set_timeout(timeout),
+        }
+    }
+    fn timeout(&self) -> std::time::Duration {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.timeout(),
+            #[cfg(target_os = "linux")]
+            Self::Nyx(nyx) => nyx.timeout(),
+        }
+    }
 }

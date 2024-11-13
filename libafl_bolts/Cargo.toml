@@ -1,6 +1,6 @@
 [package]
 name = "libafl_bolts"
-version = "0.13.2"
+version.workspace = true
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -19,7 +19,6 @@ categories = [
   "os",
   "no-std",
 ]
-rust-version = "1.70.0"
 
 [package.metadata.docs.rs]
 features = ["document-features"]
@@ -121,7 +120,7 @@ rustversion = { workspace = true }
 
 [dependencies]
 libafl_derive = { version = "0.13.2", optional = true, path = "../libafl_derive" }
-static_assertions = "1.1.0"
+static_assertions = { workspace = true }
 
 tuple_list = { version = "0.1.3" }
 hashbrown = { workspace = true, features = [

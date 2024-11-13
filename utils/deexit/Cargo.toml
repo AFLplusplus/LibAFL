@@ -4,7 +4,7 @@ authors = [
   "Dominik Maier <domenukk@gmail.com>",
 ]
 name = "deexit"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 description = "DeExit: Replace exits with aborts to catch them during in-process fuzzing"
 documentation = "https://docs.rs/libafl"

@@ -88,10 +88,7 @@ pub fn capstone() -> capstone::arch::mips::ArchCapstoneBuilder {
 pub type GuestReg = u32;
 
 impl crate::ArchExtras for crate::CPU {
-    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
         self.read_reg(Regs::Ra)
     }
 
@@ -102,10 +99,11 @@ impl crate::ArchExtras for crate::CPU {
         self.write_reg(Regs::Ra, val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_function_argument(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+    ) -> Result<GuestReg, QemuRWError> {
         QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
 
         let reg_id = match idx {

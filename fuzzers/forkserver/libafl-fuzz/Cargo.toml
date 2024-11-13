@@ -31,6 +31,7 @@ memmap2 = "0.9.4"
 nix = { version = "0.29.0", features = ["fs"] }
 regex = "1.10.5"
 serde = { version = "1.0.117", features = ["derive"] }
+libafl_nyx = { path = "../../../libafl_nyx" }
 
 [features]
 default = ["track_hit_feedbacks"]
