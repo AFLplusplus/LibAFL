@@ -162,7 +162,7 @@ impl FridaRuntime for AsanRuntime {
     fn init(
         &mut self,
         gum: &Gum,
-        _ranges: &RangeMap<usize, (u16, String)>,
+        _ranges: &RangeMap<u64, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
         self.allocator.init();
