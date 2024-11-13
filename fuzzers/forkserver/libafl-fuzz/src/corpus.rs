@@ -19,6 +19,7 @@ use nix::{
 };
 
 use crate::{fuzzer::LibaflFuzzState, OUTPUT_GRACE};
+
 pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> String {
     let id = id.0;
     let is_seed = state.must_load_initial_inputs();
