@@ -71,9 +71,9 @@ mod feedback;
 mod scheduler;
 mod stages;
 use clap::Parser;
-use corpus::{check_autoresume, create_dir_if_not_exists};
 #[cfg(not(feature = "fuzzbench"))]
 use corpus::remove_main_node_file;
+use corpus::{check_autoresume, create_dir_if_not_exists};
 mod corpus;
 mod executor;
 mod fuzzer;

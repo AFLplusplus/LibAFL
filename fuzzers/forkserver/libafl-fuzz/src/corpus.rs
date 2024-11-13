@@ -1,6 +1,10 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::{borrow::Cow, io, path::Path};
+use std::{
+    borrow::Cow,
+    fs::File,
+    io,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 use libafl::{
     corpus::{Corpus, CorpusId, Testcase},
@@ -14,8 +18,7 @@ use nix::{
     fcntl::{Flock, FlockArg},
 };
 
-use crate::fuzzer::LibaflFuzzState;
-use crate::OUTPUT_GRACE;
+use crate::{fuzzer::LibaflFuzzState, OUTPUT_GRACE};
 pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> String {
     let id = id.0;
     let is_seed = state.must_load_initial_inputs();
