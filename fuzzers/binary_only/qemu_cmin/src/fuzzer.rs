@@ -164,7 +164,7 @@ pub fn fuzz() -> Result<(), Error> {
     let mut edges_observer = unsafe {
         HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
             "edges",
-            NonNull::new(edges.as_mut_ptr()).expect("The edge map pointer is null."),
+            NonNull::new(edges.as_mut_ptr()).expect("The edge map pointer is null.") as _,
         ))
     };
 

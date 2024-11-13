@@ -1,6 +1,6 @@
+use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::path::PathBuf;
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
