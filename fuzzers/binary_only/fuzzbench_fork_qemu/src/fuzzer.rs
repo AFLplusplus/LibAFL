@@ -159,9 +159,11 @@ fn fuzz(
 
     // Create an observation channel using the coverage map
     let mut edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_DEFAULT_SIZE>::from_mut_ptr(
+        HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
             "edges",
-            NonNull::new(edges.as_mut_ptr()).expect("map ptr is null.") as _,
+            NonNull::new(edges.as_mut_ptr())
+                .expect("map ptr is null.")
+                .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
         ))
         .track_indices()
     };
