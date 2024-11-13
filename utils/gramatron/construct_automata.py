@@ -219,7 +219,6 @@ def postprocess1():
 
     # Cull transitions to states which were not expanded owing to the stack limit
     if stack_limit:
-
         blocklist = []
         for final_state in final:
             for transition in pda:
@@ -287,7 +286,6 @@ def postprocess():
 
     # Cull transitions to states which were not expanded owing to the stack limit
     if stack_limit:
-
         blocklist = []
         for final_state in final:
             for transition in pda:

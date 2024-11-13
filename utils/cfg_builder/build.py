@@ -32,7 +32,6 @@ for mname, module in cfg.items():
     # First, add all the intra-procedural edges
 
     for fname, v in module["edges"].items():
-
         if fname not in fname2id:
             GG.add_node(f_ids, label=fname)
             fname2id[fname] = f_ids
