@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu"
-version = "0.13.2"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
@@ -59,6 +59,8 @@ mips = [
 ] # build qemu for mips (el, use with the 'be' feature of mips be)
 ppc = ["libafl_qemu_sys/ppc"] # build qemu for powerpc
 hexagon = ["libafl_qemu_sys/hexagon"] # build qemu for hexagon
+riscv32 = ["libafl_qemu_sys/riscv32"] # build qemu for riscv 32bit
+riscv64 = ["libafl_qemu_sys/riscv64"] # build qemu for riscv 64bit
 
 ## Big Endian mode
 be = ["libafl_qemu_sys/be"]
@@ -108,7 +110,7 @@ hashbrown = { workspace = true, default-features = true, features = [
 num-traits = { workspace = true, default-features = true }
 num-derive = "0.4.2"
 num_enum = { workspace = true, default-features = true }
-goblin = "0.8.2"
+goblin = "0.9.2"
 libc = { workspace = true }
 strum = "0.26.3"
 strum_macros = "0.26.4"

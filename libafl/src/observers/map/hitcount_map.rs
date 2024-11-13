@@ -5,7 +5,6 @@ use core::{
     hash::Hash,
     mem::size_of,
     ops::{Deref, DerefMut},
-    ptr::{addr_of, addr_of_mut},
     slice,
 };
 
@@ -14,7 +13,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     executors::ExitKind,
-    observers::{map::MapObserver, DifferentialObserver, Observer, VariableLengthMapObserver},
+    observers::{
+        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, VarLenMapObserver,
+    },
     Error,
 };
 
@@ -44,7 +45,8 @@ fn init_count_class_16() {
     // Calling this from multiple threads may be racey and hence leak 65k mem or even create a broken lookup vec.
     // We can live with that.
     unsafe {
-        let count_class_lookup_16 = &mut *addr_of_mut!(COUNT_CLASS_LOOKUP_16);
+        let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
+        let count_class_lookup_16 = &mut *count_class_lookup_16;
 
         if !count_class_lookup_16.is_empty() {
             return;
@@ -125,11 +127,14 @@ where
         let map16 = unsafe {
             slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt)
         };
+        let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
+
         // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
         #[allow(clippy::unused_enumerate_index)]
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
-                *item = *(*addr_of!(COUNT_CLASS_LOOKUP_16)).get_unchecked(*item as usize);
+                let count_class_lookup_16 = &mut *count_class_lookup_16;
+                *item = *(*count_class_lookup_16).get_unchecked(*item as usize);
             }
         }
 
@@ -230,11 +235,24 @@ where
     }
 }
 
-impl<M> VariableLengthMapObserver for HitcountsMapObserver<M>
+impl<M, const N: usize> ConstLenMapObserver<N> for HitcountsMapObserver<M>
 where
-    M: VariableLengthMapObserver + MapObserver<Entry = u8>,
+    M: ConstLenMapObserver<N> + MapObserver<Entry = u8>,
 {
-    fn map_slice(&mut self) -> &[Self::Entry] {
+    fn map_slice(&self) -> &[Self::Entry; N] {
+        self.base.map_slice()
+    }
+
+    fn map_slice_mut(&mut self) -> &mut [Self::Entry; N] {
+        self.base.map_slice_mut()
+    }
+}
+
+impl<M> VarLenMapObserver for HitcountsMapObserver<M>
+where
+    M: VarLenMapObserver + MapObserver<Entry = u8>,
+{
+    fn map_slice(&self) -> &[Self::Entry] {
         self.base.map_slice()
     }
 
@@ -242,7 +260,7 @@ where
         self.base.map_slice_mut()
     }
 
-    fn size(&mut self) -> &usize {
+    fn size(&self) -> &usize {
         self.base.size()
     }
 

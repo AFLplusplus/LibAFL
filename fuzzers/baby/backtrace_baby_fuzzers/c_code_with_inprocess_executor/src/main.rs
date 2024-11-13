@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, ptr::NonNull};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -35,7 +35,12 @@ pub fn main() {
         libafl::executors::ExitKind::Ok
     };
     // Create an observation channel using the signals map
-    let observer = unsafe { ConstMapObserver::<u8, 3>::from_mut_ptr("signals", array_ptr) };
+    let observer = unsafe {
+        ConstMapObserver::<u8, 3>::from_mut_ptr(
+            "signals",
+            NonNull::new(array_ptr).expect("map ptr is null"),
+        )
+    };
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::owned(
         "BacktraceObserver",

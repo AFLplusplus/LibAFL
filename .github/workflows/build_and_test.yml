@@ -190,6 +190,8 @@ jobs:
 
   cargo-fmt:
     runs-on: ubuntu-24.04
+    env:
+       MAIN_LLVM_VERSION: 19
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/ubuntu-prepare
@@ -198,6 +200,8 @@ jobs:
         run: rustup component add --toolchain nightly-x86_64-unknown-linux-gnu rustfmt
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "ubuntu" }
+      - name: Installing black
+        run: python3 -m pip install black
       - name: Format Check
         run: ./scripts/fmt_all.sh check
 
@@ -246,6 +250,7 @@ jobs:
           - ./fuzzers/baby/backtrace_baby_fuzzers/rust_code_with_inprocess_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/command_executor
           - ./fuzzers/baby/backtrace_baby_fuzzers/forkserver_executor
+          - ./fuzzers/baby/baby_fuzzer_custom_executor
 
           # Binary-only
           - ./fuzzers/binary_only/fuzzbench_fork_qemu
@@ -253,6 +258,8 @@ jobs:
           - ./fuzzers/binary_only/frida_windows_gdiplus
           - ./fuzzers/binary_only/frida_libpng
           - ./fuzzers/binary_only/fuzzbench_qemu
+          - ./fuzzers/binary_only/intel_pt_baby_fuzzer
+          - ./fuzzers/binary_only/intel_pt_command_executor
           - ./fuzzers/binary_only/tinyinst_simple
 
           # Forkserver

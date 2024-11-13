@@ -23,7 +23,7 @@ command = (
     "--exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive "
     "--no-dev-deps --exclude libafl_libfuzzer --exclude libafl_qemu --exclude libafl_qemu_sys --print-command-list;"
     "DOCS_RS=1 cargo hack check -p libafl_qemu -p libafl_qemu_sys --each-feature --clean-per-run "
-    "--exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive "
+    "--exclude-features=prelude,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode,whole_archive,slirp "
     "--no-dev-deps --features usermode --print-command-list"
 )
 
@@ -40,10 +40,12 @@ for task in output[
     print("Running ", task)
     print(os.environ)
 
-    if ("utils/libafl_jumper/Cargo.toml" in task
-            and "--no-default-features" in task
-            and "--features" not in task):
-         # ignore libafl_jumper no std
+    if (
+        "utils/libafl_jumper/Cargo.toml" in task
+        and "--no-default-features" in task
+        and "--features" not in task
+    ):
+        # ignore libafl_jumper no std
         continue
 
     if "libafl_frida" in task:

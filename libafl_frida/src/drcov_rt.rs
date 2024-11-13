@@ -23,7 +23,7 @@ pub struct DrCovRuntime {
     /// The basic blocks of this execution
     pub drcov_basic_blocks: Vec<DrCovBasicBlock>,
     /// The memory ranges of this target
-    ranges: RangeMap<usize, (u16, String)>,
+    ranges: RangeMap<u64, (u16, String)>,
     coverage_directory: PathBuf,
 }
 
@@ -32,7 +32,7 @@ impl FridaRuntime for DrCovRuntime {
     fn init(
         &mut self,
         _gum: &frida_gum::Gum,
-        ranges: &RangeMap<usize, (u16, String)>,
+        ranges: &RangeMap<u64, (u16, String)>,
         _module_map: &Rc<ModuleMap>,
     ) {
         self.ranges = ranges.clone();
@@ -61,8 +61,8 @@ impl FridaRuntime for DrCovRuntime {
 
         let mut coverage_hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for bb in &self.drcov_basic_blocks {
-            coverage_hasher.write_usize(bb.start);
-            coverage_hasher.write_usize(bb.end);
+            coverage_hasher.write_u64(bb.start);
+            coverage_hasher.write_u64(bb.end);
         }
         let coverage_hash = coverage_hasher.finish();
 

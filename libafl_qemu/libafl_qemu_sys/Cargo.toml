@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu_sys"
-version = "0.13.2"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "C to Rust bindings for the LibAFL QEMU bridge"
 documentation = "https://docs.rs/libafl_qemu_sys"
@@ -33,6 +33,8 @@ aarch64 = [] # build qemu for aarch64
 mips = []    # build qemu for mips (el, use with the 'be' feature of mips be)
 ppc = []     # build qemu for powerpc
 hexagon = [] # build qemu for hexagon
+riscv32 = [] # build qemu for riscv 32bit
+riscv64 = [] # build qemu for riscv 64bit
 
 be = []
 

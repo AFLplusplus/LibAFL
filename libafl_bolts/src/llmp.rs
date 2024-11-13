@@ -1148,7 +1148,7 @@ where
         let last_msg = self.last_msg_sent;
         assert!((*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
                 "PROGRAM ABORT : BUG: EOP does not fit in page! page {page:?}, size_current {:?}, size_total {:?}",
-                ptr::addr_of!((*page).size_used), ptr::addr_of!((*page).size_total));
+                &raw const (*page).size_used, &raw const (*page).size_total);
 
         let ret: *mut LlmpMsg = if last_msg.is_null() {
             (*page).messages.as_mut_ptr()
@@ -1240,7 +1240,7 @@ where
             MessageId((*last_msg).message_id.0 + 1)
         } else {
             /* Oops, wrong usage! */
-            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", ptr::addr_of!((*page).current_msg_id), (*last_msg).message_id);
+            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", &raw const (*page).current_msg_id, (*last_msg).message_id);
         };
 
         (*ret).buf_len = buf_len as u64;
@@ -1294,7 +1294,7 @@ where
         log::debug!(
             "[{} - {:#x}] Send message with id {}",
             self.id.0,
-            self as *const Self as u64,
+            ptr::from_ref::<Self>(self) as u64,
             mid
         );
 
@@ -1710,7 +1710,7 @@ where
             log::debug!(
                 "[{} - {:#x}] Received message with ID {}...",
                 self.id.0,
-                self as *const Self as u64,
+                ptr::from_ref::<Self>(self) as u64,
                 (*msg).message_id.0
             );
 
@@ -2195,7 +2195,7 @@ impl SignalHandler for LlmpShutdownSignalHandler {
         _context: Option<&mut ucontext_t>,
     ) {
         unsafe {
-            ptr::write_volatile(ptr::addr_of_mut!(self.shutting_down), true);
+            ptr::write_volatile(&raw mut self.shutting_down, true);
         }
     }
 
@@ -2352,7 +2352,7 @@ impl Brokers {
     #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
-        if let Err(e) = unsafe { setup_signal_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+        if let Err(e) = unsafe { setup_signal_handler(&raw mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup signal handlers: {e}");
         } else {
@@ -2360,7 +2360,7 @@ impl Brokers {
         }
 
         #[cfg(all(windows, feature = "std"))]
-        if let Err(e) = unsafe { setup_ctrl_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+        if let Err(e) = unsafe { setup_ctrl_handler(&raw mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup control handlers: {e}");
         } else {
@@ -2805,7 +2805,7 @@ where
     #[cfg(any(all(unix, not(miri)), all(windows, feature = "std")))]
     fn setup_handlers() {
         #[cfg(all(unix, not(miri)))]
-        if let Err(e) = unsafe { setup_signal_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+        if let Err(e) = unsafe { setup_signal_handler(&raw mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup signal handlers: {e}");
         } else {
@@ -2813,7 +2813,7 @@ where
         }
 
         #[cfg(all(windows, feature = "std"))]
-        if let Err(e) = unsafe { setup_ctrl_handler(ptr::addr_of_mut!(LLMP_SIGHANDLER_STATE)) } {
+        if let Err(e) = unsafe { setup_ctrl_handler(&raw mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler - Ignore.
             log::info!("Failed to setup control handlers: {e}");
         } else {
@@ -3044,7 +3044,7 @@ where
         // # Safety
         // No user-provided potentially unsafe parameters.
         // Volatile read.
-        unsafe { ptr::read_volatile(ptr::addr_of!(LLMP_SIGHANDLER_STATE.shutting_down)) }
+        unsafe { ptr::read_volatile(&raw const (LLMP_SIGHANDLER_STATE.shutting_down)) }
     }
 
     /// Always returns true on platforms, where no shutdown signal handlers are supported

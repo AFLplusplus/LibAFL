@@ -1,6 +1,6 @@
 [package]
 name = "libafl_sugar"
-version = "0.13.2"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Sugar builders to create common fuzzers with LibAFL"
 documentation = "https://docs.rs/libafl_sugar"
@@ -51,6 +51,10 @@ mips = ["libafl_qemu/mips"]
 ppc = ["libafl_qemu/ppc"]
 ## build qemu for hexagon
 hexagon = ["libafl_qemu/hexagon"]
+## build qemu for riscv 32bit
+riscv32 = ["libafl_qemu/riscv32"]
+## build qemu for riscv 64bit
+riscv64 = ["libafl_qemu/riscv64"]
 
 [build-dependencies]
 pyo3-build-config = { version = "0.22.3", optional = true }

@@ -1,6 +1,6 @@
 [package]
 name = "libafl_libfuzzer"
-version = "0.13.2"
+version.workspace = true
 description = "libFuzzer shim which uses LibAFL with common defaults"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"

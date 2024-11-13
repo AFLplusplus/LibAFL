@@ -17,7 +17,7 @@ void __libafl_qemu_testfile() {}
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
     println!(
-        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "x86_64"))"#
+        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "riscv32", "riscv64", "x86_64"))"#
     );
 
     let emulation_mode = if cfg!(feature = "usermode") {
@@ -92,6 +92,10 @@ pub fn build() {
         "mips".to_string()
     } else if cfg!(feature = "ppc") {
         "ppc".to_string()
+    } else if cfg!(feature = "riscv32") {
+        "riscv32".to_string()
+    } else if cfg!(feature = "riscv64") {
+        "riscv64".to_string()
     } else if cfg!(feature = "hexagon") {
         "hexagon".to_string()
     } else {
@@ -99,7 +103,7 @@ pub fn build() {
     };
     println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\"))");
+    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))");
 
     let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)

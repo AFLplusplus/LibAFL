@@ -118,12 +118,7 @@ pub mod serdeany_registry {
         boxed::Box,
         string::{String, ToString},
     };
-    use core::{
-        any::TypeId,
-        fmt,
-        hash::BuildHasherDefault,
-        ptr::{addr_of, addr_of_mut},
-    };
+    use core::{any::TypeId, fmt, hash::BuildHasherDefault};
 
     use hashbrown::{
         hash_map::{Values, ValuesMut},
@@ -160,8 +155,9 @@ pub mod serdeany_registry {
         {
             let id: TypeRepr = visitor.next_element()?.unwrap();
 
+            let registry = &raw const REGISTRY;
             let cb = unsafe {
-                (*addr_of!(REGISTRY))
+                (*registry)
                     .deserializers
                     .as_ref()
                     .ok_or_else(||
@@ -232,8 +228,9 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny + Serialize + serde::de::DeserializeOwned,
         {
+            let registry = &raw mut REGISTRY;
             unsafe {
-                (*addr_of_mut!(REGISTRY)).register::<T>();
+                (*registry).register::<T>();
             }
         }
 
@@ -243,8 +240,9 @@ pub mod serdeany_registry {
         /// This may never be called concurrently or at the same time as `register`.
         /// It dereferences the `REGISTRY` hashmap and adds the given type to it.
         pub unsafe fn finalize() {
+            let registry = &raw mut REGISTRY;
             unsafe {
-                (*addr_of_mut!(REGISTRY)).finalize();
+                (*registry).finalize();
             }
         }
     }
@@ -265,22 +263,6 @@ pub mod serdeany_registry {
             postcard::from_bytes(&serialized).unwrap()
         }
     }
-
-    /*
-    #[cfg(feature = "anymap_debug")]
-    impl fmt::Debug for SerdeAnyMap {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            let json = serde_json::to_string(&self);
-            write!(f, "SerdeAnyMap: [{:?}]", json)
-        }
-    }
-
-    #[cfg(not(feature = "anymap_debug"))]
-    impl fmt::Debug for SerdeAnyMap {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "SerdeAnymap with {} elements", self.len())
-        }
-    }*/
 
     #[allow(unused_qualifications)]
     impl SerdeAnyMap {
@@ -369,9 +351,10 @@ pub mod serdeany_registry {
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
 
+            let registry = &raw const REGISTRY;
             assert!(
                         unsafe {
-                            (*addr_of!(REGISTRY))
+                            (*registry)
                                 .deserializers
                                 .as_ref()
                                 .expect(super::ERR_EMPTY_TYPES_REGISTER)
@@ -631,10 +614,10 @@ pub mod serdeany_registry {
             let type_repr = type_repr::<T>();
             #[cfg(not(feature = "stable_anymap"))]
             let type_repr = &type_repr;
-
+            let registry = &raw const REGISTRY;
             assert!(
                         unsafe {
-                            (*addr_of!(REGISTRY))
+                            (*registry)
                                 .deserializers
                                 .as_ref()
                                 .expect(super::ERR_EMPTY_TYPES_REGISTER)

@@ -24,7 +24,8 @@ use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 64] = [0; 64];
-static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
+static mut SIGNALS_PTR: *mut u8 = (&raw mut SIGNALS).cast();
+static mut SIGNALS_LEN: usize = unsafe { (*&raw const SIGNALS).len() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -56,7 +57,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
+    let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);

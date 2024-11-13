@@ -1,5 +1,5 @@
 //! Functionality regarding binary-only coverage collection.
-use core::ptr::addr_of_mut;
+
 use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 
 #[cfg(target_arch = "aarch64")]
@@ -37,7 +37,7 @@ impl FridaRuntime for CoverageRuntime {
     fn init(
         &mut self,
         _gum: &frida_gum::Gum,
-        _ranges: &RangeMap<usize, (u16, String)>,
+        _ranges: &RangeMap<u64, (u16, String)>,
         _module_map: &Rc<ModuleMap>,
     ) {
     }
@@ -83,8 +83,8 @@ impl CoverageRuntime {
     #[allow(clippy::cast_possible_wrap)]
     pub fn generate_inline_code(&mut self, h64: u64) -> Box<[u8]> {
         let mut borrow = self.0.borrow_mut();
-        let prev_loc_ptr = addr_of_mut!(borrow.previous_pc);
-        let map_addr_ptr = addr_of_mut!(borrow.map);
+        let prev_loc_ptr = &raw mut borrow.previous_pc;
+        let map_addr_ptr = &raw mut borrow.map;
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
             ;   .arch aarch64
@@ -124,13 +124,13 @@ impl CoverageRuntime {
             ;   b >end
 
             ;map_addr:
-            ;.qword map_addr_ptr as i64
+            ;.i64 map_addr_ptr as i64
             ;previous_loc:
-            ;.qword prev_loc_ptr as i64
+            ;.i64 prev_loc_ptr as i64
             ;loc:
-            ;.qword h64 as i64
+            ;.i64 h64 as i64
             ;loc_shr:
-            ;.qword (h64 >> 1) as i64
+            ;.i64 (h64 >> 1) as i64
             ;end:
         );
         let ops_vec = ops.finalize().unwrap();
@@ -141,8 +141,8 @@ impl CoverageRuntime {
     #[cfg(target_arch = "x86_64")]
     pub fn generate_inline_code(&mut self, h64: u64) -> Box<[u8]> {
         let mut borrow = self.0.borrow_mut();
-        let prev_loc_ptr = addr_of_mut!(borrow.previous_pc);
-        let map_addr_ptr = addr_of_mut!(borrow.map);
+        let prev_loc_ptr = &raw mut borrow.previous_pc;
+        let map_addr_ptr = &raw mut borrow.map;
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         dynasm!(ops
             ;   .arch x64

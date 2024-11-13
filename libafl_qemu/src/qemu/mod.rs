@@ -5,8 +5,7 @@
 
 use core::{
     cmp::{Ordering, PartialOrd},
-    fmt,
-    ptr::{self, addr_of_mut},
+    fmt, ptr,
 };
 use std::{
     ffi::{c_void, CString},
@@ -55,6 +54,18 @@ pub enum QemuError {
     Init(QemuInitError),
     Exit(QemuExitError),
     RW(QemuRWError),
+}
+
+impl From<QemuError> for libafl::Error {
+    fn from(qemu_error: QemuError) -> Self {
+        libafl::Error::runtime(qemu_error)
+    }
+}
+
+impl From<QemuError> for String {
+    fn from(qemu_error: QemuError) -> Self {
+        format!("LibAFL QEMU Error: {qemu_error:?}")
+    }
 }
 
 #[derive(Debug)]
@@ -309,15 +320,15 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
 }
 
 pub trait ArchExtras {
-    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>;
+    fn read_return_address(&self) -> Result<GuestReg, QemuRWError>;
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>;
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>;
+    fn read_function_argument(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+    ) -> Result<GuestReg, QemuRWError>;
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
@@ -349,10 +360,9 @@ impl CPU {
         unsafe { libafl_qemu_num_regs(self.ptr) }
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
+    pub fn read_reg<R>(&self, reg: R) -> Result<GuestReg, QemuRWError>
     where
         R: Into<i32> + Clone,
-        T: From<GuestReg>,
     {
         unsafe {
             let reg_id = reg.clone().into();
@@ -386,8 +396,7 @@ impl CPU {
         #[cfg(not(feature = "be"))]
         let val = GuestReg::to_le(val.into());
 
-        let success =
-            unsafe { libafl_qemu_write_reg(self.ptr, reg_id, ptr::addr_of!(val) as *mut u8) };
+        let success = unsafe { libafl_qemu_write_reg(self.ptr, reg_id, &raw const val as *mut u8) };
         if success == 0 {
             Err(QemuRWError {
                 kind: QemuRWErrorKind::Write,
@@ -814,9 +823,8 @@ impl Qemu {
             .write_reg(reg, val)
     }
 
-    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, QemuRWError>
+    pub fn read_reg<R>(&self, reg: R) -> Result<GuestReg, QemuRWError>
     where
-        T: Num + PartialOrd + Copy + From<GuestReg>,
         R: Into<i32> + Clone,
     {
         self.current_cpu()
@@ -882,7 +890,8 @@ impl Qemu {
             FatPtr,
         >(callback));
         libafl_qemu_add_gdb_cmd(Some(gdb_cmd), ptr::from_ref(&*fat) as *mut c_void);
-        (*addr_of_mut!(GDB_COMMANDS)).push(fat);
+        let commands_ptr = &raw mut GDB_COMMANDS;
+        (*commands_ptr).push(fat);
     }
 
     pub fn gdb_reply(&self, output: &str) {
@@ -896,17 +905,14 @@ impl Qemu {
 }
 
 impl ArchExtras for Qemu {
-    fn read_return_address<T>(&self) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError {
                 kind: QemuRWErrorKind::Read,
                 cause: QemuRWErrorCause::CurrentCpuNotFound,
                 cpu: None,
             })?
-            .read_return_address::<T>()
+            .read_return_address()
     }
 
     fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
@@ -918,13 +924,14 @@ impl ArchExtras for Qemu {
             .write_return_address::<T>(val)
     }
 
-    fn read_function_argument<T>(&self, conv: CallingConvention, idx: u8) -> Result<T, QemuRWError>
-    where
-        T: From<GuestReg>,
-    {
+    fn read_function_argument(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+    ) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
             .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
-            .read_function_argument::<T>(conv, idx)
+            .read_function_argument(conv, idx)
     }
 
     fn write_function_argument<T>(
@@ -1096,7 +1103,7 @@ pub mod pybind {
 
     extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
         let obj = unsafe {
-            let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+            let hooks = &mut *&raw mut PY_GENERIC_HOOKS;
             &hooks[idx as usize].1
         };
         Python::with_gil(|py| {
@@ -1176,7 +1183,7 @@ pub mod pybind {
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
         unsafe fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
-                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+                let hooks = &mut *&raw mut PY_GENERIC_HOOKS;
                 let idx = hooks.len();
                 hooks.push((addr, hook));
                 self.qemu.hooks().add_instruction_hooks(
@@ -1192,7 +1199,7 @@ pub mod pybind {
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
         unsafe fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
             unsafe {
-                let hooks = &mut *core::ptr::addr_of_mut!(PY_GENERIC_HOOKS);
+                let hooks = &mut *&raw mut PY_GENERIC_HOOKS;
                 hooks.retain(|(a, _)| *a != addr);
             }
             self.qemu.hooks().remove_instruction_hooks_at(addr, true)

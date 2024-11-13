@@ -7,28 +7,41 @@ use core::{
 };
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
+#[cfg(all(feature = "std", target_os = "linux"))]
+use std::{
+    ffi::{CStr, CString},
+    os::fd::AsRawFd,
+};
 #[cfg(feature = "std")]
-use std::process::Child;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
     path::{Path, PathBuf},
+    process::Child,
     process::{Command, Stdio},
     time::Duration,
 };
 
+#[cfg(all(feature = "std", target_os = "linux"))]
+use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
+#[cfg(all(feature = "std", target_os = "linux"))]
+use libc::STDIN_FILENO;
+#[cfg(all(feature = "std", target_os = "linux"))]
+use nix::unistd::Pid;
+#[cfg(all(feature = "std", target_os = "linux"))]
+use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
 use crate::{
     corpus::Corpus,
-    executors::HasObservers,
+    executors::{hooks::ExecutorHooksTuple, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasCorpus, HasExecutions, State, UsesState},
@@ -40,7 +53,7 @@ use crate::{inputs::Input, Error};
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
 /// `File`: The target reads from the specified [`InputFile`]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
@@ -48,6 +61,7 @@ pub enum InputLocation {
         argnum: usize,
     },
     /// Deliver input via `StdIn`
+    #[default]
     StdIn,
     /// Deliver the input via the specified [`InputFile`]
     /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
@@ -158,16 +172,116 @@ where
     }
 }
 
-/// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
+/// Linux specific [`CommandConfigurator`] that leverages `ptrace`
+///
+/// This configurator was primarly developed to be used in conjunction with
+/// [`crate::executors::hooks::intel_pt::IntelPTHook`]
+#[cfg(all(feature = "std", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
+pub struct PTraceCommandConfigurator {
+    #[builder(setter(into))]
+    path: CString,
+    #[builder(default)]
+    args: Vec<CString>,
+    #[builder(default)]
+    env: Vec<CString>,
+    #[builder(default)]
+    input_location: InputLocation,
+    #[builder(default, setter(strip_option))]
+    cpu: Option<CoreId>,
+    #[builder(default = 5 * 60, setter(transform = |t: Duration| t.as_secs() as u32))]
+    timeout: u32,
+}
+
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator
+where
+    I: HasTargetBytes,
+{
+    fn spawn_child(&mut self, input: &I) -> Result<Pid, Error> {
+        use nix::{
+            sys::{
+                personality, ptrace,
+                signal::{raise, Signal},
+            },
+            unistd::{alarm, dup2, execve, fork, pipe, write, ForkResult},
+        };
+
+        match unsafe { fork() } {
+            Ok(ForkResult::Parent { child }) => Ok(child),
+            Ok(ForkResult::Child) => {
+                ptrace::traceme().unwrap();
+
+                if let Some(c) = self.cpu {
+                    c.set_affinity_forced().unwrap();
+                }
+
+                // Disable Address Space Layout Randomization (ASLR) for consistent memory
+                // addresses between executions
+                let pers = personality::get().unwrap();
+                personality::set(pers | personality::Persona::ADDR_NO_RANDOMIZE).unwrap();
+
+                match &mut self.input_location {
+                    InputLocation::Arg { argnum } => {
+                        // self.args[argnum] will be overwritten if already present.
+                        assert!(
+                            *argnum <= self.args.len(),
+                            "If you want to fuzz arg {argnum}, you have to specify the other {argnum} (static) args."
+                        );
+                        let terminated_input = [&input.target_bytes() as &[u8], &[0]].concat();
+                        let cstring_input =
+                            CString::from(CStr::from_bytes_until_nul(&terminated_input).unwrap());
+                        if *argnum == self.args.len() {
+                            self.args.push(cstring_input);
+                        } else {
+                            self.args[*argnum] = cstring_input;
+                        }
+                    }
+                    InputLocation::StdIn => {
+                        let (pipe_read, pipe_write) = pipe().unwrap();
+                        write(pipe_write, &input.target_bytes()).unwrap();
+                        dup2(pipe_read.as_raw_fd(), STDIN_FILENO).unwrap();
+                    }
+                    InputLocation::File { out_file } => {
+                        out_file.write_buf(input.target_bytes().as_slice()).unwrap();
+                    }
+                }
+
+                // After this STOP, the process is traced with PTrace (no hooks yet)
+                raise(Signal::SIGSTOP).unwrap();
+
+                alarm::set(self.timeout);
+
+                // Just before this returns, hooks pre_execs are called
+                execve(&self.path, &self.args, &self.env).unwrap();
+                unreachable!("execve returns only on error and its result is unwrapped");
+            }
+            Err(e) => Err(Error::unknown(format!("Fork failed: {e}"))),
+        }
+    }
+
+    fn exec_timeout(&self) -> Duration {
+        Duration::from_secs(u64::from(self.timeout))
+    }
+
+    /// Use [`PTraceCommandConfigurator::builder().timeout`] instead
+    fn exec_timeout_mut(&mut self) -> &mut Duration {
+        unimplemented!("Use [`PTraceCommandConfigurator::builder().timeout`] instead")
+    }
+}
+
+/// A `CommandExecutor` is a wrapper around [`Command`] to execute a target as a child process.
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, S, T> {
+pub struct CommandExecutor<OT, S, T, HT = (), C = Child> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
+    hooks: HT,
     phantom: PhantomData<S>,
+    phantom_child: PhantomData<C>,
 }
 
 impl CommandExecutor<(), (), ()> {
@@ -179,7 +293,7 @@ impl CommandExecutor<(), (), ()> {
     /// `arg`, `args`, `env`, and so on.
     ///
     /// By default, input is read from stdin, unless you specify a different location using
-    /// * `arg_input_arg` for input delivered _as_ an command line argument
+    /// * `arg_input_arg` for input delivered _as_ a command line argument
     /// * `arg_input_file` for input via a file of a specific name
     /// * `arg_input_file_std` for a file with default name (at the right location in the arguments)
     #[must_use]
@@ -188,20 +302,22 @@ impl CommandExecutor<(), (), ()> {
     }
 }
 
-impl<OT, S, T> Debug for CommandExecutor<OT, S, T>
+impl<OT, S, T, HT, C> Debug for CommandExecutor<OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
+    HT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
             .field("inner", &self.configurer)
             .field("observers", &self.observers)
+            .field("hooks", &self.hooks)
             .finish()
     }
 }
 
-impl<OT, S, T> CommandExecutor<OT, S, T>
+impl<OT, S, T, HT, C> CommandExecutor<OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
@@ -214,21 +330,13 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> CommandExecutor<OT, S, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    Z: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput<Input = I>,
+    T: CommandConfigurator<I> + Debug,
+    OT: Debug + ObserversTuple<I, S>,
 {
-    fn run_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut Self::State,
-        _mgr: &mut EM,
-        input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;
@@ -288,6 +396,27 @@ where
     }
 }
 
+#[cfg(all(feature = "std", unix))]
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+where
+    EM: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput,
+    T: CommandConfigurator<S::Input> + Debug,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
+    Z: UsesState<State = S>,
+{
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        self.execute_input_with_command(state, input)
+    }
+}
+
+// this only works on unix because of the reliance on checking the process signal for detecting OOM
 impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
 where
     S: HasCorpus,
@@ -304,14 +433,94 @@ where
     }
 }
 
-impl<OT, S, T> UsesState for CommandExecutor<OT, S, T>
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
+where
+    EM: UsesState<State = S>,
+    S: State + HasExecutions + UsesInput,
+    T: CommandConfigurator<S::Input, Pid> + Debug,
+    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
+    Z: UsesState<State = S>,
+    HT: ExecutorHooksTuple<S>,
+{
+    /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
+    /// `ptrace`
+    ///
+    /// Hooks' `pre_exec` and observers' `pre_exec_child` are called with the child process stopped
+    /// just before the `exec` return (after forking).
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut Self::State,
+        _mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
+        use nix::sys::{
+            ptrace,
+            signal::Signal,
+            wait::{
+                waitpid, WaitPidFlag,
+                WaitStatus::{Exited, PtraceEvent, Signaled, Stopped},
+            },
+        };
+
+        *state.executions_mut() += 1;
+
+        let child = self.configurer.spawn_child(input)?;
+
+        let wait_status = waitpid(child, Some(WaitPidFlag::WUNTRACED))?;
+        if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
+            return Err(Error::unknown("Unexpected state of child process"));
+        }
+
+        ptrace::setoptions(child, ptrace::Options::PTRACE_O_TRACEEXEC)?;
+        ptrace::cont(child, None)?;
+
+        let wait_status = waitpid(child, None)?;
+        if !matches!(wait_status, PtraceEvent(c, Signal::SIGTRAP, e)
+            if c == child && e == (ptrace::Event::PTRACE_EVENT_EXEC as i32)
+        ) {
+            return Err(Error::unknown("Unexpected state of child process"));
+        }
+
+        self.observers.pre_exec_child_all(state, input)?;
+        if *state.executions() == 1 {
+            self.hooks.init_all::<Self>(state);
+        }
+        self.hooks.pre_exec_all(state, input);
+
+        ptrace::detach(child, None)?;
+        let res = match waitpid(child, None)? {
+            Exited(pid, 0) if pid == child => ExitKind::Ok,
+            Exited(pid, _) if pid == child => ExitKind::Crash,
+            Signaled(pid, Signal::SIGALRM, _has_coredump) if pid == child => ExitKind::Timeout,
+            Signaled(pid, Signal::SIGABRT, _has_coredump) if pid == child => ExitKind::Crash,
+            Signaled(pid, Signal::SIGKILL, _has_coredump) if pid == child => ExitKind::Oom,
+            Stopped(pid, Signal::SIGALRM) if pid == child => ExitKind::Timeout,
+            Stopped(pid, Signal::SIGABRT) if pid == child => ExitKind::Crash,
+            Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
+            s => {
+                // TODO other cases?
+                return Err(Error::unsupported(
+                    format!("Target program returned an unexpected state when waiting on it. {s:?} (waiting for pid {child})")
+                ));
+            }
+        };
+
+        self.hooks.post_exec_all(state, input);
+        self.observers.post_exec_child_all(state, input, &res)?;
+        Ok(res)
+    }
+}
+
+impl<OT, S, T, HT, C> UsesState for CommandExecutor<OT, S, T, HT, C>
 where
     S: State,
 {
     type State = S;
 }
 
-impl<OT, S, T> HasObservers for CommandExecutor<OT, S, T>
+impl<OT, S, T, HT, C> HasObservers for CommandExecutor<OT, S, T, HT, C>
 where
     S: State,
     T: Debug,
@@ -556,7 +765,7 @@ impl CommandExecutorBuilder {
     }
 }
 
-/// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
+/// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
@@ -601,7 +810,7 @@ impl CommandExecutorBuilder {
 /// }
 /// ```
 #[cfg(all(feature = "std", any(unix, doc)))]
-pub trait CommandConfigurator<I>: Sized {
+pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
         None
@@ -612,7 +821,7 @@ pub trait CommandConfigurator<I>: Sized {
     }
 
     /// Spawns a new process with the given configuration.
-    fn spawn_child(&mut self, input: &I) -> Result<Child, Error>;
+    fn spawn_child(&mut self, input: &I) -> Result<C, Error>;
 
     /// Provides timeout duration for execution of the child process.
     fn exec_timeout(&self) -> Duration;
@@ -620,14 +829,36 @@ pub trait CommandConfigurator<I>: Sized {
     fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self>
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C>
     where
         OT: MatchName,
     {
         CommandExecutor {
             configurer: self,
             observers,
+            hooks: (),
             phantom: PhantomData,
+            phantom_child: PhantomData,
+        }
+    }
+
+    /// Create an `Executor` with hooks from this `CommandConfigurator`.
+    fn into_executor_with_hooks<OT, S, HT>(
+        self,
+        observers: OT,
+        hooks: HT,
+    ) -> CommandExecutor<OT, S, Self, HT, C>
+    where
+        OT: MatchName,
+        HT: ExecutorHooksTuple<S>,
+        S: UsesInput<Input = I>,
+    {
+        CommandExecutor {
+            configurer: self,
+            observers,
+            hooks,
+            phantom: PhantomData,
+            phantom_child: PhantomData,
         }
     }
 }
