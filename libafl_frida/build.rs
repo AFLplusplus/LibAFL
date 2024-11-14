@@ -1,7 +1,11 @@
 // build.rs
 #![forbid(unexpected_cfgs)]
 
+use std::{env, path::Path};
+
 fn main() {
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let out_dir = out_dir.to_string_lossy().to_string();
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
     if target_os != "ios" {
         cc::Build::new().file("src/gettls.c").compile("libgettls.a");
@@ -46,7 +50,13 @@ fn main() {
                 "/libpath:{}/.cache/cargo-xwin/xwin/sdk/lib/um/x86_64/",
                 std::env::var("HOME").unwrap()
             ));
-        cmd.arg("/dll").arg("/OUT:test_harness.dll");
+        cmd.arg("/dll").arg(format!(
+            "/OUT:{}",
+            Path::new(&out_dir)
+                .join("test_harness.so")
+                .to_str()
+                .unwrap()
+        ));
         let output = cmd.output().expect("Failed to link test_harness.dll");
         let output_str = format!(
             "{:?}\nstatus: {}\nstdout: {}\nstderr: {}",
@@ -73,7 +83,7 @@ fn main() {
         cmd.args(compiler.args())
             .arg("test_harness.cpp")
             .arg("-o")
-            .arg("test_harness.so")
+            .arg(Path::new(&out_dir).join("test_harness.so"))
             .status()
             .expect("Failed to link test_harness");
     }
