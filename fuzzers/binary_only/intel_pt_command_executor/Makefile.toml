@@ -4,7 +4,15 @@ PROFILE_DIR = "debug"
 [env.release]
 PROFILE_DIR = "release"
 
+[tasks.target_dir]
+condition = { files_not_exist = ["${TARGET_DIR}"] }
+script_runner = "@shell"
+script = '''
+mkdir -p ${TARGET_DIR}
+'''
+
 [tasks.build_target]
+dependencies = ["target_dir"]
 command = "rustc"
 args = [
   "src/target_program.rs",
