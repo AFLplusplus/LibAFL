@@ -2,6 +2,7 @@ use std::{
     fmt::Debug,
     ops::{Range, RangeInclusive},
     ptr::slice_from_raw_parts_mut,
+    slice,
 };
 
 use libafl::{inputs::UsesInput, observers::ObserversTuple, HasMetadata};
@@ -15,46 +16,20 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct IntelPTModule<T = u8>
-where
-    T: Debug,
-{
+pub struct IntelPTModule<T = u8> {
     pt: Option<IntelPT>,
     map_ptr: *mut T,
     map_len: usize,
 }
 
-pub fn intel_pt_new_thread<ET, S, T>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    _env: CPUArchStatePtr,
-    tid: u32,
-) -> bool
-where
-    S: HasMetadata + Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-    T: Debug + 'static,
-{
-    let intel_pt_module = emulator_modules
-        .modules_mut()
-        .match_first_type_mut::<IntelPTModule<T>>()
-        .unwrap();
-
-    if intel_pt_module.pt.is_some() {
-        panic!("Intel PT module already initialized, only single core VMs are supported ATM.");
+impl<T> IntelPTModule<T> {
+    pub fn new(map_ptr: *mut T, map_len: usize) -> Self {
+        Self {
+            pt: None,
+            map_ptr,
+            map_len,
+        }
     }
-
-    intel_pt_module.pt = Some(IntelPT::builder().pid(Some(tid as i32)).build().unwrap());
-    intel_pt_module
-        .pt
-        .as_mut()
-        .unwrap()
-        .enable_tracing()
-        .unwrap();
-
-    println!("IntelPT initialized!");
-    // What does this bool mean? ignore for the moment
-    true
 }
 
 impl<S, T> EmulatorModule<S> for IntelPTModule<T>
@@ -71,6 +46,7 @@ where
     {
         emulator_modules.thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, S, T>));
         // TODO emulator_modules.thread_teradown
+        println!("first_exec");
     }
 
     fn pre_exec<ET>(
@@ -83,6 +59,7 @@ where
     {
         let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
         pt.enable_tracing().unwrap();
+        println!("pre_exec");
     }
 
     fn post_exec<OT, ET>(
@@ -109,14 +86,8 @@ where
         )
         .unwrap();
 
-        // let trace_path = "trace.out";
-        // let mut file = OpenOptions::new()
-        //     .append(true)
-        //     .create(true)
-        //     .open(trace_path)
-        //     .expect("Failed to open trace output file");
-        //
-        // file.write_all(&buff).unwrap();
+        let m = unsafe { slice::from_raw_parts(self.map_ptr, self.map_len) };
+        println!("map: {:?}", m);
     }
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
@@ -158,4 +129,37 @@ where
         }
         false
     }
+}
+
+pub fn intel_pt_new_thread<ET, S, T>(
+    emulator_modules: &mut EmulatorModules<ET, S>,
+    _state: Option<&mut S>,
+    _env: CPUArchStatePtr,
+    tid: u32,
+) -> bool
+where
+    S: HasMetadata + Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
+    T: Debug + 'static,
+{
+    let intel_pt_module = emulator_modules
+        .modules_mut()
+        .match_first_type_mut::<IntelPTModule<T>>()
+        .unwrap();
+
+    if intel_pt_module.pt.is_some() {
+        panic!("Intel PT module already initialized, only single core VMs are supported ATM.");
+    }
+
+    intel_pt_module.pt = Some(IntelPT::builder().pid(Some(tid as i32)).build().unwrap());
+    intel_pt_module
+        .pt
+        .as_mut()
+        .unwrap()
+        .enable_tracing()
+        .unwrap();
+
+    println!("IntelPT initialized!");
+    // What does this bool mean? ignore for the moment
+    true
 }

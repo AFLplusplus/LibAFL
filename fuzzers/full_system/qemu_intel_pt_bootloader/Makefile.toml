@@ -1,0 +1,40 @@
+[env.development]
+PROFILE_DIR = "debug"
+
+[env.release]
+PROFILE_DIR = "release"
+
+[tasks.target_dir]
+condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"] }
+script_runner = "@shell"
+script = '''
+mkdir -p ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+'''
+
+[tasks.build_target]
+dependencies = ["target_dir"]
+command = "nasm"
+args = [
+  "-o",
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.bin",
+  "${CARGO_MAKE_WORKING_DIRECTORY}/src/boot.s",
+]
+
+[tasks.build_fuzzer]
+command = "cargo"
+args = ["build", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+
+[tasks.build]
+dependencies = ["build_fuzzer", "build_target"]
+
+[tasks.setcap]
+script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
+dependencies = ["build_fuzzer"]
+
+[tasks.run]
+command = "cargo"
+args = ["run", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+dependencies = ["build", "setcap"]
+
+[tasks.default]
+alias = "run"
