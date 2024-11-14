@@ -32,11 +32,11 @@ all-features = true
 no-cpp-runtime = []
 
 [dependencies]
-libafl = { path = "../../libafl", version = "0.13.2", default-features = false, features = [
+libafl = { path = "../../libafl", version = "0.14.0", default-features = false, features = [
   "std",
   "serdeany_autoreg",
 ] }
-libafl_bolts = { path = "../../libafl_bolts", version = "0.13.2", default-features = false, features = [
+libafl_bolts = { path = "../../libafl_bolts", version = "0.14.0", default-features = false, features = [
   "std",
   "serdeany_autoreg",
 ] }
@@ -50,7 +50,7 @@ cmake = { workspace = true }
 bindgen = { workspace = true }
 regex = { workspace = true }
 which = { workspace = true }
-symcc_libafl = { path = "../symcc_libafl", version = "0.13.2" }
+symcc_libafl = { path = "../symcc_libafl", version = "0.14.0" }
 
 [lints]
 workspace = true
