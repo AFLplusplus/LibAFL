@@ -548,8 +548,8 @@ mod tests {
         }
 
         SimpleStdoutLogger::set_logger().unwrap();
-        
-        let out_dir = std::env::var_os("OUT_DIR").unwrap(); 
+
+        let out_dir = std::env::var_os("OUT_DIR").unwrap();
         let out_dir = out_dir.to_string_lossy().to_string();
         // Check if the harness dynamic library is present, if not - skip the test
         #[cfg(unix)]
@@ -558,10 +558,11 @@ mod tests {
         let test_harness_name = "test_harness.dll";
 
         let test_harness = std::path::Path::new(&out_dir).join(test_harness_name);
-        
+
         assert!(
             test_harness.exists(),
-            "Skipping test, {} not found", test_harness.to_str().unwrap()
+            "Skipping test, {} not found",
+            test_harness.to_str().unwrap()
         );
 
         GUM.set(Gum::obtain())
