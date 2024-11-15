@@ -12,7 +12,7 @@ FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
-AFL_VERSION = "78b7e14c73baacf1d88b3c03955e78f5080d17ba"
+AFL_VERSION = "5777ceaf23f48ae4ceae60e4f3a79263802633c6"
 AFL_DIR = { value = "${PROJECT_DIR}/AFLplusplus" }
 AFL_CC_PATH = { value = "${AFL_DIR}/afl-clang-fast" }
 CC = { value = "clang" }
@@ -65,11 +65,12 @@ script = "echo done"
 dependencies = [
   "build_afl",
   "test_instr",
-  "test_instr_fuzzbench",
   "test_cmplog",
   "test_frida",
   "test_qemu",
   "test_unicorn_mode",
+  # fuzzbench
+  "test_instr_fuzzbench",
 ]
 
 [tasks.build_libafl_fuzz]
