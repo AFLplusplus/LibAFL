@@ -1,6 +1,6 @@
 [package]
 name = "qemu_linux_process"
-version = "0.14.0"
+version = "0.14.1"
 authors = ["Romain Malmain <rmalmain@pm.me>"]
 edition = "2021"
 

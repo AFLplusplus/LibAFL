@@ -70,9 +70,9 @@ cc = { version = "1.1.21", features = ["parallel"] }
 rustversion = "1.0.17"
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.14.0", default-features = false, features = [
+libafl = { path = "../libafl", version = "0.14.1", default-features = false, features = [
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.14.0", default-features = false, features = [
+libafl_bolts = { path = "../libafl_bolts", version = "0.14.1", default-features = false, features = [
 ] }
 libc = { workspace = true }
 hashbrown = { workspace = true, default-features = true }

@@ -60,9 +60,9 @@ riscv64 = ["libafl_qemu/riscv64"]
 pyo3-build-config = { version = "0.22.3", optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.14.0" }
-libafl_bolts = { path = "../libafl_bolts", version = "0.14.0" }
-libafl_targets = { path = "../libafl_targets", version = "0.14.0" }
+libafl = { path = "../libafl", version = "0.14.1" }
+libafl_bolts = { path = "../libafl_bolts", version = "0.14.1" }
+libafl_targets = { path = "../libafl_targets", version = "0.14.1" }
 
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
@@ -72,7 +72,7 @@ pyo3 = { version = "0.22.3", optional = true }
 log = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libafl_qemu = { path = "../libafl_qemu", version = "0.14.0" }
+libafl_qemu = { path = "../libafl_qemu", version = "0.14.1" }
 
 [lib]
 name = "libafl_sugar"

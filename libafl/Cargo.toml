@@ -205,11 +205,11 @@ bytecount = "0.6.8"
 static_assertions = { workspace = true }
 
 [dependencies]
-libafl_bolts = { version = "0.14.0", path = "../libafl_bolts", default-features = false, features = [
+libafl_bolts = { version = "0.14.1", path = "../libafl_bolts", default-features = false, features = [
   "alloc",
 ] }
-libafl_derive = { version = "0.14.0", path = "../libafl_derive", optional = true }
-libafl_intelpt = { version = "0.14.0", path = "../libafl_intelpt", optional = true }
+libafl_derive = { version = "0.14.1", path = "../libafl_derive", optional = true }
+libafl_intelpt = { version = "0.14.1", path = "../libafl_intelpt", optional = true }
 
 rustversion = { workspace = true }
 tuple_list = { version = "0.1.3" }
