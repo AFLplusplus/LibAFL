@@ -47,17 +47,9 @@ auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
 cc = { workspace = true, features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", default-features = false, version = "0.14.0", features = [
-  "std",
-  "derive",
-  "frida_cli",
-] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.14.0", default-features = false, features = [
-  "std",
-  "derive",
-  "frida_cli",
-] }
-libafl_targets = { path = "../libafl_targets", version = "0.14.0", features = [
+libafl = { workspace = true, features = ["std", "derive", "frida_cli"] }
+libafl_bolts = { workspace = true, features = ["std", "derive", "frida_cli"] }
+libafl_targets = { workspace = true, default-features = true, features = [
   "std",
   "sancov_cmplog",
 ] }
