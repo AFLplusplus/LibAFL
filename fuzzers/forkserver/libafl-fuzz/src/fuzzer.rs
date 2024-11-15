@@ -499,7 +499,8 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
-            if testcase.scheduled_count() == 1 && !(opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
+            if testcase.scheduled_count() == 1
+                && !(opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
             {
                 return Ok(true);
             }
