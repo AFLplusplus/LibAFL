@@ -10,6 +10,10 @@ readme = "./README.md"
 keywords = ["fuzzing", "testing", "security", "intelpt"]
 categories = ["development-tools::testing", "no-std"]
 
+[package.metadata.docs.rs]
+features = ["std"]
+no-default-features = true # because libipt won't build
+
 [features]
 default = ["std", "libipt"]
 std = ["libafl_bolts/std"]
