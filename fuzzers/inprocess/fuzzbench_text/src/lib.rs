@@ -367,7 +367,7 @@ fn fuzz_binary(
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new::<BytesInput, _>(
+    let mutator = StdMOptMutator::new(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
         7,
@@ -582,7 +582,7 @@ fn fuzz_text(
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new::<BytesInput, _>(
+    let mutator = StdMOptMutator::new(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
         7,
