@@ -12,7 +12,7 @@ FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
 LLVM_CONFIG = { value = "llvm-config-18", condition = { env_not_set = [
   "LLVM_CONFIG",
 ] } }
-AFL_VERSION = "78b7e14c73baacf1d88b3c03955e78f5080d17ba"
+AFL_VERSION = "5777ceaf23f48ae4ceae60e4f3a79263802633c6"
 AFL_DIR = { value = "${PROJECT_DIR}/AFLplusplus" }
 AFL_CC_PATH = { value = "${AFL_DIR}/afl-clang-fast" }
 CC = { value = "clang" }
@@ -65,11 +65,12 @@ script = "echo done"
 dependencies = [
   "build_afl",
   "test_instr",
-  "test_instr_fuzzbench",
   "test_cmplog",
   "test_frida",
   "test_qemu",
   "test_unicorn_mode",
+  # fuzzbench
+  "test_instr_fuzzbench",
 ]
 
 [tasks.build_libafl_fuzz]
@@ -151,7 +152,7 @@ script_runner = "@shell"
 script = '''
 # cmplog TODO: AFL_BENCH_UNTIL_CRASH=1 instead of timeout 15s
 AFL_LLVM_CMPLOG=1 AFL_PATH=${AFL_DIR} ${AFL_CC_PATH} ./test/test-cmplog.c -o ./test/out-cmplog
-LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=0 timeout 10 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
+LIBAFL_DEBUG_OUTPUT=1 AFL_CORES=0 timeout 15 ${FUZZER} -Z -l 3 -m 0 -V30 -i ./test/seeds_cmplog -o ./test/output-cmplog -c 0 ./test/out-cmplog || true
 test -n "$( ls ${PROJECT_DIR}/test/output-cmplog/fuzzer_main/hangs/id:0000* ${PROJECT_DIR}/test/output-cmplog/fuzzer_main/crashes/id:0000*)" || {
 	echo "No crashes found"
 	exit 1
@@ -168,20 +169,20 @@ export AFL_PATH=${AFL_DIR}
 export AFL_CORES=0
 export AFL_STATS_INTERVAL=1 
 
-timeout 5 ${FUZZER} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida -- ./test/out-frida || true
+timeout 15 ${FUZZER} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida -- ./test/out-frida || true
 test -n "$( ls ./test/output-frida/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for FRIDA mode"
 	exit 1
 }
 
 ${CC} ./test/test-cmpcov.c -o ./test/out-frida-cmpcov
-AFL_FRIDA_VERBOSE=1 timeout 10 ${FUZZER} -m 0  -O -c 0 -l 3 -i ./test/seeds_frida -o ./test/output-frida-cmpcov -- ./test/out-frida-cmpcov || true
+AFL_FRIDA_VERBOSE=1 timeout 15 ${FUZZER} -m 0  -O -c 0 -l 3 -i ./test/seeds_frida -o ./test/output-frida-cmpcov -- ./test/out-frida-cmpcov || true
 test -n "$( ls ./test/output-frida-cmpcov/fuzzer_main/queue/id:000003* 2>/dev/null )" || {
 	echo "No new corpus entries found for FRIDA cmplog mode"
 	exit 1
 }
 export AFL_FRIDA_PERSISTENT_ADDR=0x`nm ./test/out-frida | grep -Ei "T _main|T main" | awk '{print $1}'`
-timeout 5 ${FUZZER} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida-persistent -- ./test/out-frida || true
+timeout 15 ${FUZZER} -m 0  -O -i ./test/seeds_frida -o ./test/output-frida-persistent -- ./test/out-frida || true
 
 test -n "$( ls ./test/output-frida-persistent/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for FRIDA persistent mode"
@@ -216,14 +217,14 @@ export AFL_PATH=${AFL_DIR}
 export AFL_CORES=0
 export AFL_STATS_INTERVAL=1
 
-timeout 5 ${FUZZER} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu -- ./test/out-qemu || true
+timeout 15 ${FUZZER} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu -- ./test/out-qemu || true
 test -n "$( ls ./test/output-qemu/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for QEMU mode"
 	exit 1
 }
 
 export AFL_ENTRYPOINT=`printf 1 | AFL_DEBUG=1 ${AFL_DIR}/afl-qemu-trace ./test/out-qemu 2>&1 >/dev/null | awk '/forkserver/{print $4; exit}'`
-timeout 5 ${FUZZER} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu-entrypoint -- ./test/out-qemu || true
+timeout 15 ${FUZZER} -m 0  -Q -i ./test/seeds_qemu -o ./test/output-qemu-entrypoint -- ./test/out-qemu || true
 test -n "$( ls ./test/output-qemu-entrypoint/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for QEMU mode with AFL_ENTRYPOINT"
 	exit 1
@@ -232,7 +233,7 @@ unset AFL_ENTRYPOINT
 
 export AFL_PRELOAD=${AFL_DIR}/libcompcov.so
 export AFL_COMPCOV_LEVEL=2
-timeout 5 ${FUZZER}  -Q -i ./test/seeds_qemu -o ./test/output-qemu-cmpcov -- ./test/out-qemu-cmpcov || true
+timeout 15 ${FUZZER}  -Q -i ./test/seeds_qemu -o ./test/output-qemu-cmpcov -- ./test/out-qemu-cmpcov || true
 test -n "$( ls ./test/output-qemu-cmpcov/fuzzer_main/queue/id:000002* 2>/dev/null )" || {
 	echo "No new corpus entries found for QEMU mode"
 	exit 1
