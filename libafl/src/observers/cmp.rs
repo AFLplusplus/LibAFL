@@ -417,7 +417,7 @@ impl AFLppCmpValuesMetadata {
 /// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
 /// - overflow:  Whether the comparison overflows
 /// - reserved:  Reserved for future use
-#[bitfield(u32)]
+#[bitfield(u16)]
 #[derive(Debug)]
 pub struct AFLppCmpLogHeader {
     /// The number of hits of a particular comparison
@@ -441,7 +441,4 @@ pub struct AFLppCmpLogHeader {
     /// 16 types for arithmetic comparison types
     #[bits(12..=15, r)]
     attribute: u4,
-    /// data
-    #[bits(16..=31, r)]
-    data: u16,
 }
