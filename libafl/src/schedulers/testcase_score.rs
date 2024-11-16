@@ -264,7 +264,7 @@ where
             perf_score = HAVOC_MAX_MULT * 100.0;
         }
 
-        if entry.objectives_found() > 0 && psmeta.strat().map_or(false, |s| s.avoid_crash()) {
+        if entry.objectives_found() > 0 && psmeta.strat().is_some_and(|s| s.avoid_crash()) {
             perf_score *= 0.00;
         }
 
@@ -342,7 +342,7 @@ where
             weight *= 2.0;
         }
 
-        if entry.objectives_found() > 0 && psmeta.strat().map_or(false, |s| s.avoid_crash()) {
+        if entry.objectives_found() > 0 && psmeta.strat().is_some_and(|s| s.avoid_crash()) {
             weight *= 0.00;
         }
 

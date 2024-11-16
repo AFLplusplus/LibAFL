@@ -171,7 +171,7 @@ impl ToolWrapper for ClangWrapper {
 
             if arg_as_path
                 .extension()
-                .map_or(false, |ext| ext.eq_ignore_ascii_case("s"))
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("s"))
             {
                 self.is_asm = true;
             }
