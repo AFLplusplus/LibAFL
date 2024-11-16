@@ -648,7 +648,7 @@ where
                 if filename.starts_with('.')
                 // || filename
                 //     .rsplit_once('-')
-                //     .map_or(false, |(_, s)| u64::from_str(s).is_ok())
+                //     .is_some_and(|(_, s)| u64::from_str(s).is_ok())
                 {
                     continue;
                 }

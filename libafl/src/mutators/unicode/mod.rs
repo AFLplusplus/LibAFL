@@ -78,7 +78,7 @@ fn choose_start<R: Rand>(
         if idx
             .checked_sub(*start) // idx adjusted to start
             .and_then(|idx| (idx < range.len()).then(|| range[idx])) // idx in range
-            .map_or(false, |r| r)
+            .is_some_and(|r| r)
         {
             options.push((*start, range));
         }
