@@ -135,7 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     assert!(
-        command.status().is_some_and(|s| s.success()),
+        command.status().is_ok_and(|s| s.success()),
         "Couldn't build runtime crate! Did you remember to use nightly? (`rustup default nightly` to install)"
     );
 
@@ -199,7 +199,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     drop(redefinitions_file);
 
     assert!(
-            nm_child.wait().is_some_and(|s| s.success()),
+            nm_child.wait().is_ok_and(|s| s.success()),
             "Couldn't link runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
@@ -242,7 +242,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .args([&archive_path, &redefined_archive_path]);
 
     assert!(
-            objcopy_command.status().is_some_and(|s| s.success()),
+            objcopy_command.status().is_ok_and(|s| s.success()),
             "Couldn't rename allocators in the runtime crate! Do you have the llvm-tools component installed? (`rustup component add llvm-tools-preview` to install)"
         );
 
