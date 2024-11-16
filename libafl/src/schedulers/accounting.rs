@@ -138,7 +138,7 @@ where
         if state
             .metadata_map()
             .get::<TopAccountingMetadata>()
-            .map_or(false, |x| x.changed)
+            .is_some_and(|x| x.changed)
         {
             self.accounting_cull(state)?;
         } else {
