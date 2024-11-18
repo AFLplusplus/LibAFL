@@ -64,7 +64,7 @@ macro_rules! hook_to_repr {
     };
 }
 
-static mut EMULATOR_TOOLS: *mut () = ptr::null_mut();
+static mut EMULATOR_MODULES: *mut () = ptr::null_mut();
 
 #[cfg(feature = "usermode")]
 pub extern "C" fn crash_hook_wrapper<ET, S>(target_sig: i32)
@@ -919,14 +919,14 @@ where
     pub unsafe fn emulator_modules_mut_unchecked<'a>() -> &'a mut EmulatorModules<ET, S> {
         #[cfg(debug_assertions)]
         {
-            (EMULATOR_TOOLS as *mut EmulatorModules<ET, S>)
+            (EMULATOR_MODULES as *mut EmulatorModules<ET, S>)
                 .as_mut()
                 .unwrap()
         }
 
         #[cfg(not(debug_assertions))]
         {
-            &mut *(EMULATOR_TOOLS as *mut EmulatorModules<ET, S>)
+            &mut *(EMULATOR_MODULES as *mut EmulatorModules<ET, S>)
         }
     }
 
@@ -940,7 +940,7 @@ where
     /// generic use (it will suppose they are the same as the ones used at initialization time).
     #[must_use]
     pub unsafe fn emulator_modules_mut<'a>() -> Option<&'a mut EmulatorModules<ET, S>> {
-        unsafe { (EMULATOR_TOOLS as *mut EmulatorModules<ET, S>).as_mut() }
+        unsafe { (EMULATOR_MODULES as *mut EmulatorModules<ET, S>).as_mut() }
     }
 }
 
@@ -1101,11 +1101,15 @@ where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
-    pub(super) fn new(qemu: Qemu, modules: ET) -> Pin<Box<Self>> {
+    pub(super) fn new(
+        qemu: Qemu,
+        emulator_hooks: EmulatorHooks<ET, S>,
+        modules: ET,
+    ) -> Pin<Box<Self>> {
         let mut modules = Box::pin(Self {
             qemu,
             modules: Box::pin(modules),
-            hooks: EmulatorHooks::default(),
+            hooks: emulator_hooks,
             phantom: PhantomData,
         });
 
@@ -1116,22 +1120,23 @@ where
 
         // Set global EmulatorModules pointer
         unsafe {
-            if EMULATOR_TOOLS.is_null() {
-                EMULATOR_TOOLS = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
+            if EMULATOR_MODULES.is_null() {
+                EMULATOR_MODULES = ptr::from_mut::<Self>(modules.as_mut().get_mut()) as *mut ();
             } else {
                 panic!("Emulator Modules have already been set and is still active. It is not supported to have multiple instances of `EmulatorModules` at the same time yet.")
             }
         }
 
-        unsafe {
-            // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
-            // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
-            modules
-                .modules
-                .init_modules_all(Self::emulator_modules_mut_unchecked());
-        }
-
         modules
+    }
+
+    pub fn post_qemu_init_all(&mut self) {
+        // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
+        // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
+        unsafe {
+            self.modules_mut()
+                .post_qemu_init_all(Self::emulator_modules_mut_unchecked())
+        }
     }
 
     pub fn first_exec_all(&mut self, state: &mut S) {
@@ -1336,7 +1341,7 @@ where
     fn drop(&mut self) {
         // Make the global pointer null at drop time
         unsafe {
-            EMULATOR_TOOLS = ptr::null_mut();
+            EMULATOR_MODULES = ptr::null_mut();
         }
     }
 }

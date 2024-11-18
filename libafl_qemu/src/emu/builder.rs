@@ -12,8 +12,8 @@ use crate::{
     command::{CommandManager, NopCommandManager, StdCommandManager},
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    Emulator, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError, StdEmulatorDriver,
-    StdSnapshotManager,
+    Emulator, EmulatorHooks, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError,
+    StdEmulatorDriver, StdSnapshotManager,
 };
 
 #[derive(Clone, Debug)]
@@ -118,6 +118,10 @@ where
     {
         let qemu_builder = self.qemu_builder.ok_or(QemuInitError::EmptyArgs)?;
 
+        let mut emulator_hooks = EmulatorHooks::default();
+
+        self.modules.pre_qemu_init_all(&mut emulator_hooks);
+
         let qemu: Qemu = match qemu_builder {
             QemuBuilder::Qemu(qemu) => qemu,
             QemuBuilder::QemuConfig(qemu_config) => {
@@ -127,13 +131,16 @@ where
             QemuBuilder::QemuString(qemu_string) => Qemu::init(&qemu_string)?,
         };
 
-        Emulator::new_with_qemu(
-            qemu,
-            self.modules,
-            self.driver,
-            self.snapshot_manager,
-            self.command_manager,
-        )
+        unsafe {
+            Ok(Emulator::new_with_qemu(
+                qemu,
+                emulator_hooks,
+                self.modules,
+                self.driver,
+                self.snapshot_manager,
+                self.command_manager,
+            ))
+        }
     }
 }
 
