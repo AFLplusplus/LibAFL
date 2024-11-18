@@ -21,10 +21,7 @@ categories = [
 ]
 
 [dev-dependencies]
-libafl_bolts = { path = "../../libafl_bolts", default-features = false, features = [
-  "xxh3",
-  "alloc",
-] } # libafl_bolts
+libafl_bolts = { workspace = true, features = ["xxh3", "alloc"] } # libafl_bolts
 
 criterion = "0.5.1" # Benchmarking
 ahash = { workspace = true, default-features = false } # The hash function already used in hashbrown

@@ -549,14 +549,20 @@ mod tests {
 
         SimpleStdoutLogger::set_logger().unwrap();
 
+        let out_dir = std::env::var_os("OUT_DIR").unwrap();
+        let out_dir = out_dir.to_string_lossy().to_string();
         // Check if the harness dynamic library is present, if not - skip the test
         #[cfg(unix)]
-        let test_harness = "./test_harness.so";
+        let test_harness_name = "test_harness.so";
         #[cfg(windows)]
-        let test_harness = ".\\test_harness.dll";
+        let test_harness_name = "test_harness.dll";
+
+        let test_harness = std::path::Path::new(&out_dir).join(test_harness_name);
+
         assert!(
-            std::path::Path::new(test_harness).exists(),
-            "Skipping test, {test_harness} not found"
+            test_harness.exists(),
+            "Skipping test, {} not found",
+            test_harness.to_str().unwrap()
         );
 
         GUM.set(Gum::obtain())
@@ -567,7 +573,7 @@ mod tests {
             "--disable-excludes",
             "--continue-on-error",
             "-H",
-            test_harness,
+            test_harness.to_str().unwrap(),
         ];
         let options: FuzzerOptions = FuzzerOptions::try_parse_from(simulated_args).unwrap();
         unsafe { test_asan(&options) }

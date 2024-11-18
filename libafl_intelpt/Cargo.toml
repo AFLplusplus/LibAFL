@@ -10,6 +10,10 @@ readme = "./README.md"
 keywords = ["fuzzing", "testing", "security", "intelpt"]
 categories = ["development-tools::testing", "no-std"]
 
+[package.metadata.docs.rs]
+features = ["std"]
+no-default-features = true # because libipt won't build
+
 [features]
 default = ["std", "libipt"]
 std = ["libafl_bolts/std"]
@@ -26,7 +30,7 @@ proc-maps = "0.4.0"
 [dependencies]
 arbitrary-int = { workspace = true }
 bitbybit = { workspace = true }
-libafl_bolts = { version = "0.14.0", path = "../libafl_bolts", default-features = false }
+libafl_bolts = { workspace = true }
 libc = { workspace = true }
 libipt = { workspace = true, optional = true }
 log = { workspace = true }

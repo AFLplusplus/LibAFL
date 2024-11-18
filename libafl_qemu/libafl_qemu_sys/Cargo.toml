@@ -66,7 +66,7 @@ strum_macros = { workspace = true }
 pyo3 = { version = "0.22.3", optional = true }
 
 [build-dependencies]
-libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.14.0" }
+libafl_qemu_build = { workspace = true, default-features = true }
 pyo3-build-config = { version = "0.22.3", optional = true }
 rustversion = { workspace = true }
 

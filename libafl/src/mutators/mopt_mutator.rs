@@ -497,7 +497,7 @@ where
 
 impl<MT> StdMOptMutator<MT> {
     /// Create a new [`StdMOptMutator`].
-    pub fn new<I, S>(
+    pub fn new<S>(
         state: &mut S,
         mutations: MT,
         max_stack_pow: usize,
