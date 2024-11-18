@@ -1342,7 +1342,11 @@ pub mod unix_shmem {
     }
 
     /// Module containing `memfd` shared memory support, usable on Linux and Android.
-    #[cfg(all(unix, feature = "std", not(target_vendor = "apple")))]
+    #[cfg(all(
+        unix,
+        feature = "std",
+        any(target_os = "linux", target_os = "android", target_os = "freebsd")
+    ))]
     pub mod memfd {
         use alloc::string::ToString;
         use core::{
