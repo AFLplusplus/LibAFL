@@ -198,7 +198,8 @@ mod generators {
 
             if !IS_CONST_MAP {
                 unsafe {
-                    *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, id);
+                    *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR =
+                        max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, id as usize);
                 }
             }
 
@@ -250,7 +251,7 @@ mod generators {
 
         if !IS_CONST_MAP {
             unsafe {
-                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, id);
+                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, id as usize);
             }
         }
 
