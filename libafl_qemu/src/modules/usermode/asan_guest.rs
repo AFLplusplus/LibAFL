@@ -124,9 +124,9 @@ pub struct AsanGuestModule<F> {
 }
 
 #[cfg(any(
-    cpu_target = "aarch64",
-    cpu_target = "x86_64",
-    cpu_target = "riscv64",
+    feature = "aarch64",
+    feature = "x86_64",
+    feature = "riscv64",
     feature = "clippy"
 ))]
 impl<F> AsanGuestModule<F> {
@@ -137,11 +137,11 @@ impl<F> AsanGuestModule<F> {
 }
 
 #[cfg(any(
-    cpu_target = "arm",
-    cpu_target = "i386",
-    cpu_target = "mips",
-    cpu_target = "ppc",
-    cpu_target = "riscv32",
+    feature = "arm",
+    feature = "i386",
+    feature = "mips",
+    feature = "ppc",
+    feature = "riscv32",
 ))]
 impl<F> AsanGuestModule<F> {
     const HIGH_SHADOW_START: GuestAddr = 0x28000000;

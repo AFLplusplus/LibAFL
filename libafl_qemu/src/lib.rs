@@ -9,7 +9,7 @@
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
 // u64::from(GuestAddr) is a no-op, but the .into() call is needed when GuestAddr is u32.
 #![cfg_attr(
-    any(cpu_target = "x86_64", cpu_target = "aarch64"),
+    any(feature = "x86_64", feature = "aarch64"),
     allow(clippy::useless_conversion)
 )]
 // libafl_qemu_sys export types with empty struct markers (e.g. struct {} start_init_save)

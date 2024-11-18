@@ -44,7 +44,7 @@ cmake = { workspace = true }
 bindgen = { workspace = true }
 regex = { workspace = true }
 which = { workspace = true }
-symcc_libafl = { workspace = true, default-features = true, version = "0.14.0" }
+symcc_libafl = { workspace = true, default-features = true }
 
 [lints]
 workspace = true

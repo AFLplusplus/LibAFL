@@ -16,20 +16,6 @@ void __libafl_qemu_testfile() {}
 #[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
-    println!(
-        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "riscv32", "riscv64", "x86_64"))"#
-    );
-
-    let emulation_mode = if cfg!(feature = "usermode") {
-        "usermode"
-    } else if cfg!(feature = "systemmode") {
-        "systemmode"
-    } else {
-        unreachable!(
-            "The macros `assert_unique_feature` and `assert_at_least_one_feature` in \
-            `libafl_qemu_sys/build_linux.rs` should panic before this code is reached."
-        );
-    };
 
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_dir = PathBuf::from(src_dir);
@@ -81,29 +67,29 @@ pub fn build() {
     println!("cargo:rerun-if-changed={}", libafl_runtime_dir.display());
 
     let cpu_target = if cfg!(feature = "x86_64") {
-        "x86_64".to_string()
+        "x86_64"
     } else if cfg!(feature = "arm") {
-        "arm".to_string()
+        "arm"
     } else if cfg!(feature = "aarch64") {
-        "aarch64".to_string()
+        "aarch64"
     } else if cfg!(feature = "i386") {
-        "i386".to_string()
+        "i386"
     } else if cfg!(feature = "mips") {
-        "mips".to_string()
+        "mips"
     } else if cfg!(feature = "ppc") {
-        "ppc".to_string()
+        "ppc"
     } else if cfg!(feature = "riscv32") {
-        "riscv32".to_string()
+        "riscv32"
     } else if cfg!(feature = "riscv64") {
-        "riscv64".to_string()
+        "riscv64"
     } else if cfg!(feature = "hexagon") {
-        "hexagon".to_string()
+        "hexagon"
     } else {
-        env::var("CPU_TARGET").unwrap_or_else(|_| "x86_64".to_string())
+        unreachable!(
+            "The macros `assert_unique_feature` and `assert_at_least_one_feature` in \
+            `libafl_qemu_sys/build_linux.rs` should panic before this code is reached."
+        );
     };
-    println!("cargo:rerun-if-env-changed=CPU_TARGET");
-    println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))");
 
     let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
@@ -167,8 +153,8 @@ pub fn build() {
         .expect("Could not write bindings.");
 
     maybe_generate_stub_bindings(
-        &cpu_target,
-        emulation_mode,
+        cpu_target,
+        cfg!(feature = "usermode"),
         stub_runtime_bindings_file.as_path(),
         runtime_bindings_file.as_path(),
     );

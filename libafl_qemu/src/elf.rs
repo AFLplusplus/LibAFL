@@ -54,17 +54,17 @@ impl<'a> EasyElf<'a> {
                     return if sym.st_value == 0 {
                         None
                     } else if self.is_pic() {
-                        #[cfg(cpu_target = "arm")]
+                        #[cfg(feature = "arm")]
                         // Required because of arm interworking addresses aka bit(0) for thumb mode
                         let addr = (sym.st_value as GuestAddr + load_addr) & !(0x1 as GuestAddr);
-                        #[cfg(not(cpu_target = "arm"))]
+                        #[cfg(not(feature = "arm"))]
                         let addr = sym.st_value as GuestAddr + load_addr;
                         Some(addr)
                     } else {
-                        #[cfg(cpu_target = "arm")]
+                        #[cfg(feature = "arm")]
                         // Required because of arm interworking addresses aka bit(0) for thumb mode
                         let addr = (sym.st_value as GuestAddr) & !(0x1 as GuestAddr);
-                        #[cfg(not(cpu_target = "arm"))]
+                        #[cfg(not(feature = "arm"))]
                         let addr = sym.st_value as GuestAddr;
                         Some(addr)
                     };

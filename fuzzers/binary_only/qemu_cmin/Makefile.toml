@@ -199,6 +199,7 @@ args = [
   "build",
   "--profile",
   "${PROFILE}",
+  "--no-default-features",
   "--features",
   "${FEATURE}",
   "--target-dir",
