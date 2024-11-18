@@ -12,7 +12,7 @@ use crate::{
     command::{CommandManager, NopCommandManager, StdCommandManager},
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    Emulator, EmulatorHooks, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuInitError,
+    Emulator, EmulatorHooks, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuHooks, QemuInitError,
     StdEmulatorDriver, StdSnapshotManager,
 };
 
@@ -118,7 +118,7 @@ where
     {
         let qemu_builder = self.qemu_builder.ok_or(QemuInitError::EmptyArgs)?;
 
-        let mut emulator_hooks = EmulatorHooks::default();
+        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
 
         self.modules.pre_qemu_init_all(&mut emulator_hooks);
 

@@ -19,8 +19,8 @@ use crate::{
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
     sync_exit::SyncExit,
-    Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuShutdownCause, Regs,
-    CPU,
+    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk,
+    QemuShutdownCause, Regs, CPU,
 };
 
 mod hooks;
@@ -329,7 +329,7 @@ where
         snapshot_manager: SM,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
-        let mut emulator_hooks = EmulatorHooks::default();
+        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
 
         modules.pre_qemu_init_all(&mut emulator_hooks);
 

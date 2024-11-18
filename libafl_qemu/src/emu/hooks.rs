@@ -1135,7 +1135,7 @@ where
         // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
         unsafe {
             self.modules_mut()
-                .post_qemu_init_all(Self::emulator_modules_mut_unchecked())
+                .post_qemu_init_all(Self::emulator_modules_mut_unchecked());
         }
     }
 
