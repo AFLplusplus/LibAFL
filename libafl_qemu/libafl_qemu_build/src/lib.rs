@@ -389,14 +389,11 @@ pub fn store_generated_content_if_different(
 #[allow(unused)]
 pub fn maybe_generate_stub_bindings(
     cpu_target: &str,
-    emulation_mode: &str,
+    is_usermode: bool,
     stub_bindings_file: &Path,
     bindings_file: &Path,
 ) {
-    if env::var("LIBAFL_QEMU_GEN_STUBS").is_ok()
-        && cpu_target == "x86_64"
-        && emulation_mode == "usermode"
-    {
+    if env::var("LIBAFL_QEMU_GEN_STUBS").is_ok() && cpu_target == "x86_64" && is_usermode {
         let current_rustc_version =
             rustc_version::version().expect("Could not get current rustc version");
 

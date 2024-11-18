@@ -28,17 +28,6 @@ pub fn build() {
     // Make sure that at least one qemu mode is set
     assert_at_least_one_feature!("usermode", "systemmode");
 
-    let emulation_mode = if cfg!(feature = "usermode") {
-        "usermode"
-    } else if cfg!(feature = "systemmode") {
-        "systemmode"
-    } else {
-        unreachable!(
-            "The above macros, `assert_unique_feature` and `assert_at_least_one_feature`, should \
-             panic before this code is reached."
-        );
-    };
-
     // Make sure we have at most one architecutre feature set
     assert_unique_feature!(
         "arm", "aarch64", "i386", "x86_64", "mips", "ppc", "hexagon", "riscv32", "riscv64"
@@ -111,7 +100,7 @@ pub fn build() {
     // If the bindings are built and differ from the current stub, replace it with the freshly generated bindings
     maybe_generate_stub_bindings(
         &cpu_target,
-        emulation_mode,
+        cfg!(feature = "usermode"),
         stub_bindings_file.as_path(),
         bindings_file.as_path(),
     );

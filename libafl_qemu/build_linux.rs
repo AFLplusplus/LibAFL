@@ -17,17 +17,6 @@ void __libafl_qemu_testfile() {}
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
 
-    let emulation_mode = if cfg!(feature = "usermode") {
-        "usermode"
-    } else if cfg!(feature = "systemmode") {
-        "systemmode"
-    } else {
-        unreachable!(
-            "The macros `assert_unique_feature` and `assert_at_least_one_feature` in \
-            `libafl_qemu_sys/build_linux.rs` should panic before this code is reached."
-        );
-    };
-
     let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let src_dir = PathBuf::from(src_dir);
 
@@ -165,7 +154,7 @@ pub fn build() {
 
     maybe_generate_stub_bindings(
         &cpu_target,
-        emulation_mode,
+        cfg!(feature = "usermode"),
         stub_runtime_bindings_file.as_path(),
         runtime_bindings_file.as_path(),
     );
