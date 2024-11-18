@@ -283,7 +283,7 @@ where
                 return None;
             }
 
-            #[cfg(cpu_target = "arm")]
+            #[cfg(feature = "arm")]
             h.cs.set_mode(if pc & 1 == 1 {
                 arch::arm::ArchMode::Thumb.into()
             } else {

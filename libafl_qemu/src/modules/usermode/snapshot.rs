@@ -6,18 +6,18 @@ use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
 
-#[cfg(any(cpu_target = "arm", cpu_target = "i386", cpu_target = "mips"))]
+#[cfg(any(feature = "arm", feature = "i386", feature = "mips"))]
 use crate::SYS_fstatat64;
-#[cfg(not(any(cpu_target = "arm", cpu_target = "riscv32")))]
+#[cfg(not(any(feature = "arm", feature = "riscv32")))]
 use crate::SYS_mmap;
-#[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "riscv32"))]
+#[cfg(any(feature = "arm", feature = "mips", feature = "riscv32"))]
 use crate::SYS_mmap2;
 #[cfg(not(any(
-    cpu_target = "arm",
-    cpu_target = "mips",
-    cpu_target = "i386",
-    cpu_target = "ppc",
-    cpu_target = "riscv32",
+    feature = "arm",
+    feature = "mips",
+    feature = "i386",
+    feature = "ppc",
+    feature = "riscv32",
 )))]
 use crate::SYS_newfstatat;
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
     qemu::{Hook, SyscallHookResult},
     Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
 };
-#[cfg(not(cpu_target = "riscv32"))]
+#[cfg(not(feature = "riscv32"))]
 use crate::{SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_statfs};
 
 // TODO use the functions provided by Qemu
@@ -806,17 +806,17 @@ where
             let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
             h.access(a2, a3 as usize);
         }
-        #[cfg(not(cpu_target = "riscv32"))]
+        #[cfg(not(feature = "riscv32"))]
         SYS_futex => {
             let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
             h.access(a0, a3 as usize);
         }
         #[cfg(not(any(
-            cpu_target = "arm",
-            cpu_target = "i386",
-            cpu_target = "mips",
-            cpu_target = "ppc",
-            cpu_target = "riscv32"
+            feature = "arm",
+            feature = "i386",
+            feature = "mips",
+            feature = "ppc",
+            feature = "riscv32"
         )))]
         SYS_newfstatat => {
             if a2 != 0 {
@@ -824,19 +824,19 @@ where
                 h.access(a2, 4096); // stat is not greater than a page
             }
         }
-        #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "i386"))]
+        #[cfg(any(feature = "arm", feature = "mips", feature = "i386"))]
         SYS_fstatat64 => {
             if a2 != 0 {
                 let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
                 h.access(a2, 4096); // stat is not greater than a page
             }
         }
-        #[cfg(not(cpu_target = "riscv32"))]
+        #[cfg(not(feature = "riscv32"))]
         SYS_statfs | SYS_fstat | SYS_fstatfs => {
             let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
             h.access(a1, 4096); // stat is not greater than a page
         }
-        #[cfg(not(cpu_target = "riscv32"))]
+        #[cfg(not(feature = "riscv32"))]
         SYS_getrandom => {
             let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
             h.access(a0, a1 as usize);
@@ -861,7 +861,7 @@ where
 
             // TODO handle huge pages
 
-            #[cfg(any(cpu_target = "arm", cpu_target = "mips", cpu_target = "riscv32"))]
+            #[cfg(any(feature = "arm", feature = "mips", feature = "riscv32"))]
             if sys_const == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
@@ -869,7 +869,7 @@ where
                 }
             }
 
-            #[cfg(not(any(cpu_target = "arm", cpu_target = "riscv32")))]
+            #[cfg(not(any(feature = "arm", feature = "riscv32")))]
             if sys_const == SYS_mmap {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();

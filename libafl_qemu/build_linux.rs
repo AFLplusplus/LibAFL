@@ -16,9 +16,6 @@ void __libafl_qemu_testfile() {}
 #[allow(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
-    println!(
-        r#"cargo::rustc-check-cfg=cfg(cpu_target, values("arm", "aarch64", "hexagon", "i386", "mips", "ppc", "riscv32", "riscv64", "x86_64"))"#
-    );
 
     let emulation_mode = if cfg!(feature = "usermode") {
         "usermode"
@@ -99,11 +96,11 @@ pub fn build() {
     } else if cfg!(feature = "hexagon") {
         "hexagon".to_string()
     } else {
-        env::var("CPU_TARGET").unwrap_or_else(|_| "x86_64".to_string())
+        unreachable!(
+            "The macros `assert_unique_feature` and `assert_at_least_one_feature` in \
+            `libafl_qemu_sys/build_linux.rs` should panic before this code is reached."
+        );
     };
-    println!("cargo:rerun-if-env-changed=CPU_TARGET");
-    println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))");
 
     let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)

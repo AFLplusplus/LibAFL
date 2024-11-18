@@ -40,8 +40,11 @@ pub fn build() {
     };
 
     // Make sure we have at most one architecutre feature set
-    // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!(
+        "arm", "aarch64", "i386", "x86_64", "mips", "ppc", "hexagon", "riscv32", "riscv64"
+    );
+    // Make sure we have at least one architecutre feature set
+    assert_at_least_one_feature!(
         "arm", "aarch64", "i386", "x86_64", "mips", "ppc", "hexagon", "riscv32", "riscv64"
     );
 
@@ -69,17 +72,13 @@ pub fn build() {
     } else if cfg!(feature = "hexagon") {
         "hexagon".to_string()
     } else {
-        env::var("CPU_TARGET").unwrap_or_else(|_| {
-            println!(
-                "cargo:warning=No architecture feature enabled or CPU_TARGET env specified for libafl_qemu, supported: arm, aarch64, hexagon, i386, mips, ppc, riscv32, riscv64, x86_64 - defaulting to x86_64"
-            );
-            "x86_64".to_string()
-        })
+        unreachable!(
+            "The above macros, `assert_unique_feature` and `assert_at_least_one_feature`, should \
+             panic before this code is reached."
+        );
     };
-    println!("cargo:rerun-if-env-changed=CPU_TARGET");
+
     println!("cargo:rerun-if-env-changed=LIBAFL_QEMU_GEN_STUBS");
-    println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
-    println!("cargo::rustc-check-cfg=cfg(cpu_target, values(\"x86_64\", \"arm\", \"aarch64\", \"i386\", \"mips\", \"ppc\", \"hexagon\", \"riscv32\", \"riscv64\"))");
 
     let jobs = env::var("NUM_JOBS")
         .ok()
@@ -102,7 +101,7 @@ pub fn build() {
     build_with_bindings(
         &cpu_target,
         cfg!(feature = "be"),
-        emulation_mode == "usermode",
+        cfg!(feature = "usermode"),
         jobs,
         &bindings_file,
     );

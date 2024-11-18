@@ -309,7 +309,7 @@ impl CmpLogRoutinesModule {
                 return None;
             }
 
-            #[cfg(cpu_target = "arm")]
+            #[cfg(feature = "arm")]
             h.cs.set_mode(if pc & 1 == 1 {
                 capstone::arch::arm::ArchMode::Thumb.into()
             } else {

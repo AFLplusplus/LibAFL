@@ -1,39 +1,39 @@
-#[cfg(cpu_target = "aarch64")]
+#[cfg(feature = "aarch64")]
 pub mod aarch64;
-#[cfg(all(cpu_target = "aarch64", not(feature = "clippy")))]
+#[cfg(all(feature = "aarch64", not(feature = "clippy")))]
 pub use aarch64::*;
 
-#[cfg(cpu_target = "arm")]
+#[cfg(feature = "arm")]
 pub mod arm;
-#[cfg(all(cpu_target = "arm", not(feature = "clippy")))]
+#[cfg(all(feature = "arm", not(feature = "clippy")))]
 pub use arm::*;
 
-#[cfg(cpu_target = "i386")]
+#[cfg(feature = "i386")]
 pub mod i386;
-#[cfg(all(cpu_target = "i386", not(feature = "clippy")))]
+#[cfg(all(feature = "i386", not(feature = "clippy")))]
 pub use i386::*;
 
-#[cfg(cpu_target = "x86_64")]
+#[cfg(feature = "x86_64")]
 pub mod x86_64;
-#[cfg(cpu_target = "x86_64")]
+#[cfg(feature = "x86_64")]
 pub use x86_64::*;
 
-#[cfg(cpu_target = "mips")]
+#[cfg(feature = "mips")]
 pub mod mips;
-#[cfg(cpu_target = "mips")]
+#[cfg(feature = "mips")]
 pub use mips::*;
 
-#[cfg(cpu_target = "ppc")]
+#[cfg(feature = "ppc")]
 pub mod ppc;
-#[cfg(cpu_target = "ppc")]
+#[cfg(feature = "ppc")]
 pub use ppc::*;
 
-#[cfg(cpu_target = "hexagon")]
+#[cfg(feature = "hexagon")]
 pub mod hexagon;
-#[cfg(cpu_target = "hexagon")]
+#[cfg(feature = "hexagon")]
 pub use hexagon::*;
 
-#[cfg(any(cpu_target = "riscv32", cpu_target = "riscv64"))]
+#[cfg(any(feature = "riscv32", feature = "riscv64"))]
 pub mod riscv;
-#[cfg(any(cpu_target = "riscv32", cpu_target = "riscv64"))]
+#[cfg(any(feature = "riscv32", feature = "riscv64"))]
 pub use riscv::*;

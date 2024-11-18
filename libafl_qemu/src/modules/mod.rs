@@ -25,19 +25,19 @@ pub use edges::{
     StdEdgeCoverageFullModuleBuilder, StdEdgeCoverageModule, StdEdgeCoverageModuleBuilder,
 };
 
-#[cfg(not(cpu_target = "hexagon"))]
+#[cfg(not(feature = "hexagon"))]
 pub mod calls;
-#[cfg(not(cpu_target = "hexagon"))]
+#[cfg(not(feature = "hexagon"))]
 pub use calls::CallTracerModule;
 
-#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
+#[cfg(not(any(feature = "mips", feature = "hexagon")))]
 pub mod cmplog;
-#[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
+#[cfg(not(any(feature = "mips", feature = "hexagon")))]
 pub use cmplog::CmpLogModule;
 
-#[cfg(not(cpu_target = "hexagon"))]
+#[cfg(not(feature = "hexagon"))]
 pub mod drcov;
-#[cfg(not(cpu_target = "hexagon"))]
+#[cfg(not(feature = "hexagon"))]
 pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 
 use crate::{emu::EmulatorModules, Qemu};
