@@ -191,20 +191,18 @@ mod generators {
                 }
             }
 
-            let mask: usize = get_mask::<IS_CONST_MAP, MAP_SIZE>();
+            let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-            let id = hash_me(src as u64) ^ hash_me(dest as u64);
+            #[allow(clippy::unnecessary_cast)]
+            let id = (hash_me(src as u64) ^ hash_me(dest as u64)) & mask;
 
-            unsafe {
-                let nxt = (id as usize + 1) & mask;
-
-                if !IS_CONST_MAP {
-                    *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
+            if !IS_CONST_MAP {
+                unsafe {
+                    *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR =
+                        max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, id as usize);
                 }
             }
 
-            // GuestAddress is u32 for 32 bit guests
-            #[allow(clippy::unnecessary_cast)]
             Some(id)
         } else {
             None
@@ -247,15 +245,13 @@ mod generators {
             }
         }
 
-        let mask: usize = get_mask::<IS_CONST_MAP, MAP_SIZE>();
+        let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-        let id = hash_me(pc as u64);
+        let id = hash_me(pc as u64) & mask;
 
-        unsafe {
-            let nxt = (id as usize + 1) & mask;
-
-            if !IS_CONST_MAP {
-                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = nxt;
+        if !IS_CONST_MAP {
+            unsafe {
+                *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, id as usize);
             }
         }
 
