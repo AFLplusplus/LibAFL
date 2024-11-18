@@ -43,23 +43,23 @@ pub fn build() {
     assert_unique_feature!("be", "aarch64", "i386", "x86_64", "hexagon", "riscv32", "riscv64");
 
     let cpu_target = if cfg!(feature = "x86_64") {
-        "x86_64".to_string()
+        "x86_64"
     } else if cfg!(feature = "arm") {
-        "arm".to_string()
+        "arm"
     } else if cfg!(feature = "aarch64") {
-        "aarch64".to_string()
+        "aarch64"
     } else if cfg!(feature = "i386") {
-        "i386".to_string()
+        "i386"
     } else if cfg!(feature = "mips") {
-        "mips".to_string()
+        "mips"
     } else if cfg!(feature = "ppc") {
-        "ppc".to_string()
+        "ppc"
     } else if cfg!(feature = "riscv32") {
-        "riscv32".to_string()
+        "riscv32"
     } else if cfg!(feature = "riscv64") {
-        "riscv64".to_string()
+        "riscv64"
     } else if cfg!(feature = "hexagon") {
-        "hexagon".to_string()
+        "hexagon"
     } else {
         unreachable!(
             "The above macros, `assert_unique_feature` and `assert_at_least_one_feature`, should \
@@ -88,7 +88,7 @@ pub fn build() {
     }
 
     build_with_bindings(
-        &cpu_target,
+        cpu_target,
         cfg!(feature = "be"),
         cfg!(feature = "usermode"),
         jobs,
@@ -99,7 +99,7 @@ pub fn build() {
 
     // If the bindings are built and differ from the current stub, replace it with the freshly generated bindings
     maybe_generate_stub_bindings(
-        &cpu_target,
+        cpu_target,
         cfg!(feature = "usermode"),
         stub_bindings_file.as_path(),
         bindings_file.as_path(),
