@@ -675,7 +675,7 @@ where
 {
     type ModuleAddressFilter = NopAddressFilter;
 
-    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
