@@ -699,12 +699,12 @@ impl ExecutionCountRestartHelper {
     }
 
     /// Clear progress for the stage this wrapper wraps.
-    pub fn clear_progress<S>(&mut self, state: &mut S) -> Result<(), Error>
+    pub fn clear_progress<S>(&mut self, state: &mut S, name: &str) -> Result<(), Error>
     where
-        S: HasMetadata,
+        S: HasNamedMetadata,
     {
         self.started_at_execs = None;
-        let _metadata = state.remove_metadata::<ExecutionCountRestartHelperMetadata>();
+        let _metadata = state.remove_named_metadata::<ExecutionCountRestartHelperMetadata>(name);
         debug_assert!(_metadata.is_some(), "Called clear_progress, but should_restart was not called before (or did mutational stages get nested?)");
         Ok(())
     }
