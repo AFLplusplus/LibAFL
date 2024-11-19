@@ -1,4 +1,7 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+};
 
 use libafl::{
     inputs::{HasTargetBytes, UsesInput},
@@ -17,10 +20,9 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-enum QemuBuilder {
-    Qemu(Qemu),
-    QemuConfig(QemuConfig),
-    QemuString(Vec<String>),
+pub enum QemuParams {
+    Config(QemuConfig),
+    Cli(Vec<String>),
 }
 
 #[derive(Clone, Debug)]
@@ -32,7 +34,7 @@ where
     driver: ED,
     snapshot_manager: SM,
     command_manager: CM,
-    qemu_builder: Option<QemuBuilder>,
+    qemu_parameters: Option<QemuParams>,
     phantom: PhantomData<S>,
 }
 
@@ -47,7 +49,7 @@ where
             driver: NopEmulatorDriver,
             snapshot_manager: NopSnapshotManager,
             command_manager: NopCommandManager,
-            qemu_builder: None,
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
@@ -67,7 +69,7 @@ where
             command_manager: StdCommandManager::default(),
             snapshot_manager: StdSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
-            qemu_builder: None,
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
@@ -85,7 +87,7 @@ where
             command_manager: StdCommandManager::default(),
             snapshot_manager: FastSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
-            qemu_builder: None,
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
@@ -99,14 +101,14 @@ where
         driver: ED,
         command_manager: CM,
         snapshot_manager: SM,
-        qemu_builder: Option<QemuBuilder>,
+        qemu_parameters: Option<QemuParams>,
     ) -> Self {
         Self {
             modules,
             command_manager,
             driver,
             snapshot_manager,
-            qemu_builder,
+            qemu_parameters,
             phantom: PhantomData,
         }
     }
@@ -116,20 +118,13 @@ where
         CM: CommandManager<ED, ET, S, SM>,
         ET: EmulatorModuleTuple<S>,
     {
-        let qemu_builder = self.qemu_builder.ok_or(QemuInitError::EmptyArgs)?;
+        let qemu_parameters = self.qemu_parameters.ok_or(QemuInitError::EmptyArgs)?;
 
         let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
 
         self.modules.pre_qemu_init_all(&mut emulator_hooks);
 
-        let qemu: Qemu = match qemu_builder {
-            QemuBuilder::Qemu(qemu) => qemu,
-            QemuBuilder::QemuConfig(qemu_config) => {
-                let res: Result<Qemu, QemuInitError> = qemu_config.into();
-                res?
-            }
-            QemuBuilder::QemuString(qemu_string) => Qemu::init(&qemu_string)?,
-        };
+        let qemu = Qemu::init_with_params(&qemu_parameters)?;
 
         unsafe {
             Ok(Emulator::new_with_qemu(
@@ -156,7 +151,7 @@ where
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            Some(QemuBuilder::QemuConfig(qemu_config)),
+            Some(QemuParams::Config(qemu_config)),
         )
     }
 
@@ -167,18 +162,7 @@ where
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            Some(QemuBuilder::QemuString(qemu_cli)),
-        )
-    }
-
-    #[must_use]
-    pub fn qemu(self, qemu: Qemu) -> EmulatorBuilder<CM, ED, ET, S, SM> {
-        EmulatorBuilder::new(
-            self.modules,
-            self.driver,
-            self.command_manager,
-            self.snapshot_manager,
-            Some(QemuBuilder::Qemu(qemu)),
+            Some(QemuParams::Cli(qemu_cli)),
         )
     }
 
@@ -192,7 +176,7 @@ where
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
@@ -202,7 +186,7 @@ where
             driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
@@ -215,7 +199,7 @@ where
             self.driver,
             command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
@@ -225,7 +209,7 @@ where
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
@@ -238,7 +222,7 @@ where
             self.driver,
             self.command_manager,
             snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 }
