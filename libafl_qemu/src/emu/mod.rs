@@ -19,8 +19,8 @@ use crate::{
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
     sync_exit::SyncExit,
-    Qemu, QemuExitError, QemuExitReason, QemuInitError, QemuMemoryChunk, QemuShutdownCause, Regs,
-    CPU,
+    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk,
+    QemuShutdownCause, Regs, CPU,
 };
 
 mod hooks;
@@ -325,31 +325,55 @@ where
     pub fn new(
         qemu_args: &[String],
         modules: ET,
-        drivers: ED,
-        snapshot_manager: SM,
-        command_manager: CM,
-    ) -> Result<Self, QemuInitError> {
-        let qemu = Qemu::init(qemu_args)?;
-
-        Self::new_with_qemu(qemu, modules, drivers, snapshot_manager, command_manager)
-    }
-
-    pub fn new_with_qemu(
-        qemu: Qemu,
-        modules: ET,
         driver: ED,
         snapshot_manager: SM,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
-        Ok(Emulator {
-            modules: EmulatorModules::new(qemu, modules),
+        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
+
+        modules.pre_qemu_init_all(&mut emulator_hooks);
+
+        let qemu = Qemu::init(qemu_args)?;
+
+        unsafe {
+            Ok(Self::new_with_qemu(
+                qemu,
+                emulator_hooks,
+                modules,
+                driver,
+                snapshot_manager,
+                command_manager,
+            ))
+        }
+    }
+
+    /// New emulator with already initialized QEMU.
+    /// We suppose modules init hooks have already been run.
+    ///
+    /// # Safety
+    ///
+    /// pre-init qemu hooks should be run by then.
+    pub(crate) unsafe fn new_with_qemu(
+        qemu: Qemu,
+        emulator_hooks: EmulatorHooks<ET, S>,
+        modules: ET,
+        driver: ED,
+        snapshot_manager: SM,
+        command_manager: CM,
+    ) -> Self {
+        let mut emulator = Emulator {
+            modules: EmulatorModules::new(qemu, emulator_hooks, modules),
             command_manager,
             snapshot_manager,
             driver,
             breakpoints_by_addr: RefCell::new(HashMap::new()),
             breakpoints_by_id: RefCell::new(HashMap::new()),
             qemu,
-        })
+        };
+
+        emulator.modules.post_qemu_init_all();
+
+        emulator
     }
 }
 
