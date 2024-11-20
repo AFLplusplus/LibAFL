@@ -14,6 +14,7 @@ use std::{
     mem::MaybeUninit,
     ops::Range,
     pin::Pin,
+    sync::OnceLock,
 };
 
 use libafl_bolts::os::unix_signals::Signal;
@@ -28,10 +29,10 @@ use libafl_qemu_sys::{
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
-use crate::{GuestAddrKind, GuestReg, Regs};
+use crate::{GuestAddrKind, GuestReg, QemuParams, Regs};
 
 pub mod config;
-use config::{QemuConfig, QemuConfigBuilder, QEMU_CONFIG};
+use config::QemuConfig;
 
 #[cfg(feature = "usermode")]
 mod usermode;
@@ -48,6 +49,8 @@ mod hooks;
 pub use hooks::*;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
+
+pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
 #[derive(Debug)]
 pub enum QemuError {
@@ -574,10 +577,21 @@ impl From<u8> for HookData {
 
 #[allow(clippy::unused_self)]
 impl Qemu {
-    /// For more details about the parameters check
-    /// [the QEMU documentation](https://www.qemu.org/docs/master/about/).
-    pub fn builder() -> QemuConfigBuilder {
-        QemuConfig::builder()
+    pub fn init_with_params(params: &QemuParams) -> Result<Self, QemuInitError> {
+        match params {
+            QemuParams::Config(config) => Self::init_with_config(config),
+            QemuParams::Cli(cli) => Self::init(cli.as_ref()),
+        }
+    }
+
+    pub fn init_with_config(config: &QemuConfig) -> Result<Self, QemuInitError> {
+        let qemu_args: Vec<String> = config.into();
+
+        QEMU_CONFIG
+            .set(config.clone())
+            .map_err(|_| unreachable!("BUG: QEMU_CONFIG was already set but Qemu was not init!"))?;
+
+        Self::init(qemu_args.as_ref())
     }
 
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
