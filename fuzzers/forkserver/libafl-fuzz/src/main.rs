@@ -321,7 +321,8 @@ struct Opt {
     /// use binary-only instrumentation (QEMU mode)
     #[arg(short = 'Q')]
     qemu_mode: bool,
-    #[cfg(target_os = "linux")]
+    /// Nyx mode (Note: unlike AFL++, you do not need to specify -Y for parallel nyx fuzzing)
+    #[cfg(feature = "nyx")]
     #[arg(short = 'X')]
     nyx_mode: bool,
     /// use unicorn-based instrumentation (Unicorn mode)
