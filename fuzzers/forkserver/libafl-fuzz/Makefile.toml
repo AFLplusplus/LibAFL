@@ -69,6 +69,9 @@ dependencies = [
   "test_frida",
   "test_qemu",
   "test_unicorn_mode",
+  # nyx
+  # since we cannot test nyx mode on CI, let's build it
+  "build_nyx_mode",
   # fuzzbench
   "test_instr_fuzzbench",
 ]
@@ -294,6 +297,11 @@ test -n "$( ls ./test/output-nyx/fuzzer_main/queue/id:000003* 2>/dev/null )" || 
 }
 '''
 dependencies = ["build_afl", "build_libafl_fuzz"]
+
+# since we cannot test nyx mode on CI, let's build it
+[tasks.build_nyx_mode]
+script_runner = "@shell"
+script = "cargo build --profile ${PROFILE} --features nyx"
 
 [tasks.clean]
 linux_alias = "clean_unix"

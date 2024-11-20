@@ -31,9 +31,12 @@ memmap2 = "0.9.4"
 nix = { version = "0.29.0", features = ["fs"] }
 regex = "1.10.5"
 serde = { version = "1.0.117", features = ["derive"] }
-libafl_nyx = { path = "../../../libafl_nyx" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libafl_nyx = { path = "../../../libafl_nyx", optional = true }
 
 [features]
 default = ["track_hit_feedbacks"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 fuzzbench = []
+nyx = ["dep:libafl_nyx"]
