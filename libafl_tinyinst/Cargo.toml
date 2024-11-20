@@ -21,11 +21,11 @@ description = "TinyInst backend for libafl"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.14.1", features = [
+libafl = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.14.1", features = [
+libafl_bolts = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",
 ] }

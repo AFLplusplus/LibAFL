@@ -125,19 +125,19 @@ impl FuzzerOptions {
     pub fn is_asan_core(&self, core_id: CoreId) -> bool {
         self.asan_cores
             .as_ref()
-            .map_or(false, |c| c.contains(core_id))
+            .is_some_and(|c| c.contains(core_id))
     }
 
     pub fn is_asan_guest_core(&self, core_id: CoreId) -> bool {
         self.asan_guest_cores
             .as_ref()
-            .map_or(false, |c| c.contains(core_id))
+            .is_some_and(|c| c.contains(core_id))
     }
 
     pub fn is_cmplog_core(&self, core_id: CoreId) -> bool {
         self.cmplog_cores
             .as_ref()
-            .map_or(false, |c| c.contains(core_id))
+            .is_some_and(|c| c.contains(core_id))
     }
 
     pub fn input_dir(&self) -> PathBuf {

@@ -20,8 +20,8 @@ categories = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
+libafl = { workspace = true, default-features = true }
+libafl_bolts = { workspace = true, default-features = true }
 clap = { workspace = true, features = ["derive"] }
 
 [lints]

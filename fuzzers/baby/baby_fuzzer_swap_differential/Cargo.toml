@@ -6,7 +6,7 @@ edition = "2021"
 default-run = "fuzzer_sd"
 
 [features]
-tui = []
+tui = ["libafl/tui_monitor"]
 multimap = []
 
 [profile.dev]

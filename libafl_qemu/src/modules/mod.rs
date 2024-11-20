@@ -40,7 +40,7 @@ pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
 pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 
-use crate::{emu::EmulatorModules, Qemu};
+use crate::{emu::EmulatorModules, EmulatorHooks, Qemu};
 
 /// A module for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -55,10 +55,19 @@ where
 
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
-    /// Initialize the module, mostly used to install some hooks early.
+    /// Hook run **before** QEMU is initialized.
     /// This is always run when Emulator gets initialized, in any case.
-    /// Install here hooks that should be alive for the whole execution of the VM.
-    fn init_module<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    /// Install here hooks that should be alive for the whole execution of the VM, even before QEMU gets initialized.
+    fn pre_qemu_init<ET>(&self, _emulator_hooks: &mut EmulatorHooks<ET, S>)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+    }
+
+    /// Hook run **after** QEMU is initialized.
+    /// This is always run when Emulator gets initialized, in any case.
+    /// Install here hooks that should be alive for the whole execution of the VM, after QEMU gets initialized.
+    fn post_qemu_init<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -137,7 +146,11 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
-    fn init_modules_all<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn pre_qemu_init_all<ET>(&self, _emulator_hooks: &mut EmulatorHooks<ET, S>)
+    where
+        ET: EmulatorModuleTuple<S>;
+
+    fn post_qemu_init_all<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>;
 
@@ -186,7 +199,13 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_modules_all<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn pre_qemu_init_all<ET>(&self, _emulator_hooks: &mut EmulatorHooks<ET, S>)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+    }
+
+    fn post_qemu_init_all<ET>(&self, _emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -239,12 +258,20 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 
-    fn init_modules_all<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn pre_qemu_init_all<ET>(&self, emulator_hooks: &mut EmulatorHooks<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
-        self.0.init_module(emulator_modules);
-        self.1.init_modules_all(emulator_modules);
+        self.0.pre_qemu_init(emulator_hooks);
+        self.1.pre_qemu_init_all(emulator_hooks);
+    }
+
+    fn post_qemu_init_all<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+        self.0.post_qemu_init(emulator_modules);
+        self.1.post_qemu_init_all(emulator_modules);
     }
 
     fn first_exec_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, state: &mut S)

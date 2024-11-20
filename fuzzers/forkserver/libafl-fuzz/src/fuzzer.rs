@@ -500,11 +500,11 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
             if testcase.scheduled_count() == 1
-                || (opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
+                && !(opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
             {
-                return Ok(false);
+                return Ok(true);
             }
-            Ok(true)
+            Ok(false)
         };
         let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
 

@@ -21,17 +21,17 @@ categories = [
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libnyx = { git = "https://github.com/nyx-fuzz/libnyx.git", rev = "ea6ceb994ab975b81aea0daaf64b92a3066c1e8d" }
-libafl = { path = "../libafl", version = "0.14.1", features = [
+libafl = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",
   "frida_cli",
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.14.1", features = [
+libafl_bolts = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",
   "frida_cli",
 ] }
-libafl_targets = { path = "../libafl_targets", version = "0.14.1", features = [
+libafl_targets = { workspace = true, default-features = true, features = [
   "std",
   "sancov_cmplog",
 ] }

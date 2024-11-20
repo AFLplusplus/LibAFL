@@ -30,7 +30,7 @@ proc-maps = "0.4.0"
 [dependencies]
 arbitrary-int = { workspace = true }
 bitbybit = { workspace = true }
-libafl_bolts = { version = "0.14.1", path = "../libafl_bolts", default-features = false }
+libafl_bolts = { workspace = true }
 libc = { workspace = true }
 libipt = { workspace = true, optional = true }
 log = { workspace = true }
