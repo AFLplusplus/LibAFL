@@ -54,6 +54,7 @@ use libafl_bolts::{
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
+#[cfg(feature = "nyx")]
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
 use serde::{Deserialize, Serialize};
@@ -125,7 +126,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     let shmem_buf = shmem.as_slice_mut();
 
     // If we are in Nyx Mode, we need to use a different map observer.
-    #[cfg(target_os = "linux")]
+    #[cfg(feature = "nyx")]
     let (nyx_helper, edges_observer) = {
         if opt.nyx_mode {
             // main node is the first core id in CentralizedLauncher
@@ -152,7 +153,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
             (None, observer)
         }
     };
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(feature = "nyx"))]
     let edges_observer = { unsafe { StdMapObserver::new("edges", shmem_buf) } };
 
     let edges_observer = HitcountsMapObserver::new(edges_observer).track_indices();
@@ -319,7 +320,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         std::env::set_var("LD_PRELOAD", &preload);
         std::env::set_var("DYLD_INSERT_LIBRARIES", &preload);
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(feature = "nyx")]
     let mut executor = {
         if opt.nyx_mode {
             SupportedExecutors::Nyx(NyxExecutor::builder().build(
@@ -349,8 +350,8 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
             )
         }
     };
-    #[cfg(not(target_os = "linux"))]
-    let executor = {
+    #[cfg(not(feature = "nyx"))]
+    let mut executor = {
         // Create the base Executor
         let mut executor_builder = base_forkserver_builder(opt, &mut shmem_provider, fuzzer_dir);
         // Set a custom exit code to be interpreted as a Crash if configured.
