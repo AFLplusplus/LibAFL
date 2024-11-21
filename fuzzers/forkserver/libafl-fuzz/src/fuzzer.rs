@@ -40,7 +40,7 @@ use libafl::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
         UsesState,
     },
-    Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
+    Error, Fuzzer, HasFeedback, HasMetadata,
 };
 #[cfg(not(feature = "fuzzbench"))]
 use libafl_bolts::shmem::StdShMemProvider;
@@ -48,6 +48,7 @@ use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos, current_time,
     fs::get_unique_std_input_file,
+    impl_serdeany,
     ownedref::OwnedRefMut,
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
@@ -644,8 +645,10 @@ pub fn fuzzer_target_mode(opt: &Opt) -> Cow<'static, str> {
     Cow::Owned(res)
 }
 
-#[derive(Debug, Serialize, Deserialize, SerdeAny)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IsInitialCorpusEntryMetadata {}
+
+impl_serdeany!(IsInitialCorpusEntryMetadata);
 
 pub fn run_fuzzer_with_stages<Z, ST, E, EM>(
     opt: &Opt,
