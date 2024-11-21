@@ -242,7 +242,7 @@ impl TimerStruct {
     #[cfg(target_os = "linux")]
     #[must_use]
     /// Constructor but use batch mode
-    /// Timeout mechanism with imprecise timing.
+    /// More efficient timeout mechanism with imprecise timing.
     ///
     /// The timeout will trigger after t seconds and at most within 2*t seconds.
     /// This means the actual timeout may occur anywhere in the range [t, 2*t],
