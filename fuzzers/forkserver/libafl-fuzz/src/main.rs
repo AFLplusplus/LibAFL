@@ -88,8 +88,8 @@ use libafl::events::{CentralizedLauncher, EventConfig};
 use libafl::monitors::MultiMonitor;
 #[cfg(feature = "fuzzbench")]
 use libafl::monitors::SimpleMonitor;
-use libafl::{schedulers::powersched::BaseSchedule, Error};
-use libafl_bolts::core_affinity::{CoreId, Cores};
+use libafl::{events::ClientDescription, schedulers::powersched::BaseSchedule, Error};
+use libafl_bolts::core_affinity::Cores;
 #[cfg(not(feature = "fuzzbench"))]
 use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use nix::sys::signal::Signal;

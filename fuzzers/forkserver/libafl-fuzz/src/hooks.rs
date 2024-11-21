@@ -3,7 +3,7 @@ use libafl::{
     state::{State, Stoppable},
     Error,
 };
-use libafl_bolts::ClientDescription;
+use libafl_bolts::ClientId;
 
 #[derive(Clone, Copy)]
 pub struct LibAflFuzzEventHook {
@@ -17,7 +17,7 @@ where
     fn pre_exec(
         &mut self,
         state: &mut S,
-        _client_id: ClientDescription,
+        _client_id: ClientId,
         event: &Event<S::Input>,
     ) -> Result<bool, Error> {
         if self.exit_on_solution && matches!(event, Event::Objective { .. }) {
@@ -26,7 +26,7 @@ where
         }
         Ok(true)
     }
-    fn post_exec(&mut self, _state: &mut S, _client_id: ClientDescription) -> Result<bool, Error> {
+    fn post_exec(&mut self, _state: &mut S, _client_id: ClientId) -> Result<bool, Error> {
         Ok(true)
     }
 }
