@@ -62,9 +62,9 @@ impl Client<'_> {
         &self,
         state: Option<ClientState>,
         mgr: ClientMgr<M>,
-        client_id: ClientDescription,
+        client_description: ClientDescription,
     ) -> Result<(), Error> {
-        let core_id = client_id.core_id();
+        let core_id = client_description.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);
         log::debug!("ARGS: {:#?}", args);
@@ -125,7 +125,7 @@ impl Client<'_> {
             .qemu(qemu)
             .harness(harness)
             .mgr(mgr)
-            .client_id(client_id)
+            .client_description(client_description)
             .extra_tokens(extra_tokens);
 
         if self.options.rerun_input.is_some() && self.options.drcov.is_some() {

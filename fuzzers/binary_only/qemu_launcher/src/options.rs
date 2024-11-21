@@ -144,20 +144,20 @@ impl FuzzerOptions {
         PathBuf::from(&self.input)
     }
 
-    pub fn output_dir(&self, client_id: ClientDescription) -> PathBuf {
+    pub fn output_dir(&self, client_description: ClientDescription) -> PathBuf {
         let mut dir = PathBuf::from(&self.output);
-        dir.push(format!("client_{:03}", client_id.id()));
+        dir.push(format!("client_{:03}", client_description.id()));
         dir
     }
 
-    pub fn queue_dir(&self, client_id: ClientDescription) -> PathBuf {
-        let mut dir = self.output_dir(client_id).clone();
+    pub fn queue_dir(&self, client_description: ClientDescription) -> PathBuf {
+        let mut dir = self.output_dir(client_description).clone();
         dir.push("queue");
         dir
     }
 
-    pub fn crashes_dir(&self, client_id: ClientDescription) -> PathBuf {
-        let mut dir = self.output_dir(client_id).clone();
+    pub fn crashes_dir(&self, client_description: ClientDescription) -> PathBuf {
+        let mut dir = self.output_dir(client_description).clone();
         dir.push("crashes");
         dir
     }

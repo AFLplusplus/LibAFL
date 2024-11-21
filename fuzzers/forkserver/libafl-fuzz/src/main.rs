@@ -141,30 +141,48 @@ fn main() {
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .main_run_client(|state: Option<_>, mgr: _, client_id: ClientDescription| {
-            println!(
-                "run primary client with id {} on core {}",
-                client_id.id(),
-                client_id.core_id().0
-            );
-            let fuzzer_dir = opt.output_dir.join("fuzzer_main");
-            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            let res = run_client(state, mgr, &fuzzer_dir, client_id.core_id(), &opt, true);
-            let _ = remove_main_node_file(&fuzzer_dir);
-            res
-        })
-        .secondary_run_client(|state: Option<_>, mgr: _, client_id: ClientDescription| {
-            println!(
-                "run secondary client with id {} on core {}",
-                client_id.id(),
-                client_id.core_id().0
-            );
-            let fuzzer_dir = opt
-                .output_dir
-                .join(format!("fuzzer_secondary_{}", client_id.id()));
-            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            run_client(state, mgr, &fuzzer_dir, client_id.core_id(), &opt, false)
-        })
+        .main_run_client(
+            |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                println!(
+                    "run primary client with id {} on core {}",
+                    client_description.id(),
+                    client_description.core_id().0
+                );
+                let fuzzer_dir = opt.output_dir.join("fuzzer_main");
+                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                let res = run_client(
+                    state,
+                    mgr,
+                    &fuzzer_dir,
+                    client_description.core_id(),
+                    &opt,
+                    true,
+                );
+                let _ = remove_main_node_file(&fuzzer_dir);
+                res
+            },
+        )
+        .secondary_run_client(
+            |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                println!(
+                    "run secondary client with id {} on core {}",
+                    client_description.id(),
+                    client_description.core_id().0
+                );
+                let fuzzer_dir = opt
+                    .output_dir
+                    .join(format!("fuzzer_secondary_{}", client_description.id()));
+                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                run_client(
+                    state,
+                    mgr,
+                    &fuzzer_dir,
+                    client_description.core_id(),
+                    &opt,
+                    false,
+                )
+            },
+        )
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
         .build()

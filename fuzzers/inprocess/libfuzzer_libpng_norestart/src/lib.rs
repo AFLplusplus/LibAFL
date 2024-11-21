@@ -163,7 +163,7 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client = |state: Option<_>,
                           mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
-                          client_id: ClientDescription| {
+                          client_description: ClientDescription| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
@@ -260,7 +260,7 @@ pub extern "C" fn libafl_main() {
                     &mut executor,
                     &mut restarting_mgr,
                     &opt.input,
-                    &client_id.core_id(),
+                    &client_description.core_id(),
                     &cores,
                 )
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));

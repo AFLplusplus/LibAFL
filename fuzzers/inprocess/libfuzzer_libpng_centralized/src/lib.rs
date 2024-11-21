@@ -142,7 +142,7 @@ pub extern "C" fn libafl_main() {
     let mut secondary_run_client =
         |state: Option<_>,
          mut mgr: CentralizedEventManager<_, _, _, _>,
-         _client_id: ClientDescription| {
+         _client_description: ClientDescription| {
             // Create an observation channel using the coverage map
             let edges_observer =
                 HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") })

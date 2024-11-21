@@ -31,10 +31,12 @@ fn main() {
     let parent_cpu_id = cores.ids.first().expect("unable to get first core id");
 
     // region: fuzzer start function
-    let mut run_client = |state: Option<_>, mut restarting_mgr, client_id: ClientDescription| {
+    let mut run_client = |state: Option<_>,
+                          mut restarting_mgr,
+                          client_description: ClientDescription| {
         // nyx stuff
         let settings = NyxSettings::builder()
-            .cpu_id(client_id.core_id().0)
+            .cpu_id(client_description.core_id().0)
             .parent_cpu_id(Some(parent_cpu_id.0))
             .build();
         let helper = NyxHelper::new("/tmp/nyx_libxml2/", settings).unwrap();

@@ -97,13 +97,15 @@ unsafe fn fuzz(
 
     let mut run_client = |state: Option<_>,
                           mgr: LlmpRestartingEventManager<_, _, _>,
-                          client_id: ClientDescription| {
+                          client_description: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         // println!("{:?}", mgr.mgr_id());
 
-        if options.asan && options.asan_cores.contains(client_id.core_id()) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _client_id| {
+        if options.asan && options.asan_cores.contains(client_description.core_id()) {
+            (|state: Option<_>,
+              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              _client_description| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -226,9 +228,11 @@ unsafe fn fuzz(
                 fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
                 Ok(())
-            })(state, mgr, client_id)
-        } else if options.cmplog && options.cmplog_cores.contains(client_id.core_id()) {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _client_id| {
+            })(state, mgr, client_description)
+        } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
+            (|state: Option<_>,
+              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              _client_description| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -360,9 +364,11 @@ unsafe fn fuzz(
                 fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
                 Ok(())
-            })(state, mgr, client_id)
+            })(state, mgr, client_description)
         } else {
-            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _client_id| {
+            (|state: Option<_>,
+              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              _client_description| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -477,7 +483,7 @@ unsafe fn fuzz(
                 fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
                 Ok(())
-            })(state, mgr, client_id)
+            })(state, mgr, client_description)
         }
     };
 

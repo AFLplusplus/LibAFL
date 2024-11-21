@@ -146,7 +146,7 @@ pub extern "C" fn libafl_main() {
         MultiMonitor::new(|s| println!("{s}")),
     );
 
-    let mut run_client = |state: Option<_>, mut restarting_mgr, _client_id| {
+    let mut run_client = |state: Option<_>, mut restarting_mgr, _client_description| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();

@@ -80,7 +80,7 @@ pub fn fuzz() {
         .expect("Symbol or env BREAKPOINT not found");
     println!("Breakpoint address = {breakpoint:#x}");
 
-    let mut run_client = |state: Option<_>, mut mgr, _client_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
         let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
 
         // Create an observation channel using the coverage map

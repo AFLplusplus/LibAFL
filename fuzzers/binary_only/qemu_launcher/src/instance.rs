@@ -65,7 +65,7 @@ pub struct Instance<'a, M: Monitor> {
     harness: Option<Harness>,
     qemu: Qemu,
     mgr: ClientMgr<M>,
-    client_id: ClientDescription,
+    client_description: ClientDescription,
     #[builder(default)]
     extra_tokens: Vec<String>,
     #[builder(default=PhantomData)]
@@ -160,10 +160,12 @@ impl<M: Monitor> Instance<'_, M> {
                     // RNG
                     StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
-                    InMemoryOnDiskCorpus::no_meta(self.options.queue_dir(self.client_id.clone()))?,
+                    InMemoryOnDiskCorpus::no_meta(
+                        self.options.queue_dir(self.client_description.clone()),
+                    )?,
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
-                    OnDiskCorpus::new(self.options.crashes_dir(self.client_id.clone()))?,
+                    OnDiskCorpus::new(self.options.crashes_dir(self.client_description.clone()))?,
                     // States of the feedbacks.
                     // The feedbacks can report the data that should persist in the State.
                     &mut feedback,
@@ -237,7 +239,10 @@ impl<M: Monitor> Instance<'_, M> {
             process::exit(0);
         }
 
-        if self.options.is_cmplog_core(self.client_id.core_id()) {
+        if self
+            .options
+            .is_cmplog_core(self.client_description.core_id())
+        {
             // Create a QEMU in-process executor
             let executor = QemuExecutor::new(
                 emulator,
