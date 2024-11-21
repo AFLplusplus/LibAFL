@@ -464,7 +464,7 @@ where
                             ));
 
                             let client_description = ClientDescription::new(
-                                (core_i * self.overcommit + overcommit_i),
+                                core_i * self.overcommit + overcommit_i,
                                 overcommit_i,
                                 CoreId(core_i),
                             );
