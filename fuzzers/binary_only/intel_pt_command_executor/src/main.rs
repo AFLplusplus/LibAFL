@@ -39,6 +39,8 @@ pub fn main() {
     let target_path = PathBuf::from(env::args().next().unwrap())
         .parent()
         .unwrap()
+        .parent()
+        .unwrap()
         .join("target_program");
 
     // We'll run the target on cpu (aka core) 0

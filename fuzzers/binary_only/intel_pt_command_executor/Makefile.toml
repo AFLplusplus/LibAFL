@@ -1,3 +1,6 @@
+[env]
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+
 [env.development]
 PROFILE_DIR = "debug"
 
@@ -14,12 +17,7 @@ mkdir -p ${TARGET_DIR}
 [tasks.build_target]
 dependencies = ["target_dir"]
 command = "rustc"
-args = [
-  "src/target_program.rs",
-  "--out-dir",
-  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}",
-  "-O",
-]
+args = ["src/target_program.rs", "--out-dir", "${TARGET_DIR}", "-O"]
 
 [tasks.build_fuzzer]
 command = "cargo"
