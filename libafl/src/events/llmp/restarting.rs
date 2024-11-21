@@ -528,9 +528,7 @@ where
                     broker_things(broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
-                ManagerKind::Client {
-                    client_description: client_id,
-                } => {
+                ManagerKind::Client { client_description } => {
                     // We are a client
                     let mgr = LlmpEventManager::builder()
                         .always_interesting(self.always_interesting)
@@ -542,7 +540,7 @@ where
                             self.time_ref.clone(),
                         )?;
 
-                    (mgr, Some(client_id.core_id()))
+                    (mgr, Some(client_description.core_id()))
                 }
             };
 
