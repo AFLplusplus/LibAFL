@@ -69,25 +69,28 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[cfg(all(feature = "fork", unix))]
 const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
 
-/// The Id of this fuzzing client.
-///
-/// Not to be confused with the LLMP Id. May contain the [`CoreId`] this client is bound to.
+/// Information about this client from the launcher
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClientId {
-    id: u64,
+pub struct ClientDescription {
+    id: usize,
+    overcommit_id: usize,
     core_id: CoreId,
 }
 
-impl ClientId {
+impl ClientDescription {
     /// Create a [`ClientId`]
     #[must_use]
-    pub fn new(id: u64, core_id: CoreId) -> Self {
-        Self { id, core_id }
+    pub fn new(id: usize, overcommit_id: usize, core_id: CoreId) -> Self {
+        Self {
+            id,
+            overcommit_id,
+            core_id,
+        }
     }
 
-    /// Id of this fuzzing client
+    /// Id unique to all clients spawned by this launcher
     #[must_use]
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> usize {
         self.id
     }
 
@@ -97,10 +100,16 @@ impl ClientId {
         self.core_id
     }
 
+    /// Incremental id unique for all clients on the same core
+    #[must_use]
+    pub fn overcommit_id(&self) -> usize {
+        self.overcommit_id
+    }
+
     /// Create a string representation safe for environment variables
     #[must_use]
     pub fn to_safe_string(&self) -> String {
-        format!("{}_{}", self.id, self.core_id.0)
+        format!("{}_{}_{}", self.id, self.overcommit_id, self.core_id.0)
     }
 
     /// Parse the string created by [`Self::to_safe_string`].
@@ -108,8 +117,13 @@ impl ClientId {
     pub fn from_safe_string(input: &str) -> Self {
         let mut iter = input.split('_');
         let id = iter.next().unwrap().parse().unwrap();
+        let overcommit_id = iter.next().unwrap().parse().unwrap();
         let core_id = iter.next().unwrap().parse::<usize>().unwrap().into();
-        Self { id, core_id }
+        Self {
+            id,
+            overcommit_id,
+            core_id,
+        }
     }
 }
 
@@ -203,7 +217,11 @@ where
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
         S: State + HasExecutions,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, ClientId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            LlmpRestartingEventManager<(), S, SP>,
+            ClientDescription,
+        ) -> Result<(), Error>,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
@@ -223,7 +241,7 @@ where
         CF: FnOnce(
             Option<S>,
             LlmpRestartingEventManager<EMH, S, SP>,
-            ClientId,
+            ClientDescription,
         ) -> Result<(), Error>,
     {
         if self.cores.ids.is_empty() {
@@ -253,10 +271,10 @@ where
         let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn clients
-        let mut index = 0_u64;
+        let mut index = 0_usize;
         for (id, bind_to) in core_ids.iter().enumerate() {
             if self.cores.ids.iter().any(|&x| x == id.into()) {
-                for _ in 0..self.overcommit {
+                for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
                     // # Safety
@@ -273,7 +291,9 @@ where
                             log::info!("{:?} PostFork", unsafe { libc::getpid() });
                             self.shmem_provider.post_fork(true)?;
 
-                            std::thread::sleep(Duration::from_millis(index * self.launch_delay));
+                            std::thread::sleep(Duration::from_millis(
+                                index as u64 * self.launch_delay,
+                            ));
 
                             if !debug_output {
                                 if let Some(file) = &self.opened_stdout_file {
@@ -286,7 +306,7 @@ where
                                 }
                             }
 
-                            let client_id = ClientId::new(index, *bind_to);
+                            let client_id = ClientDescription::new(index, overcommit_id, *bind_to);
 
                             // Fuzzer client. keeps retrying the connection to broker till the broker starts
                             let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
@@ -361,7 +381,7 @@ where
         CF: FnOnce(
             Option<S>,
             LlmpRestartingEventManager<EMH, S, SP>,
-            ClientId,
+            ClientDescription,
         ) -> Result<(), Error>,
     {
         use libafl_bolts::core_affinity;
@@ -370,7 +390,7 @@ where
 
         let mut handles = match is_client {
             Ok(core_conf) => {
-                let client_id = ClientId::from_safe_string(&core_conf);
+                let client_id = ClientDescription::from_safe_string(&core_conf);
                 // the actual client. do the fuzzing
 
                 let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
@@ -438,8 +458,9 @@ where
                                 core_i as u64 * self.launch_delay,
                             ));
 
-                            let client_id = ClientId::new(
+                            let client_id = ClientDescription::new(
                                 (core_i * self.overcommit + overcommit_i) as u64,
+                                overcommit_i,
                                 CoreId(core_i),
                             );
                             std::env::set_var(_AFL_LAUNCHER_CLIENT, client_id.to_safe_string());
@@ -608,15 +629,15 @@ where
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
-            ClientId,
+            ClientDescription,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
             CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
-            ClientId,
+            ClientDescription,
         ) -> Result<(), Error>,
     {
-        let restarting_mgr_builder = |centralized_launcher: &Self, client_id: ClientId| {
+        let restarting_mgr_builder = |centralized_launcher: &Self, client_id: ClientDescription| {
             // Fuzzer client. keeps retrying the connection to broker till the broker starts
             let builder = RestartingMgr::<(), MT, S, SP>::builder()
                 .always_interesting(centralized_launcher.always_interesting)
@@ -656,14 +677,14 @@ where
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, (), S, SP>,
-            ClientId,
+            ClientDescription,
         ) -> Result<(), Error>,
         EM: UsesState<State = S>,
-        EMB: FnOnce(&Self, ClientId) -> Result<(Option<S>, EM), Error>,
+        EMB: FnOnce(&Self, ClientDescription) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, (), S, SP>, // No broker_hooks for centralized EM
-            ClientId,
+            ClientDescription,
         ) -> Result<(), Error>,
         <<EM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
     {
@@ -697,10 +718,10 @@ where
         let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn clients
-        let mut index = 0_u64;
+        let mut index = 0_usize;
         for (id, bind_to) in core_ids.iter().enumerate() {
             if self.cores.ids.iter().any(|&x| x == id.into()) {
-                for _ in 0..self.overcommit {
+                for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
@@ -715,7 +736,9 @@ where
                             log::info!("{:?} PostFork", unsafe { libc::getpid() });
                             self.shmem_provider.post_fork(true)?;
 
-                            std::thread::sleep(Duration::from_millis(index * self.launch_delay));
+                            std::thread::sleep(Duration::from_millis(
+                                index as u64 * self.launch_delay,
+                            ));
 
                             if !debug_output {
                                 if let Some(file) = &self.opened_stdout_file {
@@ -728,7 +751,7 @@ where
                                 }
                             }
 
-                            let client_id = ClientId::new(index, *bind_to);
+                            let client_id = ClientDescription::new(index, overcommit_id, *bind_to);
 
                             if index == 1 {
                                 // Main client

@@ -10,7 +10,7 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
-    events::{ClientId, LlmpEventManager, LlmpRestartingEventManager},
+    events::{ClientDescription, LlmpEventManager, LlmpRestartingEventManager},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
@@ -124,7 +124,7 @@ impl Fuzzer {
                         .unwrap(),
                     StateRestorer::new(shmem_provider.new_shmem(0x1000).unwrap()),
                 )),
-                ClientId::new(0, CoreId(0)),
+                ClientDescription::new(0, 0, CoreId(0)),
             );
         }
 

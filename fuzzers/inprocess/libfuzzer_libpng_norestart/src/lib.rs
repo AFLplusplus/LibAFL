@@ -10,7 +10,7 @@ use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        launcher::{ClientId, Launcher},
+        launcher::{ClientDescription, Launcher},
         llmp::LlmpShouldSaveState,
         EventConfig, EventRestarter, LlmpRestartingEventManager,
     },
@@ -163,7 +163,7 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client = |state: Option<_>,
                           mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
-                          client_id: ClientId| {
+                          client_id: ClientDescription| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();

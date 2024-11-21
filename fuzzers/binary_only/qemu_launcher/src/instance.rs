@@ -7,7 +7,7 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{ClientId, EventRestarter, NopEventManager},
+    events::{ClientDescription, EventRestarter, NopEventManager},
     executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -65,7 +65,7 @@ pub struct Instance<'a, M: Monitor> {
     harness: Option<Harness>,
     qemu: Qemu,
     mgr: ClientMgr<M>,
-    client_id: ClientId,
+    client_id: ClientDescription,
     #[builder(default)]
     extra_tokens: Vec<String>,
     #[builder(default=PhantomData)]

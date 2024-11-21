@@ -2,7 +2,7 @@ use core::time::Duration;
 use std::{env, ops::Range, path::PathBuf};
 
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use libafl::{events::ClientId, Error};
+use libafl::{events::ClientDescription, Error};
 use libafl_bolts::core_affinity::{CoreId, Cores};
 use libafl_qemu::GuestAddr;
 
@@ -144,19 +144,19 @@ impl FuzzerOptions {
         PathBuf::from(&self.input)
     }
 
-    pub fn output_dir(&self, client_id: ClientId) -> PathBuf {
+    pub fn output_dir(&self, client_id: ClientDescription) -> PathBuf {
         let mut dir = PathBuf::from(&self.output);
         dir.push(format!("client_{:03}", client_id.id()));
         dir
     }
 
-    pub fn queue_dir(&self, client_id: ClientId) -> PathBuf {
+    pub fn queue_dir(&self, client_id: ClientDescription) -> PathBuf {
         let mut dir = self.output_dir(client_id).clone();
         dir.push("queue");
         dir
     }
 
-    pub fn crashes_dir(&self, client_id: ClientId) -> PathBuf {
+    pub fn crashes_dir(&self, client_id: ClientDescription) -> PathBuf {
         let mut dir = self.output_dir(client_id).clone();
         dir.push("crashes");
         dir

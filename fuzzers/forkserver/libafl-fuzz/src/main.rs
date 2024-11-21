@@ -79,7 +79,7 @@ mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
 use libafl::{
-    events::{launcher::ClientId, CentralizedLauncher, EventConfig},
+    events::{launcher::ClientDescription, CentralizedLauncher, EventConfig},
     monitors::MultiMonitor,
     schedulers::powersched::BaseSchedule,
     Error,
@@ -130,7 +130,7 @@ fn main() {
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .main_run_client(|state: Option<_>, mgr: _, client_id: ClientId| {
+        .main_run_client(|state: Option<_>, mgr: _, client_id: ClientDescription| {
             println!(
                 "run primary client with id {} on core {}",
                 client_id.id(),
@@ -142,7 +142,7 @@ fn main() {
             let _ = remove_main_node_file(&fuzzer_dir);
             res
         })
-        .secondary_run_client(|state: Option<_>, mgr: _, client_id: ClientId| {
+        .secondary_run_client(|state: Option<_>, mgr: _, client_id: ClientDescription| {
             println!(
                 "run secondary client with id {} on core {}",
                 client_id.id(),

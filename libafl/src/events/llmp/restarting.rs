@@ -39,9 +39,9 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::events::{AdaptiveSerializer, CustomBufEventResult, HasCustomBufHandlers};
 use crate::{
     events::{
-        launcher::ClientId, Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple,
-        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager,
-        LlmpShouldSaveState, ProgressReporter, StdLlmpEventHook,
+        launcher::ClientDescription, Event, EventConfig, EventFirer, EventManager,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        LlmpEventManager, LlmpShouldSaveState, ProgressReporter, StdLlmpEventHook,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -329,7 +329,7 @@ pub enum ManagerKind {
     /// A client, getting messages from a local broker.
     Client {
         /// The client id
-        client_id: ClientId,
+        client_id: ClientDescription,
     },
     /// An [`LlmpBroker`], forwarding the packets of local clients.
     Broker,

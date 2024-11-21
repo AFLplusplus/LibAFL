@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
-    events::{launcher::Launcher, ClientId, EventConfig},
+    events::{launcher::Launcher, ClientDescription, EventConfig},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
     monitors::MultiMonitor,
@@ -31,7 +31,7 @@ fn main() {
     let parent_cpu_id = cores.ids.first().expect("unable to get first core id");
 
     // region: fuzzer start function
-    let mut run_client = |state: Option<_>, mut restarting_mgr, client_id: ClientId| {
+    let mut run_client = |state: Option<_>, mut restarting_mgr, client_id: ClientDescription| {
         // nyx stuff
         let settings = NyxSettings::builder()
             .cpu_id(client_id.core_id().0)

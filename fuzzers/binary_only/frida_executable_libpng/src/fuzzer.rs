@@ -5,7 +5,9 @@ use std::{path::PathBuf, ptr::null};
 use frida_gum::Gum;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{launcher::Launcher, llmp::LlmpRestartingEventManager, ClientId, EventConfig},
+    events::{
+        launcher::Launcher, llmp::LlmpRestartingEventManager, ClientDescription, EventConfig,
+    },
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -95,7 +97,7 @@ unsafe fn fuzz(
 
     let mut run_client = |state: Option<_>,
                           mgr: LlmpRestartingEventManager<_, _, _>,
-                          client_id: ClientId| {
+                          client_id: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         // println!("{:?}", mgr.mgr_id());

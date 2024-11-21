@@ -2,7 +2,7 @@ use std::env;
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::ClientId,
+    events::ClientDescription,
     inputs::BytesInput,
     monitors::Monitor,
     state::StdState,
@@ -62,7 +62,7 @@ impl Client<'_> {
         &self,
         state: Option<ClientState>,
         mgr: ClientMgr<M>,
-        client_id: ClientId,
+        client_id: ClientDescription,
     ) -> Result<(), Error> {
         let core_id = client_id.core_id();
         let mut args = self.args()?;
