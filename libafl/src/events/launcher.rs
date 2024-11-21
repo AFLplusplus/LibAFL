@@ -78,7 +78,7 @@ pub struct ClientDescription {
 }
 
 impl ClientDescription {
-    /// Create a [`ClientId`]
+    /// Create a [`ClientDescription`]
     #[must_use]
     pub fn new(id: usize, overcommit_id: usize, core_id: CoreId) -> Self {
         Self {
@@ -306,14 +306,15 @@ where
                                 }
                             }
 
-                            let client_id = ClientDescription::new(index, overcommit_id, *bind_to);
+                            let client_description =
+                                ClientDescription::new(index, overcommit_id, *bind_to);
 
                             // Fuzzer client. keeps retrying the connection to broker till the broker starts
                             let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                                 .shmem_provider(self.shmem_provider.clone())
                                 .broker_port(self.broker_port)
                                 .kind(ManagerKind::Client {
-                                    client_id: client_id.clone(),
+                                    client_description: client_description.clone(),
                                 })
                                 .configuration(self.configuration)
                                 .serialize_state(self.serialize_state)
@@ -321,7 +322,11 @@ where
                             let builder = builder.time_ref(self.time_ref.clone());
                             let (state, mgr) = builder.build().launch()?;
 
-                            return (self.run_client.take().unwrap())(state, mgr, client_id);
+                            return (self.run_client.take().unwrap())(
+                                state,
+                                mgr,
+                                client_description,
+                            );
                         }
                     };
                 }
@@ -390,14 +395,14 @@ where
 
         let mut handles = match is_client {
             Ok(core_conf) => {
-                let client_id = ClientDescription::from_safe_string(&core_conf);
+                let client_description = ClientDescription::from_safe_string(&core_conf);
                 // the actual client. do the fuzzing
 
                 let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
-                        client_id: client_id.clone(),
+                        client_description: client_description.clone(),
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
@@ -407,7 +412,7 @@ where
 
                 let (state, mgr) = builder.build().launch()?;
 
-                return (self.run_client.take().unwrap())(state, mgr, client_id);
+                return (self.run_client.take().unwrap())(state, mgr, client_description);
             }
             Err(std::env::VarError::NotPresent) => {
                 // I am a broker
@@ -458,12 +463,15 @@ where
                                 core_i as u64 * self.launch_delay,
                             ));
 
-                            let client_id = ClientDescription::new(
+                            let client_description = ClientDescription::new(
                                 (core_i * self.overcommit + overcommit_i),
                                 overcommit_i,
                                 CoreId(core_i),
                             );
-                            std::env::set_var(_AFL_LAUNCHER_CLIENT, client_id.to_safe_string());
+                            std::env::set_var(
+                                _AFL_LAUNCHER_CLIENT,
+                                client_description.to_safe_string(),
+                            );
                             let mut child = startable_self()?;
                             let child = (if debug_output {
                                 &mut child
@@ -637,21 +645,22 @@ where
             ClientDescription,
         ) -> Result<(), Error>,
     {
-        let restarting_mgr_builder = |centralized_launcher: &Self, client_id: ClientDescription| {
-            // Fuzzer client. keeps retrying the connection to broker till the broker starts
-            let builder = RestartingMgr::<(), MT, S, SP>::builder()
-                .always_interesting(centralized_launcher.always_interesting)
-                .shmem_provider(centralized_launcher.shmem_provider.clone())
-                .broker_port(centralized_launcher.broker_port)
-                .kind(ManagerKind::Client { client_id })
-                .configuration(centralized_launcher.configuration)
-                .serialize_state(centralized_launcher.serialize_state)
-                .hooks(tuple_list!());
+        let restarting_mgr_builder =
+            |centralized_launcher: &Self, client_description: ClientDescription| {
+                // Fuzzer client. keeps retrying the connection to broker till the broker starts
+                let builder = RestartingMgr::<(), MT, S, SP>::builder()
+                    .always_interesting(centralized_launcher.always_interesting)
+                    .shmem_provider(centralized_launcher.shmem_provider.clone())
+                    .broker_port(centralized_launcher.broker_port)
+                    .kind(ManagerKind::Client { client_description })
+                    .configuration(centralized_launcher.configuration)
+                    .serialize_state(centralized_launcher.serialize_state)
+                    .hooks(tuple_list!());
 
-            let builder = builder.time_ref(centralized_launcher.time_obs.clone());
+                let builder = builder.time_ref(centralized_launcher.time_obs.clone());
 
-            builder.build().launch()
-        };
+                builder.build().launch()
+            };
 
         self.launch_generic(restarting_mgr_builder, restarting_mgr_builder)
     }
@@ -751,14 +760,15 @@ where
                                 }
                             }
 
-                            let client_id = ClientDescription::new(index, overcommit_id, *bind_to);
+                            let client_description =
+                                ClientDescription::new(index, overcommit_id, *bind_to);
 
                             if index == 1 {
                                 // Main client
                                 log::debug!("Running main client on PID {}", std::process::id());
                                 let (state, mgr) = main_inner_mgr_builder.take().unwrap()(
                                     self,
-                                    client_id.clone(),
+                                    client_description.clone(),
                                 )?;
 
                                 let mut centralized_event_manager_builder =
@@ -775,7 +785,11 @@ where
                                     self.time_obs.clone(),
                                 )?;
 
-                                self.main_run_client.take().unwrap()(state, c_mgr, client_id)?;
+                                self.main_run_client.take().unwrap()(
+                                    state,
+                                    c_mgr,
+                                    client_description,
+                                )?;
                                 Err(Error::shutting_down())
                             } else {
                                 // Secondary clients
@@ -785,7 +799,7 @@ where
                                 );
                                 let (state, mgr) = secondary_inner_mgr_builder.take().unwrap()(
                                     self,
-                                    client_id.clone(),
+                                    client_description.clone(),
                                 )?;
 
                                 let centralized_builder = CentralizedEventManager::builder();
@@ -798,7 +812,11 @@ where
                                     self.time_obs.clone(),
                                 )?;
 
-                                self.secondary_run_client.take().unwrap()(state, c_mgr, client_id)?;
+                                self.secondary_run_client.take().unwrap()(
+                                    state,
+                                    c_mgr,
+                                    client_description,
+                                )?;
                                 Err(Error::shutting_down())
                             }
                         }?,

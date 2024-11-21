@@ -328,8 +328,8 @@ pub enum ManagerKind {
     Any,
     /// A client, getting messages from a local broker.
     Client {
-        /// The client id
-        client_id: ClientDescription,
+        /// The client description
+        client_description: ClientDescription,
     },
     /// An [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
@@ -528,7 +528,9 @@ where
                     broker_things(broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
-                ManagerKind::Client { client_id } => {
+                ManagerKind::Client {
+                    client_description: client_id,
+                } => {
                     // We are a client
                     let mgr = LlmpEventManager::builder()
                         .always_interesting(self.always_interesting)
