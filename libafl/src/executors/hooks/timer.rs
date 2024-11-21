@@ -242,6 +242,11 @@ impl TimerStruct {
     #[cfg(target_os = "linux")]
     #[must_use]
     /// Constructor but use batch mode
+    /// More efficient timeout mechanism with imprecise timing.
+    ///
+    /// The timeout will trigger after t seconds and at most within 2*t seconds.
+    /// This means the actual timeout may occur anywhere in the range [t, 2*t],
+    /// providing a flexible but bounded execution time limit.
     pub fn batch_mode(exec_tmout: Duration) -> Self {
         let mut me = Self::new(exec_tmout);
         me.batch_mode = true;
