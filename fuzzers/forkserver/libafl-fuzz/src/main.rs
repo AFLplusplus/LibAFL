@@ -71,8 +71,6 @@ mod feedback;
 mod scheduler;
 mod stages;
 use clap::Parser;
-#[cfg(not(feature = "fuzzbench"))]
-use corpus::remove_main_node_file;
 use corpus::{check_autoresume, create_dir_if_not_exists};
 mod corpus;
 mod executor;
@@ -80,19 +78,23 @@ mod fuzzer;
 mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
-#[cfg(feature = "fuzzbench")]
-use libafl::events::SimpleEventManager;
-#[cfg(not(feature = "fuzzbench"))]
-use libafl::events::{CentralizedLauncher, EventConfig};
-#[cfg(not(feature = "fuzzbench"))]
-use libafl::monitors::MultiMonitor;
-#[cfg(feature = "fuzzbench")]
-use libafl::monitors::SimpleMonitor;
-use libafl::{events::ClientDescription, schedulers::powersched::BaseSchedule, Error};
+use libafl::{schedulers::powersched::BaseSchedule, Error};
 use libafl_bolts::core_affinity::Cores;
-#[cfg(not(feature = "fuzzbench"))]
-use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use nix::sys::signal::Signal;
+#[cfg(not(feature = "fuzzbench"))]
+use {
+    corpus::remove_main_node_file,
+    libafl::{
+        events::{CentralizedLauncher, ClientDescription, EventConfig},
+        monitors::MultiMonitor,
+    },
+    libafl_bolts::shmem::{ShMemProvider, StdShMemProvider},
+};
+#[cfg(feature = "fuzzbench")]
+use {
+    libafl::{events::SimpleEventManager, monitors::SimpleMonitor},
+    libafl_bolts::core_affinity::CoreId,
+};
 
 const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
 const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
