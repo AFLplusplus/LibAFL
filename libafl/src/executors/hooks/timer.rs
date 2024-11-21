@@ -243,7 +243,7 @@ impl TimerStruct {
     #[must_use]
     /// Constructor but use batch mode
     /// Timeout mechanism with imprecise timing.
-
+    /// 
     /// The timeout will trigger after t seconds and at most within 2*t seconds.
     /// This means the actual timeout may occur anywhere in the range [t, 2*t],
     /// providing a flexible but bounded execution time limit.
