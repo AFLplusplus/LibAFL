@@ -317,7 +317,7 @@ impl IntelPT {
             .set_image(Some(image))
             .map_err(error_from_pt_error)?;
 
-        let mut previous_block_ip = 0;
+        let mut previous_block_end_ip = 0;
         let mut status;
         'sync: loop {
             match decoder.sync_forward() {
@@ -326,7 +326,7 @@ impl IntelPT {
                     Self::decode_blocks(
                         &mut decoder,
                         &mut status,
-                        &mut previous_block_ip,
+                        &mut previous_block_end_ip,
                         skip,
                         map,
                     )?;
@@ -370,7 +370,7 @@ impl IntelPT {
     fn decode_blocks<T>(
         decoder: &mut BlockDecoder<()>,
         status: &mut Status,
-        previous_block_ip: &mut u64,
+        previous_block_end_ip: &mut u64,
         skip: u64,
         map: &mut [T],
     ) -> Result<(), Error>
@@ -396,13 +396,12 @@ impl IntelPT {
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
 
                     if !b.speculative() && skip < offset {
-                        // add 1 to `previous_block_ip` to avoid that all the recursive basic blocks map to 0
-                        let id = hash_me(*previous_block_ip + 1) ^ hash_me(b.ip());
+                        let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
                         *map_loc = (*map_loc).saturating_add(&1u8.into());
 
-                        *previous_block_ip = b.ip();
+                        *previous_block_end_ip = b.end_ip();
                     }
                 }
                 Err(e) => {
