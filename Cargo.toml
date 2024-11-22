@@ -91,7 +91,7 @@ cmake = "0.1.51"
 document-features = "0.2.10"
 hashbrown = { version = "0.14.5", default-features = false } # A faster hashmap, nostd compatible
 libc = "0.2.159" # For (*nix) libc
-libipt = "0.1.4"
+libipt = "0.2.0"
 log = "0.4.22"
 meminterval = "0.4.1"
 mimalloc = { version = "0.1.43", default-features = false }

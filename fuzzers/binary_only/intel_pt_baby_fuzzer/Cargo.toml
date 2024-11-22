@@ -9,7 +9,7 @@ authors = [
 edition = "2021"
 
 [features]
-tui = []
+tui = ["libafl/tui_monitor"]
 
 [dependencies]
 libafl = { path = "../../../libafl/", default-features = false, features = [
