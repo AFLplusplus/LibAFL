@@ -9,12 +9,10 @@ use std::{cell::RefCell, collections::VecDeque, fmt::Debug, marker::PhantomData,
 use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-#[cfg(not(miri))]
-use crate::inputs::BytesInput;
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers, HasTimeout},
-    inputs::UsesInput,
+    inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::Stage,
     state::{HasCorpus, State, UsesState},
