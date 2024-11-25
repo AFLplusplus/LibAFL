@@ -5,8 +5,8 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
+#[cfg(all(feature = "std", unix))]
+use std::os::unix::{ffi::OsStrExt, process::ExitStatusExt};
 #[cfg(all(feature = "std", target_os = "linux"))]
 use std::{
     ffi::{CStr, CString},
@@ -337,8 +337,6 @@ where
     OT: Debug + ObserversTuple<I, S>,
 {
     fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
-        use std::os::unix::prelude::ExitStatusExt;
-
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
@@ -346,29 +344,21 @@ where
 
         let mut child = self.configurer.spawn_child(input)?;
 
-        let res = match child
+        let exit_kind = child
             .wait_timeout(self.configurer.exec_timeout())
             .expect("waiting on child failed")
-            .map(|status| status.signal())
-        {
-            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-            Some(Some(9)) => Ok(ExitKind::Oom),
-            Some(Some(_)) => Ok(ExitKind::Crash),
-            Some(None) => Ok(ExitKind::Ok),
-            None => {
+            .map(|status| self.configurer.exit_kind_from_status(&status))
+            .unwrap_or_else(|| {
                 // if this fails, there is not much we can do. let's hope it failed because the process finished
                 // in the meantime.
                 drop(child.kill());
                 // finally, try to wait to properly clean up system resources.
                 drop(child.wait());
-                Ok(ExitKind::Timeout)
-            }
-        };
+                ExitKind::Timeout
+            });
 
-        if let Ok(exit_kind) = res {
-            self.observers
-                .post_exec_child_all(state, input, &exit_kind)?;
-        }
+        self.observers
+            .post_exec_child_all(state, input, &exit_kind)?;
 
         if let Some(h) = &mut self.configurer.stdout_observer() {
             let mut stdout = Vec::new();
@@ -392,7 +382,7 @@ where
             let obs = observers.index_mut(h);
             obs.observe_stderr(&stderr);
         }
-        res
+        Ok(exit_kind)
     }
 }
 
@@ -827,6 +817,16 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout(&self) -> Duration;
     /// Set the timeout duration for execution of the child process.
     fn exec_timeout_mut(&mut self) -> &mut Duration;
+
+    /// Maps the exit status of the child process to an `ExitKind`.
+    fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
+        match status.signal() {
+            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
+            Some(9) => ExitKind::Oom,
+            Some(_) => ExitKind::Crash,
+            None => ExitKind::Ok,
+        }
+    }
 
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C>
