@@ -5,8 +5,8 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
-#[cfg(all(feature = "std", unix))]
-use std::os::unix::{ffi::OsStrExt, process::ExitStatusExt};
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 #[cfg(all(feature = "std", target_os = "linux"))]
 use std::{
     ffi::{CStr, CString},
@@ -38,7 +38,9 @@ use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
-use crate::executors::{Executor, ExitKind};
+use crate::executors::Executor;
+#[cfg(all(feature = "std", any(unix, doc)))]
+use crate::executors::ExitKind;
 use crate::{
     corpus::Corpus,
     executors::{hooks::ExecutorHooksTuple, HasObservers},
@@ -819,7 +821,9 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout_mut(&mut self) -> &mut Duration;
 
     /// Maps the exit status of the child process to an `ExitKind`.
+    #[inline]
     fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
+        use crate::std::os::unix::process::ExitStatusExt;
         match status.signal() {
             // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
             Some(9) => ExitKind::Oom,
