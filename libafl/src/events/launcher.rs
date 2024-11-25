@@ -272,8 +272,8 @@ where
 
         // Spawn clients
         let mut index = 0_usize;
-        for (id, bind_to) in core_ids.iter().enumerate() {
-            if self.cores.ids.iter().any(|&x| x == id.into()) {
+        for bind_to in core_ids {
+            if self.cores.ids.iter().any(|&x| x == bind_to) {
                 for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
@@ -283,7 +283,9 @@ where
                         ForkResult::Parent(child) => {
                             self.shmem_provider.post_fork(false)?;
                             handles.push(child.pid);
-                            log::info!("child spawned and bound to core {id}");
+                            log::info!(
+                                "child spawned with id {index} and bound to core {bind_to:?}"
+                            );
                         }
                         ForkResult::Child => {
                             // # Safety
@@ -307,7 +309,7 @@ where
                             }
 
                             let client_description =
-                                ClientDescription::new(index, overcommit_id, *bind_to);
+                                ClientDescription::new(index, overcommit_id, bind_to);
 
                             // Fuzzer client. keeps retrying the connection to broker till the broker starts
                             let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
@@ -445,9 +447,11 @@ where
                     }
                 }
                 //spawn clients
-                for (core_i, _) in core_ids.iter().enumerate() {
-                    if self.cores.ids.iter().any(|&x| x == core_i.into()) {
+                let mut index = 0;
+                for core_id in core_ids {
+                    if self.cores.ids.iter().any(|&x| x == core_id) {
                         for overcommit_i in 0..self.overcommit {
+                            index += 1;
                             // Forward own stdio to child processes, if requested by user
                             #[allow(unused_mut)]
                             let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
@@ -460,14 +464,11 @@ where
                             }
 
                             std::thread::sleep(Duration::from_millis(
-                                core_i as u64 * self.launch_delay,
+                                core_id.0 as u64 * self.launch_delay,
                             ));
 
-                            let client_description = ClientDescription::new(
-                                core_i * self.overcommit + overcommit_i,
-                                overcommit_i,
-                                CoreId(core_i),
-                            );
+                            let client_description =
+                                ClientDescription::new(index, overcommit_i, core_id);
                             std::env::set_var(
                                 _AFL_LAUNCHER_CLIENT,
                                 client_description.to_safe_string(),
@@ -728,8 +729,8 @@ where
 
         // Spawn clients
         let mut index = 0_usize;
-        for (id, bind_to) in core_ids.iter().enumerate() {
-            if self.cores.ids.iter().any(|&x| x == id.into()) {
+        for bind_to in core_ids {
+            if self.cores.ids.iter().any(|&x| x == bind_to) {
                 for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
@@ -738,7 +739,7 @@ where
                             self.shmem_provider.post_fork(false)?;
                             handles.push(child.pid);
                             log::info!(
-                                "child with client id {index} spawned and bound to core {id}"
+                                "child with client id {index} spawned and bound to core {bind_to:?}"
                             );
                         }
                         ForkResult::Child => {
@@ -761,7 +762,7 @@ where
                             }
 
                             let client_description =
-                                ClientDescription::new(index, overcommit_id, *bind_to);
+                                ClientDescription::new(index, overcommit_id, bind_to);
 
                             if index == 1 {
                                 // Main client
