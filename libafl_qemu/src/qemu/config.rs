@@ -354,7 +354,7 @@ mod test {
     fn usermode() {
         let program = "/bin/pwd";
         let qemu_config = QemuConfig::builder().program("/bin/pwd").build();
-        let qemu = Qemu::init_with_config(&qemu_config).unwrap();
+        let qemu = Qemu::init(&qemu_config).unwrap();
         let config = qemu.get_config().unwrap();
         assert_eq!(config.to_string().trim(), program.trim());
     }
