@@ -891,6 +891,7 @@ where
             min_input_size: self.min_input_size,
             max_input_size: self.max_input_size,
             timeout,
+            #[cfg(feature = "regex")]
             asan_obs: self
                 .asan_obs
                 .clone()
@@ -956,6 +957,7 @@ where
             min_input_size: self.min_input_size,
             max_input_size: self.max_input_size,
             timeout,
+            #[cfg(feature = "regex")]
             asan_obs: self
                 .asan_obs
                 .clone()
@@ -1003,7 +1005,7 @@ where
                 0,
                 self.is_persistent,
                 self.is_deferred_frksrv,
-                self.asan_obs.is_some(),
+                self.has_asan_obs(),
                 self.map_size,
                 self.debug_child,
                 self.kill_signal.unwrap_or(KILL_SIGNAL_DEFAULT),
@@ -1456,6 +1458,18 @@ where
         self.kill_signal = Some(kill_signal);
         self
     }
+
+    /// Determine if the asan observer is present (always false if feature "regex" is disabled)
+    #[cfg(feature = "regex")]
+    pub fn has_asan_obs(&self) -> bool {
+        self.asan_obs.is_some()
+    }
+
+    /// Determine if the asan observer is present (always false if feature "regex" is disabled)
+    #[cfg(not(feature = "regex"))]
+    pub fn has_asan_obs(&self) -> bool {
+        false
+    }
 }
 
 impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
@@ -1485,6 +1499,7 @@ impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, Unix
             min_input_size: MIN_INPUT_SIZE_DEFAULT,
             kill_signal: None,
             timeout: None,
+            #[cfg(feature = "regex")]
             asan_obs: None,
             crash_exitcode: None,
             target_bytes_converter: NopTargetBytesConverter::new(),
@@ -1517,6 +1532,7 @@ impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
             min_input_size: self.min_input_size,
             kill_signal: self.kill_signal,
             timeout: self.timeout,
+            #[cfg(feature = "regex")]
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
             target_bytes_converter: self.target_bytes_converter,
@@ -1549,6 +1565,7 @@ impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
             min_input_size: self.min_input_size,
             kill_signal: self.kill_signal,
             timeout: self.timeout,
+            #[cfg(feature = "regex")]
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
             target_bytes_converter,
