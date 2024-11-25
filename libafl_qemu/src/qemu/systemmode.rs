@@ -16,8 +16,8 @@ use libc::EXIT_SUCCESS;
 use num_traits::Zero;
 
 use crate::{
-    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuRWError,
-    QemuRWErrorCause, QemuRWErrorKind, QemuSnapshotCheckResult, CPU,
+    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuSnapshotCheckResult,
+    CPU,
 };
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {

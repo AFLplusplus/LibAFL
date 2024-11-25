@@ -298,7 +298,6 @@ impl<R: AsRef<Path>> From<R> for Program {
 
 #[derive(Debug, Clone, libafl_derive::Display, TypedBuilder, Getters)]
 #[builder(builder_method(
-    vis = "pub(crate)",
     doc = "Since Qemu is a zero sized struct, this is not a completely standard builder pattern. \
     The Qemu configuration is not stored in the Qemu struct after build() but in QEMU_CONFIG \
     Therefore, to use the derived builder and avoid boilerplate a builder for QemuConfig is \
@@ -344,17 +343,6 @@ pub struct QemuConfig {
     #[builder(setter(into))]
     program: Program,
 } // Adding something here? Please leave Program as the last field
-
-impl From<&QemuConfig> for Vec<String> {
-    /// Generate the QEMU-compatible initialization cli string from the QEMU config.
-    fn from(config: &QemuConfig) -> Self {
-        config
-            .to_string()
-            .split(' ')
-            .map(ToString::to_string)
-            .collect::<Vec<String>>()
-    }
-}
 
 #[cfg(test)]
 mod test {
