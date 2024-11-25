@@ -80,7 +80,7 @@ slirp = [
   "libafl_qemu_sys/slirp",
 ] # build qemu with host libslirp (for user networking)
 
-intel_pt = ["systemmode", "x86_64", "libafl/intel_pt", "dep:libafl_intelpt"]
+intel_pt = ["systemmode", "x86_64", "dep:libafl_intelpt"]
 
 # Requires the binary's build.rs to call `build_libafl_qemu`
 shared = ["libafl_qemu_sys/shared"]
