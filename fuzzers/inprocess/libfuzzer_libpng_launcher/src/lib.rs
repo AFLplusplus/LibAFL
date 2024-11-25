@@ -62,7 +62,6 @@ struct Opt {
     cores: Cores,
 
     #[arg(
-        short,
         long,
         help = "Spawn n clients on each core, this is useful if clients don't fully load a client, e.g. because they `sleep` often.",
         name = "OVERCOMMIT",
