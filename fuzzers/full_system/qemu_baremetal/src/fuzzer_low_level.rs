@@ -29,9 +29,9 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    config, elf::EasyElf, executor::QemuExecutor, modules::edges::StdEdgeCoverageModuleBuilder,
-    Emulator, GuestPhysAddr, Qemu, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause,
-    Regs,
+    config, config::QemuConfig, elf::EasyElf, executor::QemuExecutor,
+    modules::edges::StdEdgeCoverageModuleBuilder, Emulator, GuestPhysAddr, QemuExitError,
+    QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -94,7 +94,7 @@ pub fn fuzz() {
         };
 
         // Initialize QEMU
-        let qemu = Qemu::builder()
+        let qemu_config = QemuConfig::builder()
             .machine("mps2-an385")
             .monitor(config::Monitor::Null)
             .kernel(format!("{target_dir}/example.elf"))
@@ -107,17 +107,20 @@ pub fn fuzz() {
                 .file(format!("{target_dir}/dummy.qcow2"))
                 .build()])
             .start_cpu(false)
-            .build()
-            .expect("Failed to initialized QEMU");
+            .build();
+
+        // .expect("Failed to initialized QEMU");
 
         let emulator_modules = tuple_list!(StdEdgeCoverageModuleBuilder::default()
             .map_observer(edges_observer.as_mut())
             .build()?);
 
         let emulator = Emulator::empty()
-            .qemu(qemu)
+            .qemu_config(qemu_config)
             .modules(emulator_modules)
             .build()?;
+
+        let qemu = emulator.qemu();
 
         qemu.set_breakpoint(main_addr);
 

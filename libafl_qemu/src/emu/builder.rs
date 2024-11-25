@@ -1,7 +1,4 @@
-use std::{
-    fmt::{Debug, Formatter},
-    marker::PhantomData,
-};
+use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
     inputs::{HasTargetBytes, UsesInput},
@@ -16,14 +13,8 @@ use crate::{
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
     Emulator, EmulatorHooks, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuHooks, QemuInitError,
-    StdEmulatorDriver, StdSnapshotManager,
+    QemuParams, StdEmulatorDriver, StdSnapshotManager,
 };
-
-#[derive(Clone, Debug)]
-pub enum QemuParams {
-    Config(QemuConfig),
-    Cli(Vec<String>),
-}
 
 #[derive(Clone, Debug)]
 pub struct EmulatorBuilder<CM, ED, ET, S, SM>
@@ -124,7 +115,7 @@ where
 
         self.modules.pre_qemu_init_all(&mut emulator_hooks);
 
-        let qemu = Qemu::init_with_params(&qemu_parameters)?;
+        let qemu = Qemu::init(qemu_parameters)?;
 
         unsafe {
             Ok(Emulator::new_with_qemu(

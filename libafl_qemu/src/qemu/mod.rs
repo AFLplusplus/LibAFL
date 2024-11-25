@@ -29,10 +29,15 @@ use libafl_qemu_sys::{
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
-use crate::{GuestAddrKind, GuestReg, QemuParams, Regs};
+use crate::{GuestAddrKind, GuestReg, Regs};
 
 pub mod config;
 use config::QemuConfig;
+
+pub mod error;
+pub use error::{
+    QemuError, QemuExitError, QemuInitError, QemuRWError, QemuRWErrorCause, QemuRWErrorKind,
+};
 
 #[cfg(feature = "usermode")]
 mod usermode;
@@ -52,32 +57,6 @@ static mut QEMU_IS_INITIALIZED: bool = false;
 
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
-#[derive(Debug)]
-pub enum QemuError {
-    Init(QemuInitError),
-    Exit(QemuExitError),
-    RW(QemuRWError),
-}
-
-impl From<QemuError> for libafl::Error {
-    fn from(qemu_error: QemuError) -> Self {
-        libafl::Error::runtime(qemu_error)
-    }
-}
-
-impl From<QemuError> for String {
-    fn from(qemu_error: QemuError) -> Self {
-        format!("LibAFL QEMU Error: {qemu_error:?}")
-    }
-}
-
-#[derive(Debug)]
-pub enum QemuInitError {
-    MultipleInstances,
-    EmptyArgs,
-    TooManyArgs(usize),
-}
-
 #[derive(Debug, Clone)]
 pub enum QemuExitReason {
     /// QEMU ended for some internal reason
@@ -93,87 +72,18 @@ pub enum QemuExitReason {
     Timeout,
 }
 
-#[derive(Debug, Clone)]
-pub enum QemuExitError {
-    UnknownKind, // Exit reason was not NULL, but exit kind is unknown. Should never happen.
-    UnexpectedExit, // Qemu exited without going through an expected exit point. Can be caused by a crash for example.
-}
-
-#[derive(Debug, Clone)]
-pub enum QemuRWErrorKind {
-    Read,
-    Write,
-}
-
-#[derive(Debug, Clone)]
-pub enum QemuRWErrorCause {
-    WrongCallingConvention(CallingConvention, CallingConvention), // expected, given
-    WrongArgument(i32),
-    CurrentCpuNotFound,
-    Reg(i32),
-    WrongMemoryLocation(GuestAddr, usize), // addr, size
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct QemuRWError {
-    kind: QemuRWErrorKind,
-    cause: QemuRWErrorCause,
-    cpu: Option<CPUStatePtr>, // Only makes sense when cause != CurrentCpuNotFound
-}
-
-impl QemuRWError {
-    #[must_use]
-    pub fn new(kind: QemuRWErrorKind, cause: QemuRWErrorCause, cpu: Option<CPUStatePtr>) -> Self {
-        Self { kind, cause, cpu }
-    }
-
-    pub fn wrong_mem_location(
-        kind: QemuRWErrorKind,
-        cpu: CPUStatePtr,
-        addr: GuestAddr,
-        size: usize,
-    ) -> Self {
-        Self::new(
-            kind,
-            QemuRWErrorCause::WrongMemoryLocation(addr, size),
-            Some(cpu),
-        )
-    }
-
-    #[must_use]
-    pub fn current_cpu_not_found(kind: QemuRWErrorKind) -> Self {
-        Self::new(kind, QemuRWErrorCause::CurrentCpuNotFound, None)
-    }
-
-    #[must_use]
-    pub fn new_argument_error(kind: QemuRWErrorKind, reg_id: i32) -> Self {
-        Self::new(kind, QemuRWErrorCause::WrongArgument(reg_id), None)
-    }
-
-    pub fn check_conv(
-        kind: QemuRWErrorKind,
-        expected_conv: CallingConvention,
-        given_conv: CallingConvention,
-    ) -> Result<(), Self> {
-        if expected_conv != given_conv {
-            return Err(Self::new(
-                kind,
-                QemuRWErrorCause::WrongCallingConvention(expected_conv, given_conv),
-                None,
-            ));
-        }
-
-        Ok(())
-    }
-}
-
 /// The thin wrapper around QEMU.
 /// It is considered unsafe to use it directly.
 /// Prefer using `Emulator` instead in case of doubt.
 #[derive(Clone, Copy, Debug)]
 pub struct Qemu {
     _private: (),
+}
+
+#[derive(Clone, Debug)]
+pub enum QemuParams {
+    Config(QemuConfig),
+    Cli(Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -234,33 +144,6 @@ pub trait HookId {
 #[derive(Debug)]
 pub struct HookData(u64);
 
-impl std::error::Error for QemuInitError {}
-
-impl Display for QemuInitError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            QemuInitError::MultipleInstances => {
-                write!(f, "Only one instance of the QEMU Emulator is permitted")
-            }
-            QemuInitError::EmptyArgs => {
-                write!(f, "QEMU emulator args cannot be empty")
-            }
-            QemuInitError::TooManyArgs(n) => {
-                write!(
-                    f,
-                    "Too many arguments passed to QEMU emulator ({n} > i32::MAX)"
-                )
-            }
-        }
-    }
-}
-
-impl From<QemuInitError> for libafl::Error {
-    fn from(err: QemuInitError) -> Self {
-        libafl::Error::unknown(format!("{err}"))
-    }
-}
-
 impl Display for QemuExitReason {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
@@ -269,6 +152,30 @@ impl Display for QemuExitReason {
             QemuExitReason::SyncExit => write!(f, "Sync Exit"),
             QemuExitReason::Timeout => write!(f, "Timeout"),
         }
+    }
+}
+
+impl From<QemuConfig> for QemuParams {
+    fn from(config: QemuConfig) -> Self {
+        QemuParams::Config(config)
+    }
+}
+
+impl<T> From<&[T]> for QemuParams
+where
+    T: AsRef<str>,
+{
+    fn from(cli: &[T]) -> Self {
+        QemuParams::Cli(cli.into_iter().map(|x| x.as_ref().into()).collect())
+    }
+}
+
+impl<T> From<Vec<T>> for QemuParams
+where
+    T: AsRef<str>,
+{
+    fn from(cli: Vec<T>) -> Self {
+        cli.as_slice().into()
     }
 }
 
@@ -372,11 +279,11 @@ impl CPU {
             let mut val = MaybeUninit::uninit();
             let success = libafl_qemu_read_reg(self.ptr, reg_id, val.as_mut_ptr() as *mut u8);
             if success == 0 {
-                Err(QemuRWError {
-                    kind: QemuRWErrorKind::Write,
-                    cause: QemuRWErrorCause::Reg(reg.into()),
-                    cpu: Some(self.ptr),
-                })
+                Err(QemuRWError::wrong_reg(
+                    QemuRWErrorKind::Write,
+                    reg,
+                    Some(self.ptr),
+                ))
             } else {
                 #[cfg(feature = "be")]
                 return Ok(GuestReg::from_be(val.assume_init()).into());
@@ -401,11 +308,11 @@ impl CPU {
 
         let success = unsafe { libafl_qemu_write_reg(self.ptr, reg_id, &raw const val as *mut u8) };
         if success == 0 {
-            Err(QemuRWError {
-                kind: QemuRWErrorKind::Write,
-                cause: QemuRWErrorCause::Reg(reg.into()),
-                cpu: Some(self.ptr),
-            })
+            Err(QemuRWError::wrong_reg(
+                QemuRWErrorKind::Write,
+                reg,
+                Some(self.ptr),
+            ))
         } else {
             Ok(())
         }
@@ -577,25 +484,27 @@ impl From<u8> for HookData {
 
 #[allow(clippy::unused_self)]
 impl Qemu {
-    pub fn init_with_params(params: &QemuParams) -> Result<Self, QemuInitError> {
-        match params {
-            QemuParams::Config(config) => Self::init_with_config(config),
-            QemuParams::Cli(cli) => Self::init(cli.as_ref()),
-        }
-    }
-
-    pub fn init_with_config(config: &QemuConfig) -> Result<Self, QemuInitError> {
-        let qemu_args: Vec<String> = config.into();
-
-        QEMU_CONFIG
-            .set(config.clone())
-            .map_err(|_| unreachable!("BUG: QEMU_CONFIG was already set but Qemu was not init!"))?;
-
-        Self::init(qemu_args.as_ref())
-    }
-
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn init(args: &[String]) -> Result<Self, QemuInitError> {
+    pub fn init<T>(params: T) -> Result<Self, QemuInitError>
+    where
+        T: Into<QemuParams>,
+    {
+        let params: QemuParams = params.into();
+
+        let args: Vec<String> = match params {
+            QemuParams::Config(cfg) => {
+                let qemu_args: Vec<String> =
+                    cfg.to_string().split(" ").map(|x| x.to_string()).collect();
+
+                QEMU_CONFIG.set(cfg.clone()).map_err(|_| {
+                    unreachable!("QEMU_CONFIG was already set but Qemu was not init!")
+                })?;
+
+                qemu_args
+            }
+            QemuParams::Cli(cli) => cli,
+        };
+
         if args.is_empty() {
             return Err(QemuInitError::EmptyArgs);
         }
@@ -609,6 +518,7 @@ impl Qemu {
             if QEMU_IS_INITIALIZED {
                 return Err(QemuInitError::MultipleInstances);
             }
+
             QEMU_IS_INITIALIZED = true;
         }
 
@@ -617,7 +527,7 @@ impl Qemu {
 
         let args: Vec<CString> = args
             .iter()
-            .map(|x| CString::new(x.clone()).unwrap())
+            .map(|x| CString::new(AsRef::<str>::as_ref(x)).unwrap())
             .collect();
         let mut argv: Vec<*const u8> = args.iter().map(|x| x.as_ptr() as *const u8).collect();
         argv.push(ptr::null()); // argv is always null terminated.
@@ -921,11 +831,7 @@ impl Qemu {
 impl ArchExtras for Qemu {
     fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {
         self.current_cpu()
-            .ok_or(QemuRWError {
-                kind: QemuRWErrorKind::Read,
-                cause: QemuRWErrorCause::CurrentCpuNotFound,
-                cpu: None,
-            })?
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
             .read_return_address()
     }
 
