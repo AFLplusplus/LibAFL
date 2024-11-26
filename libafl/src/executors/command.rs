@@ -801,7 +801,7 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(all(feature = "std", any(unix, doc)))]
+#[cfg(all(feature = "std", unix))]
 pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
