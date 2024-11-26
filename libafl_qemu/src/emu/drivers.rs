@@ -54,7 +54,7 @@ where
     /// Just before calling user's harness for the first time.
     /// Called only once
     fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
-        emulator.modules.first_exec_all(state);
+        emulator.modules.first_exec_all(emulator.qemu, state);
     }
 
     /// Just before calling user's harness
@@ -63,7 +63,7 @@ where
         state: &mut S,
         input: &S::Input,
     ) {
-        emulator.modules.pre_exec_all(state, input);
+        emulator.modules.pre_exec_all(emulator.qemu, state, input);
     }
 
     /// Just after returning from user's harness
@@ -78,7 +78,7 @@ where
     {
         emulator
             .modules
-            .post_exec_all(state, input, observers, exit_kind);
+            .post_exec_all(emulator.qemu, state, input, observers, exit_kind);
     }
 
     /// Just before entering QEMU
@@ -169,7 +169,7 @@ where
 {
     fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.first_exec_all(state);
+            emulator.modules.first_exec_all(emulator.qemu, state);
         }
     }
 
@@ -179,7 +179,7 @@ where
         input: &S::Input,
     ) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.pre_exec_all(state, input);
+            emulator.modules.pre_exec_all(emulator.qemu, state, input);
         }
 
         let input_location = { emulator.driver.input_location.get().cloned() };
@@ -206,7 +206,7 @@ where
         if !emulator.driver.hooks_locked {
             emulator
                 .modules
-                .post_exec_all(state, input, observers, exit_kind);
+                .post_exec_all(emulator.qemu, state, input, observers, exit_kind);
         }
     }
 

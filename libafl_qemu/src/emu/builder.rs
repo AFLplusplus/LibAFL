@@ -12,8 +12,8 @@ use crate::{
     command::{CommandManager, NopCommandManager, StdCommandManager},
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    Emulator, EmulatorHooks, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuHooks, QemuInitError,
-    QemuParams, StdEmulatorDriver, StdSnapshotManager,
+    Emulator, EmulatorHooks, EmulatorModules, NopEmulatorDriver, NopSnapshotManager, Qemu,
+    QemuHooks, QemuInitError, QemuParams, StdEmulatorDriver, StdSnapshotManager,
 };
 
 #[derive(Clone, Debug)]
@@ -111,17 +111,23 @@ where
     {
         let qemu_parameters = self.qemu_parameters.ok_or(QemuInitError::EmptyArgs)?;
 
-        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
+        let emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
 
-        self.modules.pre_qemu_init_all(&mut emulator_hooks);
+        let mut emulator_modules = EmulatorModules::new(emulator_hooks, self.modules);
+
+        // TODO: fix things there properly. The biggest issue being that it creates 2 mut ref to the module with the callback being called
+        unsafe {
+            emulator_modules
+                .modules_mut()
+                .pre_qemu_init_all(EmulatorModules::<ET, S>::emulator_modules_mut_unchecked());
+        }
 
         let qemu = Qemu::init(qemu_parameters)?;
 
         unsafe {
             Ok(Emulator::new_with_qemu(
                 qemu,
-                emulator_hooks,
-                self.modules,
+                emulator_modules,
                 self.driver,
                 self.snapshot_manager,
                 self.command_manager,

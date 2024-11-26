@@ -3,7 +3,7 @@
 use std::{fmt::Debug, marker::PhantomData, mem::transmute, pin::Pin, ptr};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
-use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
+use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
 
 #[cfg(feature = "usermode")]
 use crate::qemu::{
@@ -37,9 +37,15 @@ use crate::{
         ReadExecNHook, ReadGenHook, ReadHookId, TcgHookState, WriteExecHook, WriteExecNHook,
         WriteGenHook, WriteHookId,
     },
-    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, Qemu,
+    CpuPostRunHook, CpuPreRunHook, CpuRunHookId, HookState, MemAccessInfo, NewThreadHookFn, Qemu,
 };
 
+/// Get a C-compatible function pointer from the input hook.
+/// If the hook was already a c function, nothing is done.
+///
+/// h: input hook
+/// replacement: C-compatible function to call when C side should call the hook
+/// fntype: type used to cast h into replacement
 macro_rules! get_raw_hook {
     ($h:expr, $replacement:expr, $fntype:ty) => {
         match $h {
@@ -100,7 +106,6 @@ pub struct EmulatorModules<ET, S>
 where
     S: UsesInput,
 {
-    qemu: Qemu,
     modules: Pin<Box<ET>>,
     hooks: EmulatorHooks<ET, S>,
     phantom: PhantomData<S>,
@@ -679,10 +684,7 @@ where
         }
     }
 
-    pub fn backdoor_function(
-        &self,
-        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, cpu: CPUArchStatePtr, pc: GuestAddr),
-    ) -> BackdoorHookId {
+    pub fn backdoor_function(&self, hook: BackdoorHookFn<ET, S>) -> BackdoorHookId {
         unsafe {
             self.qemu_hooks
                 .add_backdoor_hook(transmute(hook), func_backdoor_hook_wrapper::<ET, S>)
@@ -715,15 +717,7 @@ where
         }
     }
 
-    pub fn thread_creation_function(
-        &mut self,
-        hook: fn(
-            &mut EmulatorModules<ET, S>,
-            Option<&mut S>,
-            env: CPUArchStatePtr,
-            tid: u32,
-        ) -> bool,
-    ) -> NewThreadHookId {
+    pub fn thread_creation_function(&mut self, hook: NewThreadHookFn<ET, S>) -> NewThreadHookId {
         unsafe {
             self.qemu_hooks
                 .add_new_thread_hook(transmute(hook), func_new_thread_hook_wrapper::<ET, S>)
@@ -965,7 +959,7 @@ where
     pub fn instruction_function(
         &mut self,
         addr: GuestAddr,
-        hook: fn(&mut EmulatorModules<ET, S>, Option<&mut S>, GuestAddr),
+        hook: InstructionHookFn<ET, S>,
         invalidate_block: bool,
     ) -> InstructionHookId {
         self.hooks
@@ -1076,15 +1070,7 @@ where
         self.hooks.thread_creation(hook)
     }
 
-    pub fn thread_creation_function(
-        &mut self,
-        hook: fn(
-            &mut EmulatorModules<ET, S>,
-            Option<&mut S>,
-            env: CPUArchStatePtr,
-            tid: u32,
-        ) -> bool,
-    ) -> NewThreadHookId {
+    pub fn thread_creation_function(&mut self, hook: NewThreadHookFn<ET, S>) -> NewThreadHookId {
         self.hooks.thread_creation_function(hook)
     }
 
@@ -1101,13 +1087,8 @@ where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
-    pub(super) fn new(
-        qemu: Qemu,
-        emulator_hooks: EmulatorHooks<ET, S>,
-        modules: ET,
-    ) -> Pin<Box<Self>> {
+    pub(super) fn new(emulator_hooks: EmulatorHooks<ET, S>, modules: ET) -> Pin<Box<Self>> {
         let mut modules = Box::pin(Self {
-            qemu,
             modules: Box::pin(modules),
             hooks: emulator_hooks,
             phantom: PhantomData,
@@ -1130,35 +1111,41 @@ where
         modules
     }
 
-    pub fn post_qemu_init_all(&mut self) {
+    /// Run post-QEMU init module callbacks.
+    pub unsafe fn post_qemu_init_all(&mut self, qemu: Qemu) {
         // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
         // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
         unsafe {
             self.modules_mut()
-                .post_qemu_init_all(Self::emulator_modules_mut_unchecked());
+                .post_qemu_init_all(qemu, Self::emulator_modules_mut_unchecked());
         }
     }
 
-    pub fn first_exec_all(&mut self, state: &mut S) {
+    pub fn first_exec_all(&mut self, qemu: Qemu, state: &mut S) {
         // # Safety
         // We assume that the emulator was initialized correctly
         unsafe {
             self.modules_mut()
-                .first_exec_all(Self::emulator_modules_mut_unchecked(), state);
+                .first_exec_all(qemu, Self::emulator_modules_mut_unchecked(), state);
         }
     }
 
-    pub fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) {
+    pub fn pre_exec_all(&mut self, qemu: Qemu, state: &mut S, input: &S::Input) {
         // # Safety
         // We assume that the emulator was initialized correctly
         unsafe {
-            self.modules_mut()
-                .pre_exec_all(Self::emulator_modules_mut_unchecked(), state, input);
+            self.modules_mut().pre_exec_all(
+                qemu,
+                Self::emulator_modules_mut_unchecked(),
+                state,
+                input,
+            );
         }
     }
 
     pub fn post_exec_all<OT>(
         &mut self,
+        qemu: Qemu,
         state: &mut S,
         input: &S::Input,
         observers: &mut OT,
@@ -1168,6 +1155,7 @@ where
     {
         unsafe {
             self.modules_mut().post_exec_all(
+                qemu,
                 Self::emulator_modules_mut_unchecked(),
                 state,
                 input,
@@ -1199,11 +1187,6 @@ impl<ET, S> EmulatorModules<ET, S>
 where
     S: UsesInput,
 {
-    #[must_use]
-    pub fn qemu(&self) -> Qemu {
-        self.qemu
-    }
-
     #[must_use]
     pub fn modules(&self) -> &ET {
         self.modules.as_ref().get_ref()

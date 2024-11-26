@@ -329,17 +329,22 @@ where
         snapshot_manager: SM,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
-        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
+        let emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
+        let mut emulator_modules = EmulatorModules::new(emulator_hooks, modules);
 
-        modules.pre_qemu_init_all(&mut emulator_hooks);
+        // TODO: fix things there properly. The biggest issue being that it creates 2 mut ref to the module with the callback being called
+        unsafe {
+            emulator_modules
+                .modules_mut()
+                .pre_qemu_init_all(EmulatorModules::<ET, S>::emulator_modules_mut_unchecked());
+        }
 
         let qemu = Qemu::init(qemu_args)?;
 
         unsafe {
             Ok(Self::new_with_qemu(
                 qemu,
-                emulator_hooks,
-                modules,
+                emulator_modules,
                 driver,
                 snapshot_manager,
                 command_manager,
@@ -352,17 +357,16 @@ where
     ///
     /// # Safety
     ///
-    /// pre-init qemu hooks should be run by then.
+    /// pre-init qemu hooks should be run before calling this.
     pub(crate) unsafe fn new_with_qemu(
         qemu: Qemu,
-        emulator_hooks: EmulatorHooks<ET, S>,
-        modules: ET,
+        emulator_modules: Pin<Box<EmulatorModules<ET, S>>>,
         driver: ED,
         snapshot_manager: SM,
         command_manager: CM,
     ) -> Self {
         let mut emulator = Emulator {
-            modules: EmulatorModules::new(qemu, emulator_hooks, modules),
+            modules: emulator_modules,
             command_manager,
             snapshot_manager,
             driver,
@@ -371,7 +375,7 @@ where
             qemu,
         };
 
-        emulator.modules.post_qemu_init_all();
+        emulator.modules.post_qemu_init_all(qemu);
 
         emulator
     }

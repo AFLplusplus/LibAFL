@@ -60,7 +60,7 @@ mod generators {
     };
     use crate::{
         modules::{hash_me, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
-        EmulatorModules,
+        EmulatorModules, Qemu,
     };
 
     fn get_mask<const IS_CONST_MAP: bool, const MAP_SIZE: usize>() -> usize {
@@ -78,6 +78,7 @@ mod generators {
     }
 
     pub fn gen_unique_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+        qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
         state: Option<&mut S>,
         src: GuestAddr,
@@ -108,10 +109,7 @@ mod generators {
 
             #[cfg(feature = "systemmode")]
             {
-                let paging_id = emulator_modules
-                    .qemu()
-                    .current_cpu()
-                    .and_then(|cpu| cpu.current_paging_id());
+                let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
                 if !module.must_instrument(src, paging_id)
                     && !module.must_instrument(dest, paging_id)
@@ -157,6 +155,7 @@ mod generators {
 
     #[allow(clippy::unnecessary_cast)]
     pub fn gen_hashed_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+        qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         src: GuestAddr,
@@ -179,10 +178,7 @@ mod generators {
 
             #[cfg(feature = "systemmode")]
             {
-                let paging_id = emulator_modules
-                    .qemu()
-                    .current_cpu()
-                    .and_then(|cpu| cpu.current_paging_id());
+                let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
                 if !module.must_instrument(src, paging_id)
                     && !module.must_instrument(dest, paging_id)
@@ -211,6 +207,7 @@ mod generators {
 
     #[allow(clippy::unnecessary_cast)]
     pub fn gen_hashed_block_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+        qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
@@ -234,10 +231,7 @@ mod generators {
             }
             #[cfg(feature = "systemmode")]
             {
-                let page_id = emulator_modules
-                    .qemu()
-                    .current_cpu()
-                    .and_then(|cpu| cpu.current_paging_id());
+                let page_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
                 if !module.must_instrument(pc, page_id) {
                     return None;
