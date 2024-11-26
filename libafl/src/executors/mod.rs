@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
-use crate::{observers::ObserversTuple, state::UsesState, Error};
+use crate::{state::UsesState, Error};
 
 pub mod combined;
 #[cfg(all(feature = "std", any(unix, doc)))]
@@ -130,18 +130,6 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error>;
-
-    /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
-    ///
-    /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by
-    /// the implementation of this wrapper.
-    fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
-    where
-        Self: Sized,
-        OT: ObserversTuple<Self::Input, Self::State>,
-    {
-        WithObservers::new(self, observers)
-    }
 }
 
 /// A trait that allows to get/set an `Executor`'s timeout thresold
