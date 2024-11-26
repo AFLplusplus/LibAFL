@@ -11,8 +11,7 @@ use libafl_qemu_sys::{
 };
 use libc::{c_int, c_uchar, strlen};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, PyRef, PyRefMut, Python};
-use pyo3::{IntoPyObject, Py};
+use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
 
 use crate::{Qemu, CPU};
 
