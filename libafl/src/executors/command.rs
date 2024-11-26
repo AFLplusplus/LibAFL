@@ -823,21 +823,12 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Maps the exit status of the child process to an `ExitKind`.
     #[inline]
     fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
-        #[cfg(unix)]
-        {
-            use crate::std::os::unix::process::ExitStatusExt;
-            match status.signal() {
-                // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-                Some(9) => ExitKind::Oom,
-                Some(_) => ExitKind::Crash,
-                None => ExitKind::Ok,
-            }
-        }
-        #[cfg(not(unix))]
-        {
-            unimplemented!(
-                "Provide a default implementation when `CommandConfigurator` becomes available for non-unix targets."
-            )
+        use crate::std::os::unix::process::ExitStatusExt;
+        match status.signal() {
+            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
+            Some(9) => ExitKind::Oom,
+            Some(_) => ExitKind::Crash,
+            None => ExitKind::Ok,
         }
     }
 
