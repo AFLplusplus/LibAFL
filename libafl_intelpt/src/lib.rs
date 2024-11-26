@@ -129,6 +129,8 @@ pub struct IntelPT {
     aux_tail: *mut u64,
     previous_decode_head: u64,
     ip_filters: Vec<RangeInclusive<usize>>,
+    #[cfg(feature = "export_raw")]
+    last_decode_trace: Vec<u8>,
 }
 
 #[cfg(target_os = "linux")]
@@ -544,6 +546,8 @@ impl IntelPTBuilder {
             aux_tail,
             previous_decode_head: 0,
             ip_filters,
+            #[cfg(feature = "export_raw")]
+            last_decode_trace: Vec::new(),
         })
     }
 
