@@ -112,14 +112,6 @@ impl Regs {
     pub const Sp: Regs = Regs::R1;
 }
 
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for Regs {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
-}
-
 /// Return an MIPS ArchCapstoneBuilder
 pub fn capstone() -> capstone::arch::ppc::ArchCapstoneBuilder {
     capstone::Capstone::new().ppc()

@@ -11,7 +11,8 @@ use libafl_qemu_sys::{
 };
 use libc::{c_int, c_uchar, strlen};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
+use pyo3::{pyclass, pymethods, PyRef, PyRefMut, Python};
+use pyo3::{IntoPyObject, Py};
 
 use crate::{Qemu, CPU};
 
@@ -65,8 +66,9 @@ impl GuestMaps {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
-    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
-        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
+
+    fn __next__(mut slf: PyRefMut<Self>) -> Option<Py<MapInfo>> {
+        Python::with_gil(|py| slf.next().map(|x| x.into_pyobject(py).unwrap().into()))
     }
 }
 

@@ -75,17 +75,17 @@ use pyo3::prelude::*;
 pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     use pyo3::types::PyString;
 
-    let regsm = PyModule::new_bound(m.py(), "regs")?;
+    let regsm = PyModule::new(m.py(), "regs")?;
     for r in Regs::iter() {
         let v: i32 = r.into();
-        regsm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
+        regsm.add(PyString::new(m.py(), &format!("{r:?}")), v)?;
     }
     m.add_submodule(&regsm)?;
 
-    let mmapm = PyModule::new_bound(m.py(), "mmap")?;
+    let mmapm = PyModule::new(m.py(), "mmap")?;
     for r in MmapPerms::iter() {
         let v: i32 = r.into();
-        mmapm.add(PyString::new_bound(m.py(), &format!("{r:?}")), v)?;
+        mmapm.add(PyString::new(m.py(), &format!("{r:?}")), v)?;
     }
     m.add_submodule(&mmapm)?;
 

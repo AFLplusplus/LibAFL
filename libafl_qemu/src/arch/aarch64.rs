@@ -73,14 +73,6 @@ impl Regs {
     pub const Lr: Regs = Regs::X30;
 }
 
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for Regs {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
-}
-
 /// Return an ARM64 ArchCapstoneBuilder
 pub fn capstone() -> capstone::arch::arm64::ArchCapstoneBuilder {
     capstone::Capstone::new()
