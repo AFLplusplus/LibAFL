@@ -473,8 +473,7 @@ where
         let wait_status = waitpid_filtered(child, Some(WaitPidFlag::WUNTRACED))?;
         if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
             return Err(Error::unknown(format!(
-                "Unexpected state of child process {:?} (while waiting for SIGSTOP)",
-                wait_status
+                "Unexpected state of child process {wait_status:?} (while waiting for SIGSTOP)"
             )));
         }
 
@@ -487,8 +486,7 @@ where
             if c == child && e == (ptrace::Event::PTRACE_EVENT_EXEC as i32)
         ) {
             return Err(Error::unknown(format!(
-                "Unexpected state of child process {:?} (while waiting for SIGTRAP PTRACE_EVENT_EXEC)",
-                wait_status
+                "Unexpected state of child process {wait_status:?} (while waiting for SIGTRAP PTRACE_EVENT_EXEC)"
             )));
         }
 
