@@ -3,3 +3,4 @@
 
 # 0.14.0 -> 0.14.1
 - Removed `with_observers` from `Executor` trait.
+- `MmapShMemProvider::new_shmem_persistent` has been removed in favour of `MmapShMem::persist`. You probably want to do something like this: `let shmem = MmapShMemProvider::new()?.new_shmem(size)?.persist()?;`
