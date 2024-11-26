@@ -1854,7 +1854,7 @@ mod tests {
         use crate::shmem::{MmapShMemProvider, ShMem as _};
 
         let mut provider = MmapShMemProvider::new()?;
-        let mut shmem = provider.new_shmem_persistent(1)?;
+        let mut shmem = provider.new_shmem(1)?.persist()?;
         shmem.fill(0);
 
         let description = shmem.description();
