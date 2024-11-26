@@ -166,7 +166,7 @@ where
     T: AsRef<str>,
 {
     fn from(cli: &[T]) -> Self {
-        QemuParams::Cli(cli.into_iter().map(|x| x.as_ref().into()).collect())
+        QemuParams::Cli(cli.iter().map(|x| x.as_ref().into()).collect())
     }
 }
 
@@ -493,8 +493,11 @@ impl Qemu {
 
         let args: Vec<String> = match params {
             QemuParams::Config(cfg) => {
-                let qemu_args: Vec<String> =
-                    cfg.to_string().split(" ").map(|x| x.to_string()).collect();
+                let qemu_args: Vec<String> = cfg
+                    .to_string()
+                    .split(' ')
+                    .map(ToString::to_string)
+                    .collect();
 
                 QEMU_CONFIG.set(cfg.clone()).map_err(|_| {
                     unreachable!("QEMU_CONFIG was already set but Qemu was not init!")

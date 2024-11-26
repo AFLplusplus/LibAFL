@@ -150,7 +150,6 @@ use std::pin::Pin;
 
 use libafl_qemu_sys::GuestAddr;
 use object::{Object, ObjectSection};
-
 use crate::{
     emu::EmulatorModules,
     modules::{AddressFilter, StdAddressFilter},
@@ -255,7 +254,7 @@ impl AsanGiovese {
                     Self::unpoison(qemu, a1, a2 as usize);
                 }
                 QasanAction::IsPoison => {
-                    if Self::is_invalid_access(qemu, a1, a2 as usize) {
+                    if Self::is_invalid_access_n(qemu, a1, a2 as usize) {
                         r = 1;
                     }
                 }
@@ -285,51 +284,26 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
-    pub fn is_invalid_access_1(qemu: Qemu, addr: GuestAddr) -> bool {
-        unsafe {
-            let h = qemu.g2h::<*const c_void>(addr) as isize;
-            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            let k = *shadow_addr as isize;
-            k != 0 && (h & 7).wrapping_add(1) > k
-        }
-    }
+    pub fn is_invalid_access<const N: usize>(qemu: Qemu, addr: GuestAddr) -> bool
+    {
+        const { assert!(N == 1 || N == 2 || N == 4 || N == 8) };
 
-    #[inline]
-    #[must_use]
-    pub fn is_invalid_access_2(qemu: Qemu, addr: GuestAddr) -> bool {
         unsafe {
             let h = qemu.g2h::<*const c_void>(addr) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            let k = *shadow_addr as isize;
-            k != 0 && (h & 7).wrapping_add(2) > k
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_invalid_access_4(qemu: Qemu, addr: GuestAddr) -> bool {
-        unsafe {
-            let h = qemu.g2h::<*const c_void>(addr) as isize;
-            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            let k = *shadow_addr as isize;
-            k != 0 && (h & 7).wrapping_add(4) > k
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_invalid_access_8(qemu: Qemu, addr: GuestAddr) -> bool {
-        unsafe {
-            let h = qemu.g2h::<*const c_void>(addr) as isize;
-            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            *shadow_addr != 0
+            if N < 8 {
+                let k = *shadow_addr as isize;
+                k != 0 && (h & 7).wrapping_add(N as isize) > k
+            } else {
+                *shadow_addr != 0
+            }
         }
     }
 
     #[inline]
     #[must_use]
     #[allow(clippy::cast_sign_loss)]
-    pub fn is_invalid_access(qemu: Qemu, addr: GuestAddr, n: usize) -> bool {
+    pub fn is_invalid_access_n(qemu: Qemu, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             if n == 0 {
                 return false;
@@ -724,7 +698,7 @@ pub fn init_qemu_with_asan(
         ASAN_INITED = true;
     }
 
-    let qemu = Qemu::init(args)?;
+    let qemu = Qemu::init(args.as_slice())?;
     let rt = AsanGiovese::new(qemu.hooks());
 
     Ok((qemu, rt))
@@ -843,66 +817,30 @@ impl AsanModule {
     #[allow(clippy::unused_self)]
     #[must_use]
     pub fn is_poisoned(&self, qemu: Qemu, addr: GuestAddr, size: usize) -> bool {
-        AsanGiovese::is_invalid_access(qemu, addr, size)
+        AsanGiovese::is_invalid_access_n(qemu, addr, size)
     }
 
-    pub fn read_1(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_1(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 1));
-        }
-    }
-
-    pub fn read_2(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_2(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 2));
-        }
-    }
-
-    pub fn read_4(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_4(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 4));
-        }
-    }
-
-    pub fn read_8(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_8(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, 8));
+    pub fn read<const N: usize>(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+        if self.enabled() && AsanGiovese::is_invalid_access::<N>(qemu, addr) {
+            self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, N));
         }
     }
 
     pub fn read_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
-        if self.enabled() && AsanGiovese::is_invalid_access(qemu, addr, size) {
+        if self.enabled() && AsanGiovese::is_invalid_access_n(qemu, addr, size) {
             self.rt
                 .report_or_crash(qemu, pc, AsanError::Read(addr, size));
         }
     }
 
-    pub fn write_1(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_1(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 1));
-        }
-    }
-
-    pub fn write_2(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_2(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 2));
-        }
-    }
-
-    pub fn write_4(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_4(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 4));
-        }
-    }
-
-    pub fn write_8(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access_8(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, 8));
+    pub fn write<const N: usize>(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+        if self.enabled() && AsanGiovese::is_invalid_access::<N>(qemu, addr) {
+            self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, N));
         }
     }
 
     pub fn write_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
-        if self.enabled() && AsanGiovese::is_invalid_access(qemu, addr, size) {
+        if self.enabled() && AsanGiovese::is_invalid_access_n(qemu, addr, size) {
             self.rt
                 .report_or_crash(qemu, pc, AsanError::Write(addr, size));
         }
@@ -929,47 +867,51 @@ where
     type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
-        emulator_modules.syscalls(Hook::Function(qasan_fake_syscall::<ET, S>));
+        emulator_modules.pre_syscalls(Hook::Function(qasan_fake_syscall::<ET, S>));
 
         if self.rt.error_callback.is_some() {
             emulator_modules.crash_function(oncrash_asan::<ET, S>);
         }
     }
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         emulator_modules.reads(
             Hook::Function(gen_readwrite_asan::<ET, S>),
-            Hook::Function(trace_read1_asan::<ET, S>),
-            Hook::Function(trace_read2_asan::<ET, S>),
-            Hook::Function(trace_read4_asan::<ET, S>),
-            Hook::Function(trace_read8_asan::<ET, S>),
+            Hook::Function(trace_read_asan::<ET, S, 1>),
+            Hook::Function(trace_read_asan::<ET, S, 2>),
+            Hook::Function(trace_read_asan::<ET, S, 4>),
+            Hook::Function(trace_read_asan::<ET, S, 8>),
             Hook::Function(trace_read_n_asan::<ET, S>),
         );
 
         if emulator_modules.get::<SnapshotModule>().is_none() {
             emulator_modules.writes(
                 Hook::Function(gen_readwrite_asan::<ET, S>),
-                Hook::Function(trace_write1_asan::<ET, S>),
-                Hook::Function(trace_write2_asan::<ET, S>),
-                Hook::Function(trace_write4_asan::<ET, S>),
-                Hook::Function(trace_write8_asan::<ET, S>),
+                Hook::Function(trace_write_asan::<ET, S, 1>),
+                Hook::Function(trace_write_asan::<ET, S, 2>),
+                Hook::Function(trace_write_asan::<ET, S, 4>),
+                Hook::Function(trace_write_asan::<ET, S, 8>),
                 Hook::Function(trace_write_n_asan::<ET, S>),
             );
         } else {
             // track writes for both modules as opt
             emulator_modules.writes(
                 Hook::Function(gen_write_asan_snapshot::<ET, S>),
-                Hook::Function(trace_write1_asan_snapshot::<ET, S>),
-                Hook::Function(trace_write2_asan_snapshot::<ET, S>),
-                Hook::Function(trace_write4_asan_snapshot::<ET, S>),
-                Hook::Function(trace_write8_asan_snapshot::<ET, S>),
+                Hook::Function(trace_write_asan_snapshot::<ET, S, 1>),
+                Hook::Function(trace_write_asan_snapshot::<ET, S, 2>),
+                Hook::Function(trace_write_asan_snapshot::<ET, S, 4>),
+                Hook::Function(trace_write_asan_snapshot::<ET, S, 8>),
                 Hook::Function(trace_write_n_asan_snapshot::<ET, S>),
             );
         }
@@ -977,21 +919,23 @@ where
 
     fn pre_exec<ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
         _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
         if self.empty {
-            self.rt.snapshot(emulator_modules.qemu());
+            self.rt.snapshot(qemu);
             self.empty = false;
         }
     }
 
     fn post_exec<OT, ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
@@ -1000,7 +944,7 @@ where
         OT: ObserversTuple<S::Input, S>,
         ET: EmulatorModuleTuple<S>,
     {
-        if self.reset(emulator_modules.qemu()) == AsanRollback::HasLeaks {
+        if self.reset(qemu) == AsanRollback::HasLeaks {
             *exit_kind = ExitKind::Crash;
         }
     }
@@ -1014,18 +958,21 @@ where
     }
 }
 
-pub fn oncrash_asan<ET, S>(emulator_modules: &mut EmulatorModules<ET, S>, target_sig: i32)
-where
+pub fn oncrash_asan<ET, S>(
+    qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, S>,
+    target_sig: i32,
+) where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    let qemu = emulator_modules.qemu();
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
     h.rt.report(qemu, pc, AsanError::Signal(target_sig));
 }
 
 pub fn gen_readwrite_asan<ET, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
@@ -1044,7 +991,8 @@ where
     }
 }
 
-pub fn trace_read1_asan<ET, S>(
+pub fn trace_read_asan<ET, S, const N: usize>(
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
@@ -1053,54 +1001,12 @@ pub fn trace_read1_asan<ET, S>(
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    let qemu = emulator_modules.qemu();
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.read_1(qemu, id as GuestAddr, addr);
-}
-
-pub fn trace_read2_asan<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    let qemu = emulator_modules.qemu();
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.read_2(qemu, id as GuestAddr, addr);
-}
-
-pub fn trace_read4_asan<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    let qemu = emulator_modules.qemu();
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.read_4(qemu, id as GuestAddr, addr);
-}
-
-pub fn trace_read8_asan<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    let qemu = emulator_modules.qemu();
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.read_8(qemu, id as GuestAddr, addr);
+    h.read::<N>(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_read_n_asan<ET, S>(
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
@@ -1110,12 +1016,12 @@ pub fn trace_read_n_asan<ET, S>(
     S: Unpin + UsesInput,
     ET: EmulatorModuleTuple<S>,
 {
-    let qemu = emulator_modules.qemu();
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
-pub fn trace_write1_asan<ET, S>(
+pub fn trace_write_asan<ET, S, const N: usize>(
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
@@ -1124,54 +1030,12 @@ pub fn trace_write1_asan<ET, S>(
     S: Unpin + UsesInput,
     ET: EmulatorModuleTuple<S>,
 {
-    let qemu = emulator_modules.qemu();
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.write_1(qemu, id as GuestAddr, addr);
-}
-
-pub fn trace_write2_asan<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    let qemu = emulator_modules.qemu();
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.write_2(qemu, id as GuestAddr, addr);
-}
-
-pub fn trace_write4_asan<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    let qemu = emulator_modules.qemu();
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.write_4(qemu, id as GuestAddr, addr);
-}
-
-pub fn trace_write8_asan<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    let qemu = emulator_modules.qemu();
-    let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-    h.write_8(qemu, id as GuestAddr, addr);
+    h.write::<N>(qemu, id as GuestAddr, addr);
 }
 
 pub fn trace_write_n_asan<ET, S>(
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
@@ -1181,12 +1045,12 @@ pub fn trace_write_n_asan<ET, S>(
     S: Unpin + UsesInput,
     ET: EmulatorModuleTuple<S>,
 {
-    let qemu = emulator_modules.qemu();
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
 pub fn gen_write_asan_snapshot<ET, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
@@ -1205,7 +1069,8 @@ where
     }
 }
 
-pub fn trace_write1_asan_snapshot<ET, S>(
+pub fn trace_write_asan_snapshot<ET, S, const N: usize>(
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
@@ -1215,69 +1080,15 @@ pub fn trace_write1_asan_snapshot<ET, S>(
     ET: EmulatorModuleTuple<S>,
 {
     if id != 0 {
-        let qemu = emulator_modules.qemu();
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-        h.write_1(qemu, id as GuestAddr, addr);
+        h.write::<N>(qemu, id as GuestAddr, addr);
     }
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-    h.access(addr, 1);
-}
-
-pub fn trace_write2_asan_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    if id != 0 {
-        let qemu = emulator_modules.qemu();
-        let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-        h.write_2(qemu, id as GuestAddr, addr);
-    }
-    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-    h.access(addr, 2);
-}
-
-pub fn trace_write4_asan_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    if id != 0 {
-        let qemu = emulator_modules.qemu();
-        let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-        h.write_4(qemu, id as GuestAddr, addr);
-    }
-    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-    h.access(addr, 4);
-}
-
-pub fn trace_write8_asan_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    id: u64,
-    addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    if id != 0 {
-        let qemu = emulator_modules.qemu();
-        let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-        h.write_8(qemu, id as GuestAddr, addr);
-    }
-    let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-    h.access(addr, 8);
+    h.access(addr, N);
 }
 
 pub fn trace_write_n_asan_snapshot<ET, S>(
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
@@ -1288,7 +1099,6 @@ pub fn trace_write_n_asan_snapshot<ET, S>(
     ET: EmulatorModuleTuple<S>,
 {
     if id != 0 {
-        let qemu = emulator_modules.qemu();
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
         h.read_n(qemu, id as GuestAddr, addr, size);
     }
@@ -1298,6 +1108,7 @@ pub fn trace_write_n_asan_snapshot<ET, S>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<ET, S>(
+    qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     sys_num: i32,
@@ -1315,7 +1126,6 @@ where
     ET: EmulatorModuleTuple<S>,
 {
     if sys_num == QASAN_FAKESYS_NR {
-        let qemu = emulator_modules.qemu();
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {

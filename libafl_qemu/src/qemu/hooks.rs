@@ -475,7 +475,6 @@ create_hook_types!(
         ) -> SyscallHookResult,
     >,
     extern "C" fn(
-        Qemu,
         *const (),
         i32,
         GuestAddr,
@@ -544,7 +543,6 @@ create_hook_types!(
         ) -> GuestAddr,
     >,
     extern "C" fn(
-        Qemu,
         *const (),
         GuestAddr,
         i32,

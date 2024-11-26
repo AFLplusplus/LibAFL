@@ -91,7 +91,7 @@ pub fn init_qemu_with_asan_guest(
         ASAN_GUEST_INITED = true;
     }
 
-    let emu = Qemu::init(args)?;
+    let emu = Qemu::init(args.as_slice())?;
     Ok((emu, asan_lib))
 }
 
@@ -206,6 +206,7 @@ where
 }
 
 fn gen_readwrite_guest_asan<ET, F, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
@@ -244,6 +245,7 @@ where
 unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
 
 fn guest_trace_error_asan<ET, S>(
+    _qemu: Qemu,
     _emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
@@ -256,6 +258,7 @@ fn guest_trace_error_asan<ET, S>(
 }
 
 fn guest_trace_error_n_asan<ET, S>(
+    _qemu: Qemu,
     _emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
@@ -275,8 +278,12 @@ where
 {
     type ModuleAddressFilter = F;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {

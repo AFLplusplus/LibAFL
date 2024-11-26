@@ -78,7 +78,7 @@ mod generators {
     }
 
     pub fn gen_unique_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
-        qemu: Qemu,
+        _qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
         state: Option<&mut S>,
         src: GuestAddr,
@@ -155,7 +155,7 @@ mod generators {
 
     #[allow(clippy::unnecessary_cast)]
     pub fn gen_hashed_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
-        qemu: Qemu,
+        _qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         src: GuestAddr,
@@ -207,7 +207,7 @@ mod generators {
 
     #[allow(clippy::unnecessary_cast)]
     pub fn gen_hashed_block_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
-        qemu: Qemu,
+        _qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,

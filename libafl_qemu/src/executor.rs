@@ -40,7 +40,9 @@ use libc::siginfo_t;
 
 #[cfg(feature = "usermode")]
 use crate::EmulatorModules;
-use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
+use crate::{
+    command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver, Qemu,
+};
 
 pub struct QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where
@@ -182,12 +184,12 @@ where
             inner.inprocess_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<ET, S> as *const c_void;
 
-            let handler = |emulator_modules: &mut EmulatorModules<ET, S>, host_sig| {
+            let handler = |qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, S>, host_sig| {
                 eprintln!("Crashed with signal {host_sig}");
                 unsafe {
                     libafl::executors::inprocess::generic_inproc_crash_handler::<Self, EM, OF, Z>();
                 }
-                if let Some(cpu) = emulator_modules.qemu().current_cpu() {
+                if let Some(cpu) = qemu.current_cpu() {
                     eprint!("Context:\n{}", cpu.display_context());
                 }
             };

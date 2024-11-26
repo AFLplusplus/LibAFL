@@ -9,7 +9,7 @@ use libafl_qemu_sys::{CPUStatePtr, FatPtr, GuestAddr, GuestUsize, TCGTemp};
 use crate::qemu::{
     closure_post_syscall_hook_wrapper, closure_pre_syscall_hook_wrapper,
     func_post_syscall_hook_wrapper, func_pre_syscall_hook_wrapper, PostSyscallHook,
-    PostSyscallHookId, PreSyscallHook, PreSyscallHookId, SyscallHookResult,
+    PostSyscallHookId, PreSyscallHook, PreSyscallHookId,
 };
 #[cfg(feature = "usermode")]
 use crate::qemu::{
@@ -80,6 +80,7 @@ where
 {
     unsafe {
         let emulator_modules = EmulatorModules::<ET, S>::emulator_modules_mut().unwrap();
+        let qemu = Qemu::get_unchecked();
 
         let crash_hooks_ptr = &raw mut emulator_modules.hooks.crash_hooks;
 
@@ -87,12 +88,12 @@ where
             match crash_hook {
                 HookRepr::Function(ptr) => {
                     let func: CrashHookFn<ET, S> = transmute(*ptr);
-                    func(emulator_modules, target_sig);
+                    func(qemu, emulator_modules, target_sig);
                 }
                 HookRepr::Closure(ptr) => {
                     let func: &mut CrashHookClosure<ET, S> =
                         &mut *(ptr::from_mut::<FatPtr>(ptr) as *mut CrashHookClosure<ET, S>);
-                    func(emulator_modules, target_sig);
+                    func(qemu, emulator_modules, target_sig);
                 }
                 HookRepr::Empty => (),
             }
@@ -762,10 +763,10 @@ where
     S: Unpin + UsesInput,
 {
     #[allow(clippy::type_complexity)]
-    pub fn syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
+    pub fn pre_syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
         match hook {
-            Hook::Function(f) => Some(self.syscalls_function(f)),
-            Hook::Closure(c) => Some(self.syscalls_closure(c)),
+            Hook::Function(f) => Some(self.pre_syscalls_function(f)),
+            Hook::Closure(c) => Some(self.pre_syscalls_closure(c)),
             Hook::Raw(r) => {
                 let z: *const () = ptr::null::<()>();
                 Some(self.qemu_hooks.add_pre_syscall_hook(z, r))
@@ -775,7 +776,7 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
+    pub fn pre_syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`].
         unsafe {
@@ -785,7 +786,7 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
+    pub fn pre_syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`].
         unsafe {
@@ -816,10 +817,10 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
+    pub fn post_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
         match hook {
-            Hook::Function(f) => Some(self.after_syscalls_function(f)),
-            Hook::Closure(c) => Some(self.after_syscalls_closure(c)),
+            Hook::Function(f) => Some(self.post_syscalls_function(f)),
+            Hook::Closure(c) => Some(self.post_syscalls_closure(c)),
             Hook::Raw(r) => {
                 let z: *const () = ptr::null::<()>();
                 Some(self.qemu_hooks.add_post_syscall_hook(z, r))
@@ -829,7 +830,7 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
+    pub fn post_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`]. This should be ok.
         unsafe {
@@ -839,7 +840,7 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls_closure(
+    pub fn post_syscalls_closure(
         &mut self,
         hook: PostSyscallHookClosure<ET, S>,
     ) -> PostSyscallHookId {
@@ -870,7 +871,7 @@ where
         }
     }
 
-    pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
+    pub fn crash_function(&mut self, hook: CrashHookFn<ET, S>) {
         // # Safety
         // Will cast the valid hook to a ptr.
         self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
@@ -1111,8 +1112,7 @@ where
         modules
     }
 
-    /// Run post-QEMU init module callbacks.
-    pub unsafe fn post_qemu_init_all(&mut self, qemu: Qemu) {
+    pub fn post_qemu_init_all(&mut self, qemu: Qemu) {
         // We give access to EmulatorModuleTuple<S> during init, the compiler complains (for good reasons)
         // TODO: We should find a way to be able to check for a module without giving full access to the tuple.
         unsafe {
@@ -1205,108 +1205,54 @@ where
     S: Unpin + UsesInput,
 {
     #[allow(clippy::type_complexity)]
-    pub fn syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
-        self.hooks.syscalls(hook)
+    pub fn pre_syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
+        self.hooks.pre_syscalls(hook)
     }
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `syscalls_function`
     #[allow(clippy::type_complexity)]
-    pub unsafe fn syscalls_function(
+    pub unsafe fn pre_syscalls_function(
         &mut self,
-        hook: fn(
-            &mut EmulatorModules<ET, S>,
-            Option<&mut S>,
-            sys_num: i32,
-            a0: GuestAddr,
-            a1: GuestAddr,
-            a2: GuestAddr,
-            a3: GuestAddr,
-            a4: GuestAddr,
-            a5: GuestAddr,
-            a6: GuestAddr,
-            a7: GuestAddr,
-        ) -> SyscallHookResult,
+        hook: PreSyscallHookFn<ET, S>,
     ) -> PreSyscallHookId {
-        self.hooks.syscalls_function(hook)
+        self.hooks.pre_syscalls_function(hook)
     }
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `syscalls_closure`
     #[allow(clippy::type_complexity)]
-    pub unsafe fn syscalls_closure(
+    pub unsafe fn pre_syscalls_closure(
         &mut self,
-        hook: Box<
-            dyn for<'a> FnMut(
-                &'a mut EmulatorModules<ET, S>,
-                Option<&'a mut S>,
-                i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-            ) -> SyscallHookResult,
-        >,
+        hook: PreSyscallHookClosure<ET, S>,
     ) -> PreSyscallHookId {
-        self.hooks.syscalls_closure(hook)
+        self.hooks.pre_syscalls_closure(hook)
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
-        self.hooks.after_syscalls(hook)
+    pub fn post_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
+        self.hooks.post_syscalls(hook)
     }
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `after_syscalls_function`
     #[allow(clippy::type_complexity)]
-    pub unsafe fn after_syscalls_function(
+    pub unsafe fn post_syscalls_function(
         &mut self,
-        hook: fn(
-            &mut EmulatorModules<ET, S>,
-            Option<&mut S>,
-            res: GuestAddr,
-            sys_num: i32,
-            a0: GuestAddr,
-            a1: GuestAddr,
-            a2: GuestAddr,
-            a3: GuestAddr,
-            a4: GuestAddr,
-            a5: GuestAddr,
-            a6: GuestAddr,
-            a7: GuestAddr,
-        ) -> GuestAddr,
+        hook: PostSyscallHookFn<ET, S>,
     ) -> PostSyscallHookId {
-        self.hooks.after_syscalls_function(hook)
+        self.hooks.post_syscalls_function(hook)
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn after_syscalls_closure(
+    pub fn post_syscalls_closure(
         &mut self,
-        hook: Box<
-            dyn for<'a> FnMut(
-                &'a mut EmulatorModules<ET, S>,
-                Option<&mut S>,
-                GuestAddr,
-                i32,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-                GuestAddr,
-            ) -> GuestAddr,
-        >,
+        hook: PostSyscallHookClosure<ET, S>,
     ) -> PostSyscallHookId {
-        self.hooks.after_syscalls_closure(hook)
+        self.hooks.post_syscalls_closure(hook)
     }
 
-    pub fn crash_function(&mut self, hook: fn(&mut EmulatorModules<ET, S>, target_signal: i32)) {
+    pub fn crash_function(&mut self, hook: CrashHookFn<ET, S>) {
         self.hooks.crash_function(hook);
     }
 
