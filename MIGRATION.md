@@ -1,1 +1,2 @@
 # 0.14.0 -> 0.14.1
+- `MmapShMemProvider::new_shmem_persistent` has been removed in favour of `MmapShMem::persist`. You probably want to do something like this: `let shmem = MmapShMemProvider::new(size)?.new_shmem()?.persist()?;`
