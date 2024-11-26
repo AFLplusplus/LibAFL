@@ -150,6 +150,7 @@ use std::pin::Pin;
 
 use libafl_qemu_sys::GuestAddr;
 use object::{Object, ObjectSection};
+
 use crate::{
     emu::EmulatorModules,
     modules::{AddressFilter, StdAddressFilter},
@@ -284,8 +285,7 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
-    pub fn is_invalid_access<const N: usize>(qemu: Qemu, addr: GuestAddr) -> bool
-    {
+    pub fn is_invalid_access<const N: usize>(qemu: Qemu, addr: GuestAddr) -> bool {
         const { assert!(N == 1 || N == 2 || N == 4 || N == 8) };
 
         unsafe {
