@@ -90,6 +90,7 @@ jobs:
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
 
   ubuntu-miri:
+    if: ${{ github.event.label.name == 'pre-release' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Add nightly clippy
