@@ -701,13 +701,12 @@ pub mod unix_shmem {
                 // FFI Calls.
                 unsafe {
                     let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    // Determine the number of elements to copy
+                    // Keep room for the leading slash and trailing NULL.
                     let max_copy = usize::min(filename.len(), MAX_MMAP_FILENAME_LEN - 2);
-
-                    // Perform the copy using slice indexing and `copy_from_slice`
-                    filename_path[1..1 + max_copy].copy_from_slice(&filename[..max_copy]);
                     filename_path[0] = b'/';
-                    filename_path[MAX_MMAP_FILENAME_LEN - 1] = 0; // Null terminate!
+                    filename_path[MAX_MMAP_FILENAME_LEN - 1] = 0;
+                    filename_path[1..=max_copy].copy_from_slice(&filename[..max_copy]);
+
                     log::info!(
                         "{} Creating shmem {} {:#?}",
                         map_size,
