@@ -9,7 +9,7 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{InProcessExecutor, ExitKind},
+    executors::{ExitKind, InProcessExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
