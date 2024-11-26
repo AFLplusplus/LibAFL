@@ -329,13 +329,19 @@ where
                     map_first_filled_count, 0,
                     "The map's filled count must never be 0"
                 );
+                // In theory `map_first_filled_count - unstable_entries` could be negative.
+                // Because `map_first_filled_count` is the filled count of just one single run.
+                // While the `unstable_entries` is the number of all the unstable entries across multiple runs.
+                // If the target is very unstable (~100%) then this would hit more edges than `map_first_filled_count`.
+                // But even in that case, we don't allow negative stability and just show 0% here.
+                let stable_count: u64 = map_first_filled_count.saturating_sub(unstable_entries) as u64;
                 mgr.fire(
                     state,
                     Event::UpdateUserStats {
                         name: Cow::from("stability"),
                         value: UserStats::new(
                             UserStatsValue::Ratio(
-                                (map_first_filled_count - unstable_entries) as u64,
+                                stable_count,
                                 map_first_filled_count as u64,
                             ),
                             AggregatorOps::Avg,
