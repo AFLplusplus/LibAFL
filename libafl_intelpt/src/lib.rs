@@ -342,8 +342,9 @@ impl IntelPT {
             };
         }
 
-        if cfg!(feature = "export_raw") {
-            self.set_last_decode_trace(data.as_ref().to_vec());
+        #[cfg(feature = "export_raw")]
+        {
+            self.last_decode_trace = data.as_ref().to_vec();
         }
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
@@ -421,14 +422,6 @@ impl IntelPT {
             }
         }
         Ok(())
-    }
-
-    #[cfg(not(feature = "export_raw"))]
-    #[allow(clippy::unused_self)]
-    fn set_last_decode_trace(&mut self, _trace: Vec<u8>) {}
-    #[cfg(feature = "export_raw")]
-    fn set_last_decode_trace(&mut self, trace: Vec<u8>) {
-        self.last_decode_trace = trace;
     }
 
     /// Get the raw trace used in the last decoding
