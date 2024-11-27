@@ -41,8 +41,10 @@ use libc::siginfo_t;
 #[cfg(feature = "usermode")]
 use crate::EmulatorModules;
 use crate::{
-    command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver, Qemu,
+    command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver,
 };
+#[cfg(feature = "usermode")]
+use crate::Qemu;
 
 pub struct QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
 where

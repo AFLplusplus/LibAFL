@@ -4,7 +4,7 @@ use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     state::{HasExecutions, State},
 };
-use libafl_bolts::tuples::{tuple_list, Prepend};
+use libafl_bolts::tuples::{tuple_list, Append, Prepend};
 
 #[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
@@ -109,7 +109,7 @@ where
         CM: CommandManager<ED, ET, S, SM>,
         ET: EmulatorModuleTuple<S>,
     {
-        let qemu_parameters = self.qemu_parameters.ok_or(QemuInitError::EmptyArgs)?;
+        let mut qemu_parameters = self.qemu_parameters.ok_or(QemuInitError::EmptyArgs)?;
 
         let emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
 
@@ -119,7 +119,7 @@ where
         unsafe {
             emulator_modules
                 .modules_mut()
-                .pre_qemu_init_all(EmulatorModules::<ET, S>::emulator_modules_mut_unchecked());
+                .pre_qemu_init_all(EmulatorModules::<ET, S>::emulator_modules_mut_unchecked(), &mut qemu_parameters);
         }
 
         let qemu = Qemu::init(qemu_parameters)?;
@@ -163,13 +163,27 @@ where
         )
     }
 
-    pub fn add_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), S, SM>
+    pub fn prepend_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), S, SM>
     where
         EM: EmulatorModule<S> + Unpin,
         ET: EmulatorModuleTuple<S>,
     {
         EmulatorBuilder::new(
             self.modules.prepend(module),
+            self.driver,
+            self.command_manager,
+            self.snapshot_manager,
+            self.qemu_parameters,
+        )
+    }
+
+    pub fn append_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (ET, EM), S, SM>
+    where
+        EM: EmulatorModule<S> + Unpin,
+        ET: EmulatorModuleTuple<S>,
+    {
+        EmulatorBuilder::new(
+            self.modules.append(module),
             self.driver,
             self.command_manager,
             self.snapshot_manager,

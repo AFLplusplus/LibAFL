@@ -11,15 +11,10 @@ use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rangemap::RangeMap;
 
-use crate::{
-    modules::{
-        calls::FullBacktraceCollector, snapshot::SnapshotModule, EmulatorModule,
-        EmulatorModuleTuple,
-    },
-    qemu::{MemAccessInfo, QemuInitError},
-    sys::TCGTemp,
-    Qemu, Regs,
-};
+use crate::{modules::{
+    calls::FullBacktraceCollector, snapshot::SnapshotModule, EmulatorModule,
+    EmulatorModuleTuple,
+}, qemu::MemAccessInfo, sys::TCGTemp, Qemu, QemuParams, Regs};
 
 // TODO at some point, merge parts with libafl_frida
 
@@ -176,8 +171,8 @@ impl core::fmt::Debug for AsanGiovese {
 }
 
 impl AsanGiovese {
-    unsafe fn map_shadow() {
-        assert!(
+    unsafe fn init(self: &mut Pin<Box<Self>>, qemu_hooks: QemuHooks) {
+        assert_ne!(
             libc::mmap(
                 HIGH_SHADOW_ADDR,
                 HIGH_SHADOW_SIZE,
@@ -185,9 +180,9 @@ impl AsanGiovese {
                 MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
                 -1,
                 0
-            ) != MAP_FAILED
+            ), MAP_FAILED
         );
-        assert!(
+        assert_ne!(
             libc::mmap(
                 LOW_SHADOW_ADDR,
                 LOW_SHADOW_SIZE,
@@ -195,9 +190,9 @@ impl AsanGiovese {
                 MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
                 -1,
                 0
-            ) != MAP_FAILED
+            ), MAP_FAILED
         );
-        assert!(
+        assert_ne!(
             libc::mmap(
                 GAP_SHADOW_ADDR,
                 GAP_SHADOW_SIZE,
@@ -205,12 +200,14 @@ impl AsanGiovese {
                 MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
                 -1,
                 0
-            ) != MAP_FAILED
+            ), MAP_FAILED
         );
+
+        qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
     }
 
     #[must_use]
-    fn new(qemu_hooks: QemuHooks) -> Pin<Box<Self>> {
+    fn new() -> Pin<Box<Self>> {
         let res = Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
             saved_tree: IntervalTree::new(),
@@ -219,9 +216,7 @@ impl AsanGiovese {
             saved_shadow: HashMap::default(),
             snapshot_shadow: true, // By default, track the dirty shadow pages
         };
-        let mut boxed = Box::pin(res);
-        qemu_hooks.add_pre_syscall_hook(boxed.as_mut(), Self::fake_syscall);
-        boxed
+        Box::pin(res)
     }
 
     extern "C" fn fake_syscall(
@@ -646,64 +641,6 @@ impl AsanGiovese {
     }
 }
 
-static mut ASAN_INITED: bool = false;
-
-pub fn init_qemu_with_asan(
-    args: &mut Vec<String>,
-    env: &mut [(String, String)],
-) -> Result<(Qemu, Pin<Box<AsanGiovese>>), QemuInitError> {
-    let current = env::current_exe().unwrap();
-    let asan_lib = fs::canonicalize(current)
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("libqasan.so");
-    let asan_lib = asan_lib
-        .to_str()
-        .expect("The path to the asan lib is invalid")
-        .to_string();
-    let add_asan =
-        |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
-
-    // TODO: adapt since qemu does not take envp anymore as parameter
-    let mut added = false;
-    for (k, v) in &mut *env {
-        if k == "QEMU_SET_ENV" {
-            let mut new_v = vec![];
-            for e in v.split(',') {
-                if e.starts_with("LD_PRELOAD=") {
-                    added = true;
-                    new_v.push(add_asan(e));
-                } else {
-                    new_v.push(e.to_string());
-                }
-            }
-            *v = new_v.join(",");
-        }
-    }
-    for i in 0..args.len() {
-        if args[i] == "-E" && i + 1 < args.len() && args[i + 1].starts_with("LD_PRELOAD=") {
-            added = true;
-            args[i + 1] = add_asan(&args[i + 1]);
-        }
-    }
-
-    if !added {
-        args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
-        args.insert(1, "-E".into());
-    }
-
-    unsafe {
-        AsanGiovese::map_shadow();
-        ASAN_INITED = true;
-    }
-
-    let qemu = Qemu::init(args.as_slice())?;
-    let rt = AsanGiovese::new(qemu.hooks());
-
-    Ok((qemu, rt))
-}
-
 pub enum QemuAsanOptions {
     None,
     Snapshot,
@@ -715,6 +652,7 @@ pub type AsanChildModule = AsanModule;
 
 #[derive(Debug)]
 pub struct AsanModule {
+    env: Vec<(String, String)>,
     enabled: bool,
     detect_leaks: bool,
     empty: bool,
@@ -724,25 +662,28 @@ pub struct AsanModule {
 
 impl AsanModule {
     #[must_use]
-    pub fn default(rt: Pin<Box<AsanGiovese>>) -> Self {
-        Self::new(rt, StdAddressFilter::default(), &QemuAsanOptions::Snapshot)
+    pub fn default(env: &[(String, String)]) -> Self {
+        Self::new(StdAddressFilter::default(), &QemuAsanOptions::Snapshot, env)
     }
 
     #[must_use]
     pub fn new(
-        mut rt: Pin<Box<AsanGiovese>>,
         filter: StdAddressFilter,
         options: &QemuAsanOptions,
+        env: &[(String, String)],
     ) -> Self {
-        assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_qemu_with_asan(...) instead of just Qemu::init(...)");
         let (snapshot, detect_leaks) = match options {
             QemuAsanOptions::None => (false, false),
             QemuAsanOptions::Snapshot => (true, false),
             QemuAsanOptions::DetectLeaks => (false, true),
             QemuAsanOptions::SnapshotDetectLeaks => (true, true),
         };
+
+        let mut rt = AsanGiovese::new();
         rt.set_snapshot_shadow(snapshot);
+
         Self {
+            env: env.to_vec(),
             enabled: true,
             detect_leaks,
             empty: true,
@@ -753,21 +694,24 @@ impl AsanModule {
 
     #[must_use]
     pub fn with_error_callback(
-        mut rt: Pin<Box<AsanGiovese>>,
         filter: StdAddressFilter,
         error_callback: AsanErrorCallback,
         options: &QemuAsanOptions,
+        env: &[(String, String)],
     ) -> Self {
-        assert!(unsafe { ASAN_INITED },  "The ASan runtime is not initialized, use init_qemu_with_asan(...) instead of just Qemu::init(...)");
         let (snapshot, detect_leaks) = match options {
             QemuAsanOptions::None => (false, false),
             QemuAsanOptions::Snapshot => (true, false),
             QemuAsanOptions::DetectLeaks => (false, true),
             QemuAsanOptions::SnapshotDetectLeaks => (true, true),
         };
+
+        let mut rt = AsanGiovese::new();
         rt.set_snapshot_shadow(snapshot);
         rt.set_error_callback(error_callback);
+
         Self {
+            env: env.to_vec(),
             enabled: true,
             detect_leaks,
             empty: true,
@@ -780,15 +724,15 @@ impl AsanModule {
     /// The `ASan` error report accesses [`FullBacktraceCollector`]
     #[must_use]
     pub unsafe fn with_asan_report(
-        rt: Pin<Box<AsanGiovese>>,
         filter: StdAddressFilter,
         options: &QemuAsanOptions,
+        env: &[(String, String)],
     ) -> Self {
         Self::with_error_callback(
-            rt,
             filter,
             Box::new(|rt, qemu, pc, err| unsafe { asan_report(rt, qemu, pc, &err) }),
             options,
+            env,
         )
     }
 
@@ -867,7 +811,61 @@ where
     type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn post_qemu_init<ET>(&self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn pre_qemu_init<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, qemu_params: &mut QemuParams)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
+        let mut args: Vec<String> = qemu_params.to_cli();
+
+        let current = env::current_exe().unwrap();
+        let asan_lib = fs::canonicalize(current)
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("libqasan.so");
+        let asan_lib = asan_lib
+            .to_str()
+            .expect("The path to the asan lib is invalid")
+            .to_string();
+        let add_asan =
+            |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
+
+        // TODO: adapt since qemu does not take envp anymore as parameter
+        let mut added = false;
+        for (k, v) in &mut self.env {
+            if k == "QEMU_SET_ENV" {
+                let mut new_v = vec![];
+                for e in v.split(',') {
+                    if e.starts_with("LD_PRELOAD=") {
+                        added = true;
+                        new_v.push(add_asan(e));
+                    } else {
+                        new_v.push(e.to_string());
+                    }
+                }
+                *v = new_v.join(",");
+            }
+        }
+        for i in 0..args.len() {
+            if args[i] == "-E" && i + 1 < args.len() && args[i + 1].starts_with("LD_PRELOAD=") {
+                added = true;
+                args[i + 1] = add_asan(&args[i + 1]);
+            }
+        }
+
+        if !added {
+            args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
+            args.insert(1, "-E".into());
+        }
+
+        unsafe {
+            AsanGiovese::init(&mut self.rt, emulator_modules.hooks().qemu_hooks());
+        }
+
+        *qemu_params = QemuParams::Cli(args);
+    }
+
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {

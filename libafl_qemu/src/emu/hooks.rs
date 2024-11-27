@@ -176,6 +176,10 @@ where
         }
     }
 
+    pub fn qemu_hooks(&self) -> QemuHooks {
+        self.qemu_hooks
+    }
+
     pub fn instruction_closure(
         &mut self,
         addr: GuestAddr,
@@ -1190,6 +1194,10 @@ where
     #[must_use]
     pub fn modules(&self) -> &ET {
         self.modules.as_ref().get_ref()
+    }
+
+    pub fn hooks(&mut self) -> &EmulatorHooks<ET, S> {
+        &self.hooks
     }
 
     pub fn hooks_mut(&mut self) -> &mut EmulatorHooks<ET, S> {

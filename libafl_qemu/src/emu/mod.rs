@@ -14,14 +14,7 @@ use libafl::{
 };
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
-use crate::{
-    breakpoint::{Breakpoint, BreakpointId},
-    command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
-    modules::EmulatorModuleTuple,
-    sync_exit::SyncExit,
-    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk,
-    QemuShutdownCause, Regs, CPU,
-};
+use crate::{breakpoint::{Breakpoint, BreakpointId}, command::{CommandError, CommandManager, NopCommandManager, StdCommandManager}, modules::EmulatorModuleTuple, sync_exit::SyncExit, Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk, QemuParams, QemuShutdownCause, Regs, CPU};
 
 mod hooks;
 pub use hooks::*;
@@ -329,6 +322,7 @@ where
         snapshot_manager: SM,
         command_manager: CM,
     ) -> Result<Self, QemuInitError> {
+        let mut qemu_parameters: QemuParams = qemu_args.into();
         let emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
         let mut emulator_modules = EmulatorModules::new(emulator_hooks, modules);
 
@@ -336,7 +330,7 @@ where
         unsafe {
             emulator_modules
                 .modules_mut()
-                .pre_qemu_init_all(EmulatorModules::<ET, S>::emulator_modules_mut_unchecked());
+                .pre_qemu_init_all(EmulatorModules::<ET, S>::emulator_modules_mut_unchecked(), &mut qemu_parameters);
         }
 
         let qemu = Qemu::init(qemu_args)?;

@@ -265,7 +265,7 @@ where
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn post_qemu_init<ET>(&self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {

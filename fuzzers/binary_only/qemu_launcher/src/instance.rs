@@ -37,16 +37,14 @@ use libafl_bolts::{
     rands::StdRand,
     tuples::{tuple_list, Merge, Prepend},
 };
-use libafl_qemu::{
-    elf::EasyElf,
-    modules::{
-        cmplog::CmpLogObserver, EmulatorModuleTuple, StdAddressFilter, StdEdgeCoverageModule,
-    },
-    Emulator, GuestAddr, Qemu, QemuExecutor,
-};
+use libafl_qemu::{elf::EasyElf, modules::{
+    cmplog::CmpLogObserver, EmulatorModuleTuple, StdAddressFilter, StdEdgeCoverageModule,
+}, Emulator, GuestAddr, Qemu, QemuExecutor};
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 use typed_builder::TypedBuilder;
-
+use libafl_bolts::tuples::MatchFirstType;
+use libafl_qemu::modules::{EdgeCoverageModule, EmulatorModule, NopPageFilter};
+use libafl_qemu::modules::edges::EdgeCoverageFullVariant;
 use crate::{harness::Harness, options::FuzzerOptions};
 
 pub type ClientState =
@@ -62,9 +60,6 @@ pub type ClientMgr<M> =
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
     /// The harness. We create it before forking, then `take()` it inside the client.
-    #[builder(setter(strip_option))]
-    harness: Option<Harness>,
-    qemu: Qemu,
     mgr: ClientMgr<M>,
     core_id: CoreId,
     #[builder(default)]
@@ -124,10 +119,18 @@ impl<M: Monitor> Instance<'_, M> {
 
         let edge_coverage_module = StdEdgeCoverageModule::builder()
             .map_observer(edges_observer.as_mut())
-            .address_filter(self.coverage_filter(self.qemu)?)
             .build()?;
 
         let modules = modules.prepend(edge_coverage_module);
+        let mut emulator = Emulator::empty().modules(modules).build()?;
+        let harness = Harness::init(emulator.qemu()).expect("Error setting up harness.");
+        let qemu = emulator.qemu();
+
+        // update address filter after qemu has been initialized
+        <EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0> as EmulatorModule<ClientState>>::update_address_filter(emulator.modules_mut()
+            .modules_mut()
+            .match_first_type_mut::<EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0>>()
+            .expect("Could not find back the edge module"), qemu, self.coverage_filter(qemu)?);
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -195,10 +198,6 @@ impl<M: Monitor> Instance<'_, M> {
 
         state.add_metadata(tokens);
 
-        let harness = self
-            .harness
-            .take()
-            .expect("The harness can never be None here!");
         harness.post_fork();
 
         let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
@@ -207,8 +206,6 @@ impl<M: Monitor> Instance<'_, M> {
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-        let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
 
         if let Some(rerun_input) = &self.options.rerun_input {
             // TODO: We might want to support non-bytes inputs at some point?

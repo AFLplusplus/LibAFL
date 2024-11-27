@@ -10,15 +10,12 @@ use libafl::{
 use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
 use libafl_qemu::modules::injections::InjectionModule;
-use libafl_qemu::{
-    modules::{
-        asan::{init_qemu_with_asan, AsanModule},
-        asan_guest::{init_qemu_with_asan_guest, AsanGuestModule},
-        cmplog::CmpLogModule,
-        DrCovModule,
-    },
-    Qemu,
-};
+use libafl_qemu::{modules::{
+    asan::AsanModule,
+    asan_guest::AsanGuestModule,
+    cmplog::CmpLogModule,
+    DrCovModule,
+}};
 
 use crate::{
     harness::Harness,
@@ -78,18 +75,6 @@ impl Client<'_> {
             Err(Error::empty_optional("Multiple ASAN modes configured"))?;
         }
 
-        let (qemu, mut asan, mut asan_lib) = {
-            if is_asan {
-                let (emu, asan) = init_qemu_with_asan(&mut args, &mut env)?;
-                (emu, Some(asan), None)
-            } else if is_asan_guest {
-                let (emu, asan_lib) = init_qemu_with_asan_guest(&mut args, &mut env)?;
-                (emu, None, Some(asan_lib))
-            } else {
-                (Qemu::init(&args)?, None, None)
-            }
-        };
-
         #[cfg(not(feature = "injections"))]
         let injection_module = None;
 
@@ -109,8 +94,6 @@ impl Client<'_> {
                 }
             });
 
-        let harness = Harness::init(qemu).expect("Error setting up harness.");
-
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
         let extra_tokens = injection_module
@@ -120,8 +103,6 @@ impl Client<'_> {
 
         let instance_builder = Instance::builder()
             .options(self.options)
-            .qemu(qemu)
-            .harness(harness)
             .mgr(mgr)
             .core_id(core_id)
             .extra_tokens(extra_tokens);
@@ -140,7 +121,7 @@ impl Client<'_> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanModule::default(asan.take().unwrap()),
+                        AsanModule::default(&env),
                         injection_module,
                     ),
                     state,
@@ -149,7 +130,7 @@ impl Client<'_> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanModule::default(asan.take().unwrap()),
+                        AsanModule::default(&env),
                     ),
                     state,
                 )
@@ -159,7 +140,7 @@ impl Client<'_> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
+                        AsanGuestModule::default(&env),
                         injection_module
                     ),
                     state,
@@ -168,7 +149,7 @@ impl Client<'_> {
                 instance_builder.build().run(
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
+                        AsanGuestModule::default(&env),
                     ),
                     state,
                 )
@@ -176,17 +157,17 @@ impl Client<'_> {
         } else if is_asan {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
-                    tuple_list!(AsanModule::default(asan.take().unwrap()), injection_module),
+                    tuple_list!(AsanModule::default(&env), injection_module),
                     state,
                 )
             } else {
                 instance_builder.build().run(
-                    tuple_list!(AsanModule::default(asan.take().unwrap()),),
+                    tuple_list!(AsanModule::default(&env),),
                     state,
                 )
             }
         } else if is_asan_guest {
-            let modules = tuple_list!(AsanGuestModule::default(qemu, &asan_lib.take().unwrap()));
+            let modules = tuple_list!(AsanGuestModule::default(&env));
             instance_builder.build().run(modules, state)
         } else if is_cmplog {
             if let Some(injection_module) = injection_module {
