@@ -12,7 +12,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
   MAIN_LLVM_VERSION: 18
-  GITHUB_CONTEXT: ${{ toJson(github) }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -95,8 +95,6 @@ jobs:
     runs-on: ubuntu-24.04
     if: contains( github.event.pull_request.labels.*.name, 'pre-release')
     steps:
-      - name: Debug
-        run: echo ${{ contains( github.event.pull_request.labels.*.name, 'pre-release') }}
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
       - uses: actions/checkout@v4
