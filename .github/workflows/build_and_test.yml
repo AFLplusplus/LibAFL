@@ -93,9 +93,10 @@ jobs:
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
+    if: contains( github.event.pull_request.labels.*.name, 'pre-release')
     steps:
       - name: Debug
-        run: echo "$GITHUB_CONTEXT"
+        run: echo ${{ contains( github.event.pull_request.labels.*.name, 'My Label') }}
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
       - uses: actions/checkout@v4
