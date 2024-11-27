@@ -635,10 +635,13 @@ impl From<windows_result::Error> for Error {
 impl From<pyo3::PyErr> for Error {
     fn from(err: pyo3::PyErr) -> Self {
         pyo3::Python::with_gil(|py| {
-            if err.matches(
-                py,
-                pyo3::types::PyType::new_bound::<pyo3::exceptions::PyKeyboardInterrupt>(py),
-            ) {
+            if err
+                .matches(
+                    py,
+                    pyo3::types::PyType::new::<pyo3::exceptions::PyKeyboardInterrupt>(py),
+                )
+                .unwrap()
+            {
                 Self::shutting_down()
             } else {
                 Self::illegal_state(format!("Python exception: {err:?}"))

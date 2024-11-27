@@ -1,5 +1,12 @@
+#[cfg(feature = "python")]
+use std::convert::Infallible;
+
+#[cfg(feature = "python")]
+use pyo3::{prelude::*, types::PyInt};
+
 #[cfg(cpu_target = "aarch64")]
 pub mod aarch64;
+
 #[cfg(all(cpu_target = "aarch64", not(feature = "clippy")))]
 pub use aarch64::*;
 
@@ -37,3 +44,15 @@ pub use hexagon::*;
 pub mod riscv;
 #[cfg(any(cpu_target = "riscv32", cpu_target = "riscv64"))]
 pub use riscv::*;
+
+#[cfg(feature = "python")]
+impl<'py> IntoPyObject<'py> for Regs {
+    type Target = PyInt;
+    type Output = Bound<'py, Self::Target>;
+    type Error = Infallible;
+
+    fn into_pyobject(self, py: Python<'py>) -> Result<Self::Output, Self::Error> {
+        let n: i32 = self.into();
+        n.into_pyobject(py)
+    }
+}
