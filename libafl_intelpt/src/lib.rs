@@ -739,6 +739,9 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
+        // Ignore the case when the file does not exist since it has been removed.
+        // KVM default is `System` mode
+        // https://lore.kernel.org/all/20241101185031.1799556-1-seanjc@google.com/t/#u
         if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
             match s.trim().parse::<i32>().map(TryInto::try_into) {
                 Ok(Ok(KvmPTMode::System)) => (),
