@@ -93,6 +93,8 @@ jobs:
     if: ${{ github.event.pull_request.labels.*.name == 'pre-release' }}
     runs-on: ubuntu-24.04
     steps:
+      - name: Debug
+        run: echo ${{ github.event.pull_request.labels }}
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
       - uses: actions/checkout@v4
