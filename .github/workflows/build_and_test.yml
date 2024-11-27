@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Debug
-        run: echo ${{ github.event.pull_request.labels }}
+        run: echo ${{ github.event.pull_request.labels.*.name }}
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
       - uses: actions/checkout@v4
