@@ -176,6 +176,7 @@ where
         }
     }
 
+    #[must_use]
     pub fn qemu_hooks(&self) -> QemuHooks {
         self.qemu_hooks
     }
