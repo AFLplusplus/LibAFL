@@ -35,16 +35,19 @@ use libafl_bolts::{
     core_affinity::CoreId,
     ownedref::OwnedMutSlice,
     rands::StdRand,
-    tuples::{tuple_list, Merge, Prepend},
+    tuples::{tuple_list, MatchFirstType, Merge, Prepend},
 };
-use libafl_qemu::{elf::EasyElf, modules::{
-    cmplog::CmpLogObserver, EmulatorModuleTuple, StdAddressFilter, StdEdgeCoverageModule,
-}, Emulator, GuestAddr, Qemu, QemuExecutor};
+use libafl_qemu::{
+    elf::EasyElf,
+    modules::{
+        cmplog::CmpLogObserver, edges::EdgeCoverageFullVariant, EdgeCoverageModule, EmulatorModule,
+        EmulatorModuleTuple, NopPageFilter, StdAddressFilter, StdEdgeCoverageModule,
+    },
+    Emulator, GuestAddr, Qemu, QemuExecutor,
+};
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 use typed_builder::TypedBuilder;
-use libafl_bolts::tuples::MatchFirstType;
-use libafl_qemu::modules::{EdgeCoverageModule, EmulatorModule, NopPageFilter};
-use libafl_qemu::modules::edges::EdgeCoverageFullVariant;
+
 use crate::{harness::Harness, options::FuzzerOptions};
 
 pub type ClientState =

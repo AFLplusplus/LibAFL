@@ -11,7 +11,7 @@ pub use snapshot::{IntervalSnapshotFilter, SnapshotModule};
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod asan;
 #[cfg(not(cpu_target = "hexagon"))]
-pub use asan::{AsanModule};
+pub use asan::AsanModule;
 
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod asan_guest;

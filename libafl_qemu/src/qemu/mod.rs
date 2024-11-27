@@ -191,16 +191,12 @@ where
 impl QemuParams {
     pub fn to_cli(&self) -> Vec<String> {
         match self {
-            QemuParams::Config(cfg) => {
-                cfg
-                    .to_string()
-                    .split(' ')
-                    .map(ToString::to_string)
-                    .collect()
-            }
-            QemuParams::Cli(cli) => {
-                cli.clone()
-            }
+            QemuParams::Config(cfg) => cfg
+                .to_string()
+                .split(' ')
+                .map(ToString::to_string)
+                .collect(),
+            QemuParams::Cli(cli) => cli.clone(),
         }
     }
 }
@@ -522,8 +518,8 @@ impl Qemu {
                 QEMU_CONFIG.set(cfg.clone()).map_err(|_| {
                     unreachable!("QEMU_CONFIG was already set but Qemu was not init!")
                 })?;
-            },
-            QemuParams::Cli(_) => {},
+            }
+            QemuParams::Cli(_) => {}
         };
 
         let args = params.to_cli();

@@ -11,10 +11,15 @@ use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rangemap::RangeMap;
 
-use crate::{modules::{
-    calls::FullBacktraceCollector, snapshot::SnapshotModule, EmulatorModule,
-    EmulatorModuleTuple,
-}, qemu::MemAccessInfo, sys::TCGTemp, Qemu, QemuParams, Regs};
+use crate::{
+    modules::{
+        calls::FullBacktraceCollector, snapshot::SnapshotModule, EmulatorModule,
+        EmulatorModuleTuple,
+    },
+    qemu::MemAccessInfo,
+    sys::TCGTemp,
+    Qemu, QemuParams, Regs,
+};
 
 // TODO at some point, merge parts with libafl_frida
 
@@ -180,7 +185,8 @@ impl AsanGiovese {
                 MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
                 -1,
                 0
-            ), MAP_FAILED
+            ),
+            MAP_FAILED
         );
         assert_ne!(
             libc::mmap(
@@ -190,7 +196,8 @@ impl AsanGiovese {
                 MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
                 -1,
                 0
-            ), MAP_FAILED
+            ),
+            MAP_FAILED
         );
         assert_ne!(
             libc::mmap(
@@ -200,7 +207,8 @@ impl AsanGiovese {
                 MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE | MAP_ANON,
                 -1,
                 0
-            ), MAP_FAILED
+            ),
+            MAP_FAILED
         );
 
         qemu_hooks.add_pre_syscall_hook(self.as_mut(), Self::fake_syscall);
@@ -811,8 +819,11 @@ where
     type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn pre_qemu_init<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, qemu_params: &mut QemuParams)
-    where
+    fn pre_qemu_init<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu_params: &mut QemuParams,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         let mut args: Vec<String> = qemu_params.to_cli();

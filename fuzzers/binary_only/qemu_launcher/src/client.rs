@@ -10,12 +10,9 @@ use libafl::{
 use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
 use libafl_qemu::modules::injections::InjectionModule;
-use libafl_qemu::{modules::{
-    asan::AsanModule,
-    asan_guest::AsanGuestModule,
-    cmplog::CmpLogModule,
-    DrCovModule,
-}};
+use libafl_qemu::modules::{
+    asan::AsanModule, asan_guest::AsanGuestModule, cmplog::CmpLogModule, DrCovModule,
+};
 
 use crate::{
     harness::Harness,
@@ -128,10 +125,7 @@ impl Client<'_> {
                 )
             } else {
                 instance_builder.build().run(
-                    tuple_list!(
-                        CmpLogModule::default(),
-                        AsanModule::default(&env),
-                    ),
+                    tuple_list!(CmpLogModule::default(), AsanModule::default(&env),),
                     state,
                 )
             }
@@ -147,10 +141,7 @@ impl Client<'_> {
                 )
             } else {
                 instance_builder.build().run(
-                    tuple_list!(
-                        CmpLogModule::default(),
-                        AsanGuestModule::default(&env),
-                    ),
+                    tuple_list!(CmpLogModule::default(), AsanGuestModule::default(&env),),
                     state,
                 )
             }
@@ -161,10 +152,9 @@ impl Client<'_> {
                     state,
                 )
             } else {
-                instance_builder.build().run(
-                    tuple_list!(AsanModule::default(&env),),
-                    state,
-                )
+                instance_builder
+                    .build()
+                    .run(tuple_list!(AsanModule::default(&env),), state)
             }
         } else if is_asan_guest {
             let modules = tuple_list!(AsanGuestModule::default(&env));

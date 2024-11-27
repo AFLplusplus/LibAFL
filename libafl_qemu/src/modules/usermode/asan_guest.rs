@@ -12,7 +12,13 @@ use libafl_qemu_sys::{GuestAddr, MapInfo};
 
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
-use crate::{emu::EmulatorModules, modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter}, qemu::{Hook, MemAccessInfo, Qemu}, sys::TCGTemp, QemuParams};
+use crate::{
+    emu::EmulatorModules,
+    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
+    qemu::{Hook, MemAccessInfo, Qemu},
+    sys::TCGTemp,
+    QemuParams,
+};
 
 #[derive(Clone)]
 struct QemuAsanGuestMapping {
@@ -84,7 +90,12 @@ where
 {
     #[must_use]
     pub fn new(env: &[(String, String)], filter: F) -> Self {
-        Self { env: env.to_vec(), filter, mappings: None, asan_lib: None }
+        Self {
+            env: env.to_vec(),
+            filter,
+            mappings: None,
+            asan_lib: None,
+        }
     }
 
     #[must_use]
@@ -113,7 +124,12 @@ where
 
     /* Don't sanitize the sanitizer! */
     unsafe {
-        if h.mappings.as_mut().unwrap_unchecked().iter().any(|m| m.start <= pc && pc < m.end) {
+        if h.mappings
+            .as_mut()
+            .unwrap_unchecked()
+            .iter()
+            .any(|m| m.start <= pc && pc < m.end)
+        {
             return None;
         }
     }
@@ -168,8 +184,11 @@ where
 {
     type ModuleAddressFilter = F;
 
-    fn pre_qemu_init<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, qemu_params: &mut QemuParams)
-    where
+    fn pre_qemu_init<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu_params: &mut QemuParams,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         let mut args = qemu_params.to_cli();
@@ -277,7 +296,6 @@ where
         for mapping in &mappings {
             println!("asan mapping: {mapping:#?}");
         }
-
     }
 
     fn first_exec<ET>(

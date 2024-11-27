@@ -61,8 +61,11 @@ where
     ///
     /// It is also possible to edit QEMU parameters, just before QEMU gets initialized.
     /// Thus, the module can modify options for QEMU just before it gets initialized.
-    fn pre_qemu_init<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _qemu_params: &mut QemuParams)
-    where
+    fn pre_qemu_init<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _qemu_params: &mut QemuParams,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
     }
@@ -155,8 +158,11 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
-    fn pre_qemu_init_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, qemu_params: &mut QemuParams)
-    where
+    fn pre_qemu_init_all<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu_params: &mut QemuParams,
+    ) where
         ET: EmulatorModuleTuple<S>;
 
     fn post_qemu_init_all<ET>(&mut self, qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
@@ -214,14 +220,20 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn pre_qemu_init_all<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _qemu_params: &mut QemuParams)
-    where
+    fn pre_qemu_init_all<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _qemu_params: &mut QemuParams,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
     }
 
-    fn post_qemu_init_all<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, S>)
-    where
+    fn post_qemu_init_all<ET>(
+        &mut self,
+        _qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
     }
@@ -279,8 +291,11 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 
-    fn pre_qemu_init_all<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, qemu_params: &mut QemuParams)
-    where
+    fn pre_qemu_init_all<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu_params: &mut QemuParams,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         self.0.pre_qemu_init(emulator_modules, qemu_params);

@@ -14,7 +14,14 @@ use libafl::{
 };
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
-use crate::{breakpoint::{Breakpoint, BreakpointId}, command::{CommandError, CommandManager, NopCommandManager, StdCommandManager}, modules::EmulatorModuleTuple, sync_exit::SyncExit, Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk, QemuParams, QemuShutdownCause, Regs, CPU};
+use crate::{
+    breakpoint::{Breakpoint, BreakpointId},
+    command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
+    modules::EmulatorModuleTuple,
+    sync_exit::SyncExit,
+    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk, QemuParams,
+    QemuShutdownCause, Regs, CPU,
+};
 
 mod hooks;
 pub use hooks::*;
@@ -328,9 +335,10 @@ where
 
         // TODO: fix things there properly. The biggest issue being that it creates 2 mut ref to the module with the callback being called
         unsafe {
-            emulator_modules
-                .modules_mut()
-                .pre_qemu_init_all(EmulatorModules::<ET, S>::emulator_modules_mut_unchecked(), &mut qemu_parameters);
+            emulator_modules.modules_mut().pre_qemu_init_all(
+                EmulatorModules::<ET, S>::emulator_modules_mut_unchecked(),
+                &mut qemu_parameters,
+            );
         }
 
         let qemu = Qemu::init(qemu_args)?;
