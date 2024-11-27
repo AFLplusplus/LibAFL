@@ -149,11 +149,11 @@ pub fn fuzz() {
 
             for m in qemu.mappings() {
                 log::debug!(
-            "Mapping: 0x{:016x}-0x{:016x}, {}",
-            m.start(),
-            m.end(),
-            m.path().unwrap_or(&"<EMPTY>".to_string())
-        );
+                    "Mapping: 0x{:016x}-0x{:016x}, {}",
+                    m.start(),
+                    m.end(),
+                    m.path().unwrap_or(&"<EMPTY>".to_string())
+                );
             }
 
             let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
@@ -182,9 +182,9 @@ pub fn fuzz() {
 
                     match qemu.run() {
                         Ok(QemuExitReason::Breakpoint(_)) => {}
-                        Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                            process::exit(0)
-                        }
+                        Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                            Signal::SigInterrupt,
+                        ))) => process::exit(0),
                         _ => panic!("Unexpected QEMU exit."),
                     }
 
