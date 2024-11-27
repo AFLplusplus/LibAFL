@@ -282,7 +282,7 @@ pub mod pybind {
         a6: u64,
         a7: u64,
     ) -> SyscallHookResult {
-        unsafe { (*&raw const PY_SYSCALL_HOOK).as_ref() }.map_or_else(
+        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
             || SyscallHookResult::new(None),
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
@@ -363,7 +363,7 @@ pub mod pybind {
         /// Accesses the global `PY_SYSCALL_HOOK` and may not be called concurrently.
         unsafe fn set_syscall_hook(&self, hook: PyObject) {
             unsafe {
-                (*&raw mut (PY_SYSCALL_HOOK)) = Some(hook);
+                PY_SYSCALL_HOOK = Some(hook);
             }
             self.qemu
                 .hooks()
