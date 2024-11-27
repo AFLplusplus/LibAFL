@@ -2,7 +2,10 @@
 //!
 //! The [`StdOutObserver`] and [`StdErrObserver`] observers look at the stdout of a program
 //! The executor must explicitly support these observers.
-//! For example, they are supported on the [`crate::executors::CommandExecutor`].
+#![cfg_attr(
+    all(feature = "std", unix),
+    doc = r"For example, they are supported on the [`crate::executors::CommandExecutor`]."
+)]
 
 use alloc::borrow::Cow;
 use std::vec::Vec;
