@@ -28,8 +28,8 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, CallingConvention,
-    Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason,
-    QemuForkExecutor, QemuShutdownCause, Regs,
+    Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
+    QemuShutdownCause, Regs,
 };
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 
@@ -113,7 +113,31 @@ pub fn fuzz() -> Result<(), Error> {
     log::debug!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
-    let qemu = Qemu::init(&options.args).unwrap();
+
+    let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
+    let edges = edges_shmem.as_slice_mut();
+    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
+
+    let mut edges_observer = unsafe {
+        HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
+            "edges",
+            NonNull::new(edges.as_mut_ptr())
+                .expect("The edge map pointer is null.")
+                .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
+        ))
+    };
+
+    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
+        .const_map_observer(edges_observer.as_mut())
+        .build()?);
+
+    let emulator = Emulator::empty()
+        .qemu_cli(options.args)
+        .modules(modules)
+        .build()?;
+    let qemu = emulator.qemu();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
@@ -139,8 +163,6 @@ pub fn fuzz() -> Result<(), Error> {
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-    let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
-
     let monitor = SimpleMonitor::with_user_monitor(|s| {
         println!("{s}");
     });
@@ -155,19 +177,6 @@ pub fn fuzz() -> Result<(), Error> {
                 panic!("Failed to setup the restarter: {err}");
             }
         },
-    };
-
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
-
-    let mut edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
-            "edges",
-            NonNull::new(edges.as_mut_ptr())
-                .expect("The edge map pointer is null.")
-                .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
-        ))
     };
 
     let mut feedback = MaxMapFeedback::new(&edges_observer);
@@ -222,12 +231,6 @@ pub fn fuzz() -> Result<(), Error> {
 
         ExitKind::Ok
     };
-
-    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
-        .const_map_observer(edges_observer.as_mut())
-        .build()?);
-
-    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
     let mut executor = QemuForkExecutor::new(
         emulator,

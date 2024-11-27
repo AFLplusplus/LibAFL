@@ -170,12 +170,21 @@ where
     }
 }
 
+impl<T> From<&Vec<T>> for QemuParams
+where
+    T: AsRef<str>,
+{
+    fn from(cli: &Vec<T>) -> Self {
+        cli.as_slice().into()
+    }
+}
+
 impl<T> From<Vec<T>> for QemuParams
 where
     T: AsRef<str>,
 {
     fn from(cli: Vec<T>) -> Self {
-        cli.as_slice().into()
+        (&cli).into()
     }
 }
 
