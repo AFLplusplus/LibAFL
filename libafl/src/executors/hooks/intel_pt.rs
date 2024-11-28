@@ -30,7 +30,7 @@ pub struct Section {
 }
 
 /// Hook to enable Intel Processor Trace (PT) tracing
-#[derive(TypedBuilder)]
+#[derive(Debug, TypedBuilder)]
 pub struct IntelPTHook<T> {
     #[builder(default = IntelPT::builder().build().unwrap())]
     intel_pt: IntelPT,
@@ -38,17 +38,6 @@ pub struct IntelPTHook<T> {
     image: (Image<'static>, SectionCache<'static>),
     map_ptr: *mut T,
     map_len: usize,
-}
-
-//fixme: just derive(Debug) once https://github.com/sum-catnip/libipt-rs/pull/4 will be on crates.io
-impl<T> Debug for IntelPTHook<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
-        f.debug_struct("IntelPTHook")
-            .field("intel_pt", &self.intel_pt)
-            .field("map_ptr", &self.map_ptr)
-            .field("map_len", &self.map_len)
-            .finish()
-    }
 }
 
 impl<S, T> ExecutorHook<S> for IntelPTHook<T>
@@ -70,7 +59,27 @@ where
             .intel_pt
             .decode_traces_into_map(&mut self.image.0, slice)
             .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
+        #[cfg(feature = "intel_pt_export_raw")]
+        {
+            let _ = trace_to_file(&self.intel_pt)
+                .inspect_err(|e| log::warn!("Intel PT trace save to file failed: {e}"));
+        }
     }
+}
+
+#[cfg(feature = "intel_pt_export_raw")]
+fn trace_to_file(pt: &IntelPT) -> Result<(), Error> {
+    use std::{fs, io::Write, path::Path, time};
+
+    let traces_dir = Path::new("traces");
+    fs::create_dir_all(traces_dir)?;
+    let timestamp = time::SystemTime::now()
+        .duration_since(time::UNIX_EPOCH)
+        .map_err(|e| Error::unknown(e.to_string()))?
+        .as_micros();
+    let mut file = fs::File::create(traces_dir.join(format!("trace_{timestamp}")))?;
+    file.write_all(&*pt.last_decode_trace())?;
+    Ok(())
 }
 
 // It would be nice to have this as a `TryFrom<IntoIter<Section>>`, but Rust's orphan rule doesn't

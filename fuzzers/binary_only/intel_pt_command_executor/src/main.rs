@@ -95,7 +95,7 @@ pub fn main() {
 
     // Set the instruction pointer (IP) filter and memory image of our target.
     // These information can be retrieved from `readelf -l` (for example)
-    let code_memory_addresses = ELF_ET_DYN_BASE + 0x14000..=ELF_ET_DYN_BASE + 0x14000 + 0x40000;
+    let code_memory_addresses = ELF_ET_DYN_BASE + 0x15000..=ELF_ET_DYN_BASE + 0x14000 + 0x41000;
 
     intel_pt
         .set_ip_filters(&[code_memory_addresses.clone()])
@@ -103,7 +103,7 @@ pub fn main() {
 
     let sections = [Section {
         file_path: target_path.to_string_lossy().to_string(),
-        file_offset: 0x13000,
+        file_offset: 0x14000,
         size: (*code_memory_addresses.end() - *code_memory_addresses.start() + 1) as u64,
         virtual_address: *code_memory_addresses.start() as u64,
     }];
