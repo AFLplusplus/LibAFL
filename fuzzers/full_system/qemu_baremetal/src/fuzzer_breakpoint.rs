@@ -108,7 +108,7 @@ pub fn fuzz() {
         // Initialize QEMU Emulator
         let emu = Emulator::builder()
             .qemu_cli(args)
-            .add_module(
+            .append_module(
                 StdEdgeCoverageModule::builder()
                     .map_observer(edges_observer.as_mut())
                     .build()?,
