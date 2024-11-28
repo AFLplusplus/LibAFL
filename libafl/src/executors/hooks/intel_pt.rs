@@ -75,7 +75,7 @@ fn trace_to_file(pt: &IntelPT) -> Result<(), Error> {
     fs::create_dir_all(traces_dir)?;
     let timestamp = time::SystemTime::now()
         .duration_since(time::UNIX_EPOCH)
-        .unwrap()
+        .map_err(|e| Error::unknown(e.to_string()))?
         .as_micros();
     let mut file = fs::File::create(traces_dir.join(format!("trace_{timestamp}")))?;
     file.write_all(&*pt.last_decode_trace())?;
