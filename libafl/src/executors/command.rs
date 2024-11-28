@@ -38,7 +38,9 @@ use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
 #[cfg(all(feature = "std", unix))]
-use crate::executors::{Executor, ExitKind};
+use crate::executors::Executor;
+#[cfg(all(feature = "std", any(unix, doc)))]
+use crate::executors::ExitKind;
 use crate::{
     corpus::Corpus,
     executors::{hooks::ExecutorHooksTuple, HasObservers},
@@ -337,8 +339,6 @@ where
     OT: Debug + ObserversTuple<I, S>,
 {
     fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
-        use std::os::unix::prelude::ExitStatusExt;
-
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
@@ -346,29 +346,21 @@ where
 
         let mut child = self.configurer.spawn_child(input)?;
 
-        let res = match child
+        let exit_kind = child
             .wait_timeout(self.configurer.exec_timeout())
             .expect("waiting on child failed")
-            .map(|status| status.signal())
-        {
-            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-            Some(Some(9)) => Ok(ExitKind::Oom),
-            Some(Some(_)) => Ok(ExitKind::Crash),
-            Some(None) => Ok(ExitKind::Ok),
-            None => {
+            .map(|status| self.configurer.exit_kind_from_status(&status))
+            .unwrap_or_else(|| {
                 // if this fails, there is not much we can do. let's hope it failed because the process finished
                 // in the meantime.
                 drop(child.kill());
                 // finally, try to wait to properly clean up system resources.
                 drop(child.wait());
-                Ok(ExitKind::Timeout)
-            }
-        };
+                ExitKind::Timeout
+            });
 
-        if let Ok(exit_kind) = res {
-            self.observers
-                .post_exec_child_all(state, input, &exit_kind)?;
-        }
+        self.observers
+            .post_exec_child_all(state, input, &exit_kind)?;
 
         if let Some(h) = &mut self.configurer.stdout_observer() {
             let mut stdout = Vec::new();
@@ -392,7 +384,7 @@ where
             let obs = observers.index_mut(h);
             obs.observe_stderr(&stderr);
         }
-        res
+        Ok(exit_kind)
     }
 }
 
@@ -809,7 +801,7 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(all(feature = "std", any(unix, doc)))]
+#[cfg(all(feature = "std", unix))]
 pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
@@ -827,6 +819,18 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout(&self) -> Duration;
     /// Set the timeout duration for execution of the child process.
     fn exec_timeout_mut(&mut self) -> &mut Duration;
+
+    /// Maps the exit status of the child process to an `ExitKind`.
+    #[inline]
+    fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
+        use crate::std::os::unix::process::ExitStatusExt;
+        match status.signal() {
+            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
+            Some(9) => ExitKind::Oom,
+            Some(_) => ExitKind::Crash,
+            None => ExitKind::Ok,
+        }
+    }
 
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C>
