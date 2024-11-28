@@ -19,6 +19,7 @@ use std::{
 };
 #[cfg(target_os = "linux")]
 use std::{
+    boxed::Box,
     ffi::{CStr, CString},
     fmt::Debug,
     format, fs,
@@ -304,8 +305,12 @@ impl IntelPT {
             }
         } else {
             // Head pointer wrapped, the trace is split
-            unsafe { self.join_split_trace(head_wrap, tail_wrap) }
+            OwnedRefMut::Owned(self.join_split_trace(head_wrap, tail_wrap))
         };
+        #[cfg(feature = "export_raw")]
+        {
+            self.last_decode_trace = data.as_ref().to_vec();
+        }
 
         let mut config = ConfigBuilder::new(data.as_mut()).map_err(error_from_pt_error)?;
         config.filter(self.ip_filters_to_addr_filter());
@@ -342,11 +347,6 @@ impl IntelPT {
             };
         }
 
-        #[cfg(feature = "export_raw")]
-        {
-            self.last_decode_trace = data.as_ref().to_vec();
-        }
-
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
         // might not contain a PSB packet.
         decoder.sync_backward().map_err(error_from_pt_error)?;
@@ -358,19 +358,17 @@ impl IntelPT {
 
     #[inline]
     #[must_use]
-    unsafe fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> OwnedRefMut<[u8]> {
-        let first_ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
+    fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> Box<[u8]> {
+        let first_ptr = unsafe { self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8 };
         let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
+
         let second_ptr = self.perf_aux_buffer as *mut u8;
         let second_len = head_wrap as usize;
-        OwnedRefMut::Owned(
-            [
-                slice::from_raw_parts(first_ptr, first_len),
-                slice::from_raw_parts(second_ptr, second_len),
-            ]
-            .concat()
-            .into_boxed_slice(),
-        )
+
+        let mut vec = Vec::with_capacity(first_len + second_len);
+        vec.extend_from_slice(unsafe { slice::from_raw_parts(first_ptr, first_len) });
+        vec.extend_from_slice(unsafe { slice::from_raw_parts(second_ptr, second_len) });
+        vec.into_boxed_slice()
     }
 
     #[inline]
