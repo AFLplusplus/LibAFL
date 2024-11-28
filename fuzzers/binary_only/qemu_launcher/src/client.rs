@@ -112,10 +112,13 @@ impl Client<'_> {
                 .filename(drcov.clone())
                 .full_trace(true)
                 .build();
-            instance_builder.build().run(tuple_list!(drcov), state)
+            instance_builder
+                .build()
+                .run(args, tuple_list!(drcov), state)
         } else if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(
                         CmpLogModule::default(),
                         AsanModule::default(&env),
@@ -125,6 +128,7 @@ impl Client<'_> {
                 )
             } else {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(CmpLogModule::default(), AsanModule::default(&env),),
                     state,
                 )
@@ -132,6 +136,7 @@ impl Client<'_> {
         } else if is_asan_guest && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(
                         CmpLogModule::default(),
                         AsanGuestModule::default(&env),
@@ -141,6 +146,7 @@ impl Client<'_> {
                 )
             } else {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(CmpLogModule::default(), AsanGuestModule::default(&env),),
                     state,
                 )
@@ -148,34 +154,37 @@ impl Client<'_> {
         } else if is_asan {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(AsanModule::default(&env), injection_module),
                     state,
                 )
             } else {
                 instance_builder
                     .build()
-                    .run(tuple_list!(AsanModule::default(&env),), state)
+                    .run(args, tuple_list!(AsanModule::default(&env),), state)
             }
         } else if is_asan_guest {
-            let modules = tuple_list!(AsanGuestModule::default(&env));
-            instance_builder.build().run(modules, state)
+            instance_builder
+                .build()
+                .run(args, tuple_list!(AsanGuestModule::default(&env)), state)
         } else if is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(CmpLogModule::default(), injection_module),
                     state,
                 )
             } else {
                 instance_builder
                     .build()
-                    .run(tuple_list!(CmpLogModule::default()), state)
+                    .run(args, tuple_list!(CmpLogModule::default()), state)
             }
         } else if let Some(injection_module) = injection_module {
             instance_builder
                 .build()
-                .run(tuple_list!(injection_module), state)
+                .run(args, tuple_list!(injection_module), state)
         } else {
-            instance_builder.build().run(tuple_list!(), state)
+            instance_builder.build().run(args, tuple_list!(), state)
         }
     }
 }

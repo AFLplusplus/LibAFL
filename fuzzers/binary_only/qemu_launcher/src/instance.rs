@@ -106,7 +106,12 @@ impl<M: Monitor> Instance<'_, M> {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub fn run<ET>(&mut self, modules: ET, state: Option<ClientState>) -> Result<(), Error>
+    pub fn run<ET>(
+        &mut self,
+        args: Vec<String>,
+        modules: ET,
+        state: Option<ClientState>,
+    ) -> Result<(), Error>
     where
         ET: EmulatorModuleTuple<ClientState> + Debug,
     {
@@ -125,10 +130,7 @@ impl<M: Monitor> Instance<'_, M> {
             .build()?;
 
         let modules = modules.prepend(edge_coverage_module);
-        let mut emulator = Emulator::empty()
-            .qemu_cli(self.options.args.clone())
-            .modules(modules)
-            .build()?;
+        let mut emulator = Emulator::empty().qemu_cli(args).modules(modules).build()?;
         let harness = Harness::init(emulator.qemu()).expect("Error setting up harness.");
         let qemu = emulator.qemu();
 

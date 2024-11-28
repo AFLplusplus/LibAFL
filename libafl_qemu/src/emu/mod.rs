@@ -322,14 +322,18 @@ where
     S: UsesInput + Unpin,
 {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
-    pub fn new(
-        qemu_args: &[String],
+    pub fn new<T>(
+        qemu_params: T,
         modules: ET,
         driver: ED,
         snapshot_manager: SM,
         command_manager: CM,
-    ) -> Result<Self, QemuInitError> {
-        let mut qemu_parameters: QemuParams = qemu_args.into();
+    ) -> Result<Self, QemuInitError>
+    where
+        T: Into<QemuParams>,
+    {
+        let mut qemu_params = qemu_params.into();
+
         let emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
         let mut emulator_modules = EmulatorModules::new(emulator_hooks, modules);
 
@@ -337,11 +341,11 @@ where
         unsafe {
             emulator_modules.modules_mut().pre_qemu_init_all(
                 EmulatorModules::<ET, S>::emulator_modules_mut_unchecked(),
-                &mut qemu_parameters,
+                &mut qemu_params,
             );
         }
 
-        let qemu = Qemu::init(qemu_args)?;
+        let qemu = Qemu::init(qemu_params)?;
 
         unsafe {
             Ok(Self::new_with_qemu(
@@ -360,7 +364,7 @@ where
     /// # Safety
     ///
     /// pre-init qemu hooks should be run before calling this.
-    pub(crate) unsafe fn new_with_qemu(
+    unsafe fn new_with_qemu(
         qemu: Qemu,
         emulator_modules: Pin<Box<EmulatorModules<ET, S>>>,
         driver: ED,
