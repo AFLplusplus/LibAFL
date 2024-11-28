@@ -55,7 +55,6 @@ use libafl_qemu::{
     GuestReg,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
-    Qemu,
     QemuExecutor,
     QemuExitError,
     QemuExitReason,
@@ -175,7 +174,30 @@ fn fuzz(
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let qemu = Qemu::init(&args).expect("QEMU init failed");
+
+    // Create an observation channel using the coverage map
+    let mut edges_observer = unsafe {
+        HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+            "edges",
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
+            &raw mut MAX_EDGES_FOUND,
+        ))
+        .track_indices()
+    };
+
+    let modules = tuple_list!(
+        StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()
+            .unwrap(),
+        CmpLogModule::default(),
+        // QemuAsanHelper::default(asan),
+        //QemuSnapshotHelper::new()
+    );
+
+    let emulator = Emulator::empty().qemu_cli(args).modules(modules).build()?;
+    let qemu = emulator.qemu();
+    // let qemu = Qemu::init(&args).expect("QEMU init failed");
     // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
 
     let mut elf_buffer = Vec::new();
@@ -253,16 +275,6 @@ fn fuzz(
                 panic!("Failed to setup the restarter: {err}");
             }
         },
-    };
-
-    // Create an observation channel using the coverage map
-    let mut edges_observer = unsafe {
-        HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
-            "edges",
-            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
-            &raw mut MAX_EDGES_FOUND,
-        ))
-        .track_indices()
     };
 
     // Create an observation channel to keep track of the execution time
@@ -363,18 +375,6 @@ fn fuzz(
 
             ExitKind::Ok
         };
-
-    let modules = tuple_list!(
-        StdEdgeCoverageModule::builder()
-            .map_observer(edges_observer.as_mut())
-            .build()
-            .unwrap(),
-        CmpLogModule::default(),
-        // QemuAsanHelper::default(asan),
-        //QemuSnapshotHelper::new()
-    );
-
-    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(

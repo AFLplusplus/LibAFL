@@ -4,7 +4,7 @@ use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     state::{HasExecutions, State},
 };
-use libafl_bolts::tuples::{tuple_list, Prepend};
+use libafl_bolts::tuples::{tuple_list, Append, Prepend};
 
 #[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
@@ -12,8 +12,8 @@ use crate::{
     command::{CommandManager, NopCommandManager, StdCommandManager},
     config::QemuConfig,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    Emulator, EmulatorHooks, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuHooks, QemuInitError,
-    QemuParams, StdEmulatorDriver, StdSnapshotManager,
+    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
+    StdSnapshotManager,
 };
 
 #[derive(Clone, Debug)]
@@ -109,24 +109,13 @@ where
         CM: CommandManager<ED, ET, S, SM>,
         ET: EmulatorModuleTuple<S>,
     {
-        let qemu_parameters = self.qemu_parameters.ok_or(QemuInitError::EmptyArgs)?;
-
-        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
-
-        self.modules.pre_qemu_init_all(&mut emulator_hooks);
-
-        let qemu = Qemu::init(qemu_parameters)?;
-
-        unsafe {
-            Ok(Emulator::new_with_qemu(
-                qemu,
-                emulator_hooks,
-                self.modules,
-                self.driver,
-                self.snapshot_manager,
-                self.command_manager,
-            ))
-        }
+        Emulator::new(
+            self.qemu_parameters.ok_or(QemuInitError::EmptyArgs)?,
+            self.modules,
+            self.driver,
+            self.snapshot_manager,
+            self.command_manager,
+        )
     }
 }
 
@@ -157,13 +146,27 @@ where
         )
     }
 
-    pub fn add_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), S, SM>
+    pub fn prepend_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), S, SM>
     where
         EM: EmulatorModule<S> + Unpin,
         ET: EmulatorModuleTuple<S>,
     {
         EmulatorBuilder::new(
             self.modules.prepend(module),
+            self.driver,
+            self.command_manager,
+            self.snapshot_manager,
+            self.qemu_parameters,
+        )
+    }
+
+    pub fn append_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (ET, EM), S, SM>
+    where
+        EM: EmulatorModule<S> + Unpin,
+        ET: EmulatorModuleTuple<S>,
+    {
+        EmulatorBuilder::new(
+            self.modules.append(module),
             self.driver,
             self.command_manager,
             self.snapshot_manager,
