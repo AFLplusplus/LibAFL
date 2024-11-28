@@ -12,7 +12,7 @@ use num_traits::SaturatingAdd;
 
 use crate::{
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind, NopPageFilter},
-    EmulatorModules, NewThreadHook,
+    EmulatorModules, NewThreadHook, Qemu, QemuParams,
 };
 
 #[derive(Debug)]
@@ -40,31 +40,38 @@ where
     type ModuleAddressFilter = Self;
     type ModulePageFilter = NopPageFilter;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn pre_qemu_init<ET>(
+        &mut self,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _qemu_params: &mut QemuParams,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
-        emulator_modules.thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, S, T>));
+        println!("pre_qemu_init");
+        emulator_modules
+            .thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, S, T>))
+            .unwrap();
         // TODO emulator_modules.thread_teradown
-        println!("first_exec");
     }
 
     fn pre_exec<ET>(
         &mut self,
+        _qemu: Qemu,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
-        _input: &<S as UsesInput>::Input,
+        _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
+        println!("pre_exec");
         let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
         pt.enable_tracing().unwrap();
-        println!("pre_exec");
     }
 
     fn post_exec<OT, ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
         _input: &S::Input,
         _observers: &mut OT,
@@ -79,7 +86,6 @@ where
         // we need the memory map to decode the traces here take it in prexec. use QemuMemoryChunk
         // TODO handle self modifying code
 
-        let qemu = emulator_modules.qemu();
         pt.decode_with_callback(
             |addr, out_buff| qemu.read_mem(out_buff, addr.into()).unwrap(),
             unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) },

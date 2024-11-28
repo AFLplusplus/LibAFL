@@ -1,4 +1,4 @@
-//! A fuzzer using qemu in systemmode for binary-only coverage of bootloaders
+//! A fuzzer using qemu in systemmode with intel PT
 
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
@@ -27,15 +27,17 @@ use libafl_bolts::{
     tuples::tuple_list,
 };
 use libafl_qemu::{
-    config, config::Accelerator, executor::QemuExecutor, modules::intel_pt::IntelPTModule,
-    Emulator, Qemu, QemuExitReason, QemuShutdownCause,
+    config,
+    config::{Accelerator, QemuConfig},
+    executor::QemuExecutor,
+    modules::intel_pt::IntelPTModule,
+    Emulator, EmulatorBuilder, Qemu, QemuExitReason, QemuShutdownCause,
 };
+
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
 const MAX_INPUT_SIZE: usize = 50;
-
-#[cfg(target_os = "linux")]
 fn main() {
     env_logger::init();
 
@@ -48,9 +50,13 @@ fn main() {
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| -> Result<(), Error> {
         let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
-        println!("run client");
-        // Initialize QEMU
-        let qemu = Qemu::builder()
+        let target_subdir = if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        };
+        // Configure QEMU
+        let qemu = QemuConfig::builder()
             .no_graphic(true)
             .drives([config::Drive::builder()
                 .format(config::DiskImageFileFormat::Raw)
@@ -58,21 +64,19 @@ fn main() {
                 .build()])
             .accelerator(Accelerator::Kvm)
             .bios(format!(
-                "{target_dir}/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu"
+                "{target_dir}/{target_subdir}/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu"
             ))
             .start_cpu(false)
-            .build()
-            .expect("Failed to initialize QEMU");
+            .build();
 
         let emulator_modules =
             tuple_list!(IntelPTModule::new(unsafe { MAP.as_mut_ptr() }, MAP_SIZE));
 
-        let emulator = Emulator::empty()
-            .qemu(qemu)
+        let emulator = EmulatorBuilder::empty()
+            .qemu_config(qemu)
             .modules(emulator_modules)
             .build()?;
 
-        // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |emulator: &mut Emulator<_, _, _, StdState<BytesInput, _, _, _>, _>,
                            _: &mut StdState<BytesInput, _, _, _>,
                            _: &BytesInput| unsafe {
@@ -177,6 +181,8 @@ fn main() {
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
+        .stdout_file(Some("./stdout.txt"))
+        .stderr_file(Some("./stderr.txt"))
         .build()
         .launch()
     {
@@ -184,9 +190,4 @@ fn main() {
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {err:?}"),
     }
-}
-
-#[cfg(not(target_os = "linux"))]
-pub fn main() {
-    panic!("qemu-user and libafl_qemu is only supported on linux!");
 }

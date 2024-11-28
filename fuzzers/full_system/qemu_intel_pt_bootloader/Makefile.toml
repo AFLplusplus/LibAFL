@@ -1,3 +1,6 @@
+[env]
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+
 [env.development]
 PROFILE_DIR = "debug"
 
@@ -5,10 +8,10 @@ PROFILE_DIR = "debug"
 PROFILE_DIR = "release"
 
 [tasks.target_dir]
-condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"] }
+condition = { files_not_exist = ["${TARGET_DIR}"] }
 script_runner = "@shell"
 script = '''
-mkdir -p ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+mkdir -p ${TARGET_DIR}
 '''
 
 [tasks.build_target]
