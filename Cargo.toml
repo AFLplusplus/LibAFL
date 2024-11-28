@@ -25,6 +25,7 @@ members = [
   "utils/gramatron/construct_automata",
   "utils/libafl_benches",
   "utils/libafl_jumper",
+  "bindings/pylibafl",
 ]
 default-members = [
   "libafl",
@@ -35,7 +36,6 @@ default-members = [
 ]
 
 exclude = [
-  "bindings",
   "fuzzers",
   "libafl_libfuzzer_runtime",
   "utils/noaslr",
@@ -102,6 +102,8 @@ paste = "1.0.15"
 postcard = { version = "1.0.10", features = [
   "alloc",
 ], default-features = false } # no_std compatible serde serialization format
+pyo3 = "0.23.2"
+pyo3-build-config = "0.23.2"
 rangemap = "1.5.1"
 regex = "1.10.6"
 rustversion = "1.0.17"

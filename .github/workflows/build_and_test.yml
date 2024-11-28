@@ -5,12 +5,14 @@ on:
     branches: [ main, "pr/**" ]
   pull_request:
     branches: [ main ]
+    types: ["labeled", "opened", "synchronize", "reopened"]
   workflow_dispatch:
   merge_group:
 env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
   MAIN_LLVM_VERSION: 18
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -91,6 +93,7 @@ jobs:
 
   ubuntu-miri:
     runs-on: ubuntu-24.04
+    if: contains( github.event.pull_request.labels.*.name, 'pre-release')
     steps:
       - name: Add nightly clippy
         run: rustup toolchain install nightly --component miri --allow-downgrade
