@@ -49,14 +49,6 @@ impl Regs {
     pub const Pc: Regs = Regs::Eip;
 }
 
-#[cfg(feature = "python")]
-impl IntoPy<PyObject> for Regs {
-    fn into_py(self, py: Python) -> PyObject {
-        let n: i32 = self.into();
-        n.into_py(py)
-    }
-}
-
 /// Return an X86 ArchCapstoneBuilder
 pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
     capstone::Capstone::new()
