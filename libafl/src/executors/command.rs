@@ -5,7 +5,6 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
-use std::os::unix::ffi::OsStrExt;
 #[cfg(target_os = "linux")]
 use std::{
     ffi::{CStr, CString},
@@ -14,9 +13,9 @@ use std::{
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
+    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
-    process::Child,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     time::Duration,
 };
 
@@ -35,17 +34,15 @@ use nix::unistd::Pid;
 use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
-use crate::executors::Executor;
-use crate::executors::ExitKind;
 use crate::{
     corpus::Corpus,
-    executors::{hooks::ExecutorHooksTuple, HasObservers},
-    inputs::{HasTargetBytes, UsesInput},
+    executors::{hooks::ExecutorHooksTuple, Executor, ExitKind, HasObservers},
+    inputs::{HasTargetBytes, Input, UsesInput},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasCorpus, HasExecutions, State, UsesState},
     std::borrow::ToOwned,
+    Error,
 };
-use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
@@ -752,6 +749,7 @@ impl CommandExecutorBuilder {
 
 /// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
+/// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
 /// use libafl::{Error, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
