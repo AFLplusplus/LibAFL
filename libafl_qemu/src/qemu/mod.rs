@@ -1103,8 +1103,8 @@ pub mod pybind {
 
     extern "C" fn py_generic_hook_wrapper(idx: u64, _pc: GuestAddr) {
         let obj = unsafe {
-            let hooks = &mut *&raw mut PY_GENERIC_HOOKS;
-            &hooks[idx as usize].1
+            let hooks = &raw mut PY_GENERIC_HOOKS;
+            &(*hooks)[idx as usize].1
         };
         Python::with_gil(|py| {
             obj.call0(py).expect("Error in the hook");
@@ -1183,9 +1183,9 @@ pub mod pybind {
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
         unsafe fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
-                let hooks = &mut *&raw mut PY_GENERIC_HOOKS;
-                let idx = hooks.len();
-                hooks.push((addr, hook));
+                let hooks = &raw mut PY_GENERIC_HOOKS;
+                let idx = (*hooks).len();
+                (*hooks).push((addr, hook));
                 self.qemu.hooks().add_instruction_hooks(
                     idx as u64,
                     addr,
@@ -1199,8 +1199,8 @@ pub mod pybind {
         /// Removes a hooke from `PY_GENERIC_HOOKS` -> may not be called concurrently!
         unsafe fn remove_hooks_at(&self, addr: GuestAddr) -> usize {
             unsafe {
-                let hooks = &mut *&raw mut PY_GENERIC_HOOKS;
-                hooks.retain(|(a, _)| *a != addr);
+                let hooks = &raw mut PY_GENERIC_HOOKS;
+                (*hooks).retain(|(a, _)| *a != addr);
             }
             self.qemu.hooks().remove_instruction_hooks_at(addr, true)
         }

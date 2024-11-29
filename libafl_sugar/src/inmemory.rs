@@ -436,7 +436,7 @@ pub mod pybind {
                 .cores(&self.cores)
                 .harness(|buf| {
                     Python::with_gil(|py| -> PyResult<()> {
-                        let args = (PyBytes::new_bound(py, buf),); // TODO avoid copy
+                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
                         harness.call1(py, args)?;
                         Ok(())
                     })
