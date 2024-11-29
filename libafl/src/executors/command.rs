@@ -5,14 +5,12 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
-#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use std::{
     ffi::{CStr, CString},
     os::fd::AsRawFd,
 };
-#[cfg(feature = "std")]
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
@@ -22,24 +20,22 @@ use std::{
     time::Duration,
 };
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use libc::STDIN_FILENO;
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use nix::unistd::Pid;
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
-#[cfg(all(feature = "std", unix))]
 use crate::executors::Executor;
-#[cfg(all(feature = "std", any(unix, doc)))]
 use crate::executors::ExitKind;
 use crate::{
     corpus::Corpus,
@@ -49,7 +45,6 @@ use crate::{
     state::{HasCorpus, HasExecutions, State, UsesState},
     std::borrow::ToOwned,
 };
-#[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
@@ -178,7 +173,7 @@ where
 ///
 /// This configurator was primarly developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 pub struct PTraceCommandConfigurator {
     #[builder(setter(into))]
@@ -195,7 +190,7 @@ pub struct PTraceCommandConfigurator {
     timeout: u32,
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator
 where
     I: HasTargetBytes,
@@ -331,7 +326,6 @@ where
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-#[cfg(all(feature = "std", unix))]
 impl<I, OT, S, T> CommandExecutor<OT, S, T>
 where
     S: State + HasExecutions + UsesInput<Input = I>,
@@ -388,7 +382,6 @@ where
     }
 }
 
-#[cfg(all(feature = "std", unix))]
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
@@ -425,7 +418,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
 where
     EM: UsesState<State = S>,
@@ -759,8 +752,6 @@ impl CommandExecutorBuilder {
 
 /// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
-#[cfg_attr(all(feature = "std", unix), doc = " ```")]
-#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
 /// use libafl::{Error, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
@@ -801,7 +792,6 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(all(feature = "std", unix))]
 pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
@@ -882,7 +872,6 @@ mod tests {
     };
 
     #[test]
-    #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_builder() {
         let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
