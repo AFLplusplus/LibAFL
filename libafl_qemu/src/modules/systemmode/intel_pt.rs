@@ -6,29 +6,29 @@ use std::{
 };
 
 use libafl::{inputs::UsesInput, observers::ObserversTuple, HasMetadata};
-use libafl_intelpt::IntelPT;
+pub use libafl_intelpt::{IntelPT, IntelPTBuilder};
 use libafl_qemu_sys::{CPUArchStatePtr, GuestAddr};
 use num_traits::SaturatingAdd;
+use typed_builder::TypedBuilder;
 
 use crate::{
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind, NopPageFilter},
     EmulatorModules, NewThreadHook, Qemu, QemuParams,
 };
 
-#[derive(Debug)]
+#[derive(Debug, TypedBuilder)]
 pub struct IntelPTModule<T = u8> {
+    #[builder(setter(skip), default)]
     pt: Option<IntelPT>,
+    #[builder(default = IntelPTModule::default_pt_builder())]
+    intel_pt_builder: IntelPTBuilder,
     map_ptr: *mut T,
     map_len: usize,
 }
 
-impl<T> IntelPTModule<T> {
-    pub fn new(map_ptr: *mut T, map_len: usize) -> Self {
-        Self {
-            pt: None,
-            map_ptr,
-            map_len,
-        }
+impl IntelPTModule {
+    pub fn default_pt_builder() -> IntelPTBuilder {
+        IntelPT::builder().exclude_kernel(false)
     }
 }
 
@@ -47,7 +47,6 @@ where
     ) where
         ET: EmulatorModuleTuple<S>,
     {
-        println!("pre_qemu_init");
         emulator_modules
             .thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, S, T>))
             .unwrap();
@@ -63,7 +62,6 @@ where
     ) where
         ET: EmulatorModuleTuple<S>,
     {
-        println!("pre_exec");
         let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
         pt.enable_tracing().unwrap();
     }
@@ -83,15 +81,22 @@ where
         let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
         pt.disable_tracing().unwrap();
 
-        // we need the memory map to decode the traces here take it in prexec. use QemuMemoryChunk
         // TODO handle self modifying code
 
-        pt.decode_with_callback(
-            |addr, out_buff| qemu.read_mem(out_buff, addr.into()).unwrap(),
+        // TODO log errors or panic or smth
+        let _ = pt.decode_with_callback(
+            |addr, out_buff| {
+                let _ = qemu.read_mem(out_buff, addr.into());
+            },
             unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) },
-        )
-        .unwrap();
+        );
 
+        #[cfg(feature = "intel_pt_export_raw")]
+        {
+            let _ = pt
+                .dump_last_trace_to_file()
+                .inspect_err(|e| log::warn!("Intel PT trace save to file failed: {e}"));
+        }
         let m = unsafe { slice::from_raw_parts(self.map_ptr, self.map_len) };
         println!("map: {:?}", m);
     }
@@ -157,15 +162,15 @@ where
         panic!("Intel PT module already initialized, only single core VMs are supported ATM.");
     }
 
-    intel_pt_module.pt = Some(IntelPT::builder().pid(Some(tid as i32)).build().unwrap());
-    intel_pt_module
-        .pt
-        .as_mut()
-        .unwrap()
-        .enable_tracing()
+    let pt = intel_pt_module
+        .intel_pt_builder
+        .clone()
+        .pid(Some(tid as i32))
+        .build()
         .unwrap();
 
-    println!("IntelPT initialized!");
+    intel_pt_module.pt = Some(pt);
+
     // What does this bool mean? ignore for the moment
     true
 }

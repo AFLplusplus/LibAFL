@@ -31,13 +31,13 @@ use libafl_qemu::{
     config::{Accelerator, QemuConfig},
     executor::QemuExecutor,
     modules::intel_pt::IntelPTModule,
-    Emulator, EmulatorBuilder, Qemu, QemuExitReason, QemuShutdownCause,
+    Emulator, EmulatorBuilder, QemuExitReason, QemuShutdownCause,
 };
 
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-const MAX_INPUT_SIZE: usize = 50;
+
 fn main() {
     env_logger::init();
 
@@ -49,7 +49,7 @@ fn main() {
     let objective_dir = PathBuf::from("./crashes");
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| -> Result<(), Error> {
-        let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
+        let target_dir = env::var("TARGET_DIR").unwrap_or("target".to_string());
         let target_subdir = if cfg!(debug_assertions) {
             "debug"
         } else {
@@ -69,8 +69,12 @@ fn main() {
             .start_cpu(false)
             .build();
 
-        let emulator_modules =
-            tuple_list!(IntelPTModule::new(unsafe { MAP.as_mut_ptr() }, MAP_SIZE));
+        let intel_pt_builder = IntelPTModule::default_pt_builder().ip_filters(&[0x7c00..=0x7e00]);
+        let emulator_modules = tuple_list!(IntelPTModule::builder()
+            .map_ptr(unsafe { MAP.as_mut_ptr() })
+            .map_len(MAP_SIZE)
+            .intel_pt_builder(intel_pt_builder)
+            .build());
 
         let emulator = EmulatorBuilder::empty()
             .qemu_config(qemu)
