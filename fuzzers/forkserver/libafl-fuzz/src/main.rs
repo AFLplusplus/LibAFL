@@ -71,8 +71,6 @@ mod feedback;
 mod scheduler;
 mod stages;
 use clap::Parser;
-#[cfg(not(feature = "fuzzbench"))]
-use corpus::remove_main_node_file;
 use corpus::{check_autoresume, create_dir_if_not_exists};
 mod corpus;
 mod executor;
@@ -80,19 +78,23 @@ mod fuzzer;
 mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
-#[cfg(feature = "fuzzbench")]
-use libafl::events::SimpleEventManager;
-#[cfg(not(feature = "fuzzbench"))]
-use libafl::events::{CentralizedLauncher, EventConfig};
-#[cfg(not(feature = "fuzzbench"))]
-use libafl::monitors::MultiMonitor;
-#[cfg(feature = "fuzzbench")]
-use libafl::monitors::SimpleMonitor;
 use libafl::{schedulers::powersched::BaseSchedule, Error};
-use libafl_bolts::core_affinity::{CoreId, Cores};
-#[cfg(not(feature = "fuzzbench"))]
-use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
+use libafl_bolts::core_affinity::Cores;
 use nix::sys::signal::Signal;
+#[cfg(not(feature = "fuzzbench"))]
+use {
+    corpus::remove_main_node_file,
+    libafl::{
+        events::{CentralizedLauncher, ClientDescription, EventConfig},
+        monitors::MultiMonitor,
+    },
+    libafl_bolts::shmem::{ShMemProvider, StdShMemProvider},
+};
+#[cfg(feature = "fuzzbench")]
+use {
+    libafl::{events::SimpleEventManager, monitors::SimpleMonitor},
+    libafl_bolts::core_affinity::CoreId,
+};
 
 const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
 const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
@@ -139,22 +141,48 @@ fn main() {
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .main_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
-            println!("run primary client on core {}", core_id.0);
-            let fuzzer_dir = opt.output_dir.join("fuzzer_main");
-            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            let res = run_client(state, mgr, &fuzzer_dir, core_id, &opt, true);
-            let _ = remove_main_node_file(&fuzzer_dir);
-            res
-        })
-        .secondary_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
-            println!("run secondary client on core {}", core_id.0);
-            let fuzzer_dir = opt
-                .output_dir
-                .join(format!("fuzzer_secondary_{}", core_id.0));
-            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            run_client(state, mgr, &fuzzer_dir, core_id, &opt, false)
-        })
+        .main_run_client(
+            |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                println!(
+                    "run primary client with id {} on core {}",
+                    client_description.id(),
+                    client_description.core_id().0
+                );
+                let fuzzer_dir = opt.output_dir.join("fuzzer_main");
+                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                let res = run_client(
+                    state,
+                    mgr,
+                    &fuzzer_dir,
+                    client_description.core_id(),
+                    &opt,
+                    true,
+                );
+                let _ = remove_main_node_file(&fuzzer_dir);
+                res
+            },
+        )
+        .secondary_run_client(
+            |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                println!(
+                    "run secondary client with id {} on core {}",
+                    client_description.id(),
+                    client_description.core_id().0
+                );
+                let fuzzer_dir = opt
+                    .output_dir
+                    .join(format!("fuzzer_secondary_{}", client_description.id()));
+                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                run_client(
+                    state,
+                    mgr,
+                    &fuzzer_dir,
+                    client_description.core_id(),
+                    &opt,
+                    false,
+                )
+            },
+        )
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
         .build()
