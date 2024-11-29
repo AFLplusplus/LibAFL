@@ -427,6 +427,23 @@ impl IntelPT {
     pub fn last_decode_trace(&self) -> Vec<u8> {
         self.last_decode_trace.clone()
     }
+
+    /// Dump the raw trace used in the last decoding to the file
+    /// /// `./traces/trace_<unix epoch in micros>`
+    #[cfg(feature = "export_raw")]
+    pub fn dump_last_trace_to_file(&self) -> Result<(), Error> {
+        use std::{fs, io::Write, path::Path, time};
+
+        let traces_dir = Path::new("traces");
+        fs::create_dir_all(traces_dir)?;
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .map_err(|e| Error::unknown(e.to_string()))?
+            .as_micros();
+        let mut file = fs::File::create(traces_dir.join(format!("trace_{timestamp}")))?;
+        file.write_all(&self.last_decode_trace())?;
+        Ok(())
+    }
 }
 
 #[cfg(target_os = "linux")]
