@@ -452,6 +452,7 @@ pub struct IntelPTBuilder {
     inherit: bool,
     perf_buffer_size: usize,
     perf_aux_buffer_size: usize,
+    ip_filters: Vec<RangeInclusive<usize>>,
 }
 
 #[cfg(target_os = "linux")]
@@ -461,14 +462,15 @@ impl Default for IntelPTBuilder {
     /// The default configuration corresponds to:
     /// ```rust
     /// use libafl_intelpt::{IntelPTBuilder, PAGE_SIZE};
-    /// let builder = unsafe { std::mem::zeroed::<IntelPTBuilder>() }
+    /// let builder = IntelPTBuilder::default()
     ///     .pid(None)
     ///     .all_cpus()
     ///     .exclude_kernel(true)
     ///     .exclude_hv(true)
     ///     .inherit(false)
     ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE).unwrap()
-    ///     .perf_aux_buffer_size(2 * 1024 * 1024).unwrap();
+    ///     .perf_aux_buffer_size(2 * 1024 * 1024).unwrap()
+    ///     .ip_filters(&[]);
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
     fn default() -> Self {
@@ -480,6 +482,7 @@ impl Default for IntelPTBuilder {
             inherit: false,
             perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
             perf_aux_buffer_size: 2 * 1024 * 1024,
+            ip_filters: Vec::new(),
         }
     }
 }
@@ -543,9 +546,7 @@ impl IntelPTBuilder {
         let aux_head = unsafe { &raw mut (*buff_metadata).aux_head };
         let aux_tail = unsafe { &raw mut (*buff_metadata).aux_tail };
 
-        let ip_filters = Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize);
-
-        Ok(IntelPT {
+        let mut intel_pt = IntelPT {
             fd,
             perf_buffer,
             perf_aux_buffer,
@@ -554,10 +555,14 @@ impl IntelPTBuilder {
             aux_head,
             aux_tail,
             previous_decode_head: 0,
-            ip_filters,
+            ip_filters: Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize),
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
-        })
+        };
+        if !self.ip_filters.is_empty() {
+            intel_pt.set_ip_filters(&self.ip_filters)?;
+        }
+        Ok(intel_pt)
     }
 
     /// Warn if the configuration is not recommended
@@ -650,6 +655,15 @@ impl IntelPTBuilder {
 
         self.perf_aux_buffer_size = perf_aux_buffer_size;
         Ok(self)
+    }
+
+    #[must_use]
+    /// Set filters based on Instruction Pointer (IP)
+    ///
+    /// Only instructions in `filters` ranges will be traced.
+    pub fn ip_filters(mut self, filters: &[RangeInclusive<usize>]) -> Self {
+        self.ip_filters = filters.to_vec();
+        self
     }
 }
 
