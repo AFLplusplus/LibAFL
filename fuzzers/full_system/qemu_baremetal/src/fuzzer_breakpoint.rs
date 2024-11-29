@@ -108,13 +108,12 @@ pub fn fuzz() {
         // Initialize QEMU Emulator
         let emu = Emulator::builder()
             .qemu_cli(args)
-            .add_module(
+            .prepend_module(
                 StdEdgeCoverageModule::builder()
                     .map_observer(edges_observer.as_mut())
                     .build()?,
             )
-            .build()
-            .unwrap();
+            .build()?;
 
         // Set breakpoints of interest with corresponding commands.
         emu.add_breakpoint(
