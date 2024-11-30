@@ -90,7 +90,20 @@ jobs:
       # ---- doc check ----
       - name: Test Docs
         run: RUSTFLAGS="--cfg docsrs" cargo +nightly test --doc --all-features
-
+        
+  container-exp:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: addnab/docker-run-action@v3
+        with:
+          registry: gcr.io
+          image: debian:latest
+          options: -v ${{ github.workspace }}:/work -e ABC=123
+          run: |
+            echo "Running Script"
+            ls /work
+    
   ubuntu-miri:
     runs-on: ubuntu-24.04
     if: contains( github.event.pull_request.labels.*.name, 'pre-release')
