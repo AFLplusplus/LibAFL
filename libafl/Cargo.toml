@@ -115,7 +115,7 @@ intel_pt = [
   "dep:nix",
   "dep:num_enum",
 ]
-# Save all the Intel PT raw traces to files, use only for debug
+## Save all the Intel PT raw traces to files, use only for debug
 intel_pt_export_raw = ["intel_pt", "libafl_intelpt/export_raw"]
 
 ## Enables features for corpus minimization
