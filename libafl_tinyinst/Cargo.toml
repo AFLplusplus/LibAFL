@@ -1,6 +1,6 @@
 [package]
 name = "libafl_tinyinst"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = [
   "elbiazo <eric.l.biazo@gmail.com>",
@@ -21,20 +21,20 @@ description = "TinyInst backend for libafl"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.13.2", features = [
+libafl = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",
 ] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", features = [
+libafl_bolts = { workspace = true, default-features = true, features = [
   "std",
   "libafl_derive",
 ] }
 tinyinst = { git = "https://github.com/AFLplusplus/tinyinst-rs" }
 # tinyinst-rs = { path = "../../tinyinst-rs" }
-log = { version = "0.4.22" }
+log = { workspace = true }
 
 [build-dependencies]
-cmake = { version = "0.1.51" }
+cmake = { workspace = true }
 
 [lints]
 workspace = true

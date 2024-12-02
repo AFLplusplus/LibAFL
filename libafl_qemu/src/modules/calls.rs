@@ -1,4 +1,4 @@
-use core::{cell::UnsafeCell, fmt::Debug, ptr::addr_of_mut};
+use core::{cell::UnsafeCell, fmt::Debug};
 
 use capstone::prelude::*;
 use libafl::{
@@ -308,9 +308,11 @@ where
                 &mut [0; 512]
             };
             #[cfg(feature = "systemmode")]
-            unsafe {
-                qemu.read_mem(pc, code)
-            }; // TODO handle faults
+            if let Err(err) = qemu.read_mem(pc, code) {
+                // TODO handle faults
+                log::error!("gen_block_calls: Failed to read mem at pc {pc:#x}: {err:?}");
+                return None;
+            }
 
             let mut iaddr = pc;
 
@@ -347,9 +349,13 @@ where
                     code = std::slice::from_raw_parts(qemu.g2h(iaddr), 512);
                 }
                 #[cfg(feature = "systemmode")]
-                unsafe {
-                    qemu.read_mem(pc, code);
-                } // TODO handle faults
+                if let Err(err) = qemu.read_mem(pc, code) {
+                    // TODO handle faults
+                    log::error!(
+                        "gen_block_calls error 2: Failed to read mem at pc {pc:#x}: {err:?}"
+                    );
+                    return None;
+                }
             }
         }
 
@@ -393,7 +399,7 @@ where
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -452,7 +458,7 @@ where
 
     #[cfg(feature = "systemmode")]
     fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unsafe { addr_of_mut!(NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { (&raw mut NOP_PAGE_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
@@ -547,7 +553,8 @@ impl FullBacktraceCollector {
     /// # Safety
     /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
     pub unsafe fn new() -> Self {
-        unsafe { (*addr_of_mut!(CALLSTACKS)) = Some(ThreadLocal::new()) };
+        let callstacks_ptr = &raw mut CALLSTACKS;
+        unsafe { (*callstacks_ptr) = Some(ThreadLocal::new()) };
         Self {}
     }
 
@@ -556,8 +563,9 @@ impl FullBacktraceCollector {
         // This accesses the global [`CALLSTACKS`] variable.
         // While it is racey, it might be fine if multiple clear the vecs concurrently.
         // TODO: This should probably be rewritten in a safer way.
+        let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe {
-            for tls in (*addr_of_mut!(CALLSTACKS)).as_mut().unwrap().iter_mut() {
+            for tls in (*callstacks_ptr).as_mut().unwrap().iter_mut() {
                 (*tls.get()).clear();
             }
         }
@@ -567,8 +575,9 @@ impl FullBacktraceCollector {
         // # Safety
         // This accesses the global [`CALLSTACKS`] variable.
         // However, the actual variable access is behind a `ThreadLocal` class.
+        let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe {
-            if let Some(c) = (*addr_of_mut!(CALLSTACKS)).as_mut() {
+            if let Some(c) = (*callstacks_ptr).as_mut() {
                 Some(&*c.get_or_default().get())
             } else {
                 None
@@ -589,14 +598,11 @@ impl CallTraceCollector for FullBacktraceCollector {
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
+        let callstacks_ptr = &raw mut CALLSTACKS;
         // TODO handle Thumb
         unsafe {
-            (*(*addr_of_mut!(CALLSTACKS))
-                .as_mut()
-                .unwrap()
-                .get_or_default()
-                .get())
-            .push(pc + call_len as GuestAddr);
+            (*(*callstacks_ptr).as_mut().unwrap().get_or_default().get())
+                .push(pc + call_len as GuestAddr);
         }
     }
 
@@ -611,12 +617,9 @@ impl CallTraceCollector for FullBacktraceCollector {
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
+        let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe {
-            let v = &mut *(*addr_of_mut!(CALLSTACKS))
-                .as_mut()
-                .unwrap()
-                .get_or_default()
-                .get();
+            let v = &mut *(*callstacks_ptr).as_mut().unwrap().get_or_default().get();
             if !v.is_empty() {
                 // if *v.last().unwrap() == ret_addr {
                 //    v.pop();

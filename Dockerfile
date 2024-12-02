@@ -52,6 +52,9 @@ COPY libafl_frida/Cargo.toml libafl_frida/build.rs libafl_frida/
 COPY scripts/dummy.rs libafl_frida/src/lib.rs
 COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
+COPY libafl_intelpt/Cargo.toml libafl_intelpt/README.md libafl_intelpt/
+COPY scripts/dummy.rs libafl_intelpt/src/lib.rs
+
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/build_linux.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
 
@@ -144,6 +147,8 @@ COPY libafl_libfuzzer/src libafl_libfuzzer/src
 COPY libafl_libfuzzer/runtime libafl_libfuzzer/runtime
 COPY libafl_libfuzzer/build.rs libafl_libfuzzer/build.rs
 RUN touch libafl_libfuzzer/src/lib.rs
+COPY libafl_intelpt/src libafl_intelpt/src
+RUN touch libafl_intelpt/src/lib.rs
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over

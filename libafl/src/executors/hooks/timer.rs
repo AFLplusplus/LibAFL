@@ -1,12 +1,7 @@
 //! The struct `TimerStruct` will absorb all the difference in timeout implementation in various system.
-#[cfg(any(windows, target_os = "linux"))]
-use core::ptr::addr_of_mut;
 use core::time::Duration;
 #[cfg(target_os = "linux")]
-use core::{
-    mem::zeroed,
-    ptr::{addr_of, null_mut},
-};
+use core::{mem::zeroed, ptr::null_mut};
 
 #[cfg(all(unix, not(target_os = "linux")))]
 pub(crate) const ITIMER_REAL: core::ffi::c_int = 0;
@@ -187,7 +182,7 @@ impl TimerStruct {
         let ptp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),
-                Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
+                Some(&raw mut GLOBAL_STATE as *mut c_void),
                 Some(&TP_CALLBACK_ENVIRON_V3::default()),
             )
         }
@@ -227,7 +222,7 @@ impl TimerStruct {
         unsafe {
             #[cfg(not(miri))]
             // creates a new per-process interval timer
-            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
+            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
         }
 
         Self {
@@ -247,6 +242,11 @@ impl TimerStruct {
     #[cfg(target_os = "linux")]
     #[must_use]
     /// Constructor but use batch mode
+    /// More efficient timeout mechanism with imprecise timing.
+    ///
+    /// The timeout will trigger after t seconds and at most within 2*t seconds.
+    /// This means the actual timeout may occur anywhere in the range [t, 2*t],
+    /// providing a flexible but bounded execution time limit.
     pub fn batch_mode(exec_tmout: Duration) -> Self {
         let mut me = Self::new(exec_tmout);
         me.batch_mode = true;
@@ -268,12 +268,12 @@ impl TimerStruct {
     /// Set timer
     pub fn set_timer(&mut self) {
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
 
-            write_volatile(addr_of_mut!((*data).ptp_timer), Some(*self.ptp_timer()));
+            write_volatile(&raw mut (*data).ptp_timer, Some(*self.ptp_timer()));
             write_volatile(
-                addr_of_mut!((*data).critical),
-                addr_of_mut!(*self.critical_mut()) as *mut c_void,
+                &raw mut (*data).critical,
+                &raw mut (*self.critical_mut()) as *mut c_void,
             );
             let tm: i64 = -self.milli_sec() * 10 * 1000;
             let ft = FILETIME {
@@ -300,13 +300,13 @@ impl TimerStruct {
         unsafe {
             if self.batch_mode {
                 if self.executions == 0 {
-                    libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+                    libc::timer_settime(self.timerid, 0, &raw mut self.itimerspec, null_mut());
                     self.tmout_start_time = current_time();
                 }
                 self.start_time = current_time();
             } else {
                 #[cfg(not(miri))]
-                libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+                libc::timer_settime(self.timerid, 0, &raw mut self.itimerspec, null_mut());
             }
         }
     }
@@ -336,7 +336,7 @@ impl TimerStruct {
                     || self.exec_tmout.saturating_sub(elapsed) < self.avg_exec_time * self.avg_mul_k
                 {
                     let disarmed: libc::itimerspec = zeroed();
-                    libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+                    libc::timer_settime(self.timerid, 0, &raw const disarmed, null_mut());
                     // set timer the next exec
                     if self.executions > 0 {
                         self.avg_exec_time = elapsed / self.executions;
@@ -354,7 +354,7 @@ impl TimerStruct {
             unsafe {
                 let disarmed: libc::itimerspec = zeroed();
                 #[cfg(not(miri))]
-                libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
+                libc::timer_settime(self.timerid, 0, &raw const disarmed, null_mut());
             }
         }
     }
@@ -365,7 +365,7 @@ impl TimerStruct {
         // # Safety
         // The value accesses are guarded by a critical section.
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
 
             compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(self.critical_mut());

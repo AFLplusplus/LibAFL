@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
+use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -194,7 +194,7 @@ fn fuzz(
         }
     }
 
-    println!("Break at {:#x}", qemu.read_reg::<_, u64>(Regs::Pc).unwrap());
+    println!("Break at {:#x}", qemu.read_reg(Regs::Pc).unwrap());
 
     let stack_ptr: u64 = qemu.read_reg(Regs::Sp).unwrap();
     let mut ret_addr = [0; 8];
@@ -260,7 +260,7 @@ fn fuzz(
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
             OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
-            addr_of_mut!(MAX_EDGES_FOUND),
+            &raw mut MAX_EDGES_FOUND,
         ))
         .track_indices()
     };
@@ -310,7 +310,7 @@ fn fuzz(
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new::<BytesInput, _>(
+    let mutator = StdMOptMutator::new(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
         7,

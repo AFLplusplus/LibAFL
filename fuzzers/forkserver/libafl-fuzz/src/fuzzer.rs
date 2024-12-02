@@ -7,12 +7,15 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "fuzzbench")]
+use libafl::events::SimpleEventManager;
+#[cfg(not(feature = "fuzzbench"))]
+use libafl::events::{CentralizedEventManager, LlmpRestartingEventManager};
+#[cfg(feature = "fuzzbench")]
+use libafl::monitors::SimpleMonitor;
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
-    events::{
-        CentralizedEventManager, EventManagerHooksTuple, LlmpRestartingEventManager,
-        ProgressReporter,
-    },
+    events::ProgressReporter,
     executors::forkserver::{ForkserverExecutor, ForkserverExecutorBuilder},
     feedback_and, feedback_or, feedback_or_fast,
     feedbacks::{
@@ -39,6 +42,8 @@ use libafl::{
     },
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
+#[cfg(not(feature = "fuzzbench"))]
+use libafl_bolts::shmem::StdShMemProvider;
 use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos, current_time,
@@ -49,13 +54,15 @@ use libafl_bolts::{
     tuples::{tuple_list, Handled, Merge},
     AsSliceMut,
 };
+#[cfg(feature = "nyx")]
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
 use libafl_targets::{cmps::AFLppCmpLogMap, AFLppCmpLogObserver, AFLppCmplogTracingStage};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{set_corpus_filepath, set_solution_filepath},
     env_parser::AFL_DEFAULT_MAP_SIZE,
-    executor::find_afl_binary,
+    executor::{find_afl_binary, SupportedExecutors},
     feedback::{
         filepath::CustomFilepathToTestcaseFeedback, persistent_record::PersitentRecordFeedback,
         seed::SeedFeedback,
@@ -69,23 +76,47 @@ use crate::{
 pub type LibaflFuzzState =
     StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
 
-pub fn run_client<EMH, SP>(
-    state: Option<LibaflFuzzState>,
-    mut restarting_mgr: CentralizedEventManager<
-        LlmpRestartingEventManager<(), LibaflFuzzState, SP>,
-        EMH,
-        LibaflFuzzState,
-        SP,
-    >,
-    fuzzer_dir: &Path,
-    core_id: CoreId,
-    opt: &Opt,
-    is_main_node: bool,
-) -> Result<(), Error>
-where
-    EMH: EventManagerHooksTuple<LibaflFuzzState> + Copy + Clone,
-    SP: ShMemProvider,
-{
+#[cfg(not(feature = "fuzzbench"))]
+type LibaflFuzzManager = CentralizedEventManager<
+    LlmpRestartingEventManager<(), LibaflFuzzState, StdShMemProvider>,
+    (),
+    LibaflFuzzState,
+    StdShMemProvider,
+>;
+#[cfg(feature = "fuzzbench")]
+type LibaflFuzzManager<F> = SimpleEventManager<SimpleMonitor<F>, LibaflFuzzState>;
+
+macro_rules! define_run_client {
+    ($state: ident, $mgr: ident, $fuzzer_dir: ident, $core_id: ident, $opt:ident, $is_main_node: ident, $body:block) => {
+        #[cfg(not(feature = "fuzzbench"))]
+        pub fn run_client(
+            $state: Option<LibaflFuzzState>,
+            mut $mgr: LibaflFuzzManager,
+            $fuzzer_dir: &Path,
+            $core_id: CoreId,
+            $opt: &Opt,
+            $is_main_node: bool,
+        ) -> Result<(), Error> {
+            $body
+        }
+        #[cfg(feature = "fuzzbench")]
+        pub fn run_client<F>(
+            $state: Option<LibaflFuzzState>,
+            mut $mgr: LibaflFuzzManager<F>,
+            $fuzzer_dir: &Path,
+            $core_id: CoreId,
+            $opt: &Opt,
+            $is_main_node: bool,
+        ) -> Result<(), Error>
+        where
+            F: FnMut(&str),
+        {
+            $body
+        }
+    };
+}
+
+define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     // Create the shared memory map for comms with the forkserver
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
     let mut shmem = shmem_provider
@@ -94,10 +125,38 @@ where
     shmem.write_to_env(SHMEM_ENV_VAR).unwrap();
     let shmem_buf = shmem.as_slice_mut();
 
-    // Create an observation channel to keep track of edges hit.
-    let edges_observer = unsafe {
-        HitcountsMapObserver::new(StdMapObserver::new("edges", shmem_buf)).track_indices()
+    // If we are in Nyx Mode, we need to use a different map observer.
+    #[cfg(feature = "nyx")]
+    let (nyx_helper, edges_observer) = {
+        if opt.nyx_mode {
+            // main node is the first core id in CentralizedLauncher
+            let cores = opt.cores.clone().expect("invariant; should never occur");
+            let main_node_core_id = match cores.ids.len() {
+                1 => None,
+                _ => Some(cores.ids.first().expect("invariant; should never occur").0),
+            };
+            let nyx_settings = NyxSettings::builder()
+                .cpu_id(core_id.0)
+                .parent_cpu_id(main_node_core_id)
+                .build();
+            let nyx_helper = NyxHelper::new(opt.executable.clone(), nyx_settings).unwrap();
+            let observer = unsafe {
+                StdMapObserver::from_mut_ptr(
+                    "edges",
+                    nyx_helper.bitmap_buffer,
+                    nyx_helper.bitmap_size,
+                )
+            };
+            (Some(nyx_helper), observer)
+        } else {
+            let observer = unsafe { StdMapObserver::new("edges", shmem_buf) };
+            (None, observer)
+        }
     };
+    #[cfg(not(feature = "nyx"))]
+    let edges_observer = { unsafe { StdMapObserver::new("edges", shmem_buf) } };
+
+    let edges_observer = HitcountsMapObserver::new(edges_observer).track_indices();
 
     // Create a MapFeedback for coverage guided fuzzin'
     let map_feedback = MaxMapFeedback::new(&edges_observer);
@@ -261,23 +320,58 @@ where
         std::env::set_var("LD_PRELOAD", &preload);
         std::env::set_var("DYLD_INSERT_LIBRARIES", &preload);
     }
+    #[cfg(feature = "nyx")]
+    let mut executor = {
+        if opt.nyx_mode {
+            SupportedExecutors::Nyx(NyxExecutor::builder().build(
+                nyx_helper.unwrap(),
+                (edges_observer, tuple_list!(time_observer)),
+            ))
+        } else {
+            // Create the base Executor
+            let mut executor_builder =
+                base_forkserver_builder(opt, &mut shmem_provider, fuzzer_dir);
+            // Set a custom exit code to be interpreted as a Crash if configured.
+            if let Some(crash_exitcode) = opt.crash_exitcode {
+                executor_builder = executor_builder.crash_exitcode(crash_exitcode);
+            }
 
-    // Create the base Executor
-    let mut executor_builder = base_executor_builder(opt, &mut shmem_provider, fuzzer_dir);
-    // Set a custom exit code to be interpreted as a Crash if configured.
-    if let Some(crash_exitcode) = opt.crash_exitcode {
-        executor_builder = executor_builder.crash_exitcode(crash_exitcode);
-    }
+            // Enable autodict if configured
+            if !opt.no_autodict {
+                executor_builder = executor_builder.autotokens(&mut tokens);
+            };
 
-    // Enable autodict if configured
-    if !opt.no_autodict {
-        executor_builder = executor_builder.autotokens(&mut tokens);
+            // Finalize and build our Executor
+            SupportedExecutors::Forkserver(
+                executor_builder
+                    .build_dynamic_map(edges_observer, tuple_list!(time_observer))
+                    .unwrap(),
+                PhantomData,
+            )
+        }
     };
+    #[cfg(not(feature = "nyx"))]
+    let mut executor = {
+        // Create the base Executor
+        let mut executor_builder = base_forkserver_builder(opt, &mut shmem_provider, fuzzer_dir);
+        // Set a custom exit code to be interpreted as a Crash if configured.
+        if let Some(crash_exitcode) = opt.crash_exitcode {
+            executor_builder = executor_builder.crash_exitcode(crash_exitcode);
+        }
 
-    // Finalize and build our Executor
-    let mut executor = executor_builder
-        .build_dynamic_map(edges_observer, tuple_list!(time_observer))
-        .unwrap();
+        // Enable autodict if configured
+        if !opt.no_autodict {
+            executor_builder = executor_builder.autotokens(&mut tokens);
+        };
+
+        // Finalize and build our Executor
+        SupportedExecutors::Forkserver(
+            executor_builder
+                .build_dynamic_map(edges_observer, tuple_list!(time_observer))
+                .unwrap(),
+            PhantomData,
+        )
+    };
 
     let queue_dir = fuzzer_dir.join("queue");
     if opt.auto_resume {
@@ -318,7 +412,7 @@ where
             .load_initial_inputs_multicore(
                 &mut fuzzer,
                 &mut executor,
-                &mut restarting_mgr,
+                &mut mgr,
                 &[queue_dir],
                 &core_id,
                 opt.cores.as_ref().expect("invariant; should never occur"),
@@ -383,7 +477,7 @@ where
 
         // Create the CmpLog executor.
         // Cmplog has 25% execution overhead so we give it double the timeout
-        let cmplog_executor = base_executor_builder(opt, &mut shmem_provider, fuzzer_dir)
+        let cmplog_executor = base_forkserver_builder(opt, &mut shmem_provider, fuzzer_dir)
             .timeout(Duration::from_millis(opt.hang_timeout * 2))
             .program(cmplog_executable_path)
             .build(tuple_list!(cmplog_observer))
@@ -407,11 +501,11 @@ where
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
             if testcase.scheduled_count() == 1
-                || (opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
+                && !(opt.cmplog_only_new && testcase.has_metadata::<IsInitialCorpusEntryMetadata>())
             {
-                return Ok(false);
+                return Ok(true);
             }
-            Ok(true)
+            Ok(false)
         };
         let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
 
@@ -432,7 +526,7 @@ where
             &mut stages,
             &mut executor,
             &mut state,
-            &mut restarting_mgr,
+            &mut mgr,
         )?;
     } else {
         // The order of the stages matter!
@@ -451,14 +545,14 @@ where
             &mut stages,
             &mut executor,
             &mut state,
-            &mut restarting_mgr,
+            &mut mgr,
         )?;
     }
     Ok(())
     // TODO: serialize state when exiting.
-}
+});
 
-fn base_executor_builder<'a>(
+fn base_forkserver_builder<'a>(
     opt: &'a Opt,
     shmem_provider: &'a mut UnixShMemProvider,
     fuzzer_dir: &Path,
@@ -474,6 +568,9 @@ fn base_executor_builder<'a>(
         .timeout(Duration::from_millis(opt.hang_timeout));
     if let Some(target_env) = &opt.target_env {
         executor = executor.envs(target_env);
+    }
+    if opt.frida_mode || opt.unicorn_mode || opt.qemu_mode {
+        executor = executor.kill_signal(nix::sys::signal::Signal::SIGKILL);
     }
     if let Some(kill_signal) = opt.kill_signal {
         executor = executor.kill_signal(kill_signal);

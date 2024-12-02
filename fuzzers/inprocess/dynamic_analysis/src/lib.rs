@@ -11,7 +11,6 @@ use std::{
     io::{self, Read, Write},
     path::PathBuf,
     process,
-    ptr::addr_of_mut,
 };
 
 use clap::{Arg, Command};
@@ -254,7 +253,7 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     let func_list =
-        unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut *addr_of_mut!(FUNCTION_LIST))) };
+        unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut *&raw mut FUNCTION_LIST)) };
     let profiling_observer = ProfilingObserver::new("concatenated.json", func_list)?;
     let callhook = CallHook::new();
 
@@ -308,7 +307,7 @@ fn fuzz(
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new::<BytesInput, _>(
+    let mutator = StdMOptMutator::new(
         &mut state,
         havoc_mutations().merge(tokens_mutations()),
         7,

@@ -11,7 +11,7 @@
  *
  */
 
-use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path, ptr::addr_of_mut};
+use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
 
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, Error};
@@ -262,7 +262,7 @@ where
 {
     type ModuleAddressFilter = NopAddressFilter;
 
-    fn init_module<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -339,16 +339,19 @@ where
     }
 
     fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        unsafe { addr_of_mut!(NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
+        unsafe { (&raw mut NOP_ADDRESS_FILTER).as_mut().unwrap().get_mut() }
     }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn syscall_hook<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>, // our instantiated QemuHooks
+    // Our instantiated [`EmulatorModules`]
+    emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
-    syscall: i32,  // syscall number
-    x0: GuestAddr, // registers ...
+    // Syscall number
+    syscall: i32,
+    // Registers
+    x0: GuestAddr,
     x1: GuestAddr,
     _x2: GuestAddr,
     _x3: GuestAddr,

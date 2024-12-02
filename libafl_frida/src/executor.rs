@@ -189,10 +189,10 @@ where
         let mut ranges = helper.ranges().clone();
         for module in frida_gum::Module::obtain(gum).enumerate_modules() {
             if module.base_address < Self::new as usize
-                && (Self::new as usize) < module.base_address + module.size
+                && (Self::new as usize as u64) < module.base_address as u64 + module.size as u64
             {
                 ranges.insert(
-                    module.base_address..(module.base_address + module.size),
+                    module.base_address as u64..(module.base_address as u64 + module.size as u64),
                     (0xffff, "fuzzer".to_string()),
                 );
                 break;
@@ -201,11 +201,13 @@ where
 
         log::info!("disable_excludes: {:}", helper.disable_excludes);
         if !helper.disable_excludes {
-            for range in ranges.gaps(&(0..usize::MAX)) {
+            for range in ranges.gaps(&(0..u64::MAX)) {
                 log::info!("excluding range: {:x}-{:x}", range.start, range.end);
                 stalker.exclude(&MemoryRange::new(
                     NativePointer(range.start as *mut c_void),
-                    range.end - range.start,
+                    usize::try_from(range.end - range.start).unwrap_or_else(|err| {
+                        panic!("Address out of usize range: {range:?} - {err}")
+                    }),
                 ));
             }
         }

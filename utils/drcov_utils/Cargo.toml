@@ -1,0 +1,16 @@
+[package]
+name = "drcov_utils"
+edition = "2021"
+version.workspace = true
+description = "Utility functions to work with DrCov coverage files"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+license = "MIT OR Apache-2.0"
+categories = ["development-tools"]
+keywords = ["fuzzing", "libafl", "drcov"]
+
+[dependencies]
+libafl_targets = { workspace = true, default-features = true }
+clap = { workspace = true, features = ["derive", "wrap_help"] }
+
+[lints]
+workspace = true

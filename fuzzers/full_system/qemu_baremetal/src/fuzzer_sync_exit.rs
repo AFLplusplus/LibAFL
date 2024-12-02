@@ -1,6 +1,6 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 //!
-use core::{ptr::addr_of_mut, time::Duration};
+use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -43,7 +43,7 @@ pub fn fuzz() {
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
 
@@ -52,7 +52,7 @@ pub fn fuzz() {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
                 OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
-                addr_of_mut!(MAX_EDGES_FOUND),
+                &raw mut MAX_EDGES_FOUND,
             ))
             .track_indices()
         };

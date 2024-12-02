@@ -1,6 +1,6 @@
 [package]
 name = "dump_constraints"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 description = "Dump Constraints, a lib to see the constraints oof a run"
@@ -20,9 +20,9 @@ categories = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = { path = "../../../libafl" }
-libafl_bolts = { path = "../../../libafl_bolts" }
-clap = { version = "4.5.18", features = ["derive"] }
+libafl = { workspace = true, default-features = true }
+libafl_bolts = { workspace = true, default-features = true }
+clap = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

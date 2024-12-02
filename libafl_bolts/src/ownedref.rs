@@ -870,6 +870,7 @@ impl<'a, T> From<&'a mut &'a mut [T]> for OwnedMutSlice<'a, T> {
 }
 
 /// Wrap a mutable slice and convert to a Box on serialize.
+///
 /// We use a hidden inner enum so the public API can be safe,
 /// unless the user uses the unsafe [`OwnedMutSizedSlice::from_raw_mut`].
 /// The variable length version is [`OwnedMutSlice`].
@@ -943,12 +944,9 @@ impl<'a, T: 'a + Sized, const N: usize> OwnedMutSizedSlice<'a, T, N> {
     /// The pointer must be valid and point to a map of the size `size_of<T>() * N`
     /// The content will be dereferenced in subsequent operations.
     #[must_use]
-    pub unsafe fn from_raw_mut(ptr: NonNull<T>) -> OwnedMutSizedSlice<'a, T, N> {
+    pub unsafe fn from_raw_mut(ptr: NonNull<[T; N]>) -> OwnedMutSizedSlice<'a, T, N> {
         Self {
-            inner: OwnedMutSizedSliceInner::RefRaw(
-                ptr.as_ptr() as *mut [T; N],
-                UnsafeMarker::new(),
-            ),
+            inner: OwnedMutSizedSliceInner::RefRaw(ptr.as_ptr(), UnsafeMarker::new()),
         }
     }
 

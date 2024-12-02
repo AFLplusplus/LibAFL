@@ -341,7 +341,7 @@ where
             .count
             .checked_sub(1)
             .map(CorpusId::from)
-            .map_or(false, |last| last == id)
+            .is_some_and(|last| last == id)
         {
             self.last.as_ref()
         } else {

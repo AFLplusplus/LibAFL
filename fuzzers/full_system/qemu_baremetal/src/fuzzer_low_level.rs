@@ -1,6 +1,6 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 //!
-use core::{ptr::addr_of_mut, time::Duration};
+use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -80,7 +80,7 @@ pub fn fuzz() {
         .expect("Symbol or env BREAKPOINT not found");
     println!("Breakpoint address = {breakpoint:#x}");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
         let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
 
         // Create an observation channel using the coverage map
@@ -88,7 +88,7 @@ pub fn fuzz() {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
                 OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
-                addr_of_mut!(MAX_EDGES_FOUND),
+                &raw mut MAX_EDGES_FOUND,
             ))
             .track_indices()
         };

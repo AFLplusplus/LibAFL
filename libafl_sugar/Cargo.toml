@@ -1,6 +1,6 @@
 [package]
 name = "libafl_sugar"
-version = "0.13.2"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Sugar builders to create common fuzzers with LibAFL"
 documentation = "https://docs.rs/libafl_sugar"
@@ -57,22 +57,22 @@ riscv32 = ["libafl_qemu/riscv32"]
 riscv64 = ["libafl_qemu/riscv64"]
 
 [build-dependencies]
-pyo3-build-config = { version = "0.22.3", optional = true }
+pyo3-build-config = { workspace = true, optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.13.2" }
-libafl_bolts = { path = "../libafl_bolts", version = "0.13.2" }
-libafl_targets = { path = "../libafl_targets", version = "0.13.2" }
+libafl = { workspace = true, default-features = true }
+libafl_bolts = { workspace = true, default-features = true }
+libafl_targets = { workspace = true, default-features = true }
 
 # Document all features of this crate (for `cargo doc`)
-document-features = { version = "0.2.10", optional = true }
+document-features = { workspace = true, optional = true }
 
-typed-builder = { version = "0.20.0" }         # Implement the builder pattern at compiletime
-pyo3 = { version = "0.22.3", optional = true }
-log = { version = "0.4.22" }
+typed-builder = { workspace = true }         # Implement the builder pattern at compiletime
+pyo3 = { workspace = true, optional = true }
+log = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libafl_qemu = { path = "../libafl_qemu", version = "0.13.2" }
+libafl_qemu = { workspace = true, default-features = true }
 
 [lib]
 name = "libafl_sugar"

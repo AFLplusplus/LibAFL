@@ -1,6 +1,6 @@
 [package]
 name = "libafl_libfuzzer"
-version = "0.13.2"
+version.workspace = true
 description = "libFuzzer shim which uses LibAFL with common defaults"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
@@ -14,7 +14,7 @@ include = ["/src", "/Cargo.toml", "/build.rs", "/runtime"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-cc = { version = "1.1.21" }
+cc = "1.0.106"
 rustversion = "1.0.17"
 toml = { version = "0.8.19", features = ["preserve_order"] }
 
@@ -43,7 +43,7 @@ libafl-libfuzzer-use-version = []
 
 [dependencies]
 libfuzzer-sys = { version = "0.4.7", default-features = false }
-document-features = { version = "0.2.10", optional = true }
+document-features = { workspace = true, optional = true }
 
 [package.metadata.docs.rs]
 features = ["document-features"]

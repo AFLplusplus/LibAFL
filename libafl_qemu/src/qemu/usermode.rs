@@ -11,7 +11,7 @@ use libafl_qemu_sys::{
 };
 use libc::{c_int, c_uchar, strlen};
 #[cfg(feature = "python")]
-use pyo3::{pyclass, pymethods, IntoPy, PyObject, PyRef, PyRefMut, Python};
+use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
 
 use crate::{Qemu, CPU};
 
@@ -65,8 +65,9 @@ impl GuestMaps {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
-    fn __next__(mut slf: PyRefMut<Self>) -> Option<PyObject> {
-        Python::with_gil(|py| slf.next().map(|x| x.into_py(py)))
+
+    fn __next__(mut slf: PyRefMut<Self>) -> Option<Py<MapInfo>> {
+        Python::with_gil(|py| slf.next().map(|x| x.into_pyobject(py).unwrap().into()))
     }
 }
 
@@ -281,7 +282,7 @@ pub mod pybind {
         a6: u64,
         a7: u64,
     ) -> SyscallHookResult {
-        unsafe { (*core::ptr::addr_of!(PY_SYSCALL_HOOK)).as_ref() }.map_or_else(
+        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
             || SyscallHookResult::new(None),
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
@@ -362,7 +363,7 @@ pub mod pybind {
         /// Accesses the global `PY_SYSCALL_HOOK` and may not be called concurrently.
         unsafe fn set_syscall_hook(&self, hook: PyObject) {
             unsafe {
-                (*core::ptr::addr_of_mut!(PY_SYSCALL_HOOK)) = Some(hook);
+                PY_SYSCALL_HOOK = Some(hook);
             }
             self.qemu
                 .hooks()

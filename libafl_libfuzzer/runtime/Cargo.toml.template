@@ -1,6 +1,6 @@
 [package]
 name = "libafl_libfuzzer_runtime"
-version = "0.13.2"
+version = "0.14.0"
 edition = "2021"
 publish = false
 
@@ -74,9 +74,7 @@ rand = "0.8.5"
 serde = { version = "1.0.210", default-features = true, features = [
   "derive",
 ] } # serialization lib
-hashbrown = { version = "0.14.5", default-features = true, features = [
-  "serde",
-] }
+hashbrown = { version = "0.14.5", default-features = true }
 
 # for identifying if we can grimoire-ify
 utf8-chars = "3.0.4"

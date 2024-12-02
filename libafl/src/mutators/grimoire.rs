@@ -291,7 +291,7 @@ where
                 while bytes
                     .len()
                     .checked_sub(token_1.len())
-                    .map_or(false, |len| i < len)
+                    .is_some_and(|len| i < len)
                 {
                     if bytes[i..].starts_with(token_1) {
                         bytes.splice(i..(i + token_1.len()), token_2.iter().copied());
@@ -314,7 +314,7 @@ where
                     while bytes
                         .len()
                         .checked_sub(token_1.len())
-                        .map_or(false, |len| i < len)
+                        .is_some_and(|len| i < len)
                     {
                         if bytes[i..].starts_with(token_1) {
                             bytes.splice(i..(i + token_1.len()), token_2.iter().copied());

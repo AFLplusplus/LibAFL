@@ -1,6 +1,6 @@
 [package]
 name = "construct_automata"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
@@ -24,13 +24,13 @@ categories = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-libafl = { path = "../../../libafl", default-features = false }
-serde_json = { version = "1.0.128", default-features = true }
-regex = { version = "1.10.6" }
-postcard = { version = "1.0.10", features = [
+libafl = { workspace = true }
+serde_json = { workspace = true, default-features = true }
+regex = { workspace = true }
+postcard = { workspace = true, features = [
   "alloc",
 ], default-features = false } # no_std compatible serde serialization format
-clap = { version = "4.5.18", features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

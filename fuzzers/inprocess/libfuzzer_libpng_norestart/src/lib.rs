@@ -10,8 +10,9 @@ use clap::Parser;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
-        launcher::Launcher, llmp::LlmpShouldSaveState, EventConfig, EventRestarter,
-        LlmpRestartingEventManager,
+        launcher::{ClientDescription, Launcher},
+        llmp::LlmpShouldSaveState,
+        EventConfig, EventRestarter, LlmpRestartingEventManager,
     },
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
@@ -162,7 +163,7 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client = |state: Option<_>,
                           mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
-                          core_id| {
+                          client_description: ClientDescription| {
         // Create an observation channel using the coverage map
         let edges_observer =
             HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }).track_indices();
@@ -259,7 +260,7 @@ pub extern "C" fn libafl_main() {
                     &mut executor,
                     &mut restarting_mgr,
                     &opt.input,
-                    &core_id,
+                    &client_description.core_id(),
                     &cores,
                 )
                 .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));

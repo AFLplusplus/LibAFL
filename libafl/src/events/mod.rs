@@ -40,7 +40,6 @@ use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
     current_time,
     tuples::{Handle, MatchNameRef},
-    ClientId,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -288,7 +287,7 @@ where
         /// The time of generation of the event
         time: Duration,
         /// The original sender if, if forwarded
-        forward_id: Option<ClientId>,
+        forward_id: Option<libafl_bolts::ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
         #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
         node_id: Option<NodeId>,
@@ -942,8 +941,6 @@ pub trait AdaptiveSerializer {
 #[cfg(test)]
 mod tests {
 
-    use core::ptr::{addr_of, addr_of_mut};
-
     use libafl_bolts::{current_time, tuples::tuple_list, Named};
     use tuple_list::tuple_list_type;
 
@@ -958,9 +955,10 @@ mod tests {
 
     #[test]
     fn test_event_serde() {
+        let map_ptr = &raw const MAP;
         let obv = unsafe {
-            let len = (*addr_of!(MAP)).len();
-            StdMapObserver::from_mut_ptr("test", addr_of_mut!(MAP) as *mut u32, len)
+            let len = (*map_ptr).len();
+            StdMapObserver::from_mut_ptr("test", &raw mut MAP as *mut u32, len)
         };
         let map = tuple_list!(obv);
         let observers_buf = postcard::to_allocvec(&map).unwrap();

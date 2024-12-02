@@ -1,6 +1,6 @@
 [package]
 name = "symcc_runtime"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 authors = [
   "Julius Hohnerlein <julihoh@users.noreply.github.com>",
@@ -32,25 +32,19 @@ all-features = true
 no-cpp-runtime = []
 
 [dependencies]
-libafl = { path = "../../libafl", version = "0.13.2", default-features = false, features = [
-  "std",
-  "serdeany_autoreg",
-] }
-libafl_bolts = { path = "../../libafl_bolts", version = "0.13.2", default-features = false, features = [
-  "std",
-  "serdeany_autoreg",
-] }
+libafl = { workspace = true, features = ["std", "serdeany_autoreg"] }
+libafl_bolts = { workspace = true, features = ["std", "serdeany_autoreg"] }
 
 unchecked_unwrap = "4.0.0"
-ctor = "0.2.8"
-libc = { version = "0.2.59" }
+ctor = "0.2.9"
+libc = { workspace = true }
 
 [build-dependencies]
-cmake = { version = "0.1.51" }
-bindgen = { version = "0.70.1" }
-regex = { version = "1.10.6" }
-which = { version = "7.0.0" }
-symcc_libafl = { path = "../symcc_libafl", version = "0.13.2" }
+cmake = { workspace = true }
+bindgen = { workspace = true }
+regex = { workspace = true }
+which = { workspace = true }
+symcc_libafl = { workspace = true, default-features = true, version = "0.14.0" }
 
 [lints]
 workspace = true

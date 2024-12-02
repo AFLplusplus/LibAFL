@@ -1,10 +1,17 @@
 use std::{
     fs::File,
+    marker::PhantomData,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
 
-use libafl::Error;
+use libafl::{
+    executors::{Executor, ExitKind, HasObservers, HasTimeout},
+    observers::ObserversTuple,
+    state::{State, UsesState},
+    Error,
+};
+use libafl_bolts::tuples::RefIndexable;
 use memmap2::{Mmap, MmapOptions};
 use nix::libc::{S_IRUSR, S_IXUSR};
 
@@ -32,7 +39,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         }
     } else {
         bin_path = &opt.executable;
-        #[cfg(target_os = "linux")]
+        #[cfg(feature = "nyx")]
         {
             if opt.nyx_mode {
                 if !bin_path.is_symlink() && bin_path.is_dir() {
@@ -84,7 +91,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
     }
 
     // check if the binary is an ELF file
-    #[cfg(target_os = "linux")]
+    #[cfg(feature = "nyx")]
     if mmap[0..4] != [0x7f, 0x45, 0x4c, 0x46] {
         return Err(Error::illegal_argument(format!(
             "Program '{}' is not an ELF binary",
@@ -110,7 +117,7 @@ pub fn check_binary(opt: &mut Opt, shmem_env_var: &str) -> Result<(), Error> {
         && !opt.forkserver_cs
         && !opt.non_instrumented_mode;
 
-    #[cfg(target_os = "linux")]
+    #[cfg(feature = "nyx")]
     let check_instrumentation = check_instrumentation && !opt.nyx_mode;
 
     if check_instrumentation && !is_instrumented(&mmap, shmem_env_var) {
@@ -243,4 +250,166 @@ fn check_file_found(file: &Path, perm: u32) -> bool {
         return metadata.permissions().mode() & perm != 0;
     }
     false
+}
+
+#[cfg(feature = "nyx")]
+pub enum SupportedExecutors<S, OT, FSV, NYX> {
+    Forkserver(FSV, PhantomData<(S, OT, NYX)>),
+    Nyx(NYX),
+}
+
+#[cfg(feature = "nyx")]
+impl<S, OT, FSV, NYX> UsesState for SupportedExecutors<S, OT, FSV, NYX>
+where
+    S: State,
+{
+    type State = S;
+}
+
+#[cfg(feature = "nyx")]
+impl<S, OT, FSV, NYX, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV, NYX>
+where
+    S: State,
+    Z: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    FSV: Executor<EM, Z, State = S>,
+    NYX: Executor<EM, Z, State = S>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S::Input,
+    ) -> Result<ExitKind, Error> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
+            #[cfg(feature = "nyx")]
+            Self::Nyx(nyx) => nyx.run_target(fuzzer, state, mgr, input),
+        }
+    }
+}
+
+#[cfg(feature = "nyx")]
+impl<S, OT, FSV, NYX> HasObservers for SupportedExecutors<S, OT, FSV, NYX>
+where
+    OT: ObserversTuple<S::Input, S>,
+    S: State,
+    FSV: HasObservers<Observers = OT>,
+    NYX: HasObservers<Observers = OT>,
+{
+    type Observers = OT;
+    #[inline]
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers(),
+            #[cfg(feature = "nyx")]
+            Self::Nyx(nyx) => nyx.observers(),
+        }
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers_mut(),
+            #[cfg(feature = "nyx")]
+            Self::Nyx(nyx) => nyx.observers_mut(),
+        }
+    }
+}
+
+#[cfg(feature = "nyx")]
+impl<S, OT, FSV, NYX> HasTimeout for SupportedExecutors<S, OT, FSV, NYX>
+where
+    FSV: HasTimeout,
+    NYX: HasTimeout,
+{
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
+            #[cfg(feature = "nyx")]
+            Self::Nyx(nyx) => nyx.set_timeout(timeout),
+        }
+    }
+    fn timeout(&self) -> std::time::Duration {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.timeout(),
+            #[cfg(feature = "nyx")]
+            Self::Nyx(nyx) => nyx.timeout(),
+        }
+    }
+}
+
+#[cfg(not(feature = "nyx"))]
+impl<S, OT, FSV> UsesState for SupportedExecutors<S, OT, FSV>
+where
+    S: State,
+{
+    type State = S;
+}
+
+#[cfg(not(feature = "nyx"))]
+pub enum SupportedExecutors<S, OT, FSV> {
+    Forkserver(FSV, PhantomData<(S, OT)>),
+}
+
+#[cfg(not(feature = "nyx"))]
+impl<S, OT, FSV, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV>
+where
+    S: State,
+    Z: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    FSV: Executor<EM, Z, State = S>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &S::Input,
+    ) -> Result<ExitKind, Error> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
+        }
+    }
+}
+
+#[cfg(not(feature = "nyx"))]
+impl<S, OT, FSV> HasObservers for SupportedExecutors<S, OT, FSV>
+where
+    OT: ObserversTuple<S::Input, S>,
+    S: State,
+    FSV: HasObservers<Observers = OT>,
+{
+    type Observers = OT;
+    #[inline]
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers(),
+        }
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.observers_mut(),
+        }
+    }
+}
+
+#[cfg(not(feature = "nyx"))]
+impl<S, OT, FSV> HasTimeout for SupportedExecutors<S, OT, FSV>
+where
+    FSV: HasTimeout,
+{
+    fn set_timeout(&mut self, timeout: std::time::Duration) {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.set_timeout(timeout),
+        }
+    }
+    fn timeout(&self) -> std::time::Duration {
+        match self {
+            Self::Forkserver(fsrv, _) => fsrv.timeout(),
+        }
+    }
 }

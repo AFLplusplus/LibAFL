@@ -691,19 +691,21 @@ pub mod unix_shmem {
 
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
-            /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete all `/dev/shm/libafl_*` after fuzzing
-            pub fn new(map_size: usize, rand_id: u32) -> Result<Self, Error> {
+            ///
+            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 values from filename will be used. Do not include any characters that are illegal as filenames
+            ///
+            /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete them after fuzzing
+            pub fn new(map_size: usize, filename: &[u8]) -> Result<Self, Error> {
                 // # Safety
                 // No user-provided potentially unsafe parameters.
                 // FFI Calls.
                 unsafe {
-                    let mut full_file_name = format!("/libafl_{}_{}", process::id(), rand_id);
-                    // leave one byte space for the null byte.
-                    full_file_name.truncate(MAX_MMAP_FILENAME_LEN - 1);
-                    let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    filename_path[0..full_file_name.len()]
-                        .copy_from_slice(full_file_name.as_bytes());
-                    filename_path[full_file_name.len()] = 0; // Null terminate!
+                    let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
+                    // Keep room for the leading slash and trailing NULL.
+                    let max_copy = usize::min(filename.len(), MAX_MMAP_FILENAME_LEN - 2);
+                    filename_path[0] = b'/';
+                    filename_path[1..=max_copy].copy_from_slice(&filename[..max_copy]);
+
                     log::info!(
                         "{} Creating shmem {} {:#?}",
                         map_size,
@@ -838,6 +840,43 @@ pub mod unix_shmem {
             pub fn filename_path(&self) -> &Option<[u8; MAX_MMAP_FILENAME_LEN]> {
                 &self.filename_path
             }
+
+            /// Makes a shared memory mapping available in other processes.
+            ///
+            /// Only available on UNIX systems at the moment.
+            ///
+            /// You likely want to pass the [`crate::shmem::ShMemDescription`] of the returned [`ShMem`]
+            /// and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
+            ///
+            /// # Errors
+            ///
+            /// This function will return an error if the appropriate flags could not be extracted or set.
+            #[cfg(any(unix, doc))]
+            pub fn persist(self) -> Result<Self, Error> {
+                let fd = self.shm_fd;
+
+                // # Safety
+                // No user-provided potentially unsafe parameters.
+                // FFI Calls.
+                unsafe {
+                    let flags = fcntl(fd, libc::F_GETFD);
+
+                    if flags == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to retrieve FD flags",
+                        ));
+                    }
+
+                    if fcntl(fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
+                        return Err(Error::os_error(
+                            io::Error::last_os_error(),
+                            "Failed to set FD flags",
+                        ));
+                    }
+                }
+                Ok(self)
+            }
         }
 
         impl ShMem for MmapShMem {
@@ -901,46 +940,16 @@ pub mod unix_shmem {
         pub struct MmapShMemProvider {}
 
         impl MmapShMemProvider {
-            /// Creates a new shared memory mapping, which is available in other processes.
+            /// Create a [`MmapShMem`] with the specified size and id.
             ///
-            /// Only available on UNIX systems at the moment.
-            ///
-            /// You likely want to pass the [`crate::shmem::ShMemDescription`] of the returned [`ShMem`]
-            /// and reopen the shared memory in the child process using [`crate::shmem::ShMemProvider::shmem_from_description`].
-            ///
-            /// # Errors
-            ///
-            /// This function will return an error if the appropriate flags could not be extracted or set.
+            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 values from filename will be used. Do not include any characters that are illegal as filenames.
             #[cfg(any(unix, doc))]
-            pub fn new_shmem_persistent(
+            pub fn new_shmem_with_id(
                 &mut self,
                 map_size: usize,
-            ) -> Result<<Self as ShMemProvider>::ShMem, Error> {
-                let shmem = self.new_shmem(map_size)?;
-
-                let fd = shmem.shm_fd;
-
-                // # Safety
-                // No user-provided potentially unsafe parameters.
-                // FFI Calls.
-                unsafe {
-                    let flags = fcntl(fd, libc::F_GETFD);
-
-                    if flags == -1 {
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            "Failed to retrieve FD flags",
-                        ));
-                    }
-
-                    if fcntl(fd, libc::F_SETFD, flags & !libc::FD_CLOEXEC) == -1 {
-                        return Err(Error::os_error(
-                            io::Error::last_os_error(),
-                            "Failed to set FD flags",
-                        ));
-                    }
-                }
-                Ok(shmem)
+                id: &[u8],
+            ) -> Result<MmapShMem, Error> {
+                MmapShMem::new(map_size, id)
             }
         }
 
@@ -961,10 +970,14 @@ pub mod unix_shmem {
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
+
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mut rand = StdRand::with_seed(crate::rands::random_seed());
                 let id = rand.next() as u32;
-                MmapShMem::new(map_size, id)
+                let mut full_file_name = format!("/libafl_{}_{}", process::id(), id);
+                // leave one byte space for the null byte.
+                full_file_name.truncate(MAX_MMAP_FILENAME_LEN - 1);
+                MmapShMem::new(map_size, full_file_name.as_bytes())
             }
 
             fn shmem_from_id_and_size(
@@ -1342,7 +1355,11 @@ pub mod unix_shmem {
     }
 
     /// Module containing `memfd` shared memory support, usable on Linux and Android.
-    #[cfg(all(unix, feature = "std", not(target_vendor = "apple")))]
+    #[cfg(all(
+        unix,
+        feature = "std",
+        any(target_os = "linux", target_os = "android", target_os = "freebsd")
+    ))]
     pub mod memfd {
         use alloc::string::ToString;
         use core::{
@@ -1835,7 +1852,7 @@ mod tests {
         use crate::shmem::{MmapShMemProvider, ShMem as _};
 
         let mut provider = MmapShMemProvider::new()?;
-        let mut shmem = provider.new_shmem_persistent(1)?;
+        let mut shmem = provider.new_shmem(1)?.persist()?;
         shmem.fill(0);
 
         let description = shmem.description();

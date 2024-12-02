@@ -4,7 +4,7 @@ authors = [
   "Dominik Maier <domenukk@gmail.com>",
 ]
 name = "libafl_benches"
-version = "0.13.2"
+version.workspace = true
 edition = "2021"
 description = "LibAFL Benchmarks"
 documentation = "https://docs.rs/libafl"
@@ -21,13 +21,10 @@ categories = [
 ]
 
 [dev-dependencies]
-libafl_bolts = { path = "../../libafl_bolts", default-features = false, features = [
-  "xxh3",
-  "alloc",
-] } # libafl_bolts
+libafl_bolts = { workspace = true, features = ["xxh3", "alloc"] } # libafl_bolts
 
 criterion = "0.5.1" # Benchmarking
-ahash = { version = "0.8.11", default-features = false } # The hash function already used in hashbrown
+ahash = { workspace = true, default-features = false } # The hash function already used in hashbrown
 rustc-hash = { version = "2.0.0", default-features = false } # yet another hash
 xxhash-rust = { version = "0.8.12", features = [
   "xxh3",

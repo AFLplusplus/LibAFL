@@ -1,6 +1,6 @@
 [package]
 name = "libafl_targets"
-version = "0.13.2"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Common code for target instrumentation that can be used combined with LibAFL"
 documentation = "https://docs.rs/libafl_targets"
@@ -9,6 +9,7 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2021"
+rust-version = "1.82"
 categories = [
   "development-tools::testing",
   "emulators",
@@ -70,22 +71,20 @@ cc = { version = "1.1.21", features = ["parallel"] }
 rustversion = "1.0.17"
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.13.2", default-features = false, features = [
-] }
-libafl_bolts = { path = "../libafl_bolts", version = "0.13.2", default-features = false, features = [
-] }
-libc = { version = "0.2.59" }
-hashbrown = { version = "0.15.1", default-features = true }
+libafl = { workspace = true, features = [] }
+libafl_bolts = { workspace = true, features = [] }
+libc = { workspace = true }
+hashbrown = { workspace = true, default-features = true }
 once_cell = "1.19.0"
-log = { version = "0.4.22" }
-rustversion = { version = "1.0.17" }
+log = { workspace = true }
+rustversion = { workspace = true }
 
-rangemap = { version = "1.5.1" }
-serde = { version = "1.0.210", default-features = false, features = [
+rangemap = { workspace = true }
+serde = { workspace = true, default-features = false, features = [
   "alloc",
 ] } # serialization lib
-meminterval = { version = "0.4.1", features = ["serde"], optional = true }
-ahash = { version = "0.8.11", default-features = false, optional = true }
+meminterval = { workspace = true, features = ["serde"], optional = true }
+ahash = { workspace = true, default-features = false, optional = true }
 
 [lints]
 workspace = true

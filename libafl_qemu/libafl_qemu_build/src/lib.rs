@@ -192,7 +192,7 @@ fn qemu_bindgen_clang_args(
             entry["output"] == main_obj
                 || entry["file"]
                     .as_str()
-                    .map_or(false, |file| file.ends_with(main_file))
+                    .is_some_and(|file| file.ends_with(main_file))
         })
         .expect("Didn't find compile command for qemu-system-arm");
 

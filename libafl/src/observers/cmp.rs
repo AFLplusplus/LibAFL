@@ -5,7 +5,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use c2rust_bitfields::BitfieldStruct;
+use arbitrary_int::{u1, u4, u5, u6};
+use bitbybit::bitfield;
 use hashbrown::HashMap;
 use libafl_bolts::{ownedref::OwnedRefMut, AsSlice, HasLen, Named};
 use serde::{Deserialize, Serialize};
@@ -404,8 +405,6 @@ impl AFLppCmpValuesMetadata {
     }
 }
 
-#[derive(Debug, Copy, Clone, BitfieldStruct)]
-#[repr(C, packed)]
 /// Comparison header, used to describe a set of comparison values efficiently.
 ///
 /// # Bitfields
@@ -413,17 +412,33 @@ impl AFLppCmpValuesMetadata {
 /// - hits:      The number of hits of a particular comparison
 /// - id:        Unused by ``LibAFL``, a unique ID for a particular comparison
 /// - shape:     Whether a comparison is u8/u8, u16/u16, etc.
-/// - _type:     Whether the comparison value represents an instruction (like a `cmp`) or function
+/// - type_:     Whether the comparison value represents an instruction (like a `cmp`) or function
 ///              call arguments
 /// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
 /// - overflow:  Whether the comparison overflows
 /// - reserved:  Reserved for future use
+#[bitfield(u16)]
+#[derive(Debug)]
 pub struct AFLppCmpLogHeader {
-    /// The header values
-    #[bitfield(name = "hits", ty = "u32", bits = "0..=5")] // 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)
-    #[bitfield(name = "shape", ty = "u32", bits = "6..=10")] // 31 + 1 bytes max
-    #[bitfield(name = "_type", ty = "u8", bits = "11..=11")] // 2: cmp, rtn
-    #[bitfield(name = "attribute", ty = "u32", bits = "12..=15")]
-    // 16 types for arithmetic comparison types
-    pub data: [u8; 2],
+    /// The number of hits of a particular comparison
+    ///
+    /// 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)
+    #[bits(0..=5, r)]
+    hits: u6,
+    /// Whether a comparison is u8/u8, u16/u16, etc.
+    ///
+    /// 31 + 1 bytes max
+    #[bits(6..=10, r)]
+    shape: u5,
+    /// Whether the comparison value represents an instruction (like a `cmp`) or function call
+    /// arguments
+    ///
+    /// 2: cmp, rtn
+    #[bit(11, r)]
+    type_: u1,
+    /// OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
+    ///
+    /// 16 types for arithmetic comparison types
+    #[bits(12..=15, r)]
+    attribute: u4,
 }

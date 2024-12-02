@@ -5,7 +5,7 @@
 use core::ffi::CStr;
 #[cfg(not(any(test, feature = "std")))]
 use core::panic::PanicInfo;
-use core::{arch::asm, ffi::c_void, ops::Shl};
+use core::{arch::asm, ffi::c_void};
 
 #[cfg(not(any(test, feature = "std")))]
 #[panic_handler]
@@ -120,15 +120,9 @@ pub unsafe extern "C" fn main(argc: i32, argv: *const *const u8) -> ! {
 }
 
 fn decode_hex_and_jmp(hex_string: &str) -> ! {
-    let mut hex_buf = [0_u8; 8];
-    let hex_buf = &mut hex_buf[..hex_string.len() / 2];
-    hex::decode_to_slice(hex_string, hex_buf).unwrap();
-
-    let mut addr: u64 = 0;
-    for val in hex_buf {
-        addr = addr.shl(8);
-        addr += u64::from(*val);
-    }
+    let Ok(addr) = u64::from_str_radix(hex_string, 16) else {
+        panic!("Could not parse hex string: {hex_string}");
+    };
 
     #[cfg(feature = "std")]
     println!("Hex: {addr:#x}");

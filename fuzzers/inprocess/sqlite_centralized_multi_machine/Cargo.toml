@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_libpng_launcher_centralized_multi_machine"
-version = "0.13.2"
+version = "0.14.0"
 authors = [
   "Romain Malmain <romain.malmain@pm.me>",
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
@@ -20,7 +20,7 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.1.21", features = ["parallel"] }
-which = { version = "7.0.0" }
+which = "6.0.3"
 
 [dependencies]
 # no llmp compression for now, better perfs.

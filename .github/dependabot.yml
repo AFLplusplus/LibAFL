@@ -1,7 +1,8 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
-    directories:
-      - "*"
+    directory: "/"
     schedule:
       interval: "daily"
+    ignore:
+      - dependency-name: "pyo3"

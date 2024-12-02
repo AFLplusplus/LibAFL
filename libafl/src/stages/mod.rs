@@ -205,6 +205,8 @@ where
             }
             Some(idx) if idx == StageId(Self::LEN) => {
                 // perform the stage, but don't set it
+
+                #[allow(clippy::similar_names)]
                 let stage = &mut self.0;
 
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
@@ -218,6 +220,7 @@ where
             _ => {
                 state.set_current_stage_id(StageId(Self::LEN))?;
 
+                #[allow(clippy::similar_names)]
                 let stage = &mut self.0;
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
 
@@ -696,12 +699,12 @@ impl ExecutionCountRestartHelper {
     }
 
     /// Clear progress for the stage this wrapper wraps.
-    pub fn clear_progress<S>(&mut self, state: &mut S) -> Result<(), Error>
+    pub fn clear_progress<S>(&mut self, state: &mut S, name: &str) -> Result<(), Error>
     where
-        S: HasMetadata,
+        S: HasNamedMetadata,
     {
         self.started_at_execs = None;
-        let _metadata = state.remove_metadata::<ExecutionCountRestartHelperMetadata>();
+        let _metadata = state.remove_named_metadata::<ExecutionCountRestartHelperMetadata>(name);
         debug_assert!(_metadata.is_some(), "Called clear_progress, but should_restart was not called before (or did mutational stages get nested?)");
         Ok(())
     }
@@ -820,6 +823,7 @@ mod test {
             }
         }
 
+        #[allow(clippy::similar_names)]
         let mut state = StdState::nop()?;
         let stage = StageWithOneTry;
 

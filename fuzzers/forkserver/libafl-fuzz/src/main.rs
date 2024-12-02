@@ -71,24 +71,30 @@ mod feedback;
 mod scheduler;
 mod stages;
 use clap::Parser;
-use corpus::{check_autoresume, create_dir_if_not_exists, remove_main_node_file};
+use corpus::{check_autoresume, create_dir_if_not_exists};
 mod corpus;
 mod executor;
 mod fuzzer;
 mod hooks;
 use env_parser::parse_envs;
 use fuzzer::run_client;
-use libafl::{
-    events::{CentralizedLauncher, EventConfig},
-    monitors::MultiMonitor,
-    schedulers::powersched::BaseSchedule,
-    Error,
-};
-use libafl_bolts::{
-    core_affinity::{CoreId, Cores},
-    shmem::{ShMemProvider, StdShMemProvider},
-};
+use libafl::{schedulers::powersched::BaseSchedule, Error};
+use libafl_bolts::core_affinity::Cores;
 use nix::sys::signal::Signal;
+#[cfg(not(feature = "fuzzbench"))]
+use {
+    corpus::remove_main_node_file,
+    libafl::{
+        events::{CentralizedLauncher, ClientDescription, EventConfig},
+        monitors::MultiMonitor,
+    },
+    libafl_bolts::shmem::{ShMemProvider, StdShMemProvider},
+};
+#[cfg(feature = "fuzzbench")]
+use {
+    libafl::{events::SimpleEventManager, monitors::SimpleMonitor},
+    libafl_bolts::core_affinity::CoreId,
+};
 
 const AFL_DEFAULT_INPUT_LEN_MAX: usize = 1_048_576;
 const AFL_DEFAULT_INPUT_LEN_MIN: usize = 1;
@@ -107,10 +113,14 @@ fn main() {
     executor::check_binary(&mut opt, SHMEM_ENV_VAR).expect("binary to be valid");
 
     // Create the shared memory map provider for LLMP
+    #[cfg(not(feature = "fuzzbench"))]
     let shmem_provider = StdShMemProvider::new().unwrap();
 
     // Create our Monitor
+    #[cfg(not(feature = "fuzzbench"))]
     let monitor = MultiMonitor::new(|s| println!("{s}"));
+    #[cfg(feature = "fuzzbench")]
+    let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
     opt.auto_resume = if opt.auto_resume {
         true
@@ -126,31 +136,66 @@ fn main() {
     // Currently, we will error if we don't find our assigned dir.
     // This will also not work if we use core 1-8 and then later, 16-24
     // since fuzzer names are using core_ids
-    match CentralizedLauncher::builder()
+    #[cfg(not(feature = "fuzzbench"))]
+    let res = CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
-        .main_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
-            println!("run primary client on core {}", core_id.0);
-            let fuzzer_dir = opt.output_dir.join("fuzzer_main");
-            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            let res = run_client(state, mgr, &fuzzer_dir, core_id, &opt, true);
-            let _ = remove_main_node_file(&fuzzer_dir);
-            res
-        })
-        .secondary_run_client(|state: Option<_>, mgr: _, core_id: CoreId| {
-            println!("run secondary client on core {}", core_id.0);
-            let fuzzer_dir = opt
-                .output_dir
-                .join(format!("fuzzer_secondary_{}", core_id.0));
-            let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
-            run_client(state, mgr, &fuzzer_dir, core_id, &opt, false)
-        })
+        .main_run_client(
+            |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                println!(
+                    "run primary client with id {} on core {}",
+                    client_description.id(),
+                    client_description.core_id().0
+                );
+                let fuzzer_dir = opt.output_dir.join("fuzzer_main");
+                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                let res = run_client(
+                    state,
+                    mgr,
+                    &fuzzer_dir,
+                    client_description.core_id(),
+                    &opt,
+                    true,
+                );
+                let _ = remove_main_node_file(&fuzzer_dir);
+                res
+            },
+        )
+        .secondary_run_client(
+            |state: Option<_>, mgr: _, client_description: ClientDescription| {
+                println!(
+                    "run secondary client with id {} on core {}",
+                    client_description.id(),
+                    client_description.core_id().0
+                );
+                let fuzzer_dir = opt
+                    .output_dir
+                    .join(format!("fuzzer_secondary_{}", client_description.id()));
+                let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+                run_client(
+                    state,
+                    mgr,
+                    &fuzzer_dir,
+                    client_description.core_id(),
+                    &opt,
+                    false,
+                )
+            },
+        )
         .cores(&opt.cores.clone().expect("invariant; should never occur"))
         .broker_port(opt.broker_port.unwrap_or(AFL_DEFAULT_BROKER_PORT))
         .build()
-        .launch()
-    {
+        .launch();
+    #[cfg(feature = "fuzzbench")]
+    let res = {
+        let fuzzer_dir = opt.output_dir.join("fuzzer_main");
+        let _ = check_autoresume(&fuzzer_dir, opt.auto_resume).unwrap();
+        let mgr = SimpleEventManager::new(monitor);
+        let res = run_client(None, mgr, &fuzzer_dir, CoreId(0), &opt, true);
+        res
+    };
+    match res {
         Ok(()) => unreachable!(),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {err:?}"),
@@ -296,8 +341,9 @@ struct Opt {
     /// use binary-only instrumentation (QEMU mode)
     #[arg(short = 'Q')]
     qemu_mode: bool,
-    #[cfg(target_os = "linux")]
-    #[clap(skip)]
+    /// Nyx mode (Note: unlike AFL++, you do not need to specify -Y for parallel nyx fuzzing)
+    #[cfg(feature = "nyx")]
+    #[arg(short = 'X')]
     nyx_mode: bool,
     /// use unicorn-based instrumentation (Unicorn mode)
     #[arg(short = 'U')]

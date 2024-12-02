@@ -2,7 +2,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, addr_of_mut, null, write_volatile},
+    ptr::{self, null, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
@@ -99,24 +99,24 @@ where
         executor_ptr: *const c_void,
     ) {
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
             write_volatile(
-                addr_of_mut!((*data).current_input_ptr),
+                &raw mut (*data).current_input_ptr,
                 ptr::from_ref(input) as *const c_void,
             );
-            write_volatile(addr_of_mut!((*data).executor_ptr), executor_ptr);
+            write_volatile(&raw mut (*data).executor_ptr, executor_ptr);
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(
-                addr_of_mut!((*data).state_ptr),
+                &raw mut ((*data).state_ptr),
                 ptr::from_mut(state) as *mut c_void,
             );
             write_volatile(
-                addr_of_mut!((*data).event_mgr_ptr),
+                &raw mut (*data).event_mgr_ptr,
                 ptr::from_mut(mgr) as *mut c_void,
             );
             write_volatile(
-                addr_of_mut!((*data).fuzzer_ptr),
+                &raw mut (*data).fuzzer_ptr,
                 ptr::from_mut(fuzzer) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);
@@ -133,9 +133,9 @@ where
         _input: &<Self as UsesInput>::Input,
     ) {
         unsafe {
-            let data = addr_of_mut!(GLOBAL_STATE);
+            let data = &raw mut GLOBAL_STATE;
 
-            write_volatile(addr_of_mut!((*data).current_input_ptr), null());
+            write_volatile(&raw mut (*data).current_input_ptr, null());
             compiler_fence(Ordering::SeqCst);
         }
     }
