@@ -12,66 +12,52 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
-use alloc::string::ToString;
-#[cfg(feature = "std")]
-use core::time::Duration;
 use core::{
     fmt::{self, Debug, Formatter},
     num::NonZeroUsize,
+    time::Duration,
 };
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use std::boxed::Box;
-#[cfg(feature = "std")]
-use std::net::SocketAddr;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use std::process::Stdio;
-#[cfg(all(unix, feature = "std"))]
-use std::{fs::File, os::unix::io::AsRawFd};
+use std::{net::SocketAddr, string::String};
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::Broker;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::Brokers;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::llmp::LlmpBroker;
-#[cfg(all(unix, feature = "std"))]
-use libafl_bolts::os::dup2;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use libafl_bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use libafl_bolts::{
-    core_affinity::get_core_ids,
-    os::{fork, ForkResult},
-};
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
     shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
-#[cfg(feature = "std")]
+use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
+#[cfg(all(unix, feature = "fork"))]
+use {
+    crate::{
+        events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
+        inputs::UsesInput,
+        state::UsesState,
+    },
+    alloc::string::ToString,
+    libafl_bolts::{
+        core_affinity::get_core_ids,
+        llmp::{Broker, Brokers, LlmpBroker},
+        os::{fork, ForkResult},
+    },
+    std::boxed::Box,
+};
+#[cfg(unix)]
+use {
+    libafl_bolts::os::dup2,
+    std::{fs::File, os::unix::io::AsRawFd},
+};
+#[cfg(any(windows, not(feature = "fork")))]
+use {libafl_bolts::os::startable_self, std::process::Stdio};
 
-use super::EventManagerHooksTuple;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use super::StdLlmpEventHook;
-#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
-use crate::events::multi_machine::NodeDescriptor;
-#[cfg(all(unix, feature = "std", feature = "fork", feature = "multi_machine"))]
-use crate::events::multi_machine::TcpMultiMachineHooks;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook};
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::inputs::UsesInput;
-use crate::observers::TimeObserver;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::state::UsesState;
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "fork", feature = "multi_machine"))]
+use crate::events::multi_machine::{NodeDescriptor, TcpMultiMachineHooks};
 use crate::{
     events::{
         llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
-        EventConfig,
+        EventConfig, EventManagerHooksTuple,
     },
     monitors::Monitor,
+    observers::TimeObserver,
     state::{HasExecutions, State},
     Error,
 };
@@ -83,15 +69,67 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[cfg(all(feature = "fork", unix))]
 const LIBAFL_DEBUG_OUTPUT: &str = "LIBAFL_DEBUG_OUTPUT";
 
+/// Information about this client from the launcher
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientDescription {
+    id: usize,
+    overcommit_id: usize,
+    core_id: CoreId,
+}
+
+impl ClientDescription {
+    /// Create a [`ClientDescription`]
+    #[must_use]
+    pub fn new(id: usize, overcommit_id: usize, core_id: CoreId) -> Self {
+        Self {
+            id,
+            overcommit_id,
+            core_id,
+        }
+    }
+
+    /// Id unique to all clients spawned by this launcher
+    #[must_use]
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    /// [`CoreId`] this client is bound to
+    #[must_use]
+    pub fn core_id(&self) -> CoreId {
+        self.core_id
+    }
+
+    /// Incremental id unique for all clients on the same core
+    #[must_use]
+    pub fn overcommit_id(&self) -> usize {
+        self.overcommit_id
+    }
+
+    /// Create a string representation safe for environment variables
+    #[must_use]
+    pub fn to_safe_string(&self) -> String {
+        format!("{}_{}_{}", self.id, self.overcommit_id, self.core_id.0)
+    }
+
+    /// Parse the string created by [`Self::to_safe_string`].
+    #[must_use]
+    pub fn from_safe_string(input: &str) -> Self {
+        let mut iter = input.split('_');
+        let id = iter.next().unwrap().parse().unwrap();
+        let overcommit_id = iter.next().unwrap().parse().unwrap();
+        let core_id = iter.next().unwrap().parse::<usize>().unwrap().into();
+        Self {
+            id,
+            overcommit_id,
+            core_id,
+        }
+    }
+}
+
 /// Provides a [`Launcher`], which can be used to launch a fuzzing run on a specified list of cores
 ///
 /// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
-#[cfg(feature = "std")]
-#[allow(
-    clippy::type_complexity,
-    missing_debug_implementations,
-    clippy::ignored_unit_patterns
-)]
 #[derive(TypedBuilder)]
 pub struct Launcher<'a, CF, MT, SP> {
     /// The `ShmemProvider` to use
@@ -158,7 +196,7 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
             .field("core", &self.cores)
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr);
-        #[cfg(all(unix, feature = "std"))]
+        #[cfg(unix)]
         {
             dbg_struct
                 .field("stdout_file", &self.stdout_file)
@@ -175,21 +213,20 @@ where
     SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
-    #[cfg(all(
-        feature = "std",
-        any(windows, not(feature = "fork"), all(unix, feature = "fork"))
-    ))]
-    #[allow(unused_mut, clippy::match_wild_err_arm)]
+    #[cfg(any(windows, not(feature = "fork"), all(unix, feature = "fork")))]
     pub fn launch<S>(&mut self) -> Result<(), Error>
     where
         S: State + HasExecutions,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<(), S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            LlmpRestartingEventManager<(), S, SP>,
+            ClientDescription,
+        ) -> Result<(), Error>,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
 }
 
-#[cfg(feature = "std")]
 impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
@@ -197,12 +234,15 @@ where
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "fork"))]
-    #[allow(clippy::similar_names, clippy::too_many_lines)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
         EMH: EventManagerHooksTuple<S> + Clone + Copy,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            LlmpRestartingEventManager<EMH, S, SP>,
+            ClientDescription,
+        ) -> Result<(), Error>,
     {
         if self.cores.ids.is_empty() {
             return Err(Error::illegal_argument(
@@ -231,10 +271,10 @@ where
         let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn clients
-        let mut index = 0_u64;
-        for (id, bind_to) in core_ids.iter().enumerate() {
-            if self.cores.ids.iter().any(|&x| x == id.into()) {
-                for _ in 0..self.overcommit {
+        let mut index = 0_usize;
+        for bind_to in core_ids {
+            if self.cores.ids.iter().any(|&x| x == bind_to) {
+                for overcommit_id in 0..self.overcommit {
                     index += 1;
                     self.shmem_provider.pre_fork()?;
                     // # Safety
@@ -243,7 +283,9 @@ where
                         ForkResult::Parent(child) => {
                             self.shmem_provider.post_fork(false)?;
                             handles.push(child.pid);
-                            log::info!("child spawned and bound to core {id}");
+                            log::info!(
+                                "child spawned with id {index} and bound to core {bind_to:?}"
+                            );
                         }
                         ForkResult::Child => {
                             // # Safety
@@ -251,7 +293,9 @@ where
                             log::info!("{:?} PostFork", unsafe { libc::getpid() });
                             self.shmem_provider.post_fork(true)?;
 
-                            std::thread::sleep(Duration::from_millis(index * self.launch_delay));
+                            std::thread::sleep(Duration::from_millis(
+                                index as u64 * self.launch_delay,
+                            ));
 
                             if !debug_output {
                                 if let Some(file) = &self.opened_stdout_file {
@@ -264,12 +308,15 @@ where
                                 }
                             }
 
+                            let client_description =
+                                ClientDescription::new(index, overcommit_id, bind_to);
+
                             // Fuzzer client. keeps retrying the connection to broker till the broker starts
                             let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                                 .shmem_provider(self.shmem_provider.clone())
                                 .broker_port(self.broker_port)
                                 .kind(ManagerKind::Client {
-                                    cpu_core: Some(*bind_to),
+                                    client_description: client_description.clone(),
                                 })
                                 .configuration(self.configuration)
                                 .serialize_state(self.serialize_state)
@@ -277,7 +324,11 @@ where
                             let builder = builder.time_ref(self.time_ref.clone());
                             let (state, mgr) = builder.build().launch()?;
 
-                            return (self.run_client.take().unwrap())(state, mgr, *bind_to);
+                            return (self.run_client.take().unwrap())(
+                                state,
+                                mgr,
+                                client_description,
+                            );
                         }
                     };
                 }
@@ -329,12 +380,16 @@ where
 
     /// Launch the broker and the clients and fuzz
     #[cfg(any(windows, not(feature = "fork")))]
-    #[allow(unused_mut, clippy::match_wild_err_arm, clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::match_wild_err_arm)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
         EMH: EventManagerHooksTuple<S> + Clone + Copy,
-        CF: FnOnce(Option<S>, LlmpRestartingEventManager<EMH, S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            LlmpRestartingEventManager<EMH, S, SP>,
+            ClientDescription,
+        ) -> Result<(), Error>,
     {
         use libafl_bolts::core_affinity;
 
@@ -342,14 +397,14 @@ where
 
         let mut handles = match is_client {
             Ok(core_conf) => {
-                let core_id = core_conf.parse()?;
+                let client_description = ClientDescription::from_safe_string(&core_conf);
                 // the actual client. do the fuzzing
 
                 let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
-                        cpu_core: Some(CoreId(core_id)),
+                        client_description: client_description.clone(),
                     })
                     .configuration(self.configuration)
                     .serialize_state(self.serialize_state)
@@ -359,14 +414,13 @@ where
 
                 let (state, mgr) = builder.build().launch()?;
 
-                return (self.run_client.take().unwrap())(state, mgr, CoreId(core_id));
+                return (self.run_client.take().unwrap())(state, mgr, client_description);
             }
             Err(std::env::VarError::NotPresent) => {
                 // I am a broker
                 // before going to the broker loop, spawn n clients
 
                 let core_ids = core_affinity::get_core_ids().unwrap();
-                let num_cores = core_ids.len();
                 let mut handles = vec![];
 
                 log::info!("spawning on cores: {:?}", self.cores);
@@ -393,10 +447,13 @@ where
                     }
                 }
                 //spawn clients
-                for (id, _) in core_ids.iter().enumerate().take(num_cores) {
-                    if self.cores.ids.iter().any(|&x| x == id.into()) {
-                        for _ in 0..self.overcommit {
+                let mut index = 0;
+                for core_id in core_ids {
+                    if self.cores.ids.iter().any(|&x| x == core_id) {
+                        for overcommit_i in 0..self.overcommit {
+                            index += 1;
                             // Forward own stdio to child processes, if requested by user
+                            #[allow(unused_mut)]
                             let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
                             #[cfg(unix)]
                             {
@@ -407,10 +464,15 @@ where
                             }
 
                             std::thread::sleep(Duration::from_millis(
-                                id as u64 * self.launch_delay,
+                                core_id.0 as u64 * self.launch_delay,
                             ));
 
-                            std::env::set_var(_AFL_LAUNCHER_CLIENT, id.to_string());
+                            let client_description =
+                                ClientDescription::new(index, overcommit_i, core_id);
+                            std::env::set_var(
+                                _AFL_LAUNCHER_CLIENT,
+                                client_description.to_safe_string(),
+                            );
                             let mut child = startable_self()?;
                             let child = (if debug_output {
                                 &mut child
@@ -476,9 +538,8 @@ where
 ///
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores with a single main and multiple secondary nodes
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 #[derive(TypedBuilder)]
-#[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
@@ -506,6 +567,9 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     time_obs: Option<Handle<TimeObserver>>,
     /// The list of cores to run on
     cores: &'a Cores,
+    /// The number of clients to spawn on each core
+    #[builder(default = 1)]
+    overcommit: usize,
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
@@ -513,7 +577,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     #[builder(default = 10)]
     launch_delay: u64,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stdout_file: Option<File>,
     /// A file name to write all client stderr output to. If not specified, output is sent to
@@ -521,7 +585,7 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     #[builder(default = None)]
     stderr_file: Option<&'a str>,
     /// The actual, opened, `stdout_file` - so that we keep it open until the end
-    #[cfg(all(unix, feature = "std", feature = "fork"))]
+    #[cfg(all(unix, feature = "fork"))]
     #[builder(setter(skip), default = None)]
     opened_stderr_file: Option<File>,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
@@ -541,13 +605,14 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     serialize_state: LlmpShouldSaveState,
 }
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
             .field("configuration", &self.configuration)
             .field("broker_port", &self.broker_port)
-            .field("core", &self.cores)
+            .field("cores", &self.cores)
+            .field("overcommit", &self.overcommit)
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr)
             .field("stdout_file", &self.stdout_file)
@@ -559,7 +624,7 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
 /// The standard inner manager of centralized
 pub type StdCentralizedInnerMgr<S, SP> = LlmpRestartingEventManager<(), S, SP>;
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
@@ -573,37 +638,36 @@ where
         CF: FnOnce(
             Option<S>,
             CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
-            CoreId,
+            ClientDescription,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
             CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
-            CoreId,
+            ClientDescription,
         ) -> Result<(), Error>,
     {
-        let restarting_mgr_builder = |centralized_launcher: &Self, core_to_bind: CoreId| {
-            // Fuzzer client. keeps retrying the connection to broker till the broker starts
-            let builder = RestartingMgr::<(), MT, S, SP>::builder()
-                .always_interesting(centralized_launcher.always_interesting)
-                .shmem_provider(centralized_launcher.shmem_provider.clone())
-                .broker_port(centralized_launcher.broker_port)
-                .kind(ManagerKind::Client {
-                    cpu_core: Some(core_to_bind),
-                })
-                .configuration(centralized_launcher.configuration)
-                .serialize_state(centralized_launcher.serialize_state)
-                .hooks(tuple_list!());
+        let restarting_mgr_builder =
+            |centralized_launcher: &Self, client_description: ClientDescription| {
+                // Fuzzer client. keeps retrying the connection to broker till the broker starts
+                let builder = RestartingMgr::<(), MT, S, SP>::builder()
+                    .always_interesting(centralized_launcher.always_interesting)
+                    .shmem_provider(centralized_launcher.shmem_provider.clone())
+                    .broker_port(centralized_launcher.broker_port)
+                    .kind(ManagerKind::Client { client_description })
+                    .configuration(centralized_launcher.configuration)
+                    .serialize_state(centralized_launcher.serialize_state)
+                    .hooks(tuple_list!());
 
-            let builder = builder.time_ref(centralized_launcher.time_obs.clone());
+                let builder = builder.time_ref(centralized_launcher.time_obs.clone());
 
-            builder.build().launch()
-        };
+                builder.build().launch()
+            };
 
         self.launch_generic(restarting_mgr_builder, restarting_mgr_builder)
     }
 }
 
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
@@ -612,7 +676,6 @@ where
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
     /// - `secondary_inner_mgr_builder` will be called to build the inner manager of the secondary nodes.
-    #[allow(clippy::similar_names, clippy::too_many_lines)]
     pub fn launch_generic<EM, EMB, S>(
         &mut self,
         main_inner_mgr_builder: EMB,
@@ -621,13 +684,17 @@ where
     where
         S: State,
         S::Input: Send + Sync + 'static,
-        CF: FnOnce(Option<S>, CentralizedEventManager<EM, (), S, SP>, CoreId) -> Result<(), Error>,
+        CF: FnOnce(
+            Option<S>,
+            CentralizedEventManager<EM, (), S, SP>,
+            ClientDescription,
+        ) -> Result<(), Error>,
         EM: UsesState<State = S>,
-        EMB: FnOnce(&Self, CoreId) -> Result<(Option<S>, EM), Error>,
+        EMB: FnOnce(&Self, ClientDescription) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
             CentralizedEventManager<EM, (), S, SP>, // No broker_hooks for centralized EM
-            CoreId,
+            ClientDescription,
         ) -> Result<(), Error>,
         <<EM as UsesState>::State as UsesInput>::Input: Send + Sync + 'static,
     {
@@ -647,7 +714,6 @@ where
         }
 
         let core_ids = get_core_ids().unwrap();
-        let num_cores = core_ids.len();
         let mut handles = vec![];
 
         log::debug!("spawning on cores: {:?}", self.cores);
@@ -662,78 +728,101 @@ where
         let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
 
         // Spawn clients
-        let mut index = 0_u64;
-        for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
-            if self.cores.ids.iter().any(|&x| x == id.into()) {
-                index += 1;
-                self.shmem_provider.pre_fork()?;
-                match unsafe { fork() }? {
-                    ForkResult::Parent(child) => {
-                        self.shmem_provider.post_fork(false)?;
-                        handles.push(child.pid);
-                        #[cfg(feature = "std")]
-                        log::info!("child spawned and bound to core {id}");
-                    }
-                    ForkResult::Child => {
-                        log::info!("{:?} PostFork", unsafe { libc::getpid() });
-                        self.shmem_provider.post_fork(true)?;
+        let mut index = 0_usize;
+        for bind_to in core_ids {
+            if self.cores.ids.iter().any(|&x| x == bind_to) {
+                for overcommit_id in 0..self.overcommit {
+                    index += 1;
+                    self.shmem_provider.pre_fork()?;
+                    match unsafe { fork() }? {
+                        ForkResult::Parent(child) => {
+                            self.shmem_provider.post_fork(false)?;
+                            handles.push(child.pid);
+                            log::info!(
+                                "child with client id {index} spawned and bound to core {bind_to:?}"
+                            );
+                        }
+                        ForkResult::Child => {
+                            log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                            self.shmem_provider.post_fork(true)?;
 
-                        std::thread::sleep(Duration::from_millis(index * self.launch_delay));
+                            std::thread::sleep(Duration::from_millis(
+                                index as u64 * self.launch_delay,
+                            ));
 
-                        if !debug_output {
-                            if let Some(file) = &self.opened_stdout_file {
-                                dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                if let Some(stderr) = &self.opened_stderr_file {
-                                    dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                } else {
-                                    dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                            if !debug_output {
+                                if let Some(file) = &self.opened_stdout_file {
+                                    dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                    if let Some(stderr) = &self.opened_stderr_file {
+                                        dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    } else {
+                                        dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                    }
                                 }
                             }
-                        }
 
-                        if index == 1 {
-                            // Main client
-                            log::debug!("Running main client on PID {}", std::process::id());
-                            let (state, mgr) =
-                                main_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
+                            let client_description =
+                                ClientDescription::new(index, overcommit_id, bind_to);
 
-                            let mut centralized_event_manager_builder =
-                                CentralizedEventManager::builder();
-                            centralized_event_manager_builder =
-                                centralized_event_manager_builder.is_main(true);
+                            if index == 1 {
+                                // Main client
+                                log::debug!("Running main client on PID {}", std::process::id());
+                                let (state, mgr) = main_inner_mgr_builder.take().unwrap()(
+                                    self,
+                                    client_description.clone(),
+                                )?;
 
-                            let c_mgr = centralized_event_manager_builder.build_on_port(
-                                mgr,
-                                // tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
-                                tuple_list!(),
-                                self.shmem_provider.clone(),
-                                self.centralized_broker_port,
-                                self.time_obs.clone(),
-                            )?;
+                                let mut centralized_event_manager_builder =
+                                    CentralizedEventManager::builder();
+                                centralized_event_manager_builder =
+                                    centralized_event_manager_builder.is_main(true);
 
-                            self.main_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
-                            Err(Error::shutting_down())
-                        } else {
-                            // Secondary clients
-                            log::debug!("Running secondary client on PID {}", std::process::id());
-                            let (state, mgr) =
-                                secondary_inner_mgr_builder.take().unwrap()(self, *bind_to)?;
+                                let c_mgr = centralized_event_manager_builder.build_on_port(
+                                    mgr,
+                                    // tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
+                                    tuple_list!(),
+                                    self.shmem_provider.clone(),
+                                    self.centralized_broker_port,
+                                    self.time_obs.clone(),
+                                )?;
 
-                            let centralized_builder = CentralizedEventManager::builder();
+                                self.main_run_client.take().unwrap()(
+                                    state,
+                                    c_mgr,
+                                    client_description,
+                                )?;
+                                Err(Error::shutting_down())
+                            } else {
+                                // Secondary clients
+                                log::debug!(
+                                    "Running secondary client on PID {}",
+                                    std::process::id()
+                                );
+                                let (state, mgr) = secondary_inner_mgr_builder.take().unwrap()(
+                                    self,
+                                    client_description.clone(),
+                                )?;
 
-                            let c_mgr = centralized_builder.build_on_port(
-                                mgr,
-                                tuple_list!(),
-                                self.shmem_provider.clone(),
-                                self.centralized_broker_port,
-                                self.time_obs.clone(),
-                            )?;
+                                let centralized_builder = CentralizedEventManager::builder();
 
-                            self.secondary_run_client.take().unwrap()(state, c_mgr, *bind_to)?;
-                            Err(Error::shutting_down())
-                        }
-                    }?,
-                };
+                                let c_mgr = centralized_builder.build_on_port(
+                                    mgr,
+                                    tuple_list!(),
+                                    self.shmem_provider.clone(),
+                                    self.centralized_broker_port,
+                                    self.time_obs.clone(),
+                                )?;
+
+                                self.secondary_run_client.take().unwrap()(
+                                    state,
+                                    c_mgr,
+                                    client_description,
+                                )?;
+                                Err(Error::shutting_down())
+                            }
+                        }?,
+                    };
+                }
             }
         }
 

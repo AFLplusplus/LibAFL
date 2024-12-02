@@ -39,9 +39,9 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::events::{AdaptiveSerializer, CustomBufEventResult, HasCustomBufHandlers};
 use crate::{
     events::{
-        Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, LlmpEventManager, LlmpShouldSaveState,
-        ProgressReporter, StdLlmpEventHook,
+        launcher::ClientDescription, Event, EventConfig, EventFirer, EventManager,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        LlmpEventManager, LlmpShouldSaveState, ProgressReporter, StdLlmpEventHook,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -322,14 +322,14 @@ where
 
 /// The kind of manager we're creating right now
 #[cfg(feature = "std")]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ManagerKind {
     /// Any kind will do
     Any,
     /// A client, getting messages from a local broker.
     Client {
-        /// The CPU core ID of this client
-        cpu_core: Option<CoreId>,
+        /// The client description
+        client_description: ClientDescription,
     },
     /// An [`LlmpBroker`], forwarding the packets of local clients.
     Broker,
@@ -481,7 +481,7 @@ where
                 Err(Error::shutting_down())
             };
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
-            let (mgr, core_id) = match self.kind {
+            let (mgr, core_id) = match &self.kind {
                 ManagerKind::Any => {
                     let connection =
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
@@ -528,7 +528,7 @@ where
                     broker_things(broker, self.remote_broker_addr)?;
                     unreachable!("The broker may never return normally, only on errors or when shutting down.");
                 }
-                ManagerKind::Client { cpu_core } => {
+                ManagerKind::Client { client_description } => {
                     // We are a client
                     let mgr = LlmpEventManager::builder()
                         .always_interesting(self.always_interesting)
@@ -540,7 +540,7 @@ where
                             self.time_ref.clone(),
                         )?;
 
-                    (mgr, cpu_core)
+                    (mgr, Some(client_description.core_id()))
                 }
             };
 
