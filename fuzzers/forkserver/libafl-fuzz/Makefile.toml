@@ -71,7 +71,7 @@ dependencies = [
   "test_unicorn_mode",
   # nyx
   # since we cannot test nyx mode on CI, let's build it
-  "build_nyx_mode",
+  # "build_nyx_mode",
   # fuzzbench
   "test_instr_fuzzbench",
 ]
