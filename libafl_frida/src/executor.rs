@@ -176,7 +176,7 @@ where
         )
     }
 
-    /// Creates a new [`FridaInProcessExecutor`].
+    /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
     pub fn on_thread(
         gum: &'a Gum,
         base: InProcessExecutor<'a, H, OT, S>,
