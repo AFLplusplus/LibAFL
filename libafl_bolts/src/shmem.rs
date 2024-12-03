@@ -1854,6 +1854,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
         use crate::shmem::{MmapShMemProvider, ShMem as _};
