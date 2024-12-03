@@ -84,24 +84,25 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut intel_pt = IntelPT::builder().cpu(cpu.0).inherit(true).build().unwrap();
-
     // The target is a ET_DYN elf, it will be relocated by the loader with this offset.
     // see https://github.com/torvalds/linux/blob/c1e939a21eb111a6d6067b38e8e04b8809b64c4e/arch/x86/include/asm/elf.h#L234C1-L239C38
     const DEFAULT_MAP_WINDOW: usize = (1 << 47) - PAGE_SIZE;
-    const ELF_ET_DYN_BASE: usize = DEFAULT_MAP_WINDOW / 3 * 2 & !(PAGE_SIZE - 1);
+    const ELF_ET_DYN_BASE: usize = (DEFAULT_MAP_WINDOW / 3 * 2) & !(PAGE_SIZE - 1);
 
     // Set the instruction pointer (IP) filter and memory image of our target.
     // These information can be retrieved from `readelf -l` (for example)
-    let code_memory_addresses = ELF_ET_DYN_BASE + 0x14000..=ELF_ET_DYN_BASE + 0x14000 + 0x40000;
+    let code_memory_addresses = ELF_ET_DYN_BASE + 0x15000..=ELF_ET_DYN_BASE + 0x14000 + 0x41000;
 
-    intel_pt
-        .set_ip_filters(&[code_memory_addresses.clone()])
+    let intel_pt = IntelPT::builder()
+        .cpu(cpu.0)
+        .inherit(true)
+        .ip_filters(&[code_memory_addresses.clone()])
+        .build()
         .unwrap();
 
     let sections = [Section {
         file_path: target_path.to_string_lossy().to_string(),
-        file_offset: 0x13000,
+        file_offset: 0x14000,
         size: (*code_memory_addresses.end() - *code_memory_addresses.start() + 1) as u64,
         virtual_address: *code_memory_addresses.start() as u64,
     }];
