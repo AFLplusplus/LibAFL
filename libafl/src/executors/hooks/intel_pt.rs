@@ -30,7 +30,7 @@ pub struct Section {
 }
 
 /// Hook to enable Intel Processor Trace (PT) tracing
-#[derive(TypedBuilder)]
+#[derive(Debug, TypedBuilder)]
 pub struct IntelPTHook<T> {
     #[builder(default = IntelPT::builder().build().unwrap())]
     intel_pt: IntelPT,
@@ -38,17 +38,6 @@ pub struct IntelPTHook<T> {
     image: (Image<'static>, SectionCache<'static>),
     map_ptr: *mut T,
     map_len: usize,
-}
-
-//fixme: just derive(Debug) once https://github.com/sum-catnip/libipt-rs/pull/4 will be on crates.io
-impl<T> Debug for IntelPTHook<T> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
-        f.debug_struct("IntelPTHook")
-            .field("intel_pt", &self.intel_pt)
-            .field("map_ptr", &self.map_ptr)
-            .field("map_len", &self.map_len)
-            .finish()
-    }
 }
 
 impl<S, T> ExecutorHook<S> for IntelPTHook<T>
@@ -63,13 +52,19 @@ where
     }
 
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
-        self.intel_pt.disable_tracing().unwrap();
+        let pt = &mut self.intel_pt;
+        pt.disable_tracing().unwrap();
 
         let slice = unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) };
-        let _ = self
-            .intel_pt
+        let _ = pt
             .decode_traces_into_map(&mut self.image.0, slice)
             .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
+        #[cfg(feature = "intel_pt_export_raw")]
+        {
+            let _ = pt
+                .dump_last_trace_to_file()
+                .inspect_err(|e| log::warn!("Intel PT trace save to file failed: {e}"));
+        }
     }
 }
 

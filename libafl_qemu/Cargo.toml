@@ -90,7 +90,7 @@ clippy = ["libafl_qemu_sys/clippy"]
 [dependencies]
 libafl = { workspace = true, features = ["std", "derive", "regex"] }
 libafl_bolts = { workspace = true, features = ["std", "derive"] }
-libafl_targets = { workspace = true, default-features = true, version = "0.14.1" }
+libafl_targets = { workspace = true, default-features = true }
 libafl_qemu_sys = { workspace = true }
 libafl_derive = { workspace = true, default-features = true }
 
@@ -129,7 +129,7 @@ getset = "0.1.3"
 document-features = { workspace = true, optional = true }
 
 [build-dependencies]
-libafl_qemu_build = { workspace = true, default-features = true, version = "0.14.1" }
+libafl_qemu_build = { workspace = true, default-features = true }
 pyo3-build-config = { workspace = true, optional = true }
 rustversion = { workspace = true }
 bindgen = { workspace = true }
