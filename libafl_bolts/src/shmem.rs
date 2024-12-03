@@ -656,7 +656,7 @@ pub mod unix_shmem {
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::{io, process};
+        use std::{io, path::Path, process};
 
         use libc::{
             c_int, c_uchar, close, fcntl, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat,
@@ -692,26 +692,29 @@ pub mod unix_shmem {
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
             ///
-            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 values from filename will be used. Do not include any characters that are illegal as filenames
+            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 bytes from filename will be used.
             ///
             /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete them after fuzzing
-            pub fn new(map_size: usize, filename: &[u8]) -> Result<Self, Error> {
+            pub fn new(map_size: usize, filename: impl AsRef<Path>) -> Result<Self, Error> {
+                let filename_bytes = filename.as_ref().as_os_str().as_encoded_bytes();
+
+                let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
+                // Keep room for the leading slash and trailing NULL.
+                let max_copy = usize::min(filename_bytes.len(), MAX_MMAP_FILENAME_LEN - 2);
+                filename_path[0] = b'/';
+                filename_path[1..=max_copy].copy_from_slice(&filename_bytes[..max_copy]);
+
+                log::info!(
+                    "{} Creating shmem {} {:?}",
+                    map_size,
+                    process::id(),
+                    filename_path
+                );
+
                 // # Safety
                 // No user-provided potentially unsafe parameters.
                 // FFI Calls.
                 unsafe {
-                    let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    // Keep room for the leading slash and trailing NULL.
-                    let max_copy = usize::min(filename.len(), MAX_MMAP_FILENAME_LEN - 2);
-                    filename_path[0] = b'/';
-                    filename_path[1..=max_copy].copy_from_slice(&filename[..max_copy]);
-
-                    log::info!(
-                        "{} Creating shmem {} {:#?}",
-                        map_size,
-                        process::id(),
-                        filename_path
-                    );
                     /* create the shared memory segment as if it was a file */
                     let shm_fd = shm_open(
                         filename_path.as_ptr() as *const _,
@@ -942,12 +945,12 @@ pub mod unix_shmem {
         impl MmapShMemProvider {
             /// Create a [`MmapShMem`] with the specified size and id.
             ///
-            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 values from filename will be used. Do not include any characters that are illegal as filenames.
+            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 bytes from id will be used.
             #[cfg(any(unix, doc))]
             pub fn new_shmem_with_id(
                 &mut self,
                 map_size: usize,
-                id: &[u8],
+                id: impl AsRef<Path>,
             ) -> Result<MmapShMem, Error> {
                 MmapShMem::new(map_size, id)
             }
@@ -974,10 +977,10 @@ pub mod unix_shmem {
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mut rand = StdRand::with_seed(crate::rands::random_seed());
                 let id = rand.next() as u32;
-                let mut full_file_name = format!("/libafl_{}_{}", process::id(), id);
+                let mut full_file_name = format!("libafl_{}_{}", process::id(), id);
                 // leave one byte space for the null byte.
                 full_file_name.truncate(MAX_MMAP_FILENAME_LEN - 1);
-                MmapShMem::new(map_size, full_file_name.as_bytes())
+                MmapShMem::new(map_size, full_file_name)
             }
 
             fn shmem_from_id_and_size(
