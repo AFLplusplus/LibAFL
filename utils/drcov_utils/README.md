@@ -14,3 +14,4 @@ A performant clone of [drcov-merge](https://github.com/vanhauser-thc/drcov-merge
 It can merge multiple DrCov files into a single DrCov file.
 
 Run with `cargo run --release --bin drcov_merge -- -h`
+For example `cargo run --release --bin drcov_merge -- -o merged.cov -i *`
