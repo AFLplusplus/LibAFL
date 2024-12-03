@@ -190,19 +190,13 @@ impl FridaRuntime for AsanRuntime {
         self.deregister_hooks(gum);
     }
 
-    fn pre_exec(
-        &mut self,
-        input_bytes: &[u8]
-    ) -> Result<(), libafl::Error> {
+    fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), libafl::Error> {
         self.unpoison(input_bytes.as_ptr() as usize, input_bytes.len());
         self.enable_hooks();
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        input_bytes: &[u8]
-    ) -> Result<(), libafl::Error> {
+    fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), libafl::Error> {
         self.disable_hooks();
         if self.check_for_leaks_enabled {
             self.check_for_leaks();
