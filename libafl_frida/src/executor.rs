@@ -20,6 +20,7 @@ use libafl::{
     state::{HasExecutions, State, UsesState},
     Error,
 };
+use libafl_bolts::AsSlice;
 use libafl_bolts::tuples::RefIndexable;
 
 #[cfg(not(test))]
@@ -83,7 +84,8 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        self.helper.pre_exec(input)?;
+        let target_bytes = input.target_bytes();
+        self.helper.pre_exec(target_bytes.as_slice())?;
         if self.helper.stalker_enabled() {
             if self.followed {
                 self.stalker.activate(NativePointer(core::ptr::null_mut()));
@@ -115,7 +117,7 @@ where
                 abort();
             }
         }
-        self.helper.post_exec(input)?;
+        self.helper.post_exec(target_bytes.as_slice())?;
         res
     }
 }

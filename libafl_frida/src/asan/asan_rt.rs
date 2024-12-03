@@ -27,7 +27,7 @@ use frida_gum::{
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
-use libafl_bolts::{cli::FuzzerOptions, AsSlice};
+use libafl_bolts::cli::FuzzerOptions;
 use libc::wchar_t;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
@@ -190,33 +190,28 @@ impl FridaRuntime for AsanRuntime {
         self.deregister_hooks(gum);
     }
 
-    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+    fn pre_exec(
         &mut self,
-        input: &I,
+        input_bytes: &[u8]
     ) -> Result<(), libafl::Error> {
-        let target_bytes = input.target_bytes();
-        let slice = target_bytes.as_slice();
-
-        self.unpoison(slice.as_ptr() as usize, slice.len());
+        self.unpoison(input_bytes.as_ptr() as usize, input_bytes.len());
         self.enable_hooks();
         Ok(())
     }
 
-    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+    fn post_exec(
         &mut self,
-        input: &I,
+        input_bytes: &[u8]
     ) -> Result<(), libafl::Error> {
         self.disable_hooks();
         if self.check_for_leaks_enabled {
             self.check_for_leaks();
         }
 
-        let target_bytes = input.target_bytes();
-        let slice = target_bytes.as_slice();
         // # Safety
         // The ptr and length are correct.
         unsafe {
-            self.poison(slice.as_ptr() as usize, slice.len());
+            self.poison(input_bytes.as_ptr() as usize, input_bytes.len());
         }
         self.reset_allocations();
 
