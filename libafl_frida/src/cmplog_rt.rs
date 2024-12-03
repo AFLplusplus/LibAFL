@@ -29,10 +29,7 @@ use iced_x86::{
     BlockEncoder, Code, DecoderOptions, Instruction, InstructionBlock, MemoryOperand, MemorySize,
     OpKind, Register,
 };
-use libafl::{
-    inputs::{HasTargetBytes, Input},
-    Error,
-};
+use libafl::Error;
 use libafl_targets::{cmps::__libafl_targets_cmplog_instructions, CMPLOG_MAP_W};
 use rangemap::RangeMap;
 
@@ -132,11 +129,11 @@ impl FridaRuntime for CmpLogRuntime {
 
     fn deinit(&mut self, _gum: &frida_gum::Gum) {}
 
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _input_bytes: &[u8]) -> Result<(), Error> {
         Ok(())
     }
 
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn post_exec(&mut self, _input_bytes: &[u8]) -> Result<(), Error> {
         Ok(())
     }
 }
