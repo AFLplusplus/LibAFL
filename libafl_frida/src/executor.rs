@@ -38,7 +38,7 @@ where
     'b: 'a,
 {
     base: InProcessExecutor<'a, H, OT, S>,
-    /// thread_id for the Stalker
+    /// `thread_id` for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker,
