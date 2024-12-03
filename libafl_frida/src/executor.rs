@@ -65,7 +65,8 @@ where
     }
 }
 
-impl<EM, H, OT, RT, S, TC, Z> Executor<EM, Z> for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
+impl<EM, H, OT, RT, S, TC, Z> Executor<EM, Z>
+    for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
 where
     EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
@@ -151,7 +152,8 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, NopTargetBytesConverter<S::Input>>
+impl<'a, 'b, 'c, H, OT, RT, S>
+    FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, NopTargetBytesConverter<S::Input>>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: State,
@@ -165,7 +167,13 @@ where
         base: InProcessExecutor<'a, H, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
-        FridaInProcessExecutor::with_target_bytes_converter(gum, base, helper, None, NopTargetBytesConverter::new())
+        FridaInProcessExecutor::with_target_bytes_converter(
+            gum,
+            base,
+            helper,
+            None,
+            NopTargetBytesConverter::new(),
+        )
     }
 
     /// Creates a new [`FridaInProcessExecutor`].
@@ -175,7 +183,13 @@ where
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
         thread_id: u32,
     ) -> Self {
-        FridaInProcessExecutor::with_target_bytes_converter(gum, base, helper, Some(thread_id), NopTargetBytesConverter::new())
+        FridaInProcessExecutor::with_target_bytes_converter(
+            gum,
+            base,
+            helper,
+            Some(thread_id),
+            NopTargetBytesConverter::new(),
+        )
     }
 }
 
@@ -201,7 +215,8 @@ where
         let mut ranges = helper.ranges().clone();
         for module in frida_gum::Module::obtain(gum).enumerate_modules() {
             if module.base_address < Self::with_target_bytes_converter as usize
-                && (Self::with_target_bytes_converter as usize as u64) < module.base_address as u64 + module.size as u64
+                && (Self::with_target_bytes_converter as usize as u64)
+                    < module.base_address as u64 + module.size as u64
             {
                 ranges.insert(
                     module.base_address as u64..(module.base_address as u64 + module.size as u64),
