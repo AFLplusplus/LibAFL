@@ -1828,17 +1828,10 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
-    use core::ffi::CStr;
-    use std::{
-        env,
-        process::{Command, Stdio},
-        string::ToString,
-    };
-
     use serial_test::serial;
 
     use crate::{
-        shmem::{ShMemId, ShMemProvider, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider},
         AsSlice, AsSliceMut, Error,
     };
 
@@ -1857,7 +1850,14 @@ mod tests {
     #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
-        use crate::shmem::{MmapShMemProvider, ShMem as _};
+        use core::ffi::CStr;
+        use std::{
+            env,
+            process::{Command, Stdio},
+            string::ToString,
+        };
+
+        use crate::shmem::{MmapShMemProvider, ShMem as _, ShMemId};
 
         // relies on the fact that the ID in a ShMemDescription is always a string for MmapShMem
         match env::var("SHMEM_SIZE") {
