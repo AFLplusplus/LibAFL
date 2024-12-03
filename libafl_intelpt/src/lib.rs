@@ -44,9 +44,11 @@ use libafl_bolts::ownedref::OwnedRefMut;
 use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
 use libipt::{
-    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Asid, BlockFlags,
-    ConfigBuilder, Cpu, Image, PtError, PtErrorCode, Status,
+    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
+    ConfigBuilder, Cpu, PtError, PtErrorCode, Status,
 };
+#[cfg(target_os = "linux")]
+pub use libipt::{Asid, Image, SectionCache};
 #[cfg(target_os = "linux")]
 use num_enum::TryFromPrimitive;
 #[cfg(target_os = "linux")]
@@ -435,24 +437,36 @@ impl IntelPT {
                 Ok((b, s)) => {
                     *status = s;
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
-
+                    //todo: remove !b.speculative()
                     if !b.speculative() && skip < offset {
                         let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
                         *map_loc = (*map_loc).saturating_add(&1u8.into());
 
+                        log::trace!(
+                            "previous block ip: {:x} current: {:x} asid: {:?}",
+                            previous_block_end_ip,
+                            b.ip(),
+                            decoder.asid().unwrap_or_default()
+                        );
+                        log::trace!("writing map at {} with value {:?}", id, *map_loc);
                         *previous_block_end_ip = b.end_ip();
+                    }
+
+                    if status.eos() {
+                        break 'block;
                     }
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
-                        log::trace!("PT error in block next {e:?}");
+                        log::trace!(
+                            "PT error in block next {e:?} last decoded block end {:x}",
+                            previous_block_end_ip
+                        );
                     }
+                    break 'block;
                 }
-            }
-            if status.eos() {
-                break 'block;
             }
         }
         Ok(())
