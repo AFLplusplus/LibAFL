@@ -1828,10 +1828,17 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 #[cfg(test)]
 mod tests {
+    use core::ffi::CStr;
+    use std::{
+        env,
+        process::{Command, Stdio},
+        string::ToString,
+    };
+
     use serial_test::serial;
 
     use crate::{
-        shmem::{ShMemProvider, StdShMemProvider},
+        shmem::{ShMemId, ShMemProvider, StdShMemProvider},
         AsSlice, AsSliceMut, Error,
     };
 
@@ -1847,27 +1854,52 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(unix, not(miri)))]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
-        use std::thread;
-
         use crate::shmem::{MmapShMemProvider, ShMem as _};
 
-        let mut provider = MmapShMemProvider::new()?;
-        let mut shmem = provider.new_shmem(1)?.persist()?;
-        shmem.fill(0);
+        // relies on the fact that the ID in a ShMemDescription is always a string for MmapShMem
+        match env::var("SHMEM_SIZE") {
+            Ok(size) => {
+                let mut provider = MmapShMemProvider::new()?;
+                let id = ShMemId::from_string(&env::var("SHMEM_ID").unwrap());
+                let size = size.parse().unwrap();
+                let mut shmem = provider.shmem_from_id_and_size(id, size)?;
+                shmem[0] = 1;
+            }
+            Err(env::VarError::NotPresent) => {
+                let mut provider = MmapShMemProvider::new()?;
+                let mut shmem = provider.new_shmem(1)?.persist()?;
+                shmem.fill(0);
+                let description = shmem.description();
 
-        let description = shmem.description();
+                // call the test binary again
+                // with certain env variables set to prevent infinite loops
+                // and with an added arg to only run this test
+                //
+                // a command is necessary to create the required distance between the two processes
+                // with threads/fork it works without the additional steps to persist the ShMem regardless
+                let status = Command::new(env::current_exe().unwrap())
+                    .env(
+                        "SHMEM_ID",
+                        CStr::from_bytes_until_nul(description.id.as_array())
+                            .unwrap()
+                            .to_str()
+                            .unwrap(),
+                    )
+                    .env("SHMEM_SIZE", description.size.to_string())
+                    .arg("shmem::tests::test_persist_shmem")
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .unwrap();
 
-        let handle = thread::spawn(move || -> Result<(), Error> {
-            let mut provider = MmapShMemProvider::new()?;
-            let mut shmem = provider.shmem_from_description(description)?;
-            shmem.as_slice_mut()[0] = 1;
-            Ok(())
-        });
-        handle.join().unwrap()?;
-        assert_eq!(1, shmem.as_slice()[0]);
+                assert!(status.success());
+                assert_eq!(shmem[0], 1);
+            }
+            Err(e) => panic!("{e}"),
+        }
+
         Ok(())
     }
 }
