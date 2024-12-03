@@ -20,8 +20,7 @@ use libafl::{
     state::{HasExecutions, State, UsesState},
     Error,
 };
-use libafl_bolts::tuples::RefIndexable;
-use libafl_bolts::AsSlice;
+use libafl_bolts::{tuples::RefIndexable, AsSlice};
 
 #[cfg(not(test))]
 use crate::asan::errors::AsanErrors;
