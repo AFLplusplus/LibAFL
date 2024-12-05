@@ -19,6 +19,7 @@ use std::{
 };
 #[cfg(target_os = "linux")]
 use std::{
+    boxed::Box,
     ffi::{CStr, CString},
     fmt::Debug,
     format, fs,
@@ -129,6 +130,8 @@ pub struct IntelPT {
     aux_tail: *mut u64,
     previous_decode_head: u64,
     ip_filters: Vec<RangeInclusive<usize>>,
+    #[cfg(feature = "export_raw")]
+    last_decode_trace: Vec<u8>,
 }
 
 #[cfg(target_os = "linux")]
@@ -302,8 +305,12 @@ impl IntelPT {
             }
         } else {
             // Head pointer wrapped, the trace is split
-            unsafe { self.join_split_trace(head_wrap, tail_wrap) }
+            OwnedRefMut::Owned(self.join_split_trace(head_wrap, tail_wrap))
         };
+        #[cfg(feature = "export_raw")]
+        {
+            self.last_decode_trace = data.as_ref().to_vec();
+        }
 
         let mut config = ConfigBuilder::new(data.as_mut()).map_err(error_from_pt_error)?;
         config.filter(self.ip_filters_to_addr_filter());
@@ -351,19 +358,17 @@ impl IntelPT {
 
     #[inline]
     #[must_use]
-    unsafe fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> OwnedRefMut<[u8]> {
-        let first_ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
+    fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> Box<[u8]> {
+        let first_ptr = unsafe { self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8 };
         let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
+
         let second_ptr = self.perf_aux_buffer as *mut u8;
         let second_len = head_wrap as usize;
-        OwnedRefMut::Owned(
-            [
-                slice::from_raw_parts(first_ptr, first_len),
-                slice::from_raw_parts(second_ptr, second_len),
-            ]
-            .concat()
-            .into_boxed_slice(),
-        )
+
+        let mut vec = Vec::with_capacity(first_len + second_len);
+        vec.extend_from_slice(unsafe { slice::from_raw_parts(first_ptr, first_len) });
+        vec.extend_from_slice(unsafe { slice::from_raw_parts(second_ptr, second_len) });
+        vec.into_boxed_slice()
     }
 
     #[inline]
@@ -395,7 +400,7 @@ impl IntelPT {
                     *status = s;
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
 
-                    if !b.speculative() && skip < offset {
+                    if b.ninsn() > 0 && !b.speculative() && skip < offset {
                         let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
@@ -414,6 +419,29 @@ impl IntelPT {
                 break 'block;
             }
         }
+        Ok(())
+    }
+
+    /// Get the raw trace used in the last decoding
+    #[cfg(feature = "export_raw")]
+    pub fn last_decode_trace(&self) -> Vec<u8> {
+        self.last_decode_trace.clone()
+    }
+
+    /// Dump the raw trace used in the last decoding to the file
+    /// /// `./traces/trace_<unix epoch in micros>`
+    #[cfg(feature = "export_raw")]
+    pub fn dump_last_trace_to_file(&self) -> Result<(), Error> {
+        use std::{fs, io::Write, path::Path, time};
+
+        let traces_dir = Path::new("traces");
+        fs::create_dir_all(traces_dir)?;
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .map_err(|e| Error::unknown(e.to_string()))?
+            .as_micros();
+        let mut file = fs::File::create(traces_dir.join(format!("trace_{timestamp}")))?;
+        file.write_all(&self.last_decode_trace())?;
         Ok(())
     }
 }
@@ -441,6 +469,7 @@ pub struct IntelPTBuilder {
     inherit: bool,
     perf_buffer_size: usize,
     perf_aux_buffer_size: usize,
+    ip_filters: Vec<RangeInclusive<usize>>,
 }
 
 #[cfg(target_os = "linux")]
@@ -450,14 +479,15 @@ impl Default for IntelPTBuilder {
     /// The default configuration corresponds to:
     /// ```rust
     /// use libafl_intelpt::{IntelPTBuilder, PAGE_SIZE};
-    /// let builder = unsafe { std::mem::zeroed::<IntelPTBuilder>() }
+    /// let builder = IntelPTBuilder::default()
     ///     .pid(None)
     ///     .all_cpus()
     ///     .exclude_kernel(true)
     ///     .exclude_hv(true)
     ///     .inherit(false)
     ///     .perf_buffer_size(128 * PAGE_SIZE + PAGE_SIZE).unwrap()
-    ///     .perf_aux_buffer_size(2 * 1024 * 1024).unwrap();
+    ///     .perf_aux_buffer_size(2 * 1024 * 1024).unwrap()
+    ///     .ip_filters(&[]);
     /// assert_eq!(builder, IntelPTBuilder::default());
     /// ```
     fn default() -> Self {
@@ -469,6 +499,7 @@ impl Default for IntelPTBuilder {
             inherit: false,
             perf_buffer_size: 128 * PAGE_SIZE + PAGE_SIZE,
             perf_aux_buffer_size: 2 * 1024 * 1024,
+            ip_filters: Vec::new(),
         }
     }
 }
@@ -532,9 +563,7 @@ impl IntelPTBuilder {
         let aux_head = unsafe { &raw mut (*buff_metadata).aux_head };
         let aux_tail = unsafe { &raw mut (*buff_metadata).aux_tail };
 
-        let ip_filters = Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize);
-
-        Ok(IntelPT {
+        let mut intel_pt = IntelPT {
             fd,
             perf_buffer,
             perf_aux_buffer,
@@ -543,8 +572,14 @@ impl IntelPTBuilder {
             aux_head,
             aux_tail,
             previous_decode_head: 0,
-            ip_filters,
-        })
+            ip_filters: Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize),
+            #[cfg(feature = "export_raw")]
+            last_decode_trace: Vec::new(),
+        };
+        if !self.ip_filters.is_empty() {
+            intel_pt.set_ip_filters(&self.ip_filters)?;
+        }
+        Ok(intel_pt)
     }
 
     /// Warn if the configuration is not recommended
@@ -638,6 +673,15 @@ impl IntelPTBuilder {
         self.perf_aux_buffer_size = perf_aux_buffer_size;
         Ok(self)
     }
+
+    #[must_use]
+    /// Set filters based on Instruction Pointer (IP)
+    ///
+    /// Only instructions in `filters` ranges will be traced.
+    pub fn ip_filters(mut self, filters: &[RangeInclusive<usize>]) -> Self {
+        self.ip_filters = filters.to_vec();
+        self
+    }
 }
 
 /// Perf event config for `IntelPT`
@@ -717,6 +761,9 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         let kvm_pt_mode_path = "/sys/module/kvm_intel/parameters/pt_mode";
+        // Ignore the case when the file does not exist since it has been removed.
+        // KVM default is `System` mode
+        // https://lore.kernel.org/all/20241101185031.1799556-1-seanjc@google.com/t/#u
         if let Ok(s) = fs::read_to_string(kvm_pt_mode_path) {
             match s.trim().parse::<i32>().map(TryInto::try_into) {
                 Ok(Ok(KvmPTMode::System)) => (),

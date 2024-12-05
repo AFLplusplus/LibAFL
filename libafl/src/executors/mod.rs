@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, time::Duration};
 
 pub use combined::CombinedExecutor;
-#[cfg(all(feature = "std", any(unix, doc)))]
+#[cfg(all(feature = "std", unix))]
 pub use command::CommandExecutor;
 pub use differential::DiffExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -23,7 +23,7 @@ pub use with_observers::WithObservers;
 use crate::{state::UsesState, Error};
 
 pub mod combined;
-#[cfg(all(feature = "std", any(unix, doc)))]
+#[cfg(all(feature = "std", unix))]
 pub mod command;
 pub mod differential;
 #[cfg(all(feature = "std", feature = "fork", unix))]

@@ -8,7 +8,10 @@ use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, NopCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    events::{
+        launcher::Launcher, ClientDescription, EventConfig, EventRestarter,
+        LlmpRestartingEventManager,
+    },
     executors::ExitKind,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
@@ -120,8 +123,9 @@ pub fn fuzz() {
 
     env::remove_var("LD_LIBRARY_PATH");
 
-    let mut run_client =
-        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
+    let mut run_client = |state: Option<_>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _>,
+                          client_description: ClientDescription| {
             let mut cov_path = options.coverage_path.clone();
 
             let emulator_modules = tuple_list!(DrCovModule::builder()
@@ -206,6 +210,7 @@ pub fn fuzz() {
                     ExitKind::Ok
                 };
 
+            let core_id = client_description.core_id();
             let core_idx = options
                 .cores
                 .position(core_id)
@@ -217,30 +222,30 @@ pub fn fuzz() {
                 .map(|x| x.path())
                 .collect::<Vec<PathBuf>>();
 
-            if files.is_empty() {
-                mgr.send_exiting()?;
-                Err(Error::ShuttingDown)?
-            }
+        if files.is_empty() {
+            mgr.send_exiting()?;
+            Err(Error::ShuttingDown)?
+        }
 
-            #[allow(clippy::let_unit_value)]
-            let mut feedback = ();
+        #[allow(clippy::let_unit_value)]
+        let mut feedback = ();
 
-            #[allow(clippy::let_unit_value)]
-            let mut objective = ();
+        #[allow(clippy::let_unit_value)]
+        let mut objective = ();
 
-            let mut state = state.unwrap_or_else(|| {
-                StdState::new(
-                    StdRand::new(),
-                    NopCorpus::new(),
-                    NopCorpus::new(),
-                    &mut feedback,
-                    &mut objective,
-                )
-                .unwrap()
-            });
+        let mut state = state.unwrap_or_else(|| {
+            StdState::new(
+                StdRand::new(),
+                NopCorpus::new(),
+                NopCorpus::new(),
+                &mut feedback,
+                &mut objective,
+            )
+            .unwrap()
+        });
 
-            let scheduler = QueueScheduler::new();
-            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let scheduler = QueueScheduler::new();
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
             let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
@@ -258,21 +263,21 @@ pub fn fuzz() {
             )
             .expect("Failed to create QemuExecutor");
 
-            if state.must_load_initial_inputs() {
-                state
-                    .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
-                    .unwrap_or_else(|_| {
-                        println!("Failed to load initial corpus at {:?}", &options.input_dir);
-                        process::exit(0);
-                    });
-                log::debug!("We imported {} inputs from disk.", state.corpus().count());
-            }
+        if state.must_load_initial_inputs() {
+            state
+                .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
+                .unwrap_or_else(|_| {
+                    println!("Failed to load initial corpus at {:?}", &options.input_dir);
+                    process::exit(0);
+                });
+            log::debug!("We imported {} inputs from disk.", state.corpus().count());
+        }
 
-            log::debug!("Processed {} inputs from disk.", files.len());
+        log::debug!("Processed {} inputs from disk.", files.len());
 
-            mgr.send_exiting()?;
-            Err(Error::ShuttingDown)?
-        };
+        mgr.send_exiting()?;
+        Err(Error::ShuttingDown)?
+    };
 
     match Launcher::builder()
         .shmem_provider(StdShMemProvider::new().expect("Failed to init shared memory"))

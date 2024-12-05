@@ -5,50 +5,56 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use std::{
     ffi::{CStr, CString},
     os::fd::AsRawFd,
 };
-#[cfg(feature = "std")]
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
+    os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
-    process::Child,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     time::Duration,
 };
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use libc::STDIN_FILENO;
-#[cfg(all(feature = "std", target_os = "linux"))]
-use nix::unistd::Pid;
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
+use nix::{
+    errno::Errno,
+    sys::{
+        ptrace,
+        signal::Signal,
+        wait::WaitStatus,
+        wait::{
+            waitpid, WaitPidFlag,
+            WaitStatus::{Exited, PtraceEvent, Signaled, Stopped},
+        },
+    },
+    unistd::Pid,
+};
+#[cfg(target_os = "linux")]
 use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
-#[cfg(all(feature = "std", unix))]
-use crate::executors::{Executor, ExitKind};
 use crate::{
     corpus::Corpus,
-    executors::{hooks::ExecutorHooksTuple, HasObservers},
-    inputs::{HasTargetBytes, UsesInput},
+    executors::{hooks::ExecutorHooksTuple, Executor, ExitKind, HasObservers},
+    inputs::{HasTargetBytes, Input, UsesInput},
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasCorpus, HasExecutions, State, UsesState},
     std::borrow::ToOwned,
+    Error,
 };
-#[cfg(feature = "std")]
-use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
 /// `StdIn`: The target reads from stdin
@@ -176,7 +182,7 @@ where
 ///
 /// This configurator was primarly developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 pub struct PTraceCommandConfigurator {
     #[builder(setter(into))]
@@ -193,7 +199,7 @@ pub struct PTraceCommandConfigurator {
     timeout: u32,
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator
 where
     I: HasTargetBytes,
@@ -210,8 +216,6 @@ where
         match unsafe { fork() } {
             Ok(ForkResult::Parent { child }) => Ok(child),
             Ok(ForkResult::Child) => {
-                ptrace::traceme().unwrap();
-
                 if let Some(c) = self.cpu {
                     c.set_affinity_forced().unwrap();
                 }
@@ -247,6 +251,7 @@ where
                     }
                 }
 
+                ptrace::traceme().unwrap();
                 // After this STOP, the process is traced with PTrace (no hooks yet)
                 raise(Signal::SIGSTOP).unwrap();
 
@@ -329,7 +334,6 @@ where
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-#[cfg(all(feature = "std", unix))]
 impl<I, OT, S, T> CommandExecutor<OT, S, T>
 where
     S: State + HasExecutions + UsesInput<Input = I>,
@@ -337,8 +341,6 @@ where
     OT: Debug + ObserversTuple<I, S>,
 {
     fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
-        use std::os::unix::prelude::ExitStatusExt;
-
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
@@ -346,29 +348,21 @@ where
 
         let mut child = self.configurer.spawn_child(input)?;
 
-        let res = match child
+        let exit_kind = child
             .wait_timeout(self.configurer.exec_timeout())
             .expect("waiting on child failed")
-            .map(|status| status.signal())
-        {
-            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
-            Some(Some(9)) => Ok(ExitKind::Oom),
-            Some(Some(_)) => Ok(ExitKind::Crash),
-            Some(None) => Ok(ExitKind::Ok),
-            None => {
+            .map(|status| self.configurer.exit_kind_from_status(&status))
+            .unwrap_or_else(|| {
                 // if this fails, there is not much we can do. let's hope it failed because the process finished
                 // in the meantime.
                 drop(child.kill());
                 // finally, try to wait to properly clean up system resources.
                 drop(child.wait());
-                Ok(ExitKind::Timeout)
-            }
-        };
+                ExitKind::Timeout
+            });
 
-        if let Ok(exit_kind) = res {
-            self.observers
-                .post_exec_child_all(state, input, &exit_kind)?;
-        }
+        self.observers
+            .post_exec_child_all(state, input, &exit_kind)?;
 
         if let Some(h) = &mut self.configurer.stdout_observer() {
             let mut stdout = Vec::new();
@@ -392,11 +386,10 @@ where
             let obs = observers.index_mut(h);
             obs.observe_stderr(&stderr);
         }
-        res
+        Ok(exit_kind)
     }
 }
 
-#[cfg(all(feature = "std", unix))]
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
 where
     EM: UsesState<State = S>,
@@ -423,17 +416,17 @@ where
     T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
 {
     #[inline]
-    fn set_timeout(&mut self, timeout: Duration) {
-        *self.configurer.exec_timeout_mut() = timeout;
-    }
-
-    #[inline]
     fn timeout(&self) -> Duration {
         self.configurer.exec_timeout()
     }
+
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        *self.configurer.exec_timeout_mut() = timeout;
+    }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
 where
     EM: UsesState<State = S>,
@@ -455,32 +448,28 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        use nix::sys::{
-            ptrace,
-            signal::Signal,
-            wait::{
-                waitpid, WaitPidFlag,
-                WaitStatus::{Exited, PtraceEvent, Signaled, Stopped},
-            },
-        };
-
         *state.executions_mut() += 1;
 
         let child = self.configurer.spawn_child(input)?;
 
-        let wait_status = waitpid(child, Some(WaitPidFlag::WUNTRACED))?;
+        let wait_status = waitpid_filtered(child, Some(WaitPidFlag::WUNTRACED))?;
         if !matches!(wait_status, Stopped(c, Signal::SIGSTOP) if c == child) {
-            return Err(Error::unknown("Unexpected state of child process"));
+            return Err(Error::unknown(format!(
+                "Unexpected state of child process {wait_status:?} (while waiting for SIGSTOP)"
+            )));
         }
 
-        ptrace::setoptions(child, ptrace::Options::PTRACE_O_TRACEEXEC)?;
+        let options = ptrace::Options::PTRACE_O_TRACEEXEC | ptrace::Options::PTRACE_O_EXITKILL;
+        ptrace::setoptions(child, options)?;
         ptrace::cont(child, None)?;
 
-        let wait_status = waitpid(child, None)?;
+        let wait_status = waitpid_filtered(child, None)?;
         if !matches!(wait_status, PtraceEvent(c, Signal::SIGTRAP, e)
             if c == child && e == (ptrace::Event::PTRACE_EVENT_EXEC as i32)
         ) {
-            return Err(Error::unknown("Unexpected state of child process"));
+            return Err(Error::unknown(format!(
+                "Unexpected state of child process {wait_status:?} (while waiting for SIGTRAP PTRACE_EVENT_EXEC)"
+            )));
         }
 
         self.observers.pre_exec_child_all(state, input)?;
@@ -489,6 +478,8 @@ where
         }
         self.hooks.pre_exec_all(state, input);
 
+        // todo: it might be better to keep the target ptraced in case the target handles sigalarm,
+        // breaking the libafl timeout
         ptrace::detach(child, None)?;
         let res = match waitpid(child, None)? {
             Exited(pid, 0) if pid == child => ExitKind::Ok,
@@ -496,9 +487,9 @@ where
             Signaled(pid, Signal::SIGALRM, _has_coredump) if pid == child => ExitKind::Timeout,
             Signaled(pid, Signal::SIGABRT, _has_coredump) if pid == child => ExitKind::Crash,
             Signaled(pid, Signal::SIGKILL, _has_coredump) if pid == child => ExitKind::Oom,
-            Stopped(pid, Signal::SIGALRM) if pid == child => ExitKind::Timeout,
-            Stopped(pid, Signal::SIGABRT) if pid == child => ExitKind::Crash,
-            Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
+            // Stopped(pid, Signal::SIGALRM) if pid == child => ExitKind::Timeout,
+            // Stopped(pid, Signal::SIGABRT) if pid == child => ExitKind::Crash,
+            // Stopped(pid, Signal::SIGKILL) if pid == child => ExitKind::Oom,
             s => {
                 // TODO other cases?
                 return Err(Error::unsupported(
@@ -767,8 +758,7 @@ impl CommandExecutorBuilder {
 
 /// A `CommandConfigurator` takes care of creating and spawning a [`Command`] for the [`CommandExecutor`].
 /// # Example
-#[cfg_attr(all(feature = "std", unix), doc = " ```")]
-#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
+/// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
 /// use libafl::{Error, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
@@ -809,7 +799,6 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator<I, C = Child>: Sized {
     /// Get the stdout
     fn stdout_observer(&self) -> Option<Handle<StdOutObserver>> {
@@ -827,6 +816,18 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     fn exec_timeout(&self) -> Duration;
     /// Set the timeout duration for execution of the child process.
     fn exec_timeout_mut(&mut self) -> &mut Duration;
+
+    /// Maps the exit status of the child process to an `ExitKind`.
+    #[inline]
+    fn exit_kind_from_status(&self, status: &std::process::ExitStatus) -> ExitKind {
+        use crate::std::os::unix::process::ExitStatusExt;
+        match status.signal() {
+            // for reference: https://www.man7.org/linux/man-pages/man7/signal.7.html
+            Some(9) => ExitKind::Oom,
+            Some(_) => ExitKind::Crash,
+            None => ExitKind::Ok,
+        }
+    }
 
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C>
@@ -863,6 +864,22 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 }
 
+/// waitpid wrapper that ignores some signals sent by the ptraced child
+#[cfg(all(feature = "std", target_os = "linux"))]
+fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus, Errno> {
+    loop {
+        let wait_status = waitpid(pid, options);
+        let sig = match &wait_status {
+            // IGNORED
+            Ok(Stopped(c, Signal::SIGWINCH)) if *c == pid => Signal::SIGWINCH,
+            // RETURNED
+            Ok(ws) => break Ok(*ws),
+            Err(e) => break Err(*e),
+        };
+        ptrace::cont(pid, sig)?;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
@@ -878,7 +895,6 @@ mod tests {
     };
 
     #[test]
-    #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_builder() {
         let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
