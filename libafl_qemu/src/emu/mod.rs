@@ -44,6 +44,7 @@ pub use usermode::*;
 mod systemmode;
 #[cfg(feature = "systemmode")]
 pub use systemmode::*;
+use crate::config::QemuConfigBuilder;
 
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
@@ -244,7 +245,7 @@ where
 {
     #[must_use]
     pub fn empty(
-    ) -> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager> {
+    ) -> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), QemuConfigBuilder, S, NopSnapshotManager> {
         EmulatorBuilder::empty()
     }
 }
@@ -256,7 +257,7 @@ where
 {
     #[must_use]
     pub fn builder(
-    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
+    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), QemuConfigBuilder, S, StdSnapshotManager> {
         EmulatorBuilder::default()
     }
 }

@@ -4,6 +4,7 @@ use std::fmt::Display;
 use libafl_qemu_sys::{CPUStatePtr, GuestAddr};
 
 use crate::CallingConvention;
+use crate::config::QemuConfigBuilderError;
 
 #[derive(Debug)]
 pub enum QemuError {
@@ -16,6 +17,7 @@ pub enum QemuError {
 pub enum QemuInitError {
     MultipleInstances,
     EmptyArgs,
+    ConfigurationError(QemuConfigBuilderError),
     TooManyArgs(usize),
 }
 
@@ -58,6 +60,9 @@ impl Display for QemuInitError {
             }
             QemuInitError::EmptyArgs => {
                 write!(f, "QEMU emulator args cannot be empty")
+            }
+            QemuInitError::ConfigurationError(config_error) => {
+                write!(f, "QEMU Configuration error: {config_error}")
             }
             QemuInitError::TooManyArgs(n) => {
                 write!(
