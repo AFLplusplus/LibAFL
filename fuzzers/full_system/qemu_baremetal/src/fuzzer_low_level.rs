@@ -97,7 +97,7 @@ pub fn fuzz() {
             .build()?);
 
         let emulator = Emulator::empty()
-            .qemu_config(|mut qemu_config| {
+            .qemu_config(|qemu_config| {
                 qemu_config
                     .machine("mps2-an385")
                     .monitor(config::Monitor::Null)
@@ -111,9 +111,7 @@ pub fn fuzz() {
                         .file(format!("{target_dir}/dummy.qcow2"))
                         .build()
                         .expect("Could not build drives")])
-                    .start_cpu(false);
-
-                qemu_config
+                    .start_cpu(false)
             })
             .modules(emulator_modules)
             .build()?;

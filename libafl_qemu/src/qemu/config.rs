@@ -308,6 +308,7 @@ impl<R: AsRef<Path>> From<R> for Program {
 /// programmatic way and following the builder pattern.
 #[derive(Debug, Clone, libafl_derive::Display, Builder, Getters)]
 #[getset(get = "pub")]
+#[builder(pattern = "owned")]
 pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option))]
