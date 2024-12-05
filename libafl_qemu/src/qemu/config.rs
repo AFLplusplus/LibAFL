@@ -48,6 +48,7 @@ pub struct Drive {
 }
 
 impl Drive {
+    #[must_use]
     pub fn builder() -> DriveBuilder {
         DriveBuilder::default()
     }
@@ -347,6 +348,7 @@ pub struct QemuConfig {
 } // Adding something here? Please leave Program as the last field
 
 impl QemuConfig {
+    #[must_use]
     pub fn builder() -> QemuConfigBuilder {
         QemuConfigBuilder::default()
     }
@@ -375,7 +377,8 @@ mod test {
         let drive = Drive::builder()
             .format(DiskImageFileFormat::Raw)
             .interface(DriveInterface::Ide)
-            .build();
+            .build()
+            .expect("Drive builder failed.");
         assert_eq!(drive.to_string(), "-drive format=raw,if=ide");
     }
 

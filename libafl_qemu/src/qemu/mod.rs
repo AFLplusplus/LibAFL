@@ -190,7 +190,7 @@ impl TryFrom<QemuConfigBuilder> for QemuParams {
         Ok(QemuParams::Config(
             config_builder
                 .build()
-                .or_else(|e| Err(QemuInitError::ConfigurationError(e)))?,
+                .map_err(QemuInitError::ConfigurationError)?,
         ))
     }
 }
