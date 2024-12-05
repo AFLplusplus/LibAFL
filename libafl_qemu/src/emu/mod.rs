@@ -44,6 +44,7 @@ pub use usermode::*;
 mod systemmode;
 #[cfg(feature = "systemmode")]
 pub use systemmode::*;
+
 use crate::config::QemuConfigBuilder;
 
 #[derive(Clone, Copy)]
@@ -244,8 +245,14 @@ where
     S: UsesInput,
 {
     #[must_use]
-    pub fn empty(
-    ) -> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), QemuConfigBuilder, S, NopSnapshotManager> {
+    pub fn empty() -> EmulatorBuilder<
+        NopCommandManager,
+        NopEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        S,
+        NopSnapshotManager,
+    > {
         EmulatorBuilder::empty()
     }
 }
@@ -256,8 +263,14 @@ where
     S::Input: HasTargetBytes,
 {
     #[must_use]
-    pub fn builder(
-    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), QemuConfigBuilder, S, StdSnapshotManager> {
+    pub fn builder() -> EmulatorBuilder<
+        StdCommandManager<S>,
+        StdEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        S,
+        StdSnapshotManager,
+    > {
         EmulatorBuilder::default()
     }
 }

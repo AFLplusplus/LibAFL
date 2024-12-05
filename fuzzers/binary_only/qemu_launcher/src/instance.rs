@@ -129,7 +129,10 @@ impl<M: Monitor> Instance<'_, M> {
             .build()?;
 
         let modules = modules.prepend(edge_coverage_module);
-        let mut emulator = Emulator::empty().qemu_cli(args).modules(modules).build()?;
+        let mut emulator = Emulator::empty()
+            .modules(modules)
+            .qemu_config(|_| args)
+            .build()?;
         let harness = Harness::init(emulator.qemu()).expect("Error setting up harness.");
         let qemu = emulator.qemu();
 

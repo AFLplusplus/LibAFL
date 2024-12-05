@@ -52,6 +52,7 @@ pub use systemmode::*;
 
 mod hooks;
 pub use hooks::*;
+
 use crate::config::QemuConfigBuilder;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
@@ -186,8 +187,11 @@ impl TryFrom<QemuConfigBuilder> for QemuParams {
     type Error = QemuInitError;
 
     fn try_from(config_builder: QemuConfigBuilder) -> Result<Self, Self::Error> {
-        Ok(QemuParams::Config(config_builder.build()
-            .or_else(|e| Err(QemuInitError::ConfigurationError(e)))?))
+        Ok(QemuParams::Config(
+            config_builder
+                .build()
+                .or_else(|e| Err(QemuInitError::ConfigurationError(e)))?,
+        ))
     }
 }
 
@@ -199,7 +203,6 @@ where
         QemuParams::Cli(cli.iter().map(|x| x.as_ref().into()).collect())
     }
 }
-
 impl<T> From<&Vec<T>> for QemuParams
 where
     T: AsRef<str>,
@@ -514,29 +517,8 @@ impl From<u8> for HookData {
     }
 }
 
-// impl<T> QemuBuilder<T> {
-//     pub fn new(params: T) -> Self {
-//         Self {
-//             params
-//         }
-//     }
-// }
-
-// impl<T> QemuBuilder<T>
-// where
-//     T: Into<QemuParams>
-// {
-//     pub fn build(self) -> Result<Qemu, QemuInitError> {
-//
-//     }
-// }
-
 #[allow(clippy::unused_self)]
 impl Qemu {
-    // pub fn builder() -> QemuBuilder {
-    //     QemuBuilder::default()
-    // }
-
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn init<T>(params: T) -> Result<Self, QemuInitError>
     where
@@ -546,9 +528,10 @@ impl Qemu {
 
         match &params {
             QemuParams::Config(cfg) => {
-                QEMU_CONFIG.set(cfg.clone()).map_err(|_| {
-                    unreachable!("QEMU_CONFIG was already set but Qemu was not init!")
-                })?;
+                QEMU_CONFIG
+                    .set(cfg.clone())
+                    .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
+                    .unwrap();
             }
             QemuParams::Cli(_) => {}
         };

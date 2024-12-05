@@ -1,10 +1,9 @@
 use core::fmt;
-use std::fmt::Display;
+use std::{convert::Infallible, fmt::Display};
 
 use libafl_qemu_sys::{CPUStatePtr, GuestAddr};
 
-use crate::CallingConvention;
-use crate::config::QemuConfigBuilderError;
+use crate::{config::QemuConfigBuilderError, CallingConvention};
 
 #[derive(Debug)]
 pub enum QemuError {
@@ -18,7 +17,14 @@ pub enum QemuInitError {
     MultipleInstances,
     EmptyArgs,
     ConfigurationError(QemuConfigBuilderError),
+    Infallible,
     TooManyArgs(usize),
+}
+
+impl From<Infallible> for QemuInitError {
+    fn from(_: Infallible) -> Self {
+        QemuInitError::Infallible
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -70,13 +76,22 @@ impl Display for QemuInitError {
                     "Too many arguments passed to QEMU emulator ({n} > i32::MAX)"
                 )
             }
+            QemuInitError::Infallible => {
+                write!(f, "Infallible error, should never be reached.")
+            }
         }
     }
 }
 
 impl From<QemuInitError> for libafl::Error {
     fn from(err: QemuInitError) -> Self {
-        libafl::Error::unknown(format!("{err}"))
+        libafl::Error::runtime(format!("QEMU Init error: {err}"))
+    }
+}
+
+impl From<QemuRWError> for libafl::Error {
+    fn from(err: QemuRWError) -> Self {
+        libafl::Error::runtime(format!("QEMU Runtime error: {err:?}"))
     }
 }
 

@@ -3,6 +3,7 @@ use core::{
     fmt::{Display, Formatter},
 };
 use std::path::{Path, PathBuf};
+
 use derive_builder::Builder;
 use getset::Getters;
 use libafl_derive;
@@ -44,6 +45,12 @@ pub struct Drive {
     format: Option<DiskImageFileFormat>,
     #[builder(default, setter(strip_option))]
     interface: Option<DriveInterface>,
+}
+
+impl Drive {
+    pub fn builder() -> DriveBuilder {
+        DriveBuilder::default()
+    }
 }
 
 impl Display for Drive {
@@ -295,6 +302,10 @@ impl<R: AsRef<Path>> From<R> for Program {
     }
 }
 
+/// Programmatic configurator for QEMU.
+///
+/// It is supposed to be an equivalent to QEMU's CLI usual configuration, usable in a more
+/// programmatic way and following the builder pattern.
 #[derive(Debug, Clone, libafl_derive::Display, Builder, Getters)]
 #[getset(get = "pub")]
 pub struct QemuConfig {
@@ -334,6 +345,12 @@ pub struct QemuConfig {
     program: Program,
 } // Adding something here? Please leave Program as the last field
 
+impl QemuConfig {
+    pub fn builder() -> QemuConfigBuilder {
+        QemuConfigBuilder::default()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -343,7 +360,10 @@ mod test {
     #[cfg(feature = "usermode")]
     fn usermode() {
         let program = "/bin/pwd";
-        let qemu_config = QemuConfig::builder().program("/bin/pwd").build();
+        let qemu_config = QemuConfig::builder()
+            .program("/bin/pwd")
+            .build()
+            .expect("QEMU config failed.");
         let qemu = Qemu::init(qemu_config).unwrap();
         let config = qemu.get_config().unwrap();
         assert_eq!(config.to_string().trim(), program.trim());

@@ -134,7 +134,7 @@ pub fn fuzz() -> Result<(), Error> {
         .build()?);
 
     let emulator = Emulator::empty()
-        .qemu_cli(options.args)
+        .qemu_config(|_| options.args)
         .modules(modules)
         .build()?;
     let qemu = emulator.qemu();
