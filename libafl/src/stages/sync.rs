@@ -13,13 +13,13 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasRand, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasRand, State, Stoppable},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -54,41 +54,37 @@ impl SyncFromDiskMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromDiskStage<CB, E, EM, Z> {
+pub struct SyncFromDiskStage<CB, E, EM, S, Z> {
     name: Cow<'static, str>,
     sync_dirs: Vec<PathBuf>,
     load_callback: CB,
     interval: Duration,
-    phantom: PhantomData<(E, EM, Z)>,
+    phantom: PhantomData<(E, EM, S, Z)>,
 }
 
-impl<CB, E, EM, Z> UsesState for SyncFromDiskStage<CB, E, EM, Z>
-where
-    Z: UsesState,
-{
-    type State = Z::State;
-}
-
-impl<CB, E, EM, Z> Named for SyncFromDiskStage<CB, E, EM, Z> {
+impl<CB, E, EM, S, Z> Named for SyncFromDiskStage<CB, E, EM, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<CB, E, EM, Z> Stage<E, EM, Z> for SyncFromDiskStage<CB, E, EM, Z>
+impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, S, Z>
 where
-    CB: FnMut(&mut Z, &mut Self::State, &Path) -> Result<<Self::State as UsesInput>::Input, Error>,
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    Z: Evaluator<E, EM>,
-    Self::State: HasCorpus + HasRand + HasMetadata + HasNamedMetadata,
+    CB: FnMut(&mut Z, &mut S, &Path) -> Result<<S::Corpus as Corpus>::Input, Error>,
+    Z: Evaluator<E, EM, State = S>,
+    S: HasCorpus
+        + HasRand
+        + HasMetadata
+        + HasNamedMetadata
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>
+        + HasCurrentCorpusId,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let last = state
@@ -144,19 +140,19 @@ where
     }
 
     #[inline]
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // TODO: Needs proper crash handling for when an imported testcase crashes
         // For now, Make sure we don't get stuck crashing on this testcase
         RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
     #[inline]
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
+impl<CB, E, EM, S, Z> SyncFromDiskStage<CB, E, EM, S, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
     pub fn new(sync_dirs: Vec<PathBuf>, load_callback: CB, interval: Duration, name: &str) -> Self {
@@ -174,10 +170,8 @@ impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z> {
 pub type SyncFromDiskFunction<S, Z> =
     fn(&mut Z, &mut S, &Path) -> Result<<S as UsesInput>::Input, Error>;
 
-impl<E, EM, Z> SyncFromDiskStage<SyncFromDiskFunction<Z::State, Z>, E, EM, Z>
+impl<E, EM, S, Z> SyncFromDiskStage<SyncFromDiskFunction<Z::State, Z>, E, EM, S, Z>
 where
-    E: UsesState<State = <Self as UsesState>::State>,
-    EM: UsesState<State = <Self as UsesState>::State>,
     Z: Evaluator<E, EM>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
@@ -234,38 +228,31 @@ where
     client: LlmpEventConverter<DI, IC, ICB, S, SP>,
 }
 
-impl<DI, IC, ICB, S, SP> UsesState for SyncFromBrokerStage<DI, IC, ICB, S, SP>
+impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
-    SP: ShMemProvider + 'static,
-    S: State,
-    IC: InputConverter<From = S::Input, To = DI>,
-    ICB: InputConverter<From = DI, To = S::Input>,
-    DI: Input,
-{
-    type State = S;
-}
-
-impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
-where
-    EM: UsesState<State = S> + EventFirer,
-    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata,
+    EM: EventFirer<State = S>,
+    S: HasExecutions
+        + HasCorpus
+        + HasRand
+        + HasMetadata
+        + Stoppable
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>
+        + State,
     SP: ShMemProvider,
     E: HasObservers + Executor<EM, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<EM, E::Observers, State = S>
-        + ExecutionProcessor<EM, E::Observers, State = S>,
-    IC: InputConverter<From = S::Input, To = DI>,
-    ICB: InputConverter<From = DI, To = S::Input>,
+    Z: EvaluatorObservers<EM, E::Observers> + ExecutionProcessor<EM, E::Observers, State = S>,
+    IC: InputConverter<From = <S::Corpus as Corpus>::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = <S::Corpus as Corpus>::Input>,
     DI: Input,
-    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,
-    S::Corpus: Corpus<Input = S::Input>, // delete me
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Clone,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         if self.client.can_convert() {
@@ -319,13 +306,13 @@ where
     }
 
     #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // No restart handling needed - does not execute the target.
         Ok(true)
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Not needed - does not execute the target.
         Ok(())
     }
