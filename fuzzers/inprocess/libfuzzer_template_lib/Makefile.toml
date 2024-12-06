@@ -1,0 +1,57 @@
+[env]
+FUZZER_NAME = 'fuzzer_template'
+PROJECT_DIR = { script = ["pwd"] }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR",] } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
+LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
+LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
+
+[tasks.clean]
+dependencies = ["cargo-clean", "clean-lib"]
+
+[tasks.clean-lib]
+cwd = "libsrc"
+script = """
+rm -rf build
+rm -rf ../fuzzer
+"""
+
+[tasks.cargo-clean]
+command = "cargo"
+args = ["clean"]
+
+[tasks.rebuild]
+dependencies = ["clean-lib", "build"]
+
+[tasks.build]
+dependencies = ["build-compilers", "build-lib", "build-fuzzer"]
+
+[tasks.build-compilers]
+script = """
+cargo build --release
+mkdir -p ${PROJECT_DIR}/libs
+cp -f ./target/${PROFILE_DIR}/libfuzzer_template.a ${PROJECT_DIR}/libs
+"""
+
+[tasks.build-lib]
+cwd = "libsrc"
+script = """
+CC=${LIBAFL_CC} CXX=${LIBAFL_CXX} cmake -S . -B build
+CC=${LIBAFL_CC} CXX=${LIBAFL_CXX} make -C build
+mv build/libtemplate.a ${PROJECT_DIR}/libs
+"""
+
+[tasks.build-fuzzer]
+script = """
+${LIBAFL_CC} -I ./libsrc -L${PROJECT_DIR}/libs -o fuzzer harness.c libs/libtemplate.a -lm -lc -lgcc
+"""
+
+[tasks.build-test]
+script = """
+clang-15 -I ./libsrc -L${PROJECT_DIR}/libs -DTEST_CORPUS=1 -o fuzzer_test harness.c libs/libtemplate.a -lm -lc -lgcc
+clang-15 -I ./libsrc -L${PROJECT_DIR}/libs -DTEST_ALL_CORPUS=1 -o fuzzer_testall harness.c libs/libtemplate.a -lm -lc -lgcc
+"""
