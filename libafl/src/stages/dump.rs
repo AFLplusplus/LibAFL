@@ -1,14 +1,20 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{clone::Clone, marker::PhantomData};
-use std::{fs, fs::File, io::Write, path::PathBuf};
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::{Path, PathBuf},
+    string::{String, ToString},
+};
 
 use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, CorpusId, Testcase},
+    inputs::Input,
     stages::Stage,
     state::{HasCorpus, HasRand, HasSolutions, UsesState},
     Error, HasMetadata,
@@ -29,23 +35,26 @@ impl_serdeany!(DumpToDiskMetadata);
 
 /// The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk
 #[derive(Debug)]
-pub struct DumpToDiskStage<CB, EM, Z> {
+pub struct DumpToDiskStage<CB1, CB2, EM, Z> {
     solutions_dir: PathBuf,
     corpus_dir: PathBuf,
-    to_bytes: CB,
+    to_bytes: CB1,
+    generate_filename: CB2,
     phantom: PhantomData<(EM, Z)>,
 }
 
-impl<CB, EM, Z> UsesState for DumpToDiskStage<CB, EM, Z>
+impl<CB1, CB2, EM, Z> UsesState for DumpToDiskStage<CB1, CB2, EM, Z>
 where
     EM: UsesState,
 {
     type State = EM::State;
 }
 
-impl<CB, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB, EM, Z>
+impl<CB1, CB2, P, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB1, CB2, EM, Z>
 where
-    CB: FnMut(&Self::Input, &Self::State) -> Vec<u8>,
+    CB1: FnMut(&Testcase<Self::Input>, &Self::State) -> Vec<u8>,
+    CB2: FnMut(&Testcase<Self::Input>, &CorpusId) -> P,
+    P: AsRef<Path>,
     EM: UsesState,
     E: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
@@ -77,7 +86,8 @@ where
     }
 }
 
-impl<CB, EM, Z> DumpToDiskStage<CB, EM, Z>
+/// Implementation for `DumpToDiskStage` with a default `generate_filename` function.
+impl<CB1, EM, Z> DumpToDiskStage<CB1, fn(&Testcase<EM::Input>, &CorpusId) -> String, EM, Z>
 where
     EM: UsesState,
     Z: UsesState,
@@ -85,8 +95,54 @@ where
     <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = EM::Input>,
     <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = EM::Input>,
 {
-    /// Create a new [`DumpToDiskStage`]
-    pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
+    /// Create a new [`DumpToDiskStage`] with a default `generate_filename` function.
+    pub fn new<A, B>(to_bytes: CB1, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
+    where
+        A: Into<PathBuf>,
+        B: Into<PathBuf>,
+    {
+        Self::new_with_custom_filenames(
+            to_bytes,
+            Self::generate_filename, // This is now of type `fn(&Testcase<EM::Input>, &CorpusId) -> String`
+            corpus_dir,
+            solutions_dir,
+        )
+    }
+
+    /// Default `generate_filename` function.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    fn generate_filename(testcase: &Testcase<EM::Input>, id: &CorpusId) -> String {
+        [
+            Some(id.0.to_string()),
+            testcase.filename().clone(),
+            testcase
+                .input()
+                .as_ref()
+                .map(|t| t.generate_name(Some(*id))),
+        ]
+        .iter()
+        .flatten()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join("-")
+    }
+}
+
+impl<CB1, CB2, EM, Z> DumpToDiskStage<CB1, CB2, EM, Z>
+where
+    EM: UsesState,
+    Z: UsesState,
+    <EM as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = EM::Input>,
+    <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = EM::Input>,
+{
+    /// Create a new [`DumpToDiskStage`] with a custom `generate_filename` function.
+    pub fn new_with_custom_filenames<A, B>(
+        to_bytes: CB1,
+        generate_filename: CB2,
+        corpus_dir: A,
+        solutions_dir: B,
+    ) -> Result<Self, Error>
     where
         A: Into<PathBuf>,
         B: Into<PathBuf>,
@@ -102,7 +158,7 @@ where
         }
         let solutions_dir = solutions_dir.into();
         if let Err(e) = fs::create_dir(&solutions_dir) {
-            if !corpus_dir.is_dir() {
+            if !solutions_dir.is_dir() {
                 return Err(Error::os_error(
                     e,
                     format!("Error creating directory {solutions_dir:?}"),
@@ -111,6 +167,7 @@ where
         }
         Ok(Self {
             to_bytes,
+            generate_filename,
             solutions_dir,
             corpus_dir,
             phantom: PhantomData,
@@ -118,12 +175,19 @@ where
     }
 
     #[inline]
-    fn dump_state_to_disk(&mut self, state: &mut <Self as UsesState>::State) -> Result<(), Error>
+    fn dump_state_to_disk<P: AsRef<Path>>(
+        &mut self,
+        state: &mut <Self as UsesState>::State,
+    ) -> Result<(), Error>
     where
-        CB: FnMut(
-            &<<<EM as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input,
+        CB1: FnMut(
+            &Testcase<<<<EM as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input>,
             &<EM as UsesState>::State,
         ) -> Vec<u8>,
+        CB2: FnMut(
+            &Testcase<<<<EM as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input>,
+            &CorpusId,
+        ) -> P,
     {
         let (mut corpus_id, mut solutions_id) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {
@@ -138,37 +202,29 @@ where
         while let Some(i) = corpus_id {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
             state.corpus().load_input_into(&mut testcase)?;
-            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
+            let bytes = (self.to_bytes)(&testcase, state);
 
-            let fname = self.corpus_dir.join(format!(
-                "id_{i}_{}",
-                testcase
-                    .filename()
-                    .as_ref()
-                    .map_or_else(|| "unnamed", String::as_str)
-            ));
+            let fname = self
+                .corpus_dir
+                .join((self.generate_filename)(&testcase, &i));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
             corpus_id = state.corpus().next(i);
         }
 
-        while let Some(current_id) = solutions_id {
-            let mut testcase = state.solutions().get(current_id)?.borrow_mut();
+        while let Some(i) = solutions_id {
+            let mut testcase = state.solutions().get(i)?.borrow_mut();
             state.solutions().load_input_into(&mut testcase)?;
-            let bytes = (self.to_bytes)(testcase.input().as_ref().unwrap(), state);
+            let bytes = (self.to_bytes)(&testcase, state);
 
-            let fname = self.solutions_dir.join(format!(
-                "id_{current_id}_{}",
-                testcase
-                    .filename()
-                    .as_ref()
-                    .map_or_else(|| "unnamed", String::as_str)
-            ));
+            let fname = self
+                .solutions_dir
+                .join((self.generate_filename)(&testcase, &i));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
 
-            solutions_id = state.solutions().next(current_id);
+            solutions_id = state.solutions().next(i);
         }
 
         state.add_metadata(DumpToDiskMetadata {
