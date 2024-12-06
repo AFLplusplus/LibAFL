@@ -179,6 +179,12 @@ impl IntelPT {
         }
     }
 
+    /// Get the current IP filters configuration
+    #[must_use]
+    pub fn ip_filters(&self) -> Vec<RangeInclusive<usize>> {
+        self.ip_filters.clone()
+    }
+
     fn ip_filters_to_addr_filter(&self) -> AddrFilter {
         let mut builder = AddrFilterBuilder::new();
         let mut iter = self
