@@ -154,12 +154,16 @@ where
     I: Input,
 {
     fn generate_name(&self, id: Option<CorpusId>) -> String {
-        self.names
-            .iter()
-            .cloned()
-            .zip(self.parts.iter().map(|i| i.generate_name(id)))
-            .map(|(name, generated)| format!("{name}-{generated}"))
-            .collect::<Vec<_>>()
-            .join(",")
+        if self.names().len() > 0 {
+            self.names
+                .iter()
+                .cloned()
+                .zip(self.parts.iter().map(|i| i.generate_name(id)))
+                .map(|(name, generated)| format!("{name}-{generated}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        } else {
+            "empty_multipart".to_string() // empty strings cause issues with OnDiskCorpus
+        }
     }
 }
