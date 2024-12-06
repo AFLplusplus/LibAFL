@@ -179,6 +179,12 @@ impl IntelPT {
         }
     }
 
+    /// Get the current IP filters configuration
+    #[must_use]
+    pub fn ip_filters(&self) -> Vec<RangeInclusive<usize>> {
+        self.ip_filters.clone()
+    }
+
     fn ip_filters_to_addr_filter(&self) -> AddrFilter {
         let mut builder = AddrFilterBuilder::new();
         let mut iter = self
@@ -400,7 +406,7 @@ impl IntelPT {
                     *status = s;
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
 
-                    if b.ninsn() > 0 && !b.speculative() && skip < offset {
+                    if b.ninsn() > 0 && skip < offset {
                         let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
@@ -408,15 +414,17 @@ impl IntelPT {
 
                         *previous_block_end_ip = b.end_ip();
                     }
+
+                    if status.eos() {
+                        break 'block;
+                    }
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
                         log::trace!("PT error in block next {e:?}");
                     }
+                    break 'block;
                 }
-            }
-            if status.eos() {
-                break 'block;
             }
         }
         Ok(())
