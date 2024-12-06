@@ -414,15 +414,17 @@ impl IntelPT {
 
                         *previous_block_end_ip = b.end_ip();
                     }
+
+                    if status.eos() {
+                        break 'block;
+                    }
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
                         log::trace!("PT error in block next {e:?}");
                     }
+                    break 'block;
                 }
-            }
-            if status.eos() {
-                break 'block;
             }
         }
         Ok(())
