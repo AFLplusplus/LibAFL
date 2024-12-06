@@ -154,7 +154,9 @@ where
     I: Input,
 {
     fn generate_name(&self, id: Option<CorpusId>) -> String {
-        if self.names().len() > 0 {
+        if self.names().is_empty() {
+            "empty_multipart_input".to_string() // empty strings cause issues with OnDiskCorpus
+        } else {
             self.names
                 .iter()
                 .cloned()
@@ -162,8 +164,6 @@ where
                 .map(|(name, generated)| format!("{name}-{generated}"))
                 .collect::<Vec<_>>()
                 .join(",")
-        } else {
-            "empty_multipart".to_string() // empty strings cause issues with OnDiskCorpus
         }
     }
 }
