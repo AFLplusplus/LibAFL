@@ -41,7 +41,7 @@ pub struct X<A>
 ```rust
 pub struct X<A> 
     where
-        A: P + Q // <- Try to use the as smallest set of constraints as possible. If the code still compiles after Q, then remove it. 
+        A: P + Q // <- Try to use the as smallest set of constraints as possible. If the code still compiles after deleting Q, then remove it. 
 {
     fn ...
 }
