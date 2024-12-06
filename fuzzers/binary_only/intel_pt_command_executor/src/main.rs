@@ -36,7 +36,10 @@ pub fn main() {
     // Enable logging
     env_logger::init();
 
+    // path of the program we want to fuzz
     let target_path = PathBuf::from(env::args().next().unwrap())
+        .parent()
+        .unwrap()
         .parent()
         .unwrap()
         .join("target_program");
