@@ -29,9 +29,8 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    config, config::QemuConfig, elf::EasyElf, executor::QemuExecutor,
-    modules::edges::StdEdgeCoverageModuleBuilder, Emulator, GuestPhysAddr, QemuExitError,
-    QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    config, elf::EasyElf, executor::QemuExecutor, modules::edges::StdEdgeCoverageModuleBuilder,
+    Emulator, GuestPhysAddr, QemuExitError, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -80,7 +79,7 @@ pub fn fuzz() {
         .expect("Symbol or env BREAKPOINT not found");
     println!("Breakpoint address = {breakpoint:#x}");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
         let target_dir = env::var("TARGET_DIR").expect("TARGET_DIR env not set");
 
         // Create an observation channel using the coverage map
@@ -93,30 +92,27 @@ pub fn fuzz() {
             .track_indices()
         };
 
-        // Initialize QEMU
-        let qemu_config = QemuConfig::builder()
-            .machine("mps2-an385")
-            .monitor(config::Monitor::Null)
-            .kernel(format!("{target_dir}/example.elf"))
-            .serial(config::Serial::Null)
-            .no_graphic(true)
-            .snapshot(true)
-            .drives([config::Drive::builder()
-                .interface(config::DriveInterface::None)
-                .format(config::DiskImageFileFormat::Qcow2)
-                .file(format!("{target_dir}/dummy.qcow2"))
-                .build()])
-            .start_cpu(false)
-            .build();
-
-        // .expect("Failed to initialized QEMU");
-
         let emulator_modules = tuple_list!(StdEdgeCoverageModuleBuilder::default()
             .map_observer(edges_observer.as_mut())
             .build()?);
 
         let emulator = Emulator::empty()
-            .qemu_config(qemu_config)
+            .qemu_config(|qemu_config| {
+                qemu_config
+                    .machine("mps2-an385")
+                    .monitor(config::Monitor::Null)
+                    .kernel(format!("{target_dir}/example.elf"))
+                    .serial(config::Serial::Null)
+                    .no_graphic(true)
+                    .snapshot(true)
+                    .drives([config::Drive::builder()
+                        .interface(config::DriveInterface::None)
+                        .format(config::DiskImageFileFormat::Qcow2)
+                        .file(format!("{target_dir}/dummy.qcow2"))
+                        .build()
+                        .expect("Could not build drives")])
+                    .start_cpu(false)
+            })
             .modules(emulator_modules)
             .build()?;
 

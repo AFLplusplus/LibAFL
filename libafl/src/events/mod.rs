@@ -40,7 +40,6 @@ use libafl_bolts::os::CTRL_C_EXIT;
 use libafl_bolts::{
     current_time,
     tuples::{Handle, MatchNameRef},
-    ClientId,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -288,7 +287,7 @@ where
         /// The time of generation of the event
         time: Duration,
         /// The original sender if, if forwarded
-        forward_id: Option<ClientId>,
+        forward_id: Option<libafl_bolts::ClientId>,
         /// The (multi-machine) node from which the tc is from, if any
         #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
         node_id: Option<NodeId>,

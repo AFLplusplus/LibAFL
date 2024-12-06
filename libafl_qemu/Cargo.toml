@@ -1,7 +1,10 @@
 [package]
 name = "libafl_qemu"
 version.workspace = true
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Romain Malmain <rmalmain@pm.me>",
+]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
 repository = "https://github.com/AFLplusplus/LibAFL/"
@@ -129,6 +132,7 @@ bytes-utils = "0.1.4"
 typed-builder = { workspace = true }
 memmap2 = "0.9.5"
 getset = "0.1.3"
+derive_builder = "0.20.2"
 # Document all features of this crate (for `cargo doc`)
 document-features = { workspace = true, optional = true }
 

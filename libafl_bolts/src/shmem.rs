@@ -656,7 +656,7 @@ pub mod unix_shmem {
             ops::{Deref, DerefMut},
             ptr, slice,
         };
-        use std::{io, process};
+        use std::{io, path::Path, process};
 
         use libc::{
             c_int, c_uchar, close, fcntl, ftruncate, mmap, munmap, shm_open, shm_unlink, shmat,
@@ -692,26 +692,29 @@ pub mod unix_shmem {
         impl MmapShMem {
             /// Create a new [`MmapShMem`]
             ///
-            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 values from filename will be used. Do not include any characters that are illegal as filenames
+            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 bytes from filename will be used.
             ///
             /// This will *NOT* automatically delete the shmem files, meaning that it's user's responsibility to delete them after fuzzing
-            pub fn new(map_size: usize, filename: &[u8]) -> Result<Self, Error> {
+            pub fn new(map_size: usize, filename: impl AsRef<Path>) -> Result<Self, Error> {
+                let filename_bytes = filename.as_ref().as_os_str().as_encoded_bytes();
+
+                let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
+                // Keep room for the leading slash and trailing NULL.
+                let max_copy = usize::min(filename_bytes.len(), MAX_MMAP_FILENAME_LEN - 2);
+                filename_path[0] = b'/';
+                filename_path[1..=max_copy].copy_from_slice(&filename_bytes[..max_copy]);
+
+                log::info!(
+                    "{} Creating shmem {} {:?}",
+                    map_size,
+                    process::id(),
+                    filename_path
+                );
+
                 // # Safety
                 // No user-provided potentially unsafe parameters.
                 // FFI Calls.
                 unsafe {
-                    let mut filename_path: [u8; 20] = [0_u8; MAX_MMAP_FILENAME_LEN];
-                    // Keep room for the leading slash and trailing NULL.
-                    let max_copy = usize::min(filename.len(), MAX_MMAP_FILENAME_LEN - 2);
-                    filename_path[0] = b'/';
-                    filename_path[1..=max_copy].copy_from_slice(&filename[..max_copy]);
-
-                    log::info!(
-                        "{} Creating shmem {} {:#?}",
-                        map_size,
-                        process::id(),
-                        filename_path
-                    );
                     /* create the shared memory segment as if it was a file */
                     let shm_fd = shm_open(
                         filename_path.as_ptr() as *const _,
@@ -942,12 +945,12 @@ pub mod unix_shmem {
         impl MmapShMemProvider {
             /// Create a [`MmapShMem`] with the specified size and id.
             ///
-            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 values from filename will be used. Do not include any characters that are illegal as filenames.
+            /// At most [`MAX_MMAP_FILENAME_LEN`] - 2 bytes from id will be used.
             #[cfg(any(unix, doc))]
             pub fn new_shmem_with_id(
                 &mut self,
                 map_size: usize,
-                id: &[u8],
+                id: impl AsRef<Path>,
             ) -> Result<MmapShMem, Error> {
                 MmapShMem::new(map_size, id)
             }
@@ -974,10 +977,10 @@ pub mod unix_shmem {
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mut rand = StdRand::with_seed(crate::rands::random_seed());
                 let id = rand.next() as u32;
-                let mut full_file_name = format!("/libafl_{}_{}", process::id(), id);
+                let mut full_file_name = format!("libafl_{}_{}", process::id(), id);
                 // leave one byte space for the null byte.
                 full_file_name.truncate(MAX_MMAP_FILENAME_LEN - 1);
-                MmapShMem::new(map_size, full_file_name.as_bytes())
+                MmapShMem::new(map_size, full_file_name)
             }
 
             fn shmem_from_id_and_size(
@@ -1844,27 +1847,60 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(unix, not(miri)))]
+    #[cfg(unix)]
     #[cfg_attr(miri, ignore)]
     fn test_persist_shmem() -> Result<(), Error> {
-        use std::thread;
+        use core::ffi::CStr;
+        use std::{
+            env,
+            process::{Command, Stdio},
+            string::ToString,
+        };
 
-        use crate::shmem::{MmapShMemProvider, ShMem as _};
+        use crate::shmem::{MmapShMemProvider, ShMem as _, ShMemId};
 
-        let mut provider = MmapShMemProvider::new()?;
-        let mut shmem = provider.new_shmem(1)?.persist()?;
-        shmem.fill(0);
+        // relies on the fact that the ID in a ShMemDescription is always a string for MmapShMem
+        match env::var("SHMEM_SIZE") {
+            Ok(size) => {
+                let mut provider = MmapShMemProvider::new()?;
+                let id = ShMemId::from_string(&env::var("SHMEM_ID").unwrap());
+                let size = size.parse().unwrap();
+                let mut shmem = provider.shmem_from_id_and_size(id, size)?;
+                shmem[0] = 1;
+            }
+            Err(env::VarError::NotPresent) => {
+                let mut provider = MmapShMemProvider::new()?;
+                let mut shmem = provider.new_shmem(1)?.persist()?;
+                shmem.fill(0);
+                let description = shmem.description();
 
-        let description = shmem.description();
+                // call the test binary again
+                // with certain env variables set to prevent infinite loops
+                // and with an added arg to only run this test
+                //
+                // a command is necessary to create the required distance between the two processes
+                // with threads/fork it works without the additional steps to persist the ShMem regardless
+                let status = Command::new(env::current_exe().unwrap())
+                    .env(
+                        "SHMEM_ID",
+                        CStr::from_bytes_until_nul(description.id.as_array())
+                            .unwrap()
+                            .to_str()
+                            .unwrap(),
+                    )
+                    .env("SHMEM_SIZE", description.size.to_string())
+                    .arg("shmem::tests::test_persist_shmem")
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .unwrap();
 
-        let handle = thread::spawn(move || -> Result<(), Error> {
-            let mut provider = MmapShMemProvider::new()?;
-            let mut shmem = provider.shmem_from_description(description)?;
-            shmem.as_slice_mut()[0] = 1;
-            Ok(())
-        });
-        handle.join().unwrap()?;
-        assert_eq!(1, shmem.as_slice()[0]);
+                assert!(status.success());
+                assert_eq!(shmem[0], 1);
+            }
+            Err(e) => panic!("{e}"),
+        }
+
         Ok(())
     }
 }

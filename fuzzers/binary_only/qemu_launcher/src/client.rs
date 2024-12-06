@@ -2,12 +2,13 @@ use std::env;
 
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::ClientDescription,
     inputs::BytesInput,
     monitors::Monitor,
     state::StdState,
     Error,
 };
-use libafl_bolts::{core_affinity::CoreId, rands::StdRand, tuples::tuple_list};
+use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 #[cfg(feature = "injections")]
 use libafl_qemu::modules::injections::InjectionModule;
 use libafl_qemu::modules::{
@@ -55,8 +56,9 @@ impl Client<'_> {
         &self,
         state: Option<ClientState>,
         mgr: ClientMgr<M>,
-        core_id: CoreId,
+        client_description: ClientDescription,
     ) -> Result<(), Error> {
+        let core_id = client_description.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);
         log::debug!("ARGS: {:#?}", args);
@@ -101,7 +103,7 @@ impl Client<'_> {
         let instance_builder = Instance::builder()
             .options(self.options)
             .mgr(mgr)
-            .core_id(core_id)
+            .client_description(client_description)
             .extra_tokens(extra_tokens);
 
         if self.options.rerun_input.is_some() && self.options.drcov.is_some() {

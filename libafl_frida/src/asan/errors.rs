@@ -16,7 +16,6 @@ use libafl::{
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
-    inputs::HasTargetBytes,
     observers::Observer,
     state::State,
     Error, HasMetadata,
@@ -652,7 +651,6 @@ impl<S> StateInitializer<S> for AsanErrorsFeedback<S> {}
 impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for AsanErrorsFeedback<S>
 where
     S: State + Debug,
-    S::Input: HasTargetBytes,
     OT: MatchNameRef,
 {
     #[allow(clippy::wrong_self_convention)]

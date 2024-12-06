@@ -134,7 +134,7 @@ pub extern "C" fn libafl_main() {
     // to disconnect the event coverter from the broker later
     // call detach_from_broker( port)
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
         let mut bytes = vec![];
 
         // The closure that we want to fuzz

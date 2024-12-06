@@ -53,9 +53,38 @@ pub use systemmode::*;
 mod hooks;
 pub use hooks::*;
 
+use crate::config::QemuConfigBuilder;
+
 static mut QEMU_IS_INITIALIZED: bool = false;
 
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
+
+#[allow(clippy::vec_box)]
+static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
+
+pub trait HookId {
+    fn remove(&self, invalidate_block: bool) -> bool;
+}
+
+pub trait ArchExtras {
+    fn read_return_address(&self) -> Result<GuestReg, QemuRWError>;
+    fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg>;
+    fn read_function_argument(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+    ) -> Result<GuestReg, QemuRWError>;
+    fn write_function_argument<T>(
+        &self,
+        conv: CallingConvention,
+        idx: i32,
+        val: T,
+    ) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg>;
+}
 
 #[derive(Debug, Clone)]
 pub enum QemuExitReason {
@@ -93,18 +122,6 @@ pub struct QemuMemoryChunk {
     cpu: Option<CPU>,
 }
 
-#[allow(clippy::vec_box)]
-static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
-
-unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
-    unsafe {
-        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(Qemu, &'r str) -> bool>);
-        let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
-        let qemu = Qemu::get_unchecked();
-        closure(qemu, cmd)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum QemuShutdownCause {
     None,
@@ -137,12 +154,17 @@ pub enum CallingConvention {
     Cdecl,
 }
 
-pub trait HookId {
-    fn remove(&self, invalidate_block: bool) -> bool;
-}
-
 #[derive(Debug)]
 pub struct HookData(u64);
+
+unsafe extern "C" fn gdb_cmd(data: *mut c_void, buf: *mut u8, len: usize) -> bool {
+    unsafe {
+        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(Qemu, &'r str) -> bool>);
+        let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
+        let qemu = Qemu::get_unchecked();
+        closure(qemu, cmd)
+    }
+}
 
 impl Display for QemuExitReason {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -161,6 +183,18 @@ impl From<QemuConfig> for QemuParams {
     }
 }
 
+impl TryFrom<QemuConfigBuilder> for QemuParams {
+    type Error = QemuInitError;
+
+    fn try_from(config_builder: QemuConfigBuilder) -> Result<Self, Self::Error> {
+        Ok(QemuParams::Config(
+            config_builder
+                .build()
+                .map_err(QemuInitError::ConfigurationError)?,
+        ))
+    }
+}
+
 impl<T> From<&[T]> for QemuParams
 where
     T: AsRef<str>,
@@ -169,7 +203,6 @@ where
         QemuParams::Cli(cli.iter().map(|x| x.as_ref().into()).collect())
     }
 }
-
 impl<T> From<&Vec<T>> for QemuParams
 where
     T: AsRef<str>,
@@ -249,26 +282,6 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
     fn from(oi: libafl_qemu_sys::MemOpIdx) -> Self {
         Self { oi }
     }
-}
-
-pub trait ArchExtras {
-    fn read_return_address(&self) -> Result<GuestReg, QemuRWError>;
-    fn write_return_address<T>(&self, val: T) -> Result<(), QemuRWError>
-    where
-        T: Into<GuestReg>;
-    fn read_function_argument(
-        &self,
-        conv: CallingConvention,
-        idx: u8,
-    ) -> Result<GuestReg, QemuRWError>;
-    fn write_function_argument<T>(
-        &self,
-        conv: CallingConvention,
-        idx: i32,
-        val: T,
-    ) -> Result<(), QemuRWError>
-    where
-        T: Into<GuestReg>;
 }
 
 #[allow(clippy::unused_self)]
@@ -515,9 +528,10 @@ impl Qemu {
 
         match &params {
             QemuParams::Config(cfg) => {
-                QEMU_CONFIG.set(cfg.clone()).map_err(|_| {
-                    unreachable!("QEMU_CONFIG was already set but Qemu was not init!")
-                })?;
+                QEMU_CONFIG
+                    .set(cfg.clone())
+                    .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
+                    .unwrap();
             }
             QemuParams::Cli(_) => {}
         };

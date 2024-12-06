@@ -438,7 +438,7 @@ impl IntelPT {
                     *status = s;
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
                     //todo: remove !b.speculative()
-                    if !b.speculative() && skip < offset {
+                    if b.ninsn() > 0 && !b.speculative() && skip < offset {
                         let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };

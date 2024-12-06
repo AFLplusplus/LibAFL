@@ -15,7 +15,7 @@ default = ["std", "libipt"]
 std = ["libafl_bolts/std"]
 
 libipt = ["std", "dep:libipt"]
-# Export raw Intel PT traces on decode, useful for debug, disabled by default for best performance
+## Export raw Intel PT traces on decode, useful for debug, disabled by default for best performance
 export_raw = []
 
 [dev-dependencies]

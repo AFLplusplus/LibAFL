@@ -195,7 +195,10 @@ fn fuzz(
         //QemuSnapshotHelper::new()
     );
 
-    let emulator = Emulator::empty().qemu_cli(args).modules(modules).build()?;
+    let emulator = Emulator::empty()
+        .qemu_args(|_| args)
+        .modules(modules)
+        .build()?;
     let qemu = emulator.qemu();
     // let qemu = Qemu::init(&args).expect("QEMU init failed");
     // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();

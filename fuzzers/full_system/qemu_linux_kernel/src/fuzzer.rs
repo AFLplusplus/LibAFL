@@ -57,7 +57,7 @@ pub fn fuzz() {
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
 
@@ -67,14 +67,9 @@ pub fn fuzz() {
             CmpLogModule::default(),
         );
 
-        // let driver = StdEmulatorDriver::builder()
-        //     .print_commands(true)
-        //     .build();
-
         let emu = Emulator::builder()
-            .qemu_cli(args)
+            .qemu_config(|_| args)
             .modules(modules)
-            // .driver(driver)
             .build()?;
 
         let devices = emu.list_devices();

@@ -4,10 +4,10 @@ use core::{
 };
 use std::path::{Path, PathBuf};
 
+use derive_builder::Builder;
 use getset::Getters;
 use libafl_derive;
 use strum_macros;
-use typed_builder::TypedBuilder;
 
 #[cfg(feature = "systemmode")]
 #[derive(Debug, strum_macros::Display, Clone)]
@@ -37,7 +37,7 @@ pub enum DiskImageFileFormat {
     Raw,
 }
 
-#[derive(Debug, Clone, Default, TypedBuilder)]
+#[derive(Debug, Clone, Default, Builder)]
 pub struct Drive {
     #[builder(default, setter(strip_option, into))]
     file: Option<PathBuf>,
@@ -45,6 +45,13 @@ pub struct Drive {
     format: Option<DiskImageFileFormat>,
     #[builder(default, setter(strip_option))]
     interface: Option<DriveInterface>,
+}
+
+impl Drive {
+    #[must_use]
+    pub fn builder() -> DriveBuilder {
+        DriveBuilder::default()
+    }
 }
 
 impl Display for Drive {
@@ -296,17 +303,13 @@ impl<R: AsRef<Path>> From<R> for Program {
     }
 }
 
-#[derive(Debug, Clone, libafl_derive::Display, TypedBuilder, Getters)]
-#[builder(builder_method(
-    doc = "Since Qemu is a zero sized struct, this is not a completely standard builder pattern. \
-    The Qemu configuration is not stored in the Qemu struct after build() but in QEMU_CONFIG \
-    Therefore, to use the derived builder and avoid boilerplate a builder for QemuConfig is \
-    derived. \
-    The QemuConfig::builder is called in Qemu::builder() which is the only place where it should \
-    be called, in this way the one to one matching of Qemu and QemuConfig is enforced. Therefore \
-    its visibility is pub(crate)"
-))]
+/// Programmatic configurator for QEMU.
+///
+/// It is supposed to be an equivalent to QEMU's CLI usual configuration, usable in a more
+/// programmatic way and following the builder pattern.
+#[derive(Debug, Clone, libafl_derive::Display, Builder, Getters)]
 #[getset(get = "pub")]
+#[builder(pattern = "owned")]
 pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option))]
@@ -344,6 +347,13 @@ pub struct QemuConfig {
     program: Program,
 } // Adding something here? Please leave Program as the last field
 
+impl QemuConfig {
+    #[must_use]
+    pub fn builder() -> QemuConfigBuilder {
+        QemuConfigBuilder::default()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -353,7 +363,10 @@ mod test {
     #[cfg(feature = "usermode")]
     fn usermode() {
         let program = "/bin/pwd";
-        let qemu_config = QemuConfig::builder().program("/bin/pwd").build();
+        let qemu_config = QemuConfig::builder()
+            .program("/bin/pwd")
+            .build()
+            .expect("QEMU config failed.");
         let qemu = Qemu::init(qemu_config).unwrap();
         let config = qemu.get_config().unwrap();
         assert_eq!(config.to_string().trim(), program.trim());
@@ -364,7 +377,8 @@ mod test {
         let drive = Drive::builder()
             .format(DiskImageFileFormat::Raw)
             .interface(DriveInterface::Ide)
-            .build();
+            .build()
+            .expect("Drive builder failed.");
         assert_eq!(drive.to_string(), "-drive format=raw,if=ide");
     }
 

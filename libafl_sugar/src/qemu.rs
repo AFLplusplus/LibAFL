@@ -241,7 +241,7 @@ where
                 };
 
                 let emulator = Emulator::empty()
-                    .qemu_cli(qemu_cli.to_owned())
+                    .qemu_config(|_| qemu_cli.to_owned())
                     .modules(modules)
                     .build()?;
 
@@ -361,7 +361,7 @@ where
                 };
 
                 let emulator = Emulator::empty()
-                    .qemu_cli(qemu_cli.to_owned())
+                    .qemu_config(|_| qemu_cli.to_owned())
                     .modules(modules)
                     .build()?;
 

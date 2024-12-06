@@ -13,10 +13,7 @@ use frida_gum::{
     Backend, Gum, ModuleDetails, ModuleMap, Script,
 };
 use frida_gum_sys::gchar;
-use libafl::{
-    inputs::{HasTargetBytes, Input},
-    Error,
-};
+use libafl::Error;
 use libafl_bolts::{
     cli::{FridaScriptBackend, FuzzerOptions},
     tuples::MatchFirstType,
@@ -49,10 +46,10 @@ pub trait FridaRuntime: 'static + Debug {
     fn deinit(&mut self, gum: &Gum);
 
     /// Method called before execution
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 
     /// Method called after execution
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 }
 
 /// The tuple for Frida Runtime
@@ -69,10 +66,10 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug {
     fn deinit_all(&mut self, gum: &Gum);
 
     /// Method called before execution
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn pre_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 
     /// Method called after execution
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn post_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 }
 
 impl FridaRuntimeTuple for () {
@@ -85,10 +82,10 @@ impl FridaRuntimeTuple for () {
     }
     fn deinit_all(&mut self, _gum: &Gum) {}
 
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, _input_bytes: &[u8]) -> Result<(), Error> {
         Ok(())
     }
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn post_exec_all(&mut self, _input_bytes: &[u8]) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -113,14 +110,14 @@ where
         self.1.deinit_all(gum);
     }
 
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        self.0.pre_exec(input)?;
-        self.1.pre_exec_all(input)
+    fn pre_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        self.0.pre_exec(input_bytes)?;
+        self.1.pre_exec_all(input_bytes)
     }
 
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        self.0.post_exec(input)?;
-        self.1.post_exec_all(input)
+    fn post_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        self.0.post_exec(input_bytes)?;
+        self.1.post_exec_all(input_bytes)
     }
 }
 
@@ -709,13 +706,13 @@ where
     }
 
     /// Method called before execution
-    pub fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        (*self.runtimes).borrow_mut().pre_exec_all(input)
+    pub fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        (*self.runtimes).borrow_mut().pre_exec_all(input_bytes)
     }
 
     /// Method called after execution
-    pub fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        (*self.runtimes).borrow_mut().post_exec_all(input)
+    pub fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        (*self.runtimes).borrow_mut().post_exec_all(input_bytes)
     }
 
     /// If stalker is enabled

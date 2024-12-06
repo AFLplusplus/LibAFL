@@ -67,13 +67,12 @@ fn main() {
             .drives([config::Drive::builder()
                 .format(config::DiskImageFileFormat::Raw)
                 .file(format!("{target_dir}/boot.bin"))
-                .build()])
+                .build().unwrap()])
             .accelerator(Accelerator::Kvm)
             .bios(format!(
                 "{target_dir}/{target_subdir}/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu"
             ))
-            .start_cpu(false)
-            .build();
+            .start_cpu(false);
 
         let file_path = Path::new(&target_dir)
             .join("boot.bin")
@@ -95,7 +94,7 @@ fn main() {
             .build());
 
         let emulator = EmulatorBuilder::empty()
-            .qemu_config(qemu)
+            .qemu_config(|_| qemu)
             .modules(emulator_modules)
             .build()?;
         let qemu = emulator.qemu();

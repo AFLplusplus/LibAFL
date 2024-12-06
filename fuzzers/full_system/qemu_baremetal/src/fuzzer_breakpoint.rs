@@ -83,7 +83,7 @@ pub fn fuzz() {
         .expect("Symbol or env BREAKPOINT not found");
     println!("Breakpoint address = {breakpoint:#x}");
 
-    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _client_description| {
         let args: Vec<String> = env::args().collect();
 
         // The wrapped harness function, calling out to the LLVM-style harness
@@ -107,7 +107,7 @@ pub fn fuzz() {
 
         // Initialize QEMU Emulator
         let emu = Emulator::builder()
-            .qemu_cli(args)
+            .qemu_config(|_| args)
             .prepend_module(
                 StdEdgeCoverageModule::builder()
                     .map_observer(edges_observer.as_mut())

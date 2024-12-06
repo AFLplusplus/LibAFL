@@ -7,7 +7,7 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{EventRestarter, NopEventManager},
+    events::{ClientDescription, EventRestarter, NopEventManager},
     executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -32,7 +32,6 @@ use libafl::{
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::StdShMemProvider;
 use libafl_bolts::{
-    core_affinity::CoreId,
     ownedref::OwnedMutSlice,
     rands::StdRand,
     tuples::{tuple_list, MatchFirstType, Merge, Prepend},
@@ -64,7 +63,7 @@ pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
     /// The harness. We create it before forking, then `take()` it inside the client.
     mgr: ClientMgr<M>,
-    core_id: CoreId,
+    client_description: ClientDescription,
     #[builder(default)]
     extra_tokens: Vec<String>,
     #[builder(default=PhantomData)]
@@ -130,7 +129,10 @@ impl<M: Monitor> Instance<'_, M> {
             .build()?;
 
         let modules = modules.prepend(edge_coverage_module);
-        let mut emulator = Emulator::empty().qemu_cli(args).modules(modules).build()?;
+        let mut emulator = Emulator::empty()
+            .modules(modules)
+            .qemu_config(|_| args)
+            .build()?;
         let harness = Harness::init(emulator.qemu()).expect("Error setting up harness.");
         let qemu = emulator.qemu();
 
@@ -172,10 +174,12 @@ impl<M: Monitor> Instance<'_, M> {
                     // RNG
                     StdRand::new(),
                     // Corpus that will be evolved, we keep it in memory for performance
-                    InMemoryOnDiskCorpus::no_meta(self.options.queue_dir(self.core_id))?,
+                    InMemoryOnDiskCorpus::no_meta(
+                        self.options.queue_dir(self.client_description.clone()),
+                    )?,
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
-                    OnDiskCorpus::new(self.options.crashes_dir(self.core_id))?,
+                    OnDiskCorpus::new(self.options.crashes_dir(self.client_description.clone()))?,
                     // States of the feedbacks.
                     // The feedbacks can report the data that should persist in the State.
                     &mut feedback,
@@ -243,7 +247,10 @@ impl<M: Monitor> Instance<'_, M> {
             process::exit(0);
         }
 
-        if self.options.is_cmplog_core(self.core_id) {
+        if self
+            .options
+            .is_cmplog_core(self.client_description.core_id())
+        {
             // Create a QEMU in-process executor
             let executor = QemuExecutor::new(
                 emulator,
