@@ -37,11 +37,11 @@ pub struct X<A>
 }
 
 ```
-- Reduce generics to the least restrictive necessary. __Never overspecify the contraints__.
+- Reduce generics to the least restrictive necessary. __Never overspecify the contraints__. There's no automated tool to check the useless constraints, so you have to verify this manually.
 ```rust
 pub struct X<A> 
     where
-        A: P + Q // <- Try to use the as smallest set of constraints as possible.
+        A: P + Q // <- Try to use the as smallest set of constraints as possible. If the code still compiles after Q, then remove it. 
 {
     fn ...
 }
@@ -67,9 +67,9 @@ pub trait X<A, B, C> // <- this trait have 3 generics, A, B, and C
 ```
 - Always alphabetically order the type generics. Therefore,
 ```rust
-pub struct X<E, EM, OT, S, Z> {};
+pub struct X<E, EM, OT, S, Z> {}; // <- Generics are alphabetically ordered
 ```
 But not,
 ```rust
-pub struct X<S, OT, Z, EM, E> {};
+pub struct X<S, OT, Z, EM, E> {}; // <- Generics are not ordered
 ```
