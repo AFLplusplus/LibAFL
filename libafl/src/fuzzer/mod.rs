@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// Send a monitor update all 15 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
+pub(crate) const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
 pub trait HasScheduler: UsesState
