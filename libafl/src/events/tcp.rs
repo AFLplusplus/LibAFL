@@ -644,6 +644,12 @@ where
                     log::info!("Added received Testcase as item #{item}");
                 }
             }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { .. } => {
+                log::info!("Received new Objective");
+            }
+
             Event::CustomBuf { tag, buf } => {
                 for handler in &mut self.custom_buf_handlers {
                     if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {

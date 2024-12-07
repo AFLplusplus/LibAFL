@@ -685,7 +685,7 @@ where
 
             #[cfg(feature = "share_objectives")]
             Event::Objective { .. } => {
-                log::debug!("Received new objective");
+                log::debug!("Received new Objective");
 
                 self.hooks.on_fire_all(state, client_id, &event)?;
                 self.inner.fire(state, event)?;
