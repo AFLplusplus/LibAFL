@@ -15,85 +15,10 @@ use crate::sys::libafl_tcg_gen_asan;
 use crate::{
     emu::EmulatorModules,
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
-    qemu::{Hook, MemAccessInfo, Qemu, QemuInitError},
+    qemu::{Hook, MemAccessInfo, Qemu},
     sys::TCGTemp,
+    QemuParams,
 };
-
-static mut ASAN_GUEST_INITED: bool = false;
-
-pub fn init_qemu_with_asan_guest(
-    args: &mut Vec<String>,
-    env: &mut [(String, String)],
-) -> Result<(Qemu, String), QemuInitError> {
-    let current = env::current_exe().unwrap();
-    let asan_lib = fs::canonicalize(current)
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("libgasan.so");
-
-    let asan_lib = env::var_os("CUSTOM_ASAN_PATH")
-        .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
-
-    assert!(
-        asan_lib.as_path().exists(),
-        "The ASAN library doesn't exist: {asan_lib:#?}"
-    );
-
-    let asan_lib = asan_lib
-        .to_str()
-        .expect("The path to the asan lib is invalid")
-        .to_string();
-
-    println!("Loading ASAN: {asan_lib:}");
-
-    let add_asan =
-        |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
-
-    let mut added = false;
-    for (k, v) in &mut *env {
-        if k == "QEMU_SET_ENV" {
-            let mut new_v = vec![];
-            for e in v.split(',') {
-                if e.starts_with("LD_PRELOAD=") {
-                    added = true;
-                    new_v.push(add_asan(e));
-                } else {
-                    new_v.push(e.to_string());
-                }
-            }
-            *v = new_v.join(",");
-        }
-    }
-    for i in 0..args.len() {
-        if args[i] == "-E" && i + 1 < args.len() && args[i + 1].starts_with("LD_PRELOAD=") {
-            added = true;
-            args[i + 1] = add_asan(&args[i + 1]);
-        }
-    }
-
-    if !added {
-        args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
-        args.insert(1, "-E".into());
-    }
-
-    if env::var("QASAN_DEBUG").is_ok() {
-        args.push("-E".into());
-        args.push("QASAN_DEBUG=1".into());
-    }
-
-    if env::var("QASAN_LOG").is_ok() {
-        args.push("-E".into());
-        args.push("QASAN_LOG=1".into());
-    }
-
-    unsafe {
-        ASAN_GUEST_INITED = true;
-    }
-
-    let emu = Qemu::init(args)?;
-    Ok((emu, asan_lib))
-}
 
 #[derive(Clone)]
 struct QemuAsanGuestMapping {
@@ -119,8 +44,10 @@ impl From<&MapInfo> for QemuAsanGuestMapping {
 
 #[derive(Debug)]
 pub struct AsanGuestModule<F> {
+    env: Vec<(String, String)>,
     filter: F,
-    mappings: Vec<QemuAsanGuestMapping>,
+    mappings: Option<Vec<QemuAsanGuestMapping>>,
+    asan_lib: Option<String>,
 }
 
 #[cfg(any(
@@ -152,8 +79,8 @@ impl<F> AsanGuestModule<F> {
 
 impl AsanGuestModule<StdAddressFilter> {
     #[must_use]
-    pub fn default(qemu: Qemu, asan: &str) -> Self {
-        Self::new(qemu, asan, StdAddressFilter::default())
+    pub fn default(env: &[(String, String)]) -> Self {
+        Self::new(env, StdAddressFilter::default())
     }
 }
 
@@ -162,7 +89,181 @@ where
     F: AddressFilter,
 {
     #[must_use]
-    pub fn new(qemu: Qemu, asan: &str, filter: F) -> Self {
+    pub fn new(env: &[(String, String)], filter: F) -> Self {
+        Self {
+            env: env.to_vec(),
+            filter,
+            mappings: None,
+            asan_lib: None,
+        }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
+        self.filter.allowed(&addr)
+    }
+}
+
+fn gen_readwrite_guest_asan<ET, F, S>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, S>,
+    _state: Option<&mut S>,
+    pc: GuestAddr,
+    addr: *mut TCGTemp,
+    info: MemAccessInfo,
+) -> Option<u64>
+where
+    F: AddressFilter,
+    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
+{
+    let h = emulator_modules.get_mut::<AsanGuestModule<F>>().unwrap();
+    if !h.must_instrument(pc) {
+        return None;
+    }
+
+    /* Don't sanitize the sanitizer! */
+    unsafe {
+        if h.mappings
+            .as_mut()
+            .unwrap_unchecked()
+            .iter()
+            .any(|m| m.start <= pc && pc < m.end)
+        {
+            return None;
+        }
+    }
+
+    let size = info.size();
+
+    /* TODO - If our size is > 8 then do things via a runtime callback */
+    assert!(size <= 8, "I shouldn't be here!");
+
+    unsafe {
+        libafl_tcg_gen_asan(addr, size);
+    }
+
+    None
+}
+
+#[cfg(feature = "clippy")]
+#[allow(unused_variables)]
+unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
+
+fn guest_trace_error_asan<ET, S>(
+    _qemu: Qemu,
+    _emulator_modules: &mut EmulatorModules<ET, S>,
+    _state: Option<&mut S>,
+    _id: u64,
+    _addr: GuestAddr,
+) where
+    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
+{
+    panic!("I really shouldn't be here");
+}
+
+fn guest_trace_error_n_asan<ET, S>(
+    _qemu: Qemu,
+    _emulator_modules: &mut EmulatorModules<ET, S>,
+    _state: Option<&mut S>,
+    _id: u64,
+    _addr: GuestAddr,
+    _n: usize,
+) where
+    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<S>,
+{
+    panic!("I really shouldn't be here either");
+}
+
+impl<F, S> EmulatorModule<S> for AsanGuestModule<F>
+where
+    F: AddressFilter,
+    S: Unpin + UsesInput,
+{
+    type ModuleAddressFilter = F;
+
+    fn pre_qemu_init<ET>(
+        &mut self,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu_params: &mut QemuParams,
+    ) where
+        ET: EmulatorModuleTuple<S>,
+    {
+        let mut args = qemu_params.to_cli();
+
+        let current = env::current_exe().unwrap();
+        let asan_lib = fs::canonicalize(current)
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("libgasan.so");
+
+        let asan_lib = env::var_os("CUSTOM_ASAN_PATH")
+            .map_or(asan_lib, |x| PathBuf::from(x.to_string_lossy().to_string()));
+
+        assert!(
+            asan_lib.as_path().exists(),
+            "The ASAN library doesn't exist: {asan_lib:#?}"
+        );
+
+        let asan_lib = asan_lib
+            .to_str()
+            .expect("The path to the asan lib is invalid")
+            .to_string();
+
+        println!("Loading ASAN: {asan_lib:}");
+
+        let add_asan =
+            |e: &str| "LD_PRELOAD=".to_string() + &asan_lib + " " + &e["LD_PRELOAD=".len()..];
+
+        let mut added = false;
+        for (k, v) in &mut self.env {
+            if k == "QEMU_SET_ENV" {
+                let mut new_v = vec![];
+                for e in v.split(',') {
+                    if e.starts_with("LD_PRELOAD=") {
+                        added = true;
+                        new_v.push(add_asan(e));
+                    } else {
+                        new_v.push(e.to_string());
+                    }
+                }
+                *v = new_v.join(",");
+            }
+        }
+        for i in 0..args.len() {
+            if args[i] == "-E" && i + 1 < args.len() && args[i + 1].starts_with("LD_PRELOAD=") {
+                added = true;
+                args[i + 1] = add_asan(&args[i + 1]);
+            }
+        }
+
+        if !added {
+            args.insert(1, "LD_PRELOAD=".to_string() + &asan_lib);
+            args.insert(1, "-E".into());
+        }
+
+        if env::var("QASAN_DEBUG").is_ok() {
+            args.push("-E".into());
+            args.push("QASAN_DEBUG=1".into());
+        }
+
+        if env::var("QASAN_LOG").is_ok() {
+            args.push("-E".into());
+            args.push("QASAN_LOG=1".into());
+        }
+
+        *qemu_params = QemuParams::Cli(args);
+
+        self.asan_lib = Some(asan_lib);
+    }
+
+    fn post_qemu_init<ET>(&mut self, qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, S>)
+    where
+        ET: EmulatorModuleTuple<S>,
+    {
         for mapping in qemu.mappings() {
             println!("mapping: {mapping:#?}");
         }
@@ -188,95 +289,21 @@ where
 
         let mappings = mappings
             .iter()
-            .filter(|m| m.path == asan)
+            .filter(|m| &m.path == self.asan_lib.as_ref().unwrap())
             .cloned()
             .collect::<Vec<QemuAsanGuestMapping>>();
 
         for mapping in &mappings {
             println!("asan mapping: {mapping:#?}");
         }
-
-        Self { filter, mappings }
     }
 
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(&addr)
-    }
-}
-
-fn gen_readwrite_guest_asan<ET, F, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    pc: GuestAddr,
-    addr: *mut TCGTemp,
-    info: MemAccessInfo,
-) -> Option<u64>
-where
-    F: AddressFilter,
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    let h = emulator_modules.get_mut::<AsanGuestModule<F>>().unwrap();
-    if !h.must_instrument(pc) {
-        return None;
-    }
-
-    /* Don't sanitize the sanitizer! */
-    if h.mappings.iter().any(|m| m.start <= pc && pc < m.end) {
-        return None;
-    }
-
-    let size = info.size();
-
-    /* TODO - If our size is > 8 then do things via a runtime callback */
-    assert!(size <= 8, "I shouldn't be here!");
-
-    unsafe {
-        libafl_tcg_gen_asan(addr, size);
-    }
-
-    None
-}
-
-#[cfg(feature = "clippy")]
-#[allow(unused_variables)]
-unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
-
-fn guest_trace_error_asan<ET, S>(
-    _emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    _id: u64,
-    _addr: GuestAddr,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    panic!("I really shouldn't be here");
-}
-
-fn guest_trace_error_n_asan<ET, S>(
-    _emulator_modules: &mut EmulatorModules<ET, S>,
-    _state: Option<&mut S>,
-    _id: u64,
-    _addr: GuestAddr,
-    _n: usize,
-) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
-{
-    panic!("I really shouldn't be here either");
-}
-
-impl<F, S> EmulatorModule<S> for AsanGuestModule<F>
-where
-    F: AddressFilter,
-    S: Unpin + UsesInput,
-{
-    type ModuleAddressFilter = F;
-
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
