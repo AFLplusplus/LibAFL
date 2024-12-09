@@ -3,13 +3,12 @@
 use alloc::{boxed::Box, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 
+#[cfg(feature = "multi_machine")]
+use libafl_bolts::llmp::LLMP_FLAG_MM_FORWARD;
 #[cfg(feature = "llmp_compression")]
+use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
-    compress::GzipCompressor,
-    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
-};
-use libafl_bolts::{
-    llmp::{LlmpClient, LlmpClientDescription, Tag},
+    llmp::{LlmpClient, LlmpClientDescription, Tag, LLMP_FLAG_INITIALIZED},
     shmem::{NopShMemProvider, ShMemProvider},
     ClientId,
 };
@@ -422,6 +421,8 @@ where
             return Ok(());
         }
 
+        let mut flags = LLMP_FLAG_INITIALIZED;
+
         // Filter out non interestign events and convert `NewTestcase`
         let converted_event = match event {
             Event::NewTestcase {
@@ -434,24 +435,30 @@ where
                 forward_id,
                 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                 node_id,
-            } => Event::NewTestcase {
-                input: self.converter.as_mut().unwrap().convert(input)?,
-                client_config,
-                exit_kind,
-                corpus_size,
-                observers_buf,
-                time,
-                forward_id,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id,
-            },
+            } => {
+                #[cfg(feature = "multi_machine")]
+                {
+                    flags = flags | LLMP_FLAG_MM_FORWARD;
+                }
+
+                Event::NewTestcase {
+                    input: self.converter.as_mut().unwrap().convert(input)?,
+                    client_config,
+                    exit_kind,
+                    corpus_size,
+                    observers_buf,
+                    time,
+                    forward_id,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id,
+                }
+            }
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {
                 return Ok(());
             }
         };
         let serialized = postcard::to_allocvec(&converted_event)?;
-        let flags = LLMP_FLAG_INITIALIZED;
 
         match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
@@ -462,7 +469,8 @@ where
                 )?;
             }
             None => {
-                self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+                self.llmp
+                    .send_buf_with_flags(LLMP_TAG_EVENT_TO_BOTH, flags, &serialized)?;
             }
         }
         self.last_sent = libafl_bolts::current_time();
@@ -479,6 +487,8 @@ where
             return Ok(());
         }
 
+        let mut flags = LLMP_FLAG_INITIALIZED;
+
         // Filter out non interestign events and convert `NewTestcase`
         let converted_event = match event {
             Event::NewTestcase {
@@ -491,24 +501,32 @@ where
                 forward_id,
                 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                 node_id,
-            } => Event::NewTestcase {
-                input: self.converter.as_mut().unwrap().convert(input)?,
-                client_config,
-                exit_kind,
-                corpus_size,
-                observers_buf,
-                time,
-                forward_id,
-                #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                node_id,
-            },
+            } => {
+                #[cfg(feature = "multi_machine")]
+                {
+                    flags = flags | LLMP_FLAG_MM_FORWARD;
+                }
+
+                Event::NewTestcase {
+                    input: self.converter.as_mut().unwrap().convert(input)?,
+                    client_config,
+                    exit_kind,
+                    corpus_size,
+                    observers_buf,
+                    time,
+                    forward_id,
+                    #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                    node_id,
+                }
+            }
             Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {
                 return Ok(());
             }
         };
         let serialized = postcard::to_allocvec(&converted_event)?;
-        self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
+        self.llmp
+            .send_buf_with_flags(LLMP_TAG_EVENT_TO_BOTH, flags, &serialized)?;
         Ok(())
     }
 }
