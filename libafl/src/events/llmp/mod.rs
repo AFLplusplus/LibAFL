@@ -324,7 +324,7 @@ where
 
             #[cfg(feature = "share_objectives")]
             Event::Objective { .. } => {
-                log::info!("Received new Objective");
+                log::debug!("Received new Objective");
                 Ok(())
             }
 
