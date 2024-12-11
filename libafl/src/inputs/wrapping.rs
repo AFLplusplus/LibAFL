@@ -1,10 +1,10 @@
 //! Newtype pattern style wrapper for [`super::Input`]s
 
+use alloc::{string::String, vec::Vec};
 use core::{
     fmt::Debug,
     ops::{Add, BitOrAssign, BitXorAssign, Mul, Not, Shl, Sub},
 };
-use std::{string::String, vec::Vec};
 
 use ahash::RandomState;
 use num_traits::{One, WrappingAdd, WrappingSub, Zero};
@@ -106,8 +106,8 @@ impl Input for WrappingInput<Vec<u8>> {
         )
     }
 
-    #[cfg(feature = "std")]
     /// Write this input to the file
+    #[cfg(feature = "std")]
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
         P: AsRef<Path>,

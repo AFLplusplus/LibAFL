@@ -1,7 +1,11 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
-use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    rc::Rc,
+    vec::{self, Vec},
+};
 use core::cell::RefCell;
 
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
@@ -36,7 +40,7 @@ impl HasMutatorBytes for BytesInput {
         self.as_mut().extend(iter);
     }
 
-    fn splice<R, I>(&mut self, range: R, replace_with: I) -> std::vec::Splice<'_, I::IntoIter>
+    fn splice<R, I>(&mut self, range: R, replace_with: I) -> vec::Splice<'_, I::IntoIter>
     where
         R: core::ops::RangeBounds<usize>,
         I: IntoIterator<Item = u8>,
@@ -44,7 +48,7 @@ impl HasMutatorBytes for BytesInput {
         self.as_mut().splice(range, replace_with)
     }
 
-    fn drain<R>(&mut self, range: R) -> std::vec::Drain<'_, u8>
+    fn drain<R>(&mut self, range: R) -> vec::Drain<'_, u8>
     where
         R: core::ops::RangeBounds<usize>,
     {

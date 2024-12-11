@@ -1,7 +1,7 @@
 //! Mutators for integer-style inputs
 
+use alloc::borrow::Cow;
 use core::ops::{BitOrAssign, BitXorAssign, Not, Shl};
-use std::borrow::Cow;
 
 use libafl_bolts::{rands::Rand as _, Error, Named};
 use num_traits::{One, WrappingAdd, WrappingSub, Zero};
@@ -206,7 +206,7 @@ mod tests {
     use super::int_mutators;
     use crate::{
         corpus::{Corpus as _, InMemoryCorpus, Testcase},
-        inputs::wrapping::WrappingInput,
+        inputs::wrapping::U8Input,
         mutators::MutationResult,
         state::StdState,
     };
@@ -224,7 +224,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut input: WrappingInput<u8> = 0u8.into();
+        let mut input: U8Input = 0u8.into();
 
         let mutators = int_mutators().into_vec();
 
