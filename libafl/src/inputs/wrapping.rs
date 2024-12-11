@@ -280,3 +280,100 @@ where
 }
 
 impl<I> Copy for WrappingInput<I> where I: Copy {}
+
+#[cfg(test)]
+mod tests {
+    use core::ops::{Add as _, Mul as _, Not as _, Sub as _};
+
+    use num_traits::{One, WrappingAdd as _, WrappingSub as _, Zero};
+
+    use crate::inputs::{wrapping::NumericConsts as _, WrappingInput};
+
+    #[test]
+    fn shl() {
+        let unwrapped = 0x10_u64;
+        let wrapped: WrappingInput<_> = unwrapped.into();
+        let offset = 1_u32;
+        assert_eq!(unwrapped << offset, *(wrapped << offset).as_ref());
+    }
+
+    #[test]
+    fn bit_xor_assign() {
+        let mut unwrapped = 0x10_u64;
+        let mut wrapped: WrappingInput<_> = unwrapped.into();
+        unwrapped ^= u64::one();
+        wrapped ^= WrappingInput::one();
+        assert_eq!(unwrapped, *wrapped.as_ref());
+    }
+
+    #[test]
+    fn bit_or_assign() {
+        let mut unwrapped = 0x10_u64;
+        let mut wrapped: WrappingInput<_> = unwrapped.into();
+        unwrapped |= u64::one();
+        wrapped |= WrappingInput::one();
+        assert_eq!(unwrapped, *wrapped.as_ref());
+    }
+
+    #[test]
+    fn one() {
+        let unwrapped = u64::one();
+        let wrapped: WrappingInput<u64> = WrappingInput::one();
+        assert_eq!(unwrapped, *wrapped.as_ref());
+    }
+
+    #[test]
+    fn zero() {
+        let unwrapped = u64::zero();
+        let wrapped: WrappingInput<u64> = WrappingInput::zero();
+        assert_eq!(unwrapped, *wrapped.as_ref());
+    }
+
+    #[test]
+    fn mul() {
+        let lhs: WrappingInput<u64> = 7.into();
+        let rhs: WrappingInput<u64> = 3.into();
+        assert_eq!(21, *lhs.mul(rhs).as_ref());
+    }
+
+    #[test]
+    fn add() {
+        let lhs: WrappingInput<u64> = 7.into();
+        let rhs: WrappingInput<u64> = 3.into();
+        assert_eq!(10, *lhs.add(rhs).as_ref());
+    }
+
+    #[test]
+    fn wrapping_add() {
+        let lhs: WrappingInput<u64> = 7.into();
+        let rhs: WrappingInput<u64> = 3.into();
+        assert_eq!(10, *lhs.wrapping_add(&rhs).as_ref());
+        let lhs: WrappingInput<u64> = WrappingInput::MAX;
+        let rhs: WrappingInput<u64> = 1.into();
+        assert_eq!(0, *lhs.wrapping_add(&rhs).as_ref());
+    }
+
+    #[test]
+    fn sub() {
+        let lhs: WrappingInput<u64> = 7.into();
+        let rhs: WrappingInput<u64> = 3.into();
+        assert_eq!(4, *lhs.sub(rhs).as_ref());
+    }
+
+    #[test]
+    fn wrapping_sub() {
+        let lhs: WrappingInput<u64> = 7.into();
+        let rhs: WrappingInput<u64> = 3.into();
+        assert_eq!(4, *lhs.wrapping_sub(&rhs).as_ref());
+        let lhs: WrappingInput<u64> = WrappingInput::MIN;
+        let rhs: WrappingInput<u64> = 1.into();
+        assert_eq!(u64::MAX, *lhs.wrapping_sub(&rhs).as_ref());
+    }
+
+    #[test]
+    fn not() {
+        let unwrapped = 7;
+        let wrapped: WrappingInput<u64> = unwrapped.into();
+        assert_eq!(unwrapped.not(), *wrapped.not().as_ref());
+    }
+}
