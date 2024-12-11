@@ -1,55 +1,16 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
-use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
+use alloc::{borrow::ToOwned, rc::Rc, vec::Vec};
 use core::cell::RefCell;
 
-use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
-#[cfg(feature = "std")]
-use {
-    libafl_bolts::{fs::write_file_atomic, Error},
-    std::{fs::File, io::Read, path::Path},
-};
 
-use super::{Input, WrappingInput};
-use crate::{
-    corpus::CorpusId,
-    inputs::{HasMutatorBytes, HasTargetBytes},
-};
+use super::WrappingInput;
+use crate::inputs::{HasMutatorBytes, HasTargetBytes};
 
 /// A bytes input is the basic input
 pub type BytesInput = WrappingInput<Vec<u8>>;
-
-impl Input for BytesInput {
-    fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        format!(
-            "{:016x}",
-            RandomState::with_seeds(0, 0, 0, 0).hash_one(self.as_ref())
-        )
-    }
-
-    #[cfg(feature = "std")]
-    /// Write this input to the file
-    fn to_file<P>(&self, path: P) -> Result<(), Error>
-    where
-        P: AsRef<Path>,
-    {
-        write_file_atomic(path, self.as_ref())
-    }
-
-    /// Load the content of this input from a file
-    #[cfg(feature = "std")]
-    fn from_file<P>(path: P) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        let mut file = File::open(path)?;
-        let mut bytes: Vec<u8> = vec![];
-        file.read_to_end(&mut bytes)?;
-        Ok(BytesInput::new(bytes))
-    }
-}
 
 /// Rc Ref-cell from Input
 impl From<BytesInput> for Rc<RefCell<BytesInput>> {
