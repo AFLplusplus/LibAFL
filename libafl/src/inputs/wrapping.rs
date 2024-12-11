@@ -21,7 +21,7 @@ use crate::corpus::CorpusId;
 /// Newtype pattern wrapper around an underlying structure to implement inputs
 ///
 /// This does not blanket implement [`super::Input`], because for certain inputs, writing them to disk does not make sense, because they don't own their data (like [`super::MutVecInput`])
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct WrappingInput<I>(I);
 
 impl<I> From<I> for WrappingInput<I> {
