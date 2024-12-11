@@ -54,11 +54,11 @@ impl<I> AsMut<I> for WrappingInput<I> {
     }
 }
 
-impl<'a, I> MappedInput for WrappingInput<&'a mut I> {
-    type Type<'b>
-        = WrappingInput<&'b mut I>
+impl<I> MappedInput for WrappingInput<&mut I> {
+    type Type<'a>
+        = WrappingInput<&'a mut I>
     where
-        Self: 'b;
+        Self: 'a;
 }
 
 // Macro to implement the `Input` trait and create type aliases for `WrappingInput<T>`
@@ -97,7 +97,6 @@ impl_input_for_wrapping_input!(
 );
 
 /// manually implemented because files can be written more efficiently
-
 impl Input for WrappingInput<Vec<u8>> {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
         format!(

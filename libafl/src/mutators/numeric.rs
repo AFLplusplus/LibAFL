@@ -28,7 +28,7 @@ pub type IntMutatorsType = tuple_list_type!(
 
 /// Mutators for integer-like inputs
 ///
-/// Modelled after the applicable mutators from [`super::havoc_mutations`]
+/// Modelled after the applicable mutators from [`super::havoc_mutations::havoc_mutations`]
 #[must_use]
 pub fn int_mutators() -> IntMutatorsType {
     tuple_list!(
