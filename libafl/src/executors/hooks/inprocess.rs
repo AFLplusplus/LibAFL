@@ -19,21 +19,20 @@ use libafl_bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 
+#[cfg(feature = "std")]
+use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(windows)]
 use crate::state::State;
-#[cfg(feature = "std")]
 use crate::{
-    corpus::Corpus, executors::hooks::timer::TimerStruct, observers::ObserversTuple,
-    state::UsesState,
-};
-use crate::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    observers::ObserversTuple,
+    state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     Error, HasObjective,
 };
 
