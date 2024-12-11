@@ -15,6 +15,11 @@ use libafl_bolts::{
 };
 use serde::Deserialize;
 
+#[cfg(feature = "share_objectives")]
+use crate::{
+    corpus::{Corpus, Testcase},
+    state::{HasCorpus, HasSolutions},
+};
 use crate::{
     events::{CustomBufEventResult, CustomBufHandlerFn, Event, EventFirer},
     executors::{Executor, HasObservers},
@@ -253,7 +258,7 @@ where
 
 impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
-    S: UsesInput + HasExecutions + HasMetadata + Stoppable,
+    S: UsesInput + HasExecutions + HasMetadata + Stoppable + HasCorpus + HasSolutions,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -323,8 +328,14 @@ where
             }
 
             #[cfg(feature = "share_objectives")]
-            Event::Objective { .. } => {
+            Event::Objective { input, .. } => {
                 log::debug!("Received new Objective");
+
+                let testcase = Testcase::from(input.clone());
+                testcase.set_parent_id_optional(*state.corpus().current());
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
+
                 Ok(())
             }
 

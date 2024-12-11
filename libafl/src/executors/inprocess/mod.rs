@@ -477,6 +477,9 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
             .fire(
                 state,
                 Event::Objective {
+                    #[cfg(feature = "share_objectives")]
+                    input: input.clone(),
+
                     objective_size: state.solutions().count(),
                     time: libafl_bolts::current_time(),
                 },
