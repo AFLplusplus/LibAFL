@@ -42,8 +42,17 @@
 )]
 
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, Data::Struct, DeriveInput, Field, Fields::Named, Type};
+use proc_macro_crate::{crate_name, FoundCrate};
+use quote::{format_ident, quote};
+use syn::{
+    parse_macro_input,
+    punctuated::Punctuated,
+    token::Comma,
+    Data::Struct,
+    DeriveInput, Error, Field,
+    Fields::{Named, Unit, Unnamed},
+    GenericArgument, Ident, PathArguments, PathSegment, Type,
+};
 
 /// Derive macro to implement `SerdeAny`, to use a type in a `SerdeAnyMap`
 #[proc_macro_derive(SerdeAny)]
@@ -143,4 +152,140 @@ fn libafl_display_field_by_type(it: &Field) -> proc_macro2::TokenStream {
     quote! {
         write!(f, #fmt, self.#ident)?;
     }
+}
+
+/// TODO
+#[proc_macro_derive(HasHavocMutators)]
+pub fn derive_has_mutator_bytes(input: TokenStream) -> TokenStream {
+    let input_ast = parse_macro_input!(input as DeriveInput);
+
+    let struct_name = input_ast.ident.clone();
+
+    let fields = match extract_fields(input_ast) {
+        Ok(f) => f,
+        Err(e) => return e.into_compile_error().into(),
+    };
+
+    let (getter_methods, mutator_merge_call) = match create_functions_on_fields(&fields) {
+        Ok(e) => e,
+        Err(e) => return e.into_compile_error().into(),
+    };
+
+    // required to be able to use it from within libafl — used for testing
+    let libafl_source = match crate_name("libafl").expect("Could not figure out current crate") {
+        FoundCrate::Itself => quote! { crate },
+        FoundCrate::Name(_) => quote! { libafl },
+    };
+
+    // Generate the impl block
+    let expanded = quote! {
+        use #libafl_source::{inputs::MutVecInput, mutators::{Mutator, mapped_havoc_mutations}};
+        use libafl_bolts::tuples::{Merge, NamedTuple, tuple_list};
+
+        impl #struct_name {
+            #getter_methods
+        }
+
+        impl HasHavocMutators for #struct_name {
+            fn havoc_mutators<MT: NamedTuple>() -> MT {
+                #mutator_merge_call
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+fn extract_fields(ast: DeriveInput) -> Result<Punctuated<Field, Comma>, Error> {
+    match &ast.data {
+        Struct(data_struct) => match &data_struct.fields {
+            Named(fields_named) => Ok(fields_named.named.clone()),
+            Unnamed(fields_unnamed) => Ok(fields_unnamed.unnamed.clone()),
+            Unit => Err(Error::new_spanned(
+                ast,
+                "HasHavocMutators can not be derived for unit structs",
+            )),
+        },
+        _ => Err(Error::new_spanned(
+            ast,
+            "HasHavocMutators can only be derived for structs",
+        )),
+    }
+}
+
+fn create_functions_on_fields(
+    fields: &Punctuated<Field, Comma>,
+) -> Result<(proc_macro2::TokenStream, proc_macro2::TokenStream), Error> {
+    let functions_res = fields.iter().map(|field| match field.ty.clone() {
+        Type::Path(type_path) => {
+            let segment = type_path.path.segments.last().unwrap();
+            if let Some(tokens) = create_functions_on_type(segment, field.ident.as_ref().unwrap()) {
+                return Ok(tokens);
+            }
+
+            Err(Error::new_spanned(
+                segment.ident.clone(),
+                "HasHavocMutators does not support struct parts of this type",
+            ))
+        }
+        _ => Err(Error::new_spanned(
+            field,
+            "HasHavocMutators can only be derived for structs",
+        )),
+    });
+
+    // check if any fields could not be parsed into functions, combine the errors and return them
+    if let Some(errors) = functions_res
+        .clone()
+        .filter(Result::is_err)
+        .map(Result::unwrap_err)
+        .reduce(|mut acc, e| {
+            acc.combine(e);
+            acc
+        })
+    {
+        return Err(errors);
+    }
+
+    Ok(functions_res.map(Result::unwrap).fold(
+        (quote! {}, quote! { tuple_list!() }),
+        |(acc1, acc2), (e1, e2)| {
+            (
+                quote! {
+                    #acc1
+                    #e1
+                },
+                quote! { #acc2.merge(#e2) },
+            )
+        },
+    ))
+}
+
+fn create_functions_on_type(
+    segment: &PathSegment,
+    field_name: &Ident,
+) -> Option<(proc_macro2::TokenStream, proc_macro2::TokenStream)> {
+    if segment.ident == "Vec" {
+        if let PathArguments::AngleBracketed(args) = &segment.arguments {
+            if let Some(GenericArgument::Type(Type::Path(arg_type))) = args.args.first() {
+                let arg_ident = &arg_type.path.segments.last().unwrap().ident;
+                if arg_ident == "u8" {
+                    let mutable_method_name = format_ident!("{}_mut", field_name);
+                    let immutable_method_name = field_name;
+                    return Some((
+                        quote! {
+                            pub fn #mutable_method_name(&mut self) -> MutVecInput<'_> {
+                                (&mut self.#field_name).into()
+                            }
+                            pub fn #immutable_method_name(&self) -> &[u8] {
+                                &self.#field_name
+                            }
+                        },
+                        quote! { mapped_havoc_mutations(Self::#mutable_method_name, Self::#immutable_method_name) },
+                    ));
+                }
+            }
+        }
+    }
+    None
 }
