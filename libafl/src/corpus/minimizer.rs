@@ -77,7 +77,7 @@ where
         E::Observers: ObserversTuple<E::Input, E::State>,
         CS: Scheduler<E::Input, E::State> + RemovableScheduler<E::Input, E::State>,
         EM: EventFirer<State = E::State>,
-        Z: HasScheduler<Scheduler = CS, State = E::State>,
+        Z: HasScheduler<E::Input, E::State, Scheduler = CS>,
     {
         // don't delete this else it won't work after restart
         let current = *state.corpus().current();

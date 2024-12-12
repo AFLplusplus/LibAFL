@@ -76,7 +76,6 @@ where
         + UsesInput<Input = BytesInput>,
     S::Corpus: Corpus<Input = BytesInput>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     #[inline]
     #[allow(clippy::too_many_lines)]
@@ -352,7 +351,6 @@ where
         + UsesInput<Input = BytesInput>,
     OT: ObserversTuple<BytesInput, S>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]

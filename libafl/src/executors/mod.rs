@@ -120,7 +120,6 @@ pub trait HasObservers {
 pub trait Executor<EM, Z>: UsesState
 where
     EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
 {
     /// Instruct the target about the input and run
     fn run_target(
@@ -209,7 +208,6 @@ mod test {
         EM: UsesState<State = S>,
         S: State + HasExecutions,
         S::Input: HasTargetBytes,
-        Z: UsesState<State = S>,
     {
         fn run_target(
             &mut self,

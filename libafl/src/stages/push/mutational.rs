@@ -80,7 +80,8 @@ impl<EM, M, OT, S, Z> PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>
     for StdMutationalPushStage<EM, M, OT, S, Z>
 where
     EM: EventFirer<State = S>,
-    Z: HasScheduler<State = S> + ExecutionProcessor<EM, OT>,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
     S: HasCorpus
         + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasRand
@@ -203,7 +204,8 @@ where
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Clone + Debug + Input,
-    Z: HasScheduler<State = S> + ExecutionProcessor<EM, OT>,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
 {
     type Item = Result<<S::Corpus as Corpus>::Input, Error>;
 
@@ -225,7 +227,8 @@ where
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Clone + Debug + Input,
-    Z: HasScheduler<State = S> + ExecutionProcessor<EM, OT>,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
 {
     /// Creates a new default mutational stage
     #[must_use]

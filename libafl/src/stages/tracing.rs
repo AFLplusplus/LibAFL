@@ -42,7 +42,6 @@ where
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>, //delete me
-    Z: UsesState<State = S>,  //delete me
 {
     #[allow(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
@@ -87,7 +86,6 @@ where
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
     <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]
@@ -183,7 +181,6 @@ where
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     #[inline]
     fn perform(
@@ -232,11 +229,10 @@ where
 
 impl<E, EM, SOT, S, Z> ShadowTracingStage<E, EM, SOT, S, Z>
 where
-    E: Executor<EM, Z, State = Z::State> + HasObservers,
-    S: HasExecutions + HasCorpus,
+    E: Executor<EM, Z, State = S> + HasObservers,
+    S: HasExecutions + HasCorpus + UsesInput,
     SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    EM: UsesState<State = Z::State>,
-    Z: UsesState,
+    EM: UsesState<State = S>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {

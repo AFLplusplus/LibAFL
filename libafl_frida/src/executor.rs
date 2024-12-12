@@ -74,7 +74,6 @@ where
     TC: TargetBytesConverter<Input = S::Input>,
     OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
-    Z: UsesState<State = S>,
 {
     /// Instruct the target about the input and run
     #[inline]

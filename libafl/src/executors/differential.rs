@@ -74,7 +74,6 @@ where
     <B as HasObservers>::Observers:
         ObserversTuple<<<A as UsesState>::State as UsesInput>::Input, <A as UsesState>::State>,
     DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::Input, A::State> + MatchName,
-    Z: UsesState<State = <Self as UsesState>::State>,
 {
     fn run_target(
         &mut self,

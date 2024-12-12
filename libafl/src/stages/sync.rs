@@ -69,7 +69,7 @@ impl<CB, E, EM, S, Z> Named for SyncFromDiskStage<CB, E, EM, S, Z> {
 impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<<S::Corpus as Corpus>::Input, Error>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasRand
         + HasMetadata
@@ -167,20 +167,25 @@ impl<CB, E, EM, S, Z> SyncFromDiskStage<CB, E, EM, S, Z> {
 
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
 pub type SyncFromDiskFunction<S, Z> =
-    fn(&mut Z, &mut S, &Path) -> Result<<S as UsesInput>::Input, Error>;
+    fn(&mut Z, &mut S, &Path) -> Result<<<S as HasCorpus>::Corpus as Corpus>::Input, Error>;
 
-impl<E, EM, S, Z> SyncFromDiskStage<SyncFromDiskFunction<Z::State, Z>, E, EM, S, Z>
+impl<E, EM, S, Z> SyncFromDiskStage<SyncFromDiskFunction<S, Z>, E, EM, S, Z>
 where
-    Z: Evaluator<E, EM>,
+    S: HasCorpus,
+    <S::Corpus as Corpus>::Input: Input,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dirs: Vec<PathBuf>, interval: Duration) -> Self {
-        fn load_callback<S: UsesInput, Z>(
+        fn load_callback<S: HasCorpus, Z>(
             _: &mut Z,
             _: &mut S,
             p: &Path,
-        ) -> Result<S::Input, Error> {
+        ) -> Result<<S::Corpus as Corpus>::Input, Error>
+        where
+            <S::Corpus as Corpus>::Input: Input,
+        {
             Input::from_file(p)
         }
         Self {
@@ -240,7 +245,8 @@ where
     SP: ShMemProvider,
     E: HasObservers + Executor<EM, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<EM, E::Observers> + ExecutionProcessor<EM, E::Observers, State = S>,
+    Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     IC: InputConverter<From = <S::Corpus as Corpus>::Input, To = DI>,
     ICB: InputConverter<From = DI, To = <S::Corpus as Corpus>::Input>,
     DI: Input,

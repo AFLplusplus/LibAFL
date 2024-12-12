@@ -161,7 +161,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -191,7 +191,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -224,7 +224,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, E::Input, E::Observers, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {

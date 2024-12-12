@@ -239,7 +239,7 @@ impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, O, S, Z>
 where
     E: HasObservers,
     EM: EventFirer,
-    Z: HasScheduler<State = S>,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>,
     S: HasImported
         + HasCorpus
         + HasMetadata
@@ -252,7 +252,7 @@ where
     E::Observers: MatchNameRef,
     O: MapObserver,
     C: AsRef<O> + Named,
-    <Z as HasScheduler>::Scheduler: HasQueueCycles,
+    Z::Scheduler: HasQueueCycles,
 {
     #[allow(clippy::too_many_lines)]
     fn perform(

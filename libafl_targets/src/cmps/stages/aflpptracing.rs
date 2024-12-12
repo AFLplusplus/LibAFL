@@ -38,7 +38,6 @@ impl<EM, TE, S, Z> Named for AFLppCmplogTracingStage<'_, EM, TE, S, Z> {
 impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for AFLppCmplogTracingStage<'_, EM, TE, S, Z>
 where
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
     TE: HasObservers + Executor<EM, Z, State = S>,
     TE::Observers: MatchNameRef + ObserversTuple<BytesInput, S>,
     S: HasCorpus

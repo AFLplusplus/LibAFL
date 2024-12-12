@@ -98,7 +98,6 @@ where
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions,
-    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -165,7 +164,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -195,7 +194,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -238,7 +237,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -303,7 +302,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -334,7 +333,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -373,7 +372,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {

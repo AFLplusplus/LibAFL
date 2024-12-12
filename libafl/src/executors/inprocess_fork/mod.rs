@@ -55,7 +55,7 @@ where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     OF: Feedback<EM, S::Input, OT, S>,
     S: HasSolutions,
-    Z: HasObjective<Objective = OF, State = S>,
+    Z: HasObjective<Objective = OF>,
 {
     #[allow(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
@@ -93,7 +93,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     harness_fn: &'a mut H,
     inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
@@ -107,7 +106,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S> + Debug,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -135,7 +133,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type State = S;
 }
@@ -149,7 +146,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: UsesState<State = S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -191,7 +187,7 @@ where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     OF: Feedback<EM, S::Input, OT, S>,
     S: State + HasSolutions,
-    Z: HasObjective<Objective = OF, State = S>,
+    Z: HasObjective<Objective = OF>,
 {
     /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
     #[allow(clippy::too_many_arguments)]
@@ -242,7 +238,6 @@ where
     OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type Observers = OT;
     #[inline]
