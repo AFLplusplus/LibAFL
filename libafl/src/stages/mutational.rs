@@ -9,6 +9,8 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 
 use libafl_bolts::{rands::Rand, Named};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
@@ -18,11 +20,9 @@ use crate::{
     nonzero,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
-#[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 // TODO multi mutators stage
 
@@ -152,6 +152,7 @@ where
         + HasExecutions
         + HasNamedMetadata
         + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
         + UsesInput,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
@@ -187,7 +188,7 @@ impl<E, EM, M, S, Z> StdMutationalStage<E, EM, <S::Corpus as Corpus>::Input, M, 
 where
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     Z: Evaluator<E, EM, State = S>,
-    S: HasCorpus + HasRand + HasCurrentCorpusId + UsesInput,
+    S: HasCorpus + HasRand + HasCurrentCorpusId + UsesInput + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Input + Clone,
     S::Corpus: Corpus<Input = S::Input>,
 {
@@ -208,7 +209,7 @@ impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, State = S>,
-    S: HasCorpus + HasRand + HasCurrentTestcase + UsesInput,
+    S: HasCorpus + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor + UsesInput,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
     S::Corpus: Corpus<Input = S::Input>,

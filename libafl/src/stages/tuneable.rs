@@ -6,6 +6,8 @@ use core::{marker::PhantomData, time::Duration};
 use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::Corpus,
     inputs::{Input, UsesInput},
@@ -17,11 +19,9 @@ use crate::{
         ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, Evaluator, HasMetadata, HasNamedMetadata,
 };
-#[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
@@ -202,6 +202,7 @@ where
         + HasMetadata
         + HasExecutions
         + HasCurrentTestcase
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
@@ -242,6 +243,7 @@ where
         + HasExecutions
         + HasMetadata
         + HasCurrentTestcase
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,

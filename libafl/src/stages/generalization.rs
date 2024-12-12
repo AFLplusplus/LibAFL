@@ -11,6 +11,8 @@ use libafl_bolts::{
     AsSlice, Named,
 };
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
@@ -21,11 +23,9 @@ use crate::{
     require_novelties_tracking,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
-#[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 const MAX_GENERALIZED_LEN: usize = 8192;
 
@@ -72,6 +72,7 @@ where
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = BytesInput>,
     S::Corpus: Corpus<Input = BytesInput>,
     EM: UsesState<State = S>,
@@ -344,7 +345,11 @@ impl<C, EM, O, OT, S, Z> GeneralizationStage<C, EM, O, OT, S, Z>
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    S: HasExecutions + HasMetadata + HasCorpus + UsesInput<Input = BytesInput>,
+    S: HasExecutions
+        + HasMetadata
+        + HasCorpus
+        + MaybeHasClientPerfMonitor
+        + UsesInput<Input = BytesInput>,
     OT: ObserversTuple<BytesInput, S>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,

@@ -8,6 +8,8 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
@@ -21,7 +23,9 @@ use crate::{
         MutationalStage, RetryCountRestartHelper, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, UsesState},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor, UsesState,
+    },
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -86,6 +90,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     Z: Evaluator<E, EM, State = S>,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
@@ -125,6 +130,7 @@ where
         + HasMetadata
         + HasRand
         + HasCurrentTestcase
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
     Z: Evaluator<E, EM, State = S>,

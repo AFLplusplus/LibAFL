@@ -206,7 +206,7 @@ pub trait PushStage<EM, I, OT, S, Z> {
     }
 }
 
-/// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
+/// Allows us to use a [`PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
 pub struct PushStageAdapter<CS, EM, OT, PS, Z> {

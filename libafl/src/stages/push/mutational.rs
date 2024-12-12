@@ -11,6 +11,8 @@ use libafl_bolts::rands::Rand;
 use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
     events::{EventFirer, ProgressReporter},
@@ -23,11 +25,9 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, MaybeHasClientPerfMonitor},
     Error, ExecutionProcessor, HasMetadata, HasScheduler,
 };
-#[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
 pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
@@ -81,7 +81,10 @@ impl<EM, M, OT, S, Z> PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>
 where
     EM: EventFirer<State = S>,
     Z: HasScheduler<State = S> + ExecutionProcessor<EM, OT>,
-    S: HasCorpus + UsesInput<Input = <S::Corpus as Corpus>::Input> + HasRand,
+    S: HasCorpus
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>
+        + HasRand
+        + MaybeHasClientPerfMonitor,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     <S::Corpus as Corpus>::Input: Input + Clone,
@@ -195,6 +198,7 @@ where
         + HasExecutions
         + HasLastReportTime
         + HasRand
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
@@ -216,6 +220,7 @@ where
         + HasExecutions
         + HasLastReportTime
         + HasRand
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,

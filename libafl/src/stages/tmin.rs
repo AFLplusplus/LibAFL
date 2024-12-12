@@ -1,4 +1,4 @@
-//! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
+//! The [`StdTMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
 use alloc::{
     borrow::{Cow, ToOwned},
@@ -15,6 +15,8 @@ use serde::Serialize;
 
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
@@ -31,13 +33,12 @@ use crate::{
     },
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions, State, UsesState,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
+        MaybeHasClientPerfMonitor, State, UsesState,
     },
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
 };
-#[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
@@ -76,6 +77,7 @@ where
         + HasMaxSize
         + HasNamedMetadata
         + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
@@ -148,6 +150,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,

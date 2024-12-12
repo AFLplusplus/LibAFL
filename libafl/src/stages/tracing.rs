@@ -8,6 +8,8 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::Named;
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
@@ -16,11 +18,9 @@ use crate::{
     observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
     Error, HasNamedMetadata,
 };
-#[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
@@ -39,6 +39,7 @@ where
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentTestcase
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>, //delete me
     Z: UsesState<State = S>,  //delete me
@@ -83,6 +84,7 @@ where
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,
@@ -178,6 +180,7 @@ where
         + Debug
         + HasCurrentTestcase
         + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>,
     Z: UsesState<State = S>,

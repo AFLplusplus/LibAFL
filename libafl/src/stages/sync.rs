@@ -10,8 +10,6 @@ use std::path::{Path, PathBuf};
 use libafl_bolts::{current_time, fs::find_new_files_rec, shmem::ShMemProvider, Named};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "introspection")]
-use crate::state::HasClientPerfMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
@@ -19,7 +17,7 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasRand, State, Stoppable},
+    state::{HasCorpus, HasExecutions, HasRand, MaybeHasClientPerfMonitor, State, Stoppable},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -77,7 +75,8 @@ where
         + HasMetadata
         + HasNamedMetadata
         + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + HasCurrentCorpusId,
+        + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor,
 {
     #[inline]
     fn perform(
