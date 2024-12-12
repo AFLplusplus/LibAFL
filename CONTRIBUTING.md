@@ -24,7 +24,7 @@ Once the package is installed, simply run `pre-commit install` to enable the hoo
 Before making your pull requests, try to see if your code follows these rules.
 
 - Wherever possible, use `Cow<'static, str>` instead of String.
-- `PhantomData` should have the smallest set of types needed.
+- `PhantomData` should have the smallest set of types needed. Try not adding `PhantomData` to your struct unless it is really necessary. Also even when you really need `PhantomData`, try to keep the types `T` used in `PhantomData` as smallest as possible 
 - Wherever possible, trait implementations with lifetime specifiers should use '_ lifetime elision.
 - Complex constructors should be replaced with `typed_builder`, or write code in the builder pattern for yourself.
 - Remove generic restrictions at the definitions (e.g., we do not need to specify that types impl `Serialize`, `Deserialize`, or `Debug` anymore at the struct definitions). Therefore, try avoiding code like this unless the contraint is really necessary.
