@@ -6,11 +6,11 @@
 
 use alloc::string::String;
 use core::cell::RefCell;
-#[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write};
 use std::{
-    fs::OpenOptions,
+    fs,
+    fs::{File, OpenOptions},
     io,
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -50,7 +50,6 @@ fn try_create_new<P: AsRef<Path>>(path: P) -> Result<Option<File>, io::Error> {
 /// A corpus able to store [`Testcase`]s to disk, while also keeping all of them in memory.
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
-#[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct InMemoryOnDiskCorpus<I> {
     inner: InMemoryCorpus<I>,

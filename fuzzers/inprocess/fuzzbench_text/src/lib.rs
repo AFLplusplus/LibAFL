@@ -374,7 +374,7 @@ fn fuzz_binary(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
@@ -589,7 +589,7 @@ fn fuzz_text(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(

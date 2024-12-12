@@ -16,7 +16,7 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     inputs::Input,
     stages::Stage,
-    state::{HasCorpus, HasRand, HasSolutions, UsesState},
+    state::{HasCorpus, HasRand, HasSolutions},
     Error, HasMetadata,
 };
 
@@ -35,65 +35,53 @@ impl_serdeany!(DumpToDiskMetadata);
 
 /// The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk
 #[derive(Debug)]
-pub struct DumpToDiskStage<CB1, CB2, EM, Z> {
+pub struct DumpToDiskStage<CB1, CB2, EM, S, Z> {
     solutions_dir: PathBuf,
     corpus_dir: PathBuf,
     to_bytes: CB1,
     generate_filename: CB2,
-    phantom: PhantomData<(EM, Z)>,
+    phantom: PhantomData<(EM, S, Z)>,
 }
 
-impl<CB1, CB2, EM, Z> UsesState for DumpToDiskStage<CB1, CB2, EM, Z>
+impl<CB1, CB2, E, EM, S, P, Z> Stage<E, EM, S, Z> for DumpToDiskStage<CB1, CB2, EM, S, Z>
 where
-    EM: UsesState,
-{
-    type State = EM::State;
-}
-
-impl<CB1, CB2, P, E, EM, Z> Stage<E, EM, Z> for DumpToDiskStage<CB1, CB2, EM, Z>
-where
-    CB1: FnMut(&Testcase<Self::Input>, &Self::State) -> Vec<u8>,
-    CB2: FnMut(&Testcase<Self::Input>, &CorpusId) -> P,
+    CB1: FnMut(&Testcase<<S::Corpus as Corpus>::Input>, &S) -> Vec<u8>,
+    CB2: FnMut(&Testcase<<S::Corpus as Corpus>::Input>, &CorpusId) -> P,
+    S: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     P: AsRef<Path>,
-    EM: UsesState,
-    E: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
-    EM::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
-    <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
-    <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = Self::Input>, //delete me
 {
     #[inline]
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         self.dump_state_to_disk(state)
     }
 
     #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Not executing the target, so restart safety is not needed
         Ok(true)
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Not executing the target, so restart safety is not needed
         Ok(())
     }
 }
 
 /// Implementation for `DumpToDiskStage` with a default `generate_filename` function.
-impl<CB1, EM, Z> DumpToDiskStage<CB1, fn(&Testcase<EM::Input>, &CorpusId) -> String, EM, Z>
+impl<CB1, EM, S, Z>
+    DumpToDiskStage<CB1, fn(&Testcase<<S::Corpus as Corpus>::Input>, &CorpusId) -> String, EM, S, Z>
 where
-    EM: UsesState,
-    Z: UsesState,
-    <EM as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
-    <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = EM::Input>,
-    <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = EM::Input>,
+    S: HasCorpus + HasSolutions + HasRand + HasMetadata,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Input,
 {
     /// Create a new [`DumpToDiskStage`] with a default `generate_filename` function.
     pub fn new<A, B>(to_bytes: CB1, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
@@ -111,7 +99,10 @@ where
 
     /// Default `generate_filename` function.
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn generate_filename(testcase: &Testcase<EM::Input>, id: &CorpusId) -> String {
+    fn generate_filename(
+        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
+        id: &CorpusId,
+    ) -> String {
         [
             Some(id.0.to_string()),
             testcase.filename().clone(),
@@ -128,13 +119,10 @@ where
     }
 }
 
-impl<CB1, CB2, EM, Z> DumpToDiskStage<CB1, CB2, EM, Z>
+impl<CB1, CB2, EM, S, Z> DumpToDiskStage<CB1, CB2, EM, S, Z>
 where
-    EM: UsesState,
-    Z: UsesState,
-    <EM as UsesState>::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
-    <<EM as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = EM::Input>,
-    <<EM as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = EM::Input>,
+    S: HasCorpus + HasMetadata + HasSolutions,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     /// Create a new [`DumpToDiskStage`] with a custom `generate_filename` function.
     pub fn new_with_custom_filenames<A, B>(
@@ -175,19 +163,10 @@ where
     }
 
     #[inline]
-    fn dump_state_to_disk<P: AsRef<Path>>(
-        &mut self,
-        state: &mut <Self as UsesState>::State,
-    ) -> Result<(), Error>
+    fn dump_state_to_disk<P: AsRef<Path>>(&mut self, state: &mut S) -> Result<(), Error>
     where
-        CB1: FnMut(
-            &Testcase<<<<EM as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input>,
-            &<EM as UsesState>::State,
-        ) -> Vec<u8>,
-        CB2: FnMut(
-            &Testcase<<<<EM as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input>,
-            &CorpusId,
-        ) -> P,
+        CB1: FnMut(&Testcase<<S::Corpus as Corpus>::Input>, &S) -> Vec<u8>,
+        CB2: FnMut(&Testcase<<S::Corpus as Corpus>::Input>, &CorpusId) -> P,
     {
         let (mut corpus_id, mut solutions_id) =
             if let Some(meta) = state.metadata_map().get::<DumpToDiskMetadata>() {

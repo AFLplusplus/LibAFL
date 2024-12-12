@@ -1,5 +1,5 @@
 use core::fmt::Debug;
-use std::{fs, marker::PhantomData, ops::Range, process, time::Duration};
+use std::{fs, marker::PhantomData, ops::Range, path::PathBuf, process};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -23,8 +23,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, IfStage, ShadowTracingStage,
-        StagesTuple, StatsStage, StdMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
+        ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState, UsesState},
     Error, HasMetadata, NopFuzzer,
@@ -137,7 +137,10 @@ impl<M: Monitor> Instance<'_, M> {
 
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
-            tuple_list!(StatsStage::new(Duration::from_secs(5))),
+            tuple_list!(AflStatsStage::builder()
+                .map_observer(&edges_observer)
+                .stats_file(PathBuf::from("stats.txt"))
+                .build()?),
         );
 
         // Feedback to rate the interestingness of an input
@@ -274,7 +277,7 @@ impl<M: Monitor> Instance<'_, M> {
                 5,
             )?;
 
-            let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+            let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
                 StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!
@@ -309,9 +312,8 @@ impl<M: Monitor> Instance<'_, M> {
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        Z: Fuzzer<E, ClientMgr<M>, ST>
-            + UsesState<State = ClientState>
-            + Evaluator<E, ClientMgr<M>, State = ClientState>,
+        Z: Fuzzer<E, ClientMgr<M>, ClientState, ST>
+            + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
         E: UsesState<State = ClientState>,
         ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
     {

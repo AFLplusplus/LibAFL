@@ -143,7 +143,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     let mut stages = tuple_list!(calibration, power);
