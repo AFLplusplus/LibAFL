@@ -161,8 +161,8 @@ where
     }
 
     /// Gets the number of iterations from a fixed number of runs
-    fn iterations(&self, _state: &mut S) -> Result<usize, Error> {
-        Ok(self.runs)
+    fn iterations(&self, _state: &mut S) -> usize {
+        self.runs
     }
 
     /// Runs this (mutational) stage for new objectives
@@ -183,7 +183,7 @@ where
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
         let num = self
-            .iterations(state)?
+            .iterations(state)
             .saturating_sub(usize::try_from(self.execs_since_progress_start(state)?)?);
 
         // If num is negative, then quit.
@@ -256,7 +256,7 @@ where
                     if feedback.is_interesting(state, manager, &input, &*observers, &exit_kind)? {
                         // we found a reduced corpus entry! use the smaller base
                         base = input;
-                        base_post = Some(post.clone());
+                        base_post = Some(post);
 
                         // do more runs! maybe we can minify further
                         next_i = 0;
