@@ -42,7 +42,7 @@ use crate::{
 
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<E, EM, F, FF, IP, M, S, Z> {
+pub struct StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
     /// The name
     name: Cow<'static, str>,
     /// The mutator(s) this stage uses
@@ -54,11 +54,10 @@ pub struct StdTMinMutationalStage<E, EM, F, FF, IP, M, S, Z> {
     /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
     restart_helper: ExecutionCountRestartHelper,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, F, IP, S, Z)>,
+    phantom: PhantomData<(E, EM, F, S, Z)>,
 }
 
-impl<E, EM, F, FF, IP, M, S, Z> Stage<E, EM, S, Z>
-    for StdTMinMutationalStage<E, EM, F, FF, IP, M, S, Z>
+impl<E, EM, F, FF, M, S, Z> Stage<E, EM, S, Z> for StdTMinMutationalStage<E, EM, F, FF, M, S, Z>
 where
     Z: HasScheduler<State = S>
         + ExecutionProcessor<EM, E::Observers>
@@ -81,7 +80,6 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
-    IP: MutatedTransformPost<S> + Clone,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Hash + HasLen,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -108,8 +106,8 @@ where
     }
 }
 
-impl<E, EM, F, FF, IP, M, S, Z> FeedbackFactory<F, E::Observers>
-    for StdTMinMutationalStage<E, EM, F, FF, IP, M, S, Z>
+impl<E, EM, F, FF, M, S, Z> FeedbackFactory<F, E::Observers>
+    for StdTMinMutationalStage<E, EM, F, FF, M, S, Z>
 where
     E: HasObservers,
     FF: FeedbackFactory<F, E::Observers>,
@@ -119,7 +117,7 @@ where
     }
 }
 
-impl<E, EM, F, FF, IP, M, S, Z> Named for StdTMinMutationalStage<E, EM, F, FF, IP, M, S, Z> {
+impl<E, EM, F, FF, M, S, Z> Named for StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -130,7 +128,7 @@ static mut TMIN_STAGE_ID: usize = 0;
 /// The name for tmin stage
 pub static TMIN_STAGE_NAME: &str = "tmin";
 
-impl<E, EM, F, FF, IP, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, S, Z>
+impl<E, EM, F, FF, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, M, S, Z>
 where
     Z: HasScheduler<State = S>
         + ExecutionProcessor<EM, E::Observers>
@@ -154,7 +152,6 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
-    IP: MutatedTransformPost<S> + Clone,
     <S::Corpus as Corpus>::Input: Hash + HasLen + Input,
 {
     /// The list of mutators, added to this stage (as mutable ref)
@@ -316,7 +313,7 @@ where
     }
 }
 
-impl<E, EM, F, FF, IP, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, IP, M, S, Z> {
+impl<E, EM, F, FF, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
