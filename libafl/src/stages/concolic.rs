@@ -362,14 +362,6 @@ pub struct SimpleConcolicMutationalStage<Z> {
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<Z> UsesState for SimpleConcolicMutationalStage<Z>
-where
-    Z: UsesState,
-{
-    type State = Z::State;
-}
-
-#[cfg(feature = "concolic_mutation")]
 /// The unique id for this stage
 static mut SIMPLE_CONCOLIC_MUTATIONAL_ID: usize = 0;
 
@@ -387,7 +379,7 @@ impl<Z> Named for SimpleConcolicMutationalStage<Z> {
 #[cfg(feature = "concolic_mutation")]
 impl<E, EM, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<Z>
 where
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
     S: HasExecutions
         + HasCorpus
