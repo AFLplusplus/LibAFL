@@ -862,7 +862,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
 }
 
 /// waitpid wrapper that ignores some signals sent by the ptraced child
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus, Errno> {
     loop {
         let wait_status = waitpid(pid, options);
