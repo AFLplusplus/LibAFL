@@ -124,7 +124,7 @@ where
     OT: ObserversTuple<S::Input, S> + Debug,
     S: State + HasExecutions,
     SP: ShMemProvider,
-    Z: HasObjective<Objective = OF, State = S>,
+    Z: HasObjective<Objective = OF>,
 {
     #[allow(unreachable_code)]
     #[inline]

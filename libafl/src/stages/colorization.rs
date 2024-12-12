@@ -92,7 +92,6 @@ where
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
     O: MapObserver,
     C: AsRef<O> + Named,
-    Z: UsesState<State = S>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -174,7 +173,6 @@ where
         + HasCurrentTestcase
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
-    Z: UsesState<State = S>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]

@@ -31,7 +31,7 @@ impl<G, S, Z> GenStage<G, S, Z> {
 
 impl<E, EM, G, S, Z> Stage<E, EM, S, Z> for GenStage<G, S, Z>
 where
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasRand + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     G: Generator<<S::Corpus as Corpus>::Input, S>,
 {

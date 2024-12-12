@@ -164,7 +164,7 @@ pub struct TuneableMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> MutationalStage<S> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
@@ -196,7 +196,7 @@ where
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasRand
         + HasNamedMetadata
@@ -237,7 +237,7 @@ where
 impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasRand
         + HasNamedMetadata
@@ -469,8 +469,8 @@ where
 
 impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
-    M: Mutator<I, Z::State>,
-    Z: Evaluator<E, EM>,
+    M: Mutator<I, S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasRand + HasNamedMetadata,
 {
     /// Creates a new transforming mutational stage

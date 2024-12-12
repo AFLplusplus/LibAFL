@@ -262,10 +262,10 @@ where
     EM: EventFirer<State = S> + EventRestarter + HasEventManagerId + ProgressReporter<State = S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     PS: PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>,
-    Z: ExecutesInput<E, EM, State = S>
-        + ExecutionProcessor<EM, OT>
-        + EvaluatorObservers<EM, OT>
-        + HasScheduler<Scheduler = CS>,
+    Z: ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
+        + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, OT>
+        + HasScheduler<<S::Corpus as Corpus>::Input, S>,
 {
     fn perform(
         &mut self,

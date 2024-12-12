@@ -86,7 +86,7 @@ where
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
     EM: UsesState<State = S>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     <S::Corpus as Corpus>::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {

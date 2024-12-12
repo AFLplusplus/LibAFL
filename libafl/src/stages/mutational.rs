@@ -150,7 +150,7 @@ impl<E, EM, I, M, S, Z> Named for StdMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasRand
         + HasMetadata
@@ -192,7 +192,7 @@ where
 impl<E, EM, M, S, Z> StdMutationalStage<E, EM, <S::Corpus as Corpus>::Input, M, S, Z>
 where
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasRand + HasCurrentCorpusId + UsesInput + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Input + Clone,
     S::Corpus: Corpus<Input = S::Input>,
@@ -213,7 +213,7 @@ where
 impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor + UsesInput,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
@@ -319,7 +319,7 @@ impl<E, EM, I, M, S, Z> Named for MultiMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<E, EM, I, M, S, Z>
 where
     M: MultiMutator<I, S>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasRand + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId + UsesInput,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
