@@ -157,26 +157,20 @@ macro_rules! impl_numeric {
             #[inline]
             #[allow(trivial_numeric_casts, clippy::cast_possible_wrap, clippy::cast_lossless)]
             fn randomize<R: Rand>(&mut self, rand: &mut R) {
-                // Set the value to zero
                 self.set_zero();
 
-                // Number of bytes in the target type
                 let byte_size = size_of::<$t>();
-                // Number of bytes in each random u64
-                let bytes_per_rand = 8; // u64 has 8 bytes
+                let bytes_per_rand = size_of::<u64>();
 
                 let mut current_rand = 0u64;
 
                 for byte_index in 0..byte_size {
-                    // Fetch a new random u64 every `bytes_per_rand` bytes
                     if byte_index % bytes_per_rand == 0 {
                         current_rand = rand.next();
                     }
 
-                    // Extract the relevant byte from the current random u64
-                    let rand_byte = ((current_rand >> (8 * (byte_index % bytes_per_rand))) & 0xFF) as u8;
-
-                    // Assemble the byte into the target integer
+                    let rand_index = (byte_index % bytes_per_rand);
+                    let rand_byte = ((current_rand >> (8 * rand_index)) & 0xFF) as u8;
                     *self |= (rand_byte as $t) << (8 * byte_index);
                 }
             }
