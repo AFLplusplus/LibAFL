@@ -60,7 +60,6 @@ where
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     #[inline]
     fn perform(

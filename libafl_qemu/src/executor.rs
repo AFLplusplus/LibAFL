@@ -241,7 +241,6 @@ where
     H: FnMut(&mut Emulator<CM, ED, ET, S, SM>, &mut S, &S::Input) -> ExitKind,
     OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions + Unpin,
-    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -315,7 +314,6 @@ where
     OT: ObserversTuple<S::Input, S>,
     S: UsesInput,
     SP: ShMemProvider,
-    Z: UsesState<State = S>,
 {
     inner: QemuInProcessForkExecutor<'a, CM, ED, EM, ET, H, OT, S, SM, SP, Z>,
 }
@@ -333,7 +331,6 @@ where
     S: UsesInput + Debug,
     SM: Debug,
     SP: ShMemProvider,
-    Z: UsesState<State = S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuForkExecutor")
@@ -452,7 +449,6 @@ where
     OT: ObserversTuple<S::Input, S>,
     S: State,
     SP: ShMemProvider,
-    Z: UsesState<State = S>,
 {
     type State = S;
 }
@@ -468,7 +464,6 @@ where
     OT: ObserversTuple<S::Input, S>,
     S: State,
     SP: ShMemProvider,
-    Z: UsesState<State = S>,
 {
     type Observers = OT;
     #[inline]

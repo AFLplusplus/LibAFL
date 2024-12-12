@@ -102,7 +102,7 @@ where
         + HasCurrentTestcase
         + HasCurrentCorpusId
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]

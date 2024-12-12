@@ -54,7 +54,6 @@ where
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
     SP: ShMemProvider,
-    Z: UsesState<State = S>,
 {
     #[inline]
     fn run_target(
