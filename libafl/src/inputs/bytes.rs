@@ -10,11 +10,11 @@ use core::cell::RefCell;
 
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 
-use super::WrappingInput;
+use super::ValueInput;
 use crate::inputs::{HasMutatorBytes, HasTargetBytes};
 
 /// A bytes input is the basic input
-pub type BytesInput = WrappingInput<Vec<u8>>;
+pub type BytesInput = ValueInput<Vec<u8>>;
 
 /// Rc Ref-cell from Input
 impl From<BytesInput> for Rc<RefCell<BytesInput>> {

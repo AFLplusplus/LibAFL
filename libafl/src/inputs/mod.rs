@@ -3,8 +3,8 @@
 pub mod bytes;
 pub use bytes::BytesInput;
 
-pub mod wrapping;
-pub use wrapping::WrappingInput;
+pub mod value;
+pub use value::ValueInput;
 
 pub mod encoded;
 pub use encoded::*;
@@ -213,7 +213,7 @@ where
 }
 
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
-pub type MutVecInput<'a> = WrappingInput<&'a mut Vec<u8>>;
+pub type MutVecInput<'a> = ValueInput<&'a mut Vec<u8>>;
 
 impl HasLen for MutVecInput<'_> {
     fn len(&self) -> usize {

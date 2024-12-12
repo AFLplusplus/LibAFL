@@ -7,7 +7,7 @@ use core::{
 };
 
 use ahash::RandomState;
-use num_traits::{One, WrappingAdd, WrappingSub, Zero};
+use num_traits::{One, WrappingAdd, WrappingSub};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
@@ -22,16 +22,16 @@ use crate::corpus::CorpusId;
 ///
 /// This does not blanket implement [`super::Input`], because for certain inputs, writing them to disk does not make sense, because they don't own their data (like [`super::MutVecInput`])
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
-pub struct WrappingInput<I>(I);
+pub struct ValueInput<I>(I);
 
-impl<I> From<I> for WrappingInput<I> {
+impl<I> From<I> for ValueInput<I> {
     fn from(value: I) -> Self {
         Self(value)
     }
 }
 
-impl<I> WrappingInput<I> {
-    /// Create a new [`WrappingInput`]
+impl<I> ValueInput<I> {
+    /// Create a new [`ValueInput`]
     pub const fn new(value: I) -> Self {
         Self(value)
     }
@@ -42,30 +42,30 @@ impl<I> WrappingInput<I> {
     }
 }
 
-impl<I> AsRef<I> for WrappingInput<I> {
+impl<I> AsRef<I> for ValueInput<I> {
     fn as_ref(&self) -> &I {
         &self.0
     }
 }
 
-impl<I> AsMut<I> for WrappingInput<I> {
+impl<I> AsMut<I> for ValueInput<I> {
     fn as_mut(&mut self) -> &mut I {
         &mut self.0
     }
 }
 
-impl<I> MappedInput for WrappingInput<&mut I> {
+impl<I> MappedInput for ValueInput<&mut I> {
     type Type<'a>
-        = WrappingInput<&'a mut I>
+        = ValueInput<&'a mut I>
     where
         Self: 'a;
 }
 
 // Macro to implement the `Input` trait and create type aliases for `WrappingInput<T>`
-macro_rules! impl_input_for_wrapping_input {
+macro_rules! impl_input_for_value_input {
     ($($t:ty => $name:ident),+ $(,)?) => {
         $(
-            impl Input for WrappingInput<$t> {
+            impl Input for ValueInput<$t> {
                 fn generate_name(&self, _id: Option<CorpusId>) -> String {
                     format!(
                         "{:016x}",
@@ -75,13 +75,13 @@ macro_rules! impl_input_for_wrapping_input {
             }
 
             /// Input wrapping a <$t>
-            pub type $name = WrappingInput<$t>;
+            pub type $name = ValueInput<$t>;
         )*
     };
 }
 
 // Invoke the macro with type-name pairs
-impl_input_for_wrapping_input!(
+impl_input_for_value_input!(
     u8 => U8Input,
     u16 => U16Input,
     u32 => U32Input,
@@ -97,7 +97,7 @@ impl_input_for_wrapping_input!(
 );
 
 /// manually implemented because files can be written more efficiently
-impl Input for WrappingInput<Vec<u8>> {
+impl Input for ValueInput<Vec<u8>> {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
         format!(
             "{:016x}",
@@ -128,31 +128,7 @@ impl Input for WrappingInput<Vec<u8>> {
     }
 }
 
-/// Constants for numeric types
-pub trait NumericConsts {
-    /// The number of bits, used for limiting shift operations
-    const BITS: u32;
-    /// The min value
-    const MIN: Self;
-    /// The max value
-    const MAX: Self;
-}
-
-macro_rules! impl_numeric_consts {
-    ( $( $t:ty ),* $(,)? ) => {
-        $(
-            impl NumericConsts for $t {
-                const BITS: u32 = <$t>::BITS;
-                const MIN: Self = <$t>::MIN;
-                const MAX: Self = <$t>::MAX;
-            }
-        )*
-    };
-}
-
-impl_numeric_consts!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
-
-impl<I, R> Shl<R> for WrappingInput<I>
+impl<I, R> Shl<R> for ValueInput<I>
 where
     I: Shl<R>,
     I::Output: Into<Self>,
@@ -164,7 +140,7 @@ where
     }
 }
 
-impl<I> BitXorAssign for WrappingInput<I>
+impl<I> BitXorAssign for ValueInput<I>
 where
     I: BitXorAssign,
 {
@@ -172,7 +148,7 @@ where
         self.as_mut().bitxor_assign(rhs.inner());
     }
 }
-impl<I> BitOrAssign for WrappingInput<I>
+impl<I> BitOrAssign for ValueInput<I>
 where
     I: BitOrAssign,
 {
@@ -181,16 +157,7 @@ where
     }
 }
 
-impl<I> NumericConsts for WrappingInput<I>
-where
-    I: NumericConsts,
-{
-    const BITS: u32 = I::BITS;
-    const MIN: Self = WrappingInput::new(I::MIN);
-    const MAX: Self = WrappingInput::new(I::MAX);
-}
-
-impl<I> One for WrappingInput<I>
+impl<I> One for ValueInput<I>
 where
     I: One + Mul,
 {
@@ -199,7 +166,7 @@ where
     }
 }
 
-impl<I> Mul for WrappingInput<I>
+impl<I> Mul for ValueInput<I>
 where
     I: Mul,
     I::Output: Into<Self>,
@@ -211,20 +178,20 @@ where
     }
 }
 
-impl<I> Zero for WrappingInput<I>
-where
-    I: Zero + Into<Self>,
-{
-    fn zero() -> Self {
-        I::zero().into()
-    }
+// impl<I> Zero for ValueInput<I>
+// where
+//     I: Zero + Into<Self>,
+// {
+//     fn zero() -> Self {
+//         I::zero().into()
+//     }
 
-    fn is_zero(&self) -> bool {
-        self.as_ref().is_zero()
-    }
-}
+//     fn is_zero(&self) -> bool {
+//         self.as_ref().is_zero()
+//     }
+// }
 
-impl<I> WrappingAdd for WrappingInput<I>
+impl<I> WrappingAdd for ValueInput<I>
 where
     I: WrappingAdd,
     I::Output: Into<Self>,
@@ -234,7 +201,7 @@ where
     }
 }
 
-impl<I> Add for WrappingInput<I>
+impl<I> Add for ValueInput<I>
 where
     I: Add,
     I::Output: Into<Self>,
@@ -245,7 +212,7 @@ where
         self.inner().add(rhs.inner()).into()
     }
 }
-impl<I> WrappingSub for WrappingInput<I>
+impl<I> WrappingSub for ValueInput<I>
 where
     I: WrappingSub,
     I::Output: Into<Self>,
@@ -255,7 +222,7 @@ where
     }
 }
 
-impl<I> Sub for WrappingInput<I>
+impl<I> Sub for ValueInput<I>
 where
     I: Sub,
     I::Output: Into<Self>,
@@ -267,7 +234,7 @@ where
     }
 }
 
-impl<I> Not for WrappingInput<I>
+impl<I> Not for ValueInput<I>
 where
     I: Not,
     I::Output: Into<Self>,
@@ -279,20 +246,20 @@ where
     }
 }
 
-impl<I> Copy for WrappingInput<I> where I: Copy {}
+impl<I> Copy for ValueInput<I> where I: Copy {}
 
 #[cfg(test)]
 mod tests {
     use core::ops::{Add as _, Mul as _, Not as _, Sub as _};
 
-    use num_traits::{One, WrappingAdd as _, WrappingSub as _, Zero};
+    use num_traits::{One, WrappingAdd as _, WrappingSub as _};
 
-    use crate::inputs::{wrapping::NumericConsts as _, WrappingInput};
+    use crate::inputs::ValueInput;
 
     #[test]
     fn shl() {
         let unwrapped = 0x10_u64;
-        let wrapped: WrappingInput<_> = unwrapped.into();
+        let wrapped: ValueInput<_> = unwrapped.into();
         let offset = 1_u32;
         assert_eq!(unwrapped << offset, *(wrapped << offset).as_ref());
     }
@@ -300,80 +267,73 @@ mod tests {
     #[test]
     fn bit_xor_assign() {
         let mut unwrapped = 0x10_u64;
-        let mut wrapped: WrappingInput<_> = unwrapped.into();
+        let mut wrapped: ValueInput<_> = unwrapped.into();
         unwrapped ^= u64::one();
-        wrapped ^= WrappingInput::one();
+        wrapped ^= ValueInput::one();
         assert_eq!(unwrapped, *wrapped.as_ref());
     }
 
     #[test]
     fn bit_or_assign() {
         let mut unwrapped = 0x10_u64;
-        let mut wrapped: WrappingInput<_> = unwrapped.into();
+        let mut wrapped: ValueInput<_> = unwrapped.into();
         unwrapped |= u64::one();
-        wrapped |= WrappingInput::one();
+        wrapped |= ValueInput::one();
         assert_eq!(unwrapped, *wrapped.as_ref());
     }
 
     #[test]
     fn one() {
         let unwrapped = u64::one();
-        let wrapped: WrappingInput<u64> = WrappingInput::one();
-        assert_eq!(unwrapped, *wrapped.as_ref());
-    }
-
-    #[test]
-    fn zero() {
-        let unwrapped = u64::zero();
-        let wrapped: WrappingInput<u64> = WrappingInput::zero();
+        let wrapped: ValueInput<u64> = ValueInput::one();
         assert_eq!(unwrapped, *wrapped.as_ref());
     }
 
     #[test]
     fn mul() {
-        let lhs: WrappingInput<u64> = 7.into();
-        let rhs: WrappingInput<u64> = 3.into();
+        let lhs: ValueInput<u64> = 7.into();
+        let rhs: ValueInput<u64> = 3.into();
         assert_eq!(21, *lhs.mul(rhs).as_ref());
     }
 
     #[test]
     fn add() {
-        let lhs: WrappingInput<u64> = 7.into();
-        let rhs: WrappingInput<u64> = 3.into();
+        let lhs: ValueInput<u64> = 7.into();
+        let rhs: ValueInput<u64> = 3.into();
         assert_eq!(10, *lhs.add(rhs).as_ref());
     }
 
     #[test]
     fn wrapping_add() {
-        let lhs: WrappingInput<u64> = 7.into();
-        let rhs: WrappingInput<u64> = 3.into();
+        let lhs: ValueInput<u64> = 7.into();
+        let rhs: ValueInput<u64> = 3.into();
         assert_eq!(10, *lhs.wrapping_add(&rhs).as_ref());
-        let lhs: WrappingInput<u64> = WrappingInput::MAX;
-        let rhs: WrappingInput<u64> = 1.into();
+        let lhs: ValueInput<u64> = u64::MAX.into();
+        let rhs: ValueInput<u64> = 1.into();
         assert_eq!(0, *lhs.wrapping_add(&rhs).as_ref());
     }
 
     #[test]
     fn sub() {
-        let lhs: WrappingInput<u64> = 7.into();
-        let rhs: WrappingInput<u64> = 3.into();
+        let lhs: ValueInput<u64> = 7.into();
+        let rhs: ValueInput<u64> = 3.into();
         assert_eq!(4, *lhs.sub(rhs).as_ref());
     }
 
     #[test]
     fn wrapping_sub() {
-        let lhs: WrappingInput<u64> = 7.into();
-        let rhs: WrappingInput<u64> = 3.into();
+        let lhs: ValueInput<u64> = 7.into();
+        let rhs: ValueInput<u64> = 3.into();
         assert_eq!(4, *lhs.wrapping_sub(&rhs).as_ref());
-        let lhs: WrappingInput<u64> = WrappingInput::MIN;
-        let rhs: WrappingInput<u64> = 1.into();
+        let lhs: ValueInput<u64> = u64::MIN.into();
+        let rhs: ValueInput<u64> = 1.into();
         assert_eq!(u64::MAX, *lhs.wrapping_sub(&rhs).as_ref());
     }
 
     #[test]
     fn not() {
         let unwrapped = 7;
-        let wrapped: WrappingInput<u64> = unwrapped.into();
+        let wrapped: ValueInput<u64> = unwrapped.into();
         assert_eq!(unwrapped.not(), *wrapped.not().as_ref());
     }
 }

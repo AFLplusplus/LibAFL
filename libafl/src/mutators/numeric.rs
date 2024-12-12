@@ -10,7 +10,7 @@ use tuple_list::{tuple_list, tuple_list_type};
 use super::{MutationResult, Mutator};
 use crate::{
     corpus::Corpus,
-    inputs::wrapping::NumericConsts,
+    inputs::ValueInput,
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasRand},
 };
@@ -49,10 +49,10 @@ pub struct BitFlipMutator;
 impl<I, S> Mutator<I, S> for BitFlipMutator
 where
     S: HasRand,
-    I: Shl<u32, Output = I> + BitXorAssign + NumericConsts + One,
+    I: Shl<usize, Output = I> + BitXorAssign + One,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        *input ^= I::one() << state.rand_mut().choose(0..I::BITS).unwrap();
+        *input ^= I::one() << state.rand_mut().choose(0..size_of::<I>()).unwrap();
         Ok(MutationResult::Mutated)
     }
 }
@@ -69,11 +69,10 @@ pub struct FlipMutator;
 
 impl<I, S> Mutator<I, S> for FlipMutator
 where
-    I: Shl<u32, Output = I> + NumericConsts + BitXorAssign + From<u8>,
+    I: Not<Output = I> + Copy,
 {
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        *input ^= I::MAX as I;
-
+        *input = !*input;
         Ok(MutationResult::Mutated)
     }
 }
@@ -148,16 +147,24 @@ impl Named for NegMutator {
 #[derive(Debug)]
 pub struct RandMutator;
 
-impl<I, S> Mutator<I, S> for RandMutator
+impl<I, S> Mutator<ValueInput<I>, S> for RandMutator
 where
     S: HasRand,
-    I: Shl<u32, Output = I> + NumericConsts + BitOrAssign + From<u8> + Zero,
+    ValueInput<I>: Shl<usize, Output = ValueInput<I>> + BitOrAssign,
+    I: From<u8> + Zero,
 {
-    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        // set to byte-wise since the RNGs don't work for all numeric types
-        *input = I::zero();
-        for offset in 0..I::BITS {
-            let mask: I = (state.rand_mut().next() as u8).into();
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut ValueInput<I>,
+    ) -> Result<MutationResult, Error> {
+        // set to random data byte-wise since the RNGs don't work for all numeric types
+        *input = I::zero().into();
+
+        for offset in 0..(size_of::<I>() % size_of::<u8>()) {
+            let raw = state.rand_mut().next() as u8;
+            let inner: I = raw.into();
+            let mask: ValueInput<I> = inner.into();
             *input |= mask << offset;
         }
         Ok(MutationResult::Mutated)
@@ -206,7 +213,7 @@ mod tests {
     use super::int_mutators;
     use crate::{
         corpus::{Corpus as _, InMemoryCorpus, Testcase},
-        inputs::wrapping::U8Input,
+        inputs::value::I16Input,
         mutators::MutationResult,
         state::StdState,
     };
@@ -214,7 +221,7 @@ mod tests {
     #[test]
     fn all_mutate() {
         let mut corpus = InMemoryCorpus::new();
-        corpus.add(Testcase::new(1_u8.into())).unwrap();
+        corpus.add(Testcase::new(1_i16.into())).unwrap();
         let mut state = StdState::new(
             StdRand::new(),
             corpus,
@@ -224,7 +231,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut input: U8Input = 0u8.into();
+        let mut input: I16Input = 0_i16.into();
 
         let mutators = int_mutators().into_vec();
 
