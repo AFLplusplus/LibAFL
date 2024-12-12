@@ -93,7 +93,7 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
     <S::Corpus as Corpus>::Input: Input,
 {
@@ -134,7 +134,7 @@ where
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
-    Z: Evaluator<E, EM, State = S>,
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Input,
 {
     /// Creates a new [`PowerMutationalStage`]

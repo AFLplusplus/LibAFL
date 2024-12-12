@@ -68,7 +68,6 @@ where
     E: Executor<EM, Z> + HasObservers,
     SOT: ObserversTuple<Self::Input, Self::State>,
     EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
 {
     fn run_target(
         &mut self,

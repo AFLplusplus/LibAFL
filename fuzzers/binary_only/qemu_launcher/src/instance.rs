@@ -312,9 +312,8 @@ impl<M: Monitor> Instance<'_, M> {
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        Z: Fuzzer<E, ClientMgr<M>, ST>
-            + UsesState<State = ClientState>
-            + Evaluator<E, ClientMgr<M>, State = ClientState>,
+        Z: Fuzzer<E, ClientMgr<M>, ClientState, ST>
+            + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
         E: UsesState<State = ClientState>,
         ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
     {

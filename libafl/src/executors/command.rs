@@ -396,7 +396,6 @@ where
     S: State + HasExecutions + UsesInput,
     T: CommandConfigurator<S::Input> + Debug,
     OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -433,7 +432,6 @@ where
     S: State + HasExecutions + UsesInput,
     T: CommandConfigurator<S::Input, Pid> + Debug,
     OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    Z: UsesState<State = S>,
     HT: ExecutorHooksTuple<S>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
@@ -793,7 +791,6 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
 /// where
 ///     EM: UsesState,
-///     Z: UsesState<State = EM::State>,
 ///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
 /// {
 ///     MyExecutor.into_executor(())
