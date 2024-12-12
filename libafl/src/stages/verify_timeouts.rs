@@ -15,7 +15,7 @@ use crate::{
     inputs::{BytesInput, UsesInput},
     observers::ObserversTuple,
     stages::Stage,
-    state::{HasCorpus, State, UsesState},
+    state::{HasCorpus, UsesState},
     Evaluator, HasMetadata,
 };
 
@@ -41,13 +41,6 @@ impl<E, S> VerifyTimeoutsStage<E, S> {
             phantom: PhantomData,
         }
     }
-}
-
-impl<E, S> UsesState for VerifyTimeoutsStage<E, S>
-where
-    S: State,
-{
-    type State = S;
 }
 
 /// Timeouts that `VerifyTimeoutsStage` will read from
@@ -88,21 +81,20 @@ impl<I> TimeoutsToVerify<I> {
     }
 }
 
-impl<E, EM, Z, S> Stage<E, EM, Z> for VerifyTimeoutsStage<E, S>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, S>
 where
-    E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S> + Evaluator<E, EM>,
-    S: HasCorpus + State + HasMetadata,
-    Self::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
-    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
+    Z: Evaluator<E, EM, State = S>,
+    S: HasCorpus + HasMetadata + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let mut timeouts = state
@@ -118,15 +110,17 @@ where
         }
         executor.set_timeout(self.original_timeout);
         *self.capture_timeouts.borrow_mut() = true;
-        let res = state.metadata_mut::<TimeoutsToVerify<E::Input>>().unwrap();
-        *res = TimeoutsToVerify::<E::Input>::new();
+        let res = state
+            .metadata_mut::<TimeoutsToVerify<<S::Corpus as Corpus>::Input>>()
+            .unwrap();
+        *res = TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new();
         Ok(())
     }
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }
 
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 }
