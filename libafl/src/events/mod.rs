@@ -325,6 +325,9 @@ where
     },
     /// A new objective was found
     Objective {
+        /// Input of newly found Objective
+        #[cfg(feature = "share_objectives")]
+        input: I,
         /// Objective corpus size
         objective_size: usize,
         /// The time when this event was created
