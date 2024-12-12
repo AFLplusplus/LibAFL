@@ -256,7 +256,6 @@ where
     }
 }
 
-#[cfg(not(feature = "share_objectives"))]
 impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
     S: UsesInput + HasExecutions + HasMetadata + Stoppable,
@@ -289,6 +288,7 @@ where
     }
 
     // Handle arriving events in the client
+    #[cfg(not(feature = "share_objectives"))]
     fn handle_in_client<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -344,6 +344,7 @@ where
     }
 
     /// Handle arriving events in the client
+    #[cfg(not(feature = "share_objectives"))]
     #[allow(clippy::unused_self)]
     pub fn process<E, EM, Z>(
         &mut self,
@@ -400,29 +401,6 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    // TODO other new_* routines
-
-    /// Check if it can convert the input
-    pub fn can_convert(&self) -> bool {
-        self.converter.is_some()
-    }
-
-    /// Check if it can convert the input back
-    pub fn can_convert_back(&self) -> bool {
-        self.converter_back.is_some()
-    }
-
-    /// Describe the client event mgr's llmp parts in a restorable fashion
-    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
-        self.llmp.describe()
-    }
-
-    /// Write the config for a client `EventManager` to env vars, a new client can reattach using [`LlmpEventConverterBuilder::build_existing_client_from_env()`].
-    #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) {
-        self.llmp.to_env(env_name).unwrap();
-    }
-
     // Handle arriving events in the client
     fn handle_in_client<E, EM, Z>(
         &mut self,
