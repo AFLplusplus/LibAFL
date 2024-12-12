@@ -13,7 +13,7 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},
-    Error, Fuzzer, StdFuzzer,
+    Error, EvaluatesInput, Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
     rands::{RomuDuoJrRand, StdRand},
