@@ -3,12 +3,7 @@ use std::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{current_time, Error};
 
-use crate::{
-    inputs::UsesInput,
-    stages::Stage,
-    state::{State, UsesState},
-    HasMetadata,
-};
+use crate::{stages::Stage, HasMetadata};
 /// Track an inner Stage's execution time
 #[derive(Debug)]
 pub struct TimeTrackingStageWrapper<T, S, ST> {
@@ -28,27 +23,17 @@ impl<T, S, ST> TimeTrackingStageWrapper<T, S, ST> {
     }
 }
 
-impl<T, S, ST> UsesState for TimeTrackingStageWrapper<T, S, ST>
+impl<T, E, M, Z, S, ST> Stage<E, M, S, Z> for TimeTrackingStageWrapper<T, S, ST>
 where
-    S: State + HasMetadata,
-{
-    type State = S;
-}
-
-impl<T, E, M, Z, S, ST> Stage<E, M, Z> for TimeTrackingStageWrapper<T, S, ST>
-where
-    S: UsesInput + State + HasMetadata,
-    ST: Stage<E, M, Z, State = S>,
-    M: UsesState<State = S>,
-    Z: UsesState<State = S>,
-    E: UsesState<State = S>,
+    S: HasMetadata,
+    ST: Stage<E, M, S, Z>,
     T: libafl_bolts::serdeany::SerdeAny + From<Duration>,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut M,
     ) -> Result<(), Error> {
         let before_run = current_time();
@@ -59,11 +44,11 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.inner.should_restart(state)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.clear_progress(state)
     }
 
@@ -71,7 +56,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut M,
     ) -> Result<(), Error> {
         self.inner
