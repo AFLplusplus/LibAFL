@@ -347,7 +347,7 @@ impl<F> MappedCrossoverMutator<F> {
     }
 }
 
-impl<'a, I, S, F> Mutator<ValueMutRefInput<'a, I>, S> for MappedCrossoverMutator<F>
+impl<I, S, F> Mutator<ValueMutRefInput<'_, I>, S> for MappedCrossoverMutator<F>
 where
     S: HasRand + HasCorpus,
     for<'b> F: Fn(&'b <S::Corpus as Corpus>::Input) -> &'b I,

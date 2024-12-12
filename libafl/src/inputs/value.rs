@@ -156,7 +156,7 @@ where
 #[derive(Debug)]
 pub struct ValueMutRefInput<'a, I>(&'a mut I);
 
-impl<'a, I> Deref for ValueMutRefInput<'a, I> {
+impl<I> Deref for ValueMutRefInput<'_, I> {
     type Target = I;
 
     fn deref(&self) -> &Self::Target {
@@ -164,7 +164,7 @@ impl<'a, I> Deref for ValueMutRefInput<'a, I> {
     }
 }
 
-impl<'a, I> DerefMut for ValueMutRefInput<'a, I> {
+impl<I> DerefMut for ValueMutRefInput<'_, I> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.0
     }
@@ -182,14 +182,14 @@ impl<'a, I> From<&'a mut ValueInput<I>> for ValueMutRefInput<'a, I> {
     }
 }
 
-impl<'b, I> MappedInput for ValueMutRefInput<'b, I> {
+impl<I> MappedInput for ValueMutRefInput<'_, I> {
     type Type<'a>
         = ValueMutRefInput<'a, I>
     where
         Self: 'a;
 }
 
-impl<'a, I> Numeric for ValueMutRefInput<'a, I>
+impl<I> Numeric for ValueMutRefInput<'_, I>
 where
     I: Numeric,
 {
