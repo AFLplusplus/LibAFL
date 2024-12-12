@@ -1749,7 +1749,7 @@ mod tests {
             }
             let mut gaps = 0;
             let mut range = 0..10;
-            let mut iter = mutated.bytes.iter().copied();
+            let mut iter = mutated.as_ref().iter().copied();
             while let Some(expected) = range.next() {
                 if let Some(last) = iter.next() {
                     if expected != last {
@@ -1768,9 +1768,11 @@ mod tests {
                 }
             }
             assert_eq!(
-                gaps, 1,
+                gaps,
+                1,
                 "{:?} should have exactly one gap, found {}",
-                mutated.bytes, gaps
+                mutated.as_ref(),
+                gaps
             );
         }
 
@@ -1802,20 +1804,20 @@ mod tests {
                 continue;
             }
             let mut expansion = 0;
-            let mut expansion_len = base.bytes.len();
-            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+            let mut expansion_len = base.as_ref().len();
+            for (i, value) in mutated.as_ref().iter().copied().enumerate() {
                 if i as u8 != value {
                     expansion = value as usize;
                     expansion_len = i - expansion;
                     break;
                 }
             }
-            assert_eq!(mutated.bytes.len(), base.bytes.len() + expansion_len);
+            assert_eq!(mutated.as_ref().len(), base.as_ref().len() + expansion_len);
             for (expected, value) in (0..(expansion + expansion_len))
-                .chain(expansion..base.bytes.len())
-                .zip(mutated.bytes)
+                .chain(expansion..base.as_ref().len())
+                .zip(mutated.as_ref())
             {
-                assert_eq!(expected as u8, value);
+                assert_eq!(expected as u8, *value);
             }
             for i in (expansion..).take(expansion_len) {
                 counts[i] += 1;
@@ -1851,19 +1853,19 @@ mod tests {
                 continue;
             }
             let mut inserted = 0;
-            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+            for (i, value) in mutated.as_ref().iter().copied().enumerate() {
                 if i as u8 != value {
                     inserted = value;
                     break;
                 }
             }
-            assert!(mutated.bytes.len() <= base.bytes.len() + 16);
+            assert!(mutated.as_ref().len() <= base.as_ref().len() + 16);
             assert_eq!(
-                bytecount::count(&mutated.bytes, inserted),
-                mutated.bytes.len() - base.bytes.len() + 1
+                bytecount::count(mutated.as_ref(), inserted),
+                mutated.as_ref().len() - base.as_ref().len() + 1
             );
             counts[inserted as usize] += 1;
-            insertions[mutated.bytes.len() - base.bytes.len() - 1] += 1;
+            insertions[mutated.as_ref().len() - base.as_ref().len() - 1] += 1;
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();
@@ -1901,22 +1903,22 @@ mod tests {
                 continue;
             }
             let mut inserted = 10;
-            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+            for (i, value) in mutated.as_ref().iter().copied().enumerate() {
                 if i as u8 != value {
                     inserted = value;
                     break;
                 }
             }
-            assert!(mutated.bytes.len() <= base.bytes.len() + 16);
-            let offset = usize::from((inserted as usize) < base.bytes.len());
+            assert!(mutated.as_ref().len() <= base.as_ref().len() + 16);
+            let offset = usize::from((inserted as usize) < base.as_ref().len());
             assert_eq!(
-                bytecount::count(&mutated.bytes, inserted),
-                mutated.bytes.len() - base.bytes.len() + offset,
+                bytecount::count(mutated.as_ref(), inserted),
+                mutated.as_ref().len() - base.as_ref().len() + offset,
                 "{:?}",
-                mutated.bytes
+                mutated.as_ref()
             );
             counts[inserted as usize] += 1;
-            insertions[mutated.bytes.len() - base.bytes.len() - 1] += 1;
+            insertions[mutated.as_ref().len() - base.as_ref().len() - 1] += 1;
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();
