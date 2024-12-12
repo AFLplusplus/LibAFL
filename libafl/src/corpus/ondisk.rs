@@ -22,7 +22,6 @@ use crate::{
 };
 
 /// Options for the the format of the on-disk metadata
-#[cfg(feature = "std")]
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub enum OnDiskMetadataFormat {
     /// A binary-encoded postcard
