@@ -98,7 +98,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, OF, S, Z>(
     ET: EmulatorModuleTuple<S>,
     OF: Feedback<EM, E::Input, E::Observers, E::State>,
     S: State + Unpin,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
     <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
@@ -166,9 +166,10 @@ where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<EM, S::Input, OT, S>,
         S: Unpin + State + HasExecutions + HasCorpus + HasSolutions,
-        Z: HasObjective<Objective = OF, State = S>
-            + HasScheduler<State = S>
-            + ExecutionProcessor<EM, OT>,
+        S::Corpus: Corpus<Input = S::Input>,
+        Z: HasObjective<Objective = OF>
+            + HasScheduler<<S::Corpus as Corpus>::Input, S>
+            + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
         S::Solutions: Corpus<Input = S::Input>, //delete me
         <S::Corpus as Corpus>::Input: Clone,    //delete me
     {
@@ -351,7 +352,7 @@ where
     OT: ObserversTuple<S::Input, S>,
     S: State + HasSolutions,
     SP: ShMemProvider,
-    Z: HasObjective<State = S>,
+    Z: HasObjective,
     Z::Objective: Feedback<EM, S::Input, OT, S>,
 {
     #[allow(clippy::too_many_arguments)]
@@ -413,7 +414,7 @@ where
     OT: ObserversTuple<S::Input, S> + Debug,
     S: State + HasExecutions + Unpin,
     SP: ShMemProvider,
-    Z: HasObjective<Objective = OF, State = S>,
+    Z: HasObjective<Objective = OF>,
 {
     fn run_target(
         &mut self,

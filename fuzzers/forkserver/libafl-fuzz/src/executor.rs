@@ -357,7 +357,6 @@ pub enum SupportedExecutors<S, OT, FSV> {
 impl<S, OT, FSV, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV>
 where
     S: State,
-    Z: UsesState<State = S>,
     EM: UsesState<State = S>,
     FSV: Executor<EM, Z, State = S>,
 {

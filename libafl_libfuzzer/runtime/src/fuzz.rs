@@ -62,7 +62,7 @@ fn do_fuzz<F, ST, E, S, EM>(
     mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, ST, State = S>,
+    F: Fuzzer<E, EM, S, ST>,
     S: HasMetadata
         + HasExecutions
         + UsesInput
