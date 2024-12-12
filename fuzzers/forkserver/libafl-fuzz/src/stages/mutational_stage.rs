@@ -7,18 +7,19 @@ use libafl::{
 use libafl_bolts::Named;
 
 #[derive(Debug)]
-pub enum SupportedMutationalStages<E, EM, I, M, S, SM, P, Z> {
-    StdMutational(SM, PhantomData<(E, EM, I, M, S, Z)>),
-    PowerMutational(P, PhantomData<(E, EM, I, M, S, Z)>),
+pub enum SupportedMutationalStages<SM, P> {
+    StdMutational(SM, PhantomData<P>),
+    PowerMutational(P, PhantomData<SM>),
 }
 
-impl<E, EM, I, M, S, SM, P, Z> MutationalStage<M, S>
-    for SupportedMutationalStages<E, EM, I, M, S, SM, P, Z>
+impl<S, SM, P> MutationalStage<S> for SupportedMutationalStages<SM, P>
 where
-    SM: MutationalStage<M, S>,
-    P: MutationalStage<M, S>,
+    SM: MutationalStage<S>,
+    P: MutationalStage<S, Mutator = SM::Mutator>,
 {
-    fn mutator(&self) -> &M {
+    type Mutator = SM::Mutator;
+    /// The mutator, added to this stage
+    fn mutator(&self) -> &Self::Mutator {
         match self {
             Self::StdMutational(m, _) => m.mutator(),
             Self::PowerMutational(p, _) => p.mutator(),
@@ -27,7 +28,7 @@ where
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::Mutator {
         match self {
             Self::StdMutational(m, _) => m.mutator_mut(),
             Self::PowerMutational(p, _) => p.mutator_mut(),
@@ -43,7 +44,7 @@ where
     }
 }
 
-impl<E, EM, I, M, S, SM, P, Z> Named for SupportedMutationalStages<E, EM, I, M, S, SM, P, Z>
+impl<SM, P> Named for SupportedMutationalStages<SM, P>
 where
     SM: Named,
     P: Named,
@@ -56,8 +57,7 @@ where
     }
 }
 
-impl<E, EM, I, M, S, SM, P, Z> Stage<E, EM, S, Z>
-    for SupportedMutationalStages<E, EM, I, M, S, SM, P, Z>
+impl<E, EM, S, SM, P, Z> Stage<E, EM, S, Z> for SupportedMutationalStages<SM, P>
 where
     SM: Stage<E, EM, S, Z>,
     P: Stage<E, EM, S, Z>,

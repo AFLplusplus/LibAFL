@@ -49,20 +49,21 @@ impl<E, F, EM, I, M, S, Z> Named for PowerMutationalStage<E, F, EM, I, M, S, Z> 
     }
 }
 
-impl<E, F, EM, I, M, S, Z> MutationalStage<M, S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
+impl<E, F, EM, I, M, S, Z> MutationalStage<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
     S: HasCurrentTestcase,
     F: TestcaseScore<S>,
 {
+    type Mutator = M;
     /// The mutator, added to this stage
     #[inline]
-    fn mutator(&self) -> &M {
+    fn mutator(&self) -> &Self::Mutator {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::Mutator {
         &mut self.mutator
     }
 

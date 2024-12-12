@@ -81,12 +81,15 @@ where
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<M, S> {
+pub trait MutationalStage<S> {
+    /// The mutator of this stage
+    type Mutator;
+
     /// The mutator registered for this stage
-    fn mutator(&self) -> &M;
+    fn mutator(&self) -> &Self::Mutator;
 
     /// The mutator registered for this stage (mutable)
-    fn mutator_mut(&mut self) -> &mut M;
+    fn mutator_mut(&mut self) -> &mut Self::Mutator;
 
     /// Gets the number of iterations this mutator should run for.
     fn iterations(&self, state: &mut S) -> Result<usize, Error>;
@@ -109,19 +112,21 @@ pub struct StdMutationalStage<E, EM, I, M, S, Z> {
     phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<E, EM, I, M, S, Z> MutationalStage<M, S> for StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I, M, S, Z> MutationalStage<S> for StdMutationalStage<E, EM, I, M, S, Z>
 where
     S: HasRand,
 {
+    type Mutator = M;
+
     /// The mutator, added to this stage
     #[inline]
-    fn mutator(&self) -> &M {
+    fn mutator(&self) -> &Self::Mutator {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::Mutator {
         &mut self.mutator
     }
 

@@ -266,7 +266,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         SupportedMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
     } else {
         SupportedMutationalStages::PowerMutational(
-            StdPowerMutationalStage::new(mutation),
+            StdPowerMutationalStage::<_, _, BytesInput, _, _, _>::new(mutation),
             PhantomData,
         )
     };
@@ -487,7 +487,9 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Create a randomic Input2State stage
-        let rq = MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
+        let rq = MultiMutationalStage::<_, _, BytesInput, _, _, _>::new(
+            AFLppRedQueen::with_cmplog_options(true, true),
+        );
 
         // Create an IfStage and wrap the CmpLog stages in it.
         // We run cmplog on the second fuzz run of the testcase.

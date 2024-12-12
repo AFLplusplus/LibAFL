@@ -274,7 +274,7 @@ impl<M: Monitor> Instance<'_, M> {
                 5,
             )?;
 
-            let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+            let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
                 StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!

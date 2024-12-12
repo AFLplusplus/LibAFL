@@ -161,7 +161,7 @@ pub struct TuneableMutationalStage<E, EM, I, M, S, Z> {
     phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<E, EM, I, M, S, Z> MutationalStage<M, S> for TuneableMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I, M, S, Z> MutationalStage<S> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM>,
@@ -169,15 +169,16 @@ where
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
 {
+    type Mutator = M;
     /// The mutator, added to this stage
     #[inline]
-    fn mutator(&self) -> &M {
+    fn mutator(&self) -> &Self::Mutator {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::Mutator {
         &mut self.mutator
     }
 
