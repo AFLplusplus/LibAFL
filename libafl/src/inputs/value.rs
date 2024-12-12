@@ -3,11 +3,11 @@
 use alloc::{string::String, vec::Vec};
 use core::{
     fmt::Debug,
-    ops::{Add, BitOrAssign, BitXorAssign, Mul, Not, Shl, Sub},
+    ops::{Deref, DerefMut},
 };
 
 use ahash::RandomState;
-use num_traits::{One, WrappingAdd, WrappingSub};
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
@@ -16,7 +16,7 @@ use {
 };
 
 use super::{Input, MappedInput};
-use crate::corpus::CorpusId;
+use crate::{corpus::CorpusId, mutators::numeric::Numeric};
 
 /// Newtype pattern wrapper around an underlying structure to implement inputs
 ///
@@ -54,12 +54,7 @@ impl<I> AsMut<I> for ValueInput<I> {
     }
 }
 
-impl<I> MappedInput for ValueInput<&mut I> {
-    type Type<'a>
-        = ValueInput<&'a mut I>
-    where
-        Self: 'a;
-}
+impl<I: Copy> Copy for ValueInput<I> {}
 
 // Macro to implement the `Input` trait and create type aliases for `WrappingInput<T>`
 macro_rules! impl_input_for_value_input {
@@ -128,212 +123,155 @@ impl Input for ValueInput<Vec<u8>> {
     }
 }
 
-impl<I, R> Shl<R> for ValueInput<I>
+impl<I> Numeric for ValueInput<I>
 where
-    I: Shl<R>,
-    I::Output: Into<Self>,
+    I: Numeric,
 {
-    type Output = Self;
+    fn flip_all_bits(&mut self) {
+        self.as_mut().flip_all_bits();
+    }
 
-    fn shl(self, rhs: R) -> Self::Output {
-        self.inner().shl(rhs).into()
+    fn flip_bit_at(&mut self, rhs: usize) {
+        self.as_mut().flip_bit_at(rhs);
+    }
+
+    fn wrapping_inc(&mut self) {
+        self.as_mut().wrapping_inc();
+    }
+
+    fn wrapping_dec(&mut self) {
+        self.as_mut().wrapping_dec();
+    }
+
+    fn twos_complement(&mut self) {
+        self.as_mut().twos_complement();
+    }
+
+    fn randomize<R: Rand>(&mut self, rand: &mut R) {
+        self.as_mut().randomize(rand);
     }
 }
 
-impl<I> BitXorAssign for ValueInput<I>
-where
-    I: BitXorAssign,
-{
-    fn bitxor_assign(&mut self, rhs: Self) {
-        self.as_mut().bitxor_assign(rhs.inner());
-    }
-}
-impl<I> BitOrAssign for ValueInput<I>
-where
-    I: BitOrAssign,
-{
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.as_mut().bitor_assign(rhs.inner());
+/// Input type that holds a mutable reference to an inner value
+#[derive(Debug)]
+pub struct ValueMutRefInput<'a, I>(&'a mut I);
+
+impl<'a, I> Deref for ValueMutRefInput<'a, I> {
+    type Target = I;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
     }
 }
 
-impl<I> One for ValueInput<I>
-where
-    I: One + Mul,
-{
-    fn one() -> Self {
-        I::one().into()
+impl<'a, I> DerefMut for ValueMutRefInput<'a, I> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0
     }
 }
 
-impl<I> Mul for ValueInput<I>
-where
-    I: Mul,
-    I::Output: Into<Self>,
-{
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        self.inner().mul(rhs.inner()).into()
+impl<'a, I> From<&'a mut I> for ValueMutRefInput<'a, I> {
+    fn from(value: &'a mut I) -> Self {
+        Self(value)
     }
 }
 
-// impl<I> Zero for ValueInput<I>
-// where
-//     I: Zero + Into<Self>,
-// {
-//     fn zero() -> Self {
-//         I::zero().into()
-//     }
-
-//     fn is_zero(&self) -> bool {
-//         self.as_ref().is_zero()
-//     }
-// }
-
-impl<I> WrappingAdd for ValueInput<I>
-where
-    I: WrappingAdd,
-    I::Output: Into<Self>,
-{
-    fn wrapping_add(&self, v: &Self) -> Self {
-        self.as_ref().wrapping_add(v.as_ref()).into()
+impl<'a, I> From<&'a mut ValueInput<I>> for ValueMutRefInput<'a, I> {
+    fn from(value: &'a mut ValueInput<I>) -> Self {
+        Self(value.as_mut())
     }
 }
 
-impl<I> Add for ValueInput<I>
-where
-    I: Add,
-    I::Output: Into<Self>,
-{
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        self.inner().add(rhs.inner()).into()
-    }
-}
-impl<I> WrappingSub for ValueInput<I>
-where
-    I: WrappingSub,
-    I::Output: Into<Self>,
-{
-    fn wrapping_sub(&self, v: &Self) -> Self {
-        self.as_ref().wrapping_sub(v.as_ref()).into()
-    }
+impl<'b, I> MappedInput for ValueMutRefInput<'b, I> {
+    type Type<'a>
+        = ValueMutRefInput<'a, I>
+    where
+        Self: 'a;
 }
 
-impl<I> Sub for ValueInput<I>
+impl<'a, I> Numeric for ValueMutRefInput<'a, I>
 where
-    I: Sub,
-    I::Output: Into<Self>,
+    I: Numeric,
 {
-    type Output = Self;
+    fn flip_all_bits(&mut self) {
+        self.deref_mut().flip_all_bits();
+    }
 
-    fn sub(self, rhs: Self) -> Self::Output {
-        self.inner().sub(rhs.inner()).into()
+    fn flip_bit_at(&mut self, rhs: usize) {
+        self.deref_mut().flip_bit_at(rhs);
+    }
+
+    fn wrapping_inc(&mut self) {
+        self.deref_mut().wrapping_inc();
+    }
+
+    fn wrapping_dec(&mut self) {
+        self.deref_mut().wrapping_dec();
+    }
+
+    fn twos_complement(&mut self) {
+        self.deref_mut().twos_complement();
+    }
+
+    fn randomize<R: Rand>(&mut self, rand: &mut R) {
+        self.deref_mut().randomize(rand);
     }
 }
-
-impl<I> Not for ValueInput<I>
-where
-    I: Not,
-    I::Output: Into<Self>,
-{
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        self.inner().not().into()
-    }
-}
-
-impl<I> Copy for ValueInput<I> where I: Copy {}
 
 #[cfg(test)]
 mod tests {
-    use core::ops::{Add as _, Mul as _, Not as _, Sub as _};
+    use super::{ValueInput, ValueMutRefInput};
+    use crate::mutators::numeric::Numeric;
 
-    use num_traits::{One, WrappingAdd as _, WrappingSub as _};
+    fn take_numeric<I: Numeric + Clone>(i: I) {
+        i.clone().flip_all_bits();
+        i.clone().flip_bit_at(0);
+        i.clone().flip_bit_at(size_of::<I>() * 8 - 1);
+        i.clone().twos_complement();
+        i.clone().wrapping_dec();
+        i.clone().wrapping_inc();
 
-    use crate::inputs::ValueInput;
+        ValueInput::from(i.clone()).flip_all_bits();
+        ValueInput::from(i.clone()).flip_bit_at(0);
+        ValueInput::from(i.clone()).flip_bit_at(size_of::<I>() * 8 - 1);
+        ValueInput::from(i.clone()).twos_complement();
+        ValueInput::from(i.clone()).wrapping_dec();
+        ValueInput::from(i.clone()).wrapping_inc();
 
-    #[test]
-    fn shl() {
-        let unwrapped = 0x10_u64;
-        let wrapped: ValueInput<_> = unwrapped.into();
-        let offset = 1_u32;
-        assert_eq!(unwrapped << offset, *(wrapped << offset).as_ref());
+        ValueMutRefInput::from(&mut i.clone()).flip_all_bits();
+        ValueMutRefInput::from(&mut i.clone()).flip_bit_at(0);
+        ValueMutRefInput::from(&mut i.clone()).flip_bit_at(size_of::<I>() * 8 - 1);
+        ValueMutRefInput::from(&mut i.clone()).twos_complement();
+        ValueMutRefInput::from(&mut i.clone()).wrapping_dec();
+        ValueMutRefInput::from(&mut i.clone()).wrapping_inc();
+        drop(i);
     }
 
     #[test]
-    fn bit_xor_assign() {
-        let mut unwrapped = 0x10_u64;
-        let mut wrapped: ValueInput<_> = unwrapped.into();
-        unwrapped ^= u64::one();
-        wrapped ^= ValueInput::one();
-        assert_eq!(unwrapped, *wrapped.as_ref());
-    }
-
-    #[test]
-    fn bit_or_assign() {
-        let mut unwrapped = 0x10_u64;
-        let mut wrapped: ValueInput<_> = unwrapped.into();
-        unwrapped |= u64::one();
-        wrapped |= ValueInput::one();
-        assert_eq!(unwrapped, *wrapped.as_ref());
-    }
-
-    #[test]
-    fn one() {
-        let unwrapped = u64::one();
-        let wrapped: ValueInput<u64> = ValueInput::one();
-        assert_eq!(unwrapped, *wrapped.as_ref());
-    }
-
-    #[test]
-    fn mul() {
-        let lhs: ValueInput<u64> = 7.into();
-        let rhs: ValueInput<u64> = 3.into();
-        assert_eq!(21, *lhs.mul(rhs).as_ref());
-    }
-
-    #[test]
-    fn add() {
-        let lhs: ValueInput<u64> = 7.into();
-        let rhs: ValueInput<u64> = 3.into();
-        assert_eq!(10, *lhs.add(rhs).as_ref());
-    }
-
-    #[test]
-    fn wrapping_add() {
-        let lhs: ValueInput<u64> = 7.into();
-        let rhs: ValueInput<u64> = 3.into();
-        assert_eq!(10, *lhs.wrapping_add(&rhs).as_ref());
-        let lhs: ValueInput<u64> = u64::MAX.into();
-        let rhs: ValueInput<u64> = 1.into();
-        assert_eq!(0, *lhs.wrapping_add(&rhs).as_ref());
-    }
-
-    #[test]
-    fn sub() {
-        let lhs: ValueInput<u64> = 7.into();
-        let rhs: ValueInput<u64> = 3.into();
-        assert_eq!(4, *lhs.sub(rhs).as_ref());
-    }
-
-    #[test]
-    fn wrapping_sub() {
-        let lhs: ValueInput<u64> = 7.into();
-        let rhs: ValueInput<u64> = 3.into();
-        assert_eq!(4, *lhs.wrapping_sub(&rhs).as_ref());
-        let lhs: ValueInput<u64> = u64::MIN.into();
-        let rhs: ValueInput<u64> = 1.into();
-        assert_eq!(u64::MAX, *lhs.wrapping_sub(&rhs).as_ref());
-    }
-
-    #[test]
-    fn not() {
-        let unwrapped = 7;
-        let wrapped: ValueInput<u64> = unwrapped.into();
-        assert_eq!(unwrapped.not(), *wrapped.not().as_ref());
+    fn impls_at_extremes() {
+        take_numeric(u8::MIN);
+        take_numeric(u16::MIN);
+        take_numeric(u32::MIN);
+        take_numeric(u64::MIN);
+        take_numeric(u128::MIN);
+        take_numeric(usize::MIN);
+        take_numeric(i8::MIN);
+        take_numeric(i16::MIN);
+        take_numeric(i32::MIN);
+        take_numeric(i64::MIN);
+        take_numeric(i128::MIN);
+        take_numeric(isize::MIN);
+        take_numeric(u8::MAX);
+        take_numeric(u16::MAX);
+        take_numeric(u32::MAX);
+        take_numeric(u64::MAX);
+        take_numeric(u128::MAX);
+        take_numeric(usize::MAX);
+        take_numeric(i8::MAX);
+        take_numeric(i16::MAX);
+        take_numeric(i32::MAX);
+        take_numeric(i64::MAX);
+        take_numeric(i128::MAX);
+        take_numeric(isize::MAX);
     }
 }

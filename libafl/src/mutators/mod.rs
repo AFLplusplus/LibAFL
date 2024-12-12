@@ -14,7 +14,7 @@ pub use token_mutations::*;
 pub mod havoc_mutations;
 pub use havoc_mutations::*;
 pub mod numeric;
-pub use numeric::int_mutators;
+pub use numeric::{int_mutators, mapped_int_mutators};
 pub mod encoded_mutations;
 pub use encoded_mutations::*;
 pub mod mopt_mutator;

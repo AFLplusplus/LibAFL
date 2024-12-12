@@ -1,13 +1,11 @@
 use core::num::NonZeroUsize;
-use std::{
-    borrow::Cow,
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::{borrow::Cow, hash::Hash};
 
+use ahash::RandomState;
 use libafl::{
     corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
-    inputs::{BytesInput, HasTargetBytes, Input, MutVecInput},
+    inputs::{value::ValueMutRefInput, BytesInput, HasTargetBytes, Input, MutVecInput},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error, SerdeAny,
@@ -25,15 +23,14 @@ use serde::{Deserialize, Serialize};
 pub struct CustomInput {
     pub byte_array: Vec<u8>,
     pub optional_byte_array: Option<Vec<u8>>,
+    pub num: i16,
     pub boolean: bool,
 }
 
 /// Hash-based implementation
 impl Input for CustomInput {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
+        format!("{:016x}", RandomState::with_seed(0).hash_one(self))
     }
 }
 
@@ -56,6 +53,16 @@ impl CustomInput {
     /// Returns an immutable reference to the optional byte array
     pub fn optional_byte_array(&self) -> Option<&[u8]> {
         self.optional_byte_array.as_deref()
+    }
+
+    /// Returns a mutable reference to the number
+    pub fn num_mut(&mut self) -> ValueMutRefInput<'_, i16> {
+        (&mut self.num).into()
+    }
+
+    /// Returns an immutable reference to the number
+    pub fn num(&self) -> &i16 {
+        &self.num
     }
 }
 
@@ -86,10 +93,12 @@ where
             .coinflip(0.5)
             .then(|| generator.generate(state).unwrap().target_bytes().into());
         let boolean = state.rand_mut().coinflip(0.5);
+        let num = state.rand_mut().next() as i16;
 
         Ok(CustomInput {
             byte_array,
             optional_byte_array,
+            num,
             boolean,
         })
     }

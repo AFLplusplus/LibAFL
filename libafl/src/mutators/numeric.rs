@@ -1,46 +1,192 @@
 //! Mutators for integer-style inputs
 
 use alloc::borrow::Cow;
-use core::ops::{BitOrAssign, BitXorAssign, Not, Shl};
 
-use libafl_bolts::{rands::Rand as _, Error, Named};
-use num_traits::{One, WrappingAdd, WrappingSub, Zero};
+use libafl_bolts::{
+    rands::Rand,
+    tuples::{Map as _, Merge},
+    Error, Named,
+};
+use num_traits::Zero;
 use tuple_list::{tuple_list, tuple_list_type};
 
-use super::{MutationResult, Mutator};
+use super::{
+    MappedInputFunctionMappingMutator, MutationResult, Mutator,
+    ToMappedInputFunctionMappingMutatorMapper,
+};
 use crate::{
     corpus::Corpus,
-    inputs::ValueInput,
+    inputs::value::ValueMutRefInput,
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasRand},
 };
 
-/// All mutators for integer-like inputs, return type of [`int_mutators`]
+/// All mutators for integer-like inputs
 pub type IntMutatorsType = tuple_list_type!(
     BitFlipMutator,
-    FlipMutator,
+    NegateMutator,
     IncMutator,
     DecMutator,
-    NegMutator,
+    TwosComplementMutator,
     RandMutator,
     CrossoverMutator
 );
+type IntMutatorsCrossoverType = tuple_list_type!(CrossoverMutator);
+type MappedIntMutatorsCrossoverType<F> = tuple_list_type!(MappedCrossoverMutator<F>);
+type IntMutatorsNoCrossoverType = tuple_list_type!(
+    BitFlipMutator,
+    NegateMutator,
+    IncMutator,
+    DecMutator,
+    TwosComplementMutator,
+    RandMutator,
+);
+
+/// Mutators for integer-like inputs without crossover mutations
+#[must_use]
+pub fn int_mutators_no_crossover() -> IntMutatorsNoCrossoverType {
+    tuple_list!(
+        BitFlipMutator,
+        NegateMutator,
+        IncMutator,
+        DecMutator,
+        TwosComplementMutator,
+        RandMutator,
+    )
+}
+
+/// Mutators for integer-like inputs that implement some form of crossover
+#[must_use]
+pub fn int_mutators_crossover() -> IntMutatorsCrossoverType {
+    tuple_list!(CrossoverMutator)
+}
+
+/// Mutators for integer-like inputs that implement some form of crossover with a mapper to extract the crossed over information.
+#[must_use]
+pub fn mapped_int_mutators_crossover<F>(input_mapper: F) -> MappedIntMutatorsCrossoverType<F> {
+    tuple_list!(MappedCrossoverMutator::new(input_mapper))
+}
 
 /// Mutators for integer-like inputs
 ///
 /// Modelled after the applicable mutators from [`super::havoc_mutations::havoc_mutations`]
 #[must_use]
 pub fn int_mutators() -> IntMutatorsType {
-    tuple_list!(
-        BitFlipMutator,
-        FlipMutator,
-        IncMutator,
-        DecMutator,
-        NegMutator,
-        RandMutator,
-        CrossoverMutator
-    )
+    int_mutators_no_crossover().merge(int_mutators_crossover())
 }
+
+/// Mapped mutators for integer-like inputs
+pub type MappedIntMutatorsType<F1, F2, I> = tuple_list_type!(
+    MappedInputFunctionMappingMutator<BitFlipMutator,F1,I>,
+    MappedInputFunctionMappingMutator<NegateMutator,F1,I>,
+    MappedInputFunctionMappingMutator<IncMutator,F1,I>,
+    MappedInputFunctionMappingMutator<DecMutator,F1,I>,
+    MappedInputFunctionMappingMutator<TwosComplementMutator,F1,I>,
+    MappedInputFunctionMappingMutator<RandMutator,F1,I>,
+    MappedInputFunctionMappingMutator<MappedCrossoverMutator<F2>,F1,I>
+);
+
+/// Mapped mutators for integer-like inputs
+///
+/// Modelled after the applicable mutators from [`super::havoc_mutations::havoc_mutations`]
+pub fn mapped_int_mutators<F1, F2, IO, II>(
+    current_input_mapper: F1,
+    input_from_corpus_mapper: F2,
+) -> MappedIntMutatorsType<F1, F2, II>
+where
+    F1: Clone + FnMut(IO) -> II,
+{
+    int_mutators_no_crossover()
+        .merge(mapped_int_mutators_crossover(input_from_corpus_mapper))
+        .map(ToMappedInputFunctionMappingMutatorMapper::new(
+            current_input_mapper,
+        ))
+}
+/// Functionality required for Numeric Mutators (see [`int_mutators`])
+pub trait Numeric {
+    /// Flip all bits of the number.
+    fn flip_all_bits(&mut self);
+
+    /// Flip the bit at the specified offset.
+    ///
+    /// Has no effect if `offset` is out of bounds for the type.
+    fn flip_bit_at(&mut self, offset: usize);
+
+    /// Increment the number by one, wrapping around on overflow.
+    fn wrapping_inc(&mut self);
+
+    /// Decrement the number by one, wrapping around on underflow.
+    fn wrapping_dec(&mut self);
+
+    /// Compute the two's complement of the number.
+    fn twos_complement(&mut self);
+
+    /// Randomizes the value using the provided random number generator.
+    fn randomize<R: Rand>(&mut self, rand: &mut R);
+}
+
+// Macro to implement the Numeric trait for multiple integer types
+macro_rules! impl_numeric {
+    ($($t:ty)*) => ($(
+        impl Numeric for $t {
+            #[inline]
+            fn flip_all_bits(&mut self) {
+                *self = !*self;
+            }
+
+            #[inline]
+            fn flip_bit_at(&mut self, offset: usize) {
+                *self ^= 1 << offset;
+            }
+
+            #[inline]
+            fn wrapping_inc(&mut self) {
+                *self = self.wrapping_add(1);
+            }
+
+            #[inline]
+            fn wrapping_dec(&mut self) {
+                *self = self.wrapping_sub(1);
+            }
+
+            #[inline]
+            fn twos_complement(&mut self) {
+                *self = self.wrapping_neg();
+            }
+
+            #[inline]
+            #[allow(trivial_numeric_casts, clippy::cast_possible_wrap, clippy::cast_lossless)]
+            fn randomize<R: Rand>(&mut self, rand: &mut R) {
+                // Set the value to zero
+                self.set_zero();
+
+                // Number of bytes in the target type
+                let byte_size = size_of::<$t>();
+                // Number of bytes in each random u64
+                let bytes_per_rand = 8; // u64 has 8 bytes
+
+                let mut current_rand = 0u64;
+
+                for byte_index in 0..byte_size {
+                    // Fetch a new random u64 every `bytes_per_rand` bytes
+                    if byte_index % bytes_per_rand == 0 {
+                        current_rand = rand.next();
+                    }
+
+                    // Extract the relevant byte from the current random u64
+                    let rand_byte = ((current_rand >> (8 * (byte_index % bytes_per_rand))) & 0xFF) as u8;
+
+                    // Assemble the byte into the target integer
+                    *self |= (rand_byte as $t) << (8 * byte_index);
+                }
+            }
+
+        }
+    )*)
+}
+
+// Apply the macro to all desired integer types
+impl_numeric! { u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 usize isize }
 
 /// Bitflip mutation for integer-like inputs
 #[derive(Debug)]
@@ -49,10 +195,11 @@ pub struct BitFlipMutator;
 impl<I, S> Mutator<I, S> for BitFlipMutator
 where
     S: HasRand,
-    I: Shl<usize, Output = I> + BitXorAssign + One,
+    I: Numeric,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        *input ^= I::one() << state.rand_mut().choose(0..size_of::<I>()).unwrap();
+        let offset = state.rand_mut().choose(0..size_of::<I>()).unwrap();
+        input.flip_bit_at(offset);
         Ok(MutationResult::Mutated)
     }
 }
@@ -63,21 +210,21 @@ impl Named for BitFlipMutator {
     }
 }
 
-/// Flip mutation for integer-like inputs
+/// Negate mutation for integer-like inputs, i.e. flip all bits
 #[derive(Debug)]
-pub struct FlipMutator;
+pub struct NegateMutator;
 
-impl<I, S> Mutator<I, S> for FlipMutator
+impl<I, S> Mutator<I, S> for NegateMutator
 where
-    I: Not<Output = I> + Copy,
+    I: Numeric,
 {
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        *input = !*input;
+        input.flip_all_bits();
         Ok(MutationResult::Mutated)
     }
 }
 
-impl Named for FlipMutator {
+impl Named for NegateMutator {
     fn name(&self) -> &Cow<'static, str> {
         &Cow::Borrowed("ByteFlipMutator")
     }
@@ -89,10 +236,10 @@ pub struct IncMutator;
 
 impl<I, S> Mutator<I, S> for IncMutator
 where
-    I: WrappingAdd + One,
+    I: Numeric,
 {
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        *input = input.wrapping_add(&I::one());
+        input.wrapping_inc();
         Ok(MutationResult::Mutated)
     }
 }
@@ -109,10 +256,10 @@ pub struct DecMutator;
 
 impl<I, S> Mutator<I, S> for DecMutator
 where
-    I: WrappingSub + One,
+    I: Numeric,
 {
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        *input = input.wrapping_sub(&I::one());
+        input.wrapping_dec();
         Ok(MutationResult::Mutated)
     }
 }
@@ -123,21 +270,21 @@ impl Named for DecMutator {
     }
 }
 
-/// Negate mutation for integer-like inputs
+/// Two's complement mutation for integer-like inputs
 #[derive(Debug)]
-pub struct NegMutator;
+pub struct TwosComplementMutator;
 
-impl<I, S> Mutator<I, S> for NegMutator
+impl<I, S> Mutator<I, S> for TwosComplementMutator
 where
-    I: Not<Output = I> + WrappingAdd + One + Copy,
+    I: Numeric,
 {
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        *input = (!(*input)).wrapping_add(&I::one());
+        input.twos_complement();
         Ok(MutationResult::Mutated)
     }
 }
 
-impl Named for NegMutator {
+impl Named for TwosComplementMutator {
     fn name(&self) -> &Cow<'static, str> {
         &Cow::Borrowed("NegMutator")
     }
@@ -147,26 +294,14 @@ impl Named for NegMutator {
 #[derive(Debug)]
 pub struct RandMutator;
 
-impl<I, S> Mutator<ValueInput<I>, S> for RandMutator
+impl<I, S> Mutator<I, S> for RandMutator
 where
     S: HasRand,
-    ValueInput<I>: Shl<usize, Output = ValueInput<I>> + BitOrAssign,
-    I: From<u8> + Zero,
+    I: Numeric,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut ValueInput<I>,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         // set to random data byte-wise since the RNGs don't work for all numeric types
-        *input = I::zero().into();
-
-        for offset in 0..(size_of::<I>() % size_of::<u8>()) {
-            let raw = state.rand_mut().next() as u8;
-            let inner: I = raw.into();
-            let mask: ValueInput<I> = inner.into();
-            *input |= mask << offset;
-        }
+        input.randomize(state.rand_mut());
         Ok(MutationResult::Mutated)
     }
 }
@@ -205,12 +340,59 @@ impl Named for CrossoverMutator {
         &Cow::Borrowed("CrossoverMutator")
     }
 }
+/// Crossover mutation for integer-like inputs with custom state extraction function
+#[derive(Debug)]
+pub struct MappedCrossoverMutator<F> {
+    input_mapper: F,
+}
+
+impl<F> MappedCrossoverMutator<F> {
+    /// Create a new [`MappedCrossoverMutator`]
+    pub fn new(input_mapper: F) -> Self {
+        Self { input_mapper }
+    }
+}
+
+impl<'a, I, S, F> Mutator<ValueMutRefInput<'a, I>, S> for MappedCrossoverMutator<F>
+where
+    S: HasRand + HasCorpus,
+    for<'b> F: Fn(&'b <S::Corpus as Corpus>::Input) -> &'b I,
+    I: Clone,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut ValueMutRefInput<'_, I>,
+    ) -> Result<MutationResult, Error> {
+        let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
+
+        if state.corpus().current().is_some_and(|cur| cur == id) {
+            return Ok(MutationResult::Skipped);
+        }
+
+        let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
+        let other_input = other_testcase.input().as_ref().unwrap();
+        let mapped_input = (self.input_mapper)(other_input).clone();
+        **input = mapped_input;
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<F> Named for MappedCrossoverMutator<F> {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("MappedCrossoverMutator")
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::{rands::StdRand, tuples::IntoVec as _};
+    use libafl_bolts::{
+        rands::{Rand, StdRand},
+        tuples::IntoVec as _,
+    };
+    use serde::{Deserialize, Serialize};
 
-    use super::int_mutators;
+    use super::{int_mutators, Numeric};
     use crate::{
         corpus::{Corpus as _, InMemoryCorpus, Testcase},
         inputs::value::I16Input,
@@ -219,7 +401,34 @@ mod tests {
     };
 
     #[test]
-    fn all_mutate() {
+    fn randomized() {
+        const RAND_NUM: u64 = 0xAAAAAAAAAAAAAAAA; // 0b10101010..
+        #[derive(Serialize, Deserialize, Debug)]
+        struct FixedRand;
+        impl Rand for FixedRand {
+            fn set_seed(&mut self, _seed: u64) {}
+            fn next(&mut self) -> u64 {
+                RAND_NUM
+            }
+        }
+
+        let rand = &mut FixedRand;
+
+        let mut i = 0_u8;
+        Numeric::randomize(&mut i, rand);
+        assert_eq!(0xAA, i);
+
+        let mut i = 0_u128;
+        Numeric::randomize(&mut i, rand);
+        assert_eq!(((u128::from(RAND_NUM) << 64) | u128::from(RAND_NUM)), i);
+
+        let mut i = 0_i16;
+        Numeric::randomize(&mut i, rand);
+        assert_eq!(-0b101010101010110, i); // two's complement
+    }
+
+    #[test]
+    fn all_mutate_owned() {
         let mut corpus = InMemoryCorpus::new();
         corpus.add(Testcase::new(1_i16.into())).unwrap();
         let mut state = StdState::new(
@@ -242,4 +451,29 @@ mod tests {
             );
         }
     }
+
+    // #[test]
+    // fn all_mutate_mut_ref() {
+    //     let mut corpus = InMemoryCorpus::new();
+    //     corpus.add(Testcase::new((&mut 1_i16).into())).unwrap();
+    //     let mut state = StdState::new(
+    //         StdRand::new(),
+    //         corpus,
+    //         InMemoryCorpus::new(),
+    //         &mut (),
+    //         &mut (),
+    //     )
+    //     .unwrap();
+
+    //     let mut input: ValueMutRefInput<'_, i16> = (&mut 0_i16).into();
+
+    //     let mutators = int_mutators().into_vec();
+
+    //     for mut m in mutators {
+    //         assert_eq!(
+    //             MutationResult::Mutated,
+    //             m.mutate(&mut state, &mut input).unwrap()
+    //         );
+    //     }
+    // }
 }
