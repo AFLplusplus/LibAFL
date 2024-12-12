@@ -349,7 +349,7 @@ pub mod child_signal_handlers {
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "fork", unix))]
 mod tests {
     use libafl_bolts::tuples::tuple_list;
     use serial_test::serial;

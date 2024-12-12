@@ -282,7 +282,7 @@ where
                         client_config: EventConfig::AlwaysUnique,
                         time: current_time(),
                         forward_id: None,
-                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                        #[cfg(all(unix, feature = "multi_machine"))]
                         node_id: None,
                     },
                 )?;
