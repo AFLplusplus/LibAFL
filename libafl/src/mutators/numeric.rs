@@ -109,7 +109,9 @@ pub trait Numeric {
 
     /// Flip the bit at the specified offset.
     ///
-    /// Has no effect if `offset` is out of bounds for the type.
+    /// # Safety
+    ///
+    /// Panics if the `offset` is out of bounds for the type
     fn flip_bit_at(&mut self, offset: usize);
 
     /// Increment the number by one, wrapping around on overflow.
