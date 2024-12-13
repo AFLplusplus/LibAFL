@@ -267,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn impls_at_extremes() {
+    fn compiles() {
         take_numeric(u8::MIN);
         take_numeric(u16::MIN);
         take_numeric(u32::MIN);
