@@ -1,7 +1,6 @@
 use core::num::NonZeroUsize;
 use std::{borrow::Cow, hash::Hash};
 
-use ahash::RandomState;
 use libafl::{
     corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
@@ -10,7 +9,7 @@ use libafl::{
     state::HasRand,
     Error, SerdeAny,
 };
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{generic_hash_std, rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 /// The custom [`Input`] type used in this example, consisting of a byte array part, a byte array that is not always present, and a boolean
@@ -18,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// Imagine these could be used to model command line arguments for a bash command, where
 /// - `byte_array` is binary data that is always needed like what is passed to stdin,
 /// - `optional_byte_array` is binary data passed as a command line arg, and it is only passed if it is not `None` in the input,
+/// - `num` is an arbitrary number (`i16` in this case)
 /// - `boolean` models the presence or absence of a command line flag that does not require additional data
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, SerdeAny)]
 pub struct CustomInput {
@@ -30,7 +30,7 @@ pub struct CustomInput {
 /// Hash-based implementation
 impl Input for CustomInput {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        format!("{:016x}", RandomState::with_seed(0).hash_one(self))
+        format!("{:016x}", generic_hash_std(self))
     }
 }
 

@@ -3,11 +3,11 @@
 use alloc::{string::String, vec::Vec};
 use core::{
     fmt::Debug,
+    hash::Hash,
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
-use libafl_bolts::rands::Rand;
+use libafl_bolts::{generic_hash_std, rands::Rand};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
@@ -62,10 +62,7 @@ macro_rules! impl_input_for_value_input {
         $(
             impl Input for ValueInput<$t> {
                 fn generate_name(&self, _id: Option<CorpusId>) -> String {
-                    format!(
-                        "{:016x}",
-                        RandomState::with_seeds(0, 0, 0, 0).hash_one(self.as_ref())
-                    )
+                    format!("{:016x}", generic_hash_std(self))
                 }
             }
 
@@ -94,10 +91,7 @@ impl_input_for_value_input!(
 /// manually implemented because files can be written more efficiently
 impl Input for ValueInput<Vec<u8>> {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        format!(
-            "{:016x}",
-            RandomState::with_seeds(0, 0, 0, 0).hash_one(self.as_ref())
-        )
+        format!("{:016x}", generic_hash_std(self))
     }
 
     /// Write this input to the file
