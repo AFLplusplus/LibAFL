@@ -37,7 +37,7 @@ impl<I> ValueInput<I> {
     }
 
     /// Extract the inner value
-    pub fn inner(self) -> I {
+    pub fn into_inner(self) -> I {
         self.0
     }
 }

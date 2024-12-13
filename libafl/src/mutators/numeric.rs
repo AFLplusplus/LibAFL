@@ -485,7 +485,7 @@ mod tests {
                 "Errored with {}",
                 m.name()
             );
-            assert_ne!(1, input.inner(), "Errored with {}", m.name());
+            assert_ne!(1, input.into_inner(), "Errored with {}", m.name());
         }
     }
 }

@@ -77,6 +77,6 @@ impl From<&[u8]> for BytesInput {
 
 impl From<BytesInput> for Vec<u8> {
     fn from(value: BytesInput) -> Vec<u8> {
-        value.inner()
+        value.into_inner()
     }
 }
