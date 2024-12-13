@@ -380,6 +380,7 @@ impl<F> Named for MappedCrossoverMutator<F> {
 
 #[cfg(test)]
 mod tests {
+
     use libafl_bolts::{
         rands::{Rand, StdRand},
         tuples::IntoVec as _,
@@ -434,40 +435,15 @@ mod tests {
         )
         .unwrap();
 
-        let mut input: I16Input = 0_i16.into();
-
         let mutators = int_mutators().into_vec();
 
         for mut m in mutators {
+            let mut input: I16Input = 0_i16.into();
             assert_eq!(
                 MutationResult::Mutated,
                 m.mutate(&mut state, &mut input).unwrap()
             );
+            assert_ne!(0, input.inner());
         }
     }
-
-    // #[test]
-    // fn all_mutate_mut_ref() {
-    //     let mut corpus = InMemoryCorpus::new();
-    //     corpus.add(Testcase::new((&mut 1_i16).into())).unwrap();
-    //     let mut state = StdState::new(
-    //         StdRand::new(),
-    //         corpus,
-    //         InMemoryCorpus::new(),
-    //         &mut (),
-    //         &mut (),
-    //     )
-    //     .unwrap();
-
-    //     let mut input: ValueMutRefInput<'_, i16> = (&mut 0_i16).into();
-
-    //     let mutators = int_mutators().into_vec();
-
-    //     for mut m in mutators {
-    //         assert_eq!(
-    //             MutationResult::Mutated,
-    //             m.mutate(&mut state, &mut input).unwrap()
-    //         );
-    //     }
-    // }
 }
