@@ -1272,6 +1272,18 @@ impl<I> HasMaxSize for NopState<I> {
     }
 }
 
+impl<I> HasCorpus for NopState<I> {
+    type Corpus = InMemoryCorpus<I>;
+
+    fn corpus(&self) -> &Self::Corpus {
+        unimplemented!("Unimplemented for NopState!");
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        unimplemented!("Unimplemented for No[State!");
+    }
+}
+
 impl<I> UsesInput for NopState<I>
 where
     I: Input,
