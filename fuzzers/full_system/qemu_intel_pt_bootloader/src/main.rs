@@ -35,11 +35,11 @@ use libafl_qemu::{
     config::{Accelerator, QemuConfig},
     executor::QemuExecutor,
     modules::intel_pt::{IntelPTModule, Section},
-    Emulator, EmulatorBuilder, QemuExitReason, QemuShutdownCause,
+    Emulator, EmulatorBuilder, QemuExitError, QemuExitReason, QemuShutdownCause,
 };
 
 // Coverage map
-const MAP_SIZE: usize = 128;
+const MAP_SIZE: usize = 32;
 static mut MAP: [u16; MAP_SIZE] = [0; MAP_SIZE];
 
 const BOOTLOADER_START: u64 = 0x7c00;
@@ -65,12 +65,13 @@ fn main() {
         let qemu = QemuConfig::builder()
             .no_graphic(true)
             .drives([config::Drive::builder()
-                .format(config::DiskImageFileFormat::Raw)
-                .file(format!("{target_dir}/boot.bin"))
-                .build().unwrap()])
+                .format(config::DiskImageFileFormat::Qcow2)
+                .file(format!("{target_dir}/boot.qcow2"))
+                .build()
+                .unwrap()])
             .accelerator(Accelerator::Kvm)
             .bios(format!(
-                "{target_dir}/{target_subdir}/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu"
+                "/home/marco/code/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu/"
             ))
             .start_cpu(false);
 
@@ -81,11 +82,11 @@ fn main() {
         let image = [Section {
             file_path,
             file_offset: 0,
-            size: 512 - 3,
+            size: 0x80,
             virtual_address: BOOTLOADER_START,
         }];
         let intel_pt_builder = IntelPTModule::default_pt_builder()
-            .ip_filters(&[BOOTLOADER_START as usize..=0x7e00 - 3]);
+            .ip_filters(&[BOOTLOADER_START as usize..=BOOTLOADER_START as usize + 512]);
         let emulator_modules = tuple_list!(IntelPTModule::builder()
             .map_ptr(unsafe { MAP.as_mut_ptr() })
             .map_len(MAP_SIZE)
@@ -98,7 +99,22 @@ fn main() {
             .modules(emulator_modules)
             .build()?;
         let qemu = emulator.qemu();
-        qemu.set_breakpoint(BOOTLOADER_START);
+        qemu.set_hw_breakpoint(BOOTLOADER_START);
+
+        // todo: there is smth broken somewhere, QemuExitReason::Breakpoint reports a wrong address
+        unsafe {
+            match qemu.run() {
+                Ok(QemuExitReason::Breakpoint(ba)) => {
+                    println!("break1 at {ba:x}")
+                }
+                _ => panic!("Pre-harness Unexpected QEMU exit."),
+            }
+        }
+        qemu.remove_hw_breakpoint(BOOTLOADER_START);
+
+        qemu.set_hw_breakpoint(0x7c7e);
+
+        qemu.save_snapshot("bootloader_start", true);
 
         let mut harness = |emulator: &mut Emulator<_, _, _, StdState<BytesInput, _, _, _>, _>,
                            _: &mut StdState<BytesInput, _, _, _>,
@@ -107,8 +123,21 @@ fn main() {
                 Ok(QemuExitReason::End(QemuShutdownCause::GuestShutdown)) => {
                     println!("VM shut down!")
                 }
-                _ => panic!("Unexpected QEMU exit."),
+                Ok(QemuExitReason::Breakpoint(ba)) => {
+                    println!("break2 at {ba:x}")
+                }
+                Ok(QemuExitReason::Timeout) => {
+                    panic!("Harness Unexpected QEMU exit. Timeout")
+                }
+                Ok(QemuExitReason::SyncExit) => {
+                    panic!("Harness Unexpected QEMU exit. SyncExit")
+                }
+                Ok(QemuExitReason::End(e)) => {
+                    panic!("Harness Unexpected QEMU exit. End {e:?}")
+                }
+                Err(e) => panic!("Harness Unexpected QEMU exit. Error {e:?}"),
             }
+            qemu.load_snapshot("bootloader_start", true);
             ExitKind::Ok
         };
 
@@ -129,7 +158,7 @@ fn main() {
         );
 
         // A feedback to choose if an input is a solution or not
-        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_or_fast!(CrashFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
@@ -187,9 +216,11 @@ fn main() {
 
         fuzzer
             .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
-            .unwrap();
+            .expect("Error in the fuzzing loop");
         Ok(())
     };
+
+    //todo use simpleEventManager for debug
 
     // The shared memory allocator
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");

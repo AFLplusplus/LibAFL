@@ -26,6 +26,8 @@ use libafl_qemu_sys::{
     libafl_qemu_write_reg, CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
     GuestVirtAddr,
 };
+#[cfg(feature = "systemmode")]
+use libafl_qemu_sys::{libafl_qemu_remove_hw_breakpoint, libafl_qemu_set_hw_breakpoint};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
@@ -813,6 +815,22 @@ impl Qemu {
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
         }
+    }
+
+    #[cfg(feature = "systemmode")]
+    pub fn set_hw_breakpoint(&self, addr: GuestAddr) {
+        unsafe {
+            libafl_qemu_set_hw_breakpoint(addr.into());
+        }
+        // TODO don't be lame, return a Result
+    }
+
+    #[cfg(feature = "systemmode")]
+    pub fn remove_hw_breakpoint(&self, addr: GuestAddr) {
+        unsafe {
+            libafl_qemu_remove_hw_breakpoint(addr.into());
+        }
+        // TODO don't be lame, return a Result
     }
 
     pub fn entry_break(&self, addr: GuestAddr) {

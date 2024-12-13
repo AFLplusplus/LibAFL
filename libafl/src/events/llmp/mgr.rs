@@ -367,7 +367,7 @@ where
             Ok(_) => (),
             Err(e) => log::error!("Failed to send tcp message {:#?}", e),
         }
-        log::debug!("Asking he broker to be disconnected");
+        log::debug!("Asking the broker to be disconnected");
         Ok(())
     }
 

@@ -444,14 +444,13 @@ impl IntelPT {
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
                         *map_loc = (*map_loc).saturating_add(&1u8.into());
 
-                        log::trace!(
-                            "previous block ip: {:x} current: {:x} asid: {:?}",
-                            previous_block_end_ip,
-                            b.ip(),
-                            decoder.asid().unwrap_or_default()
-                        );
-                        log::trace!("writing map at {} with value {:?}", id, *map_loc);
-                        *previous_block_end_ip = b.end_ip();
+                        // log::trace!(
+                        //     "previous block ip: {:x} current: {:x} offset: {offset:x}",
+                        //     previous_block_end_ip,
+                        //     b.ip()
+                        // );
+                        // log::trace!("writing map at {id:x} with value {:?}", *map_loc);
+                        // *previous_block_end_ip = b.end_ip();
                     }
 
                     if status.eos() {
@@ -460,8 +459,9 @@ impl IntelPT {
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
+                        let offset = decoder.offset().map_err(error_from_pt_error)?;
                         log::trace!(
-                            "PT error in block next {e:?} last decoded block end {:x}",
+                            "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
                             previous_block_end_ip
                         );
                     }
