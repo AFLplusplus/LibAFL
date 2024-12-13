@@ -85,8 +85,6 @@ pub trait HasTimeout {
 }
 
 impl<S> HasTimeout for InProcessHooks<S>
-where
-    S: UsesInput,
 {
     #[cfg(feature = "std")]
     fn timer(&self) -> &TimerStruct {
@@ -191,15 +189,15 @@ where
     }
 }
 
-impl<S> ExecutorHook<S> for InProcessHooks<S>
-where
-    S: UsesInput,
+impl<S> ExecutorHook<<S::Corpus as Corpus>::Input, S> for InProcessHooks<S>
+where 
+    S: HasCorpus
 {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
     /// Call before running a target.
     #[allow(clippy::unused_self)]
     #[allow(unused_variables)]
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input) {
+    fn pre_exec(&mut self, state: &mut S, input: &<S::Corpus as Corpus>::Input) {
         #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -213,7 +211,7 @@ where
 
     /// Call after running a target.
     #[allow(clippy::unused_self)]
-    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
+    fn post_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {
         // timeout stuff
         // # Safety
         // We're calling this only once per execution, in a single thread.
@@ -223,8 +221,6 @@ where
 }
 
 impl<S> InProcessHooks<S>
-where
-    S: UsesInput,
 {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]

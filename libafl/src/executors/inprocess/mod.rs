@@ -428,21 +428,20 @@ where
 #[inline]
 #[allow(clippy::too_many_arguments)]
 /// Save state if it is an objective
-pub fn run_observers_and_save_state<E, EM, OF, Z>(
+pub fn run_observers_and_save_state<E, EM, OF, S, Z>(
     executor: &mut E,
-    state: &mut E::State,
-    input: &E::Input,
+    state: &mut S,
+    input: &<S::Corpus as Corpus>::Input,
     fuzzer: &mut Z,
     event_mgr: &mut EM,
     exitkind: ExitKind,
 ) where
-    E: Executor<EM, Z> + HasObservers,
-    E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<EM, E::Input, E::Observers, E::State>,
-    E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput,
     Z: HasObjective<Objective = OF>,
-    <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
     let mut observers = executor.observers_mut();
 
@@ -495,29 +494,27 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
 /// # Safety
 /// This will directly access `GLOBAL_STATE` and related data pointers
 #[cfg(any(unix, feature = "std"))]
-pub unsafe fn generic_inproc_crash_handler<E, EM, OF, Z>()
+pub unsafe fn generic_inproc_crash_handler<E, EM, OF, S, Z>()
 where
-    E: Executor<EM, Z> + HasObservers,
-    E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<EM, E::Input, E::Observers, E::State>,
-    E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput,
     Z: HasObjective<Objective = OF>
-        + HasScheduler<E::Input, E::State>
-        + ExecutionProcessor<EM, E::Input, E::Observers, E::State>,
-    <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
 {
     let data = &raw mut GLOBAL_STATE;
     let in_handler = (*data).set_in_handler(true);
 
     if (*data).is_valid() {
         let executor = (*data).executor_mut::<E>();
-        let state = (*data).state_mut::<E::State>();
+        let state = (*data).state_mut::<S>();
         let event_mgr = (*data).event_mgr_mut::<EM>();
         let fuzzer = (*data).fuzzer_mut::<Z>();
-        let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
+        let input = (*data).take_current_input::<<S::Corpus as Corpus>::Input>();
 
-        run_observers_and_save_state::<E, EM, OF, Z>(
+        run_observers_and_save_state::<E, EM, OF, S, Z>(
             executor,
             state,
             input,

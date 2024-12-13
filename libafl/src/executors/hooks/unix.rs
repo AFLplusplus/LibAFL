@@ -77,16 +77,15 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, OF, Z>()
+    pub fn setup_panic_hook<E, EM, OF, S, Z>()
     where
-        E: Executor<EM, Z> + HasObservers,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<EM, E::Input, E::Observers, E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF>,
-        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
+        <S::Corpus as Corpus>::Input: Clone, //delete me
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -96,8 +95,8 @@ pub mod unix_signal_handler {
             if (*data).is_valid() {
                 // We are fuzzing!
                 let executor = (*data).executor_mut::<E>();
-                let state = (*data).state_mut::<E::State>();
-                let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
+                let state = (*data).state_mut::<S>();
+                let input = (*data).take_current_input::<<S::Corpus as Corpus>::Input>();
                 let fuzzer = (*data).fuzzer_mut::<Z>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
