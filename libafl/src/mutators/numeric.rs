@@ -125,8 +125,8 @@ pub trait Numeric {
     fn randomize<R: Rand>(&mut self, rand: &mut R);
 }
 
-// Macro to implement the Numeric trait for multiple integer types
-macro_rules! impl_numeric {
+// Macro to implement the Numeric trait for multiple integer types a u64 can be cast to
+macro_rules! impl_numeric_cast_randomize {
     ($($t:ty)*) => ($(
         impl Numeric for $t {
             #[inline]
@@ -155,7 +155,47 @@ macro_rules! impl_numeric {
             }
 
             #[inline]
-            #[allow(trivial_numeric_casts, clippy::cast_possible_wrap, clippy::cast_lossless)]
+            #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
+            fn randomize<R: Rand>(&mut self, rand: &mut R) {
+                *self = rand.next() as $t;
+            }
+
+        }
+    )*)
+}
+
+impl_numeric_cast_randomize!( u8 u16 u32 u64 usize i8 i16 i32 i64 isize );
+
+// Macro to implement the Numeric trait for multiple integer types a u64 cannot be cast to
+macro_rules! impl_numeric_iterate_randomize {
+    ($($t:ty)*) => ($(
+        impl Numeric for $t {
+            #[inline]
+            fn flip_all_bits(&mut self) {
+                *self = !*self;
+            }
+
+            #[inline]
+            fn flip_bit_at(&mut self, offset: usize) {
+                *self ^= 1 << offset;
+            }
+
+            #[inline]
+            fn wrapping_inc(&mut self) {
+                *self = self.wrapping_add(1);
+            }
+
+            #[inline]
+            fn wrapping_dec(&mut self) {
+                *self = self.wrapping_sub(1);
+            }
+
+            #[inline]
+            fn twos_complement(&mut self) {
+                *self = self.wrapping_neg();
+            }
+
+            #[inline]
             fn randomize<R: Rand>(&mut self, rand: &mut R) {
                 self.set_zero();
 
@@ -171,7 +211,7 @@ macro_rules! impl_numeric {
 
                     let rand_index = (byte_index % bytes_per_rand);
                     let rand_byte = ((current_rand >> (8 * rand_index)) & 0xFF) as u8;
-                    *self |= (rand_byte as $t) << (8 * byte_index);
+                    *self |= Self::from(rand_byte) << (8 * byte_index);
                 }
             }
 
@@ -180,7 +220,7 @@ macro_rules! impl_numeric {
 }
 
 // Apply the macro to all desired integer types
-impl_numeric! { u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 usize isize }
+impl_numeric_iterate_randomize! { u128 i128 }
 
 /// Bitflip mutation for integer-like inputs
 #[derive(Debug)]
@@ -382,7 +422,7 @@ impl<F> Named for MappedCrossoverMutator<F> {
 mod tests {
 
     use libafl_bolts::{
-        rands::{Rand, StdRand},
+        rands::{Rand, XkcdRand},
         tuples::IntoVec as _,
     };
     use serde::{Deserialize, Serialize};
@@ -425,9 +465,9 @@ mod tests {
     #[test]
     fn all_mutate_owned() {
         let mut corpus = InMemoryCorpus::new();
-        corpus.add(Testcase::new(1_i16.into())).unwrap();
+        corpus.add(Testcase::new(42_i16.into())).unwrap();
         let mut state = StdState::new(
-            StdRand::new(),
+            XkcdRand::new(),
             corpus,
             InMemoryCorpus::new(),
             &mut (),
@@ -438,12 +478,14 @@ mod tests {
         let mutators = int_mutators().into_vec();
 
         for mut m in mutators {
-            let mut input: I16Input = 0_i16.into();
+            let mut input: I16Input = 1_i16.into();
             assert_eq!(
                 MutationResult::Mutated,
-                m.mutate(&mut state, &mut input).unwrap()
+                m.mutate(&mut state, &mut input).unwrap(),
+                "Errored with {}",
+                m.name()
             );
-            assert_ne!(0, input.inner());
+            assert_ne!(1, input.inner(), "Errored with {}", m.name());
         }
     }
 }
