@@ -150,6 +150,31 @@ where
 #[derive(Debug)]
 pub struct ValueMutRefInput<'a, I>(&'a mut I);
 
+// Macro to implement the `Input` trait and create type aliases for `WrappingInput<T>`
+macro_rules! impl_input_for_value_mut_ref_input {
+    ($($t:ty => $name:ident),+ $(,)?) => {
+        $(            /// Input wrapping a <$t>
+            pub type $name<'a> = ValueMutRefInput<'a, $t>;
+        )*
+    };
+}
+
+// Invoke the macro with type-name pairs
+impl_input_for_value_mut_ref_input!(
+    u8 => MutU8Input,
+    u16 => MutU16Input,
+    u32 => MutU32Input,
+    u64 => MutU64Input,
+    u128 => MutU128Input,
+    usize => MutUsizeInput,
+    i8 => MutI8Input,
+    i16 => MutI16Input,
+    i32 => MutI32Input,
+    i64 => MutI64Input,
+    i128 => MutI128Input,
+    isize => MutIsizeInput,
+);
+
 impl<I> Deref for ValueMutRefInput<'_, I> {
     type Target = I;
 

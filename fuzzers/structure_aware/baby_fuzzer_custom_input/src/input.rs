@@ -4,7 +4,7 @@ use std::{borrow::Cow, hash::Hash};
 use libafl::{
     corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
-    inputs::{value::ValueMutRefInput, BytesInput, HasTargetBytes, Input, MutVecInput},
+    inputs::{value::MutI16Input, BytesInput, HasTargetBytes, Input, MutVecInput},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error, SerdeAny,
@@ -56,7 +56,7 @@ impl CustomInput {
     }
 
     /// Returns a mutable reference to the number
-    pub fn num_mut(&mut self) -> ValueMutRefInput<'_, i16> {
+    pub fn num_mut(&mut self) -> MutI16Input<'_> {
         (&mut self.num).into()
     }
 
