@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
+#[cfg(feature = "share_objectives")]
+use crate::state::HasSolutions;
 use crate::{
     corpus::{Corpus, CorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
@@ -245,10 +247,100 @@ where
     type State = S;
 }
 
+// Do not include trait bound HasSolutions to S if share_objectives is disabled
+#[cfg(not(feature = "share_objectives"))]
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     EM: UsesState<State = S> + EventFirer,
     S: State + HasExecutions + HasCorpus + HasRand + HasMetadata,
+    SP: ShMemProvider,
+    E: HasObservers + Executor<EM, Z, State = S>,
+    for<'a> E::Observers: Deserialize<'a>,
+    Z: EvaluatorObservers<EM, E::Observers, State = S>
+        + ExecutionProcessor<EM, E::Observers, State = S>,
+    IC: InputConverter<From = S::Input, To = DI>,
+    ICB: InputConverter<From = DI, To = S::Input>,
+    DI: Input,
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,
+    S::Corpus: Corpus<Input = S::Input>, // delete me
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut Self::State,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        if self.client.can_convert() {
+            let last_id = state
+                .metadata_map()
+                .get::<SyncFromBrokerMetadata>()
+                .and_then(|m| m.last_id);
+
+            let mut cur_id =
+                last_id.map_or_else(|| state.corpus().first(), |id| state.corpus().next(id));
+
+            while let Some(id) = cur_id {
+                let input = state.corpus().cloned_input_for_id(id)?;
+
+                self.client.fire(
+                    state,
+                    Event::NewTestcase {
+                        input,
+                        observers_buf: None,
+                        exit_kind: ExitKind::Ok,
+                        corpus_size: 0, // TODO choose if sending 0 or the actual real value
+                        client_config: EventConfig::AlwaysUnique,
+                        time: current_time(),
+                        forward_id: None,
+                        #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                        node_id: None,
+                    },
+                )?;
+
+                cur_id = state.corpus().next(id);
+            }
+
+            let last = state.corpus().last();
+            if last_id.is_none() {
+                state
+                    .metadata_map_mut()
+                    .insert(SyncFromBrokerMetadata::new(last));
+            } else {
+                state
+                    .metadata_map_mut()
+                    .get_mut::<SyncFromBrokerMetadata>()
+                    .unwrap()
+                    .last_id = last;
+            }
+        }
+
+        self.client.process(fuzzer, state, executor, manager)?;
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().finish_stage();
+        Ok(())
+    }
+
+    #[inline]
+    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+        // No restart handling needed - does not execute the target.
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+        // Not needed - does not execute the target.
+        Ok(())
+    }
+}
+
+// Add trait bound HasSolutions to S if share_objectives is enabled
+#[cfg(feature = "share_objectives")]
+impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
+where
+    EM: UsesState<State = S> + EventFirer,
+    S: State + HasExecutions + HasCorpus + HasRand + HasMetadata + HasSolutions,
     SP: ShMemProvider,
     E: HasObservers + Executor<EM, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
