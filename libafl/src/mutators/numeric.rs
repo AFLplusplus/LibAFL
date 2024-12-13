@@ -224,7 +224,7 @@ impl Named for NegateMutator {
     }
 }
 
-/// Increment mutation for integer-like inputs
+/// Increment mutation for integer-like inputs. Wraps on overflows.
 #[derive(Debug)]
 pub struct IncMutator;
 
@@ -244,7 +244,7 @@ impl Named for IncMutator {
     }
 }
 
-/// Decrement mutation for integer-like inputs
+/// Decrement mutation for integer-like inputs. Wraps on underflow.
 #[derive(Debug)]
 pub struct DecMutator;
 
