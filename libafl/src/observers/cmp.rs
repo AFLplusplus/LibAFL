@@ -417,6 +417,7 @@ impl AFLppCmpValuesMetadata {
 /// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
 /// - overflow:  Whether the comparison overflows
 /// - reserved:  Reserved for future use
+#[allow(missing_docs)] // 2024-12-15: bitfield is leading CI to fail due to missing docs.
 #[bitfield(u16)]
 #[derive(Debug)]
 pub struct AFLppCmpLogHeader {
