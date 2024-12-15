@@ -351,6 +351,7 @@ where
     DI: Input,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,
     S::Corpus: Corpus<Input = S::Input>, // delete me
+    S::Solutions: Corpus<Input = S::Input>,
 {
     #[inline]
     fn perform(
