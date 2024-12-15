@@ -92,9 +92,8 @@ impl From<i32> for MutationId {
 /// Result of the mutation.
 ///
 /// [`MutationResult::Skipped`] does not necessarily mean that the input changed,
-/// just that the mutator did something.
-#[cfg(feature = "std")]
-/// For slow targets, consider wrapping your mutator in a [`hash::HashMutator`]
+/// just that the mutator did something. For slow targets, consider wrapping your
+/// mutator in a [`hash::HashMutator`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
     /// The [`Mutator`] executed on this `Input`. It may still be the same.
