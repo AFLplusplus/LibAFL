@@ -8,7 +8,10 @@ use input::{
     CustomInput, CustomInputGenerator, ToggleBooleanMutator, ToggleOptionalByteArrayMutator,
 };
 #[cfg(feature = "simple_interface")]
-use libafl::mutators::havoc_mutations::{mapped_havoc_mutations, optional_mapped_havoc_mutations};
+use libafl::mutators::{
+    havoc_mutations::{mapped_havoc_mutations, optional_mapped_havoc_mutations},
+    numeric::mapped_int_mutators,
+};
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -32,6 +35,7 @@ use {
     libafl::mutators::{
         havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
         mapping::{ToMappedInputFunctionMappingMutatorMapper, ToOptionMappingMutatorMapper},
+        numeric::{int_mutators_no_crossover, mapped_int_mutators_crossover},
     },
     libafl_bolts::tuples::Map,
 };
@@ -43,7 +47,7 @@ static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
-    if idx > 2 {
+    if idx > 3 {
         println!("Setting signal: {idx}");
     }
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
@@ -60,17 +64,21 @@ pub fn main() {
             signals_set(1);
             if input.optional_byte_array == Some(vec![b'b']) {
                 signals_set(2);
-                if input.boolean {
-                    #[cfg(unix)]
-                    panic!("Artificial bug triggered =)");
+                // require input.num to be in the top 1% of possible values
+                if input.num > i16::MAX - i16::MAX / 50 {
+                    signals_set(3);
+                    if input.boolean {
+                        #[cfg(unix)]
+                        panic!("Artificial bug triggered =)");
 
-                    // panic!() raises a STATUS_STACK_BUFFER_OVERRUN exception which cannot be caught by the exception handler.
-                    // Here we make it raise STATUS_ACCESS_VIOLATION instead.
-                    // Extending the windows exception handler is a TODO. Maybe we can refer to what winafl code does.
-                    // https://github.com/googleprojectzero/winafl/blob/ea5f6b85572980bb2cf636910f622f36906940aa/winafl.c#L728
-                    #[cfg(windows)]
-                    unsafe {
-                        write_volatile(0 as *mut u32, 0);
+                        // panic!() raises a STATUS_STACK_BUFFER_OVERRUN exception which cannot be caught by the exception handler.
+                        // Here we make it raise STATUS_ACCESS_VIOLATION instead.
+                        // Extending the windows exception handler is a TODO. Maybe we can refer to what winafl code does.
+                        // https://github.com/googleprojectzero/winafl/blob/ea5f6b85572980bb2cf636910f622f36906940aa/winafl.c#L728
+                        #[cfg(windows)]
+                        unsafe {
+                            write_volatile(0 as *mut u32, 0);
+                        }
                     }
                 }
             }
@@ -136,7 +144,7 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     #[cfg(feature = "simple_interface")]
-    let (mapped_mutators, optional_mapped_mutators) = {
+    let (mapped_mutators, optional_mapped_mutators, int_mutators) = {
         // Creating mutators that will operate on input.byte_array
         let mapped_mutators =
             mapped_havoc_mutations(CustomInput::byte_array_mut, CustomInput::byte_array);
@@ -146,11 +154,13 @@ pub fn main() {
             CustomInput::optional_byte_array_mut,
             CustomInput::optional_byte_array,
         );
-        (mapped_mutators, optional_mapped_mutators)
+
+        let int_mutators = mapped_int_mutators(CustomInput::num_mut, CustomInput::num);
+        (mapped_mutators, optional_mapped_mutators, int_mutators)
     };
 
     #[cfg(not(feature = "simple_interface"))]
-    let (mapped_mutators, optional_mapped_mutators) = {
+    let (mapped_mutators, optional_mapped_mutators, int_mutators) = {
         // Creating mutators that will operate on input.byte_array
         let mapped_mutators = havoc_mutations_no_crossover()
             .merge(havoc_crossover_with_corpus_mapper(CustomInput::byte_array))
@@ -168,7 +178,13 @@ pub fn main() {
                 CustomInput::optional_byte_array_mut,
             ));
 
-        (mapped_mutators, optional_mapped_mutators)
+        // Creating mutators that will operate on input.num
+        let int_mutators = int_mutators_no_crossover()
+            .merge(mapped_int_mutators_crossover(CustomInput::num))
+            .map(ToMappedInputFunctionMappingMutatorMapper::new(
+                CustomInput::num_mut,
+            ));
+        (mapped_mutators, optional_mapped_mutators, int_mutators)
     };
 
     // Merging multiple lists of mutators that mutate a sub-part of the custom input
@@ -178,6 +194,8 @@ pub fn main() {
         .merge(mapped_mutators)
         // Then, mutators for the optional byte array, these return MutationResult::Skipped if the part is not present
         .merge(optional_mapped_mutators)
+        // Then, mutators for the number
+        .merge(int_mutators)
         // A custom mutator that sets the optional byte array to None if present, and generates a random byte array of length 1 if it is not
         .prepend(ToggleOptionalByteArrayMutator::new(nonzero!(1)))
         // Finally, a custom mutator that toggles the boolean part of the input
