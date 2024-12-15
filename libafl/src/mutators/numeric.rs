@@ -168,7 +168,7 @@ macro_rules! impl_numeric_cast_randomize {
 impl_numeric_cast_randomize!( u8 u16 u32 u64 usize i8 i16 i32 i64 isize );
 
 // Macro to implement the Numeric trait for multiple integer types a u64 cannot be cast to
-macro_rules! impl_numeric_iterate_randomize {
+macro_rules! impl_numeric_128_bits_randomize {
     ($($t:ty)*) => ($(
         impl Numeric for $t {
             #[inline]
@@ -208,7 +208,7 @@ macro_rules! impl_numeric_iterate_randomize {
 }
 
 // Apply the macro to all desired integer types
-impl_numeric_iterate_randomize! { u128 i128 }
+impl_numeric_128_bits_randomize! { u128 i128 }
 
 /// Bitflip mutation for integer-like inputs
 #[derive(Debug)]
