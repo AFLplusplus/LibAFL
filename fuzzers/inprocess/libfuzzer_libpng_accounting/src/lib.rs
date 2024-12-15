@@ -4,6 +4,7 @@
 //! The `launcher` will spawn new processes for each cpu core.
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
+use core::ptr::addr_of;
 
 use clap::Parser;
 use libafl::{
@@ -200,7 +201,7 @@ pub extern "C" fn libafl_main() {
             &edges_observer,
             &mut state,
             QueueScheduler::new(),
-            unsafe { &ACCOUNTING_MEMOP_MAP },
+            unsafe { &*addr_of!(ACCOUNTING_MEMOP_MAP) },
         );
 
         // A fuzzer with feedbacks and a corpus scheduler
