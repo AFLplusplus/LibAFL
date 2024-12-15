@@ -147,7 +147,7 @@ where
 }
 
 /// Input type that holds a mutable reference to an inner value
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ValueMutRefInput<'a, I>(&'a mut I);
 
 // Macro to implement the `Input` trait and create type aliases for `WrappingInput<T>`
@@ -239,58 +239,101 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{ValueInput, ValueMutRefInput};
-    use crate::mutators::numeric::Numeric;
+    #[cfg(feature = "std")]
+    use {
+        super::{ValueInput, ValueMutRefInput},
+        crate::mutators::numeric::Numeric,
+        alloc::fmt::Debug,
+        std::any::type_name,
+    };
 
-    fn take_numeric<I: Numeric + Clone>(i: I) {
-        i.clone().flip_all_bits();
-        i.clone().flip_bit_at(0);
-        i.clone().flip_bit_at(size_of::<I>() * 8 - 1);
-        i.clone().twos_complement();
-        i.clone().wrapping_dec();
-        i.clone().wrapping_inc();
+    #[cfg(feature = "std")]
+    macro_rules! apply_all_ops {
+        ($prep:stmt, $value:expr, $type:ty, $check_twos_complement:expr) => {{
+            $prep
+            let mut j = $value;
+            j.flip_all_bits();
+            $prep
+            assert_ne!(j, $value, "{:?}.flip_all_bits() for {}", j, type_name::<$type>());
 
-        ValueInput::from(i.clone()).flip_all_bits();
-        ValueInput::from(i.clone()).flip_bit_at(0);
-        ValueInput::from(i.clone()).flip_bit_at(size_of::<I>() * 8 - 1);
-        ValueInput::from(i.clone()).twos_complement();
-        ValueInput::from(i.clone()).wrapping_dec();
-        ValueInput::from(i.clone()).wrapping_inc();
+            $prep
+            let mut j = $value;
+            j.wrapping_inc();
+            $prep
+            assert_ne!(j, $value, "{:?}.wrapping_inc() for {}", j, type_name::<$type>());
 
-        ValueMutRefInput::from(&mut i.clone()).flip_all_bits();
-        ValueMutRefInput::from(&mut i.clone()).flip_bit_at(0);
-        ValueMutRefInput::from(&mut i.clone()).flip_bit_at(size_of::<I>() * 8 - 1);
-        ValueMutRefInput::from(&mut i.clone()).twos_complement();
-        ValueMutRefInput::from(&mut i.clone()).wrapping_dec();
-        ValueMutRefInput::from(&mut i.clone()).wrapping_inc();
-        drop(i);
+            $prep
+            let mut j = $value;
+            j.wrapping_dec();
+            $prep
+            assert_ne!(j, $value, "{:?}.wrapping_dec() for {}", j, type_name::<$type>());
+
+            $prep
+            let mut j = $value;
+            j.twos_complement();
+            if $check_twos_complement {
+                $prep
+                assert_ne!(j, $value, "{:?}.twos_complement() for {}", j, type_name::<$type>());
+            }
+
+            $prep
+            let mut j = $value;
+            j.flip_bit_at(0);
+            $prep
+            assert_ne!(j, $value, "{:?}.flip_bit_at(0) for {}", j, type_name::<$type>());
+
+            $prep
+            let mut j = $value;
+            j.flip_bit_at(size_of::<I>() * 8 - 1);
+            $prep
+            assert_ne!(j, $value, "{:?}.flip_bit_at({}) for {}", j, size_of::<I>() * 8 - 1, type_name::<$type>());
+        }};
+    }
+
+    #[cfg(feature = "std")]
+    fn take_numeric<I: Numeric + Clone + PartialEq + Debug>(i: &I, check_twos_complement: bool) {
+        apply_all_ops!({}, i.clone(), I, check_twos_complement);
+        apply_all_ops!(
+            {},
+            ValueInput::from(i.clone()),
+            ValueInput<I>,
+            check_twos_complement
+        );
+        apply_all_ops!(
+            let mut i_clone = i.clone(),
+            ValueMutRefInput::from(&mut i_clone),
+            ValueMutRefInput<'_, I>,
+            check_twos_complement
+        );
     }
 
     #[test]
+    #[cfg(feature = "std")] // type detection for better error messages, running with std is sufficient
     fn compiles() {
-        take_numeric(u8::MIN);
-        take_numeric(u16::MIN);
-        take_numeric(u32::MIN);
-        take_numeric(u64::MIN);
-        take_numeric(u128::MIN);
-        take_numeric(usize::MIN);
-        take_numeric(i8::MIN);
-        take_numeric(i16::MIN);
-        take_numeric(i32::MIN);
-        take_numeric(i64::MIN);
-        take_numeric(i128::MIN);
-        take_numeric(isize::MIN);
-        take_numeric(u8::MAX);
-        take_numeric(u16::MAX);
-        take_numeric(u32::MAX);
-        take_numeric(u64::MAX);
-        take_numeric(u128::MAX);
-        take_numeric(usize::MAX);
-        take_numeric(i8::MAX);
-        take_numeric(i16::MAX);
-        take_numeric(i32::MAX);
-        take_numeric(i64::MAX);
-        take_numeric(i128::MAX);
-        take_numeric(isize::MAX);
+        // twos complement doesn't change anything on the min value of numeric types
+        take_numeric(&u8::MIN, false);
+        take_numeric(&u16::MIN, false);
+        take_numeric(&u32::MIN, false);
+        take_numeric(&u64::MIN, false);
+        take_numeric(&u128::MIN, false);
+        take_numeric(&usize::MIN, false);
+        take_numeric(&i8::MIN, false);
+        take_numeric(&i16::MIN, false);
+        take_numeric(&i32::MIN, false);
+        take_numeric(&i64::MIN, false);
+        take_numeric(&i128::MIN, false);
+        take_numeric(&isize::MIN, false);
+        take_numeric(&u8::MAX, true);
+        take_numeric(&u16::MAX, true);
+        take_numeric(&u32::MAX, true);
+        take_numeric(&u64::MAX, true);
+        take_numeric(&u128::MAX, true);
+        take_numeric(&usize::MAX, true);
+        take_numeric(&i8::MAX, true);
+        take_numeric(&i16::MAX, true);
+        take_numeric(&i32::MAX, true);
+        take_numeric(&i64::MAX, true);
+        take_numeric(&i128::MAX, true);
+        take_numeric(&isize::MAX, true);
     }
 }
