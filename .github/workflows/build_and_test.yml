@@ -246,7 +246,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ ubuntu-24.04 ]
+        os: [ ubuntu-24.04, macOS-latest ]
         fuzzer:
           # Baby
           - ./fuzzers/baby/baby_fuzzer_swap_differential
