@@ -1,6 +1,5 @@
 //! Allowing mixing and matching between [`Mutator`] and [`crate::inputs::Input`] types.
 use alloc::borrow::Cow;
-use core::marker::PhantomData;
 
 use libafl_bolts::{tuples::MappingFunctor, Named};
 
@@ -58,6 +57,7 @@ pub struct FunctionMappingMutator<M, F> {
 
 impl<M, F> FunctionMappingMutator<M, F> {
     /// Creates a new [`FunctionMappingMutator`]
+    #[must_use]
     pub fn new(mapper: F, inner: M) -> Self
     where
         M: Named,
@@ -137,6 +137,7 @@ pub struct ToFunctionMappingMutatorMapper<F> {
 
 impl<F> ToFunctionMappingMutatorMapper<F> {
     /// Creates a new [`ToFunctionMappingMutatorMapper`]
+    #[must_use]
     pub fn new(mapper: F) -> Self {
         Self { mapper }
     }
@@ -188,16 +189,22 @@ where
 /// assert_eq!(input, (vec![2],));
 /// ```
 #[derive(Debug)]
-pub struct MappedInputFunctionMappingMutator<M, F, II> {
-    mapper: F,
+pub struct MappedInputFunctionMappingMutator<M, IO, II>
+where
+    II: MappedInput,
+{
+    mapper: for<'a> fn(&'a mut IO) -> II::Type<'a>,
     inner: M,
     name: Cow<'static, str>,
-    phantom: PhantomData<II>,
 }
 
-impl<M, F, II> MappedInputFunctionMappingMutator<M, F, II> {
+impl<M, IO, II> MappedInputFunctionMappingMutator<M, IO, II>
+where
+    II: MappedInput,
+{
     /// Creates a new [`MappedInputFunctionMappingMutator`]
-    pub fn new(mapper: F, inner: M) -> Self
+    #[must_use]
+    pub fn new(mapper: for<'a> fn(&'a mut IO) -> II::Type<'a>, inner: M) -> Self
     where
         M: Named,
     {
@@ -210,16 +217,14 @@ impl<M, F, II> MappedInputFunctionMappingMutator<M, F, II> {
             mapper,
             inner,
             name,
-            phantom: PhantomData,
         }
     }
 }
 
-impl<M, S, F, IO, II> Mutator<IO, S> for MappedInputFunctionMappingMutator<M, F, II>
+impl<M, S, IO, II> Mutator<IO, S> for MappedInputFunctionMappingMutator<M, IO, II>
 where
     for<'a> M: Mutator<II::Type<'a>, S>,
-    for<'a> II: MappedInput + 'a,
-    for<'a> F: FnMut(&'a mut IO) -> II::Type<'a>,
+    II: MappedInput,
 {
     fn mutate(&mut self, state: &mut S, input: &mut IO) -> Result<MutationResult, Error> {
         let mapped = &mut (self.mapper)(input);
@@ -227,7 +232,10 @@ where
     }
 }
 
-impl<M, F, II> Named for MappedInputFunctionMappingMutator<M, F, II> {
+impl<M, IO, II> Named for MappedInputFunctionMappingMutator<M, IO, II>
+where
+    II: MappedInput,
+{
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -271,33 +279,33 @@ impl<M, F, II> Named for MappedInputFunctionMappingMutator<M, F, II> {
 /// assert_eq!(input, (vec![2],));
 /// ```
 #[derive(Debug)]
-pub struct ToMappedInputFunctionMappingMutatorMapper<F, II> {
-    mapper: F,
-    phantom: PhantomData<II>,
+pub struct ToMappedInputFunctionMappingMutatorMapper<IO, II>
+where
+    II: MappedInput,
+{
+    mapper: for<'a> fn(&'a mut IO) -> II::Type<'a>,
 }
 
-impl<F, II> ToMappedInputFunctionMappingMutatorMapper<F, II> {
+impl<IO, II> ToMappedInputFunctionMappingMutatorMapper<IO, II>
+where
+    II: MappedInput,
+{
     /// Creates a new [`ToMappedInputFunctionMappingMutatorMapper`]
-    pub fn new<IO>(mapper: F) -> Self
-    where
-        F: FnMut(IO) -> II,
-    {
-        Self {
-            mapper,
-            phantom: PhantomData,
-        }
+    #[must_use]
+    pub fn new(mapper: for<'a> fn(&'a mut IO) -> II::Type<'a>) -> Self {
+        Self { mapper }
     }
 }
 
-impl<M, F, II> MappingFunctor<M> for ToMappedInputFunctionMappingMutatorMapper<F, II>
+impl<M, II, IO> MappingFunctor<M> for ToMappedInputFunctionMappingMutatorMapper<IO, II>
 where
-    F: Clone,
     M: Named,
+    II: MappedInput,
 {
-    type Output = MappedInputFunctionMappingMutator<M, F, II>;
+    type Output = MappedInputFunctionMappingMutator<M, IO, II>;
 
     fn apply(&mut self, from: M) -> Self::Output {
-        MappedInputFunctionMappingMutator::new(self.mapper.clone(), from)
+        MappedInputFunctionMappingMutator::new(self.mapper, from)
     }
 }
 
@@ -339,6 +347,7 @@ pub struct OptionMappingMutator<M> {
 
 impl<M> OptionMappingMutator<M> {
     /// Creates a new [`OptionMappingMutator`]
+    #[must_use]
     pub fn new(inner: M) -> Self
     where
         M: Named,
