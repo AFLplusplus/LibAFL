@@ -28,6 +28,11 @@ pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 
+#[cfg(feature = "std")]
+pub mod hash;
+#[cfg(feature = "std")]
+pub use hash::*;
+
 #[cfg(feature = "unicode")]
 pub mod unicode;
 #[cfg(feature = "unicode")]
@@ -84,12 +89,15 @@ impl From<i32> for MutationId {
     }
 }
 
-/// The result of a mutation.
-/// If the mutation got skipped, the target
-/// will not be executed with the returned input.
+/// Result of the mutation.
+///
+/// [`MutationResult::Skipped`] does not necessarily mean that the input changed,
+/// just that the mutator did something.
+#[cfg(feature = "std")]
+/// For slow targets, consider wrapping your mutator in a [`hash::HashMutator`]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
-    /// The [`Mutator`] mutated this `Input`.
+    /// The [`Mutator`] executed on this `Input`. It may still be the same.
     Mutated,
     /// The [`Mutator`] did not mutate this `Input`. It was `Skipped`.
     Skipped,
