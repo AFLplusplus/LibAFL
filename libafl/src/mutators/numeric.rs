@@ -7,7 +7,6 @@ use libafl_bolts::{
     tuples::{Map as _, Merge},
     Error, Named,
 };
-use num_traits::Zero;
 use tuple_list::{tuple_list, tuple_list_type};
 
 use super::{
@@ -199,22 +198,9 @@ macro_rules! impl_numeric_iterate_randomize {
 
             #[inline]
             fn randomize<R: Rand>(&mut self, rand: &mut R) {
-                self.set_zero();
-
-                let byte_size = size_of::<$t>();
-                let bytes_per_rand = size_of::<u64>();
-
-                let mut current_rand = 0u64;
-
-                for byte_index in 0..byte_size {
-                    if byte_index % bytes_per_rand == 0 {
-                        current_rand = rand.next();
-                    }
-
-                    let rand_index = (byte_index % bytes_per_rand);
-                    let rand_byte = ((current_rand >> (8 * rand_index)) & 0xFF) as u8;
-                    *self |= Self::from(rand_byte) << (8 * byte_index);
-                }
+                // randomly flip all bytes, no need to reset to zero
+                *self ^= <$t>::from(rand.next());
+                *self ^= <$t>::from(rand.next()) << 64;
             }
 
         }
