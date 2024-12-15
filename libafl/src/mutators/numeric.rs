@@ -199,8 +199,7 @@ macro_rules! impl_numeric_128_bits_randomize {
             #[inline]
             fn randomize<R: Rand>(&mut self, rand: &mut R) {
                 // flip random bits, no need to reset to zero
-                *self ^= <$t>::from(rand.next());
-                *self ^= <$t>::from(rand.next()) << 64;
+                *self ^= <$t>::from(rand.next()) << 64 | <$t>::from(rand.next());
             }
 
         }
