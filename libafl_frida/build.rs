@@ -18,6 +18,9 @@ fn main() {
         println!("cargo:rustc-link-lib=dylib=c++");
     }
 
+    #[cfg(target_vendor = "apple")]
+    println!("cargo:rustc-link-lib=dylib=resolv");
+
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=test_harness.cpp");
     println!("cargo:rerun-if-changed=src/gettls.c");
