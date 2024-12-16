@@ -3,7 +3,7 @@
 //! The [`StdOutObserver`] and [`StdErrObserver`] observers look at the stdout of a program
 //! The executor must explicitly support these observers.
 #![cfg_attr(
-    all(feature = "std", unix),
+    unix,
     doc = r"For example, they are supported on the [`crate::executors::CommandExecutor`]."
 )]
 
@@ -19,11 +19,8 @@ use crate::{observers::Observer, Error};
 /// Only works for supported executors.
 ///
 /// # Example usage
-#[cfg_attr(all(feature = "std", target_os = "linux", not(miri)), doc = " ```")] // miri doesn't like the Command crate, linux as a shorthand for the availability of base64
-#[cfg_attr(
-    not(all(feature = "std", target_os = "linux", not(miri))),
-    doc = " ```ignore"
-)]
+#[cfg_attr(all(target_os = "linux", not(miri)), doc = " ```")] // miri doesn't like the Command crate, linux as a shorthand for the availability of base64
+#[cfg_attr(not(all(target_os = "linux", not(miri))), doc = " ```ignore")]
 /// use std::borrow::Cow;
 ///
 /// use libafl::{

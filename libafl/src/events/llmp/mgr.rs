@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
+    corpus::Corpus,
     events::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
         AdaptiveSerializer, CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig,
@@ -40,7 +41,7 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
     observers::{ObserversTuple, TimeObserver},
-    state::{HasExecutions, HasImported, HasLastReportTime, NopState, State, UsesState},
+    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, NopState, State, UsesState},
     Error, HasMetadata,
 };
 
@@ -387,7 +388,8 @@ where
 impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported,
+    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
+    S::Corpus: Corpus<Input = S::Input>,
     SP: ShMemProvider,
 {
     // Handle arriving events in the client
@@ -404,9 +406,9 @@ where
         E: Executor<Self, Z, State = S> + HasObservers,
         E::Observers: ObserversTuple<S::Input, S> + Serialize,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<Self, E::Observers, State = S>
-            + EvaluatorObservers<Self, E::Observers>
-            + Evaluator<E, Self>,
+        Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
+            + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -449,9 +451,7 @@ where
                         {
                             state.scalability_monitor_mut().testcase_without_observers += 1;
                         }
-                        fuzzer.evaluate_input_with_observers::<E>(
-                            state, executor, self, input, false,
-                        )?
+                        fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
                     };
                     if let Some(item) = res.1 {
                         *state.imported_mut() += 1;
@@ -591,14 +591,15 @@ where
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported,
+    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
+    S::Corpus: Corpus<Input = S::Input>,
     SP: ShMemProvider,
     E: HasObservers + Executor<Self, Z, State = S>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
-    Z: ExecutionProcessor<Self, E::Observers, State = S>
-        + EvaluatorObservers<Self, E::Observers>
-        + Evaluator<E, Self>,
+    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
+        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
+        + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
 {
     fn process(
         &mut self,
@@ -655,11 +656,12 @@ where
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported,
+    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported + HasCorpus,
+    S::Corpus: Corpus<Input = S::Input>,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<Self, E::Observers, State = S>
-        + EvaluatorObservers<Self, E::Observers>
-        + Evaluator<E, Self>,
+    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
+        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
+        + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
 {
 }
 

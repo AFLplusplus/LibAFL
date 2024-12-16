@@ -58,7 +58,7 @@ pub(crate) struct Itimerval {
     pub it_value: Timeval,
 }
 
-#[cfg(all(feature = "std", unix, not(target_os = "linux")))]
+#[cfg(all(unix, not(target_os = "linux")))]
 extern "C" {
     pub(crate) fn setitimer(
         which: libc::c_int,
@@ -102,7 +102,7 @@ pub struct TimerStruct {
     pub(crate) tmout_start_time: Duration,
 }
 
-#[cfg(all(feature = "std", windows))]
+#[cfg(windows)]
 #[allow(non_camel_case_types)]
 type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param0: PTP_CALLBACK_INSTANCE,

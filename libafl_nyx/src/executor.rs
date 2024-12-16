@@ -50,7 +50,6 @@ where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
     S::Input: HasTargetBytes,
-    Z: UsesState<State = S>,
     OT: ObserversTuple<S::Input, S>,
 {
     fn run_target(

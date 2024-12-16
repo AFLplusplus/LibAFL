@@ -53,13 +53,12 @@ impl<EM, S, Z> Executor<EM, Z> for CustomExecutor<S>
 where
     EM: UsesState<State = S>,
     S: State + HasExecutions,
-    Z: UsesState<State = S>,
     Self::Input: HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, libafl::Error> {

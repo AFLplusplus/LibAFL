@@ -15,18 +15,19 @@ use libafl_bolts::{
 };
 use serde::Deserialize;
 
-#[cfg(feature = "share_objectives")]
 use crate::{
-    corpus::{Corpus, Testcase},
-    state::{HasCurrentTestcase, HasSolutions},
-};
-use crate::{
+    corpus::Corpus,
     events::{CustomBufEventResult, CustomBufHandlerFn, Event, EventFirer},
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
-    state::{HasExecutions, NopState, State, Stoppable, UsesState},
+    state::{HasCorpus, HasExecutions, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
+};
+#[cfg(feature = "share_objectives")]
+use crate::{
+    corpus::Testcase,
+    state::{HasCurrentTestcase, HasSolutions},
 };
 
 /// The llmp event manager
@@ -258,7 +259,7 @@ where
 
 impl<DI, IC, ICB, S, SP> LlmpEventConverter<DI, IC, ICB, S, SP>
 where
-    S: UsesInput + HasExecutions + HasMetadata + Stoppable,
+    S: UsesInput + HasExecutions + HasMetadata + Stoppable + HasCorpus,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
@@ -301,8 +302,10 @@ where
     where
         E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
+        S::Corpus: Corpus<Input = S::Input>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<EM, E::Observers, State = S> + EvaluatorObservers<EM, E::Observers>,
+        Z: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
     {
         match event {
             Event::NewTestcase {
@@ -314,7 +317,7 @@ where
                     return Ok(());
                 };
 
-                let res = fuzzer.evaluate_input_with_observers::<E>(
+                let res = fuzzer.evaluate_input_with_observers(
                     state,
                     executor,
                     manager,
@@ -356,8 +359,10 @@ where
     where
         E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
+        S::Corpus: Corpus<Input = S::Input>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<EM, E::Observers, State = S> + EvaluatorObservers<EM, E::Observers>,
+        Z: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
@@ -400,8 +405,8 @@ where
         + HasSolutions
         + HasMetadata
         + Stoppable
-        + State
-        + HasCurrentTestcase,
+        + HasCurrentTestcase
+        + HasCorpus,
     S::Solutions: Corpus<Input = S::Input>,
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
@@ -421,8 +426,10 @@ where
     where
         E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
+        S::Corpus: Corpus<Input = S::Input>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<EM, E::Observers, State = S> + EvaluatorObservers<EM, E::Observers>,
+        Z: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
     {
         match event {
             Event::NewTestcase {
@@ -434,7 +441,7 @@ where
                     return Ok(());
                 };
 
-                let res = fuzzer.evaluate_input_with_observers::<E>(
+                let res = fuzzer.evaluate_input_with_observers(
                     state,
                     executor,
                     manager,
@@ -495,8 +502,10 @@ where
     where
         E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
+        S::Corpus: Corpus<Input = S::Input>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<EM, E::Observers, State = S> + EvaluatorObservers<EM, E::Observers>,
+        Z: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();

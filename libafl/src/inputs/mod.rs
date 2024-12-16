@@ -3,6 +3,9 @@
 pub mod bytes;
 pub use bytes::BytesInput;
 
+pub mod value;
+pub use value::ValueInput;
+
 pub mod encoded;
 pub use encoded::*;
 
@@ -28,7 +31,12 @@ use alloc::{
     string::{String, ToString},
     vec::{Drain, Splice, Vec},
 };
-use core::{clone::Clone, fmt::Debug, marker::PhantomData, ops::RangeBounds};
+use core::{
+    clone::Clone,
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{Deref, DerefMut, RangeBounds},
+};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
@@ -42,6 +50,7 @@ use libafl_bolts::{
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
+use value::ValueMutRefInput;
 
 use crate::corpus::CorpusId;
 
@@ -210,36 +219,29 @@ where
 }
 
 /// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
-#[derive(Debug)]
-pub struct MutVecInput<'a>(&'a mut Vec<u8>);
-
-impl<'a> From<&'a mut Vec<u8>> for MutVecInput<'a> {
-    fn from(value: &'a mut Vec<u8>) -> Self {
-        Self(value)
-    }
-}
+pub type MutVecInput<'a> = ValueMutRefInput<'a, Vec<u8>>;
 
 impl HasLen for MutVecInput<'_> {
     fn len(&self) -> usize {
-        self.0.len()
+        self.deref().len()
     }
 }
 
 impl HasMutatorBytes for MutVecInput<'_> {
     fn bytes(&self) -> &[u8] {
-        self.0
+        self
     }
 
     fn bytes_mut(&mut self) -> &mut [u8] {
-        self.0
+        self
     }
 
     fn resize(&mut self, new_len: usize, value: u8) {
-        self.0.resize(new_len, value);
+        self.deref_mut().resize(new_len, value);
     }
 
     fn extend<'b, I: IntoIterator<Item = &'b u8>>(&mut self, iter: I) {
-        self.0.extend(iter);
+        self.deref_mut().extend(iter);
     }
 
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
@@ -247,22 +249,15 @@ impl HasMutatorBytes for MutVecInput<'_> {
         R: RangeBounds<usize>,
         I: IntoIterator<Item = u8>,
     {
-        self.0.splice::<R, I>(range, replace_with)
+        self.deref_mut().splice::<R, I>(range, replace_with)
     }
 
     fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
     where
         R: RangeBounds<usize>,
     {
-        self.0.drain(range)
+        self.deref_mut().drain(range)
     }
-}
-
-impl MappedInput for MutVecInput<'_> {
-    type Type<'b>
-        = MutVecInput<'b>
-    where
-        Self: 'b;
 }
 
 /// Defines the input type shared across traits of the type.
