@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "share_objectives")]
 use crate::state::HasSolutions;
-
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
