@@ -80,11 +80,13 @@ libafl_benches = { path = "./utils/libafl_benches", version = "0.14.1", default-
 libafl_jumper = { path = "./utils/libafl_jumper", version = "0.14.1", default-features = false }
 
 # External deps
-ahash = { version = "0.8.11", default-features = false } # The hash function already used in hashbrown
-arbitrary-int = "1.2.7" # arbitrary sized integers, useful in combination with bitfields (bitbybit crate)
+ahash = { version = "0.8.11", default-features = false }     # The hash function already used in hashbrown
+arbitrary-int = "1.2.7"                                      # arbitrary sized integers, useful in combination with bitfields (bitbybit crate)
 backtrace = { version = "0.3.74", default-features = false } # Used to get the stacktrace in StacktraceObserver
 bindgen = "0.71.1"
-bitbybit = "1.3.3" # bitfields, use this for bit fields and bit enums
+# 2024-12-16: bitbybit 1.3.3 is leading CI to fail due to missing docs.
+# fixme: Change this to 1.3.3 when the issue https://github.com/danlehmann/bitfield/issues/66 is resolved.
+bitbybit = ">= 1, < 1.3.3" # bitfields, use this for bit fields and bit enums
 clap = "4.5.18"
 cc = "1.1.21"
 cmake = "0.1.51"
