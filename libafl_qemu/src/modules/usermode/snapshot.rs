@@ -853,7 +853,11 @@ where
                  * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
                  * It is safe to assume RW perms here
                  */
-                h.change_mapped(h.initial_brk, (result - h.initial_brk) as usize, Some(MmapPerms::ReadWrite));
+                h.change_mapped(
+                    h.initial_brk,
+                    (result - h.initial_brk) as usize,
+                    Some(MmapPerms::ReadWrite),
+                );
             }
         }
         // mmap syscalls
