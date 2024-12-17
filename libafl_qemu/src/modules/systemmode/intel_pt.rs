@@ -69,7 +69,7 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
-        qemu: Qemu,
+        _qemu: Qemu,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
         _input: &S::Input,
@@ -100,7 +100,6 @@ where
                 .dump_last_trace_to_file()
                 .inspect_err(|e| log::warn!("Intel PT trace save to file failed: {e}"));
         }
-        println!("map: {:?}", map);
     }
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {

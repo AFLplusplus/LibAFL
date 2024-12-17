@@ -30,6 +30,16 @@ args = ["build", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
 [tasks.build]
 dependencies = ["build_fuzzer", "build_target"]
 
+[tasks.convert_target_image]
+command = "qemu-img"
+args = [
+  "convert",
+  "-O",
+  "qcow2",
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.bin",
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.qcow2",
+]
+
 [tasks.setcap]
 script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
 dependencies = ["build_fuzzer"]
@@ -37,7 +47,7 @@ dependencies = ["build_fuzzer"]
 [tasks.run]
 command = "cargo"
 args = ["run", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
-dependencies = ["build", "setcap"]
+dependencies = ["build", "setcap", "convert_target_image"]
 
 [tasks.default]
 alias = "run"

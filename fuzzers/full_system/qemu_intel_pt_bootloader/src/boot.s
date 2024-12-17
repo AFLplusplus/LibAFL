@@ -24,7 +24,7 @@ start:
     cmp ah, 0           ; ah must be 0
     jne fail
 
-    mov ax, [es:bx]     ; byte count
+    mov ax, [es:bx]     ; byte count of the system configuration parameters
     cmp ax, 8
     jl fail
 
@@ -67,7 +67,7 @@ sleep_forever:
     jmp sleep_forever
 
 fail_msg db "I don't like your BIOS. :(", 0
-bye db "Amazing <3 Bye!", 0
+bye db "Artificial bug triggered =)", 0
 
 times 510-($-$$) db 0   ; fill the output file with zeroes until 510 bytes are full
 

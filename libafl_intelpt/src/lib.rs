@@ -450,7 +450,7 @@ impl IntelPT {
                         //     b.ip()
                         // );
                         // log::trace!("writing map at {id:x} with value {:?}", *map_loc);
-                        // *previous_block_end_ip = b.end_ip();
+                        *previous_block_end_ip = b.end_ip();
                     }
 
                     if status.eos() {
