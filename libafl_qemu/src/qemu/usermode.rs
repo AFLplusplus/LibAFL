@@ -4,7 +4,7 @@ use std::{
 };
 
 use libafl_qemu_sys::{
-    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk, libafl_load_addr,
+    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk, libafl_get_initial_brk, libafl_load_addr,
     libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
     pageflags_get_root, read_self_maps, GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot,
     MapInfo, MmapPerms, VerifyAccess,
@@ -175,6 +175,11 @@ impl Qemu {
     #[must_use]
     pub fn get_brk(&self) -> GuestAddr {
         unsafe { libafl_get_brk() as GuestAddr }
+    }
+
+    #[must_use]
+    pub fn get_initial_brk(&self) -> GuestAddr {
+        unsafe { libafl_get_initial_brk() as GuestAddr }
     }
 
     pub fn set_brk(&self, brk: GuestAddr) {
