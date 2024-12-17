@@ -9,12 +9,13 @@ mod parent;
 extern crate log;
 extern crate simplelog;
 
-use {
-    crate::{args::Args, child::Child, exit::Exit, logger::Logger, parent::Parent},
-    anyhow::{anyhow, Result},
-    clap::Parser,
-    nix::unistd::{fork, pipe, ForkResult},
-};
+use std::os::fd::AsRawFd;
+
+use anyhow::{anyhow, Result};
+use clap::Parser;
+use nix::unistd::{fork, pipe, ForkResult};
+
+use crate::{args::Args, child::Child, exit::Exit, logger::Logger, parent::Parent};
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -30,8 +31,10 @@ fn main() -> Result<()> {
     let (a2, b2) = pipe().map_err(|e| anyhow!("Failed to create pipe #2: {e:}"))?;
 
     match unsafe { fork() } {
-        Ok(ForkResult::Parent { child: _, .. }) => Parent::new(&args, a1, a2).run()?,
-        Ok(ForkResult::Child) => Child::new(&args, b1, b2).run()?,
+        Ok(ForkResult::Parent { child: _, .. }) => {
+            Parent::new(&args, a1.as_raw_fd(), a2.as_raw_fd()).run()?
+        }
+        Ok(ForkResult::Child) => Child::new(&args, b1.as_raw_fd(), b2.as_raw_fd()).run()?,
         Err(e) => Err(anyhow!("main: fork failed: {e:}"))?,
     };
     Ok(())
