@@ -11,7 +11,7 @@ use crate::{
     corpus::Corpus,
     inputs::{BytesInput, HasTargetBytes},
     stages::Stage,
-    state::{HasCorpus, HasCurrentTestcase, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase},
     HasMetadata,
 };
 
@@ -109,39 +109,29 @@ impl<S> UnicodeIdentificationStage<S> {
     }
 }
 
-impl<S> UsesState for UnicodeIdentificationStage<S>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage<S>
 where
-    S: State,
-{
-    type State = S;
-}
-
-impl<S, E, EM, Z> Stage<E, EM, Z> for UnicodeIdentificationStage<S>
-where
-    S: HasCorpus + State + HasCurrentTestcase,
+    S: HasCorpus + HasCurrentTestcase,
     S::Corpus: Corpus<Input = BytesInput>,
-    E: UsesState<State = S>,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     fn perform(
         &mut self,
         _fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
     }
 
     #[inline]
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Stage does not run the target. No reset helper needed.
         Ok(true)
     }
 
     #[inline]
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Stage does not run the target. No reset helper needed.
         Ok(())
     }

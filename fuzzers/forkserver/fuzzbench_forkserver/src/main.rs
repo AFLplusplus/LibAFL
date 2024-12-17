@@ -298,7 +298,7 @@ fn fuzz(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus

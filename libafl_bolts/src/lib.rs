@@ -146,7 +146,7 @@ use alloc::{borrow::Cow, vec::Vec};
 #[cfg(all(not(feature = "xxh3"), feature = "alloc"))]
 use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
-use core::hash::Hasher;
+use core::hash::{Hash, Hasher};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(all(unix, feature = "std"))]
@@ -263,6 +263,21 @@ pub fn hash_std(input: &[u8]) -> u64 {
         hasher.write(input);
         hasher.finish()
     }
+}
+
+/// Hashes the input with a given hash
+///
+/// Hashes the input with a given hash, depending on features:
+/// [`xxh3_64`](https://docs.rs/xxhash-rust/latest/xxhash_rust/xxh3/fn.xxh3_64.html)
+/// if the `xxh3` feature is used, /// else [`ahash`](https://docs.rs/ahash/latest/ahash/).
+///
+/// If you have access to a `&[u8]` directly, [`hash_std`] may provide better performance
+#[cfg(any(feature = "xxh3", feature = "alloc"))]
+#[must_use]
+pub fn generic_hash_std<I: Hash>(input: &I) -> u64 {
+    let mut hasher = hasher_std();
+    input.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Main error struct for `LibAFL`

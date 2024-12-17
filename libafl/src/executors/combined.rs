@@ -26,7 +26,6 @@ impl<A, B> CombinedExecutor<A, B> {
         A: Executor<EM, Z>,
         B: Executor<EM, Z, State = <Self as UsesState>::State>,
         EM: UsesState<State = <Self as UsesState>::State>,
-        Z: UsesState<State = <Self as UsesState>::State>,
     {
         Self { primary, secondary }
     }
@@ -48,7 +47,6 @@ where
     B: Executor<EM, Z, State = <Self as UsesState>::State>,
     Self::State: HasExecutions,
     EM: UsesState<State = <Self as UsesState>::State>,
-    Z: UsesState<State = <Self as UsesState>::State>,
 {
     fn run_target(
         &mut self,

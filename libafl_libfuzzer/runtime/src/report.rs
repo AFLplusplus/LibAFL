@@ -23,7 +23,7 @@ fn do_report<F, ST, E, S, EM>(
     _mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, ST, State = S>,
+    F: Fuzzer<E, EM, S, ST>,
     S: HasMetadata
         + HasNamedMetadata
         + HasExecutions

@@ -121,7 +121,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: UsesState<State = S>,
 {
     pub(super) unsafe fn pre_run_target_child(
         &mut self,

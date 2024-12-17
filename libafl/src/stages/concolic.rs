@@ -14,14 +14,13 @@ use libafl_bolts::{
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-#[cfg(all(feature = "introspection", feature = "concolic_mutation"))]
-use crate::state::HasClientPerfMonitor;
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
+    inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage, TracingStage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]
@@ -29,51 +28,45 @@ use crate::{
     inputs::HasMutatorBytes,
     mark_feature_time,
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
-    start_timer,
-    state::State,
-    Evaluator,
+    start_timer, Evaluator,
 };
 
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<'a, EM, TE, Z> {
+pub struct ConcolicTracingStage<'a, EM, TE, S, Z> {
     name: Cow<'static, str>,
-    inner: TracingStage<EM, TE, Z>,
+    inner: TracingStage<EM, TE, S, Z>,
     observer_handle: Handle<ConcolicObserver<'a>>,
-}
-
-impl<EM, TE, Z> UsesState for ConcolicTracingStage<'_, EM, TE, Z>
-where
-    TE: UsesState,
-{
-    type State = TE::State;
 }
 
 /// The name for concolic tracer
 pub const CONCOLIC_TRACING_STAGE_NAME: &str = "concolictracing";
 
-impl<EM, TE, Z> Named for ConcolicTracingStage<'_, EM, TE, Z> {
+impl<EM, TE, S, Z> Named for ConcolicTracingStage<'_, EM, TE, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<'_, EM, TE, Z>
+impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<'_, EM, TE, S, Z>
 where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    TE: Executor<EM, Z> + HasObservers,
-    TE::Observers: ObserversTuple<TE::Input, <Self as UsesState>::State>,
-    TE::State: HasExecutions + HasCorpus + HasNamedMetadata + HasCurrentTestcase,
-    Z: UsesState<State = Self::State>,
-    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
+    TE: Executor<EM, Z, State = S> + HasObservers,
+    TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasExecutions
+        + HasCorpus
+        + HasNamedMetadata
+        + HasCurrentTestcase
+        + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    EM: UsesState<State = S>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         self.inner.trace(fuzzer, state, manager)?;
@@ -87,23 +80,23 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
         RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<'a, EM, TE, Z> ConcolicTracingStage<'a, EM, TE, Z> {
+impl<'a, EM, TE, S, Z> ConcolicTracingStage<'a, EM, TE, S, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a
     /// [`ConcolicObserver`] with the given name.
     pub fn new(
-        inner: TracingStage<EM, TE, Z>,
+        inner: TracingStage<EM, TE, S, Z>,
         observer_handle: Handle<ConcolicObserver<'a>>,
     ) -> Self {
         let observer_name = observer_handle.name().clone();
@@ -369,14 +362,6 @@ pub struct SimpleConcolicMutationalStage<Z> {
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<Z> UsesState for SimpleConcolicMutationalStage<Z>
-where
-    Z: UsesState,
-{
-    type State = Z::State;
-}
-
-#[cfg(feature = "concolic_mutation")]
 /// The unique id for this stage
 static mut SIMPLE_CONCOLIC_MUTATIONAL_ID: usize = 0;
 
@@ -392,22 +377,25 @@ impl<Z> Named for SimpleConcolicMutationalStage<Z> {
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<E, EM, Z> Stage<E, EM, Z> for SimpleConcolicMutationalStage<Z>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<Z>
 where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    Z: Evaluator<E, EM>,
-    Z::Input: HasMutatorBytes,
-    Z::State:
-        State + HasExecutions + HasCorpus + HasMetadata + HasNamedMetadata + HasCurrentTestcase,
-    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
+    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
+    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
+    S: HasExecutions
+        + HasCorpus
+        + HasMetadata
+        + HasNamedMetadata
+        + HasCurrentTestcase
+        + MaybeHasClientPerfMonitor
+        + HasCurrentCorpusId
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         {
@@ -437,7 +425,7 @@ where
     }
 
     #[inline]
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
         // Once it failed, then don't retry,
         // It will just fail again
@@ -445,7 +433,7 @@ where
     }
 
     #[inline]
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }

@@ -1,11 +1,11 @@
 pub mod level;
 mod version;
 
-use {
-    crate::args::{level::Level, version::Version},
-    clap::Parser,
-    std::iter,
-};
+use std::iter;
+
+use clap::Parser;
+
+use crate::args::{level::Level, version::Version};
 
 pub trait ParentArgs {
     fn port(&self) -> u16;
