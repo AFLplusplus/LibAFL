@@ -695,7 +695,6 @@ impl IntelPTBuilder {
 /// Perf event config for `IntelPT`
 ///
 /// (This is almost mapped to `IA32_RTIT_CTL MSR` by perf)
-#[allow(missing_docs)] // 2024-12-15: bitfield is leading CI to fail due to missing docs.
 #[cfg(target_os = "linux")]
 #[bitfield(u64, default = 0)]
 struct PtConfig {
