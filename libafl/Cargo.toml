@@ -291,6 +291,7 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 libipt = { workspace = true, optional = true }
+bloomfilter = "3.0.1"
 
 [lints]
 workspace = true

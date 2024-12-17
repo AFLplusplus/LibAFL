@@ -2,7 +2,10 @@
 
 use alloc::{string::ToString, vec::Vec};
 use core::{fmt::Debug, time::Duration};
+#[cfg(feature = "std")]
+use std::hash::Hash;
 
+use bloomfilter::Bloom;
 use libafl_bolts::{current_time, tuples::MatchName};
 use serde::Serialize;
 
@@ -243,13 +246,14 @@ pub enum ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, OF> {
+pub struct StdFuzzer<CS, F, OF, IF> {
     scheduler: CS,
     feedback: F,
     objective: OF,
+    input_filter: IF,
 }
 
-impl<CS, F, OF, S> HasScheduler<<S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, OF>
+impl<CS, F, OF, S, IF> HasScheduler<<S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, OF, IF>
 where
     S: HasCorpus,
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
@@ -265,7 +269,7 @@ where
     }
 }
 
-impl<CS, F, OF> HasFeedback for StdFuzzer<CS, F, OF> {
+impl<CS, F, OF, IF> HasFeedback for StdFuzzer<CS, F, OF, IF> {
     type Feedback = F;
 
     fn feedback(&self) -> &Self::Feedback {
@@ -277,7 +281,7 @@ impl<CS, F, OF> HasFeedback for StdFuzzer<CS, F, OF> {
     }
 }
 
-impl<CS, F, OF> HasObjective for StdFuzzer<CS, F, OF> {
+impl<CS, F, OF, IF> HasObjective for StdFuzzer<CS, F, OF, IF> {
     type Objective = OF;
 
     fn objective(&self) -> &OF {
@@ -289,8 +293,8 @@ impl<CS, F, OF> HasObjective for StdFuzzer<CS, F, OF> {
     }
 }
 
-impl<CS, EM, F, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
-    for StdFuzzer<CS, F, OF>
+impl<CS, EM, F, OF, OT, S, IF> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
+    for StdFuzzer<CS, F, OF, IF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     EM: EventFirer<State = S>,
@@ -491,8 +495,8 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
-    for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, OF, S, IF> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, OF, IF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, Self, State = S>,
@@ -528,7 +532,43 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, OF>
+trait InputFilter<I> {
+    fn should_execute(&mut self, input: &I) -> bool;
+}
+
+/// A pseudo-filter that will execute each input.
+#[derive(Debug)]
+pub struct NopInputFilter;
+impl<I> InputFilter<I> for NopInputFilter {
+    fn should_execute(&mut self, _input: &I) -> bool {
+        true
+    }
+}
+
+/// A filter that probabilistically prevents duplicate execution of the same input based on a bloom filter.
+#[cfg(feature = "std")]
+#[derive(Debug)]
+pub struct BloomInputFilter<I> {
+    bloom: Bloom<I>,
+}
+
+#[cfg(feature = "std")]
+impl<I> BloomInputFilter<I> {
+    fn new(items_count: usize, fp_p: f64) -> Result<Self, Error> {
+        let bloom = Bloom::new_for_fp_rate(items_count, fp_p).map_err(Error::illegal_argument)?;
+        Ok(Self { bloom })
+    }
+}
+
+#[cfg(feature = "std")]
+impl<I: Hash> InputFilter<I> for BloomInputFilter<I> {
+    fn should_execute(&mut self, input: &I) -> bool {
+        !self.bloom.check_and_set(input)
+    }
+}
+
+impl<CS, E, EM, F, OF, S, IF> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, OF, IF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, Self, State = S>,
@@ -545,6 +585,7 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     <S::Corpus as Corpus>::Input: Input,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    IF: InputFilter<<S::Corpus as Corpus>::Input>,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -556,7 +597,11 @@ where
         input: <S::Corpus as Corpus>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_with_observers(state, executor, manager, input, send_events)
+        if self.input_filter.should_execute(&input) {
+            self.evaluate_input_with_observers(state, executor, manager, input, send_events)
+        } else {
+            Ok((ExecuteInputResult::None, None))
+        }
     }
     fn add_disabled_input(
         &mut self,
@@ -668,7 +713,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S, ST> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, OF, S, ST, IF> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, OF, IF>
 where
     CS: Scheduler<S::Input, S>,
     E: UsesState<State = S>,
@@ -792,14 +837,38 @@ where
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, OF> {
+impl<CS, F, OF> StdFuzzer<CS, F, OF, NopInputFilter> {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
         Self {
             scheduler,
             feedback,
             objective,
+            input_filter: NopInputFilter,
         }
+    }
+}
+impl<CS, F, OF, I> StdFuzzer<CS, F, OF, BloomInputFilter<I>> {
+    /// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
+    ///
+    /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
+    ///
+    /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
+    pub fn new_with_bloom_filter(
+        scheduler: CS,
+        feedback: F,
+        objective: OF,
+        items_count: usize,
+        fp_p: f64,
+    ) -> Result<Self, Error> {
+        let input_filter = BloomInputFilter::new(items_count, fp_p)?;
+
+        Ok(Self {
+            scheduler,
+            feedback,
+            objective,
+            input_filter,
+        })
     }
 }
 
@@ -815,8 +884,8 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
-    for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, OF, S, IF> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, OF, IF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: Executor<EM, Self, State = S> + HasObservers,
