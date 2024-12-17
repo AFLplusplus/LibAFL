@@ -1,16 +1,16 @@
-use {
-    crate::{args::ParentArgs, exit::Exit},
-    anyhow::{anyhow, Result},
-    nix::unistd::read,
-    std::{
-        fmt,
-        io::{Read, Write},
-        net::{SocketAddr, TcpStream},
-        os::fd::RawFd,
-        thread::spawn,
-        time::{Duration, SystemTime},
-    },
+use std::{
+    fmt,
+    io::{Read, Write},
+    net::{SocketAddr, TcpStream},
+    os::fd::RawFd,
+    thread::spawn,
+    time::{Duration, SystemTime},
 };
+
+use anyhow::{anyhow, Result};
+use nix::unistd::read;
+
+use crate::{args::ParentArgs, exit::Exit};
 
 enum Direction {
     GdbToTarget,
