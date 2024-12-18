@@ -317,7 +317,7 @@ where
                     let new_distance = distance + successor_info.get_weight();
                     let is_shorter = distances
                         .get(successor)
-                        .map_or(true, |&current| new_distance < current);
+                        .is_none_or(|&current| new_distance < current);
 
                     if is_shorter {
                         distances.insert(*successor, new_distance);
