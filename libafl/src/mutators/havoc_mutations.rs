@@ -3,9 +3,9 @@
 use libafl_bolts::tuples::{Map, Merge};
 use tuple_list::{tuple_list, tuple_list_type};
 
-use super::{FunctionMappingMutator, ToFunctionMappingMutatorMapper};
+use super::{MappingMutator, ToMappingMutatorMapper};
 use crate::mutators::{
-    mapping::{OptionMappingMutator, ToOptionMappingMutatorMapper},
+    mapping::{OptionalMutator, ToOptionalMutatorMapper},
     mutations::{
         BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
         ByteInterestingMutator, ByteNegMutator, ByteRandMutator, BytesCopyMutator,
@@ -88,64 +88,64 @@ pub type HavocMutationsType = tuple_list_type!(
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types
 pub type MappedHavocMutationsType<F1, F2, O> = tuple_list_type!(
-    FunctionMappingMutator<BitFlipMutator, F1>,
-    FunctionMappingMutator<ByteFlipMutator, F1>,
-    FunctionMappingMutator<ByteIncMutator, F1>,
-    FunctionMappingMutator<ByteDecMutator, F1>,
-    FunctionMappingMutator<ByteNegMutator, F1>,
-    FunctionMappingMutator<ByteRandMutator, F1>,
-    FunctionMappingMutator<ByteAddMutator, F1>,
-    FunctionMappingMutator<WordAddMutator, F1>,
-    FunctionMappingMutator<DwordAddMutator, F1>,
-    FunctionMappingMutator<QwordAddMutator, F1>,
-    FunctionMappingMutator<ByteInterestingMutator, F1>,
-    FunctionMappingMutator<WordInterestingMutator, F1>,
-    FunctionMappingMutator<DwordInterestingMutator, F1>,
-    FunctionMappingMutator<BytesDeleteMutator, F1>,
-    FunctionMappingMutator<BytesDeleteMutator, F1>,
-    FunctionMappingMutator<BytesDeleteMutator, F1>,
-    FunctionMappingMutator<BytesDeleteMutator, F1>,
-    FunctionMappingMutator<BytesExpandMutator, F1>,
-    FunctionMappingMutator<BytesInsertMutator, F1>,
-    FunctionMappingMutator<BytesRandInsertMutator, F1>,
-    FunctionMappingMutator<BytesSetMutator, F1>,
-    FunctionMappingMutator<BytesRandSetMutator, F1>,
-    FunctionMappingMutator<BytesCopyMutator, F1>,
-    FunctionMappingMutator<BytesInsertCopyMutator, F1>,
-    FunctionMappingMutator<BytesSwapMutator, F1>,
-    FunctionMappingMutator<MappedCrossoverInsertMutator<F2, O>, F1>,
-    FunctionMappingMutator<MappedCrossoverReplaceMutator<F2, O>, F1>,
+    MappingMutator<BitFlipMutator, F1>,
+    MappingMutator<ByteFlipMutator, F1>,
+    MappingMutator<ByteIncMutator, F1>,
+    MappingMutator<ByteDecMutator, F1>,
+    MappingMutator<ByteNegMutator, F1>,
+    MappingMutator<ByteRandMutator, F1>,
+    MappingMutator<ByteAddMutator, F1>,
+    MappingMutator<WordAddMutator, F1>,
+    MappingMutator<DwordAddMutator, F1>,
+    MappingMutator<QwordAddMutator, F1>,
+    MappingMutator<ByteInterestingMutator, F1>,
+    MappingMutator<WordInterestingMutator, F1>,
+    MappingMutator<DwordInterestingMutator, F1>,
+    MappingMutator<BytesDeleteMutator, F1>,
+    MappingMutator<BytesDeleteMutator, F1>,
+    MappingMutator<BytesDeleteMutator, F1>,
+    MappingMutator<BytesDeleteMutator, F1>,
+    MappingMutator<BytesExpandMutator, F1>,
+    MappingMutator<BytesInsertMutator, F1>,
+    MappingMutator<BytesRandInsertMutator, F1>,
+    MappingMutator<BytesSetMutator, F1>,
+    MappingMutator<BytesRandSetMutator, F1>,
+    MappingMutator<BytesCopyMutator, F1>,
+    MappingMutator<BytesInsertCopyMutator, F1>,
+    MappingMutator<BytesSwapMutator, F1>,
+    MappingMutator<MappedCrossoverInsertMutator<F2, O>, F1>,
+    MappingMutator<MappedCrossoverReplaceMutator<F2, O>, F1>,
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types, for optional byte array input parts
 pub type OptionMappedHavocMutationsType<F1, F2, O> = tuple_list_type!(
-    FunctionMappingMutator<OptionMappingMutator<BitFlipMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<ByteFlipMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<ByteIncMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<ByteDecMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<ByteNegMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<ByteRandMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<ByteAddMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<WordAddMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<DwordAddMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<QwordAddMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<ByteInterestingMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<WordInterestingMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<DwordInterestingMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesDeleteMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesExpandMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesInsertMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesRandInsertMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesSetMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesRandSetMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesCopyMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesInsertCopyMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<BytesSwapMutator>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<MappedCrossoverInsertMutator<F2, O>>, F1>,
-    FunctionMappingMutator<OptionMappingMutator<MappedCrossoverReplaceMutator<F2, O>>, F1>,
+    MappingMutator<OptionalMutator<BitFlipMutator>, F1>,
+    MappingMutator<OptionalMutator<ByteFlipMutator>, F1>,
+    MappingMutator<OptionalMutator<ByteIncMutator>, F1>,
+    MappingMutator<OptionalMutator<ByteDecMutator>, F1>,
+    MappingMutator<OptionalMutator<ByteNegMutator>, F1>,
+    MappingMutator<OptionalMutator<ByteRandMutator>, F1>,
+    MappingMutator<OptionalMutator<ByteAddMutator>, F1>,
+    MappingMutator<OptionalMutator<WordAddMutator>, F1>,
+    MappingMutator<OptionalMutator<DwordAddMutator>, F1>,
+    MappingMutator<OptionalMutator<QwordAddMutator>, F1>,
+    MappingMutator<OptionalMutator<ByteInterestingMutator>, F1>,
+    MappingMutator<OptionalMutator<WordInterestingMutator>, F1>,
+    MappingMutator<OptionalMutator<DwordInterestingMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesDeleteMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesDeleteMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesDeleteMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesDeleteMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesExpandMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesInsertMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesRandInsertMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesSetMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesRandSetMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesCopyMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesInsertCopyMutator>, F1>,
+    MappingMutator<OptionalMutator<BytesSwapMutator>, F1>,
+    MappingMutator<OptionalMutator<MappedCrossoverInsertMutator<F2, O>>, F1>,
+    MappingMutator<OptionalMutator<MappedCrossoverReplaceMutator<F2, O>>, F1>,
 );
 
 /// Get the mutations that compose the Havoc mutator (only applied to single inputs)
@@ -235,7 +235,7 @@ where
 {
     havoc_mutations_no_crossover()
         .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
-        .map(ToFunctionMappingMutatorMapper::new(current_input_mapper))
+        .map(ToMappingMutatorMapper::new(current_input_mapper))
 }
 
 /// Get the mutations that compose the Havoc mutator for mapped input types, for optional input parts
@@ -254,6 +254,6 @@ where
         .merge(havoc_crossover_with_corpus_mapper_optional(
             input_from_corpus_mapper,
         ))
-        .map(ToOptionMappingMutatorMapper)
-        .map(ToFunctionMappingMutatorMapper::new(current_input_mapper))
+        .map(ToOptionalMutatorMapper)
+        .map(ToMappingMutatorMapper::new(current_input_mapper))
 }

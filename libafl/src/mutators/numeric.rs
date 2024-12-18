@@ -9,7 +9,7 @@ use libafl_bolts::{
 };
 use tuple_list::{tuple_list, tuple_list_type};
 
-use super::{FunctionMappingMutator, MutationResult, Mutator, ToFunctionMappingMutatorMapper};
+use super::{MappingMutator, MutationResult, Mutator, ToMappingMutatorMapper};
 use crate::{
     corpus::Corpus,
     random_corpus_id_with_disabled,
@@ -72,13 +72,13 @@ pub fn int_mutators() -> IntMutatorsType {
 
 /// Mapped mutators for integer-like inputs
 pub type MappedIntMutatorsType<F1, F2> = tuple_list_type!(
-    FunctionMappingMutator<BitFlipMutator,F1>,
-    FunctionMappingMutator<NegateMutator,F1>,
-    FunctionMappingMutator<IncMutator,F1>,
-    FunctionMappingMutator<DecMutator,F1>,
-    FunctionMappingMutator<TwosComplementMutator,F1>,
-    FunctionMappingMutator<RandMutator,F1>,
-    FunctionMappingMutator<MappedCrossoverMutator<F2>,F1>
+    MappingMutator<BitFlipMutator,F1>,
+    MappingMutator<NegateMutator,F1>,
+    MappingMutator<IncMutator,F1>,
+    MappingMutator<DecMutator,F1>,
+    MappingMutator<TwosComplementMutator,F1>,
+    MappingMutator<RandMutator,F1>,
+    MappingMutator<MappedCrossoverMutator<F2>,F1>
 );
 
 /// Mapped mutators for integer-like inputs
@@ -93,7 +93,7 @@ where
 {
     int_mutators_no_crossover()
         .merge(mapped_int_mutators_crossover(input_from_corpus_mapper))
-        .map(ToFunctionMappingMutatorMapper::new(current_input_mapper))
+        .map(ToMappingMutatorMapper::new(current_input_mapper))
 }
 /// Functionality required for Numeric Mutators (see [`int_mutators`])
 pub trait Numeric {

@@ -18,7 +18,7 @@ use crate::{
 /// use std::vec::Vec;
 ///
 /// use libafl::{
-///     mutators::{ByteIncMutator, FunctionMappingMutator, MutationResult, Mutator},
+///     mutators::{ByteIncMutator, MappingMutator, MutationResult, Mutator},
 ///     state::NopState,
 /// };
 ///
@@ -34,7 +34,7 @@ use crate::{
 /// // construct a mutator that works on &mut Vec<u8> (since it impls `HasMutatorBytes`)
 /// let inner = ByteIncMutator::new();
 /// // construct a mutator that works on &mut CustomInput
-/// let mut outer = FunctionMappingMutator::new(CustomInput::vec_mut, inner);
+/// let mut outer = MappingMutator::new(CustomInput::vec_mut, inner);
 ///
 /// let mut input = CustomInput(vec![1]);
 ///
@@ -44,19 +44,19 @@ use crate::{
 /// assert_eq!(input, CustomInput(vec![2],));
 /// ```
 #[derive(Debug)]
-pub struct FunctionMappingMutator<M, F> {
+pub struct MappingMutator<M, F> {
     mapper: F,
     inner: M,
     name: Cow<'static, str>,
 }
 
-impl<M, F> FunctionMappingMutator<M, F> {
-    /// Creates a new [`FunctionMappingMutator`]
+impl<M, F> MappingMutator<M, F> {
+    /// Creates a new [`MappingMutator`]
     pub fn new(mapper: F, inner: M) -> Self
     where
         M: Named,
     {
-        let name = Cow::Owned(format!("FunctionMappingMutator<{}>", inner.name()));
+        let name = Cow::Owned(format!("MappingMutator<{}>", inner.name()));
         Self {
             mapper,
             inner,
@@ -65,7 +65,7 @@ impl<M, F> FunctionMappingMutator<M, F> {
     }
 }
 
-impl<M, S, F, IO, II> Mutator<IO, S> for FunctionMappingMutator<M, F>
+impl<M, S, F, IO, II> Mutator<IO, S> for MappingMutator<M, F>
 where
     F: FnMut(&mut IO) -> &mut II,
     M: Mutator<II, S>,
@@ -75,15 +75,15 @@ where
     }
 }
 
-impl<M, F> Named for FunctionMappingMutator<M, F> {
+impl<M, F> Named for MappingMutator<M, F> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`ToFunctionMappingMutatorMapper`]s.
+/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`ToMappingMutatorMapper`]s.
 ///
-/// See the explanation of [`ToFunctionMappingMutatorMapper`] for details.
+/// See the explanation of [`MappingMutator`] for details.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
@@ -92,7 +92,7 @@ impl<M, F> Named for FunctionMappingMutator<M, F> {
 ///
 /// use libafl::{
 ///     mutators::{
-///         ByteIncMutator, MutationResult, MutatorsTuple, ToFunctionMappingMutatorMapper,
+///         ByteIncMutator, MutationResult, MutatorsTuple, ToMappingMutatorMapper,
 ///     },
 ///     state::NopState,
 /// };
@@ -122,26 +122,26 @@ impl<M, F> Named for FunctionMappingMutator<M, F> {
 /// assert_eq!(input, CustomInput(vec![3],));
 /// ```
 #[derive(Debug)]
-pub struct ToFunctionMappingMutatorMapper<F> {
+pub struct ToMappingMutatorMapper<F> {
     mapper: F,
 }
 
-impl<F> ToFunctionMappingMutatorMapper<F> {
-    /// Creates a new [`ToFunctionMappingMutatorMapper`]
+impl<F> ToMappingMutatorMapper<F> {
+    /// Creates a new [`ToMappingMutatorMapper`]
     pub fn new(mapper: F) -> Self {
         Self { mapper }
     }
 }
 
-impl<M, F> MappingFunctor<M> for ToFunctionMappingMutatorMapper<F>
+impl<M, F> MappingFunctor<M> for ToMappingMutatorMapper<F>
 where
     F: Clone,
     M: Named,
 {
-    type Output = FunctionMappingMutator<M, F>;
+    type Output = MappingMutator<M, F>;
 
     fn apply(&mut self, from: M) -> Self::Output {
-        FunctionMappingMutator::new(self.mapper.clone(), from)
+        MappingMutator::new(self.mapper.clone(), from)
     }
 }
 
@@ -156,12 +156,12 @@ where
 #[cfg_attr(not(feature = "std"), doc = " ```ignore")]
 /// use libafl::{
 ///     inputs::MutVecInput,
-///     mutators::{ByteIncMutator, MutationResult, Mutator, OptionMappingMutator},
+///     mutators::{ByteIncMutator, MutationResult, Mutator, OptionalMutator},
 ///     state::NopState,
 /// };
 ///
 /// let inner = ByteIncMutator::new();
-/// let mut outer = OptionMappingMutator::new(inner);
+/// let mut outer = OptionalMutator::new(inner);
 ///
 /// let mut input_raw = vec![1];
 /// let input: MutVecInput = (&mut input_raw).into();
@@ -176,23 +176,23 @@ where
 /// assert_eq!(res2, MutationResult::Skipped);
 /// ```
 #[derive(Debug)]
-pub struct OptionMappingMutator<M> {
+pub struct OptionalMutator<M> {
     inner: M,
     name: Cow<'static, str>,
 }
 
-impl<M> OptionMappingMutator<M> {
-    /// Creates a new [`OptionMappingMutator`]
+impl<M> OptionalMutator<M> {
+    /// Creates a new [`OptionalMutator`]
     pub fn new(inner: M) -> Self
     where
         M: Named,
     {
-        let name = Cow::Owned(format!("OptionMappingMutator<{}>", inner.name()));
+        let name = Cow::Owned(format!("OptionalMutator<{}>", inner.name()));
         Self { inner, name }
     }
 }
 
-impl<I, S, M> Mutator<Option<I>, S> for OptionMappingMutator<M>
+impl<I, S, M> Mutator<Option<I>, S> for OptionalMutator<M>
 where
     M: Mutator<I, S>,
 {
@@ -204,7 +204,7 @@ where
     }
 }
 
-impl<M> Named for OptionMappingMutator<M>
+impl<M> Named for OptionalMutator<M>
 where
     M: Named,
 {
@@ -213,22 +213,22 @@ where
     }
 }
 
-/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`OptionMappingMutator`]s.
+/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`OptionalMutator`]s.
 ///
-/// See the explanation of [`OptionMappingMutator`] for details.
+/// See the explanation of [`OptionalMutator`] for details.
 ///
 /// # Example
 #[cfg_attr(feature = "std", doc = " ```")]
 #[cfg_attr(not(feature = "std"), doc = " ```ignore")]
 /// use libafl::{
 ///     inputs::MutVecInput,
-///     mutators::{ByteIncMutator, MutationResult, Mutator, ToOptionMappingMutatorMapper},
+///     mutators::{ByteIncMutator, MutationResult, Mutator, ToOptionalMutatorMapper},
 ///     state::NopState,
 /// };
 /// use libafl_bolts::tuples::{tuple_list, Map};
 ///
 /// let inner = tuple_list!(ByteIncMutator::new());
-/// let outer_list = inner.map(ToOptionMappingMutatorMapper);
+/// let outer_list = inner.map(ToOptionalMutatorMapper);
 /// let mut outer = outer_list.0;
 ///
 /// let mut input_raw = vec![1];
@@ -244,15 +244,15 @@ where
 /// assert_eq!(res2, MutationResult::Skipped);
 /// ```
 #[derive(Debug)]
-pub struct ToOptionMappingMutatorMapper;
+pub struct ToOptionalMutatorMapper;
 
-impl<M> MappingFunctor<M> for ToOptionMappingMutatorMapper
+impl<M> MappingFunctor<M> for ToOptionalMutatorMapper
 where
     M: Named,
 {
-    type Output = OptionMappingMutator<M>;
+    type Output = OptionalMutator<M>;
 
     fn apply(&mut self, from: M) -> Self::Output {
-        OptionMappingMutator::new(from)
+        OptionalMutator::new(from)
     }
 }
