@@ -112,7 +112,7 @@ impl<M, F> Named for MappingMutator<M, F> {
 /// let mutators = tuple_list!(ByteIncMutator::new(), ByteIncMutator::new());
 /// // construct a mutator that works on &mut CustomInput
 /// let mut mapped_mutators =
-///     mutators.map(ToFunctionMappingMutatorMapper::new(CustomInput::vec_mut));
+///     mutators.map(ToMappingMutatorMapper::new(CustomInput::vec_mut));
 ///  
 /// let mut input = CustomInput(vec![1]);
 ///  
