@@ -43,7 +43,7 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
-    helper::FridaInstrumentationHelper,
+    helper::FridaInstrumentationHelper, helper::FridaRuntimeVec,
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
@@ -365,9 +365,10 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
+                let runtimes = FridaRuntimeVec(vec![Box::new(coverage)]);
 
                 let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
+                    FridaInstrumentationHelper::new(&gum, options, runtimes);
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
