@@ -4,7 +4,7 @@ use std::{borrow::Cow, hash::Hash};
 use libafl::{
     corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
-    inputs::{value::MutI16Input, BytesInput, HasTargetBytes, Input, MutVecInput},
+    inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error, SerdeAny,
@@ -36,28 +36,28 @@ impl Input for CustomInput {
 
 impl CustomInput {
     /// Returns a mutable reference to the byte array
-    pub fn byte_array_mut(&mut self) -> MutVecInput<'_> {
-        (&mut self.byte_array).into()
+    pub fn byte_array_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.byte_array
     }
 
     /// Returns an immutable reference to the byte array
-    pub fn byte_array(&self) -> &[u8] {
+    pub fn byte_array(&self) -> &Vec<u8> {
         &self.byte_array
     }
 
     /// Returns a mutable reference to the optional byte array
-    pub fn optional_byte_array_mut(&mut self) -> Option<MutVecInput<'_>> {
-        self.optional_byte_array.as_mut().map(|e| e.into())
+    pub fn optional_byte_array_mut(&mut self) -> &mut Option<Vec<u8>> {
+        &mut self.optional_byte_array
     }
 
     /// Returns an immutable reference to the optional byte array
-    pub fn optional_byte_array(&self) -> Option<&[u8]> {
-        self.optional_byte_array.as_deref()
+    pub fn optional_byte_array(&self) -> &Option<Vec<u8>> {
+        &self.optional_byte_array
     }
 
     /// Returns a mutable reference to the number
-    pub fn num_mut(&mut self) -> MutI16Input<'_> {
-        (&mut self.num).into()
+    pub fn num_mut(&mut self) -> &mut i16 {
+        &mut self.num
     }
 
     /// Returns an immutable reference to the number

@@ -9,13 +9,9 @@ use libafl_bolts::{
 };
 use tuple_list::{tuple_list, tuple_list_type};
 
-use super::{
-    MappedInputFunctionMappingMutator, MutationResult, Mutator,
-    ToMappedInputFunctionMappingMutatorMapper,
-};
+use super::{FunctionMappingMutator, MutationResult, Mutator, ToFunctionMappingMutatorMapper};
 use crate::{
     corpus::Corpus,
-    inputs::value::ValueMutRefInput,
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasRand},
 };
@@ -75,14 +71,14 @@ pub fn int_mutators() -> IntMutatorsType {
 }
 
 /// Mapped mutators for integer-like inputs
-pub type MappedIntMutatorsType<F1, F2, I> = tuple_list_type!(
-    MappedInputFunctionMappingMutator<BitFlipMutator,F1,I>,
-    MappedInputFunctionMappingMutator<NegateMutator,F1,I>,
-    MappedInputFunctionMappingMutator<IncMutator,F1,I>,
-    MappedInputFunctionMappingMutator<DecMutator,F1,I>,
-    MappedInputFunctionMappingMutator<TwosComplementMutator,F1,I>,
-    MappedInputFunctionMappingMutator<RandMutator,F1,I>,
-    MappedInputFunctionMappingMutator<MappedCrossoverMutator<F2>,F1,I>
+pub type MappedIntMutatorsType<F1, F2> = tuple_list_type!(
+    FunctionMappingMutator<BitFlipMutator,F1>,
+    FunctionMappingMutator<NegateMutator,F1>,
+    FunctionMappingMutator<IncMutator,F1>,
+    FunctionMappingMutator<DecMutator,F1>,
+    FunctionMappingMutator<TwosComplementMutator,F1>,
+    FunctionMappingMutator<RandMutator,F1>,
+    FunctionMappingMutator<MappedCrossoverMutator<F2>,F1>
 );
 
 /// Mapped mutators for integer-like inputs
@@ -91,15 +87,13 @@ pub type MappedIntMutatorsType<F1, F2, I> = tuple_list_type!(
 pub fn mapped_int_mutators<F1, F2, IO, II>(
     current_input_mapper: F1,
     input_from_corpus_mapper: F2,
-) -> MappedIntMutatorsType<F1, F2, II>
+) -> MappedIntMutatorsType<F1, F2>
 where
-    F1: Clone + FnMut(IO) -> II,
+    F1: Clone + FnMut(&mut IO) -> &mut II,
 {
     int_mutators_no_crossover()
         .merge(mapped_int_mutators_crossover(input_from_corpus_mapper))
-        .map(ToMappedInputFunctionMappingMutatorMapper::new(
-            current_input_mapper,
-        ))
+        .map(ToFunctionMappingMutatorMapper::new(current_input_mapper))
 }
 /// Functionality required for Numeric Mutators (see [`int_mutators`])
 pub trait Numeric {
@@ -208,6 +202,32 @@ macro_rules! impl_numeric_128_bits_randomize {
 
 // Apply the macro to all desired integer types
 impl_numeric_128_bits_randomize! { u128 i128 }
+
+impl<I: Numeric> Numeric for &mut I {
+    fn flip_all_bits(&mut self) {
+        (*self).flip_all_bits();
+    }
+
+    fn flip_bit_at(&mut self, offset: usize) {
+        (*self).flip_bit_at(offset);
+    }
+
+    fn wrapping_inc(&mut self) {
+        (*self).wrapping_inc();
+    }
+
+    fn wrapping_dec(&mut self) {
+        (*self).wrapping_dec();
+    }
+
+    fn twos_complement(&mut self) {
+        (*self).twos_complement();
+    }
+
+    fn randomize<R: Rand>(&mut self, rand: &mut R) {
+        (*self).randomize(rand);
+    }
+}
 
 /// Bitflip mutation for integer-like inputs
 #[derive(Debug)]
@@ -374,17 +394,13 @@ impl<F> MappedCrossoverMutator<F> {
     }
 }
 
-impl<I, S, F> Mutator<ValueMutRefInput<'_, I>, S> for MappedCrossoverMutator<F>
+impl<I, S, F> Mutator<I, S> for MappedCrossoverMutator<F>
 where
     S: HasRand + HasCorpus,
     for<'b> F: Fn(&'b <S::Corpus as Corpus>::Input) -> &'b I,
     I: Clone,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut ValueMutRefInput<'_, I>,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
 
         if state.corpus().current().is_some_and(|cur| cur == id) {
@@ -394,7 +410,7 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         let other_input = other_testcase.input().as_ref().unwrap();
         let mapped_input = (self.input_mapper)(other_input).clone();
-        **input = mapped_input;
+        *input = mapped_input;
         Ok(MutationResult::Mutated)
     }
 }

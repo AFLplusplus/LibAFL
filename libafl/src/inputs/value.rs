@@ -1,11 +1,7 @@
 //! Newtype pattern style wrapper for [`super::Input`]s
 
 use alloc::{string::String, vec::Vec};
-use core::{
-    fmt::Debug,
-    hash::Hash,
-    ops::{Deref, DerefMut},
-};
+use core::{fmt::Debug, hash::Hash};
 
 use libafl_bolts::{generic_hash_std, rands::Rand};
 use serde::{Deserialize, Serialize};
@@ -15,7 +11,7 @@ use {
     std::{fs::File, io::Read, path::Path},
 };
 
-use super::{Input, MappedInput};
+use super::Input;
 use crate::{corpus::CorpusId, mutators::numeric::Numeric};
 
 /// Newtype pattern wrapper around an underlying structure to implement inputs
@@ -146,104 +142,11 @@ where
     }
 }
 
-/// Input type that holds a mutable reference to an inner value
-#[derive(Debug, PartialEq)]
-pub struct ValueMutRefInput<'a, I>(&'a mut I);
-
-// Macro to implement the `Input` trait and create type aliases for `WrappingInput<T>`
-macro_rules! impl_input_for_value_mut_ref_input {
-    ($($t:ty => $name:ident),+ $(,)?) => {
-        $(            /// Input wrapping a <$t>
-            pub type $name<'a> = ValueMutRefInput<'a, $t>;
-        )*
-    };
-}
-
-// Invoke the macro with type-name pairs
-impl_input_for_value_mut_ref_input!(
-    u8 => MutU8Input,
-    u16 => MutU16Input,
-    u32 => MutU32Input,
-    u64 => MutU64Input,
-    u128 => MutU128Input,
-    usize => MutUsizeInput,
-    i8 => MutI8Input,
-    i16 => MutI16Input,
-    i32 => MutI32Input,
-    i64 => MutI64Input,
-    i128 => MutI128Input,
-    isize => MutIsizeInput,
-);
-
-impl<I> Deref for ValueMutRefInput<'_, I> {
-    type Target = I;
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-impl<I> DerefMut for ValueMutRefInput<'_, I> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0
-    }
-}
-
-impl<'a, I> From<&'a mut I> for ValueMutRefInput<'a, I> {
-    fn from(value: &'a mut I) -> Self {
-        Self(value)
-    }
-}
-
-impl<'a, I> From<&'a mut ValueInput<I>> for ValueMutRefInput<'a, I> {
-    fn from(value: &'a mut ValueInput<I>) -> Self {
-        Self(value.as_mut())
-    }
-}
-
-impl<I> MappedInput for ValueMutRefInput<'_, I> {
-    type Type<'a>
-        = ValueMutRefInput<'a, I>
-    where
-        Self: 'a;
-}
-
-impl<I> Numeric for ValueMutRefInput<'_, I>
-where
-    I: Numeric,
-{
-    fn flip_all_bits(&mut self) {
-        self.deref_mut().flip_all_bits();
-    }
-
-    fn flip_bit_at(&mut self, rhs: usize) {
-        self.deref_mut().flip_bit_at(rhs);
-    }
-
-    fn wrapping_inc(&mut self) {
-        self.deref_mut().wrapping_inc();
-    }
-
-    fn wrapping_dec(&mut self) {
-        self.deref_mut().wrapping_dec();
-    }
-
-    fn twos_complement(&mut self) {
-        self.deref_mut().twos_complement();
-    }
-
-    fn randomize<R: Rand>(&mut self, rand: &mut R) {
-        self.deref_mut().randomize(rand);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "std")]
     use {
-        super::{ValueInput, ValueMutRefInput},
-        crate::mutators::numeric::Numeric,
-        alloc::fmt::Debug,
+        super::ValueInput, crate::mutators::numeric::Numeric, alloc::fmt::Debug,
         std::any::type_name,
     };
 
@@ -291,6 +194,7 @@ mod tests {
     }
 
     #[cfg(feature = "std")]
+    #[expect(unused_mut)]
     fn take_numeric<I: Numeric + Clone + PartialEq + Debug>(i: &I, check_twos_complement: bool) {
         apply_all_ops!({}, i.clone(), I, check_twos_complement);
         apply_all_ops!(
@@ -301,8 +205,8 @@ mod tests {
         );
         apply_all_ops!(
             let mut i_clone = i.clone(),
-            ValueMutRefInput::from(&mut i_clone),
-            ValueMutRefInput<'_, I>,
+            &mut i_clone,
+            &mut I,
             check_twos_complement
         );
     }

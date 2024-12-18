@@ -850,6 +850,12 @@ impl<T> HasLen for Vec<T> {
     }
 }
 
+impl<T: HasLen> HasLen for &mut T {
+    fn len(&self) -> usize {
+        self.deref().len()
+    }
+}
+
 /// Has a ref count
 pub trait HasRefCnt {
     /// The ref count
