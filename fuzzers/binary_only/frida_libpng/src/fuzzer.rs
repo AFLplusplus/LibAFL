@@ -94,6 +94,111 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             ExitKind::Ok
         };
 
+        |state: Option<_>,
+         mut mgr: LlmpRestartingEventManager<_, _, _>,
+         _client_description| {
+            let gum = Gum::obtain();
+            let coverage = CoverageRuntime::new();
+
+            let mut enable_asan_error_callbacks = false;
+
+            let runtimes = if options.asan && options.asan_cores.contains(client_description.core_id()) {
+                #[cfg(unix)]
+                {
+                    enable_asan_error_callbacks = true;
+                    let asan = AsanRuntime::new(options);
+                    FridaRuntimeVec(vec![Box::new(coverage), Box::new(asan)])
+                }
+                #[cfg(windows)]
+                {
+                    FridaRuntimeVec(vec![Box::new(coverage)])
+                }
+            } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
+                let cmplog = CmpLogRuntime::new();
+                println!("cmplog runtime created");
+                FridaRuntimeVec(vec![Box::new(coverage), Box::new(cmplog)])
+            } else {
+                FridaRuntimeVec(vec![Box::new(coverage)])
+            };
+
+            let mut frida_helper =
+                FridaInstrumentationHelper::new(&gum, options, runtimes);
+
+            // Create an observation channel using the coverage map
+            let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
+                "edges",
+                frida_helper.map_mut_ptr().unwrap(),
+                MAP_SIZE,
+            )).track_indices();
+
+            // Create an observation channel to keep track of the execution time
+            let time_observer = TimeObserver::new("time");
+            #[cfg(unix)]
+            let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+
+            // Feedback to rate the interestingness of an input
+            // This one is composed by two Feedbacks in OR
+            let mut feedback = feedback_or!(
+                // New maximization map feedback linked to the edges observer and the feedback state
+                MaxMapFeedback::new(&edges_observer),
+                // Time feedback, this one does not need a feedback state
+                TimeFeedback::new(&time_observer)
+            );
+
+            // Feedbacks to recognize an input as solution
+            #[cfg(unix)]
+            let mut objective = feedback_or_fast!(
+                    CrashFeedback::new(),
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(
+                        ConstFeedback::from(enable_asan_error_callbacks),
+                        AsanErrorsFeedback::new(&asan_observer)
+                    )
+                );
+            #[cfg(windows)]
+            let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+
+            // If not restarting, create a State from scratch
+            let mut state = state.unwrap_or_else(|| {
+                StdState::new(
+                    // RNG
+                    StdRand::new(),
+                    // Corpus that will be evolved, we keep it in memory for performance
+                    CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
+                        .unwrap(),
+                    // Corpus in which we store solutions (crashes in this example),
+                    // on disk so the user can get them after stopping the fuzzer
+                    OnDiskCorpus::new(options.output.clone()).unwrap(),
+                    &mut feedback,
+                    &mut objective,
+                )
+                .unwrap()
+            });
+
+            println!("We're a client, let's fuzz :)");
+
+            // Create a PNG dictionary if not existing
+            if state.metadata_map().get::<Tokens>().is_none() {
+                state.add_metadata(Tokens::from([
+                    vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
+                    b"IHDR".to_vec(),
+                    b"IDAT".to_vec(),
+                    b"PLTE".to_vec(),
+                    b"IEND".to_vec(),
+                ]));
+            }
+
+            // Setup a basic mutator with a mutational stage
+            let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+
+            // A minimization+queue policy to get testcasess from the corpus
+            let scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        };
+
         if options.asan && options.asan_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
               mut mgr: LlmpRestartingEventManager<_, _, _>,
@@ -138,7 +243,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    // true enables the AsanErrorFeedback
                     feedback_and_fast!(
                         ConstFeedback::from(true),
                         AsanErrorsFeedback::new(&asan_observer)
