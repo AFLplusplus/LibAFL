@@ -86,7 +86,7 @@ backtrace = { version = "0.3.74", default-features = false } # Used to get the s
 bindgen = "0.71.1"
 # 2024-12-16: bitbybit 1.3.3 is leading CI to fail due to missing docs.
 # fixme: Change this to 1.3.3 when the issue https://github.com/danlehmann/bitfield/issues/66 is resolved.
-bitbybit = "=1.3.2" # bitfields, use this for bit fields and bit enums
+bitbybit = "=1.3.3" # bitfields, use this for bit fields and bit enums
 clap = "4.5.18"
 cc = "1.1.21"
 cmake = "0.1.51"
