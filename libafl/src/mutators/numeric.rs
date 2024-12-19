@@ -150,7 +150,7 @@ macro_rules! impl_numeric_cast_randomize {
             }
 
             #[inline]
-            #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
+            #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)] // only for some macro calls
             fn randomize<R: Rand>(&mut self, rand: &mut R) {
                 *self = rand.next() as $t;
             }
@@ -191,7 +191,7 @@ macro_rules! impl_numeric_128_bits_randomize {
             }
 
             #[inline]
-            #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
+            #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)] // only for some macro calls
             fn randomize<R: Rand>(&mut self, rand: &mut R) {
                 *self = (u128::from(rand.next()) << 64 | u128::from(rand.next())) as $t;
             }

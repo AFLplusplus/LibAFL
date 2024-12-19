@@ -36,7 +36,7 @@ impl PyContext {
         Ok(())
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn script(&mut self, nt: &str, nts: Vec<String>, script: PyObject) {
         self.ctx.add_script(nt, &nts, script);
     }

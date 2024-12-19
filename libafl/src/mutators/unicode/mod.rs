@@ -24,9 +24,7 @@ use crate::{
 };
 
 /// Unicode category data, as used by string analysis and mutators.
-#[allow(unused)]
-#[allow(missing_docs)]
-#[allow(clippy::redundant_static_lifetimes)]
+#[expect(unused, missing_docs, clippy::redundant_static_lifetimes)]
 pub mod unicode_categories;
 
 /// Input which contains the context necessary to perform unicode mutations

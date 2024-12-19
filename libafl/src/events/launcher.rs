@@ -380,7 +380,7 @@ where
 
     /// Launch the broker and the clients and fuzz
     #[cfg(any(windows, not(feature = "fork")))]
-    #[allow(clippy::too_many_lines, clippy::match_wild_err_arm)]
+    #[expect(clippy::too_many_lines, clippy::match_wild_err_arm)]
     pub fn launch_with_hooks<EMH, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
         S: State + HasExecutions,
@@ -453,7 +453,7 @@ where
                         for overcommit_i in 0..self.overcommit {
                             index += 1;
                             // Forward own stdio to child processes, if requested by user
-                            #[allow(unused_mut)]
+                            #[expect(unused_mut)]
                             let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
                             #[cfg(unix)]
                             {

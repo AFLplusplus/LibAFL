@@ -34,7 +34,6 @@ where
 /// Trait to decode encoded input to bytes
 pub trait InputDecoder {
     /// Decode encoded input to bytes
-    #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 

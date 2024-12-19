@@ -278,7 +278,7 @@ where
         self.inner.should_send()
     }
 
-    #[allow(clippy::match_same_arms)]
+    #[expect(clippy::match_same_arms)]
     fn fire(
         &mut self,
         state: &mut Self::State,

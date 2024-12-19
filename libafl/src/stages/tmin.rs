@@ -53,7 +53,6 @@ pub struct StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
     runs: usize,
     /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
     restart_helper: ExecutionCountRestartHelper,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, F, S, Z)>,
 }
 
@@ -166,7 +165,6 @@ where
     }
 
     /// Runs this (mutational) stage for new objectives
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_minification(
         &mut self,
         fuzzer: &mut Z,

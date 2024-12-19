@@ -333,7 +333,7 @@ pub enum ManagerKind {
 ///
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn setup_restarting_mgr_std<MT, S>(
     monitor: MT,
     broker_port: u16,
@@ -364,7 +364,7 @@ where
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 /// This one, additionally uses the timeobserver for the adaptive serialization
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn setup_restarting_mgr_std_adaptive<MT, S>(
     monitor: MT,
     broker_port: u16,
@@ -397,7 +397,6 @@ where
 /// The [`RestartingMgr`] is is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
-#[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
 pub struct RestartingMgr<EMH, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
@@ -439,7 +438,7 @@ pub struct RestartingMgr<EMH, MT, S, SP> {
     phantom_data: PhantomData<(EMH, S)>,
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
+#[expect(clippy::type_complexity, clippy::too_many_lines)]
 impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
@@ -612,7 +611,7 @@ where
                     return Err(Error::shutting_down());
                 }
 
-                #[allow(clippy::manual_assert)]
+                #[expect(clippy::manual_assert)]
                 if !staterestorer.has_content() && !self.serialize_state.oom_safe() {
                     if let Err(err) = mgr.detach_from_broker(self.broker_port) {
                         log::error!("Failed to detach from broker: {err}");

@@ -340,7 +340,7 @@ macro_rules! add_mutator_impl {
         #[derive(Default, Debug)]
         pub struct $name;
 
-        #[allow(trivial_numeric_casts)]
+        #[allow(trivial_numeric_casts)] // only for some calls of the macro
         impl<I, S> Mutator<I, S> for $name
         where
             S: HasRand,
@@ -413,7 +413,7 @@ macro_rules! interesting_mutator_impl {
             S: HasRand,
             I: HasMutatorBytes,
         {
-            #[allow(clippy::cast_sign_loss)]
+            #[expect(clippy::cast_sign_loss)]
             fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
                 if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
@@ -882,7 +882,7 @@ pub struct BytesSwapMutator {
     tmp_buf: Vec<u8>,
 }
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
     S: HasRand,
@@ -1475,7 +1475,6 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     let mut first_diff: i64 = -1;
     let mut last_diff: i64 = -1;
     for (i, (this_el, other_el)) in this.iter().zip(other.iter()).enumerate() {
-        #[allow(clippy::cast_possible_wrap)]
         if this_el != other_el {
             if first_diff < 0 {
                 first_diff = i64::try_from(i).unwrap();
@@ -1497,7 +1496,7 @@ where
     <S::Corpus as Corpus>::Input: HasMutatorBytes,
     I: HasMutatorBytes,
 {
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing

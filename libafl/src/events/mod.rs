@@ -11,13 +11,12 @@ pub mod centralized;
 #[cfg(all(unix, feature = "std"))]
 pub use centralized::*;
 #[cfg(feature = "std")]
-#[allow(clippy::ignored_unit_patterns)]
 pub mod launcher;
-#[allow(clippy::ignored_unit_patterns)]
+
 pub mod llmp;
 pub use llmp::*;
 #[cfg(feature = "tcp_manager")]
-#[allow(clippy::ignored_unit_patterns)]
+#[expect(clippy::ignored_unit_patterns)]
 pub mod tcp;
 
 pub mod broker_hooks;

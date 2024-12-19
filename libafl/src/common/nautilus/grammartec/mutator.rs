@@ -27,7 +27,7 @@ impl Mutator {
     }
 
     //Return value indicates if minimization is complete: true: complete, false: not complete
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn minimize_tree<F, R: Rand>(
         &mut self,
         rand: &mut R,
