@@ -543,8 +543,6 @@ where
     OT: MatchName,
     S: HasNamedMetadata + UsesInput,
 {
-    #[expect(clippy::wrong_self_convention)]
-    #[expect(clippy::needless_range_loop)]
     fn is_interesting(
         &mut self,
         state: &mut S,
@@ -616,8 +614,6 @@ where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     C: CanTrack + AsRef<O>,
 {
-    #[expect(clippy::wrong_self_convention)]
-    #[expect(clippy::needless_range_loop)]
     fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
     where
         S: HasNamedMetadata,

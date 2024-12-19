@@ -270,7 +270,7 @@ where
 
     /// Create new [`InProcessHooks`].
     #[cfg(windows)]
-    #[expect(unused)]
+    #[allow(unused_variables)] // for `exec_tmout` without `std`
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,

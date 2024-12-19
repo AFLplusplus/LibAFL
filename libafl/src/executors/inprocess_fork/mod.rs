@@ -299,7 +299,7 @@ pub mod child_signal_handlers {
     /// The function should only be called from a child crash handler.
     /// It will dereference the `data` pointer and assume it's valid.
     #[cfg(unix)]
-    #[expect(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_crash_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -323,9 +323,9 @@ pub mod child_signal_handlers {
     }
 
     #[cfg(unix)]
-    #[expect(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_timeout_handler<E>(
-        _signal: Signal,
+        #[cfg(unix)] _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,

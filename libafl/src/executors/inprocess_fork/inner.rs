@@ -278,7 +278,6 @@ where
 
     /// Creates a new [`GenericInProcessForkExecutorInner`], non linux
     #[cfg(not(target_os = "linux"))]
-    #[expect(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
         observers: OT,
