@@ -133,7 +133,12 @@ pub fn main() {
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
+    #[cfg(not(feature = "bloom_filter"))]
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    #[cfg(feature = "bloom_filter")]
+    let mut fuzzer =
+        StdFuzzer::new_with_bloom_filter(scheduler, feedback, objective, 10_000_000, 0.001)
+            .unwrap();
 
     // Create the executor for an in-process function with just one observer
     let executor = CustomExecutor::new(&state);

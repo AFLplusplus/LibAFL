@@ -562,7 +562,7 @@ mod tests {
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-        let mut fuzzer = StdFuzzer::<_, _, _>::new(sche, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(sche, feedback, objective);
 
         let mut in_process_executor = InProcessExecutor::new(
             &mut harness,
