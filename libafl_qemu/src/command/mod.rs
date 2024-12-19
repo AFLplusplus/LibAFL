@@ -231,7 +231,7 @@ where
     ///     - `ret_reg`: The register in which the guest return value should be written, if any.
     /// Returns
     ///     - `InnerHandlerResult`: How the high-level handler should behave
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,

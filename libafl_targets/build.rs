@@ -13,14 +13,13 @@ fn enable_nightly() {
 #[rustversion::not(nightly)]
 fn enable_nightly() {}
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn main() {
     println!("cargo:rustc-check-cfg=cfg(nightly)");
     enable_nightly();
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     //let out_dir_path = Path::new(&out_dir);
-    #[allow(unused_variables)]
     let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("constants.rs");

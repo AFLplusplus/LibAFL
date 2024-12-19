@@ -235,7 +235,7 @@ pub type __pid_t = ::std::os::raw::c_int;
 pub struct __fsid_t {
     pub __val: [::std::os::raw::c_int; 2usize],
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of __fsid_t"][::std::mem::size_of::<__fsid_t>() - 8usize];
     ["Alignment of __fsid_t"][::std::mem::align_of::<__fsid_t>() - 4usize];
@@ -281,7 +281,7 @@ pub union __mbstate_t__bindgen_ty_1 {
     pub __wch: ::std::os::raw::c_uint,
     pub __wchb: [::std::os::raw::c_char; 4usize],
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of __mbstate_t__bindgen_ty_1"]
         [::std::mem::size_of::<__mbstate_t__bindgen_ty_1>() - 4usize];
@@ -306,7 +306,7 @@ impl ::std::fmt::Debug for __mbstate_t__bindgen_ty_1 {
         write!(f, "__mbstate_t__bindgen_ty_1 {{ union }}")
     }
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of __mbstate_t"][::std::mem::size_of::<__mbstate_t>() - 8usize];
     ["Alignment of __mbstate_t"][::std::mem::align_of::<__mbstate_t>() - 4usize];
@@ -339,7 +339,7 @@ pub struct _G_fpos_t {
     pub __pos: __off_t,
     pub __state: __mbstate_t,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of _G_fpos_t"][::std::mem::size_of::<_G_fpos_t>() - 16usize];
     ["Alignment of _G_fpos_t"][::std::mem::align_of::<_G_fpos_t>() - 8usize];
@@ -371,7 +371,7 @@ pub struct _G_fpos64_t {
     pub __pos: __off64_t,
     pub __state: __mbstate_t,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of _G_fpos64_t"][::std::mem::size_of::<_G_fpos64_t>() - 16usize];
     ["Alignment of _G_fpos64_t"][::std::mem::align_of::<_G_fpos64_t>() - 8usize];
@@ -449,7 +449,7 @@ pub struct _IO_FILE {
     pub _mode: ::std::os::raw::c_int,
     pub _unused2: [::std::os::raw::c_char; 20usize],
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of _IO_FILE"][::std::mem::size_of::<_IO_FILE>() - 216usize];
     ["Alignment of _IO_FILE"][::std::mem::align_of::<_IO_FILE>() - 8usize];
@@ -543,7 +543,7 @@ pub struct _IO_cookie_io_functions_t {
     pub seek: cookie_seek_function_t,
     pub close: cookie_close_function_t,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of _IO_cookie_io_functions_t"]
         [::std::mem::size_of::<_IO_cookie_io_functions_t>() - 32usize];
@@ -1179,7 +1179,7 @@ pub struct __va_list_tag {
     pub overflow_arg_area: *mut ::std::os::raw::c_void,
     pub reg_save_area: *mut ::std::os::raw::c_void,
 }
-#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+#[expect(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
     ["Size of __va_list_tag"][::std::mem::size_of::<__va_list_tag>() - 24usize];
     ["Alignment of __va_list_tag"][::std::mem::align_of::<__va_list_tag>() - 8usize];

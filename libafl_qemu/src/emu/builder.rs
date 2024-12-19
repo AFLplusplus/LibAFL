@@ -60,7 +60,7 @@ where
     S::Input: HasTargetBytes,
 {
     #[must_use]
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self {
             modules: tuple_list!(),

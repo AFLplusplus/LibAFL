@@ -28,7 +28,7 @@ pub const CTRL_C_EXIT: i32 = 100;
 /// ARMv7-specific representation of a saved context
 #[cfg(target_arch = "arm")]
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[repr(C)]
 pub struct mcontext_t {
     /// Signal Number
@@ -78,7 +78,7 @@ pub struct mcontext_t {
 /// User Context Struct on `arm` `linux`
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[repr(C)]
 pub struct ucontext_t {
     /// Flags
@@ -106,7 +106,7 @@ pub struct ucontext_t {
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[repr(C)]
-#[allow(clippy::pub_underscore_fields)]
+#[expect(clippy::pub_underscore_fields)]
 pub struct arm_exception_state64 {
     /// Virtual Fault Address
     pub __far: u64,
@@ -131,7 +131,7 @@ pub struct arm_exception_state64 {
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
 #[repr(C)]
-#[allow(clippy::pub_underscore_fields)]
+#[expect(clippy::pub_underscore_fields)]
 pub struct arm_thread_state64 {
     /// General purpose registers x0-x28
     pub __x: [u64; 29],
@@ -157,7 +157,7 @@ pub struct arm_thread_state64 {
 /// ````
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[repr(C, align(16))]
 //#[repr(align(16))]
 pub struct arm_neon_state64 {
@@ -174,10 +174,10 @@ pub struct arm_neon_state64 {
 ///};
 /// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[derive(Debug)]
 #[repr(C)]
-#[allow(clippy::pub_underscore_fields)]
+#[expect(clippy::pub_underscore_fields)]
 pub struct mcontext64 {
     /// `_STRUCT_ARM_EXCEPTION_STATE64`
     pub __es: arm_exception_state64,
@@ -197,7 +197,7 @@ pub struct mcontext64 {
 /// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[repr(C)]
 pub struct sigaltstack {
     /// signal stack base
@@ -226,7 +226,7 @@ pub struct sigaltstack {
 /// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 #[repr(C)]
 pub struct ucontext_t {
     /// onstack
@@ -515,7 +515,7 @@ pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
 /// We wrap it here, as it seems to be (currently)
 /// not available on `MacOS` in the `libc` crate.
 #[cfg(unix)]
-#[allow(clippy::inline_always)] // we assume that inlining will destroy less state
+#[expect(clippy::inline_always)] // we assume that inlining will destroy less state
 #[inline(always)]
 pub fn ucontext() -> Result<ucontext_t, Error> {
     let mut ucontext = unsafe { mem::zeroed() };

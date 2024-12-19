@@ -29,7 +29,6 @@ use crate::os::unix_signals::{ucontext_t, Signal};
     any(target_os = "linux", target_os = "android"),
     target_arch = "x86_64"
 ))]
-#[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -65,7 +64,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(any(target_os = "linux", target_os = "android"), target_arch = "x86"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -144,7 +143,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "freebsd", target_arch = "aarch64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -168,7 +167,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -192,7 +191,7 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[allow(clippy::unnecessary_wraps, clippy::similar_names)]
+#[expect(clippy::unnecessary_wraps, clippy::similar_names)]
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -228,7 +227,7 @@ pub fn dump_registers<W: Write>(
     any(target_os = "freebsd", target_os = "dragonfly"),
     target_arch = "x86_64"
 ))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -258,7 +257,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "netbsd", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -368,7 +367,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "openbsd", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -396,7 +395,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -419,7 +418,7 @@ pub fn dump_registers<W: Write>(
     any(target_os = "solaris", target_os = "illumos"),
     target_arch = "x86_64"
 ))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -455,7 +454,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     context: &CONTEXT,
@@ -484,7 +483,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "windows", target_arch = "x86"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     context: &CONTEXT,
@@ -504,7 +503,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     context: &CONTEXT,
@@ -531,7 +530,7 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_os = "haiku", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -558,7 +557,7 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
@@ -670,7 +669,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -687,7 +686,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -709,7 +708,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_os = "freebsd", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -725,7 +724,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_os = "dragonfly", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -741,7 +740,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_os = "openbsd", target_arch = "x86_64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -757,7 +756,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_os = "openbsd", target_arch = "aarch64"))]
-#[allow(clippy::similar_names)]
+#[expect(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -883,7 +882,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 }
 
 #[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
-#[allow(clippy::cast_ptr_alignment)]
+#[expect(clippy::cast_ptr_alignment)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut s: usize = 0;
     #[cfg(target_os = "freebsd")]
@@ -1003,7 +1002,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 }
 
 #[cfg(target_vendor = "apple")]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut ptask = std::mem::MaybeUninit::<mach_port_t>::uninit();
     // We start by the lowest virtual address from the userland' standpoint
@@ -1105,7 +1104,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
 /// Generates a mini-BSOD given a signal and context.
 #[cfg(unix)]
-#[allow(clippy::non_ascii_literal, clippy::too_many_lines)]
+#[expect(clippy::non_ascii_literal)]
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -1132,7 +1131,7 @@ pub fn generate_minibsod<W: Write>(
 
 /// Generates a mini-BSOD given an `EXCEPTION_POINTERS` structure.
 #[cfg(windows)]
-#[allow(
+#[expect(
     clippy::non_ascii_literal,
     clippy::too_many_lines,
     clippy::not_unsafe_ptr_arg_deref

@@ -13,11 +13,11 @@ pub use syscall_numbers::riscv32::*;
 pub use syscall_numbers::riscv64::*;
 
 // QEMU specific
-#[allow(non_upper_case_globals)]
+#[expect(non_upper_case_globals)]
 pub const SYS_syscalls: c_long = 447;
-#[allow(non_upper_case_globals)]
+#[expect(non_upper_case_globals)]
 pub const SYS_riscv_flush_icache: c_long = SYS_arch_specific_syscall + 15;
-#[allow(non_upper_case_globals)]
+#[expect(non_upper_case_globals)]
 pub const SYS_riscv_hwprobe: c_long = SYS_arch_specific_syscall + 14;
 
 use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};

@@ -63,7 +63,7 @@ pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// Value indicating if cmplog is enabled.
 #[no_mangle]
-#[allow(non_upper_case_globals)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut libafl_cmplog_enabled: u8 = 0;
 
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
@@ -424,8 +424,7 @@ impl CmpMap for CmpLogMap {
 
 /// The global `CmpLog` map for the current `LibAFL` run.
 #[no_mangle]
-#[allow(clippy::large_stack_arrays)]
-#[allow(non_upper_case_globals)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
     headers: [CmpLogHeader {
         hits: 0,
@@ -440,7 +439,7 @@ pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
 /// The globale `CmpLog` map, aflpp style
 #[no_mangle]
 #[cfg(feature = "cmplog_extended_instrumentation")]
-#[allow(clippy::large_stack_arrays)]
+#[expect(clippy::large_stack_arrays)]
 pub static mut libafl_cmplog_map_extended: AFLppCmpLogMap = AFLppCmpLogMap {
     headers: [AFLppCmpLogHeader::new_with_raw_value(0); CMPLOG_MAP_W],
     vals: AFLppCmpLogVals {
@@ -478,7 +477,7 @@ impl HasLen for AFLppCmpLogMap {
 
 impl AFLppCmpLogMap {
     #[must_use]
-    #[allow(clippy::cast_ptr_alignment)]
+    #[expect(clippy::cast_ptr_alignment)]
     /// Instantiate a new boxed zeroed `AFLppCmpLogMap`. This should be used to create a new
     /// map, because it is so large it cannot be allocated on the stack with default
     /// runtime configuration.
@@ -525,7 +524,7 @@ impl Serialize for AFLppCmpLogMap {
 }
 
 impl<'de> Deserialize<'de> for AFLppCmpLogMap {
-    #[allow(clippy::cast_ptr_alignment)]
+    #[expect(clippy::cast_ptr_alignment)]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,

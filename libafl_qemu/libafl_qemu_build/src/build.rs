@@ -13,7 +13,6 @@ pub const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
 pub const QEMU_REVISION: &str = "06bf8facec33548840413fba1b20858f58e38e2d";
 
-#[allow(clippy::module_name_repetitions)]
 pub struct BuildResult {
     pub qemu_path: PathBuf,
     pub build_dir: PathBuf,
@@ -59,7 +58,7 @@ fn get_config_signature(config_cmd: &Command) -> String {
     signature_string
 }
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn configure_qemu(
     cc_compiler: &cc::Tool,
     cpp_compiler: &cc::Tool,
@@ -245,7 +244,7 @@ fn build_qemu(
     cmd
 }
 
-#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
+#[expect(clippy::too_many_lines, clippy::missing_panics_doc)]
 #[must_use]
 pub fn build(
     cpu_target: &str,

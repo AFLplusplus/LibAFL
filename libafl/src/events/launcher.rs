@@ -453,7 +453,7 @@ where
                         for overcommit_i in 0..self.overcommit {
                             index += 1;
                             // Forward own stdio to child processes, if requested by user
-                            #[expect(unused_mut)]
+                            #[allow(unused_mut)] // mut only on certain cfgs
                             let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
                             #[cfg(unix)]
                             {

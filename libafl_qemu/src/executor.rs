@@ -355,7 +355,7 @@ where
     Z: HasObjective,
     Z::Objective: Feedback<EM, S::Input, OT, S>,
 {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         emulator: Emulator<CM, ED, ET, S, SM>,
         harness_fn: &'a mut H,
