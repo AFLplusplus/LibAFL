@@ -460,7 +460,6 @@ mod windows {
     }
 
     #[expect(clippy::cast_ptr_alignment)]
-    #[expect(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
         use std::{ptr, slice};
 
@@ -477,7 +476,6 @@ mod windows {
 
         #[repr(C)]
         #[allow(non_camel_case_types)] // expect breaks for some reason
-
         struct PROCESSOR_RELATIONSHIP {
             flags: u8,
             efficiency_class: u8,

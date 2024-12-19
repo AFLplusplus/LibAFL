@@ -2205,7 +2205,6 @@ impl SignalHandler for LlmpShutdownSignalHandler {
 
 #[cfg(all(windows, feature = "std"))]
 impl CtrlHandler for LlmpShutdownSignalHandler {
-    #[expect(clippy::not_unsafe_ptr_arg_deref)]
     fn handle(&mut self, ctrl_type: u32) -> bool {
         log::info!("LLMP: Received shutdown signal, ctrl_type {:?}", ctrl_type);
         unsafe {
