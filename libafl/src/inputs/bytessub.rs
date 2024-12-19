@@ -11,7 +11,7 @@ use libafl_bolts::{
     HasLen,
 };
 
-use crate::inputs::{HasMutatorBytes, MappedInput};
+use crate::inputs::HasMutatorBytes;
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
@@ -201,23 +201,14 @@ where
         self.range.len()
     }
 }
-
-impl<I> MappedInput for BytesSubInput<'_, I> {
-    type Type<'b>
-        = BytesSubInput<'b, I>
-    where
-        Self: 'b;
-}
-
 #[cfg(test)]
 mod tests {
-
     use alloc::vec::Vec;
 
     use libafl_bolts::HasLen;
 
     use crate::{
-        inputs::{BytesInput, HasMutatorBytes, MutVecInput, NopInput},
+        inputs::{BytesInput, HasMutatorBytes, NopInput},
         mutators::{havoc_mutations_no_crossover, MutatorsTuple},
         state::NopState,
     };
@@ -346,7 +337,6 @@ mod tests {
     #[test]
     fn test_bytessubinput_use_vec() {
         let mut test_vec = vec![0, 1, 2, 3, 4];
-        let mut test_vec = MutVecInput::from(&mut test_vec);
         let mut sub_vec = test_vec.sub_input(1..2);
         drop(sub_vec.drain(..));
         assert_eq!(test_vec.len(), 4);
