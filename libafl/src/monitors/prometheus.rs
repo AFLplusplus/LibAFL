@@ -51,7 +51,7 @@ use super::Aggregator;
 use crate::monitors::{ClientStats, Monitor, UserStatsValue};
 
 /// Prometheus metrics for global and each client.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct PrometheusStats {
     corpus_count: Family<Labels, Gauge>,
     objective_count: Family<Labels, Gauge>,
@@ -60,21 +60,6 @@ pub struct PrometheusStats {
     runtime: Family<Labels, Gauge>,
     clients_count: Family<Labels, Gauge>,
     custom_stat: Family<Labels, Gauge<f64, AtomicU64>>,
-}
-
-impl PrometheusStats {
-    /// Create a new [`PrometheusStats`] with default values.
-    pub fn default() -> Self {
-        Self {
-            corpus_count: Family::<Labels, Gauge>::default(),
-            objective_count: Family::<Labels, Gauge>::default(),
-            executions: Family::<Labels, Gauge>::default(),
-            exec_rate: Family::<Labels, Gauge<f64, AtomicU64>>::default(),
-            runtime: Family::<Labels, Gauge>::default(),
-            clients_count: Family::<Labels, Gauge>::default(),
-            custom_stat: Family::<Labels, Gauge<f64, AtomicU64>>::default(),
-        }
-    }
 }
 
 /// Tracking monitor during fuzzing.
