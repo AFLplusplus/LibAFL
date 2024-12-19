@@ -2,9 +2,8 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use core::time::Duration;
+use core::{ptr::addr_of, time::Duration};
 use std::{env, net::SocketAddr, path::PathBuf};
-use core::ptr::addr_of;
 
 use clap::Parser;
 use libafl::{
