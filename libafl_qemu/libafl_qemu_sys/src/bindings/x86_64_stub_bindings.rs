@@ -5706,6 +5706,9 @@ extern "C" {
     pub fn libafl_get_brk() -> u64;
 }
 extern "C" {
+    pub fn libafl_get_initial_brk() -> u64;
+}
+extern "C" {
     pub fn libafl_set_brk(new_brk: u64) -> u64;
 }
 extern "C" {
