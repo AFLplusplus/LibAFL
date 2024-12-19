@@ -42,12 +42,13 @@ use caps::{CapSet, Capability};
 #[cfg(target_os = "linux")]
 use libafl_bolts::ownedref::OwnedRefMut;
 use libafl_bolts::Error;
-use libipt::PtError;
 #[cfg(target_os = "linux")]
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
-    ConfigBuilder, Cpu, Image, PtErrorCode, Status,
+    ConfigBuilder, Cpu, PtError, PtErrorCode, Status,
 };
+#[cfg(target_os = "linux")]
+pub use libipt::{Asid, Image, SectionCache};
 #[cfg(target_os = "linux")]
 use num_enum::TryFromPrimitive;
 #[cfg(target_os = "linux")]
@@ -240,30 +241,39 @@ impl IntelPT {
         }
     }
 
-    //         // let read_mem = |buf: &mut [u8], addr: u64| {
-    //         //     let src = addr as *const u8;
-    //         //     let dst = buf.as_mut_ptr();
-    //         //     let size = buf.len();
-    //         //     unsafe {
-    //         //         ptr::copy_nonoverlapping(src, dst, size);
-    //         //     }
-    //         // };
-    // #[allow(clippy::cast_possible_wrap)]
-    // fn decode_with_callback<F: Fn(&mut [u8], u64)>(
-    //     &mut self,
-    //     read_memory: F,
-    //     copy_buffer: Option<&mut Vec<u8>>,
-    // ) -> Result<Vec<u64>, Error> {
-    //     self.decode(
-    //         Some(|buff: &mut [u8], addr: u64, _: Asid| {
-    //             debug_assert!(i32::try_from(buff.len()).is_ok());
-    //             read_memory(buff, addr);
-    //             buff.len() as i32
-    //         }),
-    //         None,
-    //         copy_buffer,
-    //     )
-    // }
+    /// Fill the coverage map by decoding the PT traces and reading target memory through `read_mem`
+    ///
+    /// This function consumes the traces.
+    ///
+    /// # Example
+    ///
+    /// An example `read_mem` callback function for the (inprocess) `intel_pt_babyfuzzer` could be:
+    /// ```
+    /// let read_mem = |buf: &mut [u8], addr: u64| {
+    ///     let src = addr as *const u8;
+    ///     let dst = buf.as_mut_ptr();
+    ///     let size = buf.len();
+    ///     unsafe {
+    ///         core::ptr::copy_nonoverlapping(src, dst, size);
+    ///     }
+    /// };
+    /// ```
+    #[allow(clippy::cast_possible_wrap)]
+    pub fn decode_with_callback<F, T>(&mut self, read_memory: F, map: &mut [T]) -> Result<(), Error>
+    where
+        F: Fn(&mut [u8], u64),
+        T: SaturatingAdd + From<u8> + Debug,
+    {
+        self.decode_traces_into_map_common(
+            None,
+            Some(|buff: &mut [u8], addr: u64, _: Asid| {
+                debug_assert!(i32::try_from(buff.len()).is_ok());
+                read_memory(buff, addr);
+                buff.len() as i32
+            }),
+            map,
+        )
+    }
 
     /// Fill the coverage map by decoding the PT traces
     ///
@@ -274,6 +284,23 @@ impl IntelPT {
         map: &mut [T],
     ) -> Result<(), Error>
     where
+        T: SaturatingAdd + From<u8> + Debug,
+    {
+        self.decode_traces_into_map_common(
+            Some(image),
+            None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
+            map,
+        )
+    }
+
+    fn decode_traces_into_map_common<F, T>(
+        &mut self,
+        image: Option<&mut Image>,
+        read_memory: Option<F>,
+        map: &mut [T],
+    ) -> Result<(), Error>
+    where
+        F: Fn(&mut [u8], u64, Asid) -> i32,
         T: SaturatingAdd + From<u8> + Debug,
     {
         let head = unsafe { self.aux_head.read_volatile() };
@@ -326,9 +353,14 @@ impl IntelPT {
         let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
         config.flags(flags);
         let mut decoder = BlockDecoder::new(&config.finish()).map_err(error_from_pt_error)?;
-        decoder
-            .set_image(Some(image))
-            .map_err(error_from_pt_error)?;
+        decoder.set_image(image).map_err(error_from_pt_error)?;
+        if let Some(rm) = read_memory {
+            decoder
+                .image()
+                .map_err(error_from_pt_error)?
+                .set_callback(Some(rm))
+                .map_err(error_from_pt_error)?;
+        }
 
         let mut previous_block_end_ip = 0;
         let mut status;
@@ -412,6 +444,12 @@ impl IntelPT {
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
                         *map_loc = (*map_loc).saturating_add(&1u8.into());
 
+                        // log::trace!(
+                        //     "previous block ip: {:x} current: {:x} offset: {offset:x}",
+                        //     previous_block_end_ip,
+                        //     b.ip()
+                        // );
+                        // log::trace!("writing map at {id:x} with value {:?}", *map_loc);
                         *previous_block_end_ip = b.end_ip();
                     }
 
@@ -421,7 +459,11 @@ impl IntelPT {
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
-                        log::trace!("PT error in block next {e:?}");
+                        let offset = decoder.offset().map_err(error_from_pt_error)?;
+                        log::trace!(
+                            "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
+                            previous_block_end_ip
+                        );
                     }
                     break 'block;
                 }
