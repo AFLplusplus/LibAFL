@@ -54,17 +54,10 @@ where
     }
 }
 
-impl<HT, OT, S> UsesState for GenericInProcessExecutorInner<HT, OT, S>
-where
-    S: State,
-{
-    type State = S;
-}
-
 impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     type Observers = OT;
 
@@ -81,8 +74,8 @@ where
 
 impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
 where
-    HT: ExecutorHooksTuple<S>,
-    S: State,
+OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+S: HasCorpus,
 {
     /// This function marks the boundary between the fuzzer and the target
     ///
@@ -93,9 +86,9 @@ where
     pub unsafe fn enter_target<EM, Z>(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut <Self as UsesState>::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &<Self as UsesInput>::Input,
+        input: &<S::Corpus as Corpus>::Input,
         executor_ptr: *const c_void,
     ) {
         unsafe {
@@ -128,9 +121,9 @@ where
     pub fn leave_target<EM, Z>(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut <Self as UsesState>::State,
+        _state: &mut S,
         _mgr: &mut EM,
-        _input: &<Self as UsesInput>::Input,
+        _input: &<S::Corpus as Corpus>::Input,
     ) {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -143,9 +136,9 @@ where
 
 impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
 where
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S::Input, S>,
-    S: HasCorpus + HasExecutions + HasSolutions + UsesInput,
+    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus + HasExecutions + HasSolutions,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<E, EM, OF, Z>(

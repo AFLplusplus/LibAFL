@@ -6,6 +6,7 @@
 use core::{
     cell::UnsafeCell,
     fmt::Debug,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     ptr,
 };
@@ -20,28 +21,23 @@ use super::HasTimeout;
 use crate::{
     corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::UsesInput,
     observers::{DifferentialObserversTuple, ObserversTuple},
-    state::{HasCorpus, UsesState},
+    state::HasCorpus,
     Error,
 };
 
 /// A [`DiffExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
-pub struct DiffExecutor<A, B, DOT, OTA, OTB> {
+pub struct DiffExecutor<A, B, DOT, OTA, OTB, S> {
     primary: A,
     secondary: B,
     observers: UnsafeCell<ProxyObserversTuple<OTA, OTB, DOT>>,
+    phantom: PhantomData<S>,
 }
 
-impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
+impl<A, B, DOT, OTA, OTB, S> DiffExecutor<A, B, DOT, OTA, OTB, S> {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
-    pub fn new(primary: A, secondary: B, observers: DOT) -> Self
-    where
-        A: UsesState + HasObservers<Observers = OTA>,
-        B: UsesState<State = <Self as UsesState>::State> + HasObservers<Observers = OTB>,
-        DOT: DifferentialObserversTuple<OTA, OTB, A::Input, A::State>,
-    {
+    pub fn new(primary: A, secondary: B, observers: DOT) -> Self {
         Self {
             primary,
             secondary,
@@ -50,6 +46,7 @@ impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
                 secondary: OwnedMutPtr::Ptr(ptr::null_mut()),
                 differential: observers,
             }),
+            phantom: PhantomData,
         }
     }
 
@@ -64,23 +61,23 @@ impl<A, B, DOT, OTA, OTB> DiffExecutor<A, B, DOT, OTA, OTB> {
     }
 }
 
-impl<A, B, DOT, EM, Z> Executor<EM, Z> for DiffExecutor<A, B, DOT, A::Observers, B::Observers>
+impl<A, B, DOT, EM, S, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+    for DiffExecutor<A, B, DOT, A::Observers, B::Observers, S>
 where
-    A: Executor<EM, Z> + HasObservers,
-    B: Executor<EM, Z, State = <Self as UsesState>::State> + HasObservers,
-    EM: UsesState<State = <Self as UsesState>::State>,
-    <A as HasObservers>::Observers:
-        ObserversTuple<<<A as UsesState>::State as UsesInput>::Input, <A as UsesState>::State>,
-    <B as HasObservers>::Observers:
-        ObserversTuple<<<A as UsesState>::State as UsesInput>::Input, <A as UsesState>::State>,
-    DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::Input, A::State> + MatchName,
+    A: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    B: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    <A as HasObservers>::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    <B as HasObservers>::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    DOT: DifferentialObserversTuple<A::Observers, B::Observers, <S::Corpus as Corpus>::Input, S>
+        + MatchName,
+    S: HasCorpus,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         self.observers(); // update in advance
         let observers = self.observers.get_mut();
@@ -120,7 +117,7 @@ where
     }
 }
 
-impl<A, B, DOT, OTA, OTB> HasTimeout for DiffExecutor<A, B, DOT, OTA, OTB>
+impl<A, B, DOT, OTA, OTB, S> HasTimeout for DiffExecutor<A, B, DOT, OTA, OTB, S>
 where
     A: HasTimeout,
     B: HasTimeout,
@@ -154,11 +151,9 @@ pub struct ProxyObserversTuple<A, B, DOT> {
 
 impl<A, B, DOT, I, S> ObserversTuple<I, S> for ProxyObserversTuple<A, B, DOT>
 where
-    A: ObserversTuple<I, S>,
-    B: ObserversTuple<I, S>,
+    A: MatchName,
+    B: MatchName,
     DOT: DifferentialObserversTuple<A, B, I, S> + MatchName,
-    S: HasCorpus,
-    S::Corpus: Corpus<Input = I>,
 {
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.differential.pre_exec_all(state, input)
@@ -238,20 +233,14 @@ impl<A, B, DOT> ProxyObserversTuple<A, B, DOT> {
     }
 }
 
-impl<A, B, DOT, OTA, OTB> UsesState for DiffExecutor<A, B, DOT, OTA, OTB>
+impl<A, B, DOT, OTA, OTB, S> HasObservers for DiffExecutor<A, B, DOT, OTA, OTB, S>
 where
-    A: UsesState,
-{
-    type State = A::State;
-}
-
-impl<A, B, DOT, OTA, OTB> HasObservers for DiffExecutor<A, B, DOT, OTA, OTB>
-where
-    A: UsesState + HasObservers<Observers = OTA>,
-    B: UsesState<State = <Self as UsesState>::State> + HasObservers<Observers = OTB>,
-    DOT: DifferentialObserversTuple<OTA, OTB, A::Input, A::State> + MatchName,
-    OTA: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
-    OTB: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
+    A: HasObservers<Observers = OTA>,
+    B: HasObservers<Observers = OTB>,
+    DOT: DifferentialObserversTuple<OTA, OTB, <S::Corpus as Corpus>::Input, S> + MatchName,
+    OTA: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    OTB: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     type Observers = ProxyObserversTuple<OTA, OTB, DOT>;
 
