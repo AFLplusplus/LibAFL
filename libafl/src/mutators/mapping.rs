@@ -81,7 +81,7 @@ impl<M, F> Named for MappingMutator<M, F> {
     }
 }
 
-/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`ToMappingMutatorMapper`]s.
+/// Mapper to use to map a [`tuple_list`] of [`Mutator`]s using [`ToMappingMutator`]s.
 ///
 /// See the explanation of [`MappingMutator`] for details.
 ///
@@ -127,7 +127,7 @@ pub struct ToMappingMutator<F> {
 }
 
 impl<F> ToMappingMutator<F> {
-    /// Creates a new [`ToMappingMutatorMapper`]
+    /// Creates a new [`ToMappingMutator`]
     pub fn new(mapper: F) -> Self {
         Self { mapper }
     }
