@@ -21,7 +21,7 @@ use crate::{
 
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<'a, T> {
     map: OwnedMutSlice<'a, T>,
     size: OwnedMutPtr<usize>,

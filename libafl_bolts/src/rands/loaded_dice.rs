@@ -81,7 +81,7 @@ impl LoadedDiceSampler {
     }
 
     /// Create the table for this [`LoadedDiceSampler`]
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn construct_table(probs: &[f64]) -> Vec<AliasEntry> {
         let mut res = vec![];
         let n = probs.len() as f64;
@@ -116,7 +116,7 @@ mod tests {
     use crate::rands::{Rand, StdRand};
 
     #[test]
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn test_loaded_dice() {
         let mut rng = StdRand::with_seed(1337);
         let len = rng.between(3, 9);

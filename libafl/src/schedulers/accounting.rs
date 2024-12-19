@@ -26,7 +26,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct AccountingIndexesMetadata {
     /// The list of indexes.
@@ -77,7 +77,7 @@ impl AccountingIndexesMetadata {
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct TopAccountingMetadata {
     /// map index -> corpus index
@@ -178,8 +178,7 @@ where
     O: CanTrack,
 {
     /// Update the `Corpus` score
-    #[allow(clippy::unused_self)]
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_possible_wrap)]
     pub fn update_accounting_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         S: HasCorpus + HasMetadata,
@@ -267,7 +266,6 @@ where
     }
 
     /// Cull the `Corpus`
-    #[allow(clippy::unused_self)]
     pub fn accounting_cull<S>(&self, state: &S) -> Result<(), Error>
     where
         S: HasCorpus + HasMetadata,

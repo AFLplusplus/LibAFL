@@ -145,7 +145,6 @@ where
     OT: MatchName,
     C: DiffComparator<O1, O2>,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,

@@ -35,7 +35,7 @@ pub fn get_diffing_files(commits: &[String]) -> HashSet<PathBuf> {
     files
 }
 
-#[allow(clippy::implicit_hasher)]
+#[expect(clippy::implicit_hasher)]
 #[must_use]
 pub fn get_diffing_crates(diffing_files: &HashSet<PathBuf>) -> HashSet<PathBuf> {
     // TODO maybe consider using a combination of this and https://docs.rs/cargo/0.28.0/cargo/sources/path/struct.PathSource.html
@@ -99,7 +99,7 @@ pub fn find_all_crates() -> HashSet<PathBuf> {
     crates
 }
 
-#[allow(clippy::implicit_hasher)]
+#[expect(clippy::implicit_hasher)]
 pub fn extend_diffing_crates_with_deps(
     diffing_crates: &mut HashSet<PathBuf>,
     all_crates: &HashSet<PathBuf>,

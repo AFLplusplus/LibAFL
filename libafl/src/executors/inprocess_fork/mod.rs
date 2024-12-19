@@ -57,7 +57,6 @@ where
     S: HasSolutions,
     Z: HasObjective<Objective = OF>,
 {
-    #[allow(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
         harness_fn: &'a mut H,
@@ -147,7 +146,6 @@ where
     HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
 {
-    #[allow(unreachable_code)]
     #[inline]
     fn run_target(
         &mut self,
@@ -190,7 +188,7 @@ where
     Z: HasObjective<Objective = OF>,
 {
     /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
         harness_fn: &'a mut H,
@@ -301,7 +299,7 @@ pub mod child_signal_handlers {
     /// The function should only be called from a child crash handler.
     /// It will dereference the `data` pointer and assume it's valid.
     #[cfg(unix)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_crash_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -325,9 +323,9 @@ pub mod child_signal_handlers {
     }
 
     #[cfg(unix)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_timeout_handler<E>(
-        _signal: Signal,
+        #[cfg(unix)] _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,

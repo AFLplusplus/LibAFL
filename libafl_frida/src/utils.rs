@@ -192,7 +192,6 @@ pub fn get_register(context: &CpuContext, reg: X86Register) -> u64 {
 #[cfg(target_arch = "x86_64")]
 #[must_use]
 #[inline]
-#[allow(clippy::unused_self)]
 pub fn writer_register(reg: RegSpec) -> X86Register {
     for (reg1, reg2) in &X86_64_REGS {
         // println!("reg1:{:#?} reg2:{:#?}", reg1, reg);
@@ -277,7 +276,7 @@ pub fn immediate_value(operand: &Operand) -> Option<i64> {
         Operand::ImmediateI32 { imm } => Some(i64::from(*imm)),
         Operand::ImmediateU32 { imm } => Some(i64::from(*imm)),
         Operand::ImmediateI64 { imm } => Some(*imm),
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap)]
         Operand::ImmediateU64 { imm } => Some(*imm as i64),
         _ => None,
     }

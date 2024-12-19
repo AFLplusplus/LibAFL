@@ -276,7 +276,7 @@ where
     type OutputCommand = LqprintfCommand;
     const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF.0;
 
-    #[allow(clippy::uninit_vec)]
+    #[expect(clippy::uninit_vec)]
     fn parse(
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
@@ -316,7 +316,6 @@ where
     type OutputCommand = TestCommand;
     const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_TEST.0;
 
-    #[allow(clippy::cast_sign_loss)]
     fn parse(
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,

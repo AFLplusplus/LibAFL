@@ -70,7 +70,7 @@ pub struct PushStageHelper<EM, I, OT, S, Z> {
     /// This gets reset to `false` after one iteration of the stage is done.
     pub initialized: bool,
     /// The shared state, keeping track of the corpus and the fuzzer
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub shared_state: Rc<RefCell<Option<PushStageSharedState<EM, I, OT, S, Z>>>>,
     /// If the last iteration failed
     pub errored: bool,
@@ -87,7 +87,7 @@ pub struct PushStageHelper<EM, I, OT, S, Z> {
 impl<EM, I, OT, S, Z> PushStageHelper<EM, I, OT, S, Z> {
     /// Create a new [`PushStageHelper`]
     #[must_use]
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn new(
         shared_state: Rc<RefCell<Option<PushStageSharedState<EM, I, OT, S, Z>>>>,
         exit_kind_ref: Rc<Cell<Option<ExitKind>>>,
@@ -110,7 +110,6 @@ impl<EM, I, OT, S, Z> PushStageHelper<EM, I, OT, S, Z> {
 
     /// Takes the shared state from this helper, replacing it with `None`
     #[inline]
-    #[allow(clippy::type_complexity)]
     pub fn take_shared_state(&mut self) -> Option<PushStageSharedState<EM, I, OT, S, Z>> {
         let shared_state_ref = &mut (*self.shared_state).borrow_mut();
         shared_state_ref.take()
@@ -207,7 +206,6 @@ pub trait PushStage<EM, I, OT, S, Z> {
 }
 
 /// Allows us to use a [`PushStage`] as a normal [`Stage`]
-#[allow(clippy::type_complexity)]
 #[derive(Debug)]
 pub struct PushStageAdapter<CS, EM, OT, PS, Z> {
     name: Cow<'static, str>,

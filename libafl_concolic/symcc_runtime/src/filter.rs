@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+// required for the import the macro `invoke_macro_with_rust_runtime_exports` that is dynamically generated in build.rs
 #[allow(clippy::wildcard_imports)]
 use crate::*;
 
@@ -17,19 +18,19 @@ macro_rules! rust_filter_function_declaration {
     // push_path_constraint is not caught by the following case (because it has not return value),
     // but still needs to return something
     (pub fn push_path_constraint($( $arg:ident : $type:ty ),*$(,)?), $c_name:ident;) => {
-        #[allow(unused_variables)]
+        #[allow(unused_variables)] // only unused for some macro invocations
         fn push_path_constraint(&mut self, $($arg : $type),*) -> bool {
             true
         }
     };
 
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?) -> $ret:ty, $c_name:ident;) => {
-        #[allow(unused_variables)]
+        #[allow(unused_variables)] // only unused for some macro invocations
         fn $name(&mut self, $( $arg : $type),*) -> bool {true}
     };
 
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?), $c_name:ident;) => {
-        #[allow(unused_variables)]
+        #[allow(unused_variables)] // only unused for some macro invocations
         fn $name(&mut self, $( $arg : $type),*) {}
     };
 }
@@ -84,7 +85,7 @@ pub trait Filter {
 ///
 /// It applies the filter before passing expressions to the inner runtime.
 /// It also implements [`Runtime`], allowing for composing multiple [`Filter`]'s in a chain.
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 pub struct FilterRuntime<F, RT> {
     filter: F,
     runtime: RT,

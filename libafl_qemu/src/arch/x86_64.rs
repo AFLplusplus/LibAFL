@@ -49,7 +49,7 @@ pub fn get_exit_arch_regs() -> &'static EnumMap<ExitArgs, Regs> {
 }
 
 /// alias registers
-#[allow(non_upper_case_globals)]
+#[expect(non_upper_case_globals)]
 impl Regs {
     pub const Sp: Regs = Regs::Rsp;
     pub const Pc: Regs = Regs::Rip;

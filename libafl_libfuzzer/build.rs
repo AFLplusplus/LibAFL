@@ -13,7 +13,7 @@ const NAMESPACE: &str = "🐇";
 const NAMESPACE: &str = "__libafl";
 const NAMESPACE_LEN: usize = NAMESPACE.len();
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn main() -> Result<(), Box<dyn Error>> {
     if cfg!(any(clippy, docsrs)) {
         return Ok(()); // skip when clippy or docs is running

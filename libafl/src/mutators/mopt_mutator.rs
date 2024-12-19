@@ -29,7 +29,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct MOpt {
     /// Random number generator
@@ -189,7 +189,6 @@ impl MOpt {
     }
 
     /// initialize pso
-    #[allow(clippy::cast_precision_loss)]
     pub fn pso_initialize(&mut self) -> Result<(), Error> {
         if self.g_now > self.g_max {
             self.g_now = 0.0;
@@ -245,7 +244,7 @@ impl MOpt {
 
     /// Update the `PSO` algorithm parameters
     /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L10623>
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
         self.g_now += 1.0;
         if self.g_now > self.g_max {
@@ -311,7 +310,6 @@ impl MOpt {
 
     /// This function is used to decide the operator that we want to apply next
     /// see <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397>
-    #[allow(clippy::cast_precision_loss)]
     pub fn select_algorithm(&mut self) -> Result<MutationId, Error> {
         let mut res = 0;
         let mut sentry = 0;
@@ -381,7 +379,7 @@ where
         self.scheduled_mutate(state, input)
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn post_exec(&mut self, state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
@@ -430,7 +428,6 @@ where
                     }
                 }
 
-                #[allow(clippy::cast_lossless)]
                 if mopt.pilot_time > mopt.period_pilot {
                     let new_finds = mopt.total_finds - mopt.finds_until_last_swarm;
                     let f = (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));

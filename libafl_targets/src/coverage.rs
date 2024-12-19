@@ -16,19 +16,19 @@ use crate::{ACCOUNTING_MAP_SIZE, DDG_MAP_SIZE, EDGES_MAP_ALLOCATED_SIZE, EDGES_M
 
 /// The map for edges.
 #[no_mangle]
-#[allow(non_upper_case_globals)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_ALLOCATED_SIZE] = [0; EDGES_MAP_ALLOCATED_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
 /// The map for data dependency
 #[no_mangle]
-#[allow(non_upper_case_globals)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut __ddg_area_ptr_local: [u8; DDG_MAP_SIZE] = [0; DDG_MAP_SIZE];
 pub use __ddg_area_ptr_local as DDG_MAP;
 
 /// The map for accounting mem writes.
 #[no_mangle]
-#[allow(non_upper_case_globals)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
 pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
 pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 
@@ -78,7 +78,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
 
 /// The actual size we use for the map of edges.
 /// This is used for forkserver backend
-#[allow(non_upper_case_globals)]
+#[allow(non_upper_case_globals)] // expect breaks here for some reason
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_DEFAULT_SIZE;
 
@@ -221,7 +221,7 @@ mod swap {
     /// Observer to be used with `DiffExecutor`s when executing a differential target that shares
     /// the AFL map in order to swap out the maps (and thus allow for map observing the two targets
     /// separately).
-    #[allow(clippy::unsafe_derive_deserialize)]
+    #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
         first_map: OwnedMutSlice<'a, u8>,

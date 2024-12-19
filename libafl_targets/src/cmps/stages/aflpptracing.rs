@@ -23,7 +23,6 @@ pub struct AFLppCmplogTracingStage<'a, EM, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,
     cmplog_observer_handle: Handle<AFLppCmpLogObserver<'a>>,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, S, Z)>,
 }
 /// The name for aflpp tracing stage

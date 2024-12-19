@@ -22,7 +22,6 @@ use crate::{
 
 /// The Multi Map Observer merge different maps into one observer
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
 pub struct MultiMapObserver<'a, T, const DIFFERENTIAL: bool> {
     maps: Vec<OwnedMutSlice<'a, T>>,
     intervals: IntervalTree<usize, usize>,

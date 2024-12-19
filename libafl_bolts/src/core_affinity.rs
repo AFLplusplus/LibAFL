@@ -251,7 +251,6 @@ mod linux {
     use super::CoreId;
     use crate::Error;
 
-    #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         let full_set = get_affinity_mask()?;
         let mut core_ids: Vec<CoreId> = Vec::new();
@@ -361,14 +360,14 @@ mod linux {
 // FIXME: no sense of cpu granularity (yet ?)
 
 #[cfg(target_os = "haiku")]
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     haiku::get_core_ids()
 }
 
 #[cfg(target_os = "haiku")]
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 #[inline]
 fn set_for_current_helper(_core_id: CoreId) -> Result<(), Error> {
     Ok(())
@@ -381,7 +380,7 @@ mod haiku {
 
     use crate::core_affinity::{CoreId, Error};
 
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)
@@ -460,18 +459,15 @@ mod windows {
         }
     }
 
-    #[allow(trivial_numeric_casts)]
-    #[allow(clippy::cast_ptr_alignment)]
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_ptr_alignment)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
         use std::{ptr, slice};
 
-        #[allow(non_upper_case_globals)]
+        #[expect(non_upper_case_globals)]
         const RelationProcessorCore: u32 = 0;
 
         #[repr(C)]
-        #[allow(non_camel_case_types)]
-        #[allow(dead_code)]
+        #[allow(non_camel_case_types)] // expect breaks for some reason
         struct GROUP_AFFINITY {
             mask: usize,
             group: u16,
@@ -479,8 +475,7 @@ mod windows {
         }
 
         #[repr(C)]
-        #[allow(non_camel_case_types)]
-        #[allow(dead_code)]
+        #[allow(non_camel_case_types)] // expect breaks for some reason
         struct PROCESSOR_RELATIONSHIP {
             flags: u8,
             efficiency_class: u8,
@@ -490,8 +485,7 @@ mod windows {
         }
 
         #[repr(C)]
-        #[allow(non_camel_case_types)]
-        #[allow(dead_code)]
+        #[allow(non_camel_case_types)] // expect breaks for some reason
         struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX {
             relationship: u32,
             size: u32,
@@ -626,7 +620,6 @@ mod apple {
         ) -> kern_return_t;
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)
@@ -659,7 +652,7 @@ mod apple {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     pub fn set_for_current(_core_id: CoreId) -> Result<(), Error> {
         // This is the best we can do, unlike on intel architecture
         // the system does not allow to pin a process/thread to specific cpu.
@@ -703,7 +696,7 @@ mod netbsd {
     use super::CoreId;
     use crate::Error;
 
-    #[allow(trivial_numeric_casts)]
+    #[expect(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)
@@ -746,7 +739,7 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 }
 
 #[cfg(target_os = "openbsd")]
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 #[inline]
 fn set_for_current_helper(_: CoreId) -> Result<(), Error> {
     Ok(()) // There is no notion of cpu affinity on this platform
@@ -760,7 +753,7 @@ mod openbsd {
     use super::CoreId;
     use crate::Error;
 
-    #[allow(trivial_numeric_casts)]
+    #[expect(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)
@@ -788,7 +781,7 @@ mod solaris {
     use super::CoreId;
     use crate::Error;
 
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)

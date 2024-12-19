@@ -398,7 +398,7 @@ where
         }
     }
 
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     pub fn reads(
         &mut self,
         generation_hook: ReadGenHook<ET, S>,
@@ -486,7 +486,7 @@ where
         }
     }
 
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     pub fn writes(
         &mut self,
         generation_hook: WriteGenHook<ET, S>,
@@ -767,7 +767,6 @@ where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    #[allow(clippy::type_complexity)]
     pub fn syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
         match hook {
             Hook::Function(f) => Some(self.syscalls_function(f)),
@@ -780,7 +779,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`].
@@ -790,7 +788,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`].
@@ -821,7 +818,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn after_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
         match hook {
             Hook::Function(f) => Some(self.after_syscalls_function(f)),
@@ -834,7 +830,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn after_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`]. This should be ok.
@@ -844,7 +839,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn after_syscalls_closure(
         &mut self,
         hook: PostSyscallHookClosure<ET, S>,
@@ -999,7 +993,6 @@ where
             .blocks(generation_hook, post_generation_hook, execution_hook)
     }
 
-    #[allow(clippy::similar_names)]
     pub fn reads(
         &mut self,
         generation_hook: ReadGenHook<ET, S>,
@@ -1019,7 +1012,6 @@ where
         )
     }
 
-    #[allow(clippy::similar_names)]
     pub fn writes(
         &mut self,
         generation_hook: WriteGenHook<ET, S>,
@@ -1221,14 +1213,13 @@ where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    #[allow(clippy::type_complexity)]
     pub fn syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
         self.hooks.syscalls(hook)
     }
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `syscalls_function`
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub unsafe fn syscalls_function(
         &mut self,
         hook: fn(
@@ -1250,7 +1241,7 @@ where
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `syscalls_closure`
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub unsafe fn syscalls_closure(
         &mut self,
         hook: Box<
@@ -1272,14 +1263,13 @@ where
         self.hooks.syscalls_closure(hook)
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn after_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
         self.hooks.after_syscalls(hook)
     }
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `after_syscalls_function`
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub unsafe fn after_syscalls_function(
         &mut self,
         hook: fn(
@@ -1300,7 +1290,7 @@ where
         self.hooks.after_syscalls_function(hook)
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn after_syscalls_closure(
         &mut self,
         hook: Box<

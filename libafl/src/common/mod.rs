@@ -1,7 +1,5 @@
 //! This module defines trait shared across different `LibAFL` modules
 
-#![allow(unused, missing_docs)]
-
 use alloc::boxed::Box;
 use core::any::type_name;
 

@@ -122,7 +122,7 @@ impl NodeId {
 
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub struct TcpMultiMachineState<A> {
     node_descriptor: NodeDescriptor<A>,
     /// the parent to which the testcases should be forwarded when deemed interesting
@@ -364,7 +364,7 @@ where
     /// Read a [`TcpMultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
-    #[allow(clippy::uninit_vec)]
+    #[expect(clippy::uninit_vec)]
     async fn read_msg<'a, I: Input + 'a>(
         stream: &mut TcpStream,
     ) -> Result<Option<MultiMachineMsg<'a, I>>, Error> {

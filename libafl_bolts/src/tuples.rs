@@ -44,7 +44,7 @@ pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     }
 
     // specialized implementation: Copy is only implemented if the types are the same
-    #[allow(clippy::mismatching_type_param_order)]
+    #[expect(clippy::mismatching_type_param_order)]
     impl<T: ?Sized> Copy for W<'_, T, T> {}
 
     let detected = Cell::new(true);
@@ -485,7 +485,7 @@ impl MatchName for () {
 }
 
 #[cfg(feature = "alloc")]
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl<Head, Tail> MatchName for (Head, Tail)
 where
     Head: Named,
@@ -585,7 +585,7 @@ pub trait MatchNameRef {
 }
 
 #[cfg(feature = "alloc")]
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl<M> MatchNameRef for M
 where
     M: MatchName,
@@ -769,10 +769,8 @@ impl<M> Map<M> for () {
 
 /// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
-#[allow(clippy::items_after_statements)]
 macro_rules! tuple_for_each {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
-        #[allow(clippy::items_after_statements)]
         mod $fn_name {
             pub trait ForEach {
                 fn for_each(&self);
@@ -787,7 +785,7 @@ macro_rules! tuple_for_each {
                 Head: $trait_name,
                 Tail: tuple_list::TupleList + ForEach,
             {
-                #[allow(clippy::redundant_closure_call)]
+                #[allow(clippy::redundant_closure_call)] // macro may be called on a closure or a function
                 fn for_each(&self) {
                     ($body)(&self.0);
                     self.1.for_each();
@@ -806,7 +804,6 @@ macro_rules! tuple_for_each {
 #[macro_export]
 macro_rules! tuple_for_each_mut {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
-        #[allow(clippy::items_after_statements)]
         mod $fn_name {
             pub trait ForEachMut {
                 fn for_each_mut(&mut self);
@@ -821,7 +818,7 @@ macro_rules! tuple_for_each_mut {
                 Head: $trait_name,
                 Tail: tuple_list::TupleList + ForEachMut,
             {
-                #[allow(clippy::redundant_closure_call)]
+                #[allow(clippy::redundant_closure_call)] // macro may be called on a closure or a function
                 fn for_each_mut(&mut self) {
                     ($body)(&mut self.0);
                     self.1.for_each_mut();
@@ -874,7 +871,7 @@ mod test {
     use crate::tuples::{type_eq, Map, MappingFunctor};
 
     #[test]
-    #[allow(unused_qualifications)] // for type name tests
+    // for type name tests
     fn test_type_eq_simple() {
         // test eq
         assert!(type_eq::<u64, u64>());
@@ -885,13 +882,13 @@ mod test {
 
     #[test]
     #[cfg(feature = "alloc")]
-    #[allow(unused_qualifications)] // for type name tests
+    #[expect(unused_qualifications)] // for type name tests
     fn test_type_eq() {
         // An alias for equality testing
         type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
 
         // A function for lifetime testing
-        #[allow(clippy::extra_unused_lifetimes)]
+        #[expect(clippy::extra_unused_lifetimes)]
         fn test_lifetimes<'a, 'b>() {
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
             assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
@@ -937,14 +934,13 @@ mod test {
         let mapped = orig.map(MyMapper);
 
         // this won't compile if the mapped type is not correct
-        #[allow(clippy::no_effect_underscore_binding)]
+        #[expect(clippy::no_effect_underscore_binding)]
         let _type_assert: tuple_list_type!(W<A>, W<B>, W<C>) = mapped;
     }
 
     /// Function that tests the tuple macros
     #[test]
     #[cfg(feature = "std")]
-    #[allow(clippy::items_after_statements)]
     fn test_macros() {
         let mut t = tuple_list!(1, "a");
 

@@ -19,8 +19,7 @@ use crate::{
 /// Metadata for [`StdOutToMetadataFeedback`].
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdOutMetadata {
-    #[allow(missing_docs)]
-    pub stdout: String,
+    stdout: String,
 }
 
 impl_serdeany!(StdOutMetadata);
@@ -104,8 +103,7 @@ impl StdOutToMetadataFeedback {
 /// Metadata for [`StdErrToMetadataFeedback`].
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdErrMetadata {
-    #[allow(missing_docs)]
-    pub stderr: String,
+    stderr: String,
 }
 
 impl_serdeany!(StdErrMetadata);

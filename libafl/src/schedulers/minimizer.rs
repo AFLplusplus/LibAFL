@@ -26,7 +26,7 @@ pub const DEFAULT_SKIP_NON_FAVORED_PROB: f64 = 0.95;
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct IsFavoredMetadata {}
 
@@ -36,7 +36,7 @@ libafl_bolts::impl_serdeany!(IsFavoredMetadata);
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct TopRatedsMetadata {
     /// map index -> corpus index
@@ -248,8 +248,7 @@ where
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
 {
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
-    #[allow(clippy::unused_self)]
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_possible_wrap)]
     pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         F: TestcaseScore<S>,
@@ -327,7 +326,6 @@ where
     }
 
     /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
-    #[allow(clippy::unused_self)]
     pub fn cull<S>(&self, state: &S) -> Result<(), Error>
     where
         S: HasCorpus + HasMetadata,

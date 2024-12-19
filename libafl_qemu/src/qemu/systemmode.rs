@@ -33,7 +33,7 @@ pub enum DeviceSnapshotFilter {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub struct PhysMemoryChunk {
     addr: GuestPhysAddr,
     size: usize,
@@ -48,7 +48,7 @@ pub struct PhysMemoryIter {
     cpu: CPU,
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub struct HostMemoryIter<'a> {
     addr: GuestPhysAddr, // This address is correct when the iterator enters next, except if the remaining len is 0
     remaining_len: usize,
@@ -177,7 +177,7 @@ impl CPU {
     }
 }
 
-#[allow(clippy::unused_self)]
+#[expect(clippy::unused_self)]
 impl Qemu {
     pub fn guest_page_size(&self) -> usize {
         4096
@@ -314,7 +314,7 @@ impl QemuMemoryChunk {
         }
     }
 
-    #[allow(clippy::map_flatten)]
+    #[expect(clippy::map_flatten)]
     pub fn host_iter(&self, qemu: Qemu) -> Box<dyn Iterator<Item = &[u8]>> {
         Box::new(
             self.phys_iter(qemu)

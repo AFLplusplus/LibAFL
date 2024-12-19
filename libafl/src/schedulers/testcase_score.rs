@@ -34,7 +34,7 @@ where
     S: HasCorpus,
     <S::Corpus as Corpus>::Input: HasLen,
 {
-    #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
+    #[expect(clippy::cast_precision_loss)]
     fn compute(
         state: &S,
         entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
@@ -60,12 +60,7 @@ where
     S: HasCorpus + HasMetadata,
 {
     /// Compute the `power` we assign to each corpus entry
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::too_many_lines,
-        clippy::cast_sign_loss,
-        clippy::cast_lossless
-    )]
+    #[expect(clippy::cast_precision_loss, clippy::too_many_lines)]
     fn compute(
         state: &S,
         entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
@@ -282,7 +277,7 @@ where
     S: HasCorpus + HasMetadata,
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
-    #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
+    #[expect(clippy::cast_precision_loss)]
     fn compute(
         state: &S,
         entry: &mut Testcase<<S::Corpus as Corpus>::Input>,

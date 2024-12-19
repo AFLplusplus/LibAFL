@@ -117,7 +117,7 @@ where
     H: FnMut(&[u8]),
 {
     /// Run the fuzzer
-    #[allow(clippy::too_many_lines, clippy::similar_names)]
+    #[expect(clippy::too_many_lines)]
     pub fn run(&mut self, qemu: Qemu) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
@@ -498,7 +498,7 @@ pub mod pybind {
     impl QemuBytesCoverageSugar {
         /// Create a new [`QemuBytesCoverageSugar`]
         #[new]
-        #[allow(clippy::too_many_arguments)]
+        #[expect(clippy::too_many_arguments)]
         #[pyo3(signature = (
             input_dirs,
             output_dir,
@@ -532,7 +532,7 @@ pub mod pybind {
         }
 
         /// Run the fuzzer
-        #[allow(clippy::needless_pass_by_value)]
+        #[expect(clippy::needless_pass_by_value)]
         pub fn run(&self, qemu: &Qemu, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)

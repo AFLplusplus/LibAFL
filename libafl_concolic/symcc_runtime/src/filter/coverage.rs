@@ -70,7 +70,6 @@ impl<THasher: Hasher, THashBuilder: BuildHasher> CallStackCoverage<THasher, THas
         self.pending = true;
     }
 
-    #[allow(clippy::wrong_self_convention)]
     pub fn is_interesting(&self) -> bool {
         self.is_interesting
     }
@@ -139,6 +138,7 @@ macro_rules! call_stack_coverage_filter_function_implementation {
     };
 }
 
+// required for the import the macro `invoke_macro_with_rust_runtime_exports` that is dynamically generated in build.rs
 #[allow(clippy::wildcard_imports)]
 use crate::*;
 
@@ -189,7 +189,7 @@ where
     }
 
     fn register_location_on_hitmap(&mut self, location: usize) {
-        #[allow(clippy::cast_possible_truncation)] // we cannot have more than usize elements..
+        #[expect(clippy::cast_possible_truncation)] // we cannot have more than usize elements..
         let hash = (self.build_hasher.hash_one(location) % usize::MAX as u64) as usize;
         let val = unsafe {
             // # Safety

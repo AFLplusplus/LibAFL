@@ -55,8 +55,8 @@ impl FridaRuntime for CoverageRuntime {
 
 impl CoverageRuntime {
     /// Create a new coverage runtime
-    #[must_use]
     #[allow(clippy::large_stack_arrays)]
+    #[must_use]
     pub fn new() -> Self {
         Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
             map: [0_u8; MAP_SIZE],
@@ -74,7 +74,7 @@ impl CoverageRuntime {
     /// every time we need a copy that is within a direct branch of the start of the transformed basic
     /// block.
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_possible_wrap)]
     pub fn generate_inline_code(&mut self, h64: u64) -> Box<[u8]> {
         let mut borrow = self.0.borrow_mut();
         let prev_loc_ptr = &raw mut borrow.previous_pc;

@@ -27,7 +27,6 @@ use crate::{
 pub struct TracingStage<EM, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, TE, S, Z)>,
 }
 
@@ -43,7 +42,7 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>, //delete me
 {
-    #[allow(rustdoc::broken_intra_doc_links)]
+    #[expect(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
     /// see [`super::ConcolicTracingStage`]'s implementation as an example of usage.
@@ -151,7 +150,6 @@ impl<EM, TE, S, Z> TracingStage<EM, TE, S, Z> {
 #[derive(Clone, Debug)]
 pub struct ShadowTracingStage<E, EM, SOT, S, Z> {
     name: Cow<'static, str>,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, SOT, S, Z)>,
 }
 

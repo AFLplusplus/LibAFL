@@ -27,7 +27,7 @@ impl Mutator {
     }
 
     //Return value indicates if minimization is complete: true: complete, false: not complete
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn minimize_tree<F, R: Rand>(
         &mut self,
         rand: &mut R,
@@ -353,7 +353,7 @@ mod tests {
             .iter()
             .map(|x| RuleIdOrCustom::Rule(*x))
             .collect::<Vec<_>>();
-        let mut tree = Tree::from_rule_vec(rules, &ctx);
+        let tree = Tree::from_rule_vec(rules, &ctx);
 
         println!("tree: {tree:?}");
         let mut mutator = Mutator::new(&ctx);
@@ -529,7 +529,6 @@ mod tests {
 
     #[test]
     fn deterministic_splice() {
-        let mut rand = StdRand::new();
         let mut ctx = Context::new();
         let mut rand = StdRand::new();
         let mut cks = ChunkStore::new("/tmp/".to_string());

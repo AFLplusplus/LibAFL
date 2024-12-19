@@ -1,5 +1,4 @@
 use alloc::{string::String, vec::Vec};
-use core::cell::OnceCell;
 use std::sync::OnceLock;
 
 use libafl_bolts::rands::Rand;

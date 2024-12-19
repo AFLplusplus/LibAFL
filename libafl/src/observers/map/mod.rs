@@ -437,7 +437,7 @@ where
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool> {
     map: OwnedMutSlice<'a, T>,
     initial: T,

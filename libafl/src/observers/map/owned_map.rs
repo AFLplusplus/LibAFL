@@ -18,7 +18,6 @@ use crate::{
 
 /// Exact copy of `StdMapObserver` that owns its map
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[allow(clippy::unsafe_derive_deserialize)]
 pub struct OwnedMapObserver<T> {
     map: Vec<T>,
     initial: T,

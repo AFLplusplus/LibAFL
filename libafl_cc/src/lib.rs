@@ -224,7 +224,6 @@ pub trait ToolWrapper {
     fn command(&mut self) -> Result<Vec<String>, Error>;
 
     /// Command to run the compiler for a given `Configuration`
-    #[allow(clippy::too_many_lines)]
     fn command_for_configuration(
         &mut self,
         configuration: Configuration,

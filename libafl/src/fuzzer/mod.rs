@@ -78,7 +78,6 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
     ) -> Result<ExecuteInputResult, Error>;
 
     /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
-    #[allow(clippy::too_many_arguments)]
     fn process_execution(
         &mut self,
         state: &mut S,

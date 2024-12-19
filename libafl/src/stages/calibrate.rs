@@ -31,7 +31,7 @@ use crate::{
 /// Formula is same as AFL++: number of unstable entries divided by the number of filled entries.
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnstableEntriesMetadata {
@@ -106,11 +106,7 @@ where
     <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]
-    #[allow(
-        clippy::let_and_return,
-        clippy::too_many_lines,
-        clippy::cast_precision_loss
-    )]
+    #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,

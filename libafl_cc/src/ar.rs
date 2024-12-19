@@ -6,7 +6,7 @@ use std::{env, path::PathBuf, str::FromStr};
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
 /// Wrap Clang
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct ArWrapper {
     is_silent: bool,
@@ -21,9 +21,8 @@ pub struct ArWrapper {
     base_args: Vec<String>,
 }
 
-#[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
+#[expect(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl ToolWrapper for ArWrapper {
-    #[allow(clippy::too_many_lines)]
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>,

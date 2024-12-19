@@ -386,7 +386,6 @@ pub fn store_generated_content_if_different(
 //}
 
 #[rustversion::nightly]
-#[allow(unused)]
 pub fn maybe_generate_stub_bindings(
     cpu_target: &str,
     emulation_mode: &str,

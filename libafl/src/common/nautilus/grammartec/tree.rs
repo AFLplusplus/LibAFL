@@ -6,7 +6,7 @@ use libafl_bolts::rands::Rand;
 use pyo3::{
     prelude::{PyObject, PyResult, Python},
     types::{PyAnyMethods, PyBytes, PyBytesMethods, PyString, PyStringMethods, PyTuple},
-    FromPyObject, PyTypeInfo,
+    PyTypeInfo,
 };
 use serde::{Deserialize, Serialize};
 
@@ -211,9 +211,11 @@ impl TreeLike for Tree {
     fn get_rule<'c>(&self, n: NodeId, ctx: &'c Context) -> &'c Rule {
         ctx.get_rule(self.get_rule_id(n))
     }
+
     fn get_custom_rule_data(&self, n: NodeId) -> &[u8] {
         self.rules[n.to_i()].data()
     }
+
     fn get_rule_or_custom(&self, n: NodeId) -> &RuleIdOrCustom {
         &self.rules[n.to_i()]
     }
@@ -240,6 +242,7 @@ impl Tree {
         self.rules[n.to_i()].id()
     }
 
+    #[expect(dead_code)]
     fn get_rule_or_custom(&self, n: NodeId) -> &RuleIdOrCustom {
         &self.rules[n.to_i()]
     }
@@ -384,6 +387,7 @@ impl Tree {
         }
     }
 
+    #[expect(dead_code)]
     fn find_recursions_iter(&self, ctx: &Context) -> Vec<(NodeId, NodeId)> {
         let mut found_recursions = Vec::new();
         //Only search for iterations for up to 10000 nodes
@@ -442,6 +446,7 @@ impl TreeLike for TreeMutation<'_> {
     fn size(&self) -> usize {
         self.prefix.len() + self.repl.len() + self.postfix.len()
     }
+
     fn get_rule_or_custom(&self, n: NodeId) -> &RuleIdOrCustom {
         self.get_at(n)
     }

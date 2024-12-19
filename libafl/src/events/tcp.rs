@@ -112,9 +112,9 @@ where
     }
 
     /// Run in the broker until all clients exit
-    // TODO: remove allow(clippy::needless_return) when clippy is fixed
+    // TODO: remove expect(clippy::needless_return) when clippy is fixed
     #[tokio::main(flavor = "current_thread")]
-    #[allow(clippy::too_many_lines, clippy::needless_return)]
+    #[expect(clippy::too_many_lines)]
     pub async fn broker_loop(&mut self) -> Result<(), Error> {
         let (tx_bc, rx) = broadcast::channel(65536);
         let (tx, mut rx_mpsc) = mpsc::channel(65536);
@@ -289,10 +289,9 @@ where
             let event_bytes = &buf[4..];
 
             #[cfg(feature = "tcp_compression")]
-            let event_bytes = GzipCompressor::new().decompress(event_bytes)?;
+            let event_bytes = &GzipCompressor::new().decompress(event_bytes)?;
 
-            #[allow(clippy::needless_borrow)] // make decompressed vec and slice compatible
-            let event: Event<I> = postcard::from_bytes(&event_bytes)?;
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
             match Self::handle_in_broker(&mut self.monitor, client_id, &event)? {
                 BrokerEventResult::Forward => {
                     tx_bc.send(buf).expect("Could not send");
@@ -311,7 +310,7 @@ where
     }
 
     /// Handle arriving events in the broker
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
         client_id: ClientId,
@@ -593,7 +592,6 @@ where
     }
 
     // Handle arriving events in the client
-    #[allow(clippy::unused_self)]
     fn handle_in_client<E, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -789,7 +787,6 @@ where
                         let buf = self.compressor.decompress(buf)?;
 
                         // make decompressed vec and slice compatible
-                        #[allow(clippy::needless_borrow)]
                         let event = postcard::from_bytes(&buf)?;
 
                         self.handle_in_client(fuzzer, executor, state, other_client_id, event)?;
@@ -1067,7 +1064,7 @@ pub enum TcpManagerKind {
 ///
 /// The [`TcpRestartingEventManager`] is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn setup_restarting_mgr_tcp<MT, S>(
     monitor: MT,
     broker_port: u16,
@@ -1099,7 +1096,6 @@ where
 /// The [`TcpRestartingMgr`] is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
-#[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
 pub struct TcpRestartingMgr<EMH, MT, S, SP>
 where
@@ -1142,7 +1138,7 @@ where
     phantom_data: PhantomData<S>,
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
+#[expect(clippy::type_complexity, clippy::too_many_lines)]
 impl<EMH, MT, S, SP> TcpRestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
@@ -1289,7 +1285,7 @@ where
                     return Err(Error::shutting_down());
                 }
 
-                #[allow(clippy::manual_assert)]
+                #[expect(clippy::manual_assert)]
                 if !staterestorer.has_content() && self.serialize_state {
                     #[cfg(unix)]
                     if child_status == 137 {

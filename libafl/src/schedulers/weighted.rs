@@ -31,7 +31,7 @@ use crate::{
 /// The Metadata for `WeightedScheduler`
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WeightedScheduleMetadata {
@@ -156,12 +156,7 @@ where
     }
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
-    #[allow(
-        clippy::unused_self,
-        clippy::similar_names,
-        clippy::cast_precision_loss,
-        clippy::cast_lossless
-    )]
+    #[expect(clippy::cast_precision_loss)]
     pub fn create_alias_table<S>(&self, state: &mut S) -> Result<(), Error>
     where
         F: TestcaseScore<S>,
@@ -336,7 +331,6 @@ where
         on_evaluation_metadata_default(self, state, observers)
     }
 
-    #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if self.table_invalidated {
             self.create_alias_table(state)?;

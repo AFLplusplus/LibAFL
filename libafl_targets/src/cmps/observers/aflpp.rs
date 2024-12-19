@@ -174,7 +174,7 @@ impl<'a> AFLppCmpLogObserver<'a> {
     where
         S: HasMetadata,
     {
-        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
+        #[expect(clippy::option_if_let_else)] // we can't mutate state in a closure
         let meta = if let Some(meta) = state.metadata_map_mut().get_mut::<AFLppCmpValuesMetadata>()
         {
             meta

@@ -95,7 +95,7 @@ where
     }
 
     #[inline]
-    #[allow(clippy::cast_ptr_alignment)]
+    #[expect(clippy::cast_ptr_alignment)]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let mut map = self.as_slice_mut();
         let mut len = map.len();
@@ -130,7 +130,7 @@ where
         let count_class_lookup_16 = &raw mut COUNT_CLASS_LOOKUP_16;
 
         // 2022-07: Adding `enumerate` here increases execution speed/register allocation on x86_64.
-        #[allow(clippy::unused_enumerate_index)]
+        #[expect(clippy::unused_enumerate_index)]
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
                 let count_class_lookup_16 = &mut *count_class_lookup_16;
@@ -357,7 +357,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::cast_ptr_alignment)]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         for mut item in self.as_iter_mut() {
             *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };

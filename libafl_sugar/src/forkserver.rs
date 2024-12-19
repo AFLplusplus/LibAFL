@@ -76,10 +76,9 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     iterations: Option<u64>,
 }
 
-#[allow(clippy::similar_names)]
 impl ForkserverBytesCoverageSugar<'_> {
     /// Runs the fuzzer.
-    #[allow(clippy::too_many_lines, clippy::similar_names)]
+    #[expect(clippy::too_many_lines)]
     pub fn run(&mut self) {
         // a large initial map size that should be enough
         // to house all potential coverage maps for our targets
@@ -336,7 +335,7 @@ pub mod pybind {
     impl ForkserverBytesCoverageSugar {
         /// Create a new [`ForkserverBytesCoverageSugar`]
         #[new]
-        #[allow(clippy::too_many_arguments)]
+        #[expect(clippy::too_many_arguments)]
         #[pyo3(signature = (
             input_dirs,
             output_dir,
@@ -370,7 +369,7 @@ pub mod pybind {
         }
 
         /// Run the fuzzer
-        #[allow(clippy::needless_pass_by_value)]
+        #[expect(clippy::needless_pass_by_value)]
         pub fn run(&self, program: String, arguments: Vec<String>) {
             forkserver::ForkserverBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)

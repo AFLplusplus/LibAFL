@@ -2,5 +2,7 @@
 //!
 #![doc = include_str!("README.md")]
 
+#[allow(missing_docs)]
 pub mod grammartec;
+#[allow(missing_docs)]
 pub mod regex_mutator;

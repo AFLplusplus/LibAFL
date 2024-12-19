@@ -61,7 +61,6 @@ impl GzipCompressor {
     }
 
     /// Decompression.
-    #[allow(clippy::unused_self)]
     pub fn decompress(&self, buf: &[u8]) -> Result<Vec<u8>, Error> {
         let decompressed = decompress_to_vec(buf);
 

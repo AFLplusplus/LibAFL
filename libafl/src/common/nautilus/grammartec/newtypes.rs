@@ -64,6 +64,7 @@ impl Add<usize> for NodeId {
 }
 
 impl NodeId {
+    #[expect(dead_code)]
     fn steps_between(start: Self, end: Self) -> Option<usize> {
         let start_i = start.to_i();
         let end_i = end.to_i();
@@ -72,12 +73,18 @@ impl NodeId {
         }
         Some(end_i - start_i)
     }
+
+    #[expect(dead_code)]
     fn add_one(self) -> Self {
         self.add(1)
     }
+
+    #[expect(dead_code)]
     fn sub_one(self) -> Self {
         NodeId(self.0 - 1)
     }
+
+    #[expect(dead_code)]
     fn add_usize(self, n: usize) -> Option<Self> {
         self.0.checked_add(n).map(NodeId::from)
     }

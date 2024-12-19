@@ -25,7 +25,7 @@ pub struct ProbabilitySamplingScheduler<F> {
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct ProbabilityMetadata {
     /// corpus index -> probability
@@ -63,8 +63,6 @@ impl<F> ProbabilitySamplingScheduler<F> {
     }
 
     /// Calculate the score and store in `ProbabilityMetadata`
-    #[allow(clippy::cast_precision_loss)]
-    #[allow(clippy::unused_self)]
     pub fn store_probability<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         F: TestcaseScore<S>,
@@ -144,7 +142,6 @@ where
     }
 
     /// Gets the next entry
-    #[allow(clippy::cast_precision_loss)]
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from(

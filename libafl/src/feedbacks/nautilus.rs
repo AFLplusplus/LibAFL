@@ -96,7 +96,6 @@ where
     S: HasMetadata + HasCorpus,
     S::Corpus: Corpus<Input = NautilusInput>,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,

@@ -83,7 +83,7 @@ where
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct GramatronIdxMapMetadata {
     /// The map containing a vec for each terminal
@@ -95,7 +95,6 @@ libafl_bolts::impl_serdeany!(GramatronIdxMapMetadata);
 impl GramatronIdxMapMetadata {
     /// Creates a new [`struct@GramatronIdxMapMetadata`].
     #[must_use]
-    #[allow(clippy::or_fun_call)]
     pub fn new(input: &GramatronInput) -> Self {
         let mut map = HashMap::default();
         for i in 0..input.terminals().len() {
@@ -226,12 +225,11 @@ where
             return Ok(MutationResult::Skipped);
         };
 
-        #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut first = state.rand_mut().below(minus_one) as i64;
-        #[allow(clippy::cast_sign_loss, clippy::pedantic)]
-        let mut second = state
-            .rand_mut()
-            .between(first as usize + 1, chosen_nums - 1) as i64;
+        let first = state.rand_mut().below(minus_one);
+        let second = state.rand_mut().between(first + 1, chosen_nums - 1);
+
+        let mut first: isize = first.try_into().unwrap();
+        let mut second: isize = second.try_into().unwrap();
 
         let mut idx_1 = 0;
         let mut idx_2 = 0;

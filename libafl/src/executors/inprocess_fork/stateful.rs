@@ -38,7 +38,7 @@ where
     OT: ObserversTuple<S::Input, S>,
     S: State,
 {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
         harness_fn: &'a mut H,
@@ -126,7 +126,6 @@ where
     SP: ShMemProvider,
     Z: HasObjective<Objective = OF>,
 {
-    #[allow(unreachable_code)]
     #[inline]
     fn run_target(
         &mut self,
@@ -166,7 +165,7 @@ where
     S: State,
 {
     /// Creates a new [`StatefulGenericInProcessForkExecutor`] with custom hooks
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
         harness_fn: &'a mut H,

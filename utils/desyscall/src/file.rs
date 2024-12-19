@@ -11,7 +11,7 @@ extern "C" {
 
 /// # Safety
 /// Call to functions using syscalls
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 #[no_mangle]
 pub unsafe extern "C" fn write(fd: c_int, buf: Pointer, count: size_t) -> ssize_t {
     let ctx = Context::get();

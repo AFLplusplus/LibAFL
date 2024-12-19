@@ -122,7 +122,7 @@ pub mod unix_signal_handler {
     /// # Safety
     /// Well, signal handling is not safe
     #[cfg(unix)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -179,8 +179,7 @@ pub mod unix_signal_handler {
     ///
     /// # Safety
     /// Well, signal handling is not safe
-    #[allow(clippy::too_many_lines)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         signal: Signal,
         _info: &mut siginfo_t,

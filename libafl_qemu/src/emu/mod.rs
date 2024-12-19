@@ -119,7 +119,7 @@ pub struct InputLocation {
 }
 
 #[derive(Debug)]
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub struct Emulator<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
@@ -140,7 +140,7 @@ where
     S: UsesInput,
 {
     #[must_use]
-    #[allow(clippy::match_wildcard_for_single_variants)]
+    #[expect(clippy::match_wildcard_for_single_variants)]
     pub fn end_of_run(&self) -> Option<ExitKind> {
         match self {
             EmulatorDriverResult::EndOfRun(exit_kind) => Some(*exit_kind),
@@ -321,7 +321,6 @@ where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
-    #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(
         qemu_args: &[String],
         modules: ET,
@@ -471,7 +470,6 @@ where
     }
 }
 
-#[allow(clippy::unused_self)]
 impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,

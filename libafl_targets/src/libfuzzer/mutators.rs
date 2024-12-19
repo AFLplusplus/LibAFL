@@ -67,7 +67,7 @@ thread_local! {
 
 /// Mutator which is available for user-defined mutator/crossover
 /// See: [Structure-Aware Fuzzing with libFuzzer](https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md)
-#[allow(non_snake_case)]
+#[allow(non_snake_case)] // expect breaks here for some reason
 #[no_mangle]
 pub extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
     MUTATOR.with(|mutator| {
@@ -110,7 +110,7 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
 
     /// Create a weak version of the proxy, which will become unusable when the custom mutator
     /// is no longer permitted to be executed.
-    #[allow(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)] // no longer a problem in nightly
     fn weak(&self) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
         let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {

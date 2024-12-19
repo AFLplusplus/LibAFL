@@ -201,7 +201,7 @@ pub trait ObserverWithHashField {
 /// cleanup in `Observer::post_exec`. For individual executions, use
 /// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
 /// respectively.
-#[allow(unused_variables)]
+#[expect(unused_variables)]
 pub trait DifferentialObserver<OTA, OTB, I, S>: Observer<I, S> {
     /// Perform an operation with the first set of observers before they are `pre_exec`'d.
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
@@ -309,7 +309,6 @@ mod instant_serializer {
 
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn serialize<S>(instant: &Instant, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

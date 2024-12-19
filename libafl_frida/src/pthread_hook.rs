@@ -5,7 +5,7 @@ const PTHREAD_INTROSPECTION_THREAD_START: libc::c_uint = 2;
 const PTHREAD_INTROSPECTION_THREAD_TERMINATE: libc::c_uint = 3;
 const PTHREAD_INTROSPECTION_THREAD_DESTROY: libc::c_uint = 4;
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 type pthread_introspection_hook_t = extern "C" fn(
     event: libc::c_uint,
     thread: libc::pthread_t,

@@ -53,7 +53,6 @@ fn append_unicode_range<R: Rand>(
     cls: ClassUnicodeRange,
 ) {
     let mut chr_a_buf = [0; 4];
-    #[allow(clippy::similar_names)]
     let mut chr_b_buf = [0; 4];
     cls.start().encode_utf8(&mut chr_a_buf);
     cls.end().encode_utf8(&mut chr_b_buf);

@@ -23,7 +23,7 @@ use crate::{
 /// Metadata used to store information about disk dump indexes for names
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct DumpToDiskMetadata {
@@ -98,7 +98,7 @@ where
     }
 
     /// Default `generate_filename` function.
-    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     fn generate_filename(
         testcase: &Testcase<<S::Corpus as Corpus>::Input>,
         id: &CorpusId,
