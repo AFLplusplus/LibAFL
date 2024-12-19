@@ -459,7 +459,6 @@ mod windows {
         }
     }
 
-    #[expect(trivial_numeric_casts)]
     #[expect(clippy::cast_ptr_alignment)]
     #[expect(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
@@ -469,8 +468,7 @@ mod windows {
         const RelationProcessorCore: u32 = 0;
 
         #[repr(C)]
-        #[expect(non_camel_case_types)]
-        #[expect(dead_code)]
+        #[allow(non_camel_case_types)] // expect breaks for some reason
         struct GROUP_AFFINITY {
             mask: usize,
             group: u16,
@@ -478,8 +476,8 @@ mod windows {
         }
 
         #[repr(C)]
-        #[expect(non_camel_case_types)]
-        #[expect(dead_code)]
+        #[allow(non_camel_case_types)] // expect breaks for some reason
+
         struct PROCESSOR_RELATIONSHIP {
             flags: u8,
             efficiency_class: u8,
@@ -489,8 +487,7 @@ mod windows {
         }
 
         #[repr(C)]
-        #[expect(non_camel_case_types)]
-        #[expect(dead_code)]
+        #[allow(non_camel_case_types)] // expect breaks for some reason
         struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX {
             relationship: u32,
             size: u32,
@@ -625,7 +622,6 @@ mod apple {
         ) -> kern_return_t;
     }
 
-    #[expect(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         Ok((0..(usize::from(available_parallelism()?)))
             .map(CoreId)

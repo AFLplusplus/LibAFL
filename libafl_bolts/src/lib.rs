@@ -608,24 +608,28 @@ impl From<VarError> for Error {
 }
 
 impl From<ParseIntError> for Error {
+    #[allow(unused_variables)] // err is used without std
     fn from(err: ParseIntError) -> Self {
         Self::unknown(format!("Failed to parse Int: {err:?}"))
     }
 }
 
 impl From<TryFromIntError> for Error {
+    #[allow(unused_variables)] // err is used without std
     fn from(err: TryFromIntError) -> Self {
         Self::illegal_state(format!("Expected conversion failed: {err:?}"))
     }
 }
 
 impl From<TryFromSliceError> for Error {
+    #[allow(unused_variables)] // err is used without std
     fn from(err: TryFromSliceError) -> Self {
         Self::illegal_argument(format!("Could not convert slice: {err:?}"))
     }
 }
 
 impl From<SetLoggerError> for Error {
+    #[allow(unused_variables)] // err is used without std
     fn from(err: SetLoggerError) -> Self {
         Self::illegal_state(format!("Failed to register logger: {err:?}"))
     }

@@ -107,6 +107,7 @@ pub struct ucontext_t {
 #[derive(Debug)]
 #[repr(C)]
 #[expect(clippy::pub_underscore_fields)]
+#[allow(non_camel_case_types)] // expect breaks for some reason
 pub struct arm_exception_state64 {
     /// Virtual Fault Address
     pub __far: u64,
@@ -132,6 +133,7 @@ pub struct arm_exception_state64 {
 #[derive(Debug)]
 #[repr(C)]
 #[expect(clippy::pub_underscore_fields)]
+#[allow(non_camel_case_types)] // expect breaks for some reason
 pub struct arm_thread_state64 {
     /// General purpose registers x0-x28
     pub __x: [u64; 29],
@@ -157,9 +159,9 @@ pub struct arm_thread_state64 {
 /// ````
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
-#[expect(non_camel_case_types)]
 #[repr(C, align(16))]
-//#[repr(align(16))]
+#[allow(non_camel_case_types)] // expect breaks for some reason
+                               //#[repr(align(16))]
 pub struct arm_neon_state64 {
     /// opaque
     pub opaque: [u8; (32 * 16) + (2 * size_of::<u32>())],
@@ -174,10 +176,10 @@ pub struct arm_neon_state64 {
 ///};
 /// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-#[expect(non_camel_case_types)]
 #[derive(Debug)]
 #[repr(C)]
 #[expect(clippy::pub_underscore_fields)]
+#[allow(non_camel_case_types)] // expect breaks for some reason
 pub struct mcontext64 {
     /// `_STRUCT_ARM_EXCEPTION_STATE64`
     pub __es: arm_exception_state64,
@@ -197,8 +199,8 @@ pub struct mcontext64 {
 /// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
-#[expect(non_camel_case_types)]
 #[repr(C)]
+#[allow(non_camel_case_types)] // expect breaks for some reason
 pub struct sigaltstack {
     /// signal stack base
     pub ss_sp: *mut c_void,
@@ -226,8 +228,8 @@ pub struct sigaltstack {
 /// ```
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[derive(Debug)]
-#[expect(non_camel_case_types)]
 #[repr(C)]
+#[allow(non_camel_case_types)] // expect breaks for some reason
 pub struct ucontext_t {
     /// onstack
     pub uc_onstack: c_int,
