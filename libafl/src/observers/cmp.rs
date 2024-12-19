@@ -5,6 +5,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use arbitrary_int::{u1, u4, u5, u6};
+use bitbybit::bitfield;
 use hashbrown::HashMap;
 use libafl_bolts::{ownedref::OwnedRefMut, AsSlice, HasLen, Named};
 use serde::{Deserialize, Serialize};
@@ -403,47 +405,40 @@ impl AFLppCmpValuesMetadata {
     }
 }
 
-#[allow(missing_docs)] // 2024-12-15: bitfield is leading CI to fail due to missing docs.
-mod aflpp_cmplog_header {
-    use arbitrary_int::{u1, u4, u5, u6};
-    use bitbybit::bitfield;
-
-    /// Comparison header, used to describe a set of comparison values efficiently.
+/// Comparison header, used to describe a set of comparison values efficiently.
+///
+/// # Bitfields
+///
+/// - hits:      The number of hits of a particular comparison
+/// - id:        Unused by ``LibAFL``, a unique ID for a particular comparison
+/// - shape:     Whether a comparison is u8/u8, u16/u16, etc.
+/// - type_:     Whether the comparison value represents an instruction (like a `cmp`) or function
+///              call arguments
+/// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
+/// - overflow:  Whether the comparison overflows
+/// - reserved:  Reserved for future use
+#[bitfield(u16)]
+#[derive(Debug)]
+pub struct AFLppCmpLogHeader {
+    /// The number of hits of a particular comparison
     ///
-    /// # Bitfields
+    /// 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)
+    #[bits(0..=5, r)]
+    hits: u6,
+    /// Whether a comparison is u8/u8, u16/u16, etc.
     ///
-    /// - hits:      The number of hits of a particular comparison
-    /// - id:        Unused by ``LibAFL``, a unique ID for a particular comparison
-    /// - shape:     Whether a comparison is u8/u8, u16/u16, etc.
-    /// - type_:     Whether the comparison value represents an instruction (like a `cmp`) or function
-    ///              call arguments
-    /// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
-    /// - overflow:  Whether the comparison overflows
-    /// - reserved:  Reserved for future use
-    #[bitfield(u16)]
-    #[derive(Debug)]
-    pub struct AFLppCmpLogHeader {
-        /// The number of hits of a particular comparison
-        ///
-        /// 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)
-        #[bits(0..=5, r)]
-        hits: u6,
-        /// Whether a comparison is u8/u8, u16/u16, etc.
-        ///
-        /// 31 + 1 bytes max
-        #[bits(6..=10, r)]
-        shape: u5,
-        /// Whether the comparison value represents an instruction (like a `cmp`) or function call
-        /// arguments
-        ///
-        /// 2: cmp, rtn
-        #[bit(11, r)]
-        type_: u1,
-        /// OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
-        ///
-        /// 16 types for arithmetic comparison types
-        #[bits(12..=15, r)]
-        attribute: u4,
-    }
+    /// 31 + 1 bytes max
+    #[bits(6..=10, r)]
+    shape: u5,
+    /// Whether the comparison value represents an instruction (like a `cmp`) or function call
+    /// arguments
+    ///
+    /// 2: cmp, rtn
+    #[bit(11, r)]
+    type_: u1,
+    /// OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
+    ///
+    /// 16 types for arithmetic comparison types
+    #[bits(12..=15, r)]
+    attribute: u4,
 }
-pub use aflpp_cmplog_header::AFLppCmpLogHeader;

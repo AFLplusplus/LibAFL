@@ -1,10 +1,10 @@
 mod args;
 
-use {
-    crate::args::Args,
-    clap::Parser,
-    std::{thread::sleep, time::Duration},
-};
+use std::{thread::sleep, time::Duration};
+
+use clap::Parser;
+
+use crate::args::Args;
 
 #[no_mangle]
 extern "C" fn run_test(num: usize) {
