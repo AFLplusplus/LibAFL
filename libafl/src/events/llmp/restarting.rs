@@ -611,15 +611,12 @@ where
                     return Err(Error::shutting_down());
                 }
 
-                #[expect(clippy::manual_assert)]
                 if !staterestorer.has_content() && !self.serialize_state.oom_safe() {
                     if let Err(err) = mgr.detach_from_broker(self.broker_port) {
                         log::error!("Failed to detach from broker: {err}");
                     }
                     #[cfg(unix)]
-                    if child_status == 9 {
-                        panic!("Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
-                    }
+                    assert_ne!(9, child_status, "Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }

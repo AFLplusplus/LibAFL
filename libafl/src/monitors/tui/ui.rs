@@ -254,7 +254,6 @@ impl TuiUi {
             ))
             .borders(Borders::ALL);
 
-        #[expect(unused_mut)]
         let mut client_area = client_block.inner(area);
         f.render_widget(client_block, area);
 

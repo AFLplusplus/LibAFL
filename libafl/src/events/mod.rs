@@ -16,7 +16,6 @@ pub mod launcher;
 pub mod llmp;
 pub use llmp::*;
 #[cfg(feature = "tcp_manager")]
-#[expect(clippy::ignored_unit_patterns)]
 pub mod tcp;
 
 pub mod broker_hooks;

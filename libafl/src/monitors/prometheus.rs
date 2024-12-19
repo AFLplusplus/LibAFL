@@ -117,7 +117,6 @@ where
         self.aggregator.aggregate(name, &self.client_stats);
     }
 
-    #[expect(clippy::cast_sign_loss)]
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         // Update the prometheus metrics
         // The gauges must take signed i64's, with max value of 2^63-1 so it is
