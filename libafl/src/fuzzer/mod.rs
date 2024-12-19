@@ -430,6 +430,9 @@ where
                     manager.fire(
                         state,
                         Event::Objective {
+                            #[cfg(feature = "share_objectives")]
+                            input,
+
                             objective_size: state.solutions().count(),
                             time: current_time(),
                         },
@@ -615,6 +618,9 @@ where
             manager.fire(
                 state,
                 Event::Objective {
+                    #[cfg(feature = "share_objectives")]
+                    input,
+
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },

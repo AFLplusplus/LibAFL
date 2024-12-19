@@ -461,6 +461,12 @@ where
                     }
                 }
             }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { .. } => {
+                log::debug!("Received new Objective");
+            }
+
             Event::CustomBuf { tag, buf } => {
                 for handler in &mut self.custom_buf_handlers {
                     if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
