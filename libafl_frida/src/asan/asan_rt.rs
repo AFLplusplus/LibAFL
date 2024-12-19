@@ -236,7 +236,6 @@ impl AsanRuntime {
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
-    #[allow(clippy::unused_self)]
     pub fn reset_allocations(&mut self) {
         self.allocator.reset();
     }
@@ -259,13 +258,11 @@ impl AsanRuntime {
 
     /// Returns the `AsanErrors` from the recent run.
     /// Will block if some other thread holds on to the `ASAN_ERRORS` Mutex.
-    #[allow(clippy::unused_self)]
     pub fn errors(&mut self) -> MutexGuard<'static, AsanErrors> {
         ASAN_ERRORS.lock().unwrap()
     }
 
     /// Make sure the specified memory is unpoisoned
-    #[allow(clippy::unused_self)]
     pub fn unpoison(&mut self, address: usize, size: usize) {
         self.allocator
             .map_shadow_for_region(address, address + size, true);
@@ -296,7 +293,6 @@ impl AsanRuntime {
     }
 
     /// Unpoison all the memory that is currently mapped with read/write permissions.
-    #[allow(clippy::unused_self)]
     pub fn unpoison_all_existing_memory(&mut self) {
         self.allocator.unpoison_all_existing_memory();
     }
@@ -312,7 +308,6 @@ impl AsanRuntime {
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
-    #[allow(clippy::unused_self)]
     #[cfg(not(target_vendor = "apple"))]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
@@ -329,7 +324,7 @@ impl AsanRuntime {
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack mapping.
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     #[cfg(target_vendor = "apple")]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
@@ -459,7 +454,7 @@ impl AsanRuntime {
     }
 
     /// Register the required hooks
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
         let module = Module::obtain(gum);
@@ -475,7 +470,7 @@ impl AsanRuntime {
 
                     let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap();
 
-                    #[allow(non_snake_case)]
+                    #[allow(non_snake_case)] // depends on the values the macro is invoked with
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -515,7 +510,7 @@ impl AsanRuntime {
 
                     let _ = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap();
 
-                    #[allow(non_snake_case)]
+                    #[expect(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -545,7 +540,7 @@ impl AsanRuntime {
             };
         }
 
-        #[allow(unused_macro_rules)]
+        #[expect(unused_macro_rules)]
         macro_rules! hook_func_with_check {
             //No library case
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
@@ -559,7 +554,7 @@ impl AsanRuntime {
 
                     let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
-                    #[allow(non_snake_case)]
+                    #[allow(non_snake_case)] // depends on the values the macro is invoked with
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -599,7 +594,7 @@ impl AsanRuntime {
 
                     let _ = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
-                    #[allow(non_snake_case)]
+                    #[expect(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
@@ -1255,8 +1250,8 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "x86_64")]
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::cast_sign_loss)]
+    #[expect(clippy::too_many_lines)]
     extern "system" fn handle_trap(&mut self) {
         self.disable_hooks();
 
@@ -1326,7 +1321,6 @@ impl AsanRuntime {
             };
 
             // log::trace!("{:x}", base_value);
-            #[allow(clippy::option_if_let_else)]
             let error = if fault_address >= stack_start && fault_address < stack_end {
                 match access_type {
                     Some(typ) => match typ {
@@ -1425,8 +1419,8 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::cast_sign_loss)] // for displacement
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::cast_sign_loss)] // for displacement
+    #[expect(clippy::too_many_lines)]
     extern "system" fn handle_trap(&mut self) {
         self.disable_hooks();
         let mut actual_pc = self.regs[31];
@@ -1470,14 +1464,14 @@ impl AsanRuntime {
             }
         };
 
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap)]
         let fault_address =
             (self.regs[base_reg as usize] as isize + displacement as isize) as usize;
 
         let backtrace = Backtrace::new();
 
         let (stack_start, stack_end) = Self::current_stack();
-        #[allow(clippy::option_if_let_else)]
+        #[expect(clippy::option_if_let_else)]
         let error = if fault_address >= stack_start && fault_address < stack_end {
             if insn.opcode.to_string().starts_with('l') {
                 AsanError::StackOobRead((
@@ -1549,7 +1543,7 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "x86_64")]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn register_idx(&self, reg: X86Register) -> Option<(u16, u16)> {
         match reg {
             X86Register::Eax => Some((0, 32)),
@@ -1671,7 +1665,6 @@ impl AsanRuntime {
 
     */
     #[cfg(target_arch = "x86_64")]
-    #[allow(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator.shadow_bit();
         // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
@@ -1716,7 +1709,7 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
         /*x0 contains the shadow address
         x0 and x1 are saved by the asan_check
@@ -1759,7 +1752,7 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn generate_shadow_check_large_blob(&mut self, width: u32) -> Box<[u8]> {
         //x0 contains the shadow address
         //x0 and x1 are saved by the asan_check
@@ -1807,9 +1800,6 @@ impl AsanRuntime {
     // Five registers, Rdi, Rsi, Rdx, Rcx, Rax are saved in emit_shadow_check before entering this function
     // So we retrieve them after saving other registers
     #[cfg(target_arch = "x86_64")]
-    #[allow(clippy::similar_names)]
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::too_many_lines)]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         dynasm!(ops_report
@@ -1897,9 +1887,9 @@ impl AsanRuntime {
     ///
     /// Generate the instrumentation blobs for the current arch.
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::similar_names)] // We allow things like dword and qword
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::similar_names)] // We allow things like dword and qword
+    #[expect(clippy::cast_possible_wrap)]
+    #[expect(clippy::too_many_lines)]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops_report
@@ -2116,7 +2106,7 @@ impl AsanRuntime {
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
-    #[allow(clippy::similar_names, clippy::type_complexity)]
+    #[expect(clippy::similar_names, clippy::type_complexity)]
     pub fn asan_is_interesting_instruction(
         decoder: InstDecoder,
         _address: u64,
@@ -2179,7 +2169,7 @@ impl AsanRuntime {
 
         // println!("{:?} {}", instr, memory_access_size);
         //abuse the fact that the last operand is always the mem operand
-        #[allow(clippy::let_and_return)]
+        #[expect(clippy::let_and_return)]
         match instr.operands[operands_len - 1] {
             Operand::RegRegOffset(reg1, reg2, size, shift, shift_size) => {
                 let ret = Some((
@@ -2216,7 +2206,6 @@ impl AsanRuntime {
     #[cfg(target_arch = "x86_64")]
     #[inline]
     #[must_use]
-    #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
         decoder: InstDecoder,
         address: u64,
@@ -2280,8 +2269,8 @@ impl AsanRuntime {
 
     /// Emits a asan shadow byte check.
     #[inline]
-    #[allow(clippy::too_many_lines)]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_arguments)]
     #[cfg(target_arch = "x86_64")]
     pub fn emit_shadow_check(
         &mut self,
@@ -2464,7 +2453,7 @@ impl AsanRuntime {
     /// Emit a shadow memory check into the instruction stream
     #[cfg(target_arch = "aarch64")]
     #[inline]
-    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+    #[expect(clippy::too_many_lines, clippy::too_many_arguments)]
     pub fn emit_shadow_check(
         &mut self,
         _address: u64,
@@ -2479,7 +2468,7 @@ impl AsanRuntime {
             i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
             "GUM_RED_ZONE_SIZE is bigger than i32::max"
         );
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap)]
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
@@ -2571,14 +2560,14 @@ impl AsanRuntime {
 
                 if extender_encoding != -1 && shift_amount < 0b1000 {
                     // emit add extended register: https://developer.arm.com/documentation/ddi0602/latest/Base-Instructions/ADD--extended-register---Add--extended-register--
-                    #[allow(clippy::cast_sign_loss)]
+                    #[expect(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
                             .to_le_bytes(),
                     ); //add x0, x0, w1, [shift] #[amount]
                 } else if shift_encoding != -1 {
                     //https://developer.arm.com/documentation/ddi0602/2024-03/Base-Instructions/ADD--shifted-register---Add--shifted-register-- add shifted register
-                    #[allow(clippy::cast_sign_loss)]
+                    #[expect(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
                             .to_le_bytes(),
@@ -2602,10 +2591,10 @@ impl AsanRuntime {
                 0
             };
 
-        #[allow(clippy::comparison_chain)]
+        #[expect(clippy::comparison_chain)]
         if displacement < 0 {
             if displacement > -4096 {
-                #[allow(clippy::cast_sign_loss)]
+                #[expect(clippy::cast_sign_loss)]
                 let displacement = displacement.unsigned_abs();
                 // Subtract the displacement into x0
                 writer.put_sub_reg_reg_imm(
@@ -2614,7 +2603,7 @@ impl AsanRuntime {
                     u64::from(displacement),
                 );
             } else {
-                #[allow(clippy::cast_sign_loss)]
+                #[expect(clippy::cast_sign_loss)]
                 let displacement = displacement.unsigned_abs();
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
@@ -2626,7 +2615,7 @@ impl AsanRuntime {
                 ); //sub x0, x0, #[displacement 4096]
             }
         } else if displacement > 0 {
-            #[allow(clippy::cast_sign_loss)]
+            #[expect(clippy::cast_sign_loss)]
             let displacement = displacement as u32;
             if displacement < 4096 {
                 // Add the displacement into x0

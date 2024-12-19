@@ -62,7 +62,7 @@ use yaxpeax_x86::long_mode::InstDecoder;
 /// # Panic
 /// In debug mode, will panic on wraparound (which should never happen in practice)
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 fn gum_red_zone_size_i32() -> i32 {
     debug_assert!(
         i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
@@ -161,7 +161,7 @@ impl CmpLogRuntime {
     }
 
     /// Call the external function that populates the `cmplog_map` with the relevant values
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     #[cfg(target_arch = "aarch64")]
     extern "C" fn populate_lists(&mut self, op1: u64, op2: u64, retaddr: u64) {
         // log::trace!(
@@ -177,7 +177,7 @@ impl CmpLogRuntime {
         }
     }
 
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     #[cfg(target_arch = "x86_64")]
     extern "C" fn populate_lists(size: u8, op1: u64, op2: u64, retaddr: u64) {
         // log::trace!(
@@ -194,7 +194,7 @@ impl CmpLogRuntime {
     }
 
     /// Generate the instrumentation blobs for the current arch.
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     #[cfg(target_arch = "aarch64")]
     fn generate_instrumentation_blobs(&mut self) {
         macro_rules! blr_to_populate {
@@ -307,7 +307,7 @@ impl CmpLogRuntime {
         );
     }
 
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     #[cfg(all(windows, target_arch = "x86_64"))]
     fn generate_instrumentation_blobs(&mut self) {
         macro_rules! save_registers {
@@ -343,7 +343,7 @@ impl CmpLogRuntime {
         self.restore_registers = Some(restore_registers.finalize().unwrap().into_boxed_slice());
     }
 
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     #[cfg(all(unix, target_arch = "x86_64"))]
     fn generate_instrumentation_blobs(&mut self) {
         macro_rules! save_registers {
@@ -405,7 +405,7 @@ impl CmpLogRuntime {
 
     /// Emit the instrumentation code which is responsible for operands value extraction and cmplog map population
     #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     #[inline]
     pub fn emit_comparison_handling(
         &self,
@@ -557,7 +557,7 @@ impl CmpLogRuntime {
 
     /// Emit the instrumentation code which is responsible for operands value extraction and cmplog map population
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     #[inline]
     pub fn emit_comparison_handling(
         &self,
@@ -639,7 +639,7 @@ impl CmpLogRuntime {
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]
@@ -692,7 +692,7 @@ impl CmpLogRuntime {
             OpKind::Memory => {
                 // can't use try_into here, since we need to cast u64 to i64
                 // which is fine in this case
-                #[allow(clippy::cast_possible_wrap)]
+                #[expect(clippy::cast_possible_wrap)]
                 CmplogOperandType::Mem(
                     instruction.memory_base(),
                     instruction.memory_index(),
@@ -714,7 +714,7 @@ impl CmpLogRuntime {
             | OpKind::Immediate32to64 => CmplogOperandType::Imm(instruction.immediate(1)),
             OpKind::Memory =>
             {
-                #[allow(clippy::cast_possible_wrap)]
+                #[expect(clippy::cast_possible_wrap)]
                 CmplogOperandType::Mem(
                     instruction.memory_base(),
                     instruction.memory_index(),
@@ -747,7 +747,7 @@ impl CmpLogRuntime {
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-    #[allow(clippy::similar_names, clippy::type_complexity)]
+    #[expect(clippy::similar_names, clippy::type_complexity)]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]
@@ -821,10 +821,10 @@ impl CmpLogRuntime {
         }
 
         // cbz marked as special since there is only 1 operand
-        #[allow(clippy::cast_sign_loss)]
+        #[expect(clippy::cast_sign_loss)]
         let special_case = matches!(instr.opcode, Opcode::CBZ | Opcode::CBNZ);
 
-        #[allow(clippy::cast_sign_loss, clippy::similar_names)]
+        #[expect(clippy::cast_sign_loss, clippy::similar_names)]
         let operand1 = match instr.operands[0] {
             //the only possibilities are registers for the first operand
             //precompute the aarch64 frida register because it is ambiguous if register=31 means xzr or sp in yaxpeax
@@ -837,7 +837,7 @@ impl CmpLogRuntime {
             _ => panic!("First argument is not a register"), //this should never be possible in arm64
         };
 
-        #[allow(clippy::cast_sign_loss)]
+        #[expect(clippy::cast_sign_loss)]
         let operand2 = if special_case {
             Some((CmplogOperandType::Imm(0), None))
         } else {
