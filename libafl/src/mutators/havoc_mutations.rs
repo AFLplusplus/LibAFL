@@ -3,9 +3,9 @@
 use libafl_bolts::tuples::{Map, Merge};
 use tuple_list::{tuple_list, tuple_list_type};
 
-use super::{MappingMutator, ToMappingMutatorMapper};
+use super::{MappingMutator, ToMappingMutator};
 use crate::mutators::{
-    mapping::{OptionalMutator, ToOptionalMutatorMapper},
+    mapping::{OptionalMutator, ToOptionalMutator},
     mutations::{
         BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator, ByteIncMutator,
         ByteInterestingMutator, ByteNegMutator, ByteRandMutator, BytesCopyMutator,
@@ -235,7 +235,7 @@ where
 {
     havoc_mutations_no_crossover()
         .merge(havoc_crossover_with_corpus_mapper(input_from_corpus_mapper))
-        .map(ToMappingMutatorMapper::new(current_input_mapper))
+        .map(ToMappingMutator::new(current_input_mapper))
 }
 
 /// Get the mutations that compose the Havoc mutator for mapped input types, for optional input parts
@@ -254,6 +254,6 @@ where
         .merge(havoc_crossover_with_corpus_mapper_optional(
             input_from_corpus_mapper,
         ))
-        .map(ToOptionalMutatorMapper)
-        .map(ToMappingMutatorMapper::new(current_input_mapper))
+        .map(ToOptionalMutator)
+        .map(ToMappingMutator::new(current_input_mapper))
 }

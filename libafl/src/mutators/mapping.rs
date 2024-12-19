@@ -92,7 +92,7 @@ impl<M, F> Named for MappingMutator<M, F> {
 ///
 /// use libafl::{
 ///     mutators::{
-///         ByteIncMutator, MutationResult, MutatorsTuple, ToMappingMutatorMapper,
+///         ByteIncMutator, MutationResult, MutatorsTuple, ToMappingMutator,
 ///     },
 ///     state::NopState,
 /// };
@@ -112,7 +112,7 @@ impl<M, F> Named for MappingMutator<M, F> {
 /// let mutators = tuple_list!(ByteIncMutator::new(), ByteIncMutator::new());
 /// // construct a mutator that works on &mut CustomInput
 /// let mut mapped_mutators =
-///     mutators.map(ToMappingMutatorMapper::new(CustomInput::vec_mut));
+///     mutators.map(ToMappingMutator::new(CustomInput::vec_mut));
 ///  
 /// let mut input = CustomInput(vec![1]);
 ///  
@@ -122,18 +122,18 @@ impl<M, F> Named for MappingMutator<M, F> {
 /// assert_eq!(input, CustomInput(vec![3],));
 /// ```
 #[derive(Debug)]
-pub struct ToMappingMutatorMapper<F> {
+pub struct ToMappingMutator<F> {
     mapper: F,
 }
 
-impl<F> ToMappingMutatorMapper<F> {
+impl<F> ToMappingMutator<F> {
     /// Creates a new [`ToMappingMutatorMapper`]
     pub fn new(mapper: F) -> Self {
         Self { mapper }
     }
 }
 
-impl<M, F> MappingFunctor<M> for ToMappingMutatorMapper<F>
+impl<M, F> MappingFunctor<M> for ToMappingMutator<F>
 where
     F: Clone,
     M: Named,
@@ -222,13 +222,13 @@ where
 #[cfg_attr(not(feature = "std"), doc = " ```ignore")]
 /// use libafl::{
 ///     inputs::MutVecInput,
-///     mutators::{ByteIncMutator, MutationResult, Mutator, ToOptionalMutatorMapper},
+///     mutators::{ByteIncMutator, MutationResult, Mutator, ToOptionalMutator},
 ///     state::NopState,
 /// };
 /// use libafl_bolts::tuples::{tuple_list, Map};
 ///
 /// let inner = tuple_list!(ByteIncMutator::new());
-/// let outer_list = inner.map(ToOptionalMutatorMapper);
+/// let outer_list = inner.map(ToOptionalMutator);
 /// let mut outer = outer_list.0;
 ///
 /// let mut input_raw = vec![1];
@@ -244,9 +244,9 @@ where
 /// assert_eq!(res2, MutationResult::Skipped);
 /// ```
 #[derive(Debug)]
-pub struct ToOptionalMutatorMapper;
+pub struct ToOptionalMutator;
 
-impl<M> MappingFunctor<M> for ToOptionalMutatorMapper
+impl<M> MappingFunctor<M> for ToOptionalMutator
 where
     M: Named,
 {

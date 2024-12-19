@@ -5,7 +5,8 @@
 - `StatsStage` is deleted, and it is superceded by `AflStatsStage`
 - Changed mapping mutators to take borrows directly instead of `MappedInput`s. See `baby_fuzzer_custom_input` for example usage
   - Related: `MutVecInput` is deprecated in favor of directly using `&mut Vec<u8>`
-  - Related: `MappedInputFunctionMappingMutator` and `ToMappedInputFunctionMappingMutatorMapper` have been removed as now duplicates of `MappingMutator` (previously `FunctionMappingMutator`) and `ToMappingMutatorMapper` (previously `ToFunctionMappingMutatorMapper`)
+  - Related: `MappedInputFunctionMappingMutator` and `ToMappedInputFunctionMappingMutatorMapper` have been removed as now duplicates of `MappingMutator` (previously `FunctionMappingMutator`) and `ToMappingMutator` (previously `ToFunctionMappingMutatorMapper`)
+  - `ToOptionMappingMutatorMapper` and `ToFunctionMappingMutatorMapper` have been renamed to `ToOptionalMutator` and `ToMappingMutator` respectively
 
 # 0.14.0 -> 0.14.1
 - Removed `with_observers` from `Executor` trait.

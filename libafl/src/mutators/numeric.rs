@@ -9,7 +9,7 @@ use libafl_bolts::{
 };
 use tuple_list::{tuple_list, tuple_list_type};
 
-use super::{MappingMutator, MutationResult, Mutator, ToMappingMutatorMapper};
+use super::{MappingMutator, MutationResult, Mutator, ToMappingMutator};
 use crate::{
     corpus::Corpus,
     random_corpus_id_with_disabled,
@@ -93,7 +93,7 @@ where
 {
     int_mutators_no_crossover()
         .merge(mapped_int_mutators_crossover(input_from_corpus_mapper))
-        .map(ToMappingMutatorMapper::new(current_input_mapper))
+        .map(ToMappingMutator::new(current_input_mapper))
 }
 /// Functionality required for Numeric Mutators (see [`int_mutators`])
 pub trait Numeric {
