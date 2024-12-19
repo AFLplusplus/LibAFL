@@ -324,7 +324,6 @@ impl AsanRuntime {
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack mapping.
-    #[expect(clippy::unused_self)]
     #[cfg(target_vendor = "apple")]
     pub fn register_thread(&mut self) {
         let (stack_start, stack_end) = Self::current_stack();
@@ -1471,7 +1470,6 @@ impl AsanRuntime {
         let backtrace = Backtrace::new();
 
         let (stack_start, stack_end) = Self::current_stack();
-        #[expect(clippy::option_if_let_else)]
         let error = if fault_address >= stack_start && fault_address < stack_end {
             if insn.opcode.to_string().starts_with('l') {
                 AsanError::StackOobRead((
@@ -1709,7 +1707,6 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[expect(clippy::unused_self)]
     fn generate_shadow_check_blob(&mut self, width: u32) -> Box<[u8]> {
         /*x0 contains the shadow address
         x0 and x1 are saved by the asan_check
@@ -1752,7 +1749,6 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[expect(clippy::unused_self)]
     fn generate_shadow_check_large_blob(&mut self, width: u32) -> Box<[u8]> {
         //x0 contains the shadow address
         //x0 and x1 are saved by the asan_check
@@ -1887,9 +1883,7 @@ impl AsanRuntime {
     ///
     /// Generate the instrumentation blobs for the current arch.
     #[cfg(target_arch = "aarch64")]
-    #[expect(clippy::similar_names)] // We allow things like dword and qword
     #[expect(clippy::cast_possible_wrap)]
-    #[expect(clippy::too_many_lines)]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops_report
@@ -2594,7 +2588,6 @@ impl AsanRuntime {
         #[expect(clippy::comparison_chain)]
         if displacement < 0 {
             if displacement > -4096 {
-                #[expect(clippy::cast_sign_loss)]
                 let displacement = displacement.unsigned_abs();
                 // Subtract the displacement into x0
                 writer.put_sub_reg_reg_imm(
@@ -2603,7 +2596,6 @@ impl AsanRuntime {
                     u64::from(displacement),
                 );
             } else {
-                #[expect(clippy::cast_sign_loss)]
                 let displacement = displacement.unsigned_abs();
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
