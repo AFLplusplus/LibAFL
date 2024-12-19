@@ -298,7 +298,8 @@ where
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasCurrentTestcase
-        + HasSolutions,
+        + HasSolutions
+        + HasLastFoundTime,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
@@ -358,6 +359,9 @@ where
         let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
         if send_events {
             self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
+        }
+        if exec_res != ExecuteInputResult::None {
+            *state.last_found_time_mut() = current_time();
         }
         Ok((exec_res, corpus_id))
     }
@@ -505,7 +509,8 @@ where
         + MaybeHasClientPerfMonitor
         + HasCurrentTestcase
         + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + HasExecutions,
+        + HasExecutions
+        + HasLastFoundTime,
     <S::Corpus as Corpus>::Input: Input,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
