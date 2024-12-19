@@ -50,6 +50,11 @@ where
         self.qemu.get_brk()
     }
 
+    #[must_use]
+    pub fn get_initial_brk(&self) -> GuestAddr {
+        self.qemu.get_initial_brk()
+    }
+
     pub fn set_brk(&self, brk: GuestAddr) {
         self.qemu.set_brk(brk);
     }
