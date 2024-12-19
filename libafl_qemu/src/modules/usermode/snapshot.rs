@@ -89,6 +89,7 @@ pub struct SnapshotModule {
     pub maps: MappingInfo,
     pub new_maps: Mutex<MappingInfo>,
     pub pages: HashMap<GuestAddr, SnapshotPageInfo>,
+    pub initial_brk: GuestAddr,
     pub brk: GuestAddr,
     pub mmap_start: GuestAddr,
     pub mmap_limit: usize,
@@ -120,6 +121,7 @@ impl SnapshotModule {
             maps: MappingInfo::default(),
             new_maps: Mutex::new(MappingInfo::default()),
             pages: HashMap::default(),
+            initial_brk: 0,
             brk: 0,
             mmap_start: 0,
             mmap_limit: 0,
@@ -137,6 +139,7 @@ impl SnapshotModule {
             maps: MappingInfo::default(),
             new_maps: Mutex::new(MappingInfo::default()),
             pages: HashMap::default(),
+            initial_brk: 0,
             brk: 0,
             mmap_start: 0,
             mmap_limit: 0,
@@ -154,6 +157,7 @@ impl SnapshotModule {
             maps: MappingInfo::default(),
             new_maps: Mutex::new(MappingInfo::default()),
             pages: HashMap::default(),
+            initial_brk: 0,
             brk: 0,
             mmap_start: 0,
             mmap_limit,
@@ -191,6 +195,7 @@ impl SnapshotModule {
     pub fn snapshot(&mut self, qemu: Qemu) {
         log::info!("Start snapshot");
         self.brk = qemu.get_brk();
+        self.initial_brk = qemu.get_initial_brk();
         self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
         for map in qemu.mappings() {
@@ -848,12 +853,16 @@ where
         }
         SYS_brk => {
             let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-            if h.brk != result && result != 0 {
-                /* brk has changed. we change mapping from the snapshotted brk address to the new target_brk
+            if h.brk != result && result != 0 && result > h.initial_brk {
+                /* brk has changed, and it doesn't shrink below initial_brk. We change mapping from the snapshotted initial brk address to the new target_brk
                  * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
                  * It is safe to assume RW perms here
                  */
-                h.change_mapped(h.brk, (result - h.brk) as usize, Some(MmapPerms::ReadWrite));
+                h.change_mapped(
+                    h.initial_brk,
+                    (result - h.initial_brk) as usize,
+                    Some(MmapPerms::ReadWrite),
+                );
             }
         }
         // mmap syscalls

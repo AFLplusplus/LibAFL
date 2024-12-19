@@ -226,9 +226,6 @@ where
     }
 
     /// Creates a new transforming mutational stage with the given max iterations
-    ///
-    /// # Errors
-    /// Will return [`Error::IllegalArgument`] for `max_iterations` of 0.
     #[inline]
     pub fn transforming_with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
         let stage_id = unsafe {
