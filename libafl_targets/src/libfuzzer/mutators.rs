@@ -110,7 +110,7 @@ impl<'a, M, S> MutatorProxy<'a, M, S> {
 
     /// Create a weak version of the proxy, which will become unusable when the custom mutator
     /// is no longer permitted to be executed.
-    #[expect(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)] // no longer a problem in nightly
     fn weak(&self) -> WeakMutatorProxy<impl Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool, M, S> {
         let state = Rc::downgrade(&self.state);
         WeakMutatorProxy {

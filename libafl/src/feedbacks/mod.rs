@@ -85,8 +85,6 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
     /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
     /// It also keeps track of introspection stats.
     #[cfg(feature = "introspection")]
-    #[expect(clippy::too_many_arguments)]
-    #[expect(clippy::wrong_self_convention)]
     fn is_interesting_introspection(
         &mut self,
         state: &mut S,
@@ -244,7 +242,6 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    #[expect(clippy::wrong_self_convention)]
     fn is_interesting_introspection(
         &mut self,
         state: &mut S,

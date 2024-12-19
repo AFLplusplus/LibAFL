@@ -41,7 +41,6 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 /// Start and stop are being dereferenced.
 #[no_mangle]
 #[expect(clippy::cast_sign_loss)]
-#[expect(clippy::not_unsafe_ptr_arg_deref)]
 pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
         let counter_maps = &mut *counter_maps_ptr_mut();

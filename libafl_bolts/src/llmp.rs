@@ -3084,6 +3084,7 @@ where
     /// Announces a new client on the given shared map.
     /// Called from a background thread, typically.
     /// Upon receiving this message, the broker should map the announced page and start tracking it for new messages.
+    #[cfg(feature = "std")]
     fn announce_new_client(
         sender: &mut LlmpSender<SP>,
         shmem_description: &ShMemDescription,

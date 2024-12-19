@@ -2,7 +2,7 @@ use std::{string::String, vec::Vec};
 
 use pyo3::{prelude::*, pyclass, types::IntoPyDict};
 
-use crate::{nautilus::grammartec::context::Context, Error};
+use crate::nautilus::grammartec::context::Context;
 
 #[pyclass]
 struct PyContext {
@@ -23,7 +23,7 @@ impl PyContext {
         }
     }
 
-    fn rule(&mut self, py: Python, nt: &str, format: &Bound<PyAny>) -> PyResult<()> {
+    fn rule(&mut self, _py: Python, nt: &str, format: &Bound<PyAny>) -> PyResult<()> {
         if let Ok(s) = format.extract::<&str>() {
             self.ctx.add_rule(nt, s.as_bytes());
         } else if let Ok(s) = format.extract::<&[u8]>() {

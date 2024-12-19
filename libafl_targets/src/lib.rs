@@ -76,7 +76,6 @@ pub use sancov_cmp::*;
 
 /// Module containing bindings to the various sanitizer interface headers
 #[cfg(feature = "sanitizer_interfaces")]
-#[expect(clippy::mixed_attributes_style)]
 pub mod sanitizer_ifaces {
     #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]

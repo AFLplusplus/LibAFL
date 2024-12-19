@@ -23,7 +23,7 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_FOUND;
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
-#[expect(unused)]
+#[allow(unused_imports)] // only used in an unused function
 use crate::EDGES_MAP_DEFAULT_SIZE;
 #[cfg(feature = "pointer_maps")]
 use crate::{coverage::EDGES_MAP_PTR, EDGES_MAP_ALLOCATED_SIZE};
@@ -35,7 +35,7 @@ compile_error!(
 );
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
-#[expect(unused)]
+#[allow(unused_imports)] // only used in an unused function
 use core::ops::ShlAssign;
 
 #[cfg(feature = "sancov_ngram4")]
