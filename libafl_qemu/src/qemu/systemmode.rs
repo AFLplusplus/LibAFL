@@ -16,8 +16,8 @@ use libc::EXIT_SUCCESS;
 use num_traits::Zero;
 
 use crate::{
-    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuRWError,
-    QemuRWErrorCause, QemuRWErrorKind, QemuSnapshotCheckResult, CPU,
+    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuSnapshotCheckResult,
+    CPU,
 };
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {
@@ -163,7 +163,7 @@ impl CPU {
     /// # Safety
     /// no check is done on the correctness of the operation.
     /// if a problem occurred during the operation, there will be no feedback
-    pub fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
         // TODO use gdbstub's target_cpu_memory_rw_debug
         unsafe {
             libafl_qemu_sys::cpu_memory_rw_debug(
