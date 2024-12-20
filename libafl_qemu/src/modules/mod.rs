@@ -328,8 +328,8 @@ where
 
     #[cfg(feature = "systemmode")]
     fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
-        self.0.page_filter_mut().register(page_id.clone());
-        self.1.allow_page_id_all(page_id)
+        self.0.page_filter_mut().register(page_id);
+        self.1.allow_page_id_all(page_id);
     }
 }
 

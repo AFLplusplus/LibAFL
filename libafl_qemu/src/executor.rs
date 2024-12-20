@@ -20,7 +20,6 @@ use libafl::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
@@ -36,6 +35,9 @@ use libafl_qemu_sys::libafl_exit_request_timeout;
 #[cfg(feature = "usermode")]
 use libafl_qemu_sys::libafl_qemu_handle_crash;
 use libc::siginfo_t;
+
+#[cfg(any(feature = "usermode", feature = "fork"))]
+use libafl::inputs::UsesInput;
 
 #[cfg(feature = "usermode")]
 use crate::EmulatorModules;

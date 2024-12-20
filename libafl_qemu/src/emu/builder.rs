@@ -79,6 +79,8 @@ where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
 {
+    #[expect(clippy::should_implement_trait)]
+    #[must_use]
     pub fn default() -> Self {
         Self {
             modules: (),

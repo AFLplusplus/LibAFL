@@ -592,7 +592,7 @@ where
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         emu.modules_mut()
             .modules_mut()
-            .allow_page_id_all(self.page_id.clone());
+            .allow_page_id_all(self.page_id);
         Ok(None)
     }
 }

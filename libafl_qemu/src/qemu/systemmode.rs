@@ -16,8 +16,8 @@ use libc::EXIT_SUCCESS;
 use num_traits::Zero;
 
 use crate::{
-    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuRWError,
-    QemuRWErrorCause, QemuRWErrorKind, QemuSnapshotCheckResult, CPU,
+    FastSnapshotPtr, GuestAddrKind, MemAccessInfo, Qemu, QemuMemoryChunk, QemuSnapshotCheckResult,
+    CPU,
 };
 
 pub(super) extern "C" fn qemu_cleanup_atexit() {
@@ -96,6 +96,7 @@ impl CPU {
                 page as GuestVirtAddr,
                 attrs.as_mut_ptr(),
             );
+            #[expect(clippy::cast_sign_loss)]
             if paddr == (-1i64 as GuestPhysAddr) {
                 None
             } else {
@@ -147,15 +148,13 @@ impl CPU {
     /// if a problem occurred during the operation, there will be no feedback
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
         // TODO use gdbstub's target_cpu_memory_rw_debug
-        unsafe {
-            libafl_qemu_sys::cpu_memory_rw_debug(
-                self.ptr,
-                addr as GuestVirtAddr,
-                buf.as_mut_ptr() as *mut _,
-                buf.len(),
-                false,
-            )
-        };
+        libafl_qemu_sys::cpu_memory_rw_debug(
+            self.ptr,
+            addr as GuestVirtAddr,
+            buf.as_mut_ptr() as *mut _,
+            buf.len(),
+            false,
+        );
     }
 
     /// Write a value to a guest address, taking into account the potential MMU / MPU.
@@ -163,22 +162,21 @@ impl CPU {
     /// # Safety
     /// no check is done on the correctness of the operation.
     /// if a problem occurred during the operation, there will be no feedback
-    pub fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
+    pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
         // TODO use gdbstub's target_cpu_memory_rw_debug
-        unsafe {
-            libafl_qemu_sys::cpu_memory_rw_debug(
-                self.ptr,
-                addr as GuestVirtAddr,
-                buf.as_ptr() as *mut _,
-                buf.len(),
-                true,
-            )
-        };
+        libafl_qemu_sys::cpu_memory_rw_debug(
+            self.ptr,
+            addr as GuestVirtAddr,
+            buf.as_ptr() as *mut _,
+            buf.len(),
+            true,
+        );
     }
 }
 
 #[expect(clippy::unused_self)]
 impl Qemu {
+    #[must_use]
     pub fn guest_page_size(&self) -> usize {
         4096
     }
@@ -215,6 +213,7 @@ impl Qemu {
         );
     }
 
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     pub(super) unsafe fn run_inner(&self) {
         vm_start();
         qemu_main_loop();
@@ -222,12 +221,12 @@ impl Qemu {
 
     pub fn save_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *mut i8, sync) };
+        unsafe { libafl_save_qemu_snapshot(s.as_ptr().cast_mut(), sync) };
     }
 
     pub fn load_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *mut i8, sync) };
+        unsafe { libafl_load_qemu_snapshot(s.as_ptr().cast_mut(), sync) };
     }
 
     #[must_use]
@@ -259,10 +258,13 @@ impl Qemu {
         }
     }
 
+    #[expect(clippy::missing_safety_doc)]
     pub unsafe fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
-        libafl_qemu_sys::syx_snapshot_root_restore(snapshot)
+        libafl_qemu_sys::syx_snapshot_root_restore(snapshot);
     }
 
+    #[allow(clippy::missing_safety_doc)]
+    #[must_use]
     pub unsafe fn check_fast_snapshot(
         &self,
         ref_snapshot: FastSnapshotPtr,
@@ -272,6 +274,7 @@ impl Qemu {
         QemuSnapshotCheckResult::new(check_result.nb_inconsistencies)
     }
 
+    #[must_use]
     pub fn list_devices(&self) -> Vec<String> {
         let mut r = vec![];
         unsafe {
@@ -301,6 +304,7 @@ impl Qemu {
 }
 
 impl QemuMemoryChunk {
+    #[must_use]
     pub fn phys_iter(&self, qemu: Qemu) -> PhysMemoryIter {
         PhysMemoryIter {
             addr: self.addr,
@@ -315,6 +319,7 @@ impl QemuMemoryChunk {
     }
 
     #[expect(clippy::map_flatten)]
+    #[must_use]
     pub fn host_iter(&self, qemu: Qemu) -> Box<dyn Iterator<Item = &[u8]>> {
         Box::new(
             self.phys_iter(qemu)
@@ -330,12 +335,14 @@ impl QemuMemoryChunk {
         )
     }
 
+    #[must_use]
     pub fn to_host_segmented_buf(&self, qemu: Qemu) -> SegmentedBuf<&[u8]> {
         self.host_iter(qemu).collect()
     }
 }
 
 impl PhysMemoryChunk {
+    #[must_use]
     pub fn new(addr: GuestPhysAddr, size: usize, qemu: Qemu, cpu: CPU) -> Self {
         Self {
             addr,

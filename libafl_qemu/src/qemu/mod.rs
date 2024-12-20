@@ -41,7 +41,6 @@ pub use usermode::*;
 #[cfg(feature = "systemmode")]
 mod systemmode;
 #[cfg(feature = "systemmode")]
-#[expect(unused_imports)]
 pub use systemmode::*;
 
 mod hooks;
