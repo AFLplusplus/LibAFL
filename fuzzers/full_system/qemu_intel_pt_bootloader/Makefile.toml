@@ -16,8 +16,12 @@ mkdir -p ${TARGET_DIR}
 
 [tasks.build_target]
 dependencies = ["target_dir"]
-command = "rustc"
-args = ["src/target_program.rs", "--out-dir", "${TARGET_DIR}", "-O"]
+command = "nasm"
+args = [
+  "-o",
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.bin",
+  "${CARGO_MAKE_WORKING_DIRECTORY}/src/boot.s",
+]
 
 [tasks.build_fuzzer]
 command = "cargo"
@@ -26,13 +30,24 @@ args = ["build", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
 [tasks.build]
 dependencies = ["build_fuzzer", "build_target"]
 
+[tasks.convert_target_image]
+command = "qemu-img"
+args = [
+  "convert",
+  "-O",
+  "qcow2",
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.bin",
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.qcow2",
+]
+
 [tasks.setcap]
 script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
 dependencies = ["build_fuzzer"]
 
 [tasks.run]
-command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
-dependencies = ["build", "setcap"]
+command = "cargo"
+args = ["run", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+dependencies = ["build", "setcap", "convert_target_image"]
 
 [tasks.default]
 alias = "run"
