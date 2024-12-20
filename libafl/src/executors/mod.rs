@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 pub use shadow::ShadowExecutor;
 pub use with_observers::WithObservers;
 
-use crate::{state::UsesState, Error};
+use crate::Error;
 
 pub mod combined;
 #[cfg(all(feature = "std", unix))]
@@ -117,17 +117,14 @@ pub trait HasObservers {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: UsesState
-where
-    EM: UsesState<State = Self::State>,
-{
+pub trait Executor<EM, I, S, Z> {
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error>;
 }
 
@@ -170,7 +167,7 @@ mod test {
         executors::{Executor, ExitKind},
         fuzzer::NopFuzzer,
         inputs::{BytesInput, HasTargetBytes},
-        state::{HasExecutions, NopState, State, UsesState},
+        state::{HasExecutions, NopState},
     };
 
     /// A simple executor that does nothing.
@@ -196,25 +193,17 @@ mod test {
         }
     }
 
-    impl<S> UsesState for NopExecutor<S>
+    impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor<S>
     where
-        S: State,
-    {
-        type State = S;
-    }
-
-    impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
-    where
-        EM: UsesState<State = S>,
-        S: State + HasExecutions,
-        S::Input: HasTargetBytes,
+        S: HasExecutions,
+        I: HasTargetBytes,
     {
         fn run_target(
             &mut self,
             _fuzzer: &mut Z,
-            state: &mut Self::State,
+            state: &mut S,
             _mgr: &mut EM,
-            input: &Self::Input,
+            input: &I,
         ) -> Result<ExitKind, Error> {
             *state.executions_mut() += 1;
 

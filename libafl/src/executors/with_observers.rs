@@ -1,51 +1,45 @@
 //! A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 
-use core::fmt::Debug;
+use core::{fmt::Debug, marker::PhantomData};
 
 use libafl_bolts::tuples::RefIndexable;
 
 use crate::{
+    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::UsesInput,
     observers::ObserversTuple,
-    state::UsesState,
+    state::HasCorpus,
     Error,
 };
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 #[derive(Debug)]
-pub struct WithObservers<E, OT> {
+pub struct WithObservers<E, OT, S> {
     executor: E,
     observers: OT,
+    phantom: PhantomData<S>,
 }
 
-impl<E, EM, OT, Z> Executor<EM, Z> for WithObservers<E, OT>
+impl<E, EM, OT, S, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for WithObservers<E, OT, S>
 where
-    E: Executor<EM, Z>,
-    EM: UsesState<State = Self::State>,
+    S: HasCorpus,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<E, OT> UsesState for WithObservers<E, OT>
+impl<E, OT, S> HasObservers for WithObservers<E, OT, S>
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<E, OT> HasObservers for WithObservers<E, OT>
-where
-    E: UsesState,
-    OT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
+    S: HasCorpus,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
     type Observers = OT;
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -57,7 +51,7 @@ where
     }
 }
 
-impl<E, OT> WithObservers<E, OT> {
+impl<E, OT, S> WithObservers<E, OT, S> {
     /// Wraps the given [`Executor`] with the given [`ObserversTuple`] to implement [`HasObservers`].
     ///
     /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by
@@ -66,6 +60,7 @@ impl<E, OT> WithObservers<E, OT> {
         Self {
             executor,
             observers,
+            phantom: PhantomData,
         }
     }
 }
