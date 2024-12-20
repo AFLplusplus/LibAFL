@@ -34,18 +34,19 @@ use libafl_qemu::{
 };
 
 // Coverage map
-const MAP_SIZE: usize = 32;
+const MAP_SIZE: usize = 256;
 static mut MAP: [u16; MAP_SIZE] = [0; MAP_SIZE];
 
+// Bootloader code section and sleep fn address can be retrieved with `ndisasm target/boot.bin`
 const BOOTLOADER_CODE: RangeInclusive<usize> = 0x7c00..=0x7c80;
-const SLEEP_FN_ADDR: GuestAddr = 0x7c60;
+const BOOTLOADER_SLEEP_FN_ADDR: GuestAddr = 0x7c60;
 
 fn main() {
     // Initialize the logger (use env variable RUST_LOG=trace for maximum logging)
     env_logger::init();
 
     // Hardcoded parameters
-    let timeout = Duration::from_secs(3);
+    let timeout = Duration::from_secs(5);
     let objective_dir = PathBuf::from("./crashes");
 
     let mon = SimpleMonitor::new(|s| println!("{s}"));
@@ -59,12 +60,17 @@ fn main() {
     // Configure QEMU
     let qemu = QemuConfig::builder()
         .no_graphic(true)
+        .monitor(config::Monitor::Null)
+        .serial(config::Serial::Null)
+        .cpu("host")
+        .ram_size(config::RamSize::MB(1))
         .drives([config::Drive::builder()
             .format(config::DiskImageFileFormat::Qcow2)
             .file(format!("{target_dir}/boot.qcow2"))
             .build()
             .unwrap()])
         .accelerator(Accelerator::Kvm)
+        //.snapshot(true) todo: doesnt work
         .bios("/home/marco/code/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu/")
         .start_cpu(false);
 
@@ -105,7 +111,7 @@ fn main() {
     }
     qemu.remove_hw_breakpoint(*BOOTLOADER_CODE.start() as GuestAddr);
 
-    qemu.set_hw_breakpoint(SLEEP_FN_ADDR);
+    qemu.set_hw_breakpoint(BOOTLOADER_SLEEP_FN_ADDR);
 
     qemu.save_snapshot("bootloader_start", true);
 
