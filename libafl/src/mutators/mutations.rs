@@ -1280,32 +1280,18 @@ impl CrossoverReplaceMutator {
 }
 
 trait IntoOptionBytes {
-    type Type<'b>;
-
-    fn into_option_bytes<'a>(self) -> Option<&'a [u8]>
-    where
-        Self: 'a;
+    fn map_to_option_bytes(&self) -> Option<&Vec<u8>>;
 }
 
-impl IntoOptionBytes for &[u8] {
-    type Type<'b> = &'b [u8];
-
-    fn into_option_bytes<'b>(self) -> Option<&'b [u8]>
-    where
-        Self: 'b,
-    {
+impl IntoOptionBytes for Vec<u8> {
+    fn map_to_option_bytes(&self) -> Option<&Vec<u8>> {
         Some(self)
     }
 }
 
-impl IntoOptionBytes for Option<&[u8]> {
-    type Type<'b> = Option<&'b [u8]>;
-
-    fn into_option_bytes<'b>(self) -> Option<&'b [u8]>
-    where
-        Self: 'b,
-    {
-        self
+impl IntoOptionBytes for Option<Vec<u8>> {
+    fn map_to_option_bytes(&self) -> Option<&Vec<u8>> {
+        self.as_ref()
     }
 }
 
@@ -1330,9 +1316,8 @@ impl<S, F, I, O> Mutator<I, S> for MappedCrossoverInsertMutator<F, O>
 where
     S: HasCorpus + HasMaxSize + HasRand,
     I: HasMutatorBytes,
-    for<'a> O: IntoOptionBytes,
-    for<'a> O::Type<'a>: IntoOptionBytes,
-    for<'a> F: Fn(&'a <S::Corpus as Corpus>::Input) -> <O as IntoOptionBytes>::Type<'a>,
+    O: IntoOptionBytes,
+    F: Fn(&<S::Corpus as Corpus>::Input) -> &O,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1353,8 +1338,8 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            let input_mapped = (self.input_mapper)(other_input).into_option_bytes();
-            input_mapped.map_or(0, <[u8]>::len)
+            let input_mapped = (self.input_mapper)(other_input).map_to_option_bytes();
+            input_mapped.map_or(0, <Vec<u8>>::len)
         };
 
         if other_size < 2 {
@@ -1376,7 +1361,7 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_mapper)(other_input).into_option_bytes();
+        let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -1421,8 +1406,7 @@ where
     S: HasCorpus + HasMaxSize + HasRand,
     I: HasMutatorBytes,
     O: IntoOptionBytes,
-    for<'a> O::Type<'a>: IntoOptionBytes,
-    for<'a> F: Fn(&'a <S::Corpus as Corpus>::Input) -> <O as IntoOptionBytes>::Type<'a>,
+    F: Fn(&<S::Corpus as Corpus>::Input) -> &O,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1441,8 +1425,8 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            let input_mapped = (self.input_mapper)(other_input).into_option_bytes();
-            input_mapped.map_or(0, <[u8]>::len)
+            let input_mapped = (self.input_mapper)(other_input).map_to_option_bytes();
+            input_mapped.map_or(0, <Vec<u8>>::len)
         };
 
         if other_size < 2 {
@@ -1464,7 +1448,7 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_mapper)(other_input).into_option_bytes();
+        let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
         }
