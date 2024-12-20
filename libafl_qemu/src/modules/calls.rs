@@ -269,6 +269,7 @@ where
         emulator_modules.get_mut::<Self>().unwrap().collectors = collectors;
     }
 
+    #[allow(clippy::needless_pass_by_value)] // no longer a problem in nightly
     fn gen_blocks_calls<ET, S>(
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
@@ -298,7 +299,7 @@ where
         let mut ret_addrs: Vec<GuestAddr> = Vec::new();
 
         if let Some(h) = emulator_modules.modules().match_first_type::<Self>() {
-            #[allow(unused_mut)]
+            #[allow(unused_mut)] // cfg dependent
             let mut code = {
                 #[cfg(feature = "usermode")]
                 unsafe {
@@ -492,7 +493,7 @@ impl<'a> CallTraceCollector for OnCrashBacktraceCollector<'a>
 where
     'a: 'static,
 {
-    #[allow(clippy::unnecessary_cast)]
+    #[expect(clippy::unnecessary_cast)]
     fn on_call<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -506,7 +507,7 @@ where
         self.callstack_hash ^= pc as u64 + call_len as u64;
     }
 
-    #[allow(clippy::unnecessary_cast)]
+    #[expect(clippy::unnecessary_cast)]
     fn on_ret<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -587,7 +588,7 @@ impl FullBacktraceCollector {
 }
 
 impl CallTraceCollector for FullBacktraceCollector {
-    #[allow(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)] // dependent on the target instruction size
     fn on_call<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -606,7 +607,7 @@ impl CallTraceCollector for FullBacktraceCollector {
         }
     }
 
-    #[allow(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)] // dependent on the target instruction size
     fn on_ret<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,

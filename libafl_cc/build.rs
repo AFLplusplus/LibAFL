@@ -143,8 +143,7 @@ fn find_llvm_version() -> Option<i32> {
     None
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(unused)]
+#[expect(clippy::too_many_arguments)]
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,
@@ -224,8 +223,7 @@ fn build_pass(
     }
 }
 
-#[allow(clippy::single_element_loop)]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);

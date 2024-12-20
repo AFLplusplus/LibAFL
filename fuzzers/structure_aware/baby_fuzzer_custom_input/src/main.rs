@@ -53,7 +53,7 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-#[allow(clippy::similar_names, clippy::manual_assert)]
+#[expect(clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
     // The pseudo program under test uses all parts of the custom input
@@ -87,6 +87,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
+
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
 
     // Feedback to rate the interestingness of an input

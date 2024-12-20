@@ -57,8 +57,8 @@ impl From<usize> for Location {
 /// `SymExpr` represents a message in the serialization format.
 /// The messages in the format are a perfect mirror of the methods that are called on the runtime during execution.
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[allow(missing_docs)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SymExpr {
     InputByte {
         offset: usize,

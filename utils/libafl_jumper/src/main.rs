@@ -127,7 +127,7 @@ fn decode_hex_and_jmp(hex_string: &str) -> ! {
     #[cfg(feature = "std")]
     println!("Hex: {addr:#x}");
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let addr = addr as usize;
 
     let entrypoint = addr as *mut c_void;

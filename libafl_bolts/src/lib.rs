@@ -228,7 +228,7 @@ fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt:
     write!(f, "\nBacktrace: {err:?}")
 }
 #[cfg(not(feature = "errors_backtrace"))]
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fmt::Result {
     fmt::Result::Ok(())
 }
@@ -588,7 +588,6 @@ impl From<io::Error> for Error {
 
 #[cfg(feature = "alloc")]
 impl From<FromUtf8Error> for Error {
-    #[allow(unused_variables)]
     fn from(err: FromUtf8Error) -> Self {
         Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
@@ -596,7 +595,6 @@ impl From<FromUtf8Error> for Error {
 
 #[cfg(feature = "alloc")]
 impl From<Utf8Error> for Error {
-    #[allow(unused_variables)]
     fn from(err: Utf8Error) -> Self {
         Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
@@ -604,35 +602,34 @@ impl From<Utf8Error> for Error {
 
 #[cfg(feature = "std")]
 impl From<VarError> for Error {
-    #[allow(unused_variables)]
     fn from(err: VarError) -> Self {
         Self::empty(format!("Could not get env var: {err:?}"))
     }
 }
 
 impl From<ParseIntError> for Error {
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // err is unused without std
     fn from(err: ParseIntError) -> Self {
         Self::unknown(format!("Failed to parse Int: {err:?}"))
     }
 }
 
 impl From<TryFromIntError> for Error {
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // err is unused without std
     fn from(err: TryFromIntError) -> Self {
         Self::illegal_state(format!("Expected conversion failed: {err:?}"))
     }
 }
 
 impl From<TryFromSliceError> for Error {
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // err is unused without std
     fn from(err: TryFromSliceError) -> Self {
         Self::illegal_argument(format!("Could not convert slice: {err:?}"))
     }
 }
 
 impl From<SetLoggerError> for Error {
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // err is unused without std
     fn from(err: SetLoggerError) -> Self {
         Self::illegal_state(format!("Failed to register logger: {err:?}"))
     }
@@ -640,7 +637,7 @@ impl From<SetLoggerError> for Error {
 
 #[cfg(windows)]
 impl From<windows_result::Error> for Error {
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // err is unused without std
     fn from(err: windows_result::Error) -> Self {
         Self::unknown(format!("Windows API error: {err:?}"))
     }
@@ -1100,7 +1097,7 @@ impl log::Log for SimpleFdLogger {
 /// # Safety
 /// The function is arguably safe, but it might have undesirable side effects since it closes `stdout` and `stderr`.
 #[cfg(all(unix, feature = "std"))]
-#[allow(unused_qualifications)]
+#[expect(unused_qualifications)]
 pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
     let old_stdout = stdout().as_raw_fd();
     let old_stderr = stderr().as_raw_fd();
@@ -1159,7 +1156,7 @@ macro_rules! nonnull_raw_mut {
 }
 
 #[cfg(feature = "python")]
-#[allow(missing_docs)]
+#[allow(missing_docs)] // expect somehow breaks here
 pub mod pybind {
 
     use pyo3::{pymodule, types::PyModule, Bound, PyResult};

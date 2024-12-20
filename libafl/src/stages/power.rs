@@ -39,7 +39,6 @@ pub struct PowerMutationalStage<E, F, EM, I, M, S, Z> {
     name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, S, Z)>,
 }
 
@@ -68,7 +67,7 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S) -> Result<usize, Error> {
         // Update handicap
         let mut testcase = state.current_testcase_mut()?;
@@ -98,7 +97,7 @@ where
     <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
+    #[expect(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -155,7 +154,6 @@ where
     }
 
     /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,

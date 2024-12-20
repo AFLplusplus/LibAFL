@@ -71,7 +71,6 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
-#[allow(clippy::items_after_statements, clippy::too_many_lines)]
 pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     use pyo3::types::PyString;
 

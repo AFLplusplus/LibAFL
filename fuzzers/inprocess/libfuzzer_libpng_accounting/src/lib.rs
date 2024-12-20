@@ -139,6 +139,8 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _client_description| {
         // Create an observation channel using the coverage map
+        // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+        #[allow(static_mut_refs)] // only a problem on nightly
         let edges_observer = HitcountsMapObserver::new(unsafe {
             StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_FOUND)
         })

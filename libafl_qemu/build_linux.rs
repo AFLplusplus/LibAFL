@@ -13,7 +13,7 @@ static LIBAFL_QEMU_RUNTIME_TEST: &str = r#"
 void __libafl_qemu_testfile() {}
 "#;
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
     println!(
@@ -133,7 +133,6 @@ pub fn build() {
     .expect("Could not copy libafl_qemu.h to out directory.");
 
     fs::copy(
-
         libafl_qemu_arch_hdr.clone(),
         include_dir.join(libafl_qemu_arch_hdr_name),
     )

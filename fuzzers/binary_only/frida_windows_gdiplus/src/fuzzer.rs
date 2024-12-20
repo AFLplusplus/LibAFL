@@ -77,7 +77,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));

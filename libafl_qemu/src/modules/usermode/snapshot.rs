@@ -1,3 +1,4 @@
+#![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
 use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
@@ -191,7 +192,6 @@ impl SnapshotModule {
         false
     }
 
-    #[allow(clippy::uninit_assumed_init)]
     pub fn snapshot(&mut self, qemu: Qemu) {
         log::info!("Start snapshot");
         self.brk = qemu.get_brk();
@@ -753,8 +753,7 @@ pub fn trace_write_n_snapshot<ET, S>(
     h.access(addr, size);
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(non_upper_case_globals)]
+#[expect(clippy::too_many_arguments)]
 pub fn filter_mmap_snapshot<ET, S>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
@@ -781,8 +780,8 @@ where
     SyscallHookResult::new(None)
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-#[allow(non_upper_case_globals)]
+#[expect(clippy::too_many_arguments)]
+#[expect(non_upper_case_globals)]
 pub fn trace_mmap_snapshot<ET, S>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,

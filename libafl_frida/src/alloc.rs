@@ -169,7 +169,7 @@ impl Allocator {
 
     /// Allocate a new allocation of the given size.
     #[must_use]
-    #[allow(clippy::missing_safety_doc)]
+    #[expect(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         log::trace!("alloc");
         let mut is_malloc_zero = false;
@@ -180,7 +180,7 @@ impl Allocator {
             size
         };
         if size > self.max_allocation {
-            #[allow(clippy::manual_assert)]
+            #[expect(clippy::manual_assert)]
             if self.max_allocation_panics {
                 panic!("ASAN: Allocation is too large: 0x{size:x}");
             }
@@ -258,7 +258,7 @@ impl Allocator {
     }
 
     /// Releases the allocation at the given address.
-    #[allow(clippy::missing_safety_doc)]
+    #[expect(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         log::trace!("release {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
