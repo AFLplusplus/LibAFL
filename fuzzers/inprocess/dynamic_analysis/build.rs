@@ -15,9 +15,7 @@ fn main() {
             .status()
             .expect("Failed to clone Little-CMS repository");
 
-        if !status.success() {
-            panic!("Failed to clone Little-CMS repository");
-        }
+        assert!(status.success(), "Failed to clone Little-CMS repository");
     }
 
     // Tell Cargo that if the given file changes, to rerun this build script

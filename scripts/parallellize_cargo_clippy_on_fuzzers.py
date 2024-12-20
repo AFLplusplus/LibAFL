@@ -16,6 +16,9 @@ def main():
     parser.add_argument(
         "--dry-run", action="store_true", help="Show commands without executing."
     )
+    parser.add_argument(
+        "--pedantic", action="store_true", help="Activate all clippy warnings"
+    )
     args = parser.parse_args()
 
     # Setup logging
@@ -52,8 +55,10 @@ def main():
             logging.info(f"No Cargo.toml for {fuzzer}, skipping…")
             return True
 
-        cmd_default = "cargo clippy -- -D warnings"
-        cmd_nightly = "cargo +nightly clippy -- -D warnings"
+        options = "-D clippy::pedantic" if args.pedantic else ""
+
+        cmd_default = f"cargo clippy -- -D warnings {options}"
+        cmd_nightly = f"cargo +nightly clippy -- -D warnings {options}"
         for cmd in [cmd_default, cmd_nightly]:
             logging.info(f"[{fuzzer}] Running: {cmd}")
             if args.dry_run:

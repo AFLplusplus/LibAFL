@@ -26,7 +26,11 @@ use crate::utils::set_panic_hook;
 
 // Defined for internal use by LibAFL
 #[no_mangle]
-#[expect(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+#[expect(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::missing_panics_doc
+)]
 pub extern "C" fn external_current_millis() -> u64 {
     let window: Window = web_sys::window().expect("should be in browser to run this demo");
     let performance: Performance = window
@@ -35,6 +39,7 @@ pub extern "C" fn external_current_millis() -> u64 {
     performance.now() as u64
 }
 
+#[allow(clippy::missing_panics_doc)] // expect does not work, likely because of `wasm_bindgen`
 #[wasm_bindgen]
 pub fn fuzz() {
     set_panic_hook();

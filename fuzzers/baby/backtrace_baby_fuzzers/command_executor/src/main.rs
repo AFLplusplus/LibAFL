@@ -80,6 +80,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
+    #[expect(clippy::items_after_statements)]
     #[derive(Debug)]
     struct MyExecutor {
         shmem_id: ShMemId,
