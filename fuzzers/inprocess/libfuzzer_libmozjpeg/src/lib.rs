@@ -81,10 +81,12 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let edges_observer = unsafe { std_edges_map_observer("edges") };
 
     // Create an observation channel using the cmp map
+    #[allow(static_mut_refs)] // only a problem on nightly
     let cmps_observer =
         unsafe { StdMapObserver::from_mut_ptr("cmps", CMP_MAP.as_mut_ptr(), CMP_MAP.len()) };
 
     // Create an observation channel using the allocations map
+    #[allow(static_mut_refs)] // only a problem on nightly
     let allocs_observer = unsafe {
         StdMapObserver::from_mut_ptr(
             "allocs",

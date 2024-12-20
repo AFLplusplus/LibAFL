@@ -172,7 +172,6 @@ pub fn fuzz() -> Result<(), Error> {
 
     let mut feedback = MaxMapFeedback::new(&edges_observer);
 
-    #[allow(clippy::let_unit_value)]
     let mut objective = ();
 
     let mut state = state.unwrap_or_else(|| {

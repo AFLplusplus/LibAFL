@@ -77,6 +77,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
+    #[allow(static_mut_refs)] // only a problem on nightly
     let edges_observer = unsafe {
         HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
             "edges",

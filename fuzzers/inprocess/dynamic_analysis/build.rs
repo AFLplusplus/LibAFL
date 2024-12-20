@@ -7,7 +7,7 @@ fn main() {
         println!("cargo:warning=Downloading Little-CMS");
         // Clone the Little-CMS repository if the directory doesn't exist
         let status = Command::new("git")
-            .args(&[
+            .args([
                 "clone",
                 "https://github.com/mm2/Little-CMS",
                 lcms_dir.to_str().unwrap(),

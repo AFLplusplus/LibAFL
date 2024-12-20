@@ -771,7 +771,7 @@ pub mod unix_shmem {
                 }
             }
 
-            #[expect(clippy::unnecessary_wraps)]
+            #[allow(clippy::unnecessary_wraps)] // cfg dependent
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 // # Safety
                 // No user-provided potentially unsafe parameters.

@@ -17,7 +17,7 @@ use std::{
 
 use backtrace::Backtrace;
 use libafl_bolts::{ownedref::OwnedRefMut, Named};
-#[expect(unused_imports)]
+#[allow(unused_imports)] // expect breaks here for some reason
 #[cfg(feature = "casr")]
 use libcasr::{
     asan::AsanStacktrace,

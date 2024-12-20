@@ -64,7 +64,6 @@ pub extern "C" fn external_current_millis() -> u64 {
 /// The main of this program.
 /// # Panics
 /// Will panic once the fuzzer finds the correct conditions.
-#[allow(clippy::similar_names)]
 #[no_mangle]
 pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     // The closure that we want to fuzz
@@ -76,7 +75,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
             signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
-                #[allow(clippy::manual_assert)]
+                #[expect(clippy::manual_assert)]
                 if buf.len() > 2 && buf[2] == b'c' {
                     panic!("=)");
                 }

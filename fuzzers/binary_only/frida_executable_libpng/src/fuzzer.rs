@@ -85,7 +85,7 @@ pub unsafe fn lib(main: extern "C" fn(i32, *const *const u8, *const *const u8) -
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 unsafe fn fuzz(
     options: &FuzzerOptions,
     mut frida_harness: &dyn Fn(&BytesInput) -> ExitKind,

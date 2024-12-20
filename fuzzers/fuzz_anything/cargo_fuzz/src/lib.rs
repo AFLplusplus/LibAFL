@@ -1,4 +1,4 @@
-#[allow(clippy::collapsible_if)]
+#[expect(clippy::collapsible_if)]
 pub fn do_thing(data: &[u8]) {
     if data.first() == Some(&b'a') {
         if data.get(1) == Some(&b'b') {

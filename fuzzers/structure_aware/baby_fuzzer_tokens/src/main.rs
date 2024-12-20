@@ -20,6 +20,7 @@ use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
+#[allow(static_mut_refs)] // only a problem in nightly
 static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 
 /*
@@ -29,7 +30,6 @@ fn signals_set(idx: usize) {
 }
 */
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut tokenizer = NaiveTokenizer::default();
     let mut encoder_decoder = TokenInputEncoderDecoder::new();
@@ -67,6 +67,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
+    #[allow(static_mut_refs)] // only a problem in nightly
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input

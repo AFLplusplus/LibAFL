@@ -122,7 +122,6 @@ impl NodeId {
 
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
-#[expect(dead_code)]
 pub struct TcpMultiMachineState<A> {
     node_descriptor: NodeDescriptor<A>,
     /// the parent to which the testcases should be forwarded when deemed interesting

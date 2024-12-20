@@ -25,7 +25,7 @@ use libafl_intelpt::{IntelPT, PAGE_SIZE};
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-#[allow(static_mut_refs)]
+#[allow(static_mut_refs)] // only a problem in nightly
 static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
 pub fn main() {

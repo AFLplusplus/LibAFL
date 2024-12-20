@@ -27,8 +27,6 @@ use serde::{Deserialize, Serialize};
 use super::NopEventManager;
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
-#[cfg(feature = "scalability_introspection")]
-use crate::state::HasScalabilityMonitor;
 use crate::{
     corpus::Corpus,
     events::{

@@ -254,6 +254,7 @@ impl TuiUi {
             ))
             .borders(Borders::ALL);
 
+        #[allow(unused_mut)] // cfg dependent
         let mut client_area = client_block.inner(area);
         f.render_widget(client_block, area);
 

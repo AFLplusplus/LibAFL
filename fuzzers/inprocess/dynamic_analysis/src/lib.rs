@@ -198,7 +198,7 @@ fn run_testcases(filenames: &[&str]) {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -252,8 +252,8 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let func_list =
-        unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut *&raw mut FUNCTION_LIST)) };
+    #[allow(static_mut_refs)] // only a problem in nightly
+    let func_list = unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut FUNCTION_LIST)) };
     let profiling_observer = ProfilingObserver::new("concatenated.json", func_list)?;
     let callhook = CallHook::new();
 
