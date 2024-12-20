@@ -25,7 +25,7 @@ use crate::executors::hooks::timer::TimerStruct;
 use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(windows)]
 use crate::state::State;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 use crate::{corpus::Corpus, observers::ObserversTuple, state::UsesState};
 use crate::{
     events::{EventFirer, EventRestarter},
