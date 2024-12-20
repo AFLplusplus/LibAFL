@@ -216,9 +216,10 @@ impl TimerStruct {
             it_interval,
             it_value,
         };
+        #[allow(unused_mut)] // miri doesn't mutate this
         let mut timerid: libc::timer_t = null_mut();
+        #[cfg(not(miri))]
         unsafe {
-            #[cfg(not(miri))]
             // creates a new per-process interval timer
             libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
         }
@@ -348,9 +349,9 @@ impl TimerStruct {
                 }
             }
         } else {
+            #[cfg(not(miri))]
             unsafe {
                 let disarmed: libc::itimerspec = zeroed();
-                #[cfg(not(miri))]
                 libc::timer_settime(self.timerid, 0, &raw const disarmed, null_mut());
             }
         }

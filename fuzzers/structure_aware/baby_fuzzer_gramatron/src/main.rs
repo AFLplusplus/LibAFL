@@ -26,7 +26,7 @@ use libafl::{
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 
-/// Coverage map with explicit assignments due to the lack of instrumentationnly a problem in nightly
+/// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 16;
 static mut SIGNALS: [u8; SIGNALS_LEN] = [0; SIGNALS_LEN];
 static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
