@@ -241,39 +241,39 @@ impl IntelPT {
         }
     }
 
-    /// Fill the coverage map by decoding the PT traces and reading target memory through `read_mem`
-    ///
-    /// This function consumes the traces.
-    ///
-    /// # Example
-    ///
-    /// An example `read_mem` callback function for the (inprocess) `intel_pt_babyfuzzer` could be:
-    /// ```
-    /// let read_mem = |buf: &mut [u8], addr: u64| {
-    ///     let src = addr as *const u8;
-    ///     let dst = buf.as_mut_ptr();
-    ///     let size = buf.len();
-    ///     unsafe {
-    ///         core::ptr::copy_nonoverlapping(src, dst, size);
-    ///     }
-    /// };
-    /// ```
-    #[allow(clippy::cast_possible_wrap)]
-    pub fn decode_with_callback<F, T>(&mut self, read_memory: F, map: &mut [T]) -> Result<(), Error>
-    where
-        F: Fn(&mut [u8], u64),
-        T: SaturatingAdd + From<u8> + Debug,
-    {
-        self.decode_traces_into_map_common(
-            None,
-            Some(|buff: &mut [u8], addr: u64, _: Asid| {
-                debug_assert!(i32::try_from(buff.len()).is_ok());
-                read_memory(buff, addr);
-                buff.len() as i32
-            }),
-            map,
-        )
-    }
+    // /// Fill the coverage map by decoding the PT traces and reading target memory through `read_mem`
+    // ///
+    // /// This function consumes the traces.
+    // ///
+    // /// # Example
+    // ///
+    // /// An example `read_mem` callback function for the (inprocess) `intel_pt_babyfuzzer` could be:
+    // /// ```
+    // /// let read_mem = |buf: &mut [u8], addr: u64| {
+    // ///     let src = addr as *const u8;
+    // ///     let dst = buf.as_mut_ptr();
+    // ///     let size = buf.len();
+    // ///     unsafe {
+    // ///         core::ptr::copy_nonoverlapping(src, dst, size);
+    // ///     }
+    // /// };
+    // /// ```
+    // #[allow(clippy::cast_possible_wrap)]
+    // pub fn decode_with_callback<F, T>(&mut self, read_memory: F, map: &mut [T]) -> Result<(), Error>
+    // where
+    //     F: Fn(&mut [u8], u64),
+    //     T: SaturatingAdd + From<u8> + Debug,
+    // {
+    //     self.decode_traces_into_map_common(
+    //         None,
+    //         Some(|buff: &mut [u8], addr: u64, _: Asid| {
+    //             debug_assert!(i32::try_from(buff.len()).is_ok());
+    //             read_memory(buff, addr);
+    //             buff.len() as i32
+    //         }),
+    //         map,
+    //     )
+    // }
 
     /// Fill the coverage map by decoding the PT traces
     ///
@@ -281,7 +281,8 @@ impl IntelPT {
     pub fn decode_traces_into_map<T>(
         &mut self,
         image: &mut Image,
-        map: &mut [T],
+        map_ptr: *mut T,
+        map_len: usize,
     ) -> Result<(), Error>
     where
         T: SaturatingAdd + From<u8> + Debug,
@@ -289,7 +290,8 @@ impl IntelPT {
         self.decode_traces_into_map_common(
             Some(image),
             None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
-            map,
+            map_ptr,
+            map_len,
         )
     }
 
@@ -297,7 +299,8 @@ impl IntelPT {
         &mut self,
         image: Option<&mut Image>,
         read_memory: Option<F>,
-        map: &mut [T],
+        map_ptr: *mut T,
+        map_len: usize,
     ) -> Result<(), Error>
     where
         F: Fn(&mut [u8], u64, Asid) -> i32,
@@ -373,7 +376,8 @@ impl IntelPT {
                         &mut status,
                         &mut previous_block_end_ip,
                         skip,
-                        map,
+                        map_ptr,
+                        map_len,
                     )?;
                 }
                 Err(e) => {
@@ -403,10 +407,16 @@ impl IntelPT {
         let second_ptr = self.perf_aux_buffer as *mut u8;
         let second_len = head_wrap as usize;
 
-        let mut vec = Vec::with_capacity(first_len + second_len);
-        vec.extend_from_slice(unsafe { slice::from_raw_parts(first_ptr, first_len) });
-        vec.extend_from_slice(unsafe { slice::from_raw_parts(second_ptr, second_len) });
-        vec.into_boxed_slice()
+        let mut data = Box::<[u8]>::new_uninit_slice(first_len + second_len);
+        unsafe {
+            ptr::copy_nonoverlapping(first_ptr, data.as_mut_ptr().cast(), first_len);
+            ptr::copy_nonoverlapping(
+                second_ptr,
+                data.as_mut_ptr().add(first_len).cast(),
+                second_len,
+            );
+            data.assume_init()
+        }
     }
 
     #[inline]
@@ -415,7 +425,8 @@ impl IntelPT {
         status: &mut Status,
         previous_block_end_ip: &mut u64,
         skip: u64,
-        map: &mut [T],
+        map_ptr: *mut T,
+        map_len: usize,
     ) -> Result<(), Error>
     where
         T: SaturatingAdd + From<u8> + Debug,
@@ -440,10 +451,11 @@ impl IntelPT {
 
                     if b.ninsn() > 0 && skip < offset {
                         let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
-                        // SAFETY: the index is < map.len() since the modulo operation is applied
-                        let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
-                        *map_loc = (*map_loc).saturating_add(&1u8.into());
-
+                        // SAFETY: the index is < map_len since the modulo operation is applied
+                        unsafe {
+                            let map_loc = map_ptr.add(id as usize % map_len);
+                            *map_loc = (*map_loc).saturating_add(&1u8.into());
+                        }
                         // log::trace!(
                         //     "previous block ip: {:x} current: {:x} offset: {offset:x}",
                         //     previous_block_end_ip,

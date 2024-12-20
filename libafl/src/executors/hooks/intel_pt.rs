@@ -55,9 +55,8 @@ where
         let pt = &mut self.intel_pt;
         pt.disable_tracing().unwrap();
 
-        let slice = unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) };
         let _ = pt
-            .decode_traces_into_map(&mut self.image.0, slice)
+            .decode_traces_into_map(&mut self.image.0, self.map_ptr, self.map_len)
             .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
         #[cfg(feature = "intel_pt_export_raw")]
         {

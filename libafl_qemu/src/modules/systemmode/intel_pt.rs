@@ -91,8 +91,7 @@ where
         //     unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) },
         // );
 
-        let map = unsafe { &mut *slice_from_raw_parts_mut(self.map_ptr, self.map_len) };
-        let _ = pt.decode_traces_into_map(&mut self.image.0, map);
+        let _ = pt.decode_traces_into_map(&mut self.image.0, self.map_ptr, self.map_len);
 
         #[cfg(feature = "intel_pt_export_raw")]
         {
