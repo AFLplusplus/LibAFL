@@ -177,7 +177,6 @@ impl CmpLogRuntime {
         }
     }
 
-    #[expect(clippy::unused_self)]
     #[cfg(target_arch = "x86_64")]
     extern "C" fn populate_lists(size: u8, op1: u64, op2: u64, retaddr: u64) {
         // log::trace!(
@@ -343,7 +342,6 @@ impl CmpLogRuntime {
         self.restore_registers = Some(restore_registers.finalize().unwrap().into_boxed_slice());
     }
 
-    #[expect(clippy::similar_names)]
     #[cfg(all(unix, target_arch = "x86_64"))]
     fn generate_instrumentation_blobs(&mut self) {
         macro_rules! save_registers {
@@ -639,7 +637,6 @@ impl CmpLogRuntime {
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "x86_64"))]
-    #[expect(clippy::similar_names)]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
     #[must_use]
