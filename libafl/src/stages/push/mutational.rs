@@ -63,7 +63,7 @@ where
     <S::Corpus as Corpus>::Input: Clone + Debug,
 {
     /// Gets the number of iterations as a random number
-    #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
+    #[expect(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
     fn iterations(&self, state: &mut S, _corpus_id: CorpusId) -> Result<usize, Error> {
         Ok(1 + state
             .rand_mut()
@@ -232,7 +232,7 @@ where
 {
     /// Creates a new default mutational stage
     #[must_use]
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn new(
         mutator: M,
         shared_state: Rc<

@@ -64,7 +64,7 @@ where
     TS: TestcaseScore<E::State>,
 {
     /// Do the minimization
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn minimize<CS, EM, Z>(
         &self,
         fuzzer: &mut Z,

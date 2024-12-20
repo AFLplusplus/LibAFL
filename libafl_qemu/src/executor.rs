@@ -9,6 +9,8 @@ use std::ptr;
 #[cfg(feature = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(any(feature = "usermode", feature = "fork"))]
+use libafl::inputs::UsesInput;
 use libafl::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -20,7 +22,6 @@ use libafl::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
@@ -355,7 +356,7 @@ where
     Z: HasObjective,
     Z::Objective: Feedback<EM, S::Input, OT, S>,
 {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         emulator: Emulator<CM, ED, ET, S, SM>,
         harness_fn: &'a mut H,

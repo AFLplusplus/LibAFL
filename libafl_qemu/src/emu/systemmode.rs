@@ -63,12 +63,14 @@ impl Default for FastSnapshotManager {
 }
 
 impl FastSnapshotManager {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             snapshots: HashMap::new(),
         }
     }
-
+    #[allow(clippy::missing_safety_doc)]
+    #[must_use]
     pub unsafe fn get(&self, id: &SnapshotId) -> FastSnapshotPtr {
         *self.snapshots.get(id).unwrap()
     }
@@ -86,10 +88,12 @@ impl Default for QemuSnapshotManager {
 }
 
 impl QemuSnapshotManager {
+    #[must_use]
     pub fn new(is_sync: bool) -> Self {
         Self { is_sync }
     }
 
+    #[must_use]
     pub fn snapshot_id_to_name(&self, snapshot_id: &SnapshotId) -> String {
         format!("__libafl_qemu_snapshot_{}", snapshot_id.inner())
     }
@@ -168,21 +172,23 @@ where
     S: UsesInput,
 {
     /// Write a value to a phsical guest address, including ROM areas.
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
-        self.qemu.write_phys_mem(paddr, buf)
+        self.qemu.write_phys_mem(paddr, buf);
     }
 
     /// Read a value from a physical guest address.
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn read_phys_mem(&self, paddr: GuestPhysAddr, buf: &mut [u8]) {
-        self.qemu.read_phys_mem(paddr, buf)
+        self.qemu.read_phys_mem(paddr, buf);
     }
 
     pub fn save_snapshot(&self, name: &str, sync: bool) {
-        self.qemu.save_snapshot(name, sync)
+        self.qemu.save_snapshot(name, sync);
     }
 
     pub fn load_snapshot(&self, name: &str, sync: bool) {
-        self.qemu.load_snapshot(name, sync)
+        self.qemu.load_snapshot(name, sync);
     }
 
     #[must_use]
@@ -199,8 +205,9 @@ where
         self.qemu.create_fast_snapshot_filter(track, device_filter)
     }
 
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn restore_fast_snapshot(&self, snapshot: FastSnapshotPtr) {
-        self.qemu.restore_fast_snapshot(snapshot)
+        self.qemu.restore_fast_snapshot(snapshot);
     }
 
     pub fn list_devices(&self) -> Vec<String> {

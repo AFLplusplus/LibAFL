@@ -89,7 +89,7 @@ where
     }
 
     /// Handle arriving events in the broker
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         _client_id: ClientId,
         event: &Event<I>,

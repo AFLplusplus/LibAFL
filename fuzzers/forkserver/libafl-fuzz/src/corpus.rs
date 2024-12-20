@@ -41,7 +41,7 @@ pub fn generate_base_filename(state: &mut LibaflFuzzState, id: CorpusId) -> Stri
 }
 
 // The function needs to be compatible with CustomFilepathToTestcaseFeedback
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 pub fn set_corpus_filepath(
     state: &mut LibaflFuzzState,
     testcase: &mut Testcase<BytesInput>,
@@ -58,7 +58,7 @@ pub fn set_corpus_filepath(
 }
 
 // The function needs to be compatible with CustomFilepathToTestcaseFeedback
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 pub fn set_solution_filepath(
     state: &mut LibaflFuzzState,
     testcase: &mut Testcase<BytesInput>,

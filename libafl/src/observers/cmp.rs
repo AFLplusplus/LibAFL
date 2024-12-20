@@ -88,7 +88,7 @@ impl CmpValues {
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct CmpValuesMetadata {
     /// A `list` of values.
@@ -262,7 +262,6 @@ where
 
     fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         if self.add_meta {
-            #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
             let meta = state.metadata_or_insert_with(CmpValuesMetadata::new);
 
             meta.add_from(self.usable_count(), self.cmp_map_mut());
@@ -359,7 +358,7 @@ struct cmp_map {
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct AFLppCmpValuesMetadata {
     /// The first map of `AFLppCmpLogVals` retrieved by running the un-mutated input
