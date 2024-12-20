@@ -28,6 +28,7 @@ use proc_maps::get_process_maps;
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
 #[allow(static_mut_refs)] // only a problem in nightly
 static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 

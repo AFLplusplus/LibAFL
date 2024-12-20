@@ -26,6 +26,7 @@ use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, A
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
 static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
 #[allow(static_mut_refs)] // only a problem in nightly
 static SIGNALS_LEN: usize = unsafe { SIGNALS.len() };
 

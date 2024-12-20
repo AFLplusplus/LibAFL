@@ -143,6 +143,7 @@ pub fn main() {
             EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), num_edges * 2);
         }
 
+        // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
         #[allow(static_mut_refs)] // only a problem on nightly
         let edges_ptr = unsafe { EDGES.as_mut_ptr() };
 

@@ -252,6 +252,7 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
+    // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
     #[allow(static_mut_refs)] // only a problem in nightly
     let func_list = unsafe { OwnedMutPtr::from_raw_mut(Lazy::force_mut(&mut FUNCTION_LIST)) };
     let profiling_observer = ProfilingObserver::new("concatenated.json", func_list)?;
