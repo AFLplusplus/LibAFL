@@ -868,7 +868,7 @@ macro_rules! map_tuple_list_type {
     };
 }
 
-/// Merges the types of two merged [`tuple_list`]s
+/// Merges the types of two merged [`tuple_list!`]s
 ///
 /// ```rust
 /// use libafl_bolts::{merge_tuple_list_type, tuples::{Merge, tuple_list, tuple_list_type}};

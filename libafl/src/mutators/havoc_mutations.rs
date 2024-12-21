@@ -2,9 +2,8 @@
 
 use libafl_bolts::{
     map_tuple_list_type, merge_tuple_list_type,
-    tuples::{Map, Merge},
+    tuples::{tuple_list, tuple_list_type, Map, Merge},
 };
-use tuple_list::{tuple_list, tuple_list_type};
 
 use crate::mutators::{
     mapping::{ToMappingMutator, ToOptionalMutator},
