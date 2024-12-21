@@ -34,7 +34,7 @@ use libafl_bolts::{
 use {
     libafl::mutators::{
         havoc_mutations::{havoc_crossover_with_corpus_mapper, havoc_mutations_no_crossover},
-        mapping::{ToMappedInputFunctionMappingMutatorMapper, ToOptionMappingMutatorMapper},
+        mapping::{ToMappingMutator, ToOptionalMutator},
         numeric::{int_mutators_no_crossover, mapped_int_mutators_crossover},
     },
     libafl_bolts::tuples::Map,
@@ -53,7 +53,7 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-#[allow(clippy::similar_names, clippy::manual_assert)]
+#[expect(clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
     // The pseudo program under test uses all parts of the custom input
@@ -87,6 +87,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
+
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
 
     // Feedback to rate the interestingness of an input
@@ -164,26 +165,20 @@ pub fn main() {
         // Creating mutators that will operate on input.byte_array
         let mapped_mutators = havoc_mutations_no_crossover()
             .merge(havoc_crossover_with_corpus_mapper(CustomInput::byte_array))
-            .map(ToMappedInputFunctionMappingMutatorMapper::new(
-                CustomInput::byte_array_mut,
-            ));
+            .map(ToMappingMutator::new(CustomInput::byte_array_mut));
 
         // Creating mutators that will operate on input.optional_byte_array
         let optional_mapped_mutators = havoc_mutations_no_crossover()
             .merge(havoc_crossover_with_corpus_mapper(
                 CustomInput::optional_byte_array,
             ))
-            .map(ToOptionMappingMutatorMapper)
-            .map(ToMappedInputFunctionMappingMutatorMapper::new(
-                CustomInput::optional_byte_array_mut,
-            ));
+            .map(ToOptionalMutator)
+            .map(ToMappingMutator::new(CustomInput::optional_byte_array_mut));
 
         // Creating mutators that will operate on input.num
         let int_mutators = int_mutators_no_crossover()
             .merge(mapped_int_mutators_crossover(CustomInput::num))
-            .map(ToMappedInputFunctionMappingMutatorMapper::new(
-                CustomInput::num_mut,
-            ));
+            .map(ToMappingMutator::new(CustomInput::num_mut));
         (mapped_mutators, optional_mapped_mutators, int_mutators)
     };
 

@@ -42,7 +42,7 @@ extern "C" {
 /// # Safety
 /// Call to functions using syscalls
 #[no_mangle]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 #[cfg(not(windows))]
 pub unsafe extern "C" fn mmap(
     addr: Pointer,
@@ -162,7 +162,7 @@ pub unsafe extern "C" fn mmap(
     }
 
     let mut reminder_next = None;
-    #[allow(clippy::comparison_chain)]
+    #[expect(clippy::comparison_chain)]
     if let Some(p) = prev.take() {
         if p.0 < end {
             fail = true;

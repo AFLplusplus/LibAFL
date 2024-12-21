@@ -34,7 +34,6 @@ pub unsafe extern "C" fn main_hook(
 }
 
 #[no_mangle]
-#[allow(clippy::similar_names)]
 pub unsafe extern "C" fn __libc_start_main(
     main: extern "C" fn(i32, *const *const u8, *const *const u8) -> i32,
     argc: i32,

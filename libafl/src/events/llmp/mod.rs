@@ -348,7 +348,6 @@ where
 
     /// Handle arriving events in the client
     #[cfg(not(feature = "share_objectives"))]
-    #[allow(clippy::unused_self)]
     pub fn process<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -491,7 +490,6 @@ where
     }
 
     /// Handle arriving events in the client
-    #[allow(clippy::unused_self)]
     pub fn process<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,

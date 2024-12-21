@@ -77,7 +77,7 @@ impl From<u64> for MutationId {
 }
 
 impl From<i32> for MutationId {
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn from(value: i32) -> Self {
         debug_assert!(value >= 0);
         MutationId(value as usize)

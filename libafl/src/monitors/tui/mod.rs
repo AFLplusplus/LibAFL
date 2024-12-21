@@ -32,7 +32,7 @@ use typed_builder::TypedBuilder;
 use super::{ClientPerfMonitor, PerfFeature};
 use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue};
 
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 pub mod ui;
 use ui::TuiUi;
 
@@ -143,7 +143,7 @@ pub struct PerfTuiContext {
 #[cfg(feature = "introspection")]
 impl PerfTuiContext {
     /// Get the data for performance metrics
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     pub fn grab_data(&mut self, m: &ClientPerfMonitor) {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = m.elapsed_cycles() as f64;
@@ -230,7 +230,7 @@ impl ProcessTiming {
 }
 
 /// The geometry of a single data point
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 #[derive(Debug, Default, Clone)]
 pub struct ItemGeometry {
     pub pending: u64,
@@ -251,7 +251,7 @@ impl ItemGeometry {
 }
 
 /// The context for a single client tracked in this [`TuiMonitor`]
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 #[derive(Debug, Default, Clone)]
 pub struct ClientTuiContext {
     pub corpus: u64,
@@ -322,7 +322,7 @@ impl ClientTuiContext {
 }
 
 /// The [`TuiContext`] for this [`TuiMonitor`]
-#[allow(missing_docs)]
+#[expect(missing_docs)]
 #[derive(Debug, Clone)]
 pub struct TuiContext {
     pub graphs: Vec<String>,
@@ -393,7 +393,7 @@ pub struct TuiMonitor {
 }
 
 impl From<TuiMonitorConfig> for TuiMonitor {
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn from(builder: TuiMonitorConfig) -> Self {
         Self::with_time(
             TuiUi::with_version(builder.title, builder.version, builder.enhanced_graphics),
@@ -427,7 +427,7 @@ impl Monitor for TuiMonitor {
         self.start_time = time;
     }
 
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let cur_time = current_time();
 
@@ -523,7 +523,7 @@ impl TuiMonitor {
         note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
     )]
     #[must_use]
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     pub fn new(tui_ui: TuiUi) -> Self {
         Self::with_time(tui_ui, current_time())
     }

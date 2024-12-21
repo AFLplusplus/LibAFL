@@ -470,11 +470,14 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(miri))]
     use std::{env, fs, io::Write};
 
+    #[cfg(not(miri))]
     use super::{create_new, try_create_new};
 
     #[test]
+    #[cfg(not(miri))]
     fn test() {
         let tmp = env::temp_dir();
         let path = tmp.join("testfile.tmp");

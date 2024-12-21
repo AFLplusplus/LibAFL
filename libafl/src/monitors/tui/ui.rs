@@ -129,7 +129,7 @@ impl TuiUi {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn draw_overall_ui(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
         let top_layout = Layout::default()
             .direction(Direction::Vertical)
@@ -254,7 +254,7 @@ impl TuiUi {
             ))
             .borders(Borders::ALL);
 
-        #[allow(unused_mut)]
+        #[allow(unused_mut)] // cfg dependent
         let mut client_area = client_block.inner(area);
         f.render_widget(client_block, area);
 
@@ -292,7 +292,7 @@ impl TuiUi {
         self.draw_client_results_text(f, app, right_bottom_layout);
     }
 
-    #[allow(clippy::too_many_lines, clippy::cast_precision_loss)]
+    #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
     fn draw_time_chart(
         &mut self,
         title: &str,
@@ -776,7 +776,7 @@ impl TuiUi {
             .widths([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
         f.render_widget(table, area);
     }
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn draw_logs(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>, area: Rect) {
         let app = app.read().unwrap();
         let logs: Vec<ListItem> = app

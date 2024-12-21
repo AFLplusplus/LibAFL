@@ -25,7 +25,7 @@ use crate::{
 
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
 struct TuneableMutationalStageMetadata {
@@ -209,7 +209,6 @@ where
     <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,

@@ -29,7 +29,7 @@ pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
 /// Metadata used to store information about disk sync time
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromDiskMetadata {
@@ -203,7 +203,7 @@ where
 /// Metadata used to store information about the last sent testcase with `SyncFromBrokerStage`
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromBrokerMetadata {

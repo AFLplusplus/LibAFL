@@ -23,7 +23,7 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_FOUND;
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
-#[allow(unused)]
+#[allow(unused_imports)] // only used in an unused function
 use crate::EDGES_MAP_DEFAULT_SIZE;
 #[cfg(feature = "pointer_maps")]
 use crate::{coverage::EDGES_MAP_PTR, EDGES_MAP_ALLOCATED_SIZE};
@@ -35,7 +35,7 @@ compile_error!(
 );
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
-#[allow(unused)]
+#[allow(unused_imports)] // only used in an unused function
 use core::ops::ShlAssign;
 
 #[cfg(feature = "sancov_ngram4")]
@@ -180,7 +180,7 @@ where
 }
 
 #[rustversion::nightly]
-#[allow(unused)]
+#[expect(unused)]
 #[inline]
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 unsafe fn update_ngram(pos: usize) -> usize {
@@ -224,9 +224,9 @@ extern "C" {
 /// Dereferences `guard`, reads the position from there, then dereferences the [`EDGES_MAP`] at that position.
 /// Should usually not be called directly.
 #[no_mangle]
-#[allow(unused_assignments)]
+#[allow(unused_assignments)] // cfg dependent
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
-    #[allow(unused_mut)]
+    #[allow(unused_mut)] // cfg dependent
     let mut pos = *guard as usize;
 
     #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]

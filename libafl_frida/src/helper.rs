@@ -141,7 +141,7 @@ pub enum SkipRange {
 pub struct FridaInstrumentationHelperBuilder {
     stalker_enabled: bool,
     disable_excludes: bool,
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     instrument_module_predicate: Option<Box<dyn FnMut(&ModuleDetails) -> bool>>,
     skip_module_predicate: Box<dyn FnMut(&ModuleDetails) -> bool>,
     skip_ranges: Vec<SkipRange>,
@@ -488,7 +488,6 @@ where
         println!("msg: {msg:}, bytes: {bytes:x?}");
     }
 
-    #[allow(clippy::too_many_lines)]
     fn build_transformer(
         gum: &'a Gum,
         ranges: &Rc<RefCell<RangeMap<u64, (u16, String)>>>,
@@ -508,7 +507,7 @@ where
         })
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn transform(
         basic_block: StalkerIterator,
         output: &StalkerOutput,

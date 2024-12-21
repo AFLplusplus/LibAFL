@@ -35,7 +35,7 @@ use core::{
     clone::Clone,
     fmt::Debug,
     marker::PhantomData,
-    ops::{Deref, DerefMut, RangeBounds},
+    ops::{DerefMut, RangeBounds},
 };
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
@@ -50,7 +50,6 @@ use libafl_bolts::{
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
-use value::ValueMutRefInput;
 
 use crate::corpus::CorpusId;
 
@@ -198,36 +197,44 @@ pub trait HasMutatorBytes: HasLen {
     }
 }
 
-/// Mapping types to themselves, used to ensure lifetime consistency for mapped mutators.
-///
-/// Specifically, this is for [`Input`] types that are owned wrappers around a reference. The lifetime of the associated type should be the same as the reference.
-pub trait MappedInput {
-    /// The type for which this trait is implemented
-    type Type<'a>
+impl HasMutatorBytes for Vec<u8> {
+    fn bytes(&self) -> &[u8] {
+        self.as_ref()
+    }
+
+    fn bytes_mut(&mut self) -> &mut [u8] {
+        self.as_mut()
+    }
+
+    fn resize(&mut self, new_len: usize, value: u8) {
+        <Vec<u8>>::resize(self, new_len, value);
+    }
+
+    fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I) {
+        <Vec<u8> as Extend<I::Item>>::extend(self, iter);
+    }
+
+    fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
     where
-        Self: 'a;
-}
+        R: RangeBounds<usize>,
+        I: IntoIterator<Item = u8>,
+    {
+        <Vec<u8>>::splice(self, range, replace_with)
+    }
 
-impl<T> MappedInput for Option<T>
-where
-    T: MappedInput,
-{
-    type Type<'a>
-        = Option<T::Type<'a>>
+    fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
     where
-        T: 'a;
-}
-
-/// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
-pub type MutVecInput<'a> = ValueMutRefInput<'a, Vec<u8>>;
-
-impl HasLen for MutVecInput<'_> {
-    fn len(&self) -> usize {
-        self.deref().len()
+        R: RangeBounds<usize>,
+    {
+        <Vec<u8>>::drain(self, range)
     }
 }
 
-impl HasMutatorBytes for MutVecInput<'_> {
+/// A wrapper type that allows us to use mutators for Mutators for `&mut `[`Vec`].
+#[deprecated(since = "0.15.0", note = "Use &mut Vec<u8> directly")]
+pub type MutVecInput<'a> = &'a mut Vec<u8>;
+
+impl HasMutatorBytes for &mut Vec<u8> {
     fn bytes(&self) -> &[u8] {
         self
     }
@@ -241,7 +248,7 @@ impl HasMutatorBytes for MutVecInput<'_> {
     }
 
     fn extend<'b, I: IntoIterator<Item = &'b u8>>(&mut self, iter: I) {
-        self.deref_mut().extend(iter);
+        <Vec<u8> as Extend<I::Item>>::extend(self, iter);
     }
 
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>

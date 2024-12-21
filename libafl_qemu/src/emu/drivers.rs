@@ -85,7 +85,7 @@ where
     fn pre_qemu_exec(_emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
 
     /// Just after QEMU exits
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn post_qemu_exec(
         _emulator: &mut Emulator<CM, Self, ET, S, SM>,
         _state: &mut S,
@@ -109,7 +109,7 @@ where
 }
 
 #[derive(Clone, Debug, Default, TypedBuilder)]
-#[allow(clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)] // cfg dependent
 pub struct StdEmulatorDriver {
     #[builder(default = OnceCell::new())]
     snapshot_id: OnceCell<SnapshotId>,
@@ -233,7 +233,6 @@ where
             },
         };
 
-        #[allow(clippy::type_complexity)]
         let (command, ret_reg): (Option<CM::Commands>, Option<Regs>) = match &mut exit_reason {
             EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(signal) => {
