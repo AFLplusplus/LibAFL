@@ -43,7 +43,8 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
-    helper::FridaInstrumentationHelper, helper::FridaRuntimeVec,
+    helper::FridaInstrumentationHelper,
+    helper::FridaRuntimeVec,
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
@@ -99,7 +100,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let mut enable_asan_error_callbacks = false;
 
-        let runtimes = if options.asan && options.asan_cores.contains(client_description.core_id()) {
+        let runtimes = if options.asan && options.asan_cores.contains(client_description.core_id())
+        {
             #[cfg(unix)]
             {
                 enable_asan_error_callbacks = true;
@@ -118,15 +120,15 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             FridaRuntimeVec(vec![Box::new(coverage)])
         };
 
-        let mut frida_helper =
-            FridaInstrumentationHelper::new(&gum, options, runtimes);
+        let mut frida_helper = FridaInstrumentationHelper::new(&gum, options, runtimes);
 
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
             "edges",
             frida_helper.map_mut_ptr().unwrap(),
             MAP_SIZE,
-        )).track_indices();
+        ))
+        .track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -145,13 +147,13 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // Feedbacks to recognize an input as solution
         #[cfg(unix)]
         let mut objective = feedback_or_fast!(
-                CrashFeedback::new(),
-                TimeoutFeedback::new(),
-                feedback_and_fast!(
-                    ConstFeedback::from(enable_asan_error_callbacks),
-                    AsanErrorsFeedback::new(&asan_observer)
-                )
-            );
+            CrashFeedback::new(),
+            TimeoutFeedback::new(),
+            feedback_and_fast!(
+                ConstFeedback::from(enable_asan_error_callbacks),
+                AsanErrorsFeedback::new(&asan_observer)
+            )
+        );
         #[cfg(windows)]
         let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
@@ -161,8 +163,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // RNG
                 StdRand::new(),
                 // Corpus that will be evolved, we keep it in memory for performance
-                CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
-                    .unwrap(),
+                CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(options.output.clone()).unwrap(),
@@ -226,9 +227,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         if options.asan && options.asan_cores.contains(client_description.core_id()) {
             let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-            
+
             fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-            
+
             Ok(())
         } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
             // Create an observation channel using cmplog map
@@ -253,9 +254,9 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             Ok(())
         } else {
             let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-            
+
             fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-            
+
             Ok(())
         }
     };
