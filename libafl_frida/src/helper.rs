@@ -121,15 +121,16 @@ where
     }
 }
 
+/// Vector of `FridaRuntime`
 #[derive(Debug)]
 pub struct FridaRuntimeVec(pub Vec<Box<dyn FridaRuntime>>);
 
 impl MatchFirstType for FridaRuntimeVec
 {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
-        for member in self.0.iter() {
+        for member in (&self.0).iter() {
             if TypeId::of::<T>() == member.type_id() {
-                let raw = &**member as *const dyn FridaRuntime as *const T;
+                let raw = std::ptr::from_ref::<dyn FridaRuntime>(&**member) as *const T;
                 return unsafe { raw.as_ref() };
             }
         }
@@ -138,9 +139,9 @@ impl MatchFirstType for FridaRuntimeVec
     }
 
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
-        for member in self.0.iter_mut() {
+        for member in (&mut self.0).iter_mut() {
             if TypeId::of::<T>() == member.type_id() {
-                let raw = &mut **member as *mut dyn FridaRuntime as *mut T;
+                let raw = std::ptr::from_mut::<dyn FridaRuntime>(&mut **member) as *mut T;
                 return unsafe { raw.as_mut() };
             }
         }
@@ -152,26 +153,26 @@ impl MatchFirstType for FridaRuntimeVec
 impl FridaRuntimeTuple for FridaRuntimeVec
 {
     fn init_all(&mut self, gum: &Gum, ranges: &RangeMap<u64, (u16, String)>, module_map: &Rc<ModuleMap>) {
-        for runtime in self.0.iter_mut() {
+        for runtime in (&mut self.0).iter_mut() {
             runtime.init(gum, ranges, module_map);
         }
     }
 
     fn deinit_all(&mut self, gum: &Gum) {
-        for runtime in self.0.iter_mut() {
+        for runtime in (&mut self.0).iter_mut() {
             runtime.deinit(gum);
         }
     }
 
     fn pre_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        for runtime in self.0.iter_mut() {
+        for runtime in (&mut self.0).iter_mut() {
             runtime.pre_exec(input_bytes)?;
         }
         Ok(())
     }
 
     fn post_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        for runtime in self.0.iter_mut() {
+        for runtime in (&mut self.0).iter_mut() {
             runtime.post_exec(input_bytes)?;
         }
         Ok(())
