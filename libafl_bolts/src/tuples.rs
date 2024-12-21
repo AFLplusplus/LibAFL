@@ -925,6 +925,8 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
+    use core::marker::PhantomData;
+
     use tuple_list::{tuple_list, tuple_list_type};
 
     #[cfg(feature = "alloc")]
@@ -977,9 +979,9 @@ mod test {
     #[test]
     fn test_mapper() {
         struct W<T>(T);
-        struct MyMapper;
+        struct MyMapper<P>(PhantomData<P>);
 
-        impl<T> MappingFunctor<T> for MyMapper {
+        impl<T, P> MappingFunctor<T> for MyMapper<P> {
             type Output = W<T>;
 
             fn apply(&mut self, from: T) -> Self::Output {
@@ -992,9 +994,9 @@ mod test {
         struct C;
 
         type OrigType = tuple_list_type!(A, B, C);
-        type MappedType = map_tuple_list_type!(OrigType, MyMapper);
+        type MappedType = map_tuple_list_type!(OrigType, MyMapper<usize>);
         let orig: OrigType = tuple_list!(A, B, C);
-        let _mapped: MappedType = orig.map(MyMapper);
+        let _mapped: MappedType = orig.map(MyMapper(PhantomData::<usize>));
     }
 
     #[test]
