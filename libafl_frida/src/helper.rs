@@ -1,12 +1,4 @@
 use core::fmt::{self, Debug, Formatter};
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    ffi::CStr,
-    fs::{self, read_to_string},
-    path::{Path, PathBuf},
-    rc::Rc,
-};
-use std::any::TypeId;
 use frida_gum::{
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
@@ -22,6 +14,14 @@ use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+use std::any::TypeId;
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    ffi::CStr,
+    fs::{self, read_to_string},
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
 #[cfg(all(target_arch = "aarch64", unix))]
@@ -125,8 +125,7 @@ where
 #[derive(Debug)]
 pub struct FridaRuntimeVec(pub Vec<Box<dyn FridaRuntime>>);
 
-impl MatchFirstType for FridaRuntimeVec
-{
+impl MatchFirstType for FridaRuntimeVec {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         for member in (&self.0).iter() {
             if TypeId::of::<T>() == member.type_id() {
@@ -150,9 +149,13 @@ impl MatchFirstType for FridaRuntimeVec
     }
 }
 
-impl FridaRuntimeTuple for FridaRuntimeVec
-{
-    fn init_all(&mut self, gum: &Gum, ranges: &RangeMap<u64, (u16, String)>, module_map: &Rc<ModuleMap>) {
+impl FridaRuntimeTuple for FridaRuntimeVec {
+    fn init_all(
+        &mut self,
+        gum: &Gum,
+        ranges: &RangeMap<u64, (u16, String)>,
+        module_map: &Rc<ModuleMap>,
+    ) {
         for runtime in (&mut self.0).iter_mut() {
             runtime.init(gum, ranges, module_map);
         }
