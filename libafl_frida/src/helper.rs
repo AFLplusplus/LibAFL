@@ -1,4 +1,13 @@
 use core::fmt::{self, Debug, Formatter};
+use std::{
+    any::TypeId,
+    cell::{Ref, RefCell, RefMut},
+    ffi::CStr,
+    fs::{self, read_to_string},
+    path::{Path, PathBuf},
+    rc::Rc,
+};
+
 use frida_gum::{
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
@@ -14,14 +23,6 @@ use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap_anonymous, MapFlags, ProtFlags};
 use rangemap::RangeMap;
-use std::any::TypeId;
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    ffi::CStr,
-    fs::{self, read_to_string},
-    path::{Path, PathBuf},
-    rc::Rc,
-};
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
 #[cfg(all(target_arch = "aarch64", unix))]
