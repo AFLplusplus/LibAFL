@@ -43,8 +43,7 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
-    helper::FridaInstrumentationHelper,
-    helper::FridaRuntimeVec,
+    helper::{FridaInstrumentationHelper, FridaRuntimeVec},
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
