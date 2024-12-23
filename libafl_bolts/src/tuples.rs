@@ -833,6 +833,81 @@ macro_rules! tuple_for_each_mut {
     };
 }
 
+/// Maps the types of a mapping with a [`MappingFunctor`]
+///
+/// ```rust
+/// use libafl_bolts::{
+///     map_tuple_list_type,
+///     tuples::{MappingFunctor, Map, tuple_list, tuple_list_type}
+/// };
+///
+/// struct Wrapper<T>(T);
+/// struct MyMapper;
+///
+/// impl<T> MappingFunctor<T> for MyMapper {
+///     type Output = Wrapper<T>;
+///
+///     fn apply(&mut self, from: T) -> <Self as MappingFunctor<T>>::Output {
+///         Wrapper(from)
+///     }
+/// }
+///
+/// struct A;
+/// struct B;
+/// struct C;
+///
+/// type OrigType = tuple_list_type!(A, B, C);
+/// type MappedType = map_tuple_list_type!(OrigType, MyMapper);
+/// let orig: OrigType = tuple_list!(A, B, C);
+/// let _mapped: MappedType = orig.map(MyMapper);
+/// ```
+#[macro_export]
+macro_rules! map_tuple_list_type {
+    ($Tuple:ty, $Mapper:ty) => {
+        <$Tuple as $crate::tuples::Map<$Mapper>>::MapResult
+    };
+}
+
+/// Merges the types of two merged [`tuple_list!`]s
+///
+/// ```rust
+/// use libafl_bolts::{merge_tuple_list_type, tuples::{Merge, tuple_list, tuple_list_type}};
+///
+/// struct A;
+/// struct B;
+/// struct C;
+/// struct D;
+/// struct E;
+///
+/// type Lhs = tuple_list_type!(A, B, C);
+/// type Rhs = tuple_list_type!(D, E);
+/// type Merged = merge_tuple_list_type!(Lhs, Rhs);
+///
+/// let lhs: Lhs = tuple_list!(A, B, C);
+/// let rhs: Rhs = tuple_list!(D, E);
+/// let _merged: Merged = lhs.merge(rhs);
+/// ```
+#[macro_export]
+macro_rules! merge_tuple_list_type {
+   // Base case: when only two types are provided, apply the Merge trait directly
+   ($Type1:ty) => {
+        $Type1
+    };
+
+   // Base case: when only two types are provided, apply the Merge trait directly
+   ($Type1:ty, $Type2:ty) => {
+        <$Type1 as $crate::tuples::Merge<$Type2>>::MergeResult
+    };
+
+    // Recursive case: when more than two types are provided
+    ($Type1:ty, $Type2:ty, $( $rest:ty ),+) => {
+        merge_tuple_list_type!(
+            <$Type1 as $crate::tuples::Merge<$Type2>>::MergeResult,
+            $( $rest ),+
+        )
+    };
+}
+
 /*
 
 // Define trait and implement it for several primitive types.
@@ -864,11 +939,13 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
+    use core::marker::PhantomData;
+
     use tuple_list::{tuple_list, tuple_list_type};
 
     #[cfg(feature = "alloc")]
     use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::{type_eq, Map, MappingFunctor};
+    use crate::tuples::{type_eq, Map, MappingFunctor, Merge};
 
     #[test]
     // for type name tests
@@ -916,9 +993,11 @@ mod test {
     #[test]
     fn test_mapper() {
         struct W<T>(T);
-        struct MyMapper;
 
-        impl<T> MappingFunctor<T> for MyMapper {
+        // PhantomData shows how to deal with mappers that have generics
+        struct ExampleMapper<P>(PhantomData<P>);
+
+        impl<T, P> MappingFunctor<T> for ExampleMapper<P> {
             type Output = W<T>;
 
             fn apply(&mut self, from: T) -> Self::Output {
@@ -930,12 +1009,40 @@ mod test {
         struct B;
         struct C;
 
-        let orig = tuple_list!(A, B, C);
-        let mapped = orig.map(MyMapper);
+        type OrigType = tuple_list_type!(A, B, C);
+        type MappedType = map_tuple_list_type!(OrigType, ExampleMapper<usize>);
+        let orig: OrigType = tuple_list!(A, B, C);
+        let _mapped: MappedType = orig.map(ExampleMapper(PhantomData::<usize>));
+    }
 
-        // this won't compile if the mapped type is not correct
-        #[expect(clippy::no_effect_underscore_binding)]
-        let _type_assert: tuple_list_type!(W<A>, W<B>, W<C>) = mapped;
+    #[test]
+    fn test_merge() {
+        struct A;
+        struct B;
+        struct C;
+        struct D;
+        struct E;
+
+        type Lhs = tuple_list_type!(A, B, C);
+        type Rhs = tuple_list_type!(D, E);
+        type Merged = merge_tuple_list_type!(Lhs, Rhs);
+        type IndividuallyMergedPre = merge_tuple_list_type!(
+            tuple_list_type!(A),
+            tuple_list_type!(B),
+            tuple_list_type!(C),
+            Rhs
+        );
+        type IndividuallyMergedPost =
+            merge_tuple_list_type!(Lhs, tuple_list_type!(D), tuple_list_type!(E));
+        type MergedCloned = merge_tuple_list_type!(Merged);
+
+        let lhs: Lhs = tuple_list!(A, B, C);
+        let rhs: Rhs = tuple_list!(D, E);
+        let merged: Merged = lhs.merge(rhs);
+        let merged: IndividuallyMergedPre = merged;
+        let merged: IndividuallyMergedPost = merged;
+        #[allow(clippy::no_effect_underscore_binding)]
+        let _merged: MergedCloned = merged;
     }
 
     /// Function that tests the tuple macros
