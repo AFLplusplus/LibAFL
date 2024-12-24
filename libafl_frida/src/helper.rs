@@ -52,6 +52,76 @@ pub trait FridaRuntime: 'static + Debug {
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 }
 
+pub struct IfElseRuntime<CB, FR1, FR2> {
+    closure: CB,
+    if_runtimes: FR1,
+    else_runtimes: FR2,
+}
+
+impl<CB, FR1, FR2> Debug for IfElseRuntime<CB, FR1, FR2>
+where
+    FR1: Debug,
+    FR2: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.if_runtimes, f)?;
+        Debug::fmt(&self.else_runtimes, f)?;
+        Ok(())
+    }
+}
+impl<CB, FR1, FR2> IfElseRuntime<CB, FR1, FR2> {
+    pub fn new(closure: CB, if_runtimes: FR1, else_runtimes: FR2) -> Self {
+        Self {
+            closure,
+            if_runtimes,
+            else_runtimes,
+        }
+    }
+}
+
+impl<CB, FR1, FR2> FridaRuntime for IfElseRuntime<CB, FR1, FR2>
+where
+    CB: FnMut() -> Result<bool, Error> + 'static,
+    FR1: FridaRuntimeTuple + 'static,
+    FR2: FridaRuntimeTuple + 'static,
+{
+    fn init(
+        &mut self,
+        gum: &Gum,
+        ranges: &RangeMap<u64, (u16, String)>,
+        module_map: &Rc<ModuleMap>,
+    ) {
+        if (self.closure)().unwrap() {
+            self.if_runtimes.init_all(gum, ranges, module_map)
+        } else {
+            self.else_runtimes.init_all(gum, ranges, module_map)
+        }
+    }
+
+    fn deinit(&mut self, gum: &Gum) {
+        if (self.closure)().unwrap() {
+            self.if_runtimes.deinit_all(gum)
+        } else {
+            self.else_runtimes.deinit_all(gum)
+        }
+    }
+
+    fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        if (self.closure)()? {
+            self.if_runtimes.pre_exec_all(input_bytes)
+        } else {
+            self.else_runtimes.pre_exec_all(input_bytes)
+        }
+    }
+
+    fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        if (self.closure)()? {
+            self.if_runtimes.post_exec_all(input_bytes)
+        } else {
+            self.else_runtimes.post_exec_all(input_bytes)
+        }
+    }
+}
 /// The tuple for Frida Runtime
 pub trait FridaRuntimeTuple: MatchFirstType + Debug {
     /// Initialization
