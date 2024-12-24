@@ -138,8 +138,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
     #[cfg(feature = "bloom_input_filter")]
     let mut fuzzer =
-        StdFuzzer::new_with_bloom_input_filter(scheduler, feedback, objective, 10_000_000, 0.001)
-            .unwrap();
+        StdFuzzer::with_bloom_filter(scheduler, feedback, objective, 10_000_000, 0.001);
 
     // Create the executor for an in-process function with just one observer
     let executor = CustomExecutor::new(&state);
