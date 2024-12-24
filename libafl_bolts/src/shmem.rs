@@ -624,12 +624,9 @@ where
 /// Is needed on top.
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 pub mod unix_shmem {
-    /// Mmap [`ShMemProvider`] for Unix
-    #[cfg(not(target_os = "android"))]
-    pub use default::MmapShMemProvider;
     /// Mmap [`ShMem`] for Unix
     #[cfg(not(target_os = "android"))]
-    pub use default::{MmapShMem, MAX_MMAP_FILENAME_LEN};
+    pub use default::{MmapShMem, MmapShMemProvider, MAX_MMAP_FILENAME_LEN};
 
     #[cfg(doc)]
     use crate::shmem::{ShMem, ShMemProvider};
@@ -669,7 +666,7 @@ pub mod unix_shmem {
             Error,
         };
 
-        /// The size of the buffer of the filename of mmap mapped memory regions
+        /// The max number of bytes used when generating names for [`MmapShMem`]s.
         pub const MAX_MMAP_FILENAME_LEN: usize = 20;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
