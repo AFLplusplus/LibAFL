@@ -445,7 +445,12 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if self.locking {
             self.store_input_from(testcase)?;
         } else {
-            let _ = self.store_input_from(testcase);
+            if let Err(error) = self.store_input_from(testcase) {
+                log::error!(
+                    "An error occurred when trying to write a testcase without locking: {}",
+                    error
+                );
+            }
         }
         Ok(())
     }
