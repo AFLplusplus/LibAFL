@@ -9,23 +9,23 @@ use super::{MutationResult, Mutator};
 /// A wrapper around a [`Mutator`] that ensures an input really changed [`MutationResult::Mutated`]
 /// by hashing pre- and post-mutation
 #[derive(Debug)]
-pub struct HashMutator<M> {
+pub struct HashingMutator<M> {
     inner: M,
     name: Cow<'static, str>,
 }
 
-impl<M> HashMutator<M>
+impl<M> HashingMutator<M>
 where
     M: Named,
 {
-    /// Create a new [`HashMutator`]
+    /// Create a new [`HashingMutator`]
     pub fn new(inner: M) -> Self {
-        let name = Cow::Owned(format!("HashMutator<{}>", inner.name().clone()));
+        let name = Cow::Owned(format!("HashingMutator<{}>", inner.name().clone()));
         Self { inner, name }
     }
 }
 
-impl<M, I, S> Mutator<I, S> for HashMutator<M>
+impl<M, I, S> Mutator<I, S> for HashingMutator<M>
 where
     I: Hash,
     M: Mutator<I, S>,
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<M> Named for HashMutator<M> {
+impl<M> Named for HashingMutator<M> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -51,7 +51,7 @@ impl<M> Named for HashMutator<M> {
 mod tests {
     use crate::{
         inputs::BytesInput,
-        mutators::{BytesSetMutator, HashMutator, MutationResult, Mutator},
+        mutators::{BytesSetMutator, HashingMutator, MutationResult, Mutator},
         state::NopState,
     };
 
@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(BytesInput::new(vec![0; 5]), input);
 
         // now it is correctly reported as `MutationResult::Skipped`
-        let mut hash_mutator = HashMutator::new(inner);
+        let mut hash_mutator = HashingMutator::new(inner);
         assert_eq!(
             MutationResult::Skipped,
             hash_mutator.mutate(&mut state, &mut input).unwrap()
