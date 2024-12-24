@@ -5,6 +5,8 @@ use std::{env, path::PathBuf, str::FromStr};
 
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
+include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
+
 /// Wrap Clang
 #[expect(clippy::struct_excessive_bools)]
 #[derive(Debug)]
@@ -184,11 +186,7 @@ impl ToolWrapper for ArWrapper {
             })
             .collect::<Vec<_>>();
 
-        let Ok(ar_path) = env::var("LLVM_AR_PATH") else {
-            panic!("Couldn't find llvm-ar. Specify the `LLVM_AR_PATH` environment variable");
-        };
-
-        args.push(ar_path);
+        args.push(LLVM_AR_PATH.to_string());
 
         args.extend_from_slice(base_args.as_slice());
 
