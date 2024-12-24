@@ -441,8 +441,12 @@ impl<I> InMemoryOnDiskCorpus<I> {
             fs::rename(&tmpfile_path, &metafile_path)?;
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
-
-        self.store_input_from(testcase)?;
+    
+        if self.locking {
+            self.store_input_from(testcase)?;
+        } else {
+            let _ = self.store_input_from(testcase);
+        }
         Ok(())
     }
 
