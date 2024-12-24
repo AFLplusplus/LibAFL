@@ -34,7 +34,6 @@ use libafl_bolts::{
     tuples::{tuple_list, Merge},
     AsSlice,
 };
-#[cfg(unix)]
 use libafl_frida::asan::{
     asan_rt::AsanRuntime,
     errors::{AsanErrorsFeedback, AsanErrorsObserver},
