@@ -96,7 +96,7 @@ impl From<i32> for MutationId {
 /// mutator in a [`hash::HashMutator`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
-    /// The [`Mutator`] executed on this `Input`. It may still be the same.
+    /// The [`Mutator`] executed on this `Input`. It may not guarantee that the input has actually been changed.
     Mutated,
     /// The [`Mutator`] did not mutate this `Input`. It was `Skipped`.
     Skipped,

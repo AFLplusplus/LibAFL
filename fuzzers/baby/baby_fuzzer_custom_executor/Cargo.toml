@@ -8,9 +8,9 @@ authors = [
 edition = "2021"
 
 [features]
-default = ["std", "bloom_filter"]
+default = ["std", "bloom_input_filter"]
 tui = ["libafl/tui_monitor"]
-bloom_filter = ["std"]
+bloom_input_filter = ["std"]
 std = []
 
 [profile.dev]
