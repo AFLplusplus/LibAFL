@@ -1,5 +1,6 @@
 use core::fmt::{self, Debug, Formatter};
 use std::{
+    any::TypeId,
     cell::{Ref, RefCell, RefMut},
     ffi::CStr,
     fs::{self, read_to_string},
@@ -34,7 +35,7 @@ use crate::cmplog_rt::CmpLogRuntime;
 use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 /// The Runtime trait
-pub trait FridaRuntime: 'static + Debug {
+pub trait FridaRuntime: 'static + Debug + std::any::Any {
     /// Initialization
     fn init(
         &mut self,
@@ -118,6 +119,67 @@ where
     fn post_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
         self.0.post_exec(input_bytes)?;
         self.1.post_exec_all(input_bytes)
+    }
+}
+
+/// Vector of `FridaRuntime`
+#[derive(Debug)]
+pub struct FridaRuntimeVec(pub Vec<Box<dyn FridaRuntime>>);
+
+impl MatchFirstType for FridaRuntimeVec {
+    fn match_first_type<T: 'static>(&self) -> Option<&T> {
+        for member in &self.0 {
+            if TypeId::of::<T>() == member.type_id() {
+                let raw = std::ptr::from_ref::<dyn FridaRuntime>(&**member) as *const T;
+                return unsafe { raw.as_ref() };
+            }
+        }
+
+        None
+    }
+
+    fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        for member in &mut self.0 {
+            if TypeId::of::<T>() == member.type_id() {
+                let raw = std::ptr::from_mut::<dyn FridaRuntime>(&mut **member) as *mut T;
+                return unsafe { raw.as_mut() };
+            }
+        }
+
+        None
+    }
+}
+
+impl FridaRuntimeTuple for FridaRuntimeVec {
+    fn init_all(
+        &mut self,
+        gum: &Gum,
+        ranges: &RangeMap<u64, (u16, String)>,
+        module_map: &Rc<ModuleMap>,
+    ) {
+        for runtime in &mut self.0 {
+            runtime.init(gum, ranges, module_map);
+        }
+    }
+
+    fn deinit_all(&mut self, gum: &Gum) {
+        for runtime in &mut self.0 {
+            runtime.deinit(gum);
+        }
+    }
+
+    fn pre_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        for runtime in &mut self.0 {
+            runtime.pre_exec(input_bytes)?;
+        }
+        Ok(())
+    }
+
+    fn post_exec_all(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        for runtime in &mut self.0 {
+            runtime.post_exec(input_bytes)?;
+        }
+        Ok(())
     }
 }
 

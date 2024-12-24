@@ -43,7 +43,7 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
-    helper::FridaInstrumentationHelper,
+    helper::{FridaInstrumentationHelper, FridaRuntimeVec},
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
@@ -76,7 +76,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<_>,
-                          mgr: LlmpRestartingEventManager<_, _, _>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _>,
                           client_description: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
@@ -94,389 +94,169 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             ExitKind::Ok
         };
 
-        if options.asan && options.asan_cores.contains(client_description.core_id()) {
-            (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
-              _client_description| {
-                let gum = Gum::obtain();
+        let gum = Gum::obtain();
+        let coverage = CoverageRuntime::new();
 
-                let coverage = CoverageRuntime::new();
-                #[cfg(unix)]
+        let mut enable_asan_error_callbacks = false;
+
+        let runtimes = if options.asan && options.asan_cores.contains(client_description.core_id())
+        {
+            #[cfg(unix)]
+            {
+                enable_asan_error_callbacks = true;
                 let asan = AsanRuntime::new(options);
-
-                #[cfg(unix)]
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(asan, coverage));
-                #[cfg(windows)]
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
-
-                // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
-                    "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
-                    MAP_SIZE,
-                ))
-                .track_indices();
-
-                // Create an observation channel to keep track of the execution time
-                let time_observer = TimeObserver::new("time");
-                #[cfg(unix)]
-                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
-
-                // Feedback to rate the interestingness of an input
-                // This one is composed by two Feedbacks in OR
-                let mut feedback = feedback_or!(
-                    // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new(&edges_observer),
-                    // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new(&time_observer)
-                );
-
-                // Feedbacks to recognize an input as solution
-                #[cfg(unix)]
-                let mut objective = feedback_or_fast!(
-                    CrashFeedback::new(),
-                    TimeoutFeedback::new(),
-                    // true enables the AsanErrorFeedback
-                    feedback_and_fast!(
-                        ConstFeedback::from(true),
-                        AsanErrorsFeedback::new(&asan_observer)
-                    )
-                );
-                #[cfg(windows)]
-                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
-
-                // If not restarting, create a State from scratch
-                let mut state = state.unwrap_or_else(|| {
-                    StdState::new(
-                        // RNG
-                        StdRand::new(),
-                        // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
-                            .unwrap(),
-                        // Corpus in which we store solutions (crashes in this example),
-                        // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new(options.output.clone()).unwrap(),
-                        &mut feedback,
-                        &mut objective,
-                    )
-                    .unwrap()
-                });
-
-                println!("We're a client, let's fuzz :)");
-
-                // Create a PNG dictionary if not existing
-                if state.metadata_map().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from([
-                        vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
-                        b"IHDR".to_vec(),
-                        b"IDAT".to_vec(),
-                        b"PLTE".to_vec(),
-                        b"IEND".to_vec(),
-                    ]));
-                }
-
-                // Setup a basic mutator with a mutational stage
-                let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-
-                // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
-
-                // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
-
-                // Create the executor for an in-process function with just one observer for edge coverage
-                let mut executor = FridaInProcessExecutor::new(
-                    &gum,
-                    InProcessExecutor::new(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
-                    &mut frida_helper,
-                );
-
-                // In case the corpus is empty (on first run), reset
-                if state.must_load_initial_inputs() {
-                    state
-                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
-                        });
-                    println!("We imported {} inputs from disk.", state.corpus().count());
-                }
-
-                let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-
-                Ok(())
-            })(state, mgr, client_description)
+                FridaRuntimeVec(vec![Box::new(coverage), Box::new(asan)])
+            }
+            #[cfg(windows)]
+            {
+                FridaRuntimeVec(vec![Box::new(coverage)])
+            }
         } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
-            (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
-              _client_description| {
-                let gum = Gum::obtain();
-
-                let coverage = CoverageRuntime::new();
-                let cmplog = CmpLogRuntime::new();
-                println!("cmplog runtime created");
-
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
-
-                // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
-                    "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
-                    MAP_SIZE,
-                ))
-                .track_indices();
-
-                // Create an observation channel to keep track of the execution time
-                let time_observer = TimeObserver::new("time");
-                #[cfg(unix)]
-                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
-
-                // Feedback to rate the interestingness of an input
-                // This one is composed by two Feedbacks in OR
-                let mut feedback = feedback_or!(
-                    // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new(&edges_observer),
-                    // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new(&time_observer)
-                );
-
-                #[cfg(unix)]
-                let mut objective = feedback_or_fast!(
-                    CrashFeedback::new(),
-                    TimeoutFeedback::new(),
-                    feedback_and_fast!(
-                        ConstFeedback::from(false),
-                        AsanErrorsFeedback::new(&asan_observer)
-                    )
-                );
-                #[cfg(windows)]
-                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
-
-                // If not restarting, create a State from scratch
-                let mut state = state.unwrap_or_else(|| {
-                    StdState::new(
-                        // RNG
-                        StdRand::new(),
-                        // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
-                            .unwrap(),
-                        // Corpus in which we store solutions (crashes in this example),
-                        // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new(options.output.clone()).unwrap(),
-                        &mut feedback,
-                        &mut objective,
-                    )
-                    .unwrap()
-                });
-
-                println!("We're a client, let's fuzz :)");
-
-                // Create a PNG dictionary if not existing
-                if state.metadata_map().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from([
-                        vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
-                        b"IHDR".to_vec(),
-                        b"IDAT".to_vec(),
-                        b"PLTE".to_vec(),
-                        b"IEND".to_vec(),
-                    ]));
-                }
-
-                // Setup a basic mutator with a mutational stage
-                let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-
-                // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
-
-                // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
-
-                // Create the executor for an in-process function with just one observer for edge coverage
-                let mut executor = FridaInProcessExecutor::new(
-                    &gum,
-                    InProcessExecutor::new(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
-                    &mut frida_helper,
-                );
-
-                // In case the corpus is empty (on first run), reset
-                if state.must_load_initial_inputs() {
-                    state
-                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
-                        });
-                    println!("We imported {} inputs from disk.", state.corpus().count());
-                }
-
-                // Create an observation channel using cmplog map
-                let cmplog_observer = CmpLogObserver::new("cmplog", true);
-
-                let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
-
-                let tracing = ShadowTracingStage::new(&mut executor);
-
-                // Setup a randomic Input2State stage
-                let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
-                    I2SRandReplace::new()
-                )));
-
-                // Setup a basic mutator
-                let mutational = StdMutationalStage::new(mutator);
-
-                // The order of the stages matter!
-                let mut stages = tuple_list!(tracing, i2s, mutational);
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-
-                Ok(())
-            })(state, mgr, client_description)
+            let cmplog = CmpLogRuntime::new();
+            println!("cmplog runtime created");
+            FridaRuntimeVec(vec![Box::new(coverage), Box::new(cmplog)])
         } else {
-            (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
-              _client_description| {
-                let gum = Gum::obtain();
+            FridaRuntimeVec(vec![Box::new(coverage)])
+        };
 
-                let coverage = CoverageRuntime::new();
+        let mut frida_helper = FridaInstrumentationHelper::new(&gum, options, runtimes);
 
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
+        // Create an observation channel using the coverage map
+        let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
+            "edges",
+            frida_helper.map_mut_ptr().unwrap(),
+            MAP_SIZE,
+        ))
+        .track_indices();
 
-                // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
-                    "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
-                    MAP_SIZE,
-                ))
-                .track_indices();
+        // Create an observation channel to keep track of the execution time
+        let time_observer = TimeObserver::new("time");
+        #[cfg(unix)]
+        let asan_observer = AsanErrorsObserver::from_static_asan_errors();
 
-                // Create an observation channel to keep track of the execution time
-                let time_observer = TimeObserver::new("time");
-                #[cfg(unix)]
-                let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+        // Feedback to rate the interestingness of an input
+        // This one is composed by two Feedbacks in OR
+        let mut feedback = feedback_or!(
+            // New maximization map feedback linked to the edges observer and the feedback state
+            MaxMapFeedback::new(&edges_observer),
+            // Time feedback, this one does not need a feedback state
+            TimeFeedback::new(&time_observer)
+        );
 
-                // Feedback to rate the interestingness of an input
-                // This one is composed by two Feedbacks in OR
-                let mut feedback = feedback_or!(
-                    // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new(&edges_observer),
-                    // Time feedback, this one does not need a feedback state
-                    TimeFeedback::new(&time_observer)
-                );
+        // Feedbacks to recognize an input as solution
+        #[cfg(unix)]
+        let mut objective = feedback_or_fast!(
+            CrashFeedback::new(),
+            TimeoutFeedback::new(),
+            feedback_and_fast!(
+                ConstFeedback::from(enable_asan_error_callbacks),
+                AsanErrorsFeedback::new(&asan_observer)
+            )
+        );
+        #[cfg(windows)]
+        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
-                #[cfg(unix)]
-                let mut objective = feedback_or_fast!(
-                    CrashFeedback::new(),
-                    TimeoutFeedback::new(),
-                    feedback_and_fast!(
-                        ConstFeedback::from(false),
-                        AsanErrorsFeedback::new(&asan_observer)
-                    )
-                );
-                #[cfg(windows)]
-                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        // If not restarting, create a State from scratch
+        let mut state = state.unwrap_or_else(|| {
+            StdState::new(
+                // RNG
+                StdRand::new(),
+                // Corpus that will be evolved, we keep it in memory for performance
+                CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64).unwrap(),
+                // Corpus in which we store solutions (crashes in this example),
+                // on disk so the user can get them after stopping the fuzzer
+                OnDiskCorpus::new(options.output.clone()).unwrap(),
+                &mut feedback,
+                &mut objective,
+            )
+            .unwrap()
+        });
 
-                // If not restarting, create a State from scratch
-                let mut state = state.unwrap_or_else(|| {
-                    StdState::new(
-                        // RNG
-                        StdRand::new(),
-                        // Corpus that will be evolved, we keep it in memory for performance
-                        CachedOnDiskCorpus::no_meta(PathBuf::from("./corpus_discovered"), 64)
-                            .unwrap(),
-                        // Corpus in which we store solutions (crashes in this example),
-                        // on disk so the user can get them after stopping the fuzzer
-                        OnDiskCorpus::new(options.output.clone()).unwrap(),
-                        &mut feedback,
-                        &mut objective,
-                    )
-                    .unwrap()
+        println!("We're a client, let's fuzz :)");
+
+        // Create a PNG dictionary if not existing
+        if state.metadata_map().get::<Tokens>().is_none() {
+            state.add_metadata(Tokens::from([
+                vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
+                b"IHDR".to_vec(),
+                b"IDAT".to_vec(),
+                b"PLTE".to_vec(),
+                b"IEND".to_vec(),
+            ]));
+        }
+
+        // Setup a basic mutator with a mutational stage
+        let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+
+        // A minimization+queue policy to get testcasess from the corpus
+        let scheduler =
+            IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+        // let observers = ObserversVec(vec![Box::new(edges_observer), Box::new(time_observer)]);
+        #[cfg(unix)]
+        let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+        #[cfg(windows)]
+        let observers = tuple_list!(edges_observer, time_observer);
+
+        // Create the executor for an in-process function with just one observer for edge coverage
+        let mut executor = FridaInProcessExecutor::new(
+            &gum,
+            InProcessExecutor::new(
+                &mut frida_harness,
+                observers,
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+            )?,
+            &mut frida_helper,
+        );
+
+        // In case the corpus is empty (on first run), reset
+        if state.must_load_initial_inputs() {
+            state
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
+                .unwrap_or_else(|_| {
+                    panic!("Failed to load initial corpus at {:?}", &options.input)
                 });
+            println!("We imported {} inputs from disk.", state.corpus().count());
+        }
 
-                println!("We're a client, let's fuzz :)");
+        if options.asan && options.asan_cores.contains(client_description.core_id()) {
+            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-                // Create a PNG dictionary if not existing
-                if state.metadata_map().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from([
-                        vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
-                        b"IHDR".to_vec(),
-                        b"IDAT".to_vec(),
-                        b"PLTE".to_vec(),
-                        b"IEND".to_vec(),
-                    ]));
-                }
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
-                // Setup a basic mutator with a mutational stage
-                let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+            Ok(())
+        } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
+            // Create an observation channel using cmplog map
+            let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-                // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
+            let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-                // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+            let tracing = ShadowTracingStage::new(&mut executor);
 
-                #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-                #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
+            // Setup a randomic Input2State stage
+            let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
+                I2SRandReplace::new()
+            )));
 
-                // Create the executor for an in-process function with just one observer for edge coverage
-                let mut executor = FridaInProcessExecutor::new(
-                    &gum,
-                    InProcessExecutor::new(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
-                    &mut frida_helper,
-                );
+            // Setup a basic mutator
+            let mutational = StdMutationalStage::new(mutator);
 
-                // In case the corpus is empty (on first run), reset
-                if state.must_load_initial_inputs() {
-                    state
-                        .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &options.input)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to load initial corpus at {:?}", &options.input)
-                        });
-                    println!("We imported {} inputs from disk.", state.corpus().count());
-                }
+            // The order of the stages matter!
+            let mut stages = tuple_list!(tracing, i2s, mutational);
 
-                let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+            Ok(())
+        } else {
+            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+            fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
-                Ok(())
-            })(state, mgr, client_description)
+            Ok(())
         }
     };
 
