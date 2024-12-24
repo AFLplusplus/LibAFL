@@ -442,7 +442,12 @@ impl<I> InMemoryOnDiskCorpus<I> {
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
 
-        self.store_input_from(testcase)?;
+        if let Err(err) = self.store_input_from(testcase) {
+            if self.locking {
+                return Err(err);
+            }
+            log::error!("An error occurred when trying to write a testcase without locking: {err}");
+        }
         Ok(())
     }
 
