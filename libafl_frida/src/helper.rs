@@ -52,6 +52,7 @@ pub trait FridaRuntime: 'static + Debug {
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 }
 
+/// Use the runtime if closure evaluates to true
 pub struct IfElseRuntime<CB, FR1, FR2> {
     closure: CB,
     if_runtimes: FR1,
@@ -70,6 +71,7 @@ where
     }
 }
 impl<CB, FR1, FR2> IfElseRuntime<CB, FR1, FR2> {
+    /// Constructor for this conditionally enabled runtime
     pub fn new(closure: CB, if_runtimes: FR1, else_runtimes: FR2) -> Self {
         Self {
             closure,
