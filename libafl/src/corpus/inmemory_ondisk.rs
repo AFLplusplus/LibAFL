@@ -444,13 +444,11 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
         if self.locking {
             self.store_input_from(testcase)?;
-        } else {
-            if let Err(error) = self.store_input_from(testcase) {
-                log::error!(
-                    "An error occurred when trying to write a testcase without locking: {}",
-                    error
-                );
-            }
+        } else if let Err(error) = self.store_input_from(testcase) {
+            log::error!(
+                "An error occurred when trying to write a testcase without locking: {}",
+                error
+            );
         }
         Ok(())
     }
