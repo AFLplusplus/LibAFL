@@ -303,7 +303,7 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, EM, F, OF, OT, S, IF> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
+impl<CS, EM, F, IF, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
@@ -509,7 +509,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S, IF> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+impl<CS, E, EM, F, IF, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
@@ -587,7 +587,7 @@ impl<I: Hash> InputFilter<I> for BloomInputFilter {
     }
 }
 
-impl<CS, E, EM, F, OF, S, IF> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
+impl<CS, E, EM, F, IF, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
@@ -745,7 +745,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S, ST, IF> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, IF, OF, S, ST> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<S::Input, S>,
     E: UsesState<State = S>,
@@ -918,7 +918,7 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, OF, S, IF> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+impl<CS, E, EM, F, IF, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
