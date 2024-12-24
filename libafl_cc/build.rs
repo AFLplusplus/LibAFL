@@ -234,6 +234,7 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
     println!("cargo:rerun-if-env-changed=LLVM_BINDIR");
+    println!("cargo:rerun-if-env-changed=LLVM_AR_PATH");
     println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_VERSION");
@@ -244,6 +245,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let llvm_bindir = env::var("LLVM_BINDIR");
+    let llvm_ar_path = env::var("LLVM_AR_PATH");
     let llvm_cxxflags = env::var("LLVM_CXXFLAGS");
     let llvm_ldflags = env::var("LLVM_LDFLAGS");
     let llvm_version = env::var("LLVM_VERSION");
@@ -266,6 +268,8 @@ fn main() {
 pub const CLANG_PATH: &str = \"clang\";
 /// The path to the `clang++` executable
 pub const CLANGXX_PATH: &str = \"clang++\";
+/// The path to the `llvm-ar` executable
+pub const LLVM_AR_PATH: &str = \"llvm-ar\";
 /// The llvm version used to build llvm passes
 pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     "
@@ -281,16 +285,24 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         exec_llvm_config(&["--bindir"])
     };
     let bindir_path = Path::new(&llvm_bindir);
+    let llvm_ar_path = if let Ok(ar_path) = llvm_ar_path {
+        ar_path
+    } else {
+        exec_llvm_config(&["--bindir"])
+    };
 
     let clang;
     let clangcpp;
+    let llvm_ar;
 
     if cfg!(windows) {
         clang = bindir_path.join("clang.exe");
         clangcpp = bindir_path.join("clang++.exe");
+        llvm_ar = Path::new(&llvm_ar_path).join("llvm-ar.exe");
     } else {
         clang = bindir_path.join("clang");
         clangcpp = bindir_path.join("clang++");
+        llvm_ar = Path::new(&llvm_ar_path).join("llvm-ar");
     }
 
     if !clang.exists() {
@@ -300,6 +312,10 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
 
     if !clangcpp.exists() {
         println!("cargo:warning=Failed to find clang++ frontend.");
+        return;
+    }
+    if !llvm_ar.exists() {
+        println!("cargo:warning=Failed to find llvm-ar archiver.");
         return;
     }
 
@@ -344,6 +360,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         pub const CLANG_PATH: &str = {clang:?};
         /// The path to the `clang++` executable
         pub const CLANGXX_PATH: &str = {clangcpp:?};
+        /// The path to the `llvm-ar` executable
+        pub const LLVM_AR_PATH: &str = {llvm_ar:?};
 
         /// The default size of the edges map the fuzzer uses
         pub const EDGES_MAP_DEFAULT_SIZE: usize = {edge_map_default_size};
