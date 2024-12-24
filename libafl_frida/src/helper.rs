@@ -92,17 +92,17 @@ where
         module_map: &Rc<ModuleMap>,
     ) {
         if (self.closure)().unwrap() {
-            self.if_runtimes.init_all(gum, ranges, module_map)
+            self.if_runtimes.init_all(gum, ranges, module_map);
         } else {
-            self.else_runtimes.init_all(gum, ranges, module_map)
+            self.else_runtimes.init_all(gum, ranges, module_map);
         }
     }
 
     fn deinit(&mut self, gum: &Gum) {
         if (self.closure)().unwrap() {
-            self.if_runtimes.deinit_all(gum)
+            self.if_runtimes.deinit_all(gum);
         } else {
-            self.else_runtimes.deinit_all(gum)
+            self.else_runtimes.deinit_all(gum);
         }
     }
 
