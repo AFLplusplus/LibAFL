@@ -888,7 +888,7 @@ impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
     /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
     ///
     /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
-    pub fn with_bloom_filter(
+    pub fn with_bloom_input_filter(
         scheduler: CS,
         feedback: F,
         objective: OF,
@@ -1033,7 +1033,7 @@ mod tests {
     fn filtered_execution() {
         let execution_count = RefCell::new(0);
         let scheduler = StdScheduler::new();
-        let mut fuzzer = StdFuzzer::with_bloom_filter(scheduler, (), (), 100, 1e-4);
+        let mut fuzzer = StdFuzzer::with_bloom_input_filter(scheduler, (), (), 100, 1e-4);
         let mut state = StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),
