@@ -454,8 +454,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
       - name: Build fuzzers/binary_only/frida_windows_gdiplus
         run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
 
