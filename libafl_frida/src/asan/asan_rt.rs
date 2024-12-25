@@ -593,7 +593,7 @@ impl AsanRuntime {
 
                     let _ = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
-                    #[expect(non_snake_case)]
+                    #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
