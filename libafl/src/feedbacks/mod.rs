@@ -940,11 +940,10 @@ where
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
-        let observer = match observers.get(&self.observer_handle) {
-            Some(o) => o,
-            None => return Err(Error::illegal_state(
+        let Some(observer) = observers.get(&self.observer_handle) else {
+            return Err(Error::illegal_state(
                 "Observer referenced by TimeFeedback is not found in observers given to the fuzzer",
-            )),
+            ));
         };
 
         *testcase.exec_time_mut() = *observer.last_runtime();
