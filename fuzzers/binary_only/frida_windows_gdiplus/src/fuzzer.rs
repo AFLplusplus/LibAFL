@@ -6,16 +6,9 @@
 //! going to make it compilable only for Windows, don't forget to modify the
 //! `scripts/test_fuzzer.sh` to opt-out this fuzzer from that test.
 
-#[cfg(unix)]
 use mimalloc::MiMalloc;
-#[cfg(unix)]
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-#[cfg(windows)]
-use dlmalloc::GlobalDlmalloc;
-#[cfg(windows)]
-#[global_allocator]
-static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
 use std::path::PathBuf;
 
