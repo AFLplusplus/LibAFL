@@ -869,15 +869,22 @@ where
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
-    /// Create a new `StdFuzzer` with standard behavior.
-    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
+impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
+    /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
+    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF) -> Self {
         Self {
             scheduler,
             feedback,
             objective,
-            input_filter: NopInputFilter,
+            input_filter,
         }
+    }
+}
+
+impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
+    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
+    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
+        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter)
     }
 }
 
@@ -896,13 +903,7 @@ impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
         fp_p: f64,
     ) -> Self {
         let input_filter = BloomInputFilter::new(items_count, fp_p);
-
-        Self {
-            scheduler,
-            feedback,
-            objective,
-            input_filter,
-        }
+        Self::with_input_filter(scheduler, feedback, objective, input_filter)
     }
 }
 
