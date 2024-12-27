@@ -7,25 +7,25 @@ use libafl_bolts::{generic_hash_std, Error, Named};
 use super::{MutationResult, Mutator};
 
 /// A wrapper around a [`Mutator`] that ensures an input really changed [`MutationResult::Mutated`]
-/// by hashing pre- and post-mutation
+/// by hashing pre- and post-mutation and comparing the values
 #[derive(Debug)]
-pub struct HashingMutator<M> {
+pub struct MutationChecker<M> {
     inner: M,
     name: Cow<'static, str>,
 }
 
-impl<M> HashingMutator<M>
+impl<M> MutationChecker<M>
 where
     M: Named,
 {
-    /// Create a new [`HashingMutator`]
+    /// Create a new [`MutationChecker`]
     pub fn new(inner: M) -> Self {
-        let name = Cow::Owned(format!("HashingMutator<{}>", inner.name().clone()));
+        let name = Cow::Owned(format!("MutationChecker<{}>", inner.name().clone()));
         Self { inner, name }
     }
 }
 
-impl<M, I, S> Mutator<I, S> for HashingMutator<M>
+impl<M, I, S> Mutator<I, S> for MutationChecker<M>
 where
     I: Hash,
     M: Mutator<I, S>,
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<M> Named for HashingMutator<M> {
+impl<M> Named for MutationChecker<M> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -51,7 +51,7 @@ impl<M> Named for HashingMutator<M> {
 mod tests {
     use crate::{
         inputs::BytesInput,
-        mutators::{BytesSetMutator, HashingMutator, MutationResult, Mutator},
+        mutators::{BytesSetMutator, MutationChecker, MutationResult, Mutator},
         state::NopState,
     };
 
@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(BytesInput::new(vec![0; 5]), input);
 
         // now it is correctly reported as `MutationResult::Skipped`
-        let mut hash_mutator = HashingMutator::new(inner);
+        let mut hash_mutator = MutationChecker::new(inner);
         assert_eq!(
             MutationResult::Skipped,
             hash_mutator.mutate(&mut state, &mut input).unwrap()
