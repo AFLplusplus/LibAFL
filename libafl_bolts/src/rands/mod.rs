@@ -18,7 +18,7 @@ static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// Return a pseudo-random seed. For `no_std` environments, a single deterministic sequence is used.
 #[must_use]
-#[expect(unreachable_code)]
+#[allow(unreachable_code)] // cfg dependent
 pub fn random_seed() -> u64 {
     #[cfg(feature = "std")]
     return random_seed_from_random_state();
@@ -365,7 +365,7 @@ impl Rand for Lehmer64Rand {
     fn set_seed(&mut self, mut seed: u64) {
         let hi = splitmix64(&mut seed);
         let lo = splitmix64(&mut seed) | 1;
-        self.s = u128::from(hi) << 64 | u128::from(lo);
+        self.s = (u128::from(hi) << 64) | u128::from(lo);
     }
 
     #[inline]
