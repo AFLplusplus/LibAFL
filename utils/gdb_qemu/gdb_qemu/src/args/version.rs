@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use clap::builder::Str;
 
 #[derive(Default)]
@@ -18,8 +20,10 @@ impl From<Version> for Str {
             ("Cargo Target Triple", env!("VERGEN_CARGO_TARGET_TRIPLE")),
         ]
         .iter()
-        .map(|(k, v)| format!("{k:25}: {v}\n"))
-        .collect::<String>();
+        .fold(String::new(), |mut output, (k, v)| {
+            writeln!(output, "{k:25}: {v}").unwrap();
+            output
+        });
 
         format!("\n{version:}").into()
     }

@@ -1,18 +1,15 @@
 use core::num::NonZeroUsize;
-use std::{
-    borrow::Cow,
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::{borrow::Cow, hash::Hash};
 
 use libafl::{
     corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
-    inputs::{BytesInput, HasTargetBytes, Input, MutVecInput},
+    inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error, SerdeAny,
 };
-use libafl_bolts::{rands::Rand, Named};
+use libafl_bolts::{generic_hash_std, rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 /// The custom [`Input`] type used in this example, consisting of a byte array part, a byte array that is not always present, and a boolean
@@ -20,42 +17,52 @@ use serde::{Deserialize, Serialize};
 /// Imagine these could be used to model command line arguments for a bash command, where
 /// - `byte_array` is binary data that is always needed like what is passed to stdin,
 /// - `optional_byte_array` is binary data passed as a command line arg, and it is only passed if it is not `None` in the input,
+/// - `num` is an arbitrary number (`i16` in this case)
 /// - `boolean` models the presence or absence of a command line flag that does not require additional data
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, SerdeAny)]
 pub struct CustomInput {
     pub byte_array: Vec<u8>,
     pub optional_byte_array: Option<Vec<u8>>,
+    pub num: i16,
     pub boolean: bool,
 }
 
 /// Hash-based implementation
 impl Input for CustomInput {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        let mut hasher = DefaultHasher::new();
-        self.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
+        format!("{:016x}", generic_hash_std(self))
     }
 }
 
 impl CustomInput {
     /// Returns a mutable reference to the byte array
-    pub fn byte_array_mut(&mut self) -> MutVecInput<'_> {
-        (&mut self.byte_array).into()
+    pub fn byte_array_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.byte_array
     }
 
     /// Returns an immutable reference to the byte array
-    pub fn byte_array(&self) -> &[u8] {
+    pub fn byte_array(&self) -> &Vec<u8> {
         &self.byte_array
     }
 
     /// Returns a mutable reference to the optional byte array
-    pub fn optional_byte_array_mut(&mut self) -> Option<MutVecInput<'_>> {
-        self.optional_byte_array.as_mut().map(|e| e.into())
+    pub fn optional_byte_array_mut(&mut self) -> &mut Option<Vec<u8>> {
+        &mut self.optional_byte_array
     }
 
     /// Returns an immutable reference to the optional byte array
-    pub fn optional_byte_array(&self) -> Option<&[u8]> {
-        self.optional_byte_array.as_deref()
+    pub fn optional_byte_array(&self) -> &Option<Vec<u8>> {
+        &self.optional_byte_array
+    }
+
+    /// Returns a mutable reference to the number
+    pub fn num_mut(&mut self) -> &mut i16 {
+        &mut self.num
+    }
+
+    /// Returns an immutable reference to the number
+    pub fn num(&self) -> &i16 {
+        &self.num
     }
 }
 
@@ -86,10 +93,12 @@ where
             .coinflip(0.5)
             .then(|| generator.generate(state).unwrap().target_bytes().into());
         let boolean = state.rand_mut().coinflip(0.5);
+        let num = state.rand_mut().next() as i16;
 
         Ok(CustomInput {
             byte_array,
             optional_byte_array,
+            num,
             boolean,
         })
     }

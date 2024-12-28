@@ -29,7 +29,7 @@ use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 /// Coverage map with explicit assignments due to the lack of instrumentation
 const SIGNALS_LEN: usize = 16;
 static mut SIGNALS: [u8; SIGNALS_LEN] = [0; SIGNALS_LEN];
-static mut SIGNALS_PTR: *mut u8 = unsafe { &raw mut SIGNALS as _ };
+static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
 /*
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -45,7 +45,6 @@ fn read_automaton_from_file<P: AsRef<Path>>(path: P) -> Automaton {
     postcard::from_bytes(&buffer).unwrap()
 }
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut bytes = vec![];
 
@@ -59,6 +58,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
+
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
 
     // Feedback to rate the interestingness of an input

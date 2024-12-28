@@ -52,6 +52,78 @@ pub trait FridaRuntime: 'static + Debug {
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
 }
 
+/// Use the runtime if closure evaluates to true
+pub struct IfElseRuntime<CB, FR1, FR2> {
+    closure: CB,
+    if_runtimes: FR1,
+    else_runtimes: FR2,
+}
+
+impl<CB, FR1, FR2> Debug for IfElseRuntime<CB, FR1, FR2>
+where
+    FR1: Debug,
+    FR2: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(&self.if_runtimes, f)?;
+        Debug::fmt(&self.else_runtimes, f)?;
+        Ok(())
+    }
+}
+impl<CB, FR1, FR2> IfElseRuntime<CB, FR1, FR2> {
+    /// Constructor for this conditionally enabled runtime
+    pub fn new(closure: CB, if_runtimes: FR1, else_runtimes: FR2) -> Self {
+        Self {
+            closure,
+            if_runtimes,
+            else_runtimes,
+        }
+    }
+}
+
+impl<CB, FR1, FR2> FridaRuntime for IfElseRuntime<CB, FR1, FR2>
+where
+    CB: FnMut() -> Result<bool, Error> + 'static,
+    FR1: FridaRuntimeTuple + 'static,
+    FR2: FridaRuntimeTuple + 'static,
+{
+    fn init(
+        &mut self,
+        gum: &Gum,
+        ranges: &RangeMap<u64, (u16, String)>,
+        module_map: &Rc<ModuleMap>,
+    ) {
+        if (self.closure)().unwrap() {
+            self.if_runtimes.init_all(gum, ranges, module_map);
+        } else {
+            self.else_runtimes.init_all(gum, ranges, module_map);
+        }
+    }
+
+    fn deinit(&mut self, gum: &Gum) {
+        if (self.closure)().unwrap() {
+            self.if_runtimes.deinit_all(gum);
+        } else {
+            self.else_runtimes.deinit_all(gum);
+        }
+    }
+
+    fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        if (self.closure)()? {
+            self.if_runtimes.pre_exec_all(input_bytes)
+        } else {
+            self.else_runtimes.pre_exec_all(input_bytes)
+        }
+    }
+
+    fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+        if (self.closure)()? {
+            self.if_runtimes.post_exec_all(input_bytes)
+        } else {
+            self.else_runtimes.post_exec_all(input_bytes)
+        }
+    }
+}
 /// The tuple for Frida Runtime
 pub trait FridaRuntimeTuple: MatchFirstType + Debug {
     /// Initialization
@@ -141,7 +213,7 @@ pub enum SkipRange {
 pub struct FridaInstrumentationHelperBuilder {
     stalker_enabled: bool,
     disable_excludes: bool,
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     instrument_module_predicate: Option<Box<dyn FnMut(&ModuleDetails) -> bool>>,
     skip_module_predicate: Box<dyn FnMut(&ModuleDetails) -> bool>,
     skip_ranges: Vec<SkipRange>,
@@ -488,7 +560,6 @@ where
         println!("msg: {msg:}, bytes: {bytes:x?}");
     }
 
-    #[allow(clippy::too_many_lines)]
     fn build_transformer(
         gum: &'a Gum,
         ranges: &Rc<RefCell<RangeMap<u64, (u16, String)>>>,
@@ -508,7 +579,7 @@ where
         })
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn transform(
         basic_block: StalkerIterator,
         output: &StalkerOutput,

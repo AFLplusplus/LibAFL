@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 pub use token_mutations::*;
 pub mod havoc_mutations;
 pub use havoc_mutations::*;
+pub mod numeric;
+pub use numeric::{int_mutators, mapped_int_mutators};
 pub mod encoded_mutations;
 pub use encoded_mutations::*;
 pub mod mopt_mutator;
@@ -75,7 +77,7 @@ impl From<u64> for MutationId {
 }
 
 impl From<i32> for MutationId {
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn from(value: i32) -> Self {
         debug_assert!(value >= 0);
         MutationId(value as usize)

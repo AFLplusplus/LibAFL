@@ -1,9 +1,9 @@
-use {
-    crate::args::LogArgs,
-    anyhow::{anyhow, Result},
-    simplelog::{Config, LevelFilter, WriteLogger},
-    std::fs::File,
-};
+use std::fs::File;
+
+use anyhow::{anyhow, Result};
+use simplelog::{Config, LevelFilter, WriteLogger};
+
+use crate::args::LogArgs;
 
 pub struct Logger;
 

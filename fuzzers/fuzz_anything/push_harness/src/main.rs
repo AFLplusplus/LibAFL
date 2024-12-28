@@ -29,7 +29,6 @@ fn signals_set(idx: usize) {
 }
 
 /// This generates the input, using klo-routines.
-#[allow(clippy::similar_names)]
 fn input_generator() {
     // The closure that produced the input for the generator
     let mut harness = |input: &BytesInput| {
@@ -39,10 +38,11 @@ fn input_generator() {
         ExitKind::Ok
     };
 
-    let signals_ptr = unsafe { &raw mut SIGNALS };
+    let signals_ptr = &raw mut SIGNALS;
     let signals_len = unsafe { *signals_ptr }.len();
 
     // Create an observation channel using the signals map
+
     let observer =
         unsafe { StdMapObserver::from_mut_ptr("signals", &raw mut SIGNALS as _, signals_len) };
 
@@ -111,7 +111,7 @@ fn input_generator() {
 
 /// the main function loops independently of the fuzzer.
 /// `Klo` internally switches between the `LibAFL` and harness coroutines to generate the inputs.
-#[allow(clippy::manual_assert)]
+#[expect(clippy::manual_assert)]
 pub fn main() {
     // Set up the Klo-routines harness
     let mut input_generator = input_generator;

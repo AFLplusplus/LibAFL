@@ -28,7 +28,7 @@ command = "cargo"
 args = [
   "build",
   "-p",
-  "demo",
+  "gdb_demo",
   "--profile",
   "${PROFILE}",
   "--target",
@@ -38,7 +38,7 @@ args = [
 [tasks.run_demo]
 dependencies = ["demo"]
 command = "cargo"
-args = ["run", "-p", "demo", "--target", "powerpc-unknown-linux-gnu"]
+args = ["run", "-p", "gdb_demo", "--target", "powerpc-unknown-linux-gnu"]
 
 [tasks.build]
 dependencies = ["format", "clippy"]
@@ -65,7 +65,7 @@ args = [
   "/usr/powerpc-linux-gnu",
   "-g",
   "1234",
-  "${DEMO_DIR}/demo",
+  "${DEMO_DIR}/gdb_demo",
 ]
 
 [tasks.gdb]
@@ -79,9 +79,9 @@ args = [
   "-ex",
   "set confirm off",
   "-ex",
-  "file ${DEMO_DIR}/demo",
+  "file ${DEMO_DIR}/gdb_demo",
   "-ex",
-  "target remote | ${TARGET_DIR}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 ${DEMO_DIR}/demo",
+  "target remote | ${TARGET_DIR}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 ${DEMO_DIR}/gdb_demo",
 ]
 
 [tasks.all]

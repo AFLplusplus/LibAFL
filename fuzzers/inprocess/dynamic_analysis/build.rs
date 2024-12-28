@@ -7,7 +7,7 @@ fn main() {
         println!("cargo:warning=Downloading Little-CMS");
         // Clone the Little-CMS repository if the directory doesn't exist
         let status = Command::new("git")
-            .args(&[
+            .args([
                 "clone",
                 "https://github.com/mm2/Little-CMS",
                 lcms_dir.to_str().unwrap(),
@@ -15,9 +15,7 @@ fn main() {
             .status()
             .expect("Failed to clone Little-CMS repository");
 
-        if !status.success() {
-            panic!("Failed to clone Little-CMS repository");
-        }
+        assert!(status.success(), "Failed to clone Little-CMS repository");
     }
 
     // Tell Cargo that if the given file changes, to rerun this build script

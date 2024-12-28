@@ -1,5 +1,3 @@
-#![allow(clippy::used_underscore_items)]
-
 //! The allocator hooks for address sanitizer.
 use std::ffi::c_void;
 
@@ -22,7 +20,7 @@ extern "system" {
 extern "system" {
     fn memset(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
 }
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
+#[expect(clippy::not_unsafe_ptr_arg_deref)]
 impl AsanRuntime {
     #[inline]
     #[allow(non_snake_case)]
@@ -65,7 +63,7 @@ impl AsanRuntime {
         )
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_CreateFileMappingW(
         &mut self,
@@ -95,7 +93,7 @@ impl AsanRuntime {
         )
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LdrLoadDll(
         &mut self,
@@ -118,7 +116,7 @@ impl AsanRuntime {
         result
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LdrpCallInitRoutine(
         &mut self,
@@ -140,7 +138,7 @@ impl AsanRuntime {
         0
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LoadLibraryExW(
         &mut self,
@@ -157,7 +155,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_RtlCreateHeap(
         &mut self,
@@ -179,7 +177,7 @@ impl AsanRuntime {
         0xc0debeef as *mut c_void
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_RtlDestroyHeap(
         &mut self,
@@ -190,7 +188,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_HeapAlloc(
         &mut self,
@@ -213,7 +211,7 @@ impl AsanRuntime {
         ret
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_RtlAllocateHeap(
         &mut self,
@@ -236,7 +234,7 @@ impl AsanRuntime {
         ret
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_HeapReAlloc(
         &mut self,
@@ -280,7 +278,7 @@ impl AsanRuntime {
         ret
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_RtlReAllocateHeap(
         &mut self,
@@ -325,7 +323,7 @@ impl AsanRuntime {
         ret
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_RtlFreeHeap(
         &mut self,
@@ -336,7 +334,7 @@ impl AsanRuntime {
         self.allocator_mut().is_managed(ptr)
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_RtlFreeHeap(
         &mut self,
@@ -349,7 +347,7 @@ impl AsanRuntime {
         0
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_HeapFree(
         &mut self,
@@ -360,7 +358,7 @@ impl AsanRuntime {
         self.allocator_mut().is_managed(ptr)
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_HeapFree(
         &mut self,
@@ -373,7 +371,7 @@ impl AsanRuntime {
         true
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_HeapSize(
         &mut self,
@@ -384,7 +382,7 @@ impl AsanRuntime {
         self.allocator_mut().is_managed(ptr)
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_HeapSize(
         &mut self,
@@ -396,7 +394,7 @@ impl AsanRuntime {
         self.allocator().get_usable_size(ptr)
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_RtlSizeHeap(
         &mut self,
@@ -407,7 +405,7 @@ impl AsanRuntime {
         self.allocator_mut().is_managed(ptr)
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_RtlSizeHeap(
         &mut self,
@@ -419,7 +417,7 @@ impl AsanRuntime {
         self.allocator().get_usable_size(ptr)
     }
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_RtlValidateHeap(
         &mut self,
@@ -430,7 +428,7 @@ impl AsanRuntime {
         self.allocator_mut().is_managed(ptr)
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_RtlValidateHeap(
         &mut self,
@@ -442,7 +440,7 @@ impl AsanRuntime {
         true
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalAlloc(
         &mut self,
@@ -459,7 +457,7 @@ impl AsanRuntime {
         }
         ret
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalReAlloc(
         &mut self,
@@ -479,14 +477,14 @@ impl AsanRuntime {
             ret
         }
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalFree(&mut self, mem: *mut c_void) -> bool {
         let res = self.allocator_mut().is_managed(mem);
         res
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalFree(
         &mut self,
@@ -497,12 +495,12 @@ impl AsanRuntime {
         mem
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalHandle(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalHandle(
         &mut self,
@@ -511,13 +509,13 @@ impl AsanRuntime {
     ) -> *mut c_void {
         mem
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalLock(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalLock(
         &mut self,
@@ -526,12 +524,12 @@ impl AsanRuntime {
     ) -> *mut c_void {
         mem
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalUnlock(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalUnlock(
         &mut self,
@@ -540,12 +538,12 @@ impl AsanRuntime {
     ) -> bool {
         false
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalSize(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalSize(
         &mut self,
@@ -554,12 +552,12 @@ impl AsanRuntime {
     ) -> usize {
         self.allocator_mut().get_usable_size(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_LocalFlags(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_LocalFlags(
         &mut self,
@@ -569,7 +567,7 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalAlloc(
         &mut self,
@@ -589,7 +587,7 @@ impl AsanRuntime {
         }
         ret
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalReAlloc(
         &mut self,
@@ -609,12 +607,12 @@ impl AsanRuntime {
             ret
         }
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalFree(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalFree(
         &mut self,
@@ -625,12 +623,12 @@ impl AsanRuntime {
         mem
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalHandle(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalHandle(
         &mut self,
@@ -639,13 +637,13 @@ impl AsanRuntime {
     ) -> *mut c_void {
         mem
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalLock(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalLock(
         &mut self,
@@ -654,12 +652,12 @@ impl AsanRuntime {
     ) -> *mut c_void {
         mem
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalUnlock(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalUnlock(
         &mut self,
@@ -668,12 +666,12 @@ impl AsanRuntime {
     ) -> bool {
         false
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalSize(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalSize(
         &mut self,
@@ -682,12 +680,12 @@ impl AsanRuntime {
     ) -> usize {
         self.allocator_mut().get_usable_size(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_check_GlobalFlags(&mut self, mem: *mut c_void) -> bool {
         self.allocator_mut().is_managed(mem)
     }
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_GlobalFlags(
         &mut self,
@@ -715,7 +713,7 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__Znam(
         &mut self,
@@ -725,7 +723,7 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__ZnamRKSt9nothrow_t(
         &mut self,
@@ -736,7 +734,7 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__ZnamSt11align_val_t(
         &mut self,
@@ -747,7 +745,7 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, alignment) }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__ZnamSt11align_val_tRKSt9nothrow_t(
         &mut self,
@@ -763,7 +761,9 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, alignment) }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
+    #[allow(unknown_lints)] // the compiler is contradicting itself
+    #[expect(clippy::used_underscore_items)]
     #[inline]
     pub fn hook__Znwm(
         &mut self,
@@ -785,7 +785,7 @@ impl AsanRuntime {
         }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__ZnwmRKSt9nothrow_t(
         &mut self,
@@ -796,7 +796,9 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, 8) }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
+    #[allow(unknown_lints)] // the compiler is contradicting itself
+    #[expect(clippy::used_underscore_items)]
     #[inline]
     pub fn hook__ZnwmSt11align_val_t(
         &mut self,
@@ -817,7 +819,7 @@ impl AsanRuntime {
         result
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__ZnwmSt11align_val_tRKSt9nothrow_t(
         &mut self,
@@ -833,7 +835,7 @@ impl AsanRuntime {
         unsafe { self.allocator_mut().alloc(size, alignment) }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__o_malloc(
         &mut self,
@@ -859,7 +861,7 @@ impl AsanRuntime {
         ret
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook__o_calloc(
         &mut self,
@@ -877,9 +879,8 @@ impl AsanRuntime {
         ret
     }
 
-    #[allow(non_snake_case)]
     #[inline]
-    #[allow(clippy::cmp_null)]
+    #[expect(clippy::cmp_null)]
     pub fn hook_realloc(
         &mut self,
         _original: extern "C" fn(ptr: *mut c_void, size: usize) -> *mut c_void,
@@ -898,9 +899,9 @@ impl AsanRuntime {
         }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
-    #[allow(clippy::cmp_null)]
+    #[expect(clippy::cmp_null)]
     pub fn hook__o_realloc(
         &mut self,
         _original: extern "C" fn(ptr: *mut c_void, size: usize) -> *mut c_void,
@@ -919,15 +920,15 @@ impl AsanRuntime {
         }
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
     pub fn hook_check__o_free(&mut self, ptr: *mut c_void) -> bool {
         self.allocator_mut().is_managed(ptr)
     }
 
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[inline]
-    #[allow(clippy::cmp_null)]
+    #[expect(clippy::cmp_null)]
     pub fn hook__o_free(
         &mut self,
         _original: extern "C" fn(ptr: *mut c_void) -> usize,
@@ -944,7 +945,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(clippy::cmp_null)]
+    #[expect(clippy::cmp_null)]
     pub fn hook_free(
         &mut self,
         _original: extern "C" fn(ptr: *mut c_void) -> usize,
@@ -992,7 +993,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_MapViewOfFile(
         &mut self,
@@ -1020,8 +1021,8 @@ impl AsanRuntime {
         ret
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdaPv(
         &mut self,
@@ -1034,8 +1035,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdaPvm(
         &mut self,
@@ -1049,8 +1050,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdaPvmSt11align_val_t(
         &mut self,
@@ -1065,8 +1066,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdaPvRKSt9nothrow_t(
         &mut self,
@@ -1080,8 +1081,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdaPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
@@ -1100,8 +1101,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdaPvSt11align_val_t(
         &mut self,
@@ -1115,8 +1116,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdlPv(
         &mut self,
@@ -1129,8 +1130,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdlPvm(
         &mut self,
@@ -1144,8 +1145,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdlPvmSt11align_val_t(
         &mut self,
@@ -1160,8 +1161,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdlPvRKSt9nothrow_t(
         &mut self,
@@ -1175,8 +1176,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdlPvSt11align_val_tRKSt9nothrow_t(
         &mut self,
@@ -1195,8 +1196,8 @@ impl AsanRuntime {
         0
     }
 
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
+    #[expect(non_snake_case)]
+    #[expect(clippy::cmp_null)]
     #[inline]
     pub fn hook__ZdlPvSt11align_val_t(
         &mut self,
@@ -1211,7 +1212,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn hook_mmap(
         &mut self,
         original: extern "C" fn(
@@ -1254,7 +1255,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn hook__write(
         &mut self,
         original: extern "C" fn(fd: i32, buf: *const c_void, count: usize) -> usize,
@@ -1285,7 +1286,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn hook__read(
         &mut self,
         original: extern "C" fn(fd: i32, buf: *mut c_void, count: usize) -> usize,
@@ -1952,7 +1953,7 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(non_snake_case)]
+    #[expect(non_snake_case)]
     pub fn hook__strdup(
         &mut self,
         original: extern "C" fn(s: *const c_char) -> *mut c_char,

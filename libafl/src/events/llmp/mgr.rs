@@ -370,7 +370,7 @@ where
         let msg = TcpRequest::ClientQuit { client_id };
         // Send this mesasge off and we are leaving.
         match send_tcp_msg(&mut stream, &msg) {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(e) => log::error!("Failed to send tcp message {:#?}", e),
         }
         log::debug!("Asking he broker to be disconnected");
@@ -398,7 +398,6 @@ where
     SP: ShMemProvider,
 {
     // Handle arriving events in the client
-    #[allow(clippy::unused_self)]
     fn handle_in_client<E, Z>(
         &mut self,
         fuzzer: &mut Z,

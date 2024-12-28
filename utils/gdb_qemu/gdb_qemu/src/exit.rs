@@ -1,16 +1,14 @@
-use {
-    crate::errno::errno,
-    anyhow::{anyhow, Result},
-    libc::{_exit, prctl, PR_SET_PDEATHSIG},
-    nix::sys::signal::SIGKILL,
-    nix::{
-        sys::{
-            signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, SIGCHLD},
-            wait::{waitpid, WaitStatus::Exited},
-        },
-        unistd::Pid,
+use anyhow::{anyhow, Result};
+use libc::{_exit, prctl, PR_SET_PDEATHSIG};
+use nix::{
+    sys::{
+        signal::{sigaction, SaFlags, SigAction, SigHandler, SigSet, SIGCHLD, SIGKILL},
+        wait::{waitpid, WaitStatus::Exited},
     },
+    unistd::Pid,
 };
+
+use crate::errno::errno;
 
 pub struct Exit;
 

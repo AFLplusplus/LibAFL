@@ -53,14 +53,14 @@ macro_rules! extern_c_checked {
 
     ($visibility:vis static $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
         paste! {
-            #[allow(non_camel_case_types)]
-            #[allow(unused)]
+            #[expect(non_camel_case_types)]
+            #[expect(unused)]
             struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
             #[cfg_attr(nightly, used(linker))]
-            #[allow(unused_unsafe)]
+            #[expect(unused_unsafe)]
             static [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const $c_var } };
         }
 
@@ -73,14 +73,14 @@ macro_rules! extern_c_checked {
 
     ($visibility:vis static mut $c_var:ident : $c_var_ty:ty; $($tail:tt)*) => {
         paste! {
-            #[allow(non_camel_case_types)]
-            #[allow(unused)]
+            #[expect(non_camel_case_types)]
+            #[expect(unused)]
             struct [<__ $c_var:upper _STRUCT__>] { member: *const $c_var_ty }
 
             unsafe impl Sync for [<__ $c_var:upper _STRUCT__>] {}
 
             #[cfg_attr(nightly, used(linker))]
-            #[allow(unused_unsafe)]
+            #[expect(unused_unsafe)]
             static mut [<__ $c_var:upper __>]: [<__ $c_var:upper _STRUCT__>] = unsafe { [<__ $c_var:upper _STRUCT__>] { member: &raw const $c_var } };
         }
 

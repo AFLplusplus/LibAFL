@@ -262,7 +262,7 @@ pub extern "C" fn libafl_main() {
             Ok(())
         };
 
-    let mut main_run_client = secondary_run_client.clone(); // clone it just for borrow checker
+    let mut main_run_client = secondary_run_client; // clone it just for borrow checker
 
     match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)

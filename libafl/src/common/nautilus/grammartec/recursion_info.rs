@@ -53,7 +53,7 @@ impl RecursionInfo {
     // different recursions. Therefore we use the weight of the node to sample the endpoint of a path trough the
     // recursion tree. Then we just sample the length of this path uniformly as `(1.. weight)`. This
     // yields a uniform sample from the whole set of recursions inside the tree. If you read this, Good luck you are on your own.
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn find_parents(
         t: &Tree,
         nt: NTermId,
@@ -82,7 +82,7 @@ impl RecursionInfo {
         res
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn build_sampler(depths: &[usize]) -> Result<LoadedDiceSampler, Error> {
         let mut weights = depths.iter().map(|x| *x as f64).collect::<Vec<_>>();
         let norm: f64 = weights.iter().sum();
