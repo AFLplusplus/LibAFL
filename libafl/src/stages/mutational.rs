@@ -277,7 +277,6 @@ where
                 continue;
             }
 
-            // Time is measured directly in `evaluate_filtered`
             let (untransformed, post) = input.try_transform_into(state)?;
             let (_, corpus_id) =
                 fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
@@ -346,7 +345,6 @@ where
 
         let generated = self.mutator.multi_mutate(state, &input, None)?;
         for new_input in generated {
-            // Time is measured directly in `evaluate_filtered`
             let (untransformed, post) = new_input.try_transform_into(state)?;
             let (_, corpus_id) =
                 fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;

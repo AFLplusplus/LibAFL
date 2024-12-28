@@ -417,7 +417,6 @@ where
                 for (index, new_byte) in mutation {
                     input_copy.bytes_mut()[index] = new_byte;
                 }
-                // Time is measured directly in `evaluate_filtered`
                 fuzzer.evaluate_filtered(state, executor, manager, input_copy)?;
             }
         }

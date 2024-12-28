@@ -453,7 +453,6 @@ where
             return Ok(());
         }
 
-        // Time is measured directly in `evaluate_filtered`
         let (untransformed, post) = input.try_transform_into(state)?;
         let (_, corpus_id) = fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
 
