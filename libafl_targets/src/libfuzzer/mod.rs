@@ -26,8 +26,7 @@ extern "C" {
 ///
 /// # Safety
 /// Calls the libfuzzer-style init function which is native code.
-#[expect(clippy::similar_names)]
-#[expect(clippy::must_use_candidate)] // nobody uses that return code...
+#[expect(clippy::must_use_candidate, clippy::similar_names)] // nobody uses that return code...
 pub unsafe fn libfuzzer_initialize(args: &[String]) -> i32 {
     let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
     let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();

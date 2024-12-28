@@ -1532,8 +1532,7 @@ mod addr2line_legacy {
 /// # Safety
 /// Will access the global [`FullBacktraceCollector`].
 /// Calling this function concurrently might be racey.
-#[expect(clippy::unnecessary_cast)]
-#[expect(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines, clippy::unnecessary_cast)]
 pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &AsanError) {
     let mut regions = HashMap::new();
     for region in qemu.mappings() {

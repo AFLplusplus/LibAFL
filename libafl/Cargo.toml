@@ -58,6 +58,7 @@ std = [
   "serial_test",
   "libafl_bolts/std",
   "typed-builder",
+  "fastbloom",
 ]
 
 ## Tracks the Feedbacks and the Objectives that were interesting for a Testcase
@@ -294,6 +295,7 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 libipt = { workspace = true, optional = true }
+fastbloom = { version = "0.8.0", optional = true }
 
 [lints]
 workspace = true
