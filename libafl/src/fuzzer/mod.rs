@@ -2,7 +2,11 @@
 
 use alloc::{string::ToString, vec::Vec};
 use core::{fmt::Debug, time::Duration};
+#[cfg(feature = "std")]
+use std::hash::Hash;
 
+#[cfg(feature = "std")]
+use fastbloom::BloomFilter;
 use libafl_bolts::{current_time, tuples::MatchName};
 use serde::Serialize;
 
@@ -138,6 +142,16 @@ pub trait EvaluatorObservers<E, EM, I, S> {
 
 /// Evaluate an input modifying the state of the fuzzer
 pub trait Evaluator<E, EM, I, S> {
+    /// Runs the input if it was (likely) not previously run and triggers observers and feedback and adds the input to the previously executed list
+    /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
+    fn evaluate_filtered(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: I,
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
+
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
     fn evaluate_input(
@@ -242,13 +256,14 @@ pub enum ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, OF> {
+pub struct StdFuzzer<CS, F, IF, OF> {
     scheduler: CS,
     feedback: F,
     objective: OF,
+    input_filter: IF,
 }
 
-impl<CS, F, OF, S> HasScheduler<<S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, OF>
+impl<CS, F, IF, OF, S> HasScheduler<<S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, IF, OF>
 where
     S: HasCorpus,
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
@@ -264,7 +279,7 @@ where
     }
 }
 
-impl<CS, F, OF> HasFeedback for StdFuzzer<CS, F, OF> {
+impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
     type Feedback = F;
 
     fn feedback(&self) -> &Self::Feedback {
@@ -276,7 +291,7 @@ impl<CS, F, OF> HasFeedback for StdFuzzer<CS, F, OF> {
     }
 }
 
-impl<CS, F, OF> HasObjective for StdFuzzer<CS, F, OF> {
+impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     type Objective = OF;
 
     fn objective(&self) -> &OF {
@@ -288,8 +303,8 @@ impl<CS, F, OF> HasObjective for StdFuzzer<CS, F, OF> {
     }
 }
 
-impl<CS, EM, F, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
-    for StdFuzzer<CS, F, OF>
+impl<CS, EM, F, IF, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
+    for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     EM: EventFirer<State = S>,
@@ -494,8 +509,8 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
-    for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, IF, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, Self, State = S>,
@@ -532,7 +547,48 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, OF>
+trait InputFilter<I> {
+    fn should_execute(&mut self, input: &I) -> bool;
+}
+
+/// A pseudo-filter that will execute each input.
+#[derive(Debug)]
+pub struct NopInputFilter;
+impl<I> InputFilter<I> for NopInputFilter {
+    #[inline]
+    #[must_use]
+    fn should_execute(&mut self, _input: &I) -> bool {
+        true
+    }
+}
+
+/// A filter that probabilistically prevents duplicate execution of the same input based on a bloom filter.
+#[cfg(feature = "std")]
+#[derive(Debug)]
+pub struct BloomInputFilter {
+    bloom: BloomFilter,
+}
+
+#[cfg(feature = "std")]
+impl BloomInputFilter {
+    #[must_use]
+    fn new(items_count: usize, fp_p: f64) -> Self {
+        let bloom = BloomFilter::with_false_pos(fp_p).expected_items(items_count);
+        Self { bloom }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<I: Hash> InputFilter<I> for BloomInputFilter {
+    #[inline]
+    #[must_use]
+    fn should_execute(&mut self, input: &I) -> bool {
+        !self.bloom.insert(input)
+    }
+}
+
+impl<CS, E, EM, F, IF, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, Self, State = S>,
@@ -549,7 +605,22 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     <S::Corpus as Corpus>::Input: Input,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    IF: InputFilter<<S::Corpus as Corpus>::Input>,
 {
+    fn evaluate_filtered(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+        input: <S::Corpus as Corpus>::Input,
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
+        if self.input_filter.should_execute(&input) {
+            self.evaluate_input(state, executor, manager, input)
+        } else {
+            Ok((ExecuteInputResult::None, None))
+        }
+    }
+
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
     fn evaluate_input_events(
@@ -562,6 +633,7 @@ where
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
+
     fn add_disabled_input(
         &mut self,
         state: &mut S,
@@ -573,6 +645,7 @@ where
         let id = state.corpus_mut().add_disabled(testcase)?;
         Ok(id)
     }
+
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
@@ -672,7 +745,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, OF, S, ST> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, IF, OF, S, ST> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<S::Input, S>,
     E: UsesState<State = S>,
@@ -796,14 +869,41 @@ where
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, OF> {
-    /// Create a new `StdFuzzer` with standard behavior.
-    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
+impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
+    /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
+    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF) -> Self {
         Self {
             scheduler,
             feedback,
             objective,
+            input_filter,
         }
+    }
+}
+
+impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
+    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
+    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
+        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter)
+    }
+}
+
+#[cfg(feature = "std")] // hashing requires std
+impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
+    /// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
+    ///
+    /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
+    ///
+    /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
+    pub fn with_bloom_input_filter(
+        scheduler: CS,
+        feedback: F,
+        objective: OF,
+        items_count: usize,
+        fp_p: f64,
+    ) -> Self {
+        let input_filter = BloomInputFilter::new(items_count, fp_p);
+        Self::with_input_filter(scheduler, feedback, objective, input_filter)
     }
 }
 
@@ -819,8 +919,8 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
-    for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, IF, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+    for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: Executor<EM, Self, State = S> + HasObservers,
@@ -911,5 +1011,65 @@ where
         _iters: u64,
     ) -> Result<CorpusId, Error> {
         unimplemented!("NopFuzzer cannot fuzz");
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use core::cell::RefCell;
+
+    use libafl_bolts::rands::StdRand;
+
+    use super::{Evaluator, StdFuzzer};
+    use crate::{
+        corpus::InMemoryCorpus,
+        events::NopEventManager,
+        executors::{ExitKind, InProcessExecutor},
+        inputs::BytesInput,
+        schedulers::StdScheduler,
+        state::StdState,
+    };
+
+    #[test]
+    fn filtered_execution() {
+        let execution_count = RefCell::new(0);
+        let scheduler = StdScheduler::new();
+        let mut fuzzer = StdFuzzer::with_bloom_input_filter(scheduler, (), (), 100, 1e-4);
+        let mut state = StdState::new(
+            StdRand::new(),
+            InMemoryCorpus::new(),
+            InMemoryCorpus::new(),
+            &mut (),
+            &mut (),
+        )
+        .unwrap();
+        let mut manager = NopEventManager::new();
+        let mut harness = |_input: &BytesInput| {
+            *execution_count.borrow_mut() += 1;
+            ExitKind::Ok
+        };
+        let mut executor =
+            InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut manager)
+                .unwrap();
+        let input = BytesInput::new(vec![1, 2, 3]);
+        assert!(fuzzer
+            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
+            .is_ok());
+        assert_eq!(1, *execution_count.borrow()); // evaluate_input does not add it to the filter
+
+        assert!(fuzzer
+            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
+            .is_ok());
+        assert_eq!(2, *execution_count.borrow()); // at to the filter
+
+        assert!(fuzzer
+            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
+            .is_ok());
+        assert_eq!(2, *execution_count.borrow()); // the harness is not called
+
+        assert!(fuzzer
+            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
+            .is_ok());
+        assert_eq!(3, *execution_count.borrow()); // evaluate_input ignores filters
     }
 }

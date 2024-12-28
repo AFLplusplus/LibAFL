@@ -28,6 +28,11 @@ pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 
+#[cfg(feature = "std")]
+pub mod hash;
+#[cfg(feature = "std")]
+pub use hash::*;
+
 #[cfg(feature = "unicode")]
 pub mod unicode;
 #[cfg(feature = "unicode")]
@@ -84,12 +89,15 @@ impl From<i32> for MutationId {
     }
 }
 
-/// The result of a mutation.
-/// If the mutation got skipped, the target
-/// will not be executed with the returned input.
+/// Result of the mutation.
+///
+/// [`MutationResult::Skipped`] does not necessarily mean that the input changed,
+/// just that the mutator did something. For slow targets, consider using
+/// a filtered fuzzer (see [`crate::fuzzer::StdFuzzer::with_input_filter`])
+/// or wrapping your mutator in a [`hash::MutationChecker`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
-    /// The [`Mutator`] mutated this `Input`.
+    /// The [`Mutator`] executed on this `Input`. It may not guarantee that the input has actually been changed.
     Mutated,
     /// The [`Mutator`] did not mutate this `Input`. It was `Skipped`.
     Skipped,
