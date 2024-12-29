@@ -2669,7 +2669,11 @@ where
                     self.inner
                         .llmp_clients
                         .binary_search_by_key(&client_id, |x| x.id)
-                        .expect("Fatal error, client ID {client_id} not found in llmp_clients.")
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "Fatal error, client ID {client_id:?} not found in llmp_clients."
+                            )
+                        })
                 };
                 let client = &mut self.inner.llmp_clients[pos];
                 match client.recv()? {
@@ -2768,7 +2772,7 @@ where
                         self.inner
                             .llmp_clients
                             .binary_search_by_key(&client_id, |x| x.id)
-                            .expect("Fatal error, client ID {client_id} not found in llmp_clients.")
+                            .unwrap_or_else(|_| panic!("Fatal error, client ID {client_id:?} not found in llmp_clients."))
                     };
 
                     let map = &mut self.inner.llmp_clients[pos].current_recv_shmem;
