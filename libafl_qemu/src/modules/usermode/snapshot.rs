@@ -523,7 +523,17 @@ impl SnapshotModule {
         }
     }
 
-    pub fn change_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn change_brk(&mut self, old_brk: GuestAddr, new_brk: GuestAddr) {
+        if new_brk > old_brk {
+            // The heap is growing. We add a new interval that goes from old_brk to new_brk
+            self.add_mapped(old_brk, (new_brk - old_brk) as usize, Some(MmapPerms::ReadWrite));
+        } else {
+            // The heap is shrinking, we unmap new_brk -> old_brk
+            self.remove_mapped(new_brk, (old_brk - new_brk) as usize);
+        }
+    }
+
+    pub fn change_mapped_perms(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
@@ -851,10 +861,9 @@ where
                  * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
                  * It is safe to assume RW perms here
                  */
-                h.change_mapped(
-                    h.initial_brk,
-                    (result - h.initial_brk) as usize,
-                    Some(MmapPerms::ReadWrite),
+                h.change_brk(
+                    h.brk,
+                    result,
                 );
             }
         }
@@ -892,7 +901,7 @@ where
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-                    h.change_mapped(a0, a1 as usize, Some(prot));
+                    h.change_mapped_perms(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
                 let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
