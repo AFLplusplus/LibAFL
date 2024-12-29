@@ -518,68 +518,56 @@ where
             true
         }
     }
-
-    #[cfg(feature = "llmp_compression")]
     fn fire(
         &mut self,
         _state: &mut Self::State,
         event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
+        #[cfg(feature = "llmp_compression")]
         let flags = LLMP_FLAG_INITIALIZED;
+
         self.event_buffer.clear();
         self.event_buffer.resize(self.event_buffer.capacity(), 0);
 
-        match postcard::to_slice(&event, &mut self.event_buffer) {
-            Ok(written) => {
-                let written_len = written.len();
-                match self
-                    .compressor
-                    .maybe_compress(&self.event_buffer[..written_len])
-                {
-                    Some(comp_buf) => {
-                        self.llmp.send_buf_with_flags(
-                            LLMP_TAG_EVENT_TO_BOTH,
-                            flags | LLMP_FLAG_COMPRESSED,
-                            &comp_buf,
-                        )?;
-                    }
-                    None => {
-                        self.llmp
-                            .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
-                    }
-                }
-                self.last_sent = current_time();
-                Ok(())
-            }
+        // Serialize the event, reallocating event_buffer if needed
+        let written_len = match postcard::to_slice(&event, &mut self.event_buffer) {
+            Ok(written) => written.len(),
             Err(postcard::Error::SerializeBufferFull) => {
-                return Err(Error::serialize("Buffer full"));
+                let serialized = postcard::to_allocvec(&event)?;
+                self.event_buffer = serialized;
+                self.event_buffer.len()
             }
-            Err(e) => Err(Error::from(e)),
-        }
-    }
+            Err(e) => return Err(Error::from(e)),
+        };
 
-    #[cfg(not(feature = "llmp_compression"))]
-    fn fire(
-        &mut self,
-        _state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
-        self.event_buffer.clear();
-        self.event_buffer.resize(self.event_buffer.capacity(), 0);
-
-        match postcard::to_slice(&event, &mut self.event_buffer) {
-            Ok(written) => {
-                let written_len = written.len();
-
-                self.llmp
-                    .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
-
-                self.last_sent = current_time();
-                Ok(())
+        #[cfg(feature = "llmp_compression")]
+        {
+            match self
+                .compressor
+                .maybe_compress(&self.event_buffer[..written_len])
+            {
+                Some(comp_buf) => {
+                    self.llmp.send_buf_with_flags(
+                        LLMP_TAG_EVENT_TO_BOTH,
+                        flags | LLMP_FLAG_COMPRESSED,
+                        &comp_buf,
+                    )?;
+                }
+                None => {
+                    self.llmp
+                        .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
+                }
             }
-            Err(postcard::Error::SerializeBufferFull) => Err(Error::serialize("Buffer full")),
-            Err(e) => Err(Error::from(e)),
         }
+
+        #[cfg(not(feature = "llmp_compression"))]
+        {
+            self.llmp
+                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len]);
+        }
+
+        self.last_sent = current_time();
+        Ok(())
     }
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
     where
