@@ -397,14 +397,14 @@ impl Listener {
 
 /// Get sharedmem from a page
 #[inline]
-#[allow(clippy::cast_ptr_alignment)]
+#[expect(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page_mut<SHM: ShMem>(afl_shmem: &mut SHM) -> *mut LlmpPage {
     afl_shmem.as_mut_ptr() as *mut LlmpPage
 }
 
 /// Get sharedmem from a page
 #[inline]
-#[allow(clippy::cast_ptr_alignment)]
+#[expect(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page<SHM: ShMem>(afl_shmem: &SHM) -> *const LlmpPage {
     afl_shmem.as_ptr() as *const LlmpPage
 }
@@ -591,7 +591,7 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
 /// # Safety
 /// Will dereference the `last_msg` ptr
 #[inline]
-#[allow(clippy::cast_ptr_alignment)]
+#[expect(clippy::cast_ptr_alignment)]
 unsafe fn llmp_next_msg_ptr(last_msg: *const LlmpMsg) -> *mut LlmpMsg {
     /* DBG("llmp_next_msg_ptr %p %lu + %lu\n", last_msg, last_msg->buf_len_padded, sizeof(llmp_message)); */
     (last_msg as *mut u8)
@@ -1411,7 +1411,7 @@ where
          * to consume */
         let out = self.alloc_eop()?;
 
-        #[allow(clippy::cast_ptr_alignment)]
+        #[expect(clippy::cast_ptr_alignment)]
         let end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
         (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
         (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_array();
@@ -1737,7 +1737,7 @@ where
                         size_of::<LlmpPayloadSharedMapInfo>()
                     );
 
-                    #[allow(clippy::cast_ptr_alignment)]
+                    #[expect(clippy::cast_ptr_alignment)]
                     let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
                     /* The pageinfo points to the map we're about to unmap.
@@ -1808,7 +1808,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if available, else None
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
         if let Some((sender, tag, _flags, buf)) = self.recv_buf_with_flags()? {
@@ -1819,7 +1819,7 @@ where
     }
 
     /// Receive the buffer, also reading the LLMP internal message flags
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         // # Safety
@@ -1838,7 +1838,6 @@ where
     }
 
     /// Receive the buffer, also reading the LLMP internal message flags
-    #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf_blocking_with_flags(&mut self) -> Result<(ClientId, Tag, Flags, &[u8]), Error> {
         // # Safety
@@ -1989,7 +1988,7 @@ where
     ///
     /// # Safety
     /// This dereferences msg, make sure to pass a proper pointer to it.
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     pub unsafe fn msg_to_offset(&self, msg: *const LlmpMsg) -> Result<u64, Error> {
         let page = self.page();
         if llmp_msg_in_page(page, msg) {
@@ -2033,7 +2032,7 @@ where
 
     /// Gets this message from this page, at the indicated offset.
     /// Will return [`crate::Error::illegal_argument`] error if the offset is out of bounds.
-    #[allow(clippy::cast_ptr_alignment)]
+    #[expect(clippy::cast_ptr_alignment)]
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         let offset = offset as usize;
 
@@ -2206,7 +2205,6 @@ impl SignalHandler for LlmpShutdownSignalHandler {
 
 #[cfg(all(windows, feature = "std"))]
 impl CtrlHandler for LlmpShutdownSignalHandler {
-    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     fn handle(&mut self, ctrl_type: u32) -> bool {
         log::info!("LLMP: Received shutdown signal, ctrl_type {:?}", ctrl_type);
         unsafe {
@@ -2653,8 +2651,8 @@ where
     /// Returns `true` if new messages were broker-ed
     /// It is supposed that the message is never unmapped.
     #[inline]
-    #[allow(clippy::cast_ptr_alignment)]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::cast_ptr_alignment)]
+    #[expect(clippy::too_many_lines)]
     unsafe fn handle_new_msgs(&mut self, client_id: ClientId) -> Result<bool, Error> {
         let mut new_messages = false;
 
@@ -2671,7 +2669,11 @@ where
                     self.inner
                         .llmp_clients
                         .binary_search_by_key(&client_id, |x| x.id)
-                        .expect("Fatal error, client ID {client_id} not found in llmp_clients.")
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "Fatal error, client ID {client_id:?} not found in llmp_clients."
+                            )
+                        })
                 };
                 let client = &mut self.inner.llmp_clients[pos];
                 match client.recv()? {
@@ -2770,7 +2772,7 @@ where
                         self.inner
                             .llmp_clients
                             .binary_search_by_key(&client_id, |x| x.id)
-                            .expect("Fatal error, client ID {client_id} not found in llmp_clients.")
+                            .unwrap_or_else(|_| panic!("Fatal error, client ID {client_id:?} not found in llmp_clients."))
                     };
 
                     let map = &mut self.inner.llmp_clients[pos].current_recv_shmem;
@@ -3039,7 +3041,7 @@ where
     /// Internal function, returns true when shuttdown is requested by a `SIGINT` signal
     #[inline]
     #[cfg(any(unix, all(windows, feature = "std")))]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
         // # Safety
         // No user-provided potentially unsafe parameters.
@@ -3050,7 +3052,7 @@ where
     /// Always returns true on platforms, where no shutdown signal handlers are supported
     #[inline]
     #[cfg(not(any(unix, all(windows, feature = "std"))))]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
         false
     }
@@ -3086,7 +3088,7 @@ where
     /// Announces a new client on the given shared map.
     /// Called from a background thread, typically.
     /// Upon receiving this message, the broker should map the announced page and start tracking it for new messages.
-    #[allow(dead_code)]
+    #[cfg(feature = "std")]
     fn announce_new_client(
         sender: &mut LlmpSender<SP>,
         shmem_description: &ShMemDescription,
@@ -3096,7 +3098,7 @@ where
                 .alloc_next(size_of::<LlmpPayloadSharedMapInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
-            #[allow(clippy::cast_ptr_alignment)]
+            #[expect(clippy::cast_ptr_alignment)]
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
             (*pageinfo).shm_str = *shmem_description.id.as_array();
             (*pageinfo).map_size = shmem_description.size;
@@ -3114,7 +3116,7 @@ where
                 .alloc_next(size_of::<LlmpClientExitInfo>())
                 .expect("Could not allocate a new message in shared map.");
             (*msg).tag = LLMP_TAG_CLIENT_EXIT;
-            #[allow(clippy::cast_ptr_alignment)]
+            #[expect(clippy::cast_ptr_alignment)]
             let exitinfo = (*msg).buf.as_mut_ptr() as *mut LlmpClientExitInfo;
             (*exitinfo).client_id = client_id;
             sender.send(msg, true)
@@ -3127,7 +3129,7 @@ where
     /// This function returns the [`ShMemDescription`] the client uses to place incoming messages.
     /// The thread exits, when the remote broker disconnects.
     #[cfg(feature = "std")]
-    #[allow(clippy::let_and_return, clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn b2b_thread_on(
         mut stream: TcpStream,
         b2b_client_id: ClientId,
@@ -3470,7 +3472,7 @@ where
     /// Reattach to a vacant client map.
     /// It is essential, that the broker (or someone else) kept a pointer to the `out_shmem`
     /// else reattach will get a new, empty page, from the OS, or fail
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // no longer necessary on nightly
     pub fn on_existing_shmem(
         shmem_provider: SP,
         _current_out_shmem: SP::ShMem,
@@ -3674,7 +3676,7 @@ where
     }
 
     /// Returns the next message, tag, buf, if available, else None
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
         self.receiver.recv_buf()
@@ -3687,13 +3689,12 @@ where
     }
 
     /// Receive a `buf` from the broker, including the `flags` used during transmission.
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn recv_buf_with_flags(&mut self) -> Result<Option<(ClientId, Tag, Flags, &[u8])>, Error> {
         self.receiver.recv_buf_with_flags()
     }
 
     /// Receive a `buf` from the broker, including the `flags` used during transmission.
-    #[allow(clippy::type_complexity)]
     pub fn recv_buf_blocking_with_flags(&mut self) -> Result<(ClientId, Tag, Flags, &[u8]), Error> {
         self.receiver.recv_buf_blocking_with_flags()
     }
@@ -3797,7 +3798,6 @@ mod tests {
     #[serial]
     #[cfg_attr(miri, ignore)]
     fn test_llmp_connection() {
-        #[allow(unused_variables)]
         let shmem_provider = StdShMemProvider::new().unwrap();
         let mut broker = match LlmpConnection::on_port(shmem_provider.clone(), 1337).unwrap() {
             IsClient { client: _ } => panic!("Could not bind to port as broker"),

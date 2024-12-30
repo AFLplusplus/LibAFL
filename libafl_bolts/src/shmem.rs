@@ -626,10 +626,7 @@ where
 pub mod unix_shmem {
     /// Mmap [`ShMem`] for Unix
     #[cfg(not(target_os = "android"))]
-    pub use default::MmapShMem;
-    /// Mmap [`ShMemProvider`] for Unix
-    #[cfg(not(target_os = "android"))]
-    pub use default::MmapShMemProvider;
+    pub use default::{MmapShMem, MmapShMemProvider, MAX_MMAP_FILENAME_LEN};
 
     #[cfg(doc)]
     use crate::shmem::{ShMem, ShMemProvider};
@@ -669,7 +666,8 @@ pub mod unix_shmem {
             Error,
         };
 
-        const MAX_MMAP_FILENAME_LEN: usize = 20;
+        /// The max number of bytes used when generating names for [`MmapShMem`]s.
+        pub const MAX_MMAP_FILENAME_LEN: usize = 20;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
@@ -771,7 +769,7 @@ pub mod unix_shmem {
                 }
             }
 
-            #[allow(clippy::unnecessary_wraps)]
+            #[allow(clippy::unnecessary_wraps)] // cfg dependent
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 // # Safety
                 // No user-provided potentially unsafe parameters.
@@ -1012,7 +1010,7 @@ pub mod unix_shmem {
 
         impl CommonUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
-            #[allow(unused_qualifications)]
+            #[expect(unused_qualifications)]
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
                 const SHM_R: libc::c_int = 0o400;
@@ -1136,7 +1134,7 @@ pub mod unix_shmem {
     }
 
     /// Module containing `ashmem` shared memory support, commonly used on Android.
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(all(any(target_os = "linux", target_os = "android"), feature = "std"))]
     pub mod ashmem {
         use alloc::string::ToString;
         use core::{
@@ -1156,7 +1154,6 @@ pub mod unix_shmem {
         };
 
         /// An ashmem based impl for linux/android
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMem {
             id: ShMemId,
@@ -1164,9 +1161,9 @@ pub mod unix_shmem {
             map_size: usize,
         }
 
+        #[allow(non_camel_case_types)] // expect somehow breaks here
         #[derive(Copy, Clone)]
         #[repr(C)]
-        #[allow(non_camel_case_types)]
         struct ashmem_pin {
             pub offset: c_uint,
             pub len: c_uint,
@@ -1209,7 +1206,7 @@ pub mod unix_shmem {
                     //return Err(Error::unknown("Failed to set the ashmem mapping's name".to_string()));
                     //};
 
-                    #[allow(trivial_numeric_casts)]
+                    #[expect(trivial_numeric_casts)]
                     if ioctl(fd, ASHMEM_SET_SIZE as _, map_size) != 0 {
                         close(fd);
                         return Err(Error::unknown(
@@ -1244,7 +1241,7 @@ pub mod unix_shmem {
             pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
-                    #[allow(trivial_numeric_casts, clippy::cast_sign_loss)]
+                    #[expect(trivial_numeric_casts, clippy::cast_sign_loss)]
                     if ioctl(fd, ASHMEM_GET_SIZE as _) as u32 as usize != map_size {
                         return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
@@ -1275,7 +1272,6 @@ pub mod unix_shmem {
             }
         }
 
-        #[cfg(unix)]
         impl ShMem for AshmemShMem {
             fn id(&self) -> ShMemId {
                 self.id
@@ -1297,15 +1293,14 @@ pub mod unix_shmem {
         }
 
         /// [`Drop`] implementation for [`AshmemShMem`], which cleans up the mapping.
-        #[cfg(unix)]
         impl Drop for AshmemShMem {
-            #[allow(trivial_numeric_casts)]
+            #[expect(trivial_numeric_casts)]
             fn drop(&mut self) {
                 unsafe {
                     let fd: i32 = self.id.to_string().parse().unwrap();
 
-                    #[allow(trivial_numeric_casts)]
-                    #[allow(clippy::cast_sign_loss)]
+                    #[expect(trivial_numeric_casts)]
+                    #[expect(clippy::cast_sign_loss)]
                     let length = ioctl(fd, ASHMEM_GET_SIZE as _) as u32;
 
                     let ap = ashmem_pin {
@@ -1320,13 +1315,11 @@ pub mod unix_shmem {
         }
 
         /// A [`ShMemProvider`] which uses ashmem to provide shared memory mappings.
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMemProvider {}
 
         unsafe impl Send for AshmemShMemProvider {}
 
-        #[cfg(unix)]
         impl Default for AshmemShMemProvider {
             fn default() -> Self {
                 Self::new().unwrap()
@@ -1334,7 +1327,6 @@ pub mod unix_shmem {
         }
 
         /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
-        #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
             type ShMem = AshmemShMem;
 
@@ -1400,7 +1392,7 @@ pub mod unix_shmem {
                     };
                     let fd = fd.into_raw_fd();
 
-                    #[allow(clippy::cast_possible_wrap)]
+                    #[expect(clippy::cast_possible_wrap)]
                     if ftruncate(fd, map_size as i64) == -1 {
                         close(fd);
                         return Err(Error::last_os_error(format!(
@@ -1438,7 +1430,7 @@ pub mod unix_shmem {
                             "Failed to map the memfd mapping".to_string(),
                         ));
                     }
-                    #[allow(clippy::cast_sign_loss)]
+                    #[expect(clippy::cast_sign_loss)]
                     if stat.st_size as usize != map_size {
                         return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
@@ -1490,7 +1482,6 @@ pub mod unix_shmem {
         /// [`Drop`] implementation for [`MemfdShMem`], which cleans up the mapping.
         #[cfg(unix)]
         impl Drop for MemfdShMem {
-            #[allow(trivial_numeric_casts)]
             fn drop(&mut self) {
                 let fd = i32::from(self.id);
 

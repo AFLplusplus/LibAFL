@@ -26,7 +26,6 @@ extern "C" {
 
 }
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();

@@ -25,10 +25,10 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(16).unwrap();
+
     let signals_len = signals.as_slice().len();
     let signals_ptr = signals.as_slice_mut().as_mut_ptr();
 
@@ -64,6 +64,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
+
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", signals_ptr, signals_len) };
     // Create a stacktrace observer to add the observers tuple
 

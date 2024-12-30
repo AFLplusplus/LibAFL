@@ -27,8 +27,6 @@ use serde::{Deserialize, Serialize};
 use super::NopEventManager;
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
-#[cfg(feature = "scalability_introspection")]
-use crate::state::HasScalabilityMonitor;
 use crate::{
     corpus::Corpus,
     events::{
@@ -278,7 +276,7 @@ where
         self.inner.should_send()
     }
 
-    #[allow(clippy::match_same_arms)]
+    #[expect(clippy::match_same_arms)]
     fn fire(
         &mut self,
         state: &mut Self::State,

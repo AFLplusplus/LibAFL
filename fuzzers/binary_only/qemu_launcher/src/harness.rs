@@ -21,12 +21,12 @@ pub const MAX_INPUT_SIZE: usize = 1_048_576; // 1MB
 impl Harness {
     /// Change environment
     #[inline]
-    #[allow(clippy::ptr_arg)]
+    #[expect(clippy::ptr_arg)]
     pub fn edit_env(_env: &mut Vec<(String, String)>) {}
 
     /// Change arguments
     #[inline]
-    #[allow(clippy::ptr_arg)]
+    #[expect(clippy::ptr_arg)]
     pub fn edit_args(_args: &mut Vec<String>) {}
 
     /// Helper function to find the function we want to fuzz.
@@ -80,7 +80,7 @@ impl Harness {
 
     /// If we need to do extra work after forking, we can do that here.
     #[inline]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     pub fn post_fork(&self) {}
 
     pub fn run(&self, input: &BytesInput) -> ExitKind {

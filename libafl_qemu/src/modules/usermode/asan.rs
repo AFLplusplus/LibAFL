@@ -1,5 +1,5 @@
 #![allow(clippy::cast_possible_wrap)]
-
+#![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
 use std::{borrow::Cow, env, fs, path::PathBuf, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
@@ -328,7 +328,7 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     pub fn is_invalid_access(qemu: Qemu, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             if n == 0 {
@@ -380,7 +380,7 @@ impl AsanGiovese {
     }
 
     #[inline]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     pub fn poison(&mut self, qemu: Qemu, addr: GuestAddr, n: usize, poison_byte: i8) -> bool {
         unsafe {
             if n == 0 {
@@ -425,8 +425,8 @@ impl AsanGiovese {
     }
 
     #[inline]
-    #[allow(clippy::must_use_candidate)]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::must_use_candidate)]
+    #[expect(clippy::cast_sign_loss)]
     pub fn unpoison(qemu: Qemu, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             let n = n as isize;
@@ -453,7 +453,7 @@ impl AsanGiovese {
     }
 
     #[inline]
-    #[allow(clippy::mut_from_ref)]
+    #[expect(clippy::mut_from_ref)]
     fn get_shadow_page(qemu: &Qemu, page: GuestAddr) -> &mut [i8] {
         unsafe {
             let h = qemu.g2h::<*const c_void>(page) as isize;
@@ -840,7 +840,6 @@ impl AsanModule {
         self.rt.deallocation(qemu, pc, addr);
     }
 
-    #[allow(clippy::unused_self)]
     #[must_use]
     pub fn is_poisoned(&self, qemu: Qemu, addr: GuestAddr, size: usize) -> bool {
         AsanGiovese::is_invalid_access(qemu, addr, size)
@@ -912,7 +911,6 @@ impl AsanModule {
         self.rt.poison(qemu, addr, size, poison.into());
     }
 
-    #[allow(clippy::unused_self)]
     pub fn unpoison(&mut self, qemu: Qemu, addr: GuestAddr, size: usize) {
         AsanGiovese::unpoison(qemu, addr, size);
     }
@@ -1296,7 +1294,7 @@ pub fn trace_write_n_asan_snapshot<ET, S>(
     h.access(addr, size);
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<ET, S>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
@@ -1534,8 +1532,7 @@ mod addr2line_legacy {
 /// # Safety
 /// Will access the global [`FullBacktraceCollector`].
 /// Calling this function concurrently might be racey.
-#[allow(clippy::unnecessary_cast)]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines, clippy::unnecessary_cast)]
 pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &AsanError) {
     let mut regions = HashMap::new();
     for region in qemu.mappings() {

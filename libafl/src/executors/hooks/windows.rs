@@ -154,7 +154,6 @@ pub mod windows_exception_handler {
     impl ExceptionHandler for InProcessExecutorHandlerData {
         /// # Safety
         /// Will dereference `EXCEPTION_POINTERS` and access `GLOBAL_STATE`.
-        #[allow(clippy::not_unsafe_ptr_arg_deref)]
         unsafe fn handle(
             &mut self,
             _code: ExceptionCode,
@@ -316,7 +315,6 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,

@@ -27,7 +27,7 @@ use crate::{
 // TODO multi mutators stage
 
 /// Action performed after the un-transformed input is executed (e.g., updating metadata)
-#[allow(unused_variables)]
+#[expect(unused_variables)]
 pub trait MutatedTransformPost<S>: Sized {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
@@ -108,7 +108,6 @@ pub struct StdMutationalStage<E, EM, I, M, S, Z> {
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: NonZeroUsize,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
@@ -164,7 +163,6 @@ where
     S::Corpus: Corpus<Input = S::Input>,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -226,9 +224,6 @@ where
     }
 
     /// Creates a new transforming mutational stage with the given max iterations
-    ///
-    /// # Errors
-    /// Will return [`Error::IllegalArgument`] for `max_iterations` of 0.
     #[inline]
     pub fn transforming_with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
         let stage_id = unsafe {
@@ -247,7 +242,6 @@ where
     }
 
     /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,
@@ -283,9 +277,9 @@ where
                 continue;
             }
 
-            // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (_, corpus_id) =
+                fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, corpus_id)?;
@@ -301,7 +295,6 @@ where
 pub struct MultiMutationalStage<E, EM, I, M, S, Z> {
     name: Cow<'static, str>,
     mutator: M,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
@@ -337,8 +330,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::let_and_return)]
-    #[allow(clippy::cast_possible_wrap)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -353,15 +344,13 @@ where
         drop(testcase);
 
         let generated = self.mutator.multi_mutate(state, &input, None)?;
-        // println!("Generated {}", generated.len());
         for new_input in generated {
-            // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = new_input.try_transform_into(state)?;
-            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (_, corpus_id) =
+                fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
             self.mutator.multi_post_exec(state, corpus_id)?;
             post.post_exec(state, corpus_id)?;
         }
-        // println!("Found {}", found);
 
         Ok(())
     }
