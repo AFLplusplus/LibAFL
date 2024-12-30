@@ -45,6 +45,9 @@ use crate::{
     Error, HasMetadata,
 };
 
+/// Default initial capacity of the event buffer - 4KB
+const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
+
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, `llmp`.
 pub struct LlmpEventManager<EMH, S, SP>
@@ -166,7 +169,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             time_ref,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
-            event_buffer: Vec::with_capacity(1024 * 4),
+            event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
 
@@ -201,7 +204,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             time_ref,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
-            event_buffer: Vec::with_capacity(1024 * 4),
+            event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
 
@@ -236,7 +239,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             time_ref,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
-            event_buffer: Vec::with_capacity(1024 * 4),
+            event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
 
@@ -269,7 +272,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             time_ref,
             phantom: PhantomData,
             custom_buf_handlers: vec![],
-            event_buffer: Vec::with_capacity(1024 * 4),
+            event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
 }
@@ -526,7 +529,6 @@ where
         #[cfg(feature = "llmp_compression")]
         let flags = LLMP_FLAG_INITIALIZED;
 
-        self.event_buffer.clear();
         self.event_buffer.resize(self.event_buffer.capacity(), 0);
 
         // Serialize the event, reallocating event_buffer if needed
