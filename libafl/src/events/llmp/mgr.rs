@@ -565,7 +565,7 @@ where
         #[cfg(not(feature = "llmp_compression"))]
         {
             self.llmp
-                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len]);
+                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
         }
 
         self.last_sent = current_time();

@@ -239,9 +239,9 @@ impl FridaInstrumentationHelperBuilder {
         let name = path
             .file_name()
             .and_then(|name| name.to_str())
-            .expect("Failed to get script file name from path: {path:}");
+            .unwrap_or_else(|| panic!("Failed to get script file name from path: {path:}"));
         let script_prefix = include_str!("script.js");
-        let file_contents = read_to_string(path).expect("Failed to read script: {path:}");
+        let file_contents = read_to_string(path).unwrap_or_else(|| panic!("Failed to read script: {path:}"));
         let payload = script_prefix.to_string() + &file_contents;
         let gum = Gum::obtain();
         let backend = match backend {
