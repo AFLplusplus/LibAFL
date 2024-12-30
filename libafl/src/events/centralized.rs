@@ -292,12 +292,11 @@ where
                     is_tc = true;
                     true
                 }
-                Event::UpdateExecStats { .. } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::UpdateExecStats { .. } | Event::Stop => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
 
                 #[cfg(feature = "share_objectives")]
                 Event::Objective { .. } => true,
 
-                Event::Stop => true,
                 _ => false,
             };
 
