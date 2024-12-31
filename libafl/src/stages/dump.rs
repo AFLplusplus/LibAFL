@@ -106,10 +106,7 @@ where
         [
             Some(id.0.to_string()),
             testcase.filename().clone(),
-            testcase
-                .input()
-                .as_ref()
-                .map(|t| t.generate_name(Some(*id))),
+            testcase.input().as_ref().map(|t| t.generate_name()),
         ]
         .iter()
         .flatten()
