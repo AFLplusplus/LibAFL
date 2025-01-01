@@ -1134,7 +1134,7 @@ pub mod unix_shmem {
     }
 
     /// Module containing `ashmem` shared memory support, commonly used on Android.
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(all(any(target_os = "linux", target_os = "android"), feature = "std"))]
     pub mod ashmem {
         use alloc::string::ToString;
         use core::{
@@ -1154,7 +1154,6 @@ pub mod unix_shmem {
         };
 
         /// An ashmem based impl for linux/android
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMem {
             id: ShMemId,
@@ -1273,7 +1272,6 @@ pub mod unix_shmem {
             }
         }
 
-        #[cfg(unix)]
         impl ShMem for AshmemShMem {
             fn id(&self) -> ShMemId {
                 self.id
@@ -1295,7 +1293,6 @@ pub mod unix_shmem {
         }
 
         /// [`Drop`] implementation for [`AshmemShMem`], which cleans up the mapping.
-        #[cfg(unix)]
         impl Drop for AshmemShMem {
             #[expect(trivial_numeric_casts)]
             fn drop(&mut self) {
@@ -1318,13 +1315,11 @@ pub mod unix_shmem {
         }
 
         /// A [`ShMemProvider`] which uses ashmem to provide shared memory mappings.
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMemProvider {}
 
         unsafe impl Send for AshmemShMemProvider {}
 
-        #[cfg(unix)]
         impl Default for AshmemShMemProvider {
             fn default() -> Self {
                 Self::new().unwrap()
@@ -1332,7 +1327,6 @@ pub mod unix_shmem {
         }
 
         /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
-        #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
             type ShMem = AshmemShMem;
 
