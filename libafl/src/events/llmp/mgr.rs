@@ -417,7 +417,7 @@ where
             + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
             + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
     {
-        println!("Got event in client: {} from {:?}", event.name(), client_id);
+        log::debug!("Got event in client: {} from {:?}", event.name(), client_id);
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
         }
