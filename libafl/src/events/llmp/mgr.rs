@@ -417,7 +417,7 @@ where
             + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
             + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
     {
-        println!("Got event in client: {} from {:?}", event.name(), client_id);
+        log::trace!("Got event in client: {} from {client_id:?}", event.name());
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
         }
@@ -571,7 +571,7 @@ where
         #[cfg(not(feature = "llmp_compression"))]
         {
             self.llmp
-                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len]);
+                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
         }
 
         self.last_sent = current_time();
