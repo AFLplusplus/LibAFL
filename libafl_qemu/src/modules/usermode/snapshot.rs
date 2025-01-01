@@ -392,6 +392,18 @@ impl SnapshotModule {
 
             log::debug!("Start restore");
 
+            let new_brk = qemu.get_brk();
+            if new_brk < self.brk {
+                // The heap has shrunk below the snapshotted brk value. We need to remap those pages in the target, the next step will restore their content if needed
+                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as u64)) & (!(SNAPSHOT_PAGE_SIZE - 1) as u64);
+                log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
+                drop(qemu.map_fixed(
+                    aligned_new_brk,
+                    (self.brk - aligned_new_brk) as usize,
+                    MmapPerms::ReadWrite,
+                ));
+            }
+
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
@@ -855,18 +867,8 @@ where
             h.access(a0, a1 as usize);
         }
         SYS_brk => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-            if h.brk != result && result != 0 && result > h.initial_brk {
-                /* brk has changed, and it doesn't shrink below initial_brk. 
-                 * We change the snapshot mapping based on the new (result) and old (h.brk) brk values, then we update the current brk.
-                 * It is safe to assume RW perms here.
-                 */
-                h.change_brk(
-                    h.brk,
-                    result,
-                );
-                h.brk = result;
-            }
+            // We don't handle brk here. It is handled in the reset function only when it's needed.
+            log::debug!("New brk ({:#x?}) received.", result);
         }
         // mmap syscalls
         sys_const => {
