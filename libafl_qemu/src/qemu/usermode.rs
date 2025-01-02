@@ -286,7 +286,7 @@ pub mod pybind {
         a6: u64,
         a7: u64,
     ) -> SyscallHookResult {
-        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+        unsafe { &*(&raw const PY_SYSCALL_HOOK).as_ref() }.map_or_else(
             || SyscallHookResult::new(None),
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
