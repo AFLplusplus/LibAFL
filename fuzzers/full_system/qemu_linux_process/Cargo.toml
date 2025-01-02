@@ -5,7 +5,10 @@ authors = ["Romain Malmain <rmalmain@pm.me>"]
 edition = "2021"
 
 [features]
+
+## Build and run the target with the Nyx API instead of the built-in LibAFL QEMU API.
 nyx = []
+
 shared = ["libafl_qemu/shared"]
 
 [profile.release]

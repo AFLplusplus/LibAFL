@@ -52,6 +52,7 @@ mod generators {
 
     use hashbrown::hash_map::Entry;
     use libafl::{inputs::UsesInput, HasMetadata};
+    use libafl_bolts::hash_64_fast;
     use libafl_qemu_sys::GuestAddr;
 
     use super::{
@@ -59,9 +60,7 @@ mod generators {
         LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
     };
     use crate::{
-        modules::{
-            utils::hash_me, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter,
-        },
+        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
         EmulatorModules,
     };
 
@@ -196,7 +195,7 @@ mod generators {
             let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
             #[expect(clippy::unnecessary_cast)]
-            let id = (hash_me(src as u64) ^ hash_me(dest as u64)) & mask;
+            let id = (hash_64_fast(src as u64) ^ hash_64_fast(dest as u64)) & mask;
 
             if !IS_CONST_MAP {
                 unsafe {
@@ -250,7 +249,7 @@ mod generators {
 
         let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-        let id = hash_me(pc as u64) & mask;
+        let id = hash_64_fast(pc as u64) & mask;
 
         if !IS_CONST_MAP {
             unsafe {
