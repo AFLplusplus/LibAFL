@@ -20,6 +20,7 @@ use crate::{
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
 
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
 pub mod nyx;
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();

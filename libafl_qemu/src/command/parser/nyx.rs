@@ -123,12 +123,11 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let host_config_addr =
-            qemu.read_reg(arch_regs_map[ExitArgs::Arg2]).unwrap() as GuestVirtAddr;
+        let host_config_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
 
         Ok(GetHostConfigCommand::new(QemuMemoryChunk::virt(
             host_config_addr,
-            size_of::<bindings::host_config_t>() as u64,
+            GuestVirtAddr::try_from(size_of::<bindings::host_config_t>()).unwrap(),
             qemu.current_cpu().unwrap(),
         )))
     }
@@ -149,14 +148,12 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let agent_config_addr =
-            qemu.read_reg(arch_regs_map[ExitArgs::Arg2]).unwrap() as GuestVirtAddr;
+        let agent_config_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
 
         let mut agent_config_buf: [u8; size_of::<bindings::agent_config_t>()] =
             [0; size_of::<bindings::agent_config_t>()];
 
-        qemu.read_mem(agent_config_addr, &mut agent_config_buf)
-            .unwrap();
+        qemu.read_mem(agent_config_addr, &mut agent_config_buf)?;
 
         let agent_config: bindings::agent_config_t = unsafe { transmute(agent_config_buf) };
 
@@ -179,11 +176,11 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let str_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2]).unwrap() as GuestVirtAddr;
+        let str_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
 
         let mut msg_chunk: [u8; bindings::HPRINTF_MAX_SIZE as usize] =
             [0; bindings::HPRINTF_MAX_SIZE as usize];
-        qemu.read_mem(str_addr, &mut msg_chunk).unwrap();
+        qemu.read_mem(str_addr, &mut msg_chunk)?;
 
         let cstr = CStr::from_bytes_until_nul(&msg_chunk).unwrap();
 
