@@ -781,8 +781,7 @@ where
     SyscallHookResult::new(None)
 }
 
-#[expect(clippy::too_many_arguments)]
-#[expect(non_upper_case_globals)]
+#[expect(non_upper_case_globals, clippy::too_many_arguments)]
 pub fn trace_mmap_snapshot<ET, S>(
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
