@@ -1,5 +1,5 @@
-[bits 16] ; use 16 bits 
-[org 0x7c00] ; sets the start address
+[bits 16]               ; use 16 bits
+[org 0x7c00]            ; sets the start address
 
 %macro print_string 1   ; %1: Pointer to the string (null-terminated)
     mov si, %1          ; Load the pointer to the string

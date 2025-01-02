@@ -300,6 +300,26 @@ impl From<bool> for VgaPci {
     }
 }
 
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum DefaultDevices {
+    #[strum(serialize = "")]
+    ENABLE,
+    #[strum(serialize = "-nodefaults")]
+    DISABLE,
+}
+
+#[cfg(feature = "systemmode")]
+impl From<bool> for DefaultDevices {
+    fn from(default_devices: bool) -> Self {
+        if default_devices {
+            DefaultDevices::ENABLE
+        } else {
+            DefaultDevices::DISABLE
+        }
+    }
+}
+
 #[cfg(feature = "usermode")]
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -363,6 +383,9 @@ pub struct QemuConfig {
     vga_pci: Option<VgaPci>,
     #[builder(default, setter(strip_option, into))]
     start_cpu: Option<StartCPU>,
+    #[cfg(feature = "systemmode")]
+    #[builder(default, setter(strip_option, into))]
+    default_devices: Option<DefaultDevices>,
     #[cfg(feature = "usermode")]
     #[builder(setter(into))]
     program: Program,

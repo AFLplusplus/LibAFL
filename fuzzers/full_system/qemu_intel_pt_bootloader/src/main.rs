@@ -71,6 +71,7 @@ fn main() {
             .unwrap()])
         .accelerator(Accelerator::Kvm)
         //.snapshot(true) todo: doesnt work
+        .default_devices(false)
         .bios("/home/marco/code/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu/")
         .start_cpu(false);
 

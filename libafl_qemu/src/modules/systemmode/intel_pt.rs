@@ -1,7 +1,6 @@
 use std::{
     fmt::Debug,
     ops::{Range, RangeInclusive},
-    ptr::slice_from_raw_parts_mut,
 };
 
 use libafl::{inputs::UsesInput, observers::ObserversTuple, Error, HasMetadata};
