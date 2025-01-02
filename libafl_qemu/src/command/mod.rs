@@ -32,6 +32,7 @@ use crate::{
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
+pub mod nyx;
 pub mod parser;
 
 mod bindings {

@@ -59,7 +59,9 @@ mod generators {
         LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
     };
     use crate::{
-        modules::{hash_me, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
+        modules::{
+            utils::hash_me, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter,
+        },
         EmulatorModules,
     };
 

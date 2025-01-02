@@ -19,6 +19,7 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
+use libafl::inputs::{HasTargetBytes, UsesInput};
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
@@ -27,12 +28,52 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_qemu::{
-    emu::Emulator,
-    executor::QemuExecutor,
-    modules::{cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule},
-};
+use libafl_qemu::{emu::Emulator, executor::QemuExecutor, modules::{cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule}, FastSnapshotManager, QemuInitError};
+use libafl_qemu::modules::EmulatorModuleTuple;
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+
+#[cfg(feature = "nyx")]
+use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
+
+#[cfg(not(feature = "nyx"))]
+use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
+
+#[cfg(not(feature = "nyx"))]
+use libafl::state::{State, HasExecutions};
+
+#[cfg(feature = "nyx")]
+fn get_emulator<ET, S>(args: Vec<String>, modules: ET) -> Result<Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, FastSnapshotManager>, QemuInitError>
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    <S as UsesInput>::Input: HasTargetBytes,
+{
+    Emulator::empty()
+        .qemu_cli(args)
+        .modules(modules)
+        .driver(
+            NyxEmulatorDriver::builder()
+                .allow_page_on_start(true)
+                .process_only(true)
+                .build(),
+        )
+        .command_manager(NyxCommandManager::default())
+        .snapshot_manager(FastSnapshotManager::default())
+        .build()
+}
+
+#[cfg(not(feature = "nyx"))]
+fn get_emulator<ET, S>(args: Vec<String>, modules: ET) -> Result<Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>, QemuInitError>
+where
+    ET: EmulatorModuleTuple<S>,
+    S: State + HasExecutions + Unpin,
+    <S as UsesInput>::Input: HasTargetBytes,
+{
+    Emulator::builder()
+        .qemu_cli(args)
+        .modules(modules)
+        .build()
+}
 
 pub fn fuzz() {
     env_logger::init();
@@ -69,10 +110,7 @@ pub fn fuzz() {
             CmpLogModule::default(),
         );
 
-        let emu = Emulator::builder()
-            .qemu_cli(args)
-            .modules(modules)
-            .build()?;
+        let emu = get_emulator(args, modules)?;
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =

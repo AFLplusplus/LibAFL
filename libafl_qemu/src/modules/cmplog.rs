@@ -12,12 +12,15 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "systemmode")]
-use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 #[cfg(feature = "usermode")]
 use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
 use crate::{
     emu::EmulatorModules,
-    modules::{hash_me, AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
+    modules::{
+        utils::{filters::StdAddressFilter, hash_me},
+        AddressFilter, EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::Hook,
 };
 

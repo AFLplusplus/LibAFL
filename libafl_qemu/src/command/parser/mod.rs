@@ -20,6 +20,8 @@ use crate::{
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
 
+pub mod nyx;
+
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
 pub trait NativeCommandParser<CM, ED, ET, S, SM>
