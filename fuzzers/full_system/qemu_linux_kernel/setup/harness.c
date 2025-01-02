@@ -141,7 +141,6 @@ static void __exit harness_exit(void) {
 }
 
 static int harness_open(struct inode *inode, struct file *file) {
-  int ret;
   lqprintf("harness: Device open\n");
 
   char *data = kzalloc(BUF_SIZE, GFP_KERNEL);
@@ -149,6 +148,11 @@ static int harness_open(struct inode *inode, struct file *file) {
 
   unsigned long x509_fn_addr = kln_pointer("x509_cert_parse");
   lqprintf("harness: x509 fn addr: 0x%lx\n", x509_fn_addr);
+
+  if (x509_fn_addr == 0) {
+    lqprintf("harness: Error: x509 function not found.\n");
+    return -1;
+  }
 
   // TODO: better filtering...
   libafl_qemu_trace_vaddr_size(x509_fn_addr, 0x1000);
