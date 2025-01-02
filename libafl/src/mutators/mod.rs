@@ -353,7 +353,7 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
     ) -> Result<MutationResult, Error> {
         let mutator = self
             .get_mut(index.0)
-            .ok_or_else(|| Error::key_not_found(format!("Mutator with id {index:?} not found.")))?;
+            .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
         mutator.mutate(state, input)
     }
 
@@ -365,7 +365,7 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
     ) -> Result<(), Error> {
         let mutator = self
             .get_mut(index)
-            .ok_or_else(|| Error::key_not_found(format!("Mutator with id {index:?} not found.")))?;
+            .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
         mutator.post_exec(state, new_corpus_id)
     }
 }

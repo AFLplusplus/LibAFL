@@ -182,13 +182,13 @@ where
             .push(Box::pin((InstructionHookId::invalid(), fat)));
 
         unsafe {
-            let hook_state = &raw mut self
+            let hook_state = &mut self
                 .instruction_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1;
+                .1 as *mut FatPtr;
 
             let id = self.qemu_hooks.add_instruction_hooks(
                 &mut *hook_state,
@@ -656,13 +656,13 @@ where
             self.backdoor_hooks
                 .push(Box::pin((BackdoorHookId::invalid(), fat)));
 
-            let hook_state = &raw mut self
+            let hook_state = &mut self
                 .backdoor_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1;
+                .1 as *mut FatPtr;
 
             let id = self
                 .qemu_hooks
@@ -739,13 +739,13 @@ where
             self.new_thread_hooks
                 .push(Box::pin((NewThreadHookId::invalid(), fat)));
 
-            let hook_state = &raw mut self
+            let hook_state = &mut self
                 .new_thread_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1;
+                .1 as *mut FatPtr;
 
             let id = self
                 .qemu_hooks
@@ -797,13 +797,13 @@ where
             self.pre_syscall_hooks
                 .push(Box::pin((PreSyscallHookId::invalid(), fat)));
 
-            let hook_state = &raw mut self
+            let hook_state = &mut self
                 .pre_syscall_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1;
+                .1 as *mut FatPtr;
 
             let id = self
                 .qemu_hooks
@@ -848,13 +848,13 @@ where
             self.post_syscall_hooks
                 .push(Box::pin((PostSyscallHookId::invalid(), fat)));
 
-            let hooks_state = &raw mut self
+            let hooks_state = &mut self
                 .post_syscall_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1;
+                .1 as *mut FatPtr;
 
             let id = self.qemu_hooks.add_post_syscall_hook(
                 &mut *hooks_state,
