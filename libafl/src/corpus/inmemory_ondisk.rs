@@ -10,10 +10,11 @@ use std::{
     fs,
     fs::{File, OpenOptions},
     io,
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 
+use fs2::FileExt;
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
@@ -379,30 +380,27 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         I: Input,
     {
-        let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
+        let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             testcase.input().as_ref().unwrap().generate_name()
         });
 
-        // New testcase, we need to save it.
-        let mut file_name = file_name_orig.clone();
+        let lockfile_name = format!(".{file_name}.lock");
+        let lockfile_path = self.dir_path.join(lockfile_name);
 
-        let mut ctr = 2;
-        let file_name = if self.locking {
-            loop {
-                let lockfile_name = format!(".{file_name}.lafl_lock");
-                let lockfile_path = self.dir_path.join(lockfile_name);
+        let mut lockfile = try_create_new(&lockfile_path)?.unwrap_or(File::open(lockfile_path)?);
 
-                if try_create_new(lockfile_path)?.is_some() {
-                    break file_name;
-                }
+        lockfile.lock_exclusive()?;
 
-                file_name = format!("{file_name_orig}-{ctr}");
-                ctr += 1;
-            }
-        } else {
-            file_name
+        let mut bfr = [0u8; 4];
+        let ctr = match lockfile.read_exact(&mut bfr) {
+            Ok(_) => u32::from_le_bytes(bfr) + 1,
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 1,
+            Err(e) => return Err(e.into()),
         };
+
+        lockfile.write_all(&ctr.to_le_bytes())?;
+        lockfile.unlock()?;
 
         if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
@@ -410,7 +408,11 @@ impl<I> InMemoryOnDiskCorpus<I> {
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {
-            let metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());
+            let metafile_name = format!(
+                ".{}_{}.metadata",
+                testcase.filename().as_ref().unwrap(),
+                ctr
+            );
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
             tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
@@ -442,12 +444,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
 
-        if let Err(err) = self.store_input_from(testcase) {
-            if self.locking {
-                return Err(err);
-            }
-            log::error!("An error occurred when trying to write a testcase without locking: {err}");
-        }
+        self.store_input_from(testcase)?;
         Ok(())
     }
 
