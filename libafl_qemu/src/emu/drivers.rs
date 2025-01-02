@@ -1,7 +1,7 @@
 //! Emulator Drivers, as the name suggests, drive QEMU execution
 //! They are used to perform specific actions on the emulator before and / or after QEMU runs.
 
-use std::{cell::OnceCell, cmp::min, fmt::Debug, slice::from_raw_parts};
+use std::{cell::OnceCell, cmp::min, fmt::Debug, ptr, slice::from_raw_parts};
 
 use libafl::{
     executors::ExitKind,
@@ -315,7 +315,7 @@ pub struct NyxEmulatorDriver {
     process_only: bool, // adds x86_64 process address space in the address filters of every module.
     #[builder(default = false)]
     print_commands: bool,
-    #[builder(default = 1 * 1024 * 1024)]
+    #[builder(default = (1024 * 1024))]
     max_input_size: usize,
 }
 
@@ -338,7 +338,7 @@ impl NyxEmulatorDriver {
 
         let kafl_payload_buf = unsafe {
             from_raw_parts(
-                &kafl_payload as *const bindings::kAFL_payload as *const u8,
+                ptr::from_ref(&kafl_payload) as *const u8,
                 size_of::<bindings::kAFL_payload>(),
             )
         };
@@ -421,7 +421,7 @@ where
         if emulator.driver.input_location.get().is_some() {
             let qemu = emulator.qemu();
 
-            emulator.driver.write_input(qemu, input).unwrap()
+            emulator.driver.write_input(qemu, input).unwrap();
         }
     }
 

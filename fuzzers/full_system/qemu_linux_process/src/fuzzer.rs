@@ -3,6 +3,8 @@
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
+#[cfg(not(feature = "nyx"))]
+use libafl::state::{HasExecutions, State};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
@@ -10,7 +12,7 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::BytesInput,
+    inputs::{BytesInput, HasTargetBytes, UsesInput},
     monitors::MultiMonitor,
     mutators::{havoc_mutations, I2SRandReplaceBinonly, StdScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
@@ -19,7 +21,6 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
-use libafl::inputs::{HasTargetBytes, UsesInput};
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
@@ -28,21 +29,29 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_qemu::{emu::Emulator, executor::QemuExecutor, modules::{cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule}, FastSnapshotManager, QemuInitError};
-use libafl_qemu::modules::EmulatorModuleTuple;
+#[cfg(feature = "nyx")]
+use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
+#[cfg(not(feature = "nyx"))]
+use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
+use libafl_qemu::{
+    emu::Emulator,
+    executor::QemuExecutor,
+    modules::{
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
+        EmulatorModuleTuple,
+    },
+    FastSnapshotManager, QemuInitError,
+};
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
-use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
-
-#[cfg(not(feature = "nyx"))]
-use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
-
-#[cfg(not(feature = "nyx"))]
-use libafl::state::{State, HasExecutions};
-
-#[cfg(feature = "nyx")]
-fn get_emulator<ET, S>(args: Vec<String>, modules: ET) -> Result<Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, FastSnapshotManager>, QemuInitError>
+fn get_emulator<ET, S>(
+    args: Vec<String>,
+    modules: ET,
+) -> Result<
+    Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, FastSnapshotManager>,
+    QemuInitError,
+>
 where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
@@ -63,16 +72,19 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-fn get_emulator<ET, S>(args: Vec<String>, modules: ET) -> Result<Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>, QemuInitError>
+fn get_emulator<ET, S>(
+    args: Vec<String>,
+    modules: ET,
+) -> Result<
+    Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>,
+    QemuInitError,
+>
 where
     ET: EmulatorModuleTuple<S>,
     S: State + HasExecutions + Unpin,
     <S as UsesInput>::Input: HasTargetBytes,
 {
-    Emulator::builder()
-        .qemu_cli(args)
-        .modules(modules)
-        .build()
+    Emulator::builder().qemu_cli(args).modules(modules).build()
 }
 
 pub fn fuzz() {

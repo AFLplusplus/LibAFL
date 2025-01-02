@@ -38,9 +38,7 @@ LINUX_BUILDER_DIR = { value = "${TARGET_DIR}/linux_builder", condition = { env_n
   "LINUX_BUILDER_DIR",
 ] } }
 LINUX_BUILDER_OUT = "${LINUX_BUILDER_DIR}/output"
-HARNESS_API = { value = "lqemu", condition = { env_not_set = [
-  "HARNESS_API",
-] } }
+HARNESS_API = { value = "lqemu", condition = { env_not_set = ["HARNESS_API"] } }
 
 [tasks.target_dir]
 condition = { files_not_exist = [
@@ -90,10 +88,7 @@ args = [
 ]
 
 [tasks.compile_target]
-dependencies = [
-  "compile_target_native",
-  "compile_target_nyx",
-]
+dependencies = ["compile_target_native", "compile_target_nyx"]
 
 [tasks.target]
 dependencies = ["build", "compile_target"]
@@ -127,7 +122,15 @@ ${LINUX_BUILDER_DIR}/update.sh
 [tasks.build]
 dependencies = ["target_dir"]
 command = "cargo"
-args = ["build", "--profile", "${PROFILE}", "--target-dir", "${TARGET_DIR}", "--features", "${FEATURE}"]
+args = [
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--target-dir",
+  "${TARGET_DIR}",
+  "--features",
+  "${FEATURE}",
+]
 
 [tasks.run]
 dependencies = ["build"]

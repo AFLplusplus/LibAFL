@@ -3,6 +3,7 @@ use std::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::offset_of,
+    ptr,
     slice::from_raw_parts,
 };
 
@@ -209,6 +210,7 @@ pub struct GetPayloadCommand {
 }
 
 impl GetPayloadCommand {
+    #[must_use]
     pub fn new(input_struct_location: GuestVirtAddr) -> Self {
         Self {
             input_struct_location,
@@ -398,6 +400,7 @@ pub struct GetHostConfigCommand {
 }
 
 impl GetHostConfigCommand {
+    #[must_use]
     pub fn new(host_config_location: QemuMemoryChunk) -> Self {
         Self {
             host_config_location,
@@ -433,7 +436,7 @@ where
 
         let host_config_buf = unsafe {
             from_raw_parts(
-                &host_config as *const bindings::host_config_t as *const u8,
+                ptr::from_ref(&host_config) as *const u8,
                 size_of::<bindings::host_config_t>(),
             )
         };
@@ -454,6 +457,7 @@ pub struct PrintfCommand {
 }
 
 impl PrintfCommand {
+    #[must_use]
     pub fn new(content: String) -> Self {
         Self { content }
     }
@@ -486,6 +490,7 @@ pub struct SetAgentConfigCommand {
 }
 
 impl SetAgentConfigCommand {
+    #[must_use]
     pub fn new(agent_config: bindings::agent_config_t) -> Self {
         Self { agent_config }
     }

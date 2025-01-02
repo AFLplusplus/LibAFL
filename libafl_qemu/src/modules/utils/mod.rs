@@ -1,7 +1,7 @@
 pub mod filters;
 
 /// Fast hash function for 64 bits integers minimizing collisions.
-/// Adapted from https://xorshift.di.unimi.it/splitmix64.c
+/// Adapted from <https://xorshift.di.unimi.it/splitmix64.c>
 #[must_use]
 pub fn hash_me(mut x: u64) -> u64 {
     x = (x ^ (x.overflowing_shr(30).0))

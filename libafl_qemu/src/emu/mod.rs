@@ -200,10 +200,12 @@ impl InputLocation {
         }
     }
 
+    #[must_use]
     pub fn mem_chunk(&self) -> &QemuMemoryChunk {
         &self.mem_chunk
     }
 
+    #[must_use]
     pub fn ret_register(&self) -> &Option<Regs> {
         &self.ret_register
     }

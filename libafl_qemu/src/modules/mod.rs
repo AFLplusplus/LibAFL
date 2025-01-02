@@ -2,7 +2,9 @@ use core::{fmt::Debug, ops::Range};
 
 use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
-use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
+use libafl_qemu_sys::GuestAddr;
+#[cfg(feature = "systemmode")]
+use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{emu::EmulatorModules, EmulatorHooks, Qemu};
 
