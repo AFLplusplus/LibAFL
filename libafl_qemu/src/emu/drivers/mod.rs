@@ -18,7 +18,9 @@ use crate::{
     QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError, SnapshotManagerError,
 };
 
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
 pub mod nyx;
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
 pub use nyx::{NyxEmulatorDriver, NyxEmulatorDriverBuilder};
 
 #[derive(Debug, Clone)]
