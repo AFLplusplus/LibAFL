@@ -153,7 +153,7 @@ use object::{Object, ObjectSection};
 
 use crate::{
     emu::EmulatorModules,
-    modules::{AddressFilter, StdAddressFilter},
+    modules::{utils::filters::StdAddressFilter, AddressFilter},
     qemu::{Hook, QemuHooks, SyscallHookResult},
 };
 

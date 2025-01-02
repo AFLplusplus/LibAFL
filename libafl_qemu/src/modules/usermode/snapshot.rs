@@ -24,8 +24,9 @@ use crate::SYS_newfstatat;
 use crate::{
     emu::EmulatorModules,
     modules::{
-        asan::AsanModule, EmulatorModule, EmulatorModuleTuple, NopAddressFilter, Range,
-        NOP_ADDRESS_FILTER,
+        asan::AsanModule,
+        utils::filters::{NopAddressFilter, NOP_ADDRESS_FILTER},
+        EmulatorModule, EmulatorModuleTuple, Range,
     },
     qemu::{Hook, SyscallHookResult},
     Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,

@@ -11,11 +11,12 @@ use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
 #[cfg(feature = "systemmode")]
-use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     capstone,
     modules::{
-        AddressFilter, EmulatorModule, EmulatorModuleTuple, EmulatorModules, StdAddressFilter,
+        utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        EmulatorModules,
     },
     qemu::{ArchExtras, Hook},
     Qemu,

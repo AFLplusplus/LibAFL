@@ -41,7 +41,7 @@ use bitbybit::bitfield;
 use caps::{CapSet, Capability};
 #[cfg(target_os = "linux")]
 use libafl_bolts::ownedref::OwnedRefMut;
-use libafl_bolts::Error;
+use libafl_bolts::{hash_64_fast, Error};
 use libipt::PtError;
 #[cfg(target_os = "linux")]
 use libipt::{
@@ -407,7 +407,7 @@ impl IntelPT {
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
 
                     if b.ninsn() > 0 && skip < offset {
-                        let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
+                        let id = hash_64_fast(*previous_block_end_ip) ^ hash_64_fast(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
                         *map_loc = (*map_loc).saturating_add(&1u8.into());
@@ -959,21 +959,6 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
 #[inline]
 const fn next_page_aligned_addr(address: u64) -> u64 {
     (address + PAGE_SIZE as u64 - 1) & !(PAGE_SIZE as u64 - 1)
-}
-
-// copy pasted from libafl_qemu/src/modules/edges.rs
-// adapted from https://xorshift.di.unimi.it/splitmix64.c
-#[cfg(target_os = "linux")]
-#[inline]
-#[must_use]
-const fn hash_me(mut x: u64) -> u64 {
-    x = (x ^ (x.overflowing_shr(30).0))
-        .overflowing_mul(0xbf58476d1ce4e5b9)
-        .0;
-    x = (x ^ (x.overflowing_shr(27).0))
-        .overflowing_mul(0x94d049bb133111eb)
-        .0;
-    x ^ (x.overflowing_shr(31).0)
 }
 
 #[cfg(target_os = "linux")]

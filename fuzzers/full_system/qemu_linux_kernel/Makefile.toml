@@ -100,20 +100,23 @@ else
   LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu
 fi
 
-${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel \
+cp ${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd ${LINUX_BUILDER_OUT}/OVMF_CODE.fd.clone
+cp ${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd ${LINUX_BUILDER_OUT}/OVMF_VARS.fd.clone
+cp ${LINUX_BUILDER_OUT}/linux.qcow2 ${LINUX_BUILDER_OUT}/linux.qcow2.clone
+
+${TARGET_DIR}/${PROFILE_DIR}/qemu_linux_kernel \
   -accel tcg \
   -m 4G \
-  -drive if=pflash,format=raw,readonly=on,file="${LINUX_BUILDER_OUT}/OVMF_CODE.fd" \
-  -drive if=pflash,format=raw,snapshot=off,file="${LINUX_BUILDER_OUT}/OVMF_VARS.fd" \
-  -blockdev filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage,driver=file \
-  -blockdev driver=qcow2,file=storage,node-name=disk \
-  -device virtio-scsi-pci,id=scsi0 \
+  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd" `# OVMF code pflash` \
+  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd" `# OVMF vars pflash` \
+  -device virtio-scsi-pci,id=scsi0 `# SCSI bus` \
   -device scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1 \
+  -blockdev driver=file,filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage `# Backend file of "disk"` \
+  -blockdev driver=qcow2,file=storage,node-name=disk `# QCOW2 "disk"` \
   -L "${LIBAFL_QEMU_BIOS_DIR}" \
   -nographic \
   -monitor null \
-  -serial null \
-  -snapshot
+  -serial null
 '''
 
 [tasks.debug]

@@ -31,6 +31,9 @@ default = [
   "injections",
 ]
 document-features = ["dep:document-features"]
+
+qemu_sanitizers = ["libafl_qemu_sys/qemu_sanitizers"]
+
 paranoid_debug = [
   "libafl_qemu_sys/paranoid_debug",
 ] # Will perform as many checks as possible. The target will be greatly slowed down.

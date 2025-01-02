@@ -23,7 +23,10 @@ use crate::SYS_execve;
 use crate::{
     elf::EasyElf,
     emu::EmulatorModules,
-    modules::{EmulatorModule, EmulatorModuleTuple, NopAddressFilter, NOP_ADDRESS_FILTER},
+    modules::{
+        utils::filters::{NopAddressFilter, NOP_ADDRESS_FILTER},
+        EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::{ArchExtras, Hook, SyscallHookResult},
     CallingConvention, Qemu,
 };

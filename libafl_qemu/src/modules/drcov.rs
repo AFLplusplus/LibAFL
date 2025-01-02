@@ -8,10 +8,12 @@ use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "systemmode")]
-use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     emu::EmulatorModules,
-    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, NopAddressFilter},
+    modules::{
+        utils::filters::NopAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::Hook,
 };
 

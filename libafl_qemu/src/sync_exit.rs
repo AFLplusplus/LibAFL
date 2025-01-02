@@ -17,7 +17,7 @@ pub enum ExitArgs {
     Arg6,
 }
 
-pub struct SyncExit<CM, ED, ET, S, SM>
+pub struct CustomInsn<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
@@ -25,7 +25,7 @@ where
     command: CM::Commands,
 }
 
-impl<CM, ED, ET, S, SM> Clone for SyncExit<CM, ED, ET, S, SM>
+impl<CM, ED, ET, S, SM> Clone for CustomInsn<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<CM, ED, ET, S, SM> Debug for SyncExit<CM, ED, ET, S, SM>
+impl<CM, ED, ET, S, SM> Debug for CustomInsn<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<CM, ED, ET, S, SM> SyncExit<CM, ED, ET, S, SM>
+impl<CM, ED, ET, S, SM> CustomInsn<CM, ED, ET, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput,

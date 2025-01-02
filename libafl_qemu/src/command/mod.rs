@@ -32,6 +32,8 @@ use crate::{
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+pub mod nyx;
 pub mod parser;
 
 mod bindings {

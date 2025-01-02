@@ -48,11 +48,17 @@ pub use hooks::*;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum QemuError {
     Init(QemuInitError),
     Exit(QemuExitError),
     RW(QemuRWError),
+}
+
+impl From<QemuRWError> for QemuError {
+    fn from(qemu_rw_error: QemuRWError) -> Self {
+        QemuError::RW(qemu_rw_error)
+    }
 }
 
 impl From<QemuError> for libafl::Error {
@@ -67,7 +73,7 @@ impl From<QemuError> for String {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum QemuInitError {
     MultipleInstances,
     EmptyArgs,
@@ -719,7 +725,7 @@ impl Qemu {
                     let bp_addr = exit_reason.data.breakpoint.addr;
                     QemuExitReason::Breakpoint(bp_addr)
                 },
-                libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
+                libafl_qemu_sys::libafl_exit_reason_kind_CUSTOM_INSN => QemuExitReason::SyncExit,
 
                 #[cfg(feature = "systemmode")]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
