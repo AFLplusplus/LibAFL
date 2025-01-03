@@ -1,4 +1,6 @@
-use std::{string::String, vec::Vec};
+#![allow(clippy::useless_conversion)] // This seems to be a false-positive(?)
+
+use std::{ffi::CString, string::String, vec::Vec};
 
 use pyo3::{prelude::*, pyclass, types::IntoPyDict};
 
@@ -48,8 +50,8 @@ impl PyContext {
 
 fn loader(py: Python, grammar: &str) -> PyResult<Context> {
     let py_ctx = Bound::new(py, PyContext::new())?;
-    let locals = [("ctx", &py_ctx)].into_py_dict_bound(py);
-    py.run_bound(grammar, None, Some(&locals))?;
+    let locals = [("ctx", &py_ctx)].into_py_dict(py)?;
+    py.run(&CString::new(grammar)?, None, Some(&locals))?;
     Ok(py_ctx.borrow().get_context())
 }
 
