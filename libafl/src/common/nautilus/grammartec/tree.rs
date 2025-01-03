@@ -85,13 +85,13 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
             .into_iter()
             .map(io::Cursor::into_inner)
             .collect::<Vec<_>>();
-        let byte_arrays = bufs.iter().map(|b| PyBytes::new_bound(py, b));
-        let res = expr.call1(py, PyTuple::new_bound(py, byte_arrays))?;
+        let byte_arrays = bufs.iter().map(|b| PyBytes::new(py, b));
+        let res = expr.call1(py, PyTuple::new(py, byte_arrays)?)?;
         let bound = res.bind(py);
-        if PyString::is_type_of_bound(bound) {
+        if PyString::is_type_of(bound) {
             let pystr = bound.downcast::<PyString>()?;
             self.write(pystr.to_string_lossy().as_bytes());
-        } else if PyBytes::is_type_of_bound(bound) {
+        } else if PyBytes::is_type_of(bound) {
             let pybytes = bound.downcast::<PyBytes>()?;
             self.write(pybytes.as_bytes());
         } else {
