@@ -385,22 +385,26 @@ impl<I> InMemoryOnDiskCorpus<I> {
             testcase.input().as_ref().unwrap().generate_name()
         });
 
-        let lockfile_name = format!(".{file_name}.lock");
-        let lockfile_path = self.dir_path.join(lockfile_name);
+        let mut ctr = 1;
+        if self.locking {
+            let lockfile_name = format!(".{file_name}.lock");
+            let lockfile_path = self.dir_path.join(lockfile_name);
 
-        let mut lockfile = try_create_new(&lockfile_path)?.unwrap_or(File::open(lockfile_path)?);
+            let mut lockfile =
+                try_create_new(&lockfile_path)?.unwrap_or(File::open(lockfile_path)?);
 
-        lockfile.lock_exclusive()?;
+            lockfile.lock_exclusive()?;
 
-        let mut bfr = [0u8; 4];
-        let ctr = match lockfile.read_exact(&mut bfr) {
-            Ok(_) => u32::from_le_bytes(bfr) + 1,
-            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 1,
-            Err(e) => return Err(e.into()),
-        };
+            let mut bfr = [0u8; 4];
+            ctr = match lockfile.read_exact(&mut bfr) {
+                Ok(_) => u32::from_le_bytes(bfr) + 1,
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 1,
+                Err(e) => return Err(e.into()),
+            };
 
-        lockfile.write_all(&ctr.to_le_bytes())?;
-        lockfile.unlock()?;
+            lockfile.write_all(&ctr.to_le_bytes())?;
+            lockfile.unlock()?;
+        }
 
         if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
@@ -408,11 +412,16 @@ impl<I> InMemoryOnDiskCorpus<I> {
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {
-            let metafile_name = format!(
-                ".{}_{}.metadata",
-                testcase.filename().as_ref().unwrap(),
-                ctr
-            );
+            let metafile_name;
+            if self.locking {
+                metafile_name = format!(
+                    ".{}_{}.metadata",
+                    testcase.filename().as_ref().unwrap(),
+                    ctr
+                );
+            } else {
+                metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());
+            }
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
             tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
