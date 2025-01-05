@@ -394,8 +394,10 @@ impl SnapshotModule {
 
             let new_brk = qemu.get_brk();
             if new_brk < self.brk {
-                // The heap has shrunk below the snapshotted brk value. We need to remap those pages in the target, the next step will restore their content if needed
-                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as u64)) & (!(SNAPSHOT_PAGE_SIZE - 1) as u64);
+                // The heap has shrunk below the snapshotted brk value. We need to remap those pages in the target.
+                // The next for loop will restore their content if needed.
+                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as u64))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as u64);
                 log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
                 drop(qemu.map_fixed(
                     aligned_new_brk,
@@ -535,17 +537,12 @@ impl SnapshotModule {
         }
     }
 
-    pub fn change_brk(&mut self, old_brk: GuestAddr, new_brk: GuestAddr) {
-        if new_brk > old_brk {
-            // The heap is growing. We add a new interval that goes from old_brk to new_brk
-            self.add_mapped(old_brk, (new_brk - old_brk) as usize, Some(MmapPerms::ReadWrite));
-        } else {
-            // The heap is shrinking, we unmap new_brk -> old_brk
-            self.remove_mapped(new_brk, (old_brk - new_brk) as usize);
-        }
-    }
-
-    pub fn change_mapped_perms(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn change_mapped_perms(
+        &mut self,
+        start: GuestAddr,
+        mut size: usize,
+        perms: Option<MmapPerms>,
+    ) {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
