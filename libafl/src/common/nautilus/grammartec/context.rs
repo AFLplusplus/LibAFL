@@ -357,6 +357,8 @@ mod tests {
         tree::{Tree, TreeLike},
     };
 
+    // Some (but not all) versions of clippy think the from_nt things are format strings.
+    #[allow(clippy::literal_string_with_formatting_args)]
     #[test]
     fn simple_context() {
         let mut ctx = Context::new();
