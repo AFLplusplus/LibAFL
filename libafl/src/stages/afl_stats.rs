@@ -1,4 +1,8 @@
 //! Stage to compute and report AFL++ stats
+use crate::events::Event;
+use crate::monitors::UserStats;
+use crate::monitors::{AggregatorOps, UserStatsValue};
+use crate::state::UsesState;
 use alloc::{string::String, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use std::{
@@ -238,7 +242,7 @@ pub struct AFLPlotData<'a> {
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer,
+    EM: EventFirer + UsesState<State = S>,
     Z: HasScheduler<<S::Corpus as Corpus>::Input, S>,
     S: HasImported
         + HasCorpus
@@ -267,7 +271,24 @@ where
                 "state is not currently processing a corpus index",
             ));
         };
+        // Clone or copy the required data from `state`
+        let corpus_idx_value = corpus_idx.0; // Extract `usize` value from `CorpusId`
+
+        // Fire the UpdateUserStats event with the corpus index
+        _manager.fire(
+            state,
+            Event::UpdateUserStats {
+                name: Cow::Borrowed("Current Testcase Index"),
+                value: UserStats::new(
+                    UserStatsValue::Number(corpus_idx_value as u64),
+                    AggregatorOps::Sum,
+                ),
+                phantom: PhantomData,
+            },
+        )?;
+
         let testcase = state.corpus().get(corpus_idx)?.borrow();
+        
         // NOTE: scheduled_count represents the amount of fuzz runs a
         // testcase has had. Since this stage is kept at the very end of stage list,
         // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero
