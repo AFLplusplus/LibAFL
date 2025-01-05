@@ -397,7 +397,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
             let mut bfr = [0u8; 4];
             ctr = match lockfile.read_exact(&mut bfr) {
-                Ok(_) => u32::from_le_bytes(bfr) + 1,
+                Ok(()) => u32::from_le_bytes(bfr) + 1,
                 Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 1,
                 Err(e) => return Err(e.into()),
             };
