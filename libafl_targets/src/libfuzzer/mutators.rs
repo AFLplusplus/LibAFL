@@ -351,7 +351,7 @@ where
         }
 
         if new_len > max_len {
-            return Err(Error::illegal_state("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
+            return Err(Error::illegal_state(format!("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
         }
         input.resize(new_len, 0);
         Ok(MutationResult::Mutated)
@@ -449,7 +449,7 @@ where
         }
 
         if new_len > max_len {
-            return Err(Error::illegal_state("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
+            return Err(Error::illegal_state(format!("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
         }
 
         input.resize(new_len, 0);
