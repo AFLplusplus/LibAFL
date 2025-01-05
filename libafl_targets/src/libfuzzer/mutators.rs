@@ -349,6 +349,7 @@ where
         if result.deref().borrow().is_err() {
             return result.replace(Ok(MutationResult::Skipped));
         }
+
         if new_len > max_len {
             return Err(Error::illegal_state("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
         }
