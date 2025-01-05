@@ -323,8 +323,8 @@ where
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
         let len_orig = input.bytes().len();
-        let len_max = state.max_size();
-        input.resize(len_max, 0);
+        let max_len = state.max_size();
+        input.resize(max_len, 0);
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
@@ -337,7 +337,7 @@ where
             libafl_targets_libfuzzer_custom_mutator(
                 input.bytes_mut().as_mut_ptr(),
                 len_orig,
-                len_max,
+                max_len,
                 seed as u32,
             )
         };
@@ -349,7 +349,7 @@ where
         if result.deref().borrow().is_err() {
             return result.replace(Ok(MutationResult::Skipped));
         }
-        if new_len > len_max {
+        if new_len > max_len {
             return Err(Error::illegal_state("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
         }
         input.resize(new_len, 0);
@@ -415,10 +415,10 @@ where
         let seed = state.rand_mut().next();
         let mut out = vec![0u8; state.max_size()];
 
-        let len_max = state.max_size();
+        let max_len = state.max_size();
         let len_orig = input.len();
 
-        input.resize(len_max, 0);
+        input.resize(max_len, 0);
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
@@ -434,7 +434,7 @@ where
                 data2.as_ptr(),
                 data2.len(),
                 out.as_mut_ptr(),
-                len_max,
+                max_len,
                 seed as u32,
             )
         };
@@ -447,7 +447,7 @@ where
             return result.replace(Ok(MutationResult::Skipped));
         }
 
-        if new_len > len_max {
+        if new_len > max_len {
             return Err(Error::illegal_state("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
         }
 
