@@ -59,7 +59,6 @@ where
     S: HasCorpus,
     F: FnMut(&mut S, &mut Testcase<<S::Corpus as Corpus>::Input>, &Path) -> Result<(), Error>,
 {
-    #[allow(clippy::wrong_self_convention)]
     #[inline]
     fn is_interesting(
         &mut self,

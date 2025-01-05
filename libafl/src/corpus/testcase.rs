@@ -358,7 +358,6 @@ where
     }
 
     /// Get the `len` or calculate it, if not yet calculated.
-    #[allow(clippy::len_without_is_empty)]
     pub fn load_len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
         match &self.input {
             Some(i) => {
@@ -389,7 +388,7 @@ impl<I> From<I> for Testcase<I> {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct SchedulerTestcaseMetadata {
     /// Number of bits set in bitmap, updated in `calibrate_case`

@@ -80,7 +80,6 @@ pub enum InputLocation {
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
 /// Use [`CommandExecutor::builder()`] to use this configurator.
-#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible

@@ -76,7 +76,6 @@ pub trait StateInitializer<S> {
 /// indicating the "interestingness" of the last run.
 pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
     /// `is_interesting ` return if an input is worth the addition to the corpus
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,
@@ -91,8 +90,6 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
     /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
     /// It also keeps track of introspection stats.
     #[cfg(feature = "introspection")]
-    #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection(
         &mut self,
         state: &mut S,
@@ -140,7 +137,6 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
     ///
     /// Precondition: `testcase` must contain an input.
     #[inline]
-    #[allow(unused_variables)]
     fn append_metadata(
         &mut self,
         _state: &mut S,
@@ -225,7 +221,6 @@ where
     B: Feedback<EM, I, OT, S>,
     FL: FeedbackLogic,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         state: &mut S,
@@ -252,7 +247,6 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection(
         &mut self,
         state: &mut S,
@@ -645,7 +639,6 @@ impl<A, EM, I, OT, S> Feedback<EM, I, OT, S> for NotFeedback<A>
 where
     A: Feedback<EM, I, OT, S>,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         state: &mut S,
@@ -845,7 +838,6 @@ impl<EM, I, L, OT, S> Feedback<EM, I, OT, S> for ExitKindFeedback<L>
 where
     L: ExitKindLogic,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,
@@ -945,7 +937,12 @@ where
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
-        let observer = observers.get(&self.observer_handle).unwrap();
+        let Some(observer) = observers.get(&self.observer_handle) else {
+            return Err(Error::illegal_state(
+                "Observer referenced by TimeFeedback is not found in observers given to the fuzzer",
+            ));
+        };
+
         *testcase.exec_time_mut() = *observer.last_runtime();
         Ok(())
     }
@@ -982,7 +979,6 @@ impl<S> StateInitializer<S> for ConstFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConstFeedback {
     #[inline]
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,

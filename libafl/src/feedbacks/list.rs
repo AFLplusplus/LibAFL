@@ -129,7 +129,6 @@ where
     S: HasNamedMetadata,
     T: Debug + Eq + Hash + for<'a> Deserialize<'a> + Serialize + Default + Copy + 'static,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         state: &mut S,

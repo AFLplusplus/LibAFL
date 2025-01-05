@@ -2,8 +2,6 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 //!
 //! Needs the `fork` feature flag.
-#![allow(clippy::needless_pass_by_value)]
-
 use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
@@ -57,7 +55,6 @@ pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
 >;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-#[allow(dead_code)]
 pub struct GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -426,7 +423,6 @@ where
 }
 
 #[inline]
-#[allow(clippy::too_many_arguments)]
 /// Save state if it is an objective
 pub fn run_observers_and_save_state<E, EM, OF, Z>(
     executor: &mut E,
@@ -550,7 +546,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::let_unit_value)]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let rand = XkcdRand::new();
@@ -562,7 +557,7 @@ mod tests {
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-        let mut fuzzer = StdFuzzer::<_, _, _>::new(sche, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(sche, feedback, objective);
 
         let mut in_process_executor = InProcessExecutor::new(
             &mut harness,

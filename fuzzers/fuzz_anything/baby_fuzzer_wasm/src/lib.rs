@@ -1,3 +1,4 @@
+#![allow(unexpected_cfgs)] // the wasm_bindgen introduces these on nightly only
 mod utils;
 
 use libafl::{
@@ -25,7 +26,11 @@ use crate::utils::set_panic_hook;
 
 // Defined for internal use by LibAFL
 #[no_mangle]
-#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+#[expect(
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::missing_panics_doc
+)]
 pub extern "C" fn external_current_millis() -> u64 {
     let window: Window = web_sys::window().expect("should be in browser to run this demo");
     let performance: Performance = window
@@ -34,7 +39,7 @@ pub extern "C" fn external_current_millis() -> u64 {
     performance.now() as u64
 }
 
-#[allow(clippy::missing_panics_doc)]
+#[allow(clippy::missing_panics_doc)] // expect does not work, likely because of `wasm_bindgen`
 #[wasm_bindgen]
 pub fn fuzz() {
     set_panic_hook();
@@ -64,7 +69,6 @@ pub fn fuzz() {
             signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
-                #[allow(clippy::manual_assert)]
                 if buf.len() > 2 && buf[2] == b'c' {
                     // WASM cannot handle traps: https://webassembly.github.io/spec/core/intro/overview.html
                     // in a "real" fuzzing campaign, you should prefer to setup trap handling in JS,
@@ -77,6 +81,8 @@ pub fn fuzz() {
     };
 
     // Create an observation channel using the signals map
+    // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+    #[allow(static_mut_refs)] // only a problem in nightly
     let observer =
         unsafe { StdMapObserver::from_mut_ptr("signals", signals.as_mut_ptr(), signals.len()) };
 

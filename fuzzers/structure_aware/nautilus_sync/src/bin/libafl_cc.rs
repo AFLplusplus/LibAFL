@@ -2,7 +2,6 @@ use std::env;
 
 use libafl_cc::{ClangWrapper, CompilerWrapper, ToolWrapper};
 
-#[allow(clippy::missing_panics_doc)]
 pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {

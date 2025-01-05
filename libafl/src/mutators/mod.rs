@@ -28,6 +28,11 @@ pub use mapping::*;
 pub mod tuneable;
 pub use tuneable::*;
 
+#[cfg(feature = "std")]
+pub mod hash;
+#[cfg(feature = "std")]
+pub use hash::*;
+
 #[cfg(feature = "unicode")]
 pub mod unicode;
 #[cfg(feature = "unicode")]
@@ -77,19 +82,22 @@ impl From<u64> for MutationId {
 }
 
 impl From<i32> for MutationId {
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn from(value: i32) -> Self {
         debug_assert!(value >= 0);
         MutationId(value as usize)
     }
 }
 
-/// The result of a mutation.
-/// If the mutation got skipped, the target
-/// will not be executed with the returned input.
+/// Result of the mutation.
+///
+/// [`MutationResult::Skipped`] does not necessarily mean that the input changed,
+/// just that the mutator did something. For slow targets, consider using
+/// a filtered fuzzer (see [`crate::fuzzer::StdFuzzer::with_input_filter`])
+/// or wrapping your mutator in a [`hash::MutationChecker`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
-    /// The [`Mutator`] mutated this `Input`.
+    /// The [`Mutator`] executed on this `Input`. It may not guarantee that the input has actually been changed.
     Mutated,
     /// The [`Mutator`] did not mutate this `Input`. It was `Skipped`.
     Skipped,
@@ -345,7 +353,7 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
     ) -> Result<MutationResult, Error> {
         let mutator = self
             .get_mut(index.0)
-            .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
+            .ok_or_else(|| Error::key_not_found(format!("Mutator with id {index:?} not found.")))?;
         mutator.mutate(state, input)
     }
 
@@ -357,7 +365,7 @@ impl<I, S> MutatorsTuple<I, S> for Vec<Box<dyn Mutator<I, S>>> {
     ) -> Result<(), Error> {
         let mutator = self
             .get_mut(index)
-            .ok_or_else(|| Error::key_not_found("Mutator with id {index:?} not found."))?;
+            .ok_or_else(|| Error::key_not_found(format!("Mutator with id {index:?} not found.")))?;
         mutator.post_exec(state, new_corpus_id)
     }
 }

@@ -18,7 +18,7 @@ static SEED_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// Return a pseudo-random seed. For `no_std` environments, a single deterministic sequence is used.
 #[must_use]
-#[allow(unreachable_code)]
+#[allow(unreachable_code)] // cfg dependent
 pub fn random_seed() -> u64 {
     #[cfg(feature = "std")]
     return random_seed_from_random_state();
@@ -34,7 +34,6 @@ fn random_seed_deterministic() -> u64 {
     splitmix64(&mut seed)
 }
 
-#[allow(dead_code)]
 #[cfg(feature = "std")]
 fn random_seed_from_random_state() -> u64 {
     use std::{
@@ -115,7 +114,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
 
     /// Gets a value between 0.0 (inclusive) and 1.0 (exclusive)
     #[inline]
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn next_float(&mut self) -> f64 {
         // both 2^53 and 2^-53 can be represented in f64 exactly
         const MAX: u64 = 1u64 << 53;
@@ -366,11 +365,11 @@ impl Rand for Lehmer64Rand {
     fn set_seed(&mut self, mut seed: u64) {
         let hi = splitmix64(&mut seed);
         let lo = splitmix64(&mut seed) | 1;
-        self.s = u128::from(hi) << 64 | u128::from(lo);
+        self.s = (u128::from(hi) << 64) | u128::from(lo);
     }
 
     #[inline]
-    #[allow(clippy::unreadable_literal)]
+    #[expect(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         self.s *= 0xda942042e4dd58b5;
         (self.s >> 64) as u64
@@ -418,7 +417,7 @@ impl Rand for RomuTrioRand {
     }
 
     #[inline]
-    #[allow(clippy::unreadable_literal)]
+    #[expect(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         let xp = self.x_state;
         let yp = self.y_state;
@@ -457,7 +456,7 @@ impl Rand for RomuDuoJrRand {
     }
 
     #[inline]
-    #[allow(clippy::unreadable_literal)]
+    #[expect(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         let xp = self.x_state;
         self.x_state = 15241094284759029579_u64.wrapping_mul(self.y_state);
@@ -516,7 +515,6 @@ impl Rand for Sfc64Rand {
 
 /// fake rand, for testing purposes
 #[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
-#[allow(clippy::upper_case_acronyms)]
 pub struct XkcdRand {
     val: u64,
 }
@@ -675,8 +673,6 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
-#[allow(missing_docs)]
 /// `Rand` Python bindings
 pub mod pybind {
     use pyo3::prelude::*;
@@ -685,7 +681,7 @@ pub mod pybind {
     use super::{random_seed, Rand, StdRand};
 
     #[pyclass(unsendable, name = "StdRand")]
-    #[allow(clippy::unsafe_derive_deserialize)]
+    #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for StdRand
     pub struct PythonStdRand {
@@ -721,7 +717,7 @@ pub mod pybind {
 
     /// Rand Trait binding
     #[pyclass(unsendable, name = "Rand")]
-    #[allow(clippy::unsafe_derive_deserialize)]
+    #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug)]
     pub struct PythonRand {
         wrapper: PythonRandWrapper,

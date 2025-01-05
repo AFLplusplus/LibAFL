@@ -175,7 +175,7 @@ pub trait Corpus: Sized {
     fn nth(&self, nth: usize) -> CorpusId {
         self.ids()
             .nth(nth)
-            .expect("Failed to get the {nth} CorpusId")
+            .unwrap_or_else(|| panic!("Failed to get the {nth} CorpusId"))
     }
 
     /// Get the nth corpus id; considers both enabled and disabled testcases

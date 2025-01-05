@@ -6,16 +6,9 @@
 //! going to make it compilable only for Windows, don't forget to modify the
 //! `scripts/test_fuzzer.sh` to opt-out this fuzzer from that test.
 
-#[cfg(unix)]
 use mimalloc::MiMalloc;
-#[cfg(unix)]
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-#[cfg(windows)]
-use dlmalloc::GlobalDlmalloc;
-#[cfg(windows)]
-#[global_allocator]
-static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
 use std::path::PathBuf;
 
@@ -77,7 +70,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));

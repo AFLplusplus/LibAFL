@@ -25,6 +25,8 @@ use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+#[allow(static_mut_refs)] // only a problem in nightly
 static mut SIGNALS_PTR: *mut u8 = unsafe { SIGNALS.as_mut_ptr() };
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
@@ -44,7 +46,6 @@ fn is_sub<T: PartialEq>(mut haystack: &[T], needle: &[T]) -> bool {
     false
 }
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut initial_inputs = vec![];
     for entry in fs::read_dir("./corpus").unwrap() {
@@ -83,6 +84,8 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
+    // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+    #[allow(static_mut_refs)] // only a problem in nightly
     let observer = unsafe {
         StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()).track_novelties()
     };

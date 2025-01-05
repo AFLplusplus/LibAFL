@@ -117,7 +117,6 @@ where
         self.aggregator.aggregate(name, &self.client_stats);
     }
 
-    #[allow(clippy::cast_sign_loss)]
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         // Update the prometheus metrics
         // The gauges must take signed i64's, with max value of 2^63-1 so it is
@@ -196,7 +195,7 @@ where
         for (key, val) in &self.aggregator.aggregated {
             // print global aggregated custom stats
             write!(global_fmt, ", {key}: {val}").unwrap();
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             let value: f64 = match val {
                 UserStatsValue::Number(n) => *n as f64,
                 UserStatsValue::Float(f) => *f,
@@ -303,7 +302,7 @@ where
             write!(fmt, ", {key}: {val}").unwrap();
             // Update metrics added to the user_stats hashmap by feedback event-fires
             // You can filter for each custom stat in promQL via labels of both the stat name and client id
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             let value: f64 = match val.value() {
                 UserStatsValue::Number(n) => *n as f64,
                 UserStatsValue::Float(f) => *f,
