@@ -32,24 +32,25 @@ struct ValueBloomFeedbackMetadata {
 pub struct ValueBloomFeedback<'a, T> {
     name: Cow<'static, str>,
     observer_hnd: Handle<ValueObserver<'a, T>>,
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
 }
 
 impl<'a, T> ValueBloomFeedback<'a, T> {
     /// Create a new [`ValueBloomFeedback`]
     #[must_use]
     pub fn new(observer_hnd: &Handle<ValueObserver<'a, T>>) -> Self {
-        Self {
-            observer_hnd: observer_hnd.clone(),
-            name: observer_hnd.name().clone(),
-        }
+        Self::with_name(observer_hnd.name().clone(), observer_hnd)
     }
 
     /// Create a new [`ValueBloomFeedback`] with a given name
     #[must_use]
-    pub fn with_name(observer_hnd: &Handle<ValueObserver<'a, T>>, name: Cow<'static, str>) -> Self {
+    pub fn with_name(name: Cow<'static, str>, observer_hnd: &Handle<ValueObserver<'a, T>>) -> Self {
         Self {
-            observer_hnd: observer_hnd.clone(),
             name,
+            observer_hnd: observer_hnd.clone(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
         }
     }
 }
@@ -93,12 +94,24 @@ impl<EM, I, OT: ObserversTuple<I, S>, S: HasNamedMetadata, T: Hash> Feedback<EM,
 
         let metadata = state.named_metadata_mut::<ValueBloomFeedbackMetadata>(&self.name)?;
 
-        if metadata.bloom.contains(val) {
-            Ok(false)
+        let res = if metadata.bloom.contains(val) {
+            false
         } else {
             metadata.bloom.insert(val);
-            Ok(true)
+            true
+        };
+
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(true);
         }
+
+        Ok(res)
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or_else(|| Error::illegal_state("No last result set in `ValueBloomFeedback`. Either `is_interesting` has never been called or the fuzzer restarted in the meantime."))
     }
 }
 
