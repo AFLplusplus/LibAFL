@@ -60,11 +60,11 @@ impl Client<'_> {
         let core_id = client_description.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);
-        log::debug!("ARGS: {:#?}", args);
+        log::info!("ARGS: {:#?}", args);
 
         let mut env = self.env();
         Harness::edit_env(&mut env);
-        log::debug!("ENV: {:#?}", env);
+        log::info!("ENV: {:#?}", env);
 
         let is_asan = self.options.is_asan_core(core_id);
         let is_asan_guest = self.options.is_asan_guest_core(core_id);
