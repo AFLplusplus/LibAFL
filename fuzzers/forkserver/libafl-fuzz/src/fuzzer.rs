@@ -22,7 +22,7 @@ use libafl::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
     },
     fuzzer::StdFuzzer,
-    inputs::{BytesInput, NopTargetBytesConverter},
+    inputs::{BytesInput, NopTargetBytesConverter, UsesInput},
     mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -38,7 +38,6 @@ use libafl::{
     },
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
-        UsesState,
     },
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
@@ -266,7 +265,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         SupportedMutationalStages::StdMutational(StdMutationalStage::new(mutation), PhantomData)
     } else {
         SupportedMutationalStages::PowerMutational(
-            StdPowerMutationalStage::new(mutation),
+            StdPowerMutationalStage::<_, _, BytesInput, _, _, _>::new(mutation),
             PhantomData,
         )
     };
@@ -487,7 +486,9 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Create a randomic Input2State stage
-        let rq = MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
+        let rq = MultiMutationalStage::<_, _, BytesInput, _, _, _>::new(
+            AFLppRedQueen::with_cmplog_options(true, true),
+        );
 
         // Create an IfStage and wrap the CmpLog stages in it.
         // We run cmplog on the second fuzz run of the testcase.
@@ -647,20 +648,19 @@ pub fn fuzzer_target_mode(opt: &Opt) -> Cow<'static, str> {
 #[derive(Debug, Serialize, Deserialize, SerdeAny)]
 pub struct IsInitialCorpusEntryMetadata {}
 
-pub fn run_fuzzer_with_stages<Z, ST, E, EM>(
+pub fn run_fuzzer_with_stages<E, EM, S, ST, Z>(
     opt: &Opt,
     fuzzer: &mut Z,
     stages: &mut ST,
     executor: &mut E,
-    state: &mut <Z as UsesState>::State,
+    state: &mut S,
     mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    Z: Fuzzer<E, EM, ST>,
-    E: UsesState<State = Z::State>,
-    EM: ProgressReporter<State = Z::State>,
-    ST: StagesTuple<E, EM, Z::State, Z>,
-    <Z as UsesState>::State: HasLastReportTime + HasExecutions + HasMetadata,
+    Z: Fuzzer<E, EM, S, ST>,
+    EM: ProgressReporter<State = S>,
+    ST: StagesTuple<E, EM, S, Z>,
+    S: HasLastReportTime + HasExecutions + HasMetadata + UsesInput,
 {
     if opt.bench_just_one {
         fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;

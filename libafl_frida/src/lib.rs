@@ -24,26 +24,22 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
+    unfulfilled_lint_expectations,
     unused_must_use,
-    //unused_results
-))]
-#![cfg_attr(
-    test,
-    deny(
-        bad_style,
-        dead_code,
-        improper_ctypes,
-        non_shorthand_field_patterns,
-        no_mangle_generic_items,
-        overflowing_literals,
-        path_statements,
-        patterns_in_fns_without_body,
-        unconditional_recursion,
-        unused,
-        unused_allocation,
-        unused_comparisons,
-        unused_parens,
-        while_true
+    bad_style,
+    dead_code,
+    improper_ctypes,
+    non_shorthand_field_patterns,
+    no_mangle_generic_items,
+    overflowing_literals,
+    path_statements,
+    patterns_in_fns_without_body,
+    unconditional_recursion,
+    unused,
+    unused_allocation,
+    unused_comparisons,
+    unused_parens,
+    while_true
     )
 )]
 
@@ -81,7 +77,7 @@ pub mod utils;
 use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FridaOptions {
     enable_asan: bool,
     enable_asan_leak_detection: bool,
@@ -104,7 +100,7 @@ impl FridaOptions {
     /// # Panics
     /// Panics, if no `=` sign exists in input, or or `value` behind `=` has zero length.
     #[must_use]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn parse_env_options() -> Self {
         let mut options = Self::default();
         let mut asan_cores = None;
@@ -370,7 +366,7 @@ mod tests {
 
     static GUM: OnceLock<Gum> = OnceLock::new();
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     unsafe fn test_asan(options: &FuzzerOptions) {
         // The names of the functions to run
         let tests = vec![

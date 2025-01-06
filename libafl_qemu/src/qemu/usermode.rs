@@ -4,10 +4,10 @@ use std::{
 };
 
 use libafl_qemu_sys::{
-    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk, libafl_load_addr,
-    libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
-    pageflags_get_root, read_self_maps, GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot,
-    MapInfo, MmapPerms, VerifyAccess,
+    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
+    libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
+    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps, GuestAddr, GuestUsize,
+    IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
 use libc::{c_int, c_uchar, strlen};
 #[cfg(feature = "python")]
@@ -40,7 +40,6 @@ impl GuestMaps {
 impl Iterator for GuestMaps {
     type Item = MapInfo;
 
-    #[allow(clippy::uninit_assumed_init)]
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let mut ret = MaybeUninit::uninit();
@@ -123,7 +122,7 @@ impl CPU {
     }
 }
 
-#[allow(clippy::unused_self)]
+#[expect(clippy::unused_self)]
 impl Qemu {
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
@@ -177,6 +176,11 @@ impl Qemu {
         unsafe { libafl_get_brk() as GuestAddr }
     }
 
+    #[must_use]
+    pub fn get_initial_brk(&self) -> GuestAddr {
+        unsafe { libafl_get_initial_brk() as GuestAddr }
+    }
+
     pub fn set_brk(&self, brk: GuestAddr) {
         unsafe { libafl_set_brk(brk.into()) };
     }
@@ -190,7 +194,7 @@ impl Qemu {
         unsafe { mmap_next_start = start };
     }
 
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn mmap(
         self,
         addr: GuestAddr,
@@ -282,7 +286,9 @@ pub mod pybind {
         a6: u64,
         a7: u64,
     ) -> SyscallHookResult {
-        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+        // If we don't deref_addrof we run into the "static-mut-references" lint which is worse.
+        #[expect(clippy::deref_addrof)]
+        unsafe { (*(&raw const PY_SYSCALL_HOOK)).as_ref() }.map_or_else(
             || SyscallHookResult::new(None),
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);

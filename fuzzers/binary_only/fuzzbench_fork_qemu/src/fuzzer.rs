@@ -243,7 +243,7 @@ fn fuzz(
     let cmplog = cmp_shmem.as_slice_mut();
 
     // Beginning of a page should be properly aligned.
-    #[allow(clippy::cast_ptr_alignment)]
+    #[expect(clippy::cast_ptr_alignment)]
     let cmplog_map_ptr = cmplog
         .as_mut_ptr()
         .cast::<libafl_qemu::modules::cmplog::CmpLogMap>();
@@ -314,7 +314,7 @@ fn fuzz(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus

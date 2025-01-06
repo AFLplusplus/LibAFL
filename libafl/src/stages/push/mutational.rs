@@ -11,22 +11,23 @@ use libafl_bolts::rands::Rand;
 use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
-    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
+    events::{EventFirer, ProgressReporter},
     executors::ExitKind,
-    inputs::UsesInput,
+    fuzzer::STATS_TIMEOUT_DEFAULT,
+    inputs::{Input, UsesInput},
     mark_feature_time,
     mutators::Mutator,
     nonzero,
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, UsesState},
-    Error, EvaluatorObservers, ExecutionProcessor, HasMetadata, HasScheduler,
+    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, MaybeHasClientPerfMonitor},
+    Error, ExecutionProcessor, HasMetadata, HasScheduler,
 };
-#[cfg(feature = "introspection")]
-use crate::{monitors::PerfFeature, state::HasClientPerfMonitor};
 
 /// The default maximum number of mutations to perform per input.
 pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
@@ -42,14 +43,10 @@ pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 ///
 /// The default mutational push stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalPushStage<CS, EM, M, OT, Z>
+pub struct StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    CS: Scheduler<Z::Input, Z::State>,
-    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
-    M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
-    Z::State: HasRand + HasCorpus + Clone + Debug,
-    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
+    S: HasCorpus,
+    <S::Corpus as Corpus>::Input: Clone + Debug,
 {
     current_corpus_id: Option<CorpusId>,
     testcases_to_do: usize,
@@ -57,21 +54,17 @@ where
 
     mutator: M,
 
-    psh: PushStageHelper<CS, EM, OT, Z>,
+    psh: PushStageHelper<EM, <S::Corpus as Corpus>::Input, OT, S, Z>,
 }
 
-impl<CS, EM, M, OT, Z> StdMutationalPushStage<CS, EM, M, OT, Z>
+impl<EM, M, OT, S, Z> StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    CS: Scheduler<Z::Input, Z::State>,
-    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
-    M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
-    Z::State: HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
+    S: HasCorpus + HasRand,
+    <S::Corpus as Corpus>::Input: Clone + Debug,
 {
     /// Gets the number of iterations as a random number
-    #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
-    fn iterations(&self, state: &mut Z::State, _corpus_id: CorpusId) -> Result<usize, Error> {
+    #[expect(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
+    fn iterations(&self, state: &mut S, _corpus_id: CorpusId) -> Result<usize, Error> {
         Ok(1 + state
             .rand_mut()
             .below(nonzero!(DEFAULT_MUTATIONAL_MAX_ITERATIONS)))
@@ -83,23 +76,29 @@ where
     }
 }
 
-impl<CS, EM, M, OT, Z> PushStage<CS, EM, OT, Z> for StdMutationalPushStage<CS, EM, M, OT, Z>
+impl<EM, M, OT, S, Z> PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>
+    for StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    CS: Scheduler<Z::Input, Z::State>,
-    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId + ProgressReporter,
-    M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
-    Z::State: HasCorpus + HasRand + HasExecutions + HasLastReportTime + HasMetadata + Clone + Debug,
-    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
-    <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
+    EM: EventFirer<State = S>,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
+    S: HasCorpus
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>
+        + HasRand
+        + MaybeHasClientPerfMonitor,
+    M: Mutator<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
+    <S::Corpus as Corpus>::Input: Input + Clone,
 {
     #[inline]
-    fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, OT, Z> {
+    fn push_stage_helper(&self) -> &PushStageHelper<EM, <S::Corpus as Corpus>::Input, OT, S, Z> {
         &self.psh
     }
 
     #[inline]
-    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, OT, Z> {
+    fn push_stage_helper_mut(
+        &mut self,
+    ) -> &mut PushStageHelper<EM, <S::Corpus as Corpus>::Input, OT, S, Z> {
         &mut self.psh
     }
 
@@ -107,7 +106,7 @@ where
     fn init(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Z::State,
+        state: &mut S,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
@@ -126,10 +125,10 @@ where
     fn pre_exec(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Z::State,
+        state: &mut S,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-    ) -> Option<Result<<Z::State as UsesInput>::Input, Error>> {
+    ) -> Option<Result<<S::Corpus as Corpus>::Input, Error>> {
         if self.testcases_done >= self.testcases_to_do {
             // finished with this cicle.
             return None;
@@ -161,10 +160,10 @@ where
     fn post_exec(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Z::State,
+        state: &mut S,
         event_mgr: &mut EM,
         observers: &mut OT,
-        last_input: <Z::State as UsesInput>::Input,
+        last_input: <S::Corpus as Corpus>::Input,
         exit_kind: ExitKind,
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
@@ -183,7 +182,7 @@ where
     fn deinit(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Z::State,
+        _state: &mut S,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
@@ -192,38 +191,53 @@ where
     }
 }
 
-impl<CS, EM, M, OT, Z> Iterator for StdMutationalPushStage<CS, EM, M, OT, Z>
+impl<EM, M, OT, S, Z> Iterator for StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    CS: Scheduler<Z::Input, Z::State>,
-    EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = Z::State>,
-    M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
-    Z::State: HasCorpus + HasRand + HasExecutions + HasMetadata + HasLastReportTime + Clone + Debug,
-    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
-    <<Z as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Z::Input>, //delete me
+    EM: ProgressReporter<State = S>,
+    S: HasCorpus
+        + HasMetadata
+        + HasExecutions
+        + HasLastReportTime
+        + HasRand
+        + MaybeHasClientPerfMonitor
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
+    M: Mutator<<S::Corpus as Corpus>::Input, S>,
+    <S::Corpus as Corpus>::Input: Clone + Debug + Input,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
 {
-    type Item = Result<<Z::State as UsesInput>::Input, Error>;
+    type Item = Result<<S::Corpus as Corpus>::Input, Error>;
 
-    fn next(&mut self) -> Option<Result<<Z::State as UsesInput>::Input, Error>> {
+    fn next(&mut self) -> Option<Result<<S::Corpus as Corpus>::Input, Error>> {
         self.next_std()
     }
 }
 
-impl<CS, EM, M, OT, Z> StdMutationalPushStage<CS, EM, M, OT, Z>
+impl<EM, M, OT, S, Z> StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    CS: Scheduler<Z::Input, Z::State>,
-    EM: EventFirer<State = Z::State> + EventRestarter + HasEventManagerId,
-    M: Mutator<Z::Input, Z::State>,
-    OT: ObserversTuple<Z::Input, Z::State> + Serialize,
-    Z::State: HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<EM, OT> + EvaluatorObservers<EM, OT> + HasScheduler<Scheduler = CS>,
+    EM: ProgressReporter<State = S>,
+    S: HasCorpus
+        + HasMetadata
+        + HasExecutions
+        + HasLastReportTime
+        + HasRand
+        + MaybeHasClientPerfMonitor
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
+    M: Mutator<<S::Corpus as Corpus>::Input, S>,
+    <S::Corpus as Corpus>::Input: Clone + Debug + Input,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
+        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
 {
     /// Creates a new default mutational stage
     #[must_use]
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn new(
         mutator: M,
-        shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, OT, Z>>>>,
+        shared_state: Rc<
+            RefCell<Option<PushStageSharedState<EM, <S::Corpus as Corpus>::Input, OT, S, Z>>>,
+        >,
         exit_kind: Rc<Cell<Option<ExitKind>>>,
     ) -> Self {
         Self {
@@ -233,5 +247,75 @@ where
             testcases_to_do: 0,
             testcases_done: 0,
         }
+    }
+
+    /// This is the implementation for `next` for this stage
+    pub fn next_std(&mut self) -> Option<Result<<S::Corpus as Corpus>::Input, Error>> {
+        let mut shared_state = {
+            let shared_state_ref = &mut (*self.push_stage_helper_mut().shared_state).borrow_mut();
+            shared_state_ref.take().unwrap()
+        };
+
+        let step_success = if self.push_stage_helper().initialized {
+            // We already ran once
+
+            let last_input = self.push_stage_helper_mut().current_input.take().unwrap();
+
+            self.post_exec(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+                last_input,
+                self.push_stage_helper().exit_kind().unwrap(),
+            )
+        } else {
+            self.init(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+            )
+        };
+        if let Err(err) = step_success {
+            self.push_stage_helper_mut().end_of_iter(shared_state, true);
+            return Some(Err(err));
+        }
+
+        //for i in 0..num {
+        let ret = self.pre_exec(
+            &mut shared_state.fuzzer,
+            &mut shared_state.state,
+            &mut shared_state.event_mgr,
+            &mut shared_state.observers,
+        );
+        if ret.is_none() {
+            // We're done.
+            drop(self.push_stage_helper_mut().current_input.take());
+            self.push_stage_helper_mut().initialized = false;
+
+            if let Err(err) = self.deinit(
+                &mut shared_state.fuzzer,
+                &mut shared_state.state,
+                &mut shared_state.event_mgr,
+                &mut shared_state.observers,
+            ) {
+                self.push_stage_helper_mut().end_of_iter(shared_state, true);
+                return Some(Err(err));
+            };
+
+            if let Err(err) = shared_state
+                .event_mgr
+                .maybe_report_progress(&mut shared_state.state, STATS_TIMEOUT_DEFAULT)
+            {
+                self.push_stage_helper_mut().end_of_iter(shared_state, true);
+                return Some(Err(err));
+            };
+        } else {
+            self.push_stage_helper_mut().reset_exit_kind();
+        }
+        self.push_stage_helper_mut()
+            .end_of_iter(shared_state, false);
+        ret
     }
 }

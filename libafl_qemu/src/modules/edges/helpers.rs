@@ -148,13 +148,13 @@ mod generators {
                     }
                 }
                 // GuestAddress is u32 for 32 bit guests
-                #[allow(clippy::unnecessary_cast)]
+                #[expect(clippy::unnecessary_cast)]
                 Some(id as u64)
             }
         }
     }
 
-    #[allow(clippy::unnecessary_cast, unused_variables)]
+    #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     pub fn gen_hashed_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
@@ -190,7 +190,7 @@ mod generators {
 
             let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-            #[allow(clippy::unnecessary_cast)]
+            #[expect(clippy::unnecessary_cast)]
             let id = (hash_me(src as u64) ^ hash_me(dest as u64)) & mask;
 
             if !IS_CONST_MAP {
@@ -206,7 +206,8 @@ mod generators {
         }
     }
 
-    #[allow(clippy::unnecessary_cast, unused_variables)]
+    #[expect(clippy::unnecessary_cast)]
+    #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     pub fn gen_hashed_block_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
@@ -250,8 +251,6 @@ mod generators {
             }
         }
 
-        // GuestAddress is u32 for 32 bit guests
-        #[allow(clippy::unnecessary_cast)]
         Some(id)
     }
 }

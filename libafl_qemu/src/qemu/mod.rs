@@ -47,7 +47,6 @@ pub use usermode::*;
 #[cfg(feature = "systemmode")]
 mod systemmode;
 #[cfg(feature = "systemmode")]
-#[allow(unused_imports)]
 pub use systemmode::*;
 
 mod hooks;
@@ -284,10 +283,9 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
     }
 }
 
-#[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     pub fn index(&self) -> usize {
         unsafe { libafl_qemu_cpu_index(self.ptr) as usize }
     }
@@ -517,9 +515,8 @@ impl From<u8> for HookData {
     }
 }
 
-#[allow(clippy::unused_self)]
 impl Qemu {
-    #[allow(clippy::must_use_candidate, clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     pub fn init<T>(params: T) -> Result<Self, QemuInitError>
     where
         T: Into<QemuParams>,
@@ -555,7 +552,7 @@ impl Qemu {
             QEMU_IS_INITIALIZED = true;
         }
 
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap)]
         let argc = argc as i32;
 
         let args: Vec<CString> = args
@@ -690,8 +687,8 @@ impl Qemu {
     }
 
     #[must_use]
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_possible_wrap)] // platform dependent
+    #[expect(clippy::cast_sign_loss)]
     pub fn num_cpus(&self) -> usize {
         unsafe { libafl_qemu_num_cpus() as usize }
     }
@@ -707,7 +704,7 @@ impl Qemu {
     }
 
     #[must_use]
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_possible_wrap)]
     pub fn cpu_from_index(&self, index: usize) -> CPU {
         unsafe {
             CPU {
@@ -840,7 +837,7 @@ impl Qemu {
     /// # Safety
     ///
     /// Calling this multiple times concurrently will access static variables and is unsafe.
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         let fat: Box<FatPtr> = Box::new(transmute::<
             Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
@@ -1071,7 +1068,7 @@ pub mod pybind {
 
     #[pymethods]
     impl Qemu {
-        #[allow(clippy::needless_pass_by_value)]
+        #[expect(clippy::needless_pass_by_value)]
         #[new]
         fn new(args: Vec<String>) -> PyResult<Qemu> {
             let qemu =

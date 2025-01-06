@@ -121,7 +121,7 @@ impl DrCovModule<NopAddressFilter> {
 }
 impl<F> DrCovModule<F> {
     #[must_use]
-    #[allow(clippy::let_underscore_untyped)]
+    #[expect(clippy::let_underscore_untyped)]
     pub fn new(
         filter: F,
         filename: PathBuf,
@@ -169,7 +169,7 @@ impl<F> DrCovModule<F> {
                             continue 'pcs_full;
                         }
                         if *idm == *id {
-                            #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
+                            #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
                             match lengths.get(pc) {
                                 Some(block_length) => {
                                     drcov_vec.push(DrCovBasicBlock::new(
@@ -218,7 +218,7 @@ impl<F> DrCovModule<F> {
                         continue 'pcs;
                     }
 
-                    #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
+                    #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
                     match lengths.get(pc) {
                         Some(block_length) => {
                             drcov_vec.push(DrCovBasicBlock::new(
@@ -290,7 +290,7 @@ where
 
             let mut module_mapping: RangeMap<u64, (u16, String)> = RangeMap::new();
 
-            #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
+            #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
             for (i, (r, p)) in qemu
                 .mappings()
                 .filter_map(|m| {
@@ -407,7 +407,7 @@ where
             meta.current_id = id + 1;
             if drcov_module.full_trace {
                 // GuestAddress is u32 for 32 bit guests
-                #[allow(clippy::unnecessary_cast)]
+                #[expect(clippy::unnecessary_cast)]
                 Some(id as u64)
             } else {
                 None
@@ -416,6 +416,7 @@ where
     }
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn gen_block_lengths<ET, F, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
@@ -439,6 +440,7 @@ pub fn gen_block_lengths<ET, F, S>(
         .insert(pc, block_length);
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn exec_trace_block<ET, F, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,

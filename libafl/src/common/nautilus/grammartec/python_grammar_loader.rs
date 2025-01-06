@@ -1,8 +1,10 @@
-use std::{string::String, vec::Vec};
+#![allow(clippy::useless_conversion)] // This seems to be a false-positive(?)
+
+use std::{ffi::CString, string::String, vec::Vec};
 
 use pyo3::{prelude::*, pyclass, types::IntoPyDict};
 
-use crate::{nautilus::grammartec::context::Context, Error};
+use crate::nautilus::grammartec::context::Context;
 
 #[pyclass]
 struct PyContext {
@@ -23,7 +25,7 @@ impl PyContext {
         }
     }
 
-    fn rule(&mut self, py: Python, nt: &str, format: &Bound<PyAny>) -> PyResult<()> {
+    fn rule(&mut self, _py: Python, nt: &str, format: &Bound<PyAny>) -> PyResult<()> {
         if let Ok(s) = format.extract::<&str>() {
             self.ctx.add_rule(nt, s.as_bytes());
         } else if let Ok(s) = format.extract::<&[u8]>() {
@@ -36,7 +38,7 @@ impl PyContext {
         Ok(())
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn script(&mut self, nt: &str, nts: Vec<String>, script: PyObject) {
         self.ctx.add_script(nt, &nts, script);
     }
@@ -48,8 +50,8 @@ impl PyContext {
 
 fn loader(py: Python, grammar: &str) -> PyResult<Context> {
     let py_ctx = Bound::new(py, PyContext::new())?;
-    let locals = [("ctx", &py_ctx)].into_py_dict_bound(py);
-    py.run_bound(grammar, None, Some(&locals))?;
+    let locals = [("ctx", &py_ctx)].into_py_dict(py)?;
+    py.run(&CString::new(grammar)?, None, Some(&locals))?;
     Ok(py_ctx.borrow().get_context())
 }
 

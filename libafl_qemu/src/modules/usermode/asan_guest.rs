@@ -104,6 +104,7 @@ where
     }
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn gen_readwrite_guest_asan<ET, F, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
@@ -147,9 +148,10 @@ where
 }
 
 #[cfg(feature = "clippy")]
-#[allow(unused_variables)]
+#[expect(unused_variables)]
 unsafe fn libafl_tcg_gen_asan(addr: *mut TCGTemp, size: usize) {}
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn guest_trace_error_asan<ET, S>(
     _qemu: Qemu,
     _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -163,6 +165,7 @@ fn guest_trace_error_asan<ET, S>(
     panic!("I really shouldn't be here");
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn guest_trace_error_n_asan<ET, S>(
     _qemu: Qemu,
     _emulator_modules: &mut EmulatorModules<ET, S>,

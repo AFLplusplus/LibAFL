@@ -198,6 +198,10 @@ where
         let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
+        if other.names().is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
+
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
 
@@ -323,6 +327,10 @@ where
 
         let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
+
+        if other.names().is_empty() {
+            return Ok(MutationResult::Skipped);
+        }
 
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];

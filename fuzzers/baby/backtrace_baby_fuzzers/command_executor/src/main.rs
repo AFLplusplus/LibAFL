@@ -32,7 +32,6 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(3).unwrap();
@@ -81,6 +80,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
+    #[expect(clippy::items_after_statements)]
     #[derive(Debug)]
     struct MyExecutor {
         shmem_id: ShMemId,
@@ -88,6 +88,8 @@ pub fn main() {
     }
 
     impl CommandConfigurator<BytesInput> for MyExecutor {
+        #[allow(unknown_lints)] // stable doesn't even know of the lint
+        #[allow(clippy::zombie_processes)] // only a problem on nightly
         fn spawn_child(&mut self, input: &BytesInput) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
 

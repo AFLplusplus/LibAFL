@@ -2,8 +2,6 @@
 //! It should usually be paired with extra error-handling, such as a restarting event manager, to be effective.
 //!
 //! Needs the `fork` feature flag.
-#![allow(clippy::needless_pass_by_value)]
-
 use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
@@ -57,7 +55,6 @@ pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
 >;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-#[allow(dead_code)]
 pub struct GenericInProcessExecutor<H, HB, HT, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -106,7 +103,6 @@ where
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions,
-    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -173,7 +169,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -201,7 +197,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -242,7 +238,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -287,7 +283,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -316,7 +312,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -353,7 +349,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -427,7 +423,6 @@ where
 }
 
 #[inline]
-#[allow(clippy::too_many_arguments)]
 /// Save state if it is an objective
 pub fn run_observers_and_save_state<E, EM, OF, Z>(
     executor: &mut E,
@@ -442,7 +437,7 @@ pub fn run_observers_and_save_state<E, EM, OF, Z>(
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<EM, E::Input, E::Observers, E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    Z: HasObjective<Objective = OF>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
     let mut observers = executor.observers_mut();
@@ -503,9 +498,9 @@ where
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<EM, E::Input, E::Observers, E::State>,
     E::State: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
-    Z: HasObjective<Objective = OF, State = E::State>
-        + HasScheduler<State = E::State>
-        + ExecutionProcessor<EM, E::Observers>,
+    Z: HasObjective<Objective = OF>
+        + HasScheduler<E::Input, E::State>
+        + ExecutionProcessor<EM, E::Input, E::Observers, E::State>,
     <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
 {
     let data = &raw mut GLOBAL_STATE;
@@ -533,7 +528,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use libafl_bolts::tuples::tuple_list;
+    use libafl_bolts::{rands::XkcdRand, tuples::tuple_list};
 
     use crate::{
         corpus::InMemoryCorpus,
@@ -542,7 +537,7 @@ mod tests {
         feedbacks::CrashFeedback,
         inputs::{NopInput, UsesInput},
         schedulers::RandScheduler,
-        state::StdState,
+        state::{NopState, StdState},
         StdFuzzer,
     };
 
@@ -551,19 +546,18 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::let_unit_value)]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
-        let rand = libafl_bolts::rands::XkcdRand::new();
+        let rand = XkcdRand::new();
         let corpus = InMemoryCorpus::<NopInput>::new();
         let solutions = InMemoryCorpus::new();
         let mut objective = CrashFeedback::new();
         let mut feedback = tuple_list!();
-        let sche = RandScheduler::new();
+        let sche: RandScheduler<NopState<NopInput>> = RandScheduler::new();
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-        let mut fuzzer = StdFuzzer::<_, _, _, _>::new(sche, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(sche, feedback, objective);
 
         let mut in_process_executor = InProcessExecutor::new(
             &mut harness,

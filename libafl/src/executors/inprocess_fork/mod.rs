@@ -55,9 +55,8 @@ where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     OF: Feedback<EM, S::Input, OT, S>,
     S: HasSolutions,
-    Z: HasObjective<Objective = OF, State = S>,
+    Z: HasObjective<Objective = OF>,
 {
-    #[allow(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
         harness_fn: &'a mut H,
@@ -93,7 +92,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     harness_fn: &'a mut H,
     inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
@@ -107,7 +105,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S> + Debug,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -135,7 +132,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type State = S;
 }
@@ -149,9 +145,7 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: UsesState<State = S>,
 {
-    #[allow(unreachable_code)]
     #[inline]
     fn run_target(
         &mut self,
@@ -191,10 +185,10 @@ where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     OF: Feedback<EM, S::Input, OT, S>,
     S: State + HasSolutions,
-    Z: HasObjective<Objective = OF, State = S>,
+    Z: HasObjective<Objective = OF>,
 {
     /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
         harness_fn: &'a mut H,
@@ -242,7 +236,6 @@ where
     OT: ObserversTuple<S::Input, S>,
     SP: ShMemProvider,
     EM: UsesState<State = S>,
-    Z: UsesState<State = S>,
 {
     type Observers = OT;
     #[inline]
@@ -306,7 +299,7 @@ pub mod child_signal_handlers {
     /// The function should only be called from a child crash handler.
     /// It will dereference the `data` pointer and assume it's valid.
     #[cfg(unix)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_crash_handler<E>(
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -330,9 +323,9 @@ pub mod child_signal_handlers {
     }
 
     #[cfg(unix)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_timeout_handler<E>(
-        _signal: Signal,
+        #[cfg(unix)] _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
@@ -354,7 +347,7 @@ pub mod child_signal_handlers {
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "std", feature = "fork", unix))]
+#[cfg(all(feature = "fork", unix))]
 mod tests {
     use libafl_bolts::tuples::tuple_list;
     use serial_test::serial;

@@ -58,10 +58,14 @@ std = [
   "serial_test",
   "libafl_bolts/std",
   "typed-builder",
+  "fastbloom",
 ]
 
 ## Tracks the Feedbacks and the Objectives that were interesting for a Testcase
 track_hit_feedbacks = ["std"]
+
+## `ValueBloomFeedback` checks if an observed value has already been observed, and returns `is_interesting=true` otherwise.
+value_bloom_feedback = ["fastbloom", "fastbloom/serde"]
 
 ## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = []
@@ -291,6 +295,7 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 libipt = { workspace = true, optional = true }
+fastbloom = { workspace = true, optional = true }
 
 [lints]
 workspace = true

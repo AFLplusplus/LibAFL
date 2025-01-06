@@ -13,7 +13,7 @@ use libafl::{
 
 use crate::{fuzz_with, options::LibfuzzerOptions};
 
-#[allow(clippy::unnecessary_wraps, clippy::cast_precision_loss)]
+#[expect(clippy::unnecessary_wraps, clippy::cast_precision_loss)]
 fn do_report<F, ST, E, S, EM>(
     _options: &LibfuzzerOptions,
     _fuzzer: &mut F,
@@ -23,7 +23,7 @@ fn do_report<F, ST, E, S, EM>(
     _mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, ST, State = S>,
+    F: Fuzzer<E, EM, S, ST>,
     S: HasMetadata
         + HasNamedMetadata
         + HasExecutions

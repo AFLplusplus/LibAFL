@@ -56,7 +56,6 @@ where
     S::Corpus: Corpus<Input = I>,
     I: Input,
 {
-    #[allow(clippy::wrong_self_convention)]
     #[inline]
     fn is_interesting(
         &mut self,

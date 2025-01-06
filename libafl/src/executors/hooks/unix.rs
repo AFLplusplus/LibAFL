@@ -84,7 +84,7 @@ pub mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -122,7 +122,7 @@ pub mod unix_signal_handler {
     /// # Safety
     /// Well, signal handling is not safe
     #[cfg(unix)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub unsafe fn inproc_timeout_handler<E, EM, OF, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
@@ -134,7 +134,7 @@ pub mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -179,8 +179,7 @@ pub mod unix_signal_handler {
     ///
     /// # Safety
     /// Well, signal handling is not safe
-    #[allow(clippy::too_many_lines)]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
@@ -192,7 +191,7 @@ pub mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {

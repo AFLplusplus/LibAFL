@@ -34,7 +34,6 @@ extern "C" {
 
 }
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut shmem_provider = StdShMemProvider::new().unwrap();
     unsafe { create_shmem_array() };

@@ -74,7 +74,6 @@ where
     <B as HasObservers>::Observers:
         ObserversTuple<<<A as UsesState>::State as UsesInput>::Input, <A as UsesState>::State>,
     DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::Input, A::State> + MatchName,
-    Z: UsesState<State = <Self as UsesState>::State>,
 {
     fn run_target(
         &mut self,
@@ -209,7 +208,7 @@ where
     B: MatchName,
     DOT: MatchName,
 {
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         if let Some(t) = self.primary.as_ref().match_name::<T>(name) {
             Some(t)
@@ -220,7 +219,7 @@ where
         }
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
         if let Some(t) = self.primary.as_mut().match_name_mut::<T>(name) {
             Some(t)

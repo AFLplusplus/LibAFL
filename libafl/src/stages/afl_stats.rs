@@ -26,11 +26,12 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
     executors::HasObservers,
+    inputs::UsesInput,
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
-    state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable, UsesState},
+    state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
     std::string::ToString,
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };
@@ -73,7 +74,7 @@ libafl_bolts::impl_serdeany!(FuzzTime);
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<C, E, EM, O, Z> {
+pub struct AflStatsStage<C, E, EM, O, S, Z> {
     map_observer_handle: Handle<C>,
     stats_file_path: PathBuf,
     plot_file_path: Option<PathBuf>,
@@ -112,7 +113,7 @@ pub struct AflStatsStage<C, E, EM, O, Z> {
     autotokens_enabled: bool,
     /// The core we are bound to
     core_id: CoreId,
-    phantom_data: PhantomData<(O, E, EM, Z)>,
+    phantom_data: PhantomData<(O, E, EM, S, Z)>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -234,39 +235,31 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<C, E, EM, O, Z> UsesState for AflStatsStage<C, E, EM, O, Z>
+impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, O, S, Z>
 where
-    E: UsesState,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
-{
-    type State = E::State;
-}
-
-impl<C, E, EM, O, Z> Stage<E, EM, Z> for AflStatsStage<C, E, EM, O, Z>
-where
-    E: UsesState + HasObservers,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State> + HasScheduler,
-    E::State: HasImported
+    E: HasObservers,
+    EM: EventFirer,
+    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>,
+    S: HasImported
         + HasCorpus
         + HasMetadata
         + HasStartTime
         + HasExecutions
         + HasNamedMetadata
-        + Stoppable,
+        + Stoppable
+        + HasCurrentCorpusId
+        + UsesInput,
     E::Observers: MatchNameRef,
     O: MapObserver,
     C: AsRef<O> + Named,
-    <Z as HasScheduler>::Scheduler: HasQueueCycles,
-    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
+    Z::Scheduler: HasQueueCycles,
 {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut S,
         _manager: &mut EM,
     ) -> Result<(), Error> {
         let Some(corpus_idx) = state.current_corpus_id()? else {
@@ -328,7 +321,6 @@ where
         } else {
             0
         };
-        #[allow(clippy::similar_names)]
         let stats = AFLFuzzerStats {
             start_time: self.start_time,
             last_update: self.last_report_time.as_secs(),
@@ -363,7 +355,7 @@ where
             time_wo_finds: (current_time() - self.last_find).as_secs(),
             corpus_variable: 0,
             stability: self.calculate_stability(unstable_entries_in_map, filled_entries_in_map),
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             bitmap_cvg: (filled_entries_in_map as f64 / map_size as f64) * 100.0,
             saved_crashes: self.saved_crashes,
             saved_hangs: self.saved_hangs,
@@ -413,27 +405,26 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }
 
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<C, E, EM, O, Z> AflStatsStage<C, E, EM, O, Z>
+impl<C, E, EM, O, S, Z> AflStatsStage<C, E, EM, O, S, Z>
 where
-    E: UsesState + HasObservers,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
-    E::State: HasImported + HasCorpus + HasMetadata + HasExecutions,
+    E: HasObservers,
+    EM: EventFirer,
+    S: HasImported + HasCorpus + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,
 {
     /// Builder for `AflStatsStage`
     #[must_use]
-    pub fn builder() -> AflStatsStageBuilder<C, E, EM, O, Z> {
+    pub fn builder() -> AflStatsStageBuilder<C, E, EM, O, S, Z> {
         AflStatsStageBuilder::new()
     }
 
@@ -459,13 +450,13 @@ where
         Ok(())
     }
 
-    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<E::Input>) {
+    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
         if testcase.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<E::Input>) {
+    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
         if let Some(exec_time) = testcase.exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
@@ -477,7 +468,7 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth(&mut self, testcase: &Testcase<E::Input>) {
+    fn maybe_update_max_depth(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
         if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
@@ -490,7 +481,11 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_crash(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
+    fn maybe_update_last_crash(
+        &mut self,
+        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
+        state: &S,
+    ) {
         #[cfg(feature = "track_hit_feedbacks")]
         if testcase
             .hit_objectives()
@@ -502,7 +497,11 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_hang(&mut self, testcase: &Testcase<E::Input>, state: &E::State) {
+    fn maybe_update_last_hang(
+        &mut self,
+        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
+        state: &S,
+    ) {
         if testcase
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
@@ -532,8 +531,8 @@ where
         }
     }
 
-    #[allow(clippy::cast_precision_loss)]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::cast_precision_loss)]
+    #[expect(clippy::unused_self)]
     fn calculate_stability(&self, unstable_entries: usize, filled_entries: u64) -> f64 {
         ((filled_entries as f64 - unstable_entries as f64) / filled_entries as f64) * 100.0
     }
@@ -624,7 +623,7 @@ pub fn get_run_cmdline() -> Cow<'static, str> {
 
 /// The Builder for `AflStatsStage`
 #[derive(Debug)]
-pub struct AflStatsStageBuilder<C, E, EM, O, Z> {
+pub struct AflStatsStageBuilder<C, E, EM, O, S, Z> {
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     core_id: Option<CoreId>,
@@ -636,15 +635,14 @@ pub struct AflStatsStageBuilder<C, E, EM, O, Z> {
     banner: String,
     version: String,
     target_mode: String,
-    phantom_data: PhantomData<(O, E, EM, Z)>,
+    phantom_data: PhantomData<(O, E, EM, S, Z)>,
 }
 
-impl<C, E, EM, O, Z> AflStatsStageBuilder<C, E, EM, O, Z>
+impl<C, E, EM, O, S, Z> AflStatsStageBuilder<C, E, EM, O, S, Z>
 where
-    E: UsesState + HasObservers,
-    EM: EventFirer<State = E::State>,
-    Z: UsesState<State = E::State>,
-    E::State: HasImported + HasCorpus + HasMetadata + HasExecutions,
+    E: HasObservers,
+    EM: EventFirer,
+    S: HasImported + HasCorpus + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,
 {
@@ -758,7 +756,7 @@ where
     /// Cannot create the plot file (if provided)
     /// No `MapObserver` supplied to the builder
     /// No `stats_file_path` provieded
-    pub fn build(self) -> Result<AflStatsStage<C, E, EM, O, Z>, Error> {
+    pub fn build(self) -> Result<AflStatsStage<C, E, EM, O, S, Z>, Error> {
         if self.stats_file_path.is_none() {
             return Err(Error::illegal_argument("Must set `stats_file_path`"));
         }

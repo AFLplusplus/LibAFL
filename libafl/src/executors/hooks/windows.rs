@@ -31,7 +31,7 @@ pub mod windows_asan_handler {
         OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -154,7 +154,6 @@ pub mod windows_exception_handler {
     impl ExceptionHandler for InProcessExecutorHandlerData {
         /// # Safety
         /// Will dereference `EXCEPTION_POINTERS` and access `GLOBAL_STATE`.
-        #[allow(clippy::not_unsafe_ptr_arg_deref)]
         unsafe fn handle(
             &mut self,
             _code: ExceptionCode,
@@ -190,7 +189,7 @@ pub mod windows_exception_handler {
         OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
         E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -253,7 +252,7 @@ pub mod windows_exception_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: State + HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -316,7 +315,6 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
@@ -326,7 +324,7 @@ pub mod windows_exception_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<EM, E::Input, E::Observers, E::State>,
         E::State: HasExecutions + HasSolutions + HasCorpus,
-        Z: HasObjective<Objective = OF, State = E::State>,
+        Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
         <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {

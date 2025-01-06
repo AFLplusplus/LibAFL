@@ -349,7 +349,8 @@ where
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn syscall_hook<ET, S>(
     // Our instantiated [`EmulatorModules`]
     _qemu: Qemu,

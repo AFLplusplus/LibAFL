@@ -1,4 +1,4 @@
-//! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
+//! The [`NewHashFeedback`] uses the backtrace hash and a hashset to only keep novel cases
 
 use alloc::{borrow::Cow, string::ToString};
 use std::fmt::Debug;
@@ -32,7 +32,7 @@ pub trait HashSetState<T> {
 
 /// The state of [`NewHashFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct NewHashFeedbackMetadata {
     /// Contains information about untouched entries
     hash_set: HashSet<u64>,
@@ -104,7 +104,6 @@ impl<O> NewHashFeedback<O>
 where
     O: ObserverWithHashField + Named,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn has_interesting_backtrace_hash_observation<OT, S: HasNamedMetadata>(
         &mut self,
         state: &mut S,
@@ -156,7 +155,6 @@ where
     OT: MatchName,
     S: HasNamedMetadata,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         state: &mut S,

@@ -340,7 +340,7 @@ macro_rules! add_mutator_impl {
         #[derive(Default, Debug)]
         pub struct $name;
 
-        #[allow(trivial_numeric_casts)]
+        #[allow(trivial_numeric_casts)] // only for some calls of the macro
         impl<I, S> Mutator<I, S> for $name
         where
             S: HasRand,
@@ -413,7 +413,7 @@ macro_rules! interesting_mutator_impl {
             S: HasRand,
             I: HasMutatorBytes,
         {
-            #[allow(clippy::cast_sign_loss)]
+            #[expect(clippy::cast_sign_loss)]
             fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
                 if input.bytes().len() < size_of::<$size>() {
                     Ok(MutationResult::Skipped)
@@ -882,7 +882,7 @@ pub struct BytesSwapMutator {
     tmp_buf: Vec<u8>,
 }
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
     S: HasRand,
@@ -1280,32 +1280,18 @@ impl CrossoverReplaceMutator {
 }
 
 trait IntoOptionBytes {
-    type Type<'b>;
-
-    fn into_option_bytes<'a>(self) -> Option<&'a [u8]>
-    where
-        Self: 'a;
+    fn map_to_option_bytes(&self) -> Option<&Vec<u8>>;
 }
 
-impl IntoOptionBytes for &[u8] {
-    type Type<'b> = &'b [u8];
-
-    fn into_option_bytes<'b>(self) -> Option<&'b [u8]>
-    where
-        Self: 'b,
-    {
+impl IntoOptionBytes for Vec<u8> {
+    fn map_to_option_bytes(&self) -> Option<&Vec<u8>> {
         Some(self)
     }
 }
 
-impl IntoOptionBytes for Option<&[u8]> {
-    type Type<'b> = Option<&'b [u8]>;
-
-    fn into_option_bytes<'b>(self) -> Option<&'b [u8]>
-    where
-        Self: 'b,
-    {
-        self
+impl IntoOptionBytes for Option<Vec<u8>> {
+    fn map_to_option_bytes(&self) -> Option<&Vec<u8>> {
+        self.as_ref()
     }
 }
 
@@ -1330,9 +1316,8 @@ impl<S, F, I, O> Mutator<I, S> for MappedCrossoverInsertMutator<F, O>
 where
     S: HasCorpus + HasMaxSize + HasRand,
     I: HasMutatorBytes,
-    for<'a> O: IntoOptionBytes,
-    for<'a> O::Type<'a>: IntoOptionBytes,
-    for<'a> F: Fn(&'a <S::Corpus as Corpus>::Input) -> <O as IntoOptionBytes>::Type<'a>,
+    O: IntoOptionBytes,
+    F: Fn(&<S::Corpus as Corpus>::Input) -> &O,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1353,8 +1338,8 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            let input_mapped = (self.input_mapper)(other_input).into_option_bytes();
-            input_mapped.map_or(0, <[u8]>::len)
+            let input_mapped = (self.input_mapper)(other_input).map_to_option_bytes();
+            input_mapped.map_or(0, <Vec<u8>>::len)
         };
 
         if other_size < 2 {
@@ -1376,7 +1361,7 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_mapper)(other_input).into_option_bytes();
+        let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -1421,8 +1406,7 @@ where
     S: HasCorpus + HasMaxSize + HasRand,
     I: HasMutatorBytes,
     O: IntoOptionBytes,
-    for<'a> O::Type<'a>: IntoOptionBytes,
-    for<'a> F: Fn(&'a <S::Corpus as Corpus>::Input) -> <O as IntoOptionBytes>::Type<'a>,
+    F: Fn(&<S::Corpus as Corpus>::Input) -> &O,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1441,8 +1425,8 @@ where
         let other_size = {
             let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
             let other_input = other_testcase.load_input(state.corpus())?;
-            let input_mapped = (self.input_mapper)(other_input).into_option_bytes();
-            input_mapped.map_or(0, <[u8]>::len)
+            let input_mapped = (self.input_mapper)(other_input).map_to_option_bytes();
+            input_mapped.map_or(0, <Vec<u8>>::len)
         };
 
         if other_size < 2 {
@@ -1464,7 +1448,7 @@ where
         let other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         // No need to load the input again, it'll still be cached.
         let other_input = &mut other_testcase.input().as_ref().unwrap();
-        let wrapped_mapped_other_input = (self.input_mapper)(other_input).into_option_bytes();
+        let wrapped_mapped_other_input = (self.input_mapper)(other_input).map_to_option_bytes();
         if wrapped_mapped_other_input.is_none() {
             return Ok(MutationResult::Skipped);
         }
@@ -1491,7 +1475,6 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
     let mut first_diff: i64 = -1;
     let mut last_diff: i64 = -1;
     for (i, (this_el, other_el)) in this.iter().zip(other.iter()).enumerate() {
-        #[allow(clippy::cast_possible_wrap)]
         if this_el != other_el {
             if first_diff < 0 {
                 first_diff = i64::try_from(i).unwrap();
@@ -1513,7 +1496,7 @@ where
     <S::Corpus as Corpus>::Input: HasMutatorBytes,
     I: HasMutatorBytes,
 {
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
@@ -1749,7 +1732,7 @@ mod tests {
             }
             let mut gaps = 0;
             let mut range = 0..10;
-            let mut iter = mutated.bytes.iter().copied();
+            let mut iter = mutated.as_ref().iter().copied();
             while let Some(expected) = range.next() {
                 if let Some(last) = iter.next() {
                     if expected != last {
@@ -1768,9 +1751,11 @@ mod tests {
                 }
             }
             assert_eq!(
-                gaps, 1,
+                gaps,
+                1,
                 "{:?} should have exactly one gap, found {}",
-                mutated.bytes, gaps
+                mutated.as_ref(),
+                gaps
             );
         }
 
@@ -1802,20 +1787,20 @@ mod tests {
                 continue;
             }
             let mut expansion = 0;
-            let mut expansion_len = base.bytes.len();
-            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+            let mut expansion_len = base.as_ref().len();
+            for (i, value) in mutated.as_ref().iter().copied().enumerate() {
                 if i as u8 != value {
                     expansion = value as usize;
                     expansion_len = i - expansion;
                     break;
                 }
             }
-            assert_eq!(mutated.bytes.len(), base.bytes.len() + expansion_len);
+            assert_eq!(mutated.as_ref().len(), base.as_ref().len() + expansion_len);
             for (expected, value) in (0..(expansion + expansion_len))
-                .chain(expansion..base.bytes.len())
-                .zip(mutated.bytes)
+                .chain(expansion..base.as_ref().len())
+                .zip(mutated.as_ref())
             {
-                assert_eq!(expected as u8, value);
+                assert_eq!(expected as u8, *value);
             }
             for i in (expansion..).take(expansion_len) {
                 counts[i] += 1;
@@ -1851,19 +1836,19 @@ mod tests {
                 continue;
             }
             let mut inserted = 0;
-            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+            for (i, value) in mutated.as_ref().iter().copied().enumerate() {
                 if i as u8 != value {
                     inserted = value;
                     break;
                 }
             }
-            assert!(mutated.bytes.len() <= base.bytes.len() + 16);
+            assert!(mutated.as_ref().len() <= base.as_ref().len() + 16);
             assert_eq!(
-                bytecount::count(&mutated.bytes, inserted),
-                mutated.bytes.len() - base.bytes.len() + 1
+                bytecount::count(mutated.as_ref(), inserted),
+                mutated.as_ref().len() - base.as_ref().len() + 1
             );
             counts[inserted as usize] += 1;
-            insertions[mutated.bytes.len() - base.bytes.len() - 1] += 1;
+            insertions[mutated.as_ref().len() - base.as_ref().len() - 1] += 1;
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();
@@ -1901,22 +1886,22 @@ mod tests {
                 continue;
             }
             let mut inserted = 10;
-            for (i, value) in mutated.bytes.iter().copied().enumerate() {
+            for (i, value) in mutated.as_ref().iter().copied().enumerate() {
                 if i as u8 != value {
                     inserted = value;
                     break;
                 }
             }
-            assert!(mutated.bytes.len() <= base.bytes.len() + 16);
-            let offset = usize::from((inserted as usize) < base.bytes.len());
+            assert!(mutated.as_ref().len() <= base.as_ref().len() + 16);
+            let offset = usize::from((inserted as usize) < base.as_ref().len());
             assert_eq!(
-                bytecount::count(&mutated.bytes, inserted),
-                mutated.bytes.len() - base.bytes.len() + offset,
+                bytecount::count(mutated.as_ref(), inserted),
+                mutated.as_ref().len() - base.as_ref().len() + offset,
                 "{:?}",
-                mutated.bytes
+                mutated.as_ref()
             );
             counts[inserted as usize] += 1;
-            insertions[mutated.bytes.len() - base.bytes.len() - 1] += 1;
+            insertions[mutated.as_ref().len() - base.as_ref().len() - 1] += 1;
         }
 
         let average = counts.iter().copied().sum::<usize>() / counts.len();

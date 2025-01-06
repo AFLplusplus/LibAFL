@@ -63,7 +63,7 @@ use nix::unistd::dup;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -258,7 +258,7 @@ fn run_testcases(filenames: &[&str]) {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn fuzz_binary(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -374,7 +374,7 @@ fn fuzz_binary(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
@@ -469,7 +469,7 @@ fn fuzz_binary(
 }
 
 /// The actual fuzzer based on `Grimoire`
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn fuzz_text(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -589,7 +589,7 @@ fn fuzz_text(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(

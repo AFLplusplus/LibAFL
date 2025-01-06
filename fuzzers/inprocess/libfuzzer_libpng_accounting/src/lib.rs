@@ -2,7 +2,7 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
-use core::time::Duration;
+use core::{ptr::addr_of, time::Duration};
 use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::Parser;
@@ -139,6 +139,8 @@ pub extern "C" fn libafl_main() {
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _client_description| {
         // Create an observation channel using the coverage map
+        // TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+        #[allow(static_mut_refs)] // only a problem on nightly
         let edges_observer = HitcountsMapObserver::new(unsafe {
             StdMapObserver::from_mut_ptr("edges", EDGES_MAP.as_mut_ptr(), MAX_EDGES_FOUND)
         })
@@ -200,7 +202,7 @@ pub extern "C" fn libafl_main() {
             &edges_observer,
             &mut state,
             QueueScheduler::new(),
-            unsafe { &ACCOUNTING_MEMOP_MAP },
+            unsafe { &*addr_of!(ACCOUNTING_MEMOP_MAP) },
         );
 
         // A fuzzer with feedbacks and a corpus scheduler

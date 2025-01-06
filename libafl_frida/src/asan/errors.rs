@@ -50,7 +50,7 @@ pub(crate) struct AsanReadWriteError {
     pub backtrace: Backtrace,
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
     OobRead(AsanReadWriteError),
@@ -108,7 +108,7 @@ impl AsanError {
 }
 
 /// A struct holding errors that occurred during frida address sanitizer runs
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     continue_on_error: bool,
@@ -153,7 +153,7 @@ impl AsanErrors {
     }
 
     /// Report an error
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub(crate) fn report_error(&mut self, error: AsanError) {
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
@@ -168,7 +168,7 @@ impl AsanErrors {
                 );
             }));
 
-        #[allow(clippy::non_ascii_literal)]
+        #[expect(clippy::non_ascii_literal)]
         writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -201,7 +201,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
@@ -248,7 +248,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "rip: 0x{:016x}", error.pc).unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -291,7 +291,7 @@ impl AsanErrors {
                     .print_trace(&error.backtrace, output)
                     .unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let fault_address: i64 = fault_address.try_into().unwrap();
                 let metadata_address: i64 = error.metadata.address.try_into().unwrap();
@@ -322,7 +322,7 @@ impl AsanErrors {
                 }
 
                 if error.metadata.freed {
-                    #[allow(clippy::non_ascii_literal)]
+                    #[expect(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                     if let Some(backtrace) = &mut release_site_backtrace {
                         writeln!(output, "free site backtrace:").unwrap();
@@ -357,7 +357,7 @@ impl AsanErrors {
                         writeln!(output, " at 0x{_pc:x}").unwrap();
                     }
 
-                    #[allow(clippy::non_ascii_literal)]
+                    #[expect(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                     for reg in 0..29 {
                         let val = cpu_context.reg(reg);
@@ -384,7 +384,7 @@ impl AsanErrors {
                 output.reset().unwrap();
                 backtrace_printer.print_trace(backtrace, output).unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -405,7 +405,7 @@ impl AsanErrors {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                 if let Some(backtrace) = &mut release_site_backtrace {
                     writeln!(output, "previous free site backtrace:").unwrap();
@@ -422,7 +422,7 @@ impl AsanErrors {
                 writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
@@ -463,7 +463,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -512,7 +512,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "Rip: 0x{pc:016x}").unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -557,7 +557,7 @@ impl AsanErrors {
 
         self.errors.push(error);
 
-        #[allow(clippy::manual_assert)]
+        #[expect(clippy::manual_assert)]
         if !self.continue_on_error {
             panic!("ASAN: Crashing target!");
         }
@@ -569,7 +569,7 @@ pub static ASAN_ERRORS: Mutex<AsanErrors> = Mutex::new(AsanErrors::new(true));
 
 /// An observer for frida address sanitizer `AsanError`s for a `Frida` executor run
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub enum AsanErrorsObserver {
     /// Observer referencing a list behind a [`OwnedPtr`] pointer.
     Ptr(OwnedPtr<AsanErrors>),
@@ -653,7 +653,6 @@ where
     S: State + Debug,
     OT: MatchNameRef,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,

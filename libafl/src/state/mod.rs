@@ -725,7 +725,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         if let Some(remaining) = self.remaining_initial_files.as_ref() {
             // everything was loaded
@@ -750,7 +750,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         log::info!("Loading file {:?} ...", &path);
         let input = (config.loader)(fuzzer, self, path)?;
@@ -779,7 +779,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         loop {
             match self.next_file() {
@@ -844,7 +844,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
             fuzzer,
@@ -872,7 +872,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
         self.continue_loading_initial_inputs_custom(
@@ -899,7 +899,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
             fuzzer,
@@ -925,7 +925,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
         self.continue_loading_initial_inputs_custom(
@@ -952,7 +952,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
         self.continue_loading_initial_inputs_custom(
@@ -994,7 +994,7 @@ where
     where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         if self.multicore_inputs_processed.unwrap_or(false) {
             self.continue_loading_initial_inputs_custom(
@@ -1090,7 +1090,7 @@ where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -1129,7 +1129,7 @@ where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -1147,7 +1147,7 @@ where
         E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
-        Z: Evaluator<E, EM, State = Self>,
+        Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
@@ -1242,6 +1242,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
+    named_metadata: NamedSerdeAnyMap,
     execution: u64,
     stop_requested: bool,
     rand: StdRand,
@@ -1254,6 +1255,7 @@ impl<I> NopState<I> {
     pub fn new() -> Self {
         NopState {
             metadata: SerdeAnyMap::new(),
+            named_metadata: NamedSerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
             stop_requested: false,
@@ -1320,6 +1322,16 @@ impl<I> HasMetadata for NopState<I> {
 
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
+    }
+}
+
+impl<I> HasNamedMetadata for NopState<I> {
+    fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
+        &self.named_metadata
+    }
+
+    fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
+        &mut self.named_metadata
     }
 }
 

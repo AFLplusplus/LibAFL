@@ -212,6 +212,7 @@ where
     }))
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn gen_hashed_cmp_ids<ET, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
@@ -306,6 +307,7 @@ impl CmpLogRoutinesModule {
         }
     }
 
+    #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     fn gen_blocks_calls<ET, S>(
         qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
@@ -331,7 +333,7 @@ impl CmpLogRoutinesModule {
         }
 
         if let Some(h) = emulator_modules.get::<Self>() {
-            #[allow(unused_mut)]
+            #[allow(unused_mut)] // cfg dependent
             let mut code = {
                 #[cfg(feature = "usermode")]
                 unsafe {

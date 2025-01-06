@@ -44,7 +44,6 @@ pub type OwnedInProcessExecutor<OT, S, ES> = StatefulGenericInProcessExecutor<
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 /// The harness can access the internal state of the executor.
-#[allow(dead_code)]
 pub struct StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
     H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
@@ -98,7 +97,6 @@ where
     HT: ExecutorHooksTuple<S>,
     OT: ObserversTuple<S::Input, S>,
     S: State + HasExecutions,
-    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -165,7 +163,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             tuple_list!(),
@@ -195,7 +193,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -238,7 +236,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -303,7 +301,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic(
             user_hooks,
@@ -319,7 +317,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn batched_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
@@ -334,7 +332,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
@@ -358,7 +356,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn with_timeout_generic<EM, OF, Z>(
         user_hooks: HT,
         harness_fn: HB,
@@ -373,7 +371,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<EM, S::Input, OT, S>,
         S: State,
-        Z: HasObjective<Objective = OF, State = S>,
+        Z: HasObjective<Objective = OF>,
         <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
         <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {

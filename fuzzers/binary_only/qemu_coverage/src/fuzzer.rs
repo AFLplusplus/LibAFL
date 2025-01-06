@@ -227,10 +227,8 @@ pub fn fuzz() {
             Err(Error::ShuttingDown)?
         }
 
-        #[allow(clippy::let_unit_value)]
         let mut feedback = ();
 
-        #[allow(clippy::let_unit_value)]
         let mut objective = ();
 
         let mut state = state.unwrap_or_else(|| {

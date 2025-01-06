@@ -80,7 +80,6 @@ pub enum InputLocation {
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
 /// Use [`CommandExecutor::builder()`] to use this configurator.
-#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
@@ -396,7 +395,6 @@ where
     S: State + HasExecutions + UsesInput,
     T: CommandConfigurator<S::Input> + Debug,
     OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -433,7 +431,6 @@ where
     S: State + HasExecutions + UsesInput,
     T: CommandConfigurator<S::Input, Pid> + Debug,
     OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    Z: UsesState<State = S>,
     HT: ExecutorHooksTuple<S>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
@@ -793,7 +790,6 @@ impl CommandExecutorBuilder {
 /// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
 /// where
 ///     EM: UsesState,
-///     Z: UsesState<State = EM::State>,
 ///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
 /// {
 ///     MyExecutor.into_executor(())
@@ -865,7 +861,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
 }
 
 /// waitpid wrapper that ignores some signals sent by the ptraced child
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 fn waitpid_filtered(pid: Pid, options: Option<WaitPidFlag>) -> Result<WaitStatus, Errno> {
     loop {
         let wait_status = waitpid(pid, options);

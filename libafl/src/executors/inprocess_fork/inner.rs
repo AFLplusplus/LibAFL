@@ -121,7 +121,6 @@ where
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    Z: UsesState<State = S>,
 {
     pub(super) unsafe fn pre_run_target_child(
         &mut self,
@@ -255,7 +254,6 @@ where
 
     /// Creates a new [`GenericInProcessForkExecutorInner`] with custom hooks
     #[cfg(target_os = "linux")]
-    #[allow(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
         observers: OT,
@@ -280,7 +278,6 @@ where
 
     /// Creates a new [`GenericInProcessForkExecutorInner`], non linux
     #[cfg(not(target_os = "linux"))]
-    #[allow(clippy::too_many_arguments)]
     pub fn with_hooks(
         userhooks: HT,
         observers: OT,

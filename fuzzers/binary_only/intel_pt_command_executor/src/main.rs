@@ -25,7 +25,8 @@ use libafl_intelpt::{IntelPT, PAGE_SIZE};
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-#[allow(static_mut_refs)]
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+#[allow(static_mut_refs)] // only a problem in nightly
 static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
 pub fn main() {
@@ -36,7 +37,10 @@ pub fn main() {
     // Enable logging
     env_logger::init();
 
+    // path of the program we want to fuzz
     let target_path = PathBuf::from(env::args().next().unwrap())
+        .parent()
+        .unwrap()
         .parent()
         .unwrap()
         .join("target_program");
