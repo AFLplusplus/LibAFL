@@ -125,7 +125,7 @@ where
 {
     fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.first_exec_all(state);
+            emulator.modules.first_exec_all(emulator.qemu, state);
         }
     }
 
@@ -135,7 +135,7 @@ where
         input: &S::Input,
     ) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.pre_exec_all(state, input);
+            emulator.modules.pre_exec_all(emulator.qemu, state, input);
         }
 
         if emulator.driver.input_location.get().is_some() {
@@ -157,7 +157,7 @@ where
         if !emulator.driver.hooks_locked {
             emulator
                 .modules
-                .post_exec_all(state, input, observers, exit_kind);
+                .post_exec_all(emulator.qemu, state, input, observers, exit_kind);
         }
     }
 

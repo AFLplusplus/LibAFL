@@ -6,8 +6,11 @@ use libafl_qemu_sys::GuestAddr;
 #[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 
-use crate::{emu::EmulatorModules, EmulatorHooks, Qemu};
-use crate::{modules::utils::filters::{AddressFilter, PageFilter}};
+use crate::{
+    emu::EmulatorModules,
+    modules::utils::filters::{AddressFilter, PageFilter},
+    Qemu, QemuParams,
+};
 
 #[cfg(feature = "usermode")]
 pub mod usermode;
