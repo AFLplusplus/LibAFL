@@ -7,6 +7,9 @@
   - Related: `MutVecInput` is deprecated in favor of directly using `&mut Vec<u8>`
   - Related: `MappedInputFunctionMappingMutator` and `ToMappedInputFunctionMappingMutatorMapper` have been removed as now duplicates of `MappingMutator` (previously `FunctionMappingMutator`) and `ToMappingMutator` (previously `ToFunctionMappingMutatorMapper`)
   - Related: `ToOptionMappingMutatorMapper` and `ToFunctionMappingMutatorMapper` have been renamed to `ToOptionalMutator` and `ToMappingMutator` respectively
+- `Qemu` cannot be used to initialize `Emulator` directly anymore. Instead, `Qemu` should be initialized through `Emulator` systematically if `Emulator` should be used.
+  - Related: `EmulatorBuilder` uses a single function to provide a `Qemu` initializer: `EmulatorBuilder::qemu_parameters`. For now, it can be either a `Vec<String>` or a `QemuConfig` instance.
+  - Related: Qemu's `AsanModule` does not need any special call to `Qemu` init methods anymore. It is now possible to simply initialize `AsanModule` (or `AsanGuestModule`) with a reference to the environment as parameter.
 
 # 0.14.0 -> 0.14.1
 - Removed `with_observers` from `Executor` trait.
