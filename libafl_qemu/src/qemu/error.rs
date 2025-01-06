@@ -49,7 +49,7 @@ pub enum QemuRWErrorCause {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub struct QemuRWError {
     kind: QemuRWErrorKind,
     cause: QemuRWErrorCause,

@@ -58,7 +58,7 @@ static mut QEMU_IS_INITIALIZED: bool = false;
 
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
-#[allow(clippy::vec_box)]
+#[expect(clippy::vec_box)]
 static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
 
 pub trait HookId {
@@ -687,7 +687,7 @@ impl Qemu {
     }
 
     #[must_use]
-    #[allow(clippy::cast_possible_wrap)] // platform dependent
+    #[expect(clippy::cast_possible_wrap)] // platform dependent
     #[expect(clippy::cast_sign_loss)]
     pub fn num_cpus(&self) -> usize {
         unsafe { libafl_qemu_num_cpus() as usize }

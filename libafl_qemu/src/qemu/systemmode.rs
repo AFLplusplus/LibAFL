@@ -263,8 +263,8 @@ impl Qemu {
         libafl_qemu_sys::syx_snapshot_root_restore(snapshot);
     }
 
-    #[allow(clippy::missing_safety_doc)]
     #[must_use]
+    #[expect(clippy::missing_safety_doc)]
     pub unsafe fn check_fast_snapshot(
         &self,
         ref_snapshot: FastSnapshotPtr,
