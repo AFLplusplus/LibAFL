@@ -2,7 +2,7 @@
 //!
 
 use core::hash::Hash;
-use std::{borrow::Cow, string::ToString};
+use std::borrow::Cow;
 
 use fastbloom::BloomFilter;
 use libafl_bolts::{
@@ -37,10 +37,19 @@ pub struct ValueBloomFeedback<'a, T> {
 impl<'a, T> ValueBloomFeedback<'a, T> {
     /// Create a new [`ValueBloomFeedback`]
     #[must_use]
-    pub fn new(observer_hnd: &Handle<ValueObserver<'a, T>>, name: &str) -> Self {
+    pub fn new(observer_hnd: &Handle<ValueObserver<'a, T>>) -> Self {
         Self {
-            name: Cow::Owned(name.to_string()),
             observer_hnd: observer_hnd.clone(),
+            name: observer_hnd.name().clone(),
+        }
+    }
+
+    /// Create a new [`ValueBloomFeedback`] with a given name
+    #[must_use]
+    pub fn with_name(observer_hnd: &Handle<ValueObserver<'a, T>>, name: Cow<'static, str>) -> Self {
+        Self {
+            observer_hnd: observer_hnd.clone(),
+            name,
         }
     }
 }
@@ -85,10 +94,85 @@ impl<EM, I, OT: ObserversTuple<I, S>, S: HasNamedMetadata, T: Hash> Feedback<EM,
         let metadata = state.named_metadata_mut::<ValueBloomFeedbackMetadata>(&self.name)?;
 
         if metadata.bloom.contains(val) {
-            Ok(true)
+            Ok(false)
         } else {
             metadata.bloom.insert(val);
-            Ok(false)
+            Ok(true)
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::ptr::write_volatile;
+
+    use libafl_bolts::{ownedref::OwnedRef, serdeany::NamedSerdeAnyMap, tuples::Handled};
+    use tuple_list::tuple_list;
+
+    use super::ValueBloomFeedback;
+    use crate::{
+        events::NopEventManager,
+        executors::ExitKind,
+        feedbacks::{Feedback, StateInitializer},
+        inputs::NopInput,
+        observers::ValueObserver,
+        HasNamedMetadata,
+    };
+
+    static mut VALUE: u32 = 0;
+
+    struct NamedMetadataState {
+        map: NamedSerdeAnyMap,
+    }
+
+    impl HasNamedMetadata for NamedMetadataState {
+        fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
+            &self.map
+        }
+
+        fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
+            &mut self.map
+        }
+    }
+
+    #[test]
+    fn test_value_bloom_feedback() {
+        let value_ptr = unsafe { OwnedRef::from_ptr(&raw mut VALUE) };
+
+        let observer = ValueObserver::new("test_value", value_ptr);
+
+        let mut vbf = ValueBloomFeedback::new(&observer.handle());
+
+        let mut state = NamedMetadataState {
+            map: NamedSerdeAnyMap::new(),
+        };
+        vbf.init_state(&mut state).unwrap();
+
+        let observers = tuple_list!(observer);
+        let mut mgr = NopEventManager::<NamedMetadataState>::new();
+        let input = NopInput {};
+        let exit_ok = ExitKind::Ok;
+
+        let first_eval = vbf
+            .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
+            .unwrap();
+        assert_eq!(first_eval, true);
+
+        let second_eval = vbf
+            .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
+            .unwrap();
+
+        assert_ne!(first_eval, second_eval);
+
+        unsafe {
+            write_volatile(&raw mut VALUE, 1234_u32);
+        }
+
+        let next_eval = vbf
+            .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
+            .unwrap();
+        assert_eq!(next_eval, true);
+
+        //assert_eq!(vbf.)
     }
 }
