@@ -34,6 +34,7 @@ pub struct Fuzzer {
 
 impl Fuzzer {
     pub fn new() -> Fuzzer {
+        env_logger::init();
         let options = FuzzerOptions::parse();
         options.validate();
         Fuzzer { options }
