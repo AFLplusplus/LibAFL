@@ -241,9 +241,10 @@ where
                 };
 
                 let emulator = Emulator::empty()
-                    .qemu_config(|_| qemu_cli.to_owned())
+                    .qemu_parameters(qemu_cli.to_owned())
                     .modules(modules)
-                    .build()?;
+                    .build()
+                    .expect("Could not initialize Emulator");
 
                 let executor = QemuExecutor::new(
                     emulator,
@@ -361,9 +362,10 @@ where
                 };
 
                 let emulator = Emulator::empty()
-                    .qemu_config(|_| qemu_cli.to_owned())
+                    .qemu_parameters(qemu_cli.to_owned())
                     .modules(modules)
-                    .build()?;
+                    .build()
+                    .expect("Could not initialize Emulator");
 
                 let mut executor = QemuExecutor::new(
                     emulator,

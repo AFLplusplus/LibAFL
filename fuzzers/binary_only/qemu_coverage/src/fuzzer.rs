@@ -135,7 +135,7 @@ pub fn fuzz() {
             .build());
 
         let emulator = Emulator::empty()
-            .qemu_config(|_| options.args.clone())
+            .qemu_parameters(options.args.clone())
             .modules(emulator_modules)
             .build()
             .expect("QEMU initialization failed");

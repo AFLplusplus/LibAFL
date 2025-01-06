@@ -52,8 +52,6 @@ pub use systemmode::*;
 mod hooks;
 pub use hooks::*;
 
-use crate::config::QemuConfigBuilder;
-
 static mut QEMU_IS_INITIALIZED: bool = false;
 
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
@@ -182,17 +180,17 @@ impl From<QemuConfig> for QemuParams {
     }
 }
 
-impl TryFrom<QemuConfigBuilder> for QemuParams {
-    type Error = QemuInitError;
-
-    fn try_from(config_builder: QemuConfigBuilder) -> Result<Self, Self::Error> {
-        Ok(QemuParams::Config(
-            config_builder
-                .build()
-                .map_err(QemuInitError::ConfigurationError)?,
-        ))
-    }
-}
+// impl TryFrom<QemuConfigBuilder> for QemuParams {
+//     type Error = QemuInitError;
+//
+//     fn try_from(config_builder: QemuConfigBuilder) -> Result<Self, Self::Error> {
+//         Ok(QemuParams::Config(
+//             config_builder
+//                 .build()
+//                 .map_err(QemuInitError::ConfigurationError)?,
+//         ))
+//     }
+// }
 
 impl<T> From<&[T]> for QemuParams
 where
@@ -202,6 +200,7 @@ where
         QemuParams::Cli(cli.iter().map(|x| x.as_ref().into()).collect())
     }
 }
+
 impl<T> From<&Vec<T>> for QemuParams
 where
     T: AsRef<str>,
@@ -528,7 +527,7 @@ impl Qemu {
                 QEMU_CONFIG
                     .set(cfg.clone())
                     .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
-                    .unwrap();
+                    .expect("Could not set QEMU Config.");
             }
             QemuParams::Cli(_) => {}
         };
@@ -687,7 +686,7 @@ impl Qemu {
     }
 
     #[must_use]
-    #[expect(clippy::cast_possible_wrap)] // platform dependent
+    #[allow(clippy::cast_possible_wrap)] // platform dependent
     #[expect(clippy::cast_sign_loss)]
     pub fn num_cpus(&self) -> usize {
         unsafe { libafl_qemu_num_cpus() as usize }

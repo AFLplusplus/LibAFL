@@ -3,7 +3,7 @@ use std::{convert::Infallible, fmt::Display};
 
 use libafl_qemu_sys::{CPUStatePtr, GuestAddr};
 
-use crate::{config::QemuConfigBuilderError, CallingConvention};
+use crate::CallingConvention;
 
 #[derive(Debug)]
 pub enum QemuError {
@@ -15,16 +15,10 @@ pub enum QemuError {
 #[derive(Debug)]
 pub enum QemuInitError {
     MultipleInstances,
+    NoParametersProvided,
     EmptyArgs,
-    ConfigurationError(QemuConfigBuilderError),
     Infallible,
     TooManyArgs(usize),
-}
-
-impl From<Infallible> for QemuInitError {
-    fn from(_: Infallible) -> Self {
-        QemuInitError::Infallible
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,11 +58,11 @@ impl Display for QemuInitError {
             QemuInitError::MultipleInstances => {
                 write!(f, "Only one instance of the QEMU Emulator is permitted")
             }
+            QemuInitError::NoParametersProvided => {
+                write!(f, "No parameters were provided to initialize QEMU.")
+            }
             QemuInitError::EmptyArgs => {
                 write!(f, "QEMU emulator args cannot be empty")
-            }
-            QemuInitError::ConfigurationError(config_error) => {
-                write!(f, "QEMU Configuration error: {config_error}")
             }
             QemuInitError::TooManyArgs(n) => {
                 write!(
@@ -77,7 +71,7 @@ impl Display for QemuInitError {
                 )
             }
             QemuInitError::Infallible => {
-                write!(f, "Infallible error, should never be reached.")
+                panic!("Infallible error, should never be reached.")
             }
         }
     }
@@ -85,13 +79,13 @@ impl Display for QemuInitError {
 
 impl From<QemuInitError> for libafl::Error {
     fn from(err: QemuInitError) -> Self {
-        libafl::Error::runtime(format!("QEMU Init error: {err}"))
+        libafl::Error::unknown(format!("{err}"))
     }
 }
 
-impl From<QemuRWError> for libafl::Error {
-    fn from(err: QemuRWError) -> Self {
-        libafl::Error::runtime(format!("QEMU Runtime error: {err:?}"))
+impl From<Infallible> for QemuInitError {
+    fn from(_: Infallible) -> Self {
+        QemuInitError::Infallible
     }
 }
 

@@ -154,6 +154,7 @@ mod generators {
         }
     }
 
+    #[allow(unused_variables)]
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     pub fn gen_hashed_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         qemu: Qemu,
@@ -207,6 +208,7 @@ mod generators {
     }
 
     #[expect(clippy::unnecessary_cast)]
+    #[allow(unused_variables)]
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     pub fn gen_hashed_block_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         qemu: Qemu,

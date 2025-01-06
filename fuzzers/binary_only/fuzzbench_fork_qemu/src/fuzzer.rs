@@ -176,7 +176,7 @@ fn fuzz(
     );
 
     let emulator = Emulator::empty()
-        .qemu_config(|_| args)
+        .qemu_parameters(args)
         .modules(emulator_modules)
         .build()?;
 

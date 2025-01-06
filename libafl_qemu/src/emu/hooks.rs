@@ -1211,7 +1211,7 @@ where
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `syscalls_function`
-    #[expect(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub unsafe fn pre_syscalls_function(
         &mut self,
         hook: PreSyscallHookFn<ET, S>,
@@ -1221,7 +1221,7 @@ where
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `syscalls_closure`
-    #[expect(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub unsafe fn pre_syscalls_closure(
         &mut self,
         hook: PreSyscallHookClosure<ET, S>,
@@ -1235,7 +1235,7 @@ where
 
     /// # Safety
     /// Calls through to the, potentially unsafe, `after_syscalls_function`
-    #[expect(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub unsafe fn post_syscalls_function(
         &mut self,
         hook: PostSyscallHookFn<ET, S>,
@@ -1243,7 +1243,7 @@ where
         self.hooks.post_syscalls_function(hook)
     }
 
-    #[expect(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)]
     pub fn post_syscalls_closure(
         &mut self,
         hook: PostSyscallHookClosure<ET, S>,

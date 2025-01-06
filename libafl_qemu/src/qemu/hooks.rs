@@ -1,7 +1,7 @@
 //! The high-level hooks
-#![expect(clippy::type_complexity)]
-#![expect(clippy::missing_transmute_annotations)]
-#![expect(clippy::too_many_arguments)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::missing_transmute_annotations)]
+#![allow(clippy::too_many_arguments)]
 
 use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 

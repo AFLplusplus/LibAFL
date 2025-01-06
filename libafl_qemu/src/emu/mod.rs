@@ -120,6 +120,9 @@ pub struct InputLocation {
     ret_register: Option<Regs>,
 }
 
+/// The high-level interface to [`Qemu`].
+///
+/// It embeds
 #[derive(Debug)]
 #[expect(clippy::type_complexity)]
 pub struct Emulator<CM, ED, ET, S, SM>
@@ -335,7 +338,7 @@ where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
-    #[expect(clippy::must_use_candidate, clippy::similar_names)]
+    #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new<T>(
         qemu_params: T,
         modules: ET,

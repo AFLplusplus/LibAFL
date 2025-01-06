@@ -68,7 +68,7 @@ pub fn fuzz() {
         );
 
         let emu = Emulator::builder()
-            .qemu_config(|_| args)
+            .qemu_parameters(args)
             .modules(modules)
             .build()?;
 
