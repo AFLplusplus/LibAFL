@@ -2,7 +2,7 @@
 //!
 
 use core::hash::Hash;
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use fastbloom::BloomFilter;
 use libafl_bolts::{
