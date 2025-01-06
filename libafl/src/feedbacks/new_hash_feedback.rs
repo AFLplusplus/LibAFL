@@ -1,4 +1,4 @@
-//! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
+//! The [`NewHashFeedback`] uses the backtrace hash and a hashset to only keep novel cases
 
 use alloc::{borrow::Cow, string::ToString};
 use std::fmt::Debug;

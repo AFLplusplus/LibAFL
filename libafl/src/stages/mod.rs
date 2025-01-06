@@ -612,13 +612,6 @@ mod test {
     /// Test to test retries in stages
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
-        // # Safety
-        // No concurrency per testcase
-        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
-        unsafe {
-            RetryCountRestartHelper::register();
-        }
-
         struct StageWithOneTry;
 
         impl Named for StageWithOneTry {
@@ -626,6 +619,13 @@ mod test {
                 static NAME: Cow<'static, str> = Cow::Borrowed("TestStage");
                 &NAME
             }
+        }
+
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            RetryCountRestartHelper::register();
         }
 
         let mut state = StdState::nop()?;

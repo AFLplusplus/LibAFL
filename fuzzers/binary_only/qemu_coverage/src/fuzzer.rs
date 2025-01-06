@@ -7,7 +7,7 @@ use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, NopCorpus},
+    corpus::{Corpus, InMemoryCorpus},
     events::{
         launcher::Launcher, ClientDescription, EventConfig, EventRestarter,
         LlmpRestartingEventManager,
@@ -31,7 +31,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     modules::{drcov::DrCovModule, StdAddressFilter},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor,
     QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 
@@ -123,80 +123,93 @@ pub fn fuzz() {
 
     env::remove_var("LD_LIBRARY_PATH");
 
-    let qemu = Qemu::init(&options.args).unwrap();
-
-    let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
-
-    let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
-        .expect("Symbol LLVMFuzzerTestOneInput not found");
-    log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
-
-    qemu.entry_break(test_one_input_ptr);
-
-    for m in qemu.mappings() {
-        log::debug!(
-            "Mapping: 0x{:016x}-0x{:016x}, {}",
-            m.start(),
-            m.end(),
-            m.path().unwrap_or(&"<EMPTY>".to_string())
-        );
-    }
-
-    let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
-    log::debug!("Break at {pc:#x}");
-
-    let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
-    log::debug!("Return address = {ret_addr:#x}");
-
-    qemu.set_breakpoint(ret_addr);
-
-    let input_addr = qemu
-        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
-        .unwrap();
-    log::debug!("Placing input at {input_addr:#x}");
-
-    let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
-
-    let reset = |buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
-        unsafe {
-            let _ = qemu.write_mem(input_addr, buf);
-            qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
-            qemu.write_reg(Regs::Sp, stack_ptr)?;
-            qemu.write_return_address(ret_addr)?;
-            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
-            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
-
-            match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {}
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
-                }
-                _ => panic!("Unexpected QEMU exit."),
-            }
-
-            Ok(())
-        }
-    };
-
-    let mut harness =
-        |_emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
-            let target = input.target_bytes();
-            let mut buf = target.as_slice();
-            let mut len = buf.len();
-            if len > MAX_INPUT_SIZE {
-                buf = &buf[0..MAX_INPUT_SIZE];
-                len = MAX_INPUT_SIZE;
-            }
-            let len = len as GuestReg;
-            reset(buf, len).unwrap();
-            ExitKind::Ok
-        };
-
     let mut run_client = |state: Option<_>,
                           mut mgr: LlmpRestartingEventManager<_, _, _>,
                           client_description: ClientDescription| {
+        let mut cov_path = options.coverage_path.clone();
+
+        let emulator_modules = tuple_list!(DrCovModule::builder()
+            .filter(StdAddressFilter::default())
+            .filename(cov_path.clone())
+            .full_trace(false)
+            .build());
+
+        let emulator = Emulator::empty()
+            .qemu_parameters(options.args.clone())
+            .modules(emulator_modules)
+            .build()
+            .expect("QEMU initialization failed");
+        let qemu = emulator.qemu();
+
+        let mut elf_buffer = Vec::new();
+        let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
+
+        let test_one_input_ptr = elf
+            .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
+            .expect("Symbol LLVMFuzzerTestOneInput not found");
+        log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+
+        qemu.entry_break(test_one_input_ptr);
+
+        for m in qemu.mappings() {
+            log::debug!(
+                "Mapping: 0x{:016x}-0x{:016x}, {}",
+                m.start(),
+                m.end(),
+                m.path().unwrap_or(&"<EMPTY>".to_string())
+            );
+        }
+
+        let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
+        log::debug!("Break at {pc:#x}");
+
+        let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
+        log::debug!("Return address = {ret_addr:#x}");
+
+        qemu.set_breakpoint(ret_addr);
+
+        let input_addr = qemu
+            .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+            .unwrap();
+        log::debug!("Placing input at {input_addr:#x}");
+
+        let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
+
+        let reset = |buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
+            unsafe {
+                let _ = qemu.write_mem(input_addr, buf);
+                qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
+                qemu.write_reg(Regs::Sp, stack_ptr)?;
+                qemu.write_return_address(ret_addr)?;
+                qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)?;
+                qemu.write_function_argument(CallingConvention::Cdecl, 1, len)?;
+
+                match qemu.run() {
+                    Ok(QemuExitReason::Breakpoint(_)) => {}
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                        Signal::SigInterrupt,
+                    ))) => process::exit(0),
+                    _ => panic!("Unexpected QEMU exit."),
+                }
+
+                Ok(())
+            }
+        };
+
+        let mut harness =
+            |_emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+                let target = input.target_bytes();
+                let mut buf = target.as_slice();
+                let mut len = buf.len();
+                if len > MAX_INPUT_SIZE {
+                    buf = &buf[0..MAX_INPUT_SIZE];
+                    len = MAX_INPUT_SIZE;
+                }
+                let len = len as GuestReg;
+                reset(buf, len).unwrap();
+                ExitKind::Ok
+            };
+
         let core_id = client_description.core_id();
         let core_idx = options
             .cores
@@ -221,8 +234,8 @@ pub fn fuzz() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 StdRand::new(),
-                NopCorpus::new(),
-                NopCorpus::new(),
+                InMemoryCorpus::new(),
+                InMemoryCorpus::new(),
                 &mut feedback,
                 &mut objective,
             )
@@ -232,22 +245,10 @@ pub fn fuzz() {
         let scheduler = QueueScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut cov_path = options.coverage_path.clone();
         let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
         let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
         let core = core_id.0;
         cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
-
-        let emulator_modules = tuple_list!(DrCovModule::builder()
-            .filter(StdAddressFilter::default())
-            .filename(cov_path)
-            .full_trace(false)
-            .build());
-
-        let emulator = Emulator::empty()
-            .qemu(qemu)
-            .modules(emulator_modules)
-            .build()?;
 
         let mut executor = QemuExecutor::new(
             emulator,

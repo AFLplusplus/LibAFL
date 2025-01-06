@@ -13,6 +13,7 @@ use crate::{
     emu::EmulatorModules,
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, NopAddressFilter},
     qemu::Hook,
+    Qemu,
 };
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
@@ -264,7 +265,7 @@ where
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -276,14 +277,16 @@ where
     }
 
     #[cfg(feature = "usermode")]
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         if self.module_mapping.is_none() {
             log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
-
-            let qemu = emulator_modules.qemu();
 
             let mut module_mapping: RangeMap<u64, (u16, String)> = RangeMap::new();
 
@@ -307,8 +310,12 @@ where
     }
 
     #[cfg(feature = "systemmode")]
-    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         assert!(
@@ -319,6 +326,7 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
+        _qemu: Qemu,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
         _input: &S::Input,
@@ -359,6 +367,7 @@ where
 }
 
 pub fn gen_unique_block_ids<ET, F, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
@@ -409,6 +418,7 @@ where
 
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn gen_block_lengths<ET, F, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
@@ -432,6 +442,7 @@ pub fn gen_block_lengths<ET, F, S>(
 
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn exec_trace_block<ET, F, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,
