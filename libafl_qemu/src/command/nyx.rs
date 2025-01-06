@@ -1,9 +1,9 @@
 //! # Nyx API Command handlers
 //!
 //! Nyx command handlers.
-//! Makes it possible to run Nyx targets in LibAFL QEMU.
+//! Makes it possible to run Nyx targets in `LibAFL` QEMU.
 //! The [Nyx API](https://github.com/IntelLabs/kafl.targets/blob/master/nyx_api.h) refers to the hypercalls used in Nyx to communicate with the fuzzer, not to the fuzzer itself.
-//! This is mostly a convenient way to run Nyx-compatible targets in LibAFL QEMU directly, without having to change a single bit of the target files.
+//! This is mostly a convenient way to run Nyx-compatible targets in `LibAFL` QEMU directly, without having to change a single bit of the target files.
 
 use std::{
     fmt,
