@@ -169,13 +169,13 @@ mod test {
         let first_eval = vbf
             .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
             .unwrap();
-        assert_eq!(first_eval, true);
+        assert!(first_eval);
 
         let second_eval = vbf
             .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
             .unwrap();
 
-        assert_ne!(first_eval, second_eval);
+        assert!(!second_eval);
 
         unsafe {
             write_volatile(&raw mut VALUE, 1234_u32);
@@ -184,6 +184,6 @@ mod test {
         let next_eval = vbf
             .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
             .unwrap();
-        assert_eq!(next_eval, true);
+        assert!(next_eval);
     }
 }
