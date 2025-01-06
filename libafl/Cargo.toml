@@ -39,7 +39,6 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
-  "value_bloom_feedback",
 ]
 document-features = ["dep:document-features"]
 
