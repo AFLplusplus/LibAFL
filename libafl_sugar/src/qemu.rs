@@ -118,7 +118,7 @@ where
 {
     /// Run the fuzzer
     #[expect(clippy::too_many_lines)]
-    pub fn run(&mut self, qemu: Qemu) {
+    pub fn run(&mut self, qemu_cli: &[String]) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -240,7 +240,11 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
+                let emulator = Emulator::empty()
+                    .qemu_parameters(qemu_cli.to_owned())
+                    .modules(modules)
+                    .build()
+                    .expect("Could not initialize Emulator");
 
                 let executor = QemuExecutor::new(
                     emulator,
@@ -357,7 +361,11 @@ where
                     ExitKind::Ok
                 };
 
-                let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
+                let emulator = Emulator::empty()
+                    .qemu_parameters(qemu_cli.to_owned())
+                    .modules(modules)
+                    .build()
+                    .expect("Could not initialize Emulator");
 
                 let mut executor = QemuExecutor::new(
                     emulator,
@@ -476,7 +484,6 @@ pub mod pybind {
     use std::path::PathBuf;
 
     use libafl_bolts::core_affinity::Cores;
-    use libafl_qemu::qemu::pybind::Qemu;
     use pyo3::{prelude::*, types::PyBytes};
 
     use crate::qemu;
@@ -533,7 +540,7 @@ pub mod pybind {
 
         /// Run the fuzzer
         #[expect(clippy::needless_pass_by_value)]
-        pub fn run(&self, qemu: &Qemu, harness: PyObject) {
+        pub fn run(&self, qemu_cli: Vec<String>, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
@@ -552,7 +559,7 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(qemu.qemu);
+                .run(&qemu_cli);
         }
     }
 

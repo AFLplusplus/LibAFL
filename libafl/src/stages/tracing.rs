@@ -42,10 +42,10 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     EM: UsesState<State = S>, //delete me
 {
-    #[expect(rustdoc::broken_intra_doc_links)]
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
     /// see [`super::ConcolicTracingStage`]'s implementation as an example of usage.
+    #[allow(rustdoc::broken_intra_doc_links)]
     pub fn trace(&mut self, fuzzer: &mut Z, state: &mut S, manager: &mut EM) -> Result<(), Error> {
         start_timer!(state);
         let input = state.current_input_cloned()?;

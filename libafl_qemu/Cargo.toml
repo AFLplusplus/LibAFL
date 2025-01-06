@@ -1,7 +1,10 @@
 [package]
 name = "libafl_qemu"
 version.workspace = true
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Romain Malmain <rmalmain@pm.me>",
+]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
 repository = "https://github.com/AFLplusplus/LibAFL/"

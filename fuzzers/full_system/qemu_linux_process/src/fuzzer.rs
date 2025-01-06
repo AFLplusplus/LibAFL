@@ -58,7 +58,7 @@ where
     <S as UsesInput>::Input: HasTargetBytes,
 {
     Emulator::empty()
-        .qemu_cli(args)
+        .qemu_parameters(args)
         .modules(modules)
         .driver(
             NyxEmulatorDriver::builder()

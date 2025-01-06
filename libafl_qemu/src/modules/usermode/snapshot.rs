@@ -681,7 +681,7 @@ where
 {
     type ModuleAddressFilter = NopAddressFilter;
 
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -698,23 +698,24 @@ where
         }
 
         if !self.accurate_unmap {
-            emulator_modules.syscalls(Hook::Function(filter_mmap_snapshot::<ET, S>));
+            emulator_modules.pre_syscalls(Hook::Function(filter_mmap_snapshot::<ET, S>));
         }
-        emulator_modules.after_syscalls(Hook::Function(trace_mmap_snapshot::<ET, S>));
+        emulator_modules.post_syscalls(Hook::Function(trace_mmap_snapshot::<ET, S>));
     }
 
     fn pre_exec<ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
         _input: &S::Input,
     ) where
         ET: EmulatorModuleTuple<S>,
     {
         if self.empty {
-            self.snapshot(emulator_modules.qemu());
+            self.snapshot(qemu);
         } else {
-            self.reset(emulator_modules.qemu());
+            self.reset(qemu);
         }
     }
 
@@ -728,6 +729,7 @@ where
 }
 
 pub fn trace_write_snapshot<ET, S, const SIZE: usize>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
@@ -741,6 +743,7 @@ pub fn trace_write_snapshot<ET, S, const SIZE: usize>(
 }
 
 pub fn trace_write_n_snapshot<ET, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     _id: u64,
@@ -756,6 +759,7 @@ pub fn trace_write_n_snapshot<ET, S>(
 
 #[expect(clippy::too_many_arguments)]
 pub fn filter_mmap_snapshot<ET, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     sys_num: i32,
@@ -783,6 +787,7 @@ where
 
 #[expect(non_upper_case_globals, clippy::too_many_arguments)]
 pub fn trace_mmap_snapshot<ET, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     result: GuestAddr,

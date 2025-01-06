@@ -15,13 +15,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "systemmode")]
 use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 #[cfg(feature = "usermode")]
-use crate::{capstone, qemu::ArchExtras, CallingConvention, Qemu};
+use crate::{capstone, qemu::ArchExtras, CallingConvention};
 use crate::{
     emu::EmulatorModules,
     modules::{
         utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::Hook,
+    Qemu,
 };
 
 #[cfg_attr(
@@ -77,8 +78,12 @@ where
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         emulator_modules.cmps(
@@ -142,8 +147,12 @@ where
 
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         emulator_modules.cmps(
@@ -175,6 +184,7 @@ where
 }
 
 pub fn gen_unique_cmp_ids<ET, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
@@ -207,6 +217,7 @@ where
 
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn gen_hashed_cmp_ids<ET, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
@@ -301,6 +312,7 @@ impl CmpLogRoutinesModule {
 
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     fn gen_blocks_calls<ET, S>(
+        qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
@@ -322,8 +334,6 @@ impl CmpLogRoutinesModule {
             })
             .unwrap();
         }
-
-        let qemu = emulator_modules.qemu();
 
         if let Some(h) = emulator_modules.get::<Self>() {
             #[allow(unused_mut)] // cfg dependent
@@ -396,8 +406,12 @@ where
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         emulator_modules.blocks(

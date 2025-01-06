@@ -1,30 +1,33 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::marker::PhantomData;
 
 use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     state::{HasExecutions, State},
 };
-use libafl_bolts::tuples::{tuple_list, Prepend};
+use libafl_bolts::tuples::{tuple_list, Append, Prepend};
 
 #[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
 use crate::{
     command::{CommandManager, NopCommandManager, StdCommandManager},
-    config::QemuConfig,
+    config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
-    Emulator, EmulatorHooks, NopEmulatorDriver, NopSnapshotManager, Qemu, QemuHooks, QemuInitError,
-    StdEmulatorDriver, StdSnapshotManager,
+    Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
+    StdSnapshotManager,
 };
+#[cfg(doc)]
+use crate::{config::QemuConfig, Qemu};
 
-#[derive(Clone, Debug)]
-enum QemuBuilder {
-    Qemu(Qemu),
-    QemuConfig(QemuConfig),
-    QemuString(Vec<String>),
-}
-
-#[derive(Clone, Debug)]
-pub struct EmulatorBuilder<CM, ED, ET, S, SM>
+/// An [`Emulator`] Builder.
+///
+/// It is the most common way to create a new [`Emulator`].
+/// In addition to the main components of an [`Emulator`], it expects to receive a way to initialize [`Qemu`].
+/// It must be set through [`EmulatorBuilder::qemu_parameters`].
+/// At the moment, there are two main ways to initialize QEMU:
+/// - with a QEMU-compatible CLI. It will be given to QEMU as-is. The first argument should always be a path to the running binary, as expected by execve.
+/// - with an instance of [`QemuConfig`]. It is a more programmatic way to configure [`Qemu`]. It should be built using [`QemuConfigBuilder`].
+#[derive(Clone)]
+pub struct EmulatorBuilder<CM, ED, ET, QP, S, SM>
 where
     S: UsesInput,
 {
@@ -32,11 +35,19 @@ where
     driver: ED,
     snapshot_manager: SM,
     command_manager: CM,
-    qemu_builder: Option<QemuBuilder>,
+    qemu_parameters: Option<QP>,
     phantom: PhantomData<S>,
 }
 
-impl<S> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager>
+impl<S>
+    EmulatorBuilder<
+        NopCommandManager,
+        NopEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        S,
+        NopSnapshotManager,
+    >
 where
     S: UsesInput,
 {
@@ -47,14 +58,22 @@ where
             driver: NopEmulatorDriver,
             snapshot_manager: NopSnapshotManager,
             command_manager: NopCommandManager,
-            qemu_builder: None,
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
 }
 
 #[cfg(feature = "usermode")]
-impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
+impl<S>
+    EmulatorBuilder<
+        StdCommandManager<S>,
+        StdEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        S,
+        StdSnapshotManager,
+    >
 where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
@@ -67,14 +86,22 @@ where
             command_manager: StdCommandManager::default(),
             snapshot_manager: StdSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
-            qemu_builder: None,
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
 }
 
 #[cfg(feature = "systemmode")]
-impl<S> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager>
+impl<S>
+    EmulatorBuilder<
+        StdCommandManager<S>,
+        StdEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        S,
+        StdSnapshotManager,
+    >
 where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
@@ -87,12 +114,12 @@ where
             command_manager: StdCommandManager::default(),
             snapshot_manager: FastSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
-            qemu_builder: None,
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
 }
-impl<CM, ED, ET, S, SM> EmulatorBuilder<CM, ED, ET, S, SM>
+impl<CM, ED, ET, QP, S, SM> EmulatorBuilder<CM, ED, ET, QP, S, SM>
 where
     S: UsesInput + Unpin,
 {
@@ -101,90 +128,63 @@ where
         driver: ED,
         command_manager: CM,
         snapshot_manager: SM,
-        qemu_builder: Option<QemuBuilder>,
+        qemu_parameters: Option<QP>,
     ) -> Self {
         Self {
             modules,
             command_manager,
             driver,
             snapshot_manager,
-            qemu_builder,
+            qemu_parameters,
             phantom: PhantomData,
         }
     }
 
-    pub fn build(self) -> Result<Emulator<CM, ED, ET, S, SM>, QemuInitError>
+    pub fn build<E>(self) -> Result<Emulator<CM, ED, ET, S, SM>, QemuInitError>
     where
         CM: CommandManager<ED, ET, S, SM>,
         ET: EmulatorModuleTuple<S>,
+        QP: TryInto<QemuParams, Error = E>,
+        QemuInitError: From<E>,
     {
-        let qemu_builder = self.qemu_builder.ok_or(QemuInitError::EmptyArgs)?;
+        let qemu_params: QemuParams = self
+            .qemu_parameters
+            .ok_or(QemuInitError::NoParametersProvided)?
+            .try_into()?;
 
-        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
-
-        self.modules.pre_qemu_init_all(&mut emulator_hooks);
-
-        let qemu: Qemu = match qemu_builder {
-            QemuBuilder::Qemu(qemu) => qemu,
-            QemuBuilder::QemuConfig(qemu_config) => {
-                let res: Result<Qemu, QemuInitError> = qemu_config.into();
-                res?
-            }
-            QemuBuilder::QemuString(qemu_string) => Qemu::init(&qemu_string)?,
-        };
-
-        unsafe {
-            Ok(Emulator::new_with_qemu(
-                qemu,
-                emulator_hooks,
-                self.modules,
-                self.driver,
-                self.snapshot_manager,
-                self.command_manager,
-            ))
-        }
+        Emulator::new(
+            qemu_params,
+            self.modules,
+            self.driver,
+            self.snapshot_manager,
+            self.command_manager,
+        )
     }
 }
 
-impl<CM, ED, ET, S, SM> EmulatorBuilder<CM, ED, ET, S, SM>
+impl<CM, ED, ET, QP, S, SM> EmulatorBuilder<CM, ED, ET, QP, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput + Unpin,
 {
     #[must_use]
-    pub fn qemu_config(self, qemu_config: QemuConfig) -> EmulatorBuilder<CM, ED, ET, S, SM> {
+    pub fn qemu_parameters<QP2>(
+        self,
+        qemu_parameters: QP2,
+    ) -> EmulatorBuilder<CM, ED, ET, QP2, S, SM>
+    where
+        QP2: Into<QemuParams>,
+    {
         EmulatorBuilder::new(
             self.modules,
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            Some(QemuBuilder::QemuConfig(qemu_config)),
+            Some(qemu_parameters),
         )
     }
 
-    #[must_use]
-    pub fn qemu_cli(self, qemu_cli: Vec<String>) -> EmulatorBuilder<CM, ED, ET, S, SM> {
-        EmulatorBuilder::new(
-            self.modules,
-            self.driver,
-            self.command_manager,
-            self.snapshot_manager,
-            Some(QemuBuilder::QemuString(qemu_cli)),
-        )
-    }
-
-    #[must_use]
-    pub fn qemu(self, qemu: Qemu) -> EmulatorBuilder<CM, ED, ET, S, SM> {
-        EmulatorBuilder::new(
-            self.modules,
-            self.driver,
-            self.command_manager,
-            self.snapshot_manager,
-            Some(QemuBuilder::Qemu(qemu)),
-        )
-    }
-
-    pub fn add_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), S, SM>
+    pub fn prepend_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), QP, S, SM>
     where
         EM: EmulatorModule<S> + Unpin,
         ET: EmulatorModuleTuple<S>,
@@ -194,21 +194,38 @@ where
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
-    pub fn driver<ED2>(self, driver: ED2) -> EmulatorBuilder<CM, ED2, ET, S, SM> {
+    pub fn append_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (ET, EM), QP, S, SM>
+    where
+        EM: EmulatorModule<S> + Unpin,
+        ET: EmulatorModuleTuple<S>,
+    {
+        EmulatorBuilder::new(
+            self.modules.append(module),
+            self.driver,
+            self.command_manager,
+            self.snapshot_manager,
+            self.qemu_parameters,
+        )
+    }
+
+    pub fn driver<ED2>(self, driver: ED2) -> EmulatorBuilder<CM, ED2, ET, QP, S, SM> {
         EmulatorBuilder::new(
             self.modules,
             driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
-    pub fn command_manager<CM2>(self, command_manager: CM2) -> EmulatorBuilder<CM2, ED, ET, S, SM>
+    pub fn command_manager<CM2>(
+        self,
+        command_manager: CM2,
+    ) -> EmulatorBuilder<CM2, ED, ET, QP, S, SM>
     where
         CM2: CommandManager<ED, ET, S, SM>,
     {
@@ -217,30 +234,30 @@ where
             self.driver,
             command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
-    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<CM, ED, ET2, S, SM> {
+    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<CM, ED, ET2, QP, S, SM> {
         EmulatorBuilder::new(
             modules,
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 
     pub fn snapshot_manager<SM2>(
         self,
         snapshot_manager: SM2,
-    ) -> EmulatorBuilder<CM, ED, ET, S, SM2> {
+    ) -> EmulatorBuilder<CM, ED, ET, QP, S, SM2> {
         EmulatorBuilder::new(
             self.modules,
             self.driver,
             self.command_manager,
             snapshot_manager,
-            self.qemu_builder,
+            self.qemu_parameters,
         )
     }
 }
