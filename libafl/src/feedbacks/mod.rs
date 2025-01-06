@@ -54,6 +54,11 @@ pub use capture_feedback::CaptureTimeoutFeedback;
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 
+#[cfg(feature = "value_bloom_feedback")]
+pub mod value_bloom;
+#[cfg(feature = "value_bloom_feedback")]
+pub use value_bloom::ValueBloomFeedback;
+
 /// Feedback which initializes a state.
 ///
 /// This trait is separate from the general [`Feedback`] definition as it would not be sufficiently
