@@ -107,8 +107,7 @@ pub fn fuzz() {
                 .file(format!("{target_dir}/dummy.qcow2"))
                 .build()])
             .start_cpu(false)
-            .build()
-            .expect("Could not build QEMU configuration");
+            .build();
 
         let emulator_modules = tuple_list!(StdEdgeCoverageModuleBuilder::default()
             .map_observer(edges_observer.as_mut())
