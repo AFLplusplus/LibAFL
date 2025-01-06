@@ -396,8 +396,8 @@ impl SnapshotModule {
             if new_brk < self.brk {
                 // The heap has shrunk below the snapshotted brk value. We need to remap those pages in the target.
                 // The next for loop will restore their content if needed.
-                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as u64))
-                    & (!(SNAPSHOT_PAGE_SIZE - 1) as u64);
+                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
                 log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
                 drop(qemu.map_fixed(
                     aligned_new_brk,
