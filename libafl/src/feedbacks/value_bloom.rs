@@ -185,6 +185,5 @@ mod test {
             .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
             .unwrap();
         assert_eq!(next_eval, true);
-
     }
 }
