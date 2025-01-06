@@ -97,6 +97,58 @@ where
 
     #[cfg(feature = "track_hit_feedbacks")]
     fn last_result(&self) -> Result<bool, Error> {
-        self.last_result.ok_or_else(|| Error::illegal_state("No last result set in `ValueBloomFeedback`. Either `is_interesting` has never been called or the fuzzer restarted in the meantime."))
+        self.last_result.ok_or_else(|| Error::illegal_state("No last result set in `BoolValuefeedback`. Either `is_interesting` has never been called or the fuzzer restarted in the meantime."))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::{cell::UnsafeCell, ptr::write_volatile};
+
+    use libafl_bolts::{ownedref::OwnedRef, tuples::Handled};
+    use tuple_list::tuple_list;
+
+    use crate::{
+        executors::ExitKind,
+        feedbacks::{BoolValueFeedback, Feedback, StateInitializer},
+        observers::ValueObserver,
+        state::NopState,
+    };
+
+    #[test]
+    fn test_value_bloom_feedback() {
+        let value: UnsafeCell<bool> = false.into();
+
+        // # Safety
+        // The value is only read from in the feedback, not while we change the value.
+        let value_ptr = unsafe { OwnedRef::from_ptr(value.get()) };
+
+        let observer = ValueObserver::new("test_value", value_ptr);
+
+        let mut bool_feedback = BoolValueFeedback::new(&observer.handle());
+
+        let mut state: NopState<()> = NopState::new();
+        bool_feedback.init_state(&mut state).unwrap();
+
+        let observers = tuple_list!(observer);
+        let mut mgr = ();
+        let input = ();
+        let exit_ok = ExitKind::Ok;
+
+        let false_eval = bool_feedback
+            .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
+            .unwrap();
+        assert!(!false_eval);
+
+        // # Safety
+        // The feedback is not keeping a borrow around, only the pointer.
+        unsafe {
+            write_volatile(value.get(), true);
+        }
+
+        let true_eval = bool_feedback
+            .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
+            .unwrap();
+        assert!(true_eval);
     }
 }
