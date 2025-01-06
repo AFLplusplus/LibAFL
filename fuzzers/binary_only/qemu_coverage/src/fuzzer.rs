@@ -7,7 +7,7 @@ use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, NopCorpus},
+    corpus::{Corpus, InMemoryCorpus},
     events::{
         launcher::Launcher, ClientDescription, EventConfig, EventRestarter,
         LlmpRestartingEventManager,
@@ -221,8 +221,8 @@ pub fn fuzz() {
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 StdRand::new(),
-                NopCorpus::new(),
-                NopCorpus::new(),
+                InMemoryCorpus::new(),
+                InMemoryCorpus::new(),
                 &mut feedback,
                 &mut objective,
             )
