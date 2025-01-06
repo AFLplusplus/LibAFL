@@ -29,6 +29,8 @@ slirp = []  # build qemu with host libslirp (for user networking)
 
 clippy = [] # special feature for clippy, don't use in normal projects§
 
+qemu_sanitizers = [] # Enable QEMU sanitizers
+
 paranoid_debug = [
 ] # Will perform as many checks as possible. The target will be greatly slowed down.
 

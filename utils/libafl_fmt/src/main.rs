@@ -223,6 +223,7 @@ async fn main() -> io::Result<()> {
         r".*Little-CMS.*",
         r".*cms_transform_fuzzer.cc.*",
         r".*sqlite3.*",
+        r".*libfuzzer_libmozjpeg.*",
     ])
     .expect("Could not create the regex set from the given regex");
 
