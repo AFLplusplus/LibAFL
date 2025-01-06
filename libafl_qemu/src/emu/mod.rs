@@ -20,7 +20,7 @@ use crate::{
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
-    sync_exit::SyncExit,
+    sync_exit::CustomInsn,
     Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk, QemuParams,
     QemuShutdownCause, Regs, CPU,
 };
@@ -62,8 +62,8 @@ where
 {
     QemuExit(QemuShutdownCause),               // QEMU ended for some reason.
     Breakpoint(Breakpoint<CM, ED, ET, S, SM>), // Breakpoint triggered. Contains the address of the trigger.
-    SyncExit(SyncExit<CM, ED, ET, S, SM>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
-    Timeout,                               // Timeout
+    CustomInsn(CustomInsn<CM, ED, ET, S, SM>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    Timeout,                                   // Timeout
 }
 
 impl<CM, ED, ET, S, SM> Clone for EmulatorExitResult<CM, ED, ET, S, SM>
@@ -77,8 +77,8 @@ where
                 EmulatorExitResult::QemuExit(qemu_exit.clone())
             }
             EmulatorExitResult::Breakpoint(bp) => EmulatorExitResult::Breakpoint(bp.clone()),
-            EmulatorExitResult::SyncExit(sync_exit) => {
-                EmulatorExitResult::SyncExit(sync_exit.clone())
+            EmulatorExitResult::CustomInsn(sync_exit) => {
+                EmulatorExitResult::CustomInsn(sync_exit.clone())
             }
             EmulatorExitResult::Timeout => EmulatorExitResult::Timeout,
         }
@@ -98,7 +98,7 @@ where
             EmulatorExitResult::Breakpoint(bp) => {
                 write!(f, "{bp:?}")
             }
-            EmulatorExitResult::SyncExit(sync_exit) => {
+            EmulatorExitResult::CustomInsn(sync_exit) => {
                 write!(f, "{sync_exit:?}")
             }
             EmulatorExitResult::Timeout => {
@@ -220,6 +220,16 @@ impl InputLocation {
             ret_register,
         }
     }
+
+    #[must_use]
+    pub fn mem_chunk(&self) -> &QemuMemoryChunk {
+        &self.mem_chunk
+    }
+
+    #[must_use]
+    pub fn ret_register(&self) -> &Option<Regs> {
+        &self.ret_register
+    }
 }
 
 impl From<EmulatorExitError> for EmulatorDriverError {
@@ -243,7 +253,7 @@ where
         match self {
             EmulatorExitResult::QemuExit(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
             EmulatorExitResult::Breakpoint(bp) => write!(f, "{bp}"),
-            EmulatorExitResult::SyncExit(sync_exit) => {
+            EmulatorExitResult::CustomInsn(sync_exit) => {
                 write!(f, "Sync exit: {sync_exit:?}")
             }
             EmulatorExitResult::Timeout => {
@@ -445,7 +455,9 @@ where
             ED::pre_qemu_exec(self, input);
 
             // Run QEMU
+            log::debug!("Running QEMU...");
             let mut exit_reason = self.run_qemu();
+            log::debug!("QEMU stopped.");
 
             // Handle QEMU exit
             if let Some(exit_handler_result) =
@@ -479,7 +491,7 @@ where
                         .clone();
                     EmulatorExitResult::Breakpoint(bp.clone())
                 }
-                QemuExitReason::SyncExit => EmulatorExitResult::SyncExit(SyncExit::new(
+                QemuExitReason::SyncExit => EmulatorExitResult::CustomInsn(CustomInsn::new(
                     self.command_manager.parse(self.qemu)?,
                 )),
             }),

@@ -30,8 +30,8 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::{drcov::DrCovModule, StdAddressFilter},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor,
+    modules::{drcov::DrCovModule, utils::filters::StdAddressFilter},
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
     QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 

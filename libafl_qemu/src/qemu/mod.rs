@@ -675,7 +675,7 @@ impl Qemu {
                     let bp_addr = exit_reason.data.breakpoint.addr;
                     QemuExitReason::Breakpoint(bp_addr)
                 },
-                libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
+                libafl_qemu_sys::libafl_exit_reason_kind_CUSTOM_INSN => QemuExitReason::SyncExit,
 
                 #[cfg(feature = "systemmode")]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,

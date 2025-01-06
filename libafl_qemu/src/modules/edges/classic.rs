@@ -8,8 +8,9 @@ use super::{
 };
 use crate::{
     modules::{
+        utils::filters::{StdAddressFilter, StdPageFilter},
         AddressFilter, EdgeCoverageModule, EdgeCoverageModuleBuilder, EmulatorModuleTuple,
-        PageFilter, StdAddressFilter, StdPageFilter,
+        PageFilter,
     },
     EmulatorModules, Hook,
 };

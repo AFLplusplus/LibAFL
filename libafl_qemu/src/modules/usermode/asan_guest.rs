@@ -14,7 +14,9 @@ use libafl_qemu_sys::{GuestAddr, MapInfo};
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
     emu::EmulatorModules,
-    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
+    modules::{
+        utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::{Hook, MemAccessInfo, Qemu},
     sys::TCGTemp,
     QemuParams,

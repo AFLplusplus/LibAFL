@@ -91,6 +91,8 @@ static int harness_find_kallsyms_lookup(void) {
 
   lqprintf("kallsyms_lookup_name address = 0x%lx\n", kln_addr);
 
+  if (kln_addr == 0) { return -1; }
+
   kln_pointer = (unsigned long (*)(const char *name))kln_addr;
 
   return ret;
@@ -108,6 +110,8 @@ static int __init harness_init(void) {
 
   err = alloc_chrdev_region(&dev, 0, 1, "harness");
 
+  if (err < 0) { return err; }
+
   dev_major = MAJOR(dev);
 
   harness_class = class_create("harness");
@@ -120,7 +124,9 @@ static int __init harness_init(void) {
 
   device_create(harness_class, NULL, MKDEV(dev_major, 0), NULL, "harness");
 
-  harness_find_kallsyms_lookup();
+  err = harness_find_kallsyms_lookup();
+
+  if (err < 0) { return err; }
 
   return 0;
 }
@@ -135,7 +141,6 @@ static void __exit harness_exit(void) {
 }
 
 static int harness_open(struct inode *inode, struct file *file) {
-  int ret;
   lqprintf("harness: Device open\n");
 
   char *data = kzalloc(BUF_SIZE, GFP_KERNEL);
@@ -143,6 +148,11 @@ static int harness_open(struct inode *inode, struct file *file) {
 
   unsigned long x509_fn_addr = kln_pointer("x509_cert_parse");
   lqprintf("harness: x509 fn addr: 0x%lx\n", x509_fn_addr);
+
+  if (x509_fn_addr == 0) {
+    lqprintf("harness: Error: x509 function not found.\n");
+    return -1;
+  }
 
   // TODO: better filtering...
   libafl_qemu_trace_vaddr_size(x509_fn_addr, 0x1000);
