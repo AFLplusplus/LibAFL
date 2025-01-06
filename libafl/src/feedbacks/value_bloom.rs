@@ -135,6 +135,13 @@ mod test {
         let value: UnsafeCell<u32> = 0_u32.into();
 
         // # Safety
+        // The same testcase doesn't usually run twice
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            super::ValueBloomFeedbackMetadata::register();
+        }
+
+        // # Safety
         // The value is only read from in the feedback, not while we change the value.
         let value_ptr = unsafe { OwnedRef::from_ptr(value.get()) };
 

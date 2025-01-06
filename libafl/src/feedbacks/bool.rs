@@ -116,7 +116,7 @@ mod test {
     };
 
     #[test]
-    fn test_value_bloom_feedback() {
+    fn test_bool_value_feedback() {
         let value: UnsafeCell<bool> = false.into();
 
         // # Safety
