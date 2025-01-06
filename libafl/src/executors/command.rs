@@ -6,7 +6,7 @@ use core::{
     ops::IndexMut,
 };
 #[cfg(all(feature = "intel_pt", target_os = "linux"))]
-use std::ffi::{CStr, CString};
+use std::{ffi::{CStr, CString}, os::fd::AsRawFd};
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
