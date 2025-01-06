@@ -1,6 +1,6 @@
 //! The [`BoolValueFeedback`] is a [`Feedback`] returning `true` or `false` as the `is_interesting` value.
 
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
