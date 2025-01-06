@@ -186,6 +186,5 @@ mod test {
             .unwrap();
         assert_eq!(next_eval, true);
 
-        //assert_eq!(vbf.)
     }
 }
