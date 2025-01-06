@@ -1,8 +1,8 @@
 //! The [`ValueBloomFeedback`] checks if a value has already been observed in a [`BloomFilter`] and returns `true` if the value is new, adding it to the bloom filter.
 //!
 
+use alloc::borrow::Cow;
 use core::hash::Hash;
-use std::borrow::Cow;
 
 use fastbloom::BloomFilter;
 use libafl_bolts::{

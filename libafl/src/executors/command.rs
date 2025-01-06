@@ -5,7 +5,7 @@ use core::{
     marker::PhantomData,
     ops::IndexMut,
 };
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use std::{
     ffi::{CStr, CString},
     os::fd::AsRawFd,
@@ -19,14 +19,14 @@ use std::{
     time::Duration,
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libafl_bolts::core_affinity::CoreId;
 use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     tuples::{Handle, MatchName, RefIndexable},
     AsSlice,
 };
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use libc::STDIN_FILENO;
 #[cfg(target_os = "linux")]
 use nix::{
@@ -42,7 +42,7 @@ use nix::{
     },
     unistd::Pid,
 };
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
@@ -181,7 +181,7 @@ where
 ///
 /// This configurator was primarly developed to be used in conjunction with
 /// [`crate::executors::hooks::intel_pt::IntelPTHook`]
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 #[derive(Debug, Clone, PartialEq, Eq, TypedBuilder)]
 pub struct PTraceCommandConfigurator {
     #[builder(setter(into))]
@@ -198,7 +198,7 @@ pub struct PTraceCommandConfigurator {
     timeout: u32,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "intel_pt", target_os = "linux"))]
 impl<I> CommandConfigurator<I, Pid> for PTraceCommandConfigurator
 where
     I: HasTargetBytes,

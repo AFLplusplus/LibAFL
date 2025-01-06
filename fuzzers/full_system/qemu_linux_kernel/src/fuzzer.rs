@@ -67,14 +67,9 @@ pub fn fuzz() {
             CmpLogModule::default(),
         );
 
-        // let driver = StdEmulatorDriver::builder()
-        //     .print_commands(true)
-        //     .build();
-
         let emu = Emulator::builder()
-            .qemu_cli(args)
+            .qemu_parameters(args)
             .modules(modules)
-            // .driver(driver)
             .build()?;
 
         let devices = emu.list_devices();
