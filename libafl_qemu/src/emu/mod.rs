@@ -122,7 +122,11 @@ pub struct InputLocation {
 
 /// The high-level interface to [`Qemu`].
 ///
-/// It embeds
+/// It embeds multiple structures aiming at making QEMU usage easier:
+///     - A [`SnapshotManager`], implementing the QEMU snapshot method to use.
+///     - An [`EmulatorDriver`], responsible for handling the high-level control flow.
+///     - A [`CommandManager`].
+///     - [`EmulatorModules`].
 #[derive(Debug)]
 #[expect(clippy::type_complexity)]
 pub struct Emulator<CM, ED, ET, S, SM>

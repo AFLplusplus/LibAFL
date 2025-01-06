@@ -4,7 +4,6 @@ use core::{
 };
 use std::path::{Path, PathBuf};
 
-use derive_builder::Builder;
 use getset::Getters;
 use libafl_derive;
 use strum_macros;
@@ -38,7 +37,7 @@ pub enum DiskImageFileFormat {
     Raw,
 }
 
-#[derive(Debug, Clone, Default, Builder)]
+#[derive(Debug, Clone, Default, TypedBuilder)]
 pub struct Drive {
     #[builder(default, setter(strip_option, into))]
     file: Option<PathBuf>,
@@ -46,13 +45,6 @@ pub struct Drive {
     format: Option<DiskImageFileFormat>,
     #[builder(default, setter(strip_option))]
     interface: Option<DriveInterface>,
-}
-
-impl Drive {
-    #[must_use]
-    pub fn builder() -> DriveBuilder {
-        DriveBuilder::default()
-    }
 }
 
 impl Display for Drive {
@@ -305,8 +297,6 @@ impl<R: AsRef<Path>> From<R> for Program {
 }
 
 #[derive(Debug, Clone, libafl_derive::Display, TypedBuilder, Getters)]
-#[getset(get = "pub")]
-// #[builder(pattern = "owned")]
 pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option))]
@@ -364,8 +354,7 @@ mod test {
         let drive = Drive::builder()
             .format(DiskImageFileFormat::Raw)
             .interface(DriveInterface::Ide)
-            .build()
-            .expect("Drive builder failed.");
+            .build();
         assert_eq!(drive.to_string(), "-drive format=raw,if=ide");
     }
 
