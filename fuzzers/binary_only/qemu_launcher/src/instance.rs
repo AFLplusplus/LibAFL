@@ -39,8 +39,10 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     modules::{
-        cmplog::CmpLogObserver, utils::filters::StdAddressFilter, EmulatorModuleTuple,
-        StdEdgeCoverageModule,
+        cmplog::CmpLogObserver,
+        edges::EdgeCoverageFullVariant,
+        utils::filters::{NopPageFilter, StdAddressFilter},
+        EdgeCoverageModule, EmulatorModule, EmulatorModuleTuple, StdEdgeCoverageModule,
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
