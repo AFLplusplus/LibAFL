@@ -1242,6 +1242,7 @@ impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
     metadata: SerdeAnyMap,
+    named_metadata: NamedSerdeAnyMap,
     execution: u64,
     stop_requested: bool,
     rand: StdRand,
@@ -1254,6 +1255,7 @@ impl<I> NopState<I> {
     pub fn new() -> Self {
         NopState {
             metadata: SerdeAnyMap::new(),
+            named_metadata: NamedSerdeAnyMap::new(),
             execution: 0,
             rand: StdRand::default(),
             stop_requested: false,
@@ -1320,6 +1322,16 @@ impl<I> HasMetadata for NopState<I> {
 
     fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
+    }
+}
+
+impl<I> HasNamedMetadata for NopState<I> {
+    fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
+        &self.named_metadata
+    }
+
+    fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
+        &mut self.named_metadata
     }
 }
 

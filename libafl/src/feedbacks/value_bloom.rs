@@ -12,9 +12,9 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Feedback, StateInitializer};
 use crate::{
     executors::ExitKind,
+    feedbacks::{Feedback, StateInitializer},
     observers::{ObserversTuple, ValueObserver},
     HasNamedMetadata,
 };
@@ -117,73 +117,66 @@ impl<EM, I, OT: ObserversTuple<I, S>, S: HasNamedMetadata, T: Hash> Feedback<EM,
 
 #[cfg(test)]
 mod test {
-    use core::ptr::write_volatile;
+    use core::{cell::UnsafeCell, ptr::write_volatile};
 
-    use libafl_bolts::{ownedref::OwnedRef, serdeany::NamedSerdeAnyMap, tuples::Handled};
+    use libafl_bolts::{ownedref::OwnedRef, tuples::Handled};
     use tuple_list::tuple_list;
 
     use super::ValueBloomFeedback;
     use crate::{
-        events::NopEventManager,
         executors::ExitKind,
         feedbacks::{Feedback, StateInitializer},
-        inputs::NopInput,
         observers::ValueObserver,
-        HasNamedMetadata,
+        state::NopState,
     };
-
-    static mut VALUE: u32 = 0;
-
-    struct NamedMetadataState {
-        map: NamedSerdeAnyMap,
-    }
-
-    impl HasNamedMetadata for NamedMetadataState {
-        fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
-            &self.map
-        }
-
-        fn named_metadata_map_mut(&mut self) -> &mut NamedSerdeAnyMap {
-            &mut self.map
-        }
-    }
 
     #[test]
     fn test_value_bloom_feedback() {
-        let value_ptr = unsafe { OwnedRef::from_ptr(&raw mut VALUE) };
+        let value: UnsafeCell<u32> = 0_u32.into();
+
+        // # Safety
+        // The same testcase doesn't usually run twice
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            super::ValueBloomFeedbackMetadata::register();
+        }
+
+        // # Safety
+        // The value is only read from in the feedback, not while we change the value.
+        let value_ptr = unsafe { OwnedRef::from_ptr(value.get()) };
 
         let observer = ValueObserver::new("test_value", value_ptr);
-
         let mut vbf = ValueBloomFeedback::new(&observer.handle());
 
-        let mut state = NamedMetadataState {
-            map: NamedSerdeAnyMap::new(),
-        };
-        vbf.init_state(&mut state).unwrap();
-
         let observers = tuple_list!(observer);
-        let mut mgr = NopEventManager::<NamedMetadataState>::new();
-        let input = NopInput {};
+
+        let mut state: NopState<()> = NopState::new();
+        let mut mgr = ();
+        let input = ();
         let exit_ok = ExitKind::Ok;
+
+        vbf.init_state(&mut state).unwrap();
 
         let first_eval = vbf
             .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
             .unwrap();
-        assert_eq!(first_eval, true);
+        assert!(first_eval);
 
         let second_eval = vbf
             .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
             .unwrap();
 
-        assert_ne!(first_eval, second_eval);
+        assert!(!second_eval);
 
+        // # Safety
+        // The feedback is not keeping a borrow around, only the pointer.
         unsafe {
-            write_volatile(&raw mut VALUE, 1234_u32);
+            write_volatile(value.get(), 1234_u32);
         }
 
         let next_eval = vbf
             .is_interesting(&mut state, &mut mgr, &input, &observers, &exit_ok)
             .unwrap();
-        assert_eq!(next_eval, true);
+        assert!(next_eval);
     }
 }
