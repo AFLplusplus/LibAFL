@@ -15,9 +15,19 @@ use crate::{
     Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
     StdSnapshotManager,
 };
+#[cfg(doc)]
+use crate::{config::QemuConfig, Qemu};
 
+/// An [`Emulator`] Builder.
+///
+/// It is the most common way to create a new [`Emulator`].
+/// In addition to the main components of an [`Emulator`], it expects to receive a way to initialize [`Qemu`].
+/// It must be set through [`EmulatorBuilder::qemu_parameters`].
+/// At the moment, there are two main ways to initialize QEMU:
+/// - with a QEMU-compatible CLI. It will be given to QEMU as-is. The first argument should always be a path to the running binary, as expected by execve.
+/// - with an instance of [`QemuConfig`]. It is a more programmatic way to configure [`Qemu`]. It should be built using [`QemuConfigBuilder`].
 #[derive(Clone)]
-pub struct EmulatorBuilder<CM, ED, ET, QB, S, SM>
+pub struct EmulatorBuilder<CM, ED, ET, QP, S, SM>
 where
     S: UsesInput,
 {
@@ -25,7 +35,7 @@ where
     driver: ED,
     snapshot_manager: SM,
     command_manager: CM,
-    qemu_parameters: Option<QB>,
+    qemu_parameters: Option<QP>,
     phantom: PhantomData<S>,
 }
 
@@ -158,12 +168,12 @@ where
     S: UsesInput + Unpin,
 {
     #[must_use]
-    pub fn qemu_parameters<QB2>(
+    pub fn qemu_parameters<QP2>(
         self,
-        qemu_parameters: QB2,
-    ) -> EmulatorBuilder<CM, ED, ET, QB2, S, SM>
+        qemu_parameters: QP2,
+    ) -> EmulatorBuilder<CM, ED, ET, QP2, S, SM>
     where
-        QB2: Into<QemuParams>,
+        QP2: Into<QemuParams>,
     {
         EmulatorBuilder::new(
             self.modules,

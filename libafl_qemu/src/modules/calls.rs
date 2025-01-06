@@ -553,6 +553,7 @@ pub struct FullBacktraceCollector {}
 impl FullBacktraceCollector {
     /// # Safety
     /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub unsafe fn new() -> Self {
         let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe { (*callstacks_ptr) = Some(ThreadLocal::new()) };

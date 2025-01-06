@@ -14,6 +14,8 @@ use libafl::{
 };
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
+#[cfg(doc)]
+use crate::modules::EmulatorModule;
 use crate::{
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
@@ -123,10 +125,20 @@ pub struct InputLocation {
 /// The high-level interface to [`Qemu`].
 ///
 /// It embeds multiple structures aiming at making QEMU usage easier:
-///     - A [`SnapshotManager`], implementing the QEMU snapshot method to use.
-///     - An [`EmulatorDriver`], responsible for handling the high-level control flow.
-///     - A [`CommandManager`].
-///     - [`EmulatorModules`].
+///
+/// - An [`IsSnapshotManager`] implementation, implementing the QEMU snapshot method to use.
+/// - An [`EmulatorDriver`] implementation, responsible for handling the high-level control flow of QEMU runtime.
+/// - A [`CommandManager`] implementation, handling the commands received from the target.
+/// - [`EmulatorModules`], containing the [`EmulatorModule`] implementations' state.
+///
+/// Each of these fields can be set manually to finely tune how QEMU is getting handled.
+/// It is highly encouraged to build [`Emulator`] using the associated [`EmulatorBuilder`].
+/// There are two main functions to access the builder:
+///
+/// - [`Emulator::builder`] gives access to the standard [`EmulatorBuilder`], embedding all the standard components of an [`Emulator`].
+/// - [`Emulator::empty`] gives access to an empty [`EmulatorBuilder`]. This is mostly useful to create a more custom [`Emulator`].
+///
+/// Please check the documentation of [`EmulatorBuilder`] for more details.
 #[derive(Debug)]
 #[expect(clippy::type_complexity)]
 pub struct Emulator<CM, ED, ET, S, SM>
