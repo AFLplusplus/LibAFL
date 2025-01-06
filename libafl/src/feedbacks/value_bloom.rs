@@ -12,9 +12,9 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Feedback, StateInitializer};
 use crate::{
     executors::ExitKind,
+    feedbacks::{Feedback, StateInitializer},
     observers::{ObserversTuple, ValueObserver},
     HasNamedMetadata,
 };

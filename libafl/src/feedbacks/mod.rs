@@ -31,6 +31,9 @@ use crate::{corpus::Testcase, executors::ExitKind, observers::TimeObserver, Erro
 #[cfg(feature = "std")]
 pub mod capture_feedback;
 
+pub mod bool;
+pub use bool::BoolValueFeedback;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
