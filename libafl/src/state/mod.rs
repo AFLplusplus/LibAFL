@@ -756,7 +756,7 @@ where
         let input = match (config.loader)(fuzzer, self, path) {
             Ok(input) => input,
             Err(err) => {
-                log::error("Skipping input that we could not load from {path:?}: {err:?}");
+                log::error!("Skipping input that we could not load from {path:?}: {err:?}");
                 return Ok(ExecuteInputResult::None);
             }
         };
