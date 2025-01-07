@@ -26,9 +26,15 @@ pub type IntMutatorsType = tuple_list_type!(
     RandMutator,
     CrossoverMutator
 );
-type IntMutatorsCrossoverType = tuple_list_type!(CrossoverMutator);
-type MappedIntMutatorsCrossoverType<F> = tuple_list_type!(MappedCrossoverMutator<F>);
-type IntMutatorsNoCrossoverType = tuple_list_type!(
+
+/// Mutators for integer-like inputs that implement some form of crossover
+pub type IntMutatorsCrossoverType = tuple_list_type!(CrossoverMutator);
+
+/// Mapped mutators for integer-like inputs that implement some form of crossover.
+pub type MappedIntMutatorsCrossoverType<F> = tuple_list_type!(MappedCrossoverMutator<F>);
+
+/// Mutators for integer-like inputs without crossover mutations
+pub type IntMutatorsNoCrossoverType = tuple_list_type!(
     BitFlipMutator,
     NegateMutator,
     IncMutator,
