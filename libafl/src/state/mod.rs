@@ -754,12 +754,12 @@ where
     {
         log::info!("Loading file {path:?} ...");
         let input = match (config.loader)(fuzzer, self, path) {
-            Ok(input) => input
+            Ok(input) => input,
             Err(err) => {
-                log::error("Skipping input that we could not load from {path:?}: {err:?}")
-                return Ok(ExecuteInputResult::None)
+                log::error("Skipping input that we could not load from {path:?}: {err:?}");
+                return Ok(ExecuteInputResult::None);
             }
-        }
+        };
         if config.forced {
             let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
             Ok(ExecuteInputResult::Corpus)
