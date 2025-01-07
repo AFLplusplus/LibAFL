@@ -116,13 +116,23 @@ macro_rules! none_input_converter {
 }
 
 /// An input for tests, mainly. There is no real use much else.
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, Hash)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, Default, Hash)]
 pub struct NopInput {}
+
+impl NopInput {
+    /// Creates a new [`NopInput`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl Input for NopInput {
     fn generate_name(&self, _id: Option<CorpusId>) -> String {
         "nop-input".to_string()
     }
 }
+
 impl HasTargetBytes for NopInput {
     fn target_bytes(&self) -> OwnedSlice<u8> {
         OwnedSlice::from(vec![0])

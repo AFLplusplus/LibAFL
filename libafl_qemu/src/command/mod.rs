@@ -32,6 +32,8 @@ use crate::{
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+pub mod nyx;
 pub mod parser;
 
 mod bindings {
@@ -452,8 +454,8 @@ where
         // Unleash hooks if locked
         if emu.driver_mut().unlock_hooks() {
             // Prepare hooks
-            emu.modules_mut().first_exec_all(state);
-            emu.modules_mut().pre_exec_all(state, input);
+            emu.modules_mut().first_exec_all(qemu, state);
+            emu.modules_mut().pre_exec_all(qemu, state, input);
         }
 
         // Auto page filtering if option is enabled

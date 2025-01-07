@@ -23,7 +23,10 @@ use crate::SYS_execve;
 use crate::{
     elf::EasyElf,
     emu::EmulatorModules,
-    modules::{EmulatorModule, EmulatorModuleTuple, NopAddressFilter, NOP_ADDRESS_FILTER},
+    modules::{
+        utils::filters::{NopAddressFilter, NOP_ADDRESS_FILTER},
+        EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::{ArchExtras, Hook, SyscallHookResult},
     CallingConvention, Qemu,
 };
@@ -211,12 +214,15 @@ impl InjectionModule {
         })
     }
 
-    fn on_call_check<ET, S>(emulator_modules: &mut EmulatorModules<ET, S>, id: usize, parameter: u8)
-    where
+    fn on_call_check<ET, S>(
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        id: usize,
+        parameter: u8,
+    ) where
         ET: EmulatorModuleTuple<S>,
         S: Unpin + UsesInput,
     {
-        let qemu = emulator_modules.qemu();
         let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
@@ -262,18 +268,21 @@ where
 {
     type ModuleAddressFilter = NopAddressFilter;
 
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
-        emulator_modules.syscalls(Hook::Function(syscall_hook::<ET, S>));
+        emulator_modules.pre_syscalls(Hook::Function(syscall_hook::<ET, S>));
     }
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
-        let qemu = emulator_modules.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in qemu.mappings() {
@@ -324,8 +333,8 @@ where
                 for hook_addr in hook_addrs {
                     emulator_modules.instructions(
                         hook_addr,
-                        Hook::Closure(Box::new(move |hooks, _state, _guest_addr| {
-                            Self::on_call_check(hooks, id, param);
+                        Hook::Closure(Box::new(move |qemu, hooks, _state, _guest_addr| {
+                            Self::on_call_check(qemu, hooks, id, param);
                         })),
                         true,
                     );
@@ -347,6 +356,7 @@ where
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn syscall_hook<ET, S>(
     // Our instantiated [`EmulatorModules`]
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     // Syscall number
