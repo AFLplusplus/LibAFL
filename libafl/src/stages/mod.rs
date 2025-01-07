@@ -180,7 +180,6 @@ where
             Some(idx) if idx == StageId(Self::LEN) => {
                 // perform the stage, but don't set it
 
-                #[allow(clippy::similar_names)]
                 let stage = &mut self.0;
 
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
@@ -194,7 +193,6 @@ where
             _ => {
                 state.set_current_stage_id(StageId(Self::LEN))?;
 
-                #[allow(clippy::similar_names)]
                 let stage = &mut self.0;
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
 
@@ -558,7 +556,7 @@ mod test {
     impl_serdeany!(TestProgress);
 
     impl TestProgress {
-        #[allow(clippy::unnecessary_wraps)]
+        #[expect(clippy::unnecessary_wraps)]
         fn should_restart<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
         where
             S: HasMetadata,
@@ -614,13 +612,6 @@ mod test {
     /// Test to test retries in stages
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
-        // # Safety
-        // No concurrency per testcase
-        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
-        unsafe {
-            RetryCountRestartHelper::register();
-        }
-
         struct StageWithOneTry;
 
         impl Named for StageWithOneTry {
@@ -630,7 +621,13 @@ mod test {
             }
         }
 
-        #[allow(clippy::similar_names)]
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            RetryCountRestartHelper::register();
+        }
+
         let mut state = StdState::nop()?;
         let stage = StageWithOneTry;
 

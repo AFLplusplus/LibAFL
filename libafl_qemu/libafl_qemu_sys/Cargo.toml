@@ -56,6 +56,10 @@ clippy = [
   "libafl_qemu_build/clippy",
 ] # special feature for clippy, don't use in normal projects
 
+qemu_sanitizers = [
+  "libafl_qemu_build/qemu_sanitizers",
+] # Compile QEMU with sanitizers enabled
+
 paranoid_debug = [
   "libafl_qemu_build/paranoid_debug",
 ] # Will perform as many checks as possible. The target will be greatly slowed down.

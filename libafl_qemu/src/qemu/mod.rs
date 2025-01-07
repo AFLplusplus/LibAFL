@@ -26,8 +26,6 @@ use libafl_qemu_sys::{
     libafl_qemu_write_reg, CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
     GuestVirtAddr,
 };
-#[cfg(feature = "systemmode")]
-use libafl_qemu_sys::{libafl_qemu_remove_hw_breakpoint, libafl_qemu_set_hw_breakpoint};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
@@ -49,19 +47,16 @@ pub use usermode::*;
 #[cfg(feature = "systemmode")]
 mod systemmode;
 #[cfg(feature = "systemmode")]
-#[allow(unused_imports)]
 pub use systemmode::*;
 
 mod hooks;
 pub use hooks::*;
 
-use crate::config::QemuConfigBuilder;
-
 static mut QEMU_IS_INITIALIZED: bool = false;
 
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
-#[allow(clippy::vec_box)]
+#[expect(clippy::vec_box)]
 static mut GDB_COMMANDS: Vec<Box<FatPtr>> = Vec::new();
 
 pub trait HookId {
@@ -185,17 +180,17 @@ impl From<QemuConfig> for QemuParams {
     }
 }
 
-impl TryFrom<QemuConfigBuilder> for QemuParams {
-    type Error = QemuInitError;
-
-    fn try_from(config_builder: QemuConfigBuilder) -> Result<Self, Self::Error> {
-        Ok(QemuParams::Config(
-            config_builder
-                .build()
-                .map_err(QemuInitError::ConfigurationError)?,
-        ))
-    }
-}
+// impl TryFrom<QemuConfigBuilder> for QemuParams {
+//     type Error = QemuInitError;
+//
+//     fn try_from(config_builder: QemuConfigBuilder) -> Result<Self, Self::Error> {
+//         Ok(QemuParams::Config(
+//             config_builder
+//                 .build()
+//                 .map_err(QemuInitError::ConfigurationError)?,
+//         ))
+//     }
+// }
 
 impl<T> From<&[T]> for QemuParams
 where
@@ -205,6 +200,7 @@ where
         QemuParams::Cli(cli.iter().map(|x| x.as_ref().into()).collect())
     }
 }
+
 impl<T> From<&Vec<T>> for QemuParams
 where
     T: AsRef<str>,
@@ -286,10 +282,9 @@ impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
     }
 }
 
-#[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     pub fn index(&self) -> usize {
         unsafe { libafl_qemu_cpu_index(self.ptr) as usize }
     }
@@ -519,9 +514,8 @@ impl From<u8> for HookData {
     }
 }
 
-#[allow(clippy::unused_self)]
 impl Qemu {
-    #[allow(clippy::must_use_candidate, clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     pub fn init<T>(params: T) -> Result<Self, QemuInitError>
     where
         T: Into<QemuParams>,
@@ -533,7 +527,7 @@ impl Qemu {
                 QEMU_CONFIG
                     .set(cfg.clone())
                     .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
-                    .unwrap();
+                    .expect("Could not set QEMU Config.");
             }
             QemuParams::Cli(_) => {}
         };
@@ -557,7 +551,7 @@ impl Qemu {
             QEMU_IS_INITIALIZED = true;
         }
 
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap)]
         let argc = argc as i32;
 
         let args: Vec<CString> = args
@@ -681,7 +675,7 @@ impl Qemu {
                     let bp_addr = exit_reason.data.breakpoint.addr;
                     QemuExitReason::Breakpoint(bp_addr)
                 },
-                libafl_qemu_sys::libafl_exit_reason_kind_SYNC_EXIT => QemuExitReason::SyncExit,
+                libafl_qemu_sys::libafl_exit_reason_kind_CUSTOM_INSN => QemuExitReason::SyncExit,
 
                 #[cfg(feature = "systemmode")]
                 libafl_qemu_sys::libafl_exit_reason_kind_TIMEOUT => QemuExitReason::Timeout,
@@ -692,8 +686,8 @@ impl Qemu {
     }
 
     #[must_use]
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::cast_sign_loss)]
+    #[allow(clippy::cast_possible_wrap)] // platform dependent
+    #[expect(clippy::cast_sign_loss)]
     pub fn num_cpus(&self) -> usize {
         unsafe { libafl_qemu_num_cpus() as usize }
     }
@@ -709,7 +703,7 @@ impl Qemu {
     }
 
     #[must_use]
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_possible_wrap)]
     pub fn cpu_from_index(&self, index: usize) -> CPU {
         unsafe {
             CPU {
@@ -817,22 +811,6 @@ impl Qemu {
         }
     }
 
-    #[cfg(feature = "systemmode")]
-    pub fn set_hw_breakpoint(&self, addr: GuestAddr) {
-        unsafe {
-            libafl_qemu_set_hw_breakpoint(addr.into());
-        }
-        // TODO don't be lame, return a Result
-    }
-
-    #[cfg(feature = "systemmode")]
-    pub fn remove_hw_breakpoint(&self, addr: GuestAddr) {
-        unsafe {
-            libafl_qemu_remove_hw_breakpoint(addr.into());
-        }
-        // TODO don't be lame, return a Result
-    }
-
     pub fn entry_break(&self, addr: GuestAddr) {
         self.set_breakpoint(addr);
         unsafe {
@@ -858,7 +836,7 @@ impl Qemu {
     /// # Safety
     ///
     /// Calling this multiple times concurrently will access static variables and is unsafe.
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub unsafe fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         let fat: Box<FatPtr> = Box::new(transmute::<
             Box<dyn for<'a, 'b> FnMut(&'a Qemu, &'b str) -> bool>,
@@ -1089,7 +1067,7 @@ pub mod pybind {
 
     #[pymethods]
     impl Qemu {
-        #[allow(clippy::needless_pass_by_value)]
+        #[expect(clippy::needless_pass_by_value)]
         #[new]
         fn new(args: Vec<String>) -> PyResult<Qemu> {
             let qemu =

@@ -2,6 +2,7 @@
 use capstone::{arch::BuildsCapstone, Capstone, InsnDetail};
 use hashbrown::HashMap;
 use libafl::{inputs::UsesInput, HasMetadata};
+use libafl_bolts::hash_64_fast;
 use libafl_qemu_sys::GuestAddr;
 pub use libafl_targets::{
     cmps::{
@@ -12,12 +13,14 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "systemmode")]
-use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 #[cfg(feature = "usermode")]
 use crate::{capstone, qemu::ArchExtras, CallingConvention};
 use crate::{
     emu::EmulatorModules,
-    modules::{hash_me, AddressFilter, EmulatorModule, EmulatorModuleTuple, StdAddressFilter},
+    modules::{
+        utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::Hook,
     Qemu,
 };
@@ -212,6 +215,7 @@ where
     }))
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn gen_hashed_cmp_ids<ET, S>(
     _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
@@ -228,7 +232,7 @@ where
             return None;
         }
     }
-    Some(hash_me(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
+    Some(hash_64_fast(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
 }
 
 pub extern "C" fn trace_cmp1_cmplog(_: *const (), id: u64, v0: u8, v1: u8) {
@@ -306,6 +310,7 @@ impl CmpLogRoutinesModule {
         }
     }
 
+    #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
     fn gen_blocks_calls<ET, S>(
         qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
@@ -331,7 +336,7 @@ impl CmpLogRoutinesModule {
         }
 
         if let Some(h) = emulator_modules.get::<Self>() {
-            #[allow(unused_mut)]
+            #[allow(unused_mut)] // cfg dependent
             let mut code = {
                 #[cfg(feature = "usermode")]
                 unsafe {
@@ -356,7 +361,7 @@ impl CmpLogRoutinesModule {
                 for detail in insn_detail.groups() {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
-                            let k = (hash_me(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
+                            let k = (hash_64_fast(pc.into())) & (CMPLOG_MAP_W as u64 - 1);
                             qemu.hooks().add_instruction_hooks(
                                 k,
                                 insn.address() as GuestAddr,

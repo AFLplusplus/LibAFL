@@ -63,7 +63,6 @@ where
     P: Stage<E, EM, S, Z>,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,

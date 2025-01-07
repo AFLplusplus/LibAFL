@@ -193,13 +193,13 @@ where
             .push(Box::pin((InstructionHookId::invalid(), fat)));
 
         unsafe {
-            let hook_state = &mut self
+            let hook_state = &raw mut self
                 .instruction_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1 as *mut FatPtr;
+                .1;
 
             let id = self.qemu_hooks.add_instruction_hooks(
                 &mut *hook_state,
@@ -409,7 +409,7 @@ where
         }
     }
 
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     pub fn reads(
         &mut self,
         generation_hook: ReadGenHook<ET, S>,
@@ -497,7 +497,7 @@ where
         }
     }
 
-    #[allow(clippy::similar_names)]
+    #[expect(clippy::similar_names)]
     pub fn writes(
         &mut self,
         generation_hook: WriteGenHook<ET, S>,
@@ -667,13 +667,13 @@ where
             self.backdoor_hooks
                 .push(Box::pin((BackdoorHookId::invalid(), fat)));
 
-            let hook_state = &mut self
+            let hook_state = &raw mut self
                 .backdoor_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1 as *mut FatPtr;
+                .1;
 
             let id = self
                 .qemu_hooks
@@ -739,13 +739,13 @@ where
             self.new_thread_hooks
                 .push(Box::pin((NewThreadHookId::invalid(), fat)));
 
-            let hook_state = &mut self
+            let hook_state = &raw mut self
                 .new_thread_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1 as *mut FatPtr;
+                .1;
 
             let id = self
                 .qemu_hooks
@@ -767,7 +767,6 @@ where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    #[allow(clippy::type_complexity)]
     pub fn pre_syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
         match hook {
             Hook::Function(f) => Some(self.pre_syscalls_function(f)),
@@ -780,7 +779,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn pre_syscalls_function(&mut self, hook: PreSyscallHookFn<ET, S>) -> PreSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`].
@@ -790,7 +788,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn pre_syscalls_closure(&mut self, hook: PreSyscallHookClosure<ET, S>) -> PreSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`].
@@ -800,13 +797,13 @@ where
             self.pre_syscall_hooks
                 .push(Box::pin((PreSyscallHookId::invalid(), fat)));
 
-            let hook_state = &mut self
+            let hook_state = &raw mut self
                 .pre_syscall_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1 as *mut FatPtr;
+                .1;
 
             let id = self
                 .qemu_hooks
@@ -821,7 +818,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn post_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
         match hook {
             Hook::Function(f) => Some(self.post_syscalls_function(f)),
@@ -834,7 +830,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn post_syscalls_function(&mut self, hook: PostSyscallHookFn<ET, S>) -> PostSyscallHookId {
         // # Safety
         // Will dereference the hook as [`FatPtr`]. This should be ok.
@@ -844,7 +839,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn post_syscalls_closure(
         &mut self,
         hook: PostSyscallHookClosure<ET, S>,
@@ -854,13 +848,13 @@ where
             self.post_syscall_hooks
                 .push(Box::pin((PostSyscallHookId::invalid(), fat)));
 
-            let hooks_state = &mut self
+            let hooks_state = &raw mut self
                 .post_syscall_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
                 .get_unchecked_mut()
-                .1 as *mut FatPtr;
+                .1;
 
             let id = self.qemu_hooks.add_post_syscall_hook(
                 &mut *hooks_state,
@@ -999,7 +993,6 @@ where
             .blocks(generation_hook, post_generation_hook, execution_hook)
     }
 
-    #[allow(clippy::similar_names)]
     pub fn reads(
         &mut self,
         generation_hook: ReadGenHook<ET, S>,
@@ -1019,7 +1012,6 @@ where
         )
     }
 
-    #[allow(clippy::similar_names)]
     pub fn writes(
         &mut self,
         generation_hook: WriteGenHook<ET, S>,
@@ -1213,7 +1205,6 @@ where
     ET: EmulatorModuleTuple<S>,
     S: Unpin + UsesInput,
 {
-    #[allow(clippy::type_complexity)]
     pub fn pre_syscalls(&mut self, hook: PreSyscallHook<ET, S>) -> Option<PreSyscallHookId> {
         self.hooks.pre_syscalls(hook)
     }
@@ -1238,7 +1229,6 @@ where
         self.hooks.pre_syscalls_closure(hook)
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn post_syscalls(&mut self, hook: PostSyscallHook<ET, S>) -> Option<PostSyscallHookId> {
         self.hooks.post_syscalls(hook)
     }

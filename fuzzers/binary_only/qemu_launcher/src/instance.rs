@@ -39,8 +39,10 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     modules::{
-        cmplog::CmpLogObserver, edges::EdgeCoverageFullVariant, EdgeCoverageModule, EmulatorModule,
-        EmulatorModuleTuple, NopPageFilter, StdAddressFilter, StdEdgeCoverageModule,
+        cmplog::CmpLogObserver,
+        edges::EdgeCoverageFullVariant,
+        utils::filters::{NopPageFilter, StdAddressFilter},
+        EdgeCoverageModule, EmulatorModule, EmulatorModuleTuple, StdEdgeCoverageModule,
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
@@ -71,7 +73,6 @@ pub struct Instance<'a, M: Monitor> {
 }
 
 impl<M: Monitor> Instance<'_, M> {
-    #[allow(clippy::similar_names)] // elf != self
     fn coverage_filter(&self, qemu: Qemu) -> Result<StdAddressFilter, Error> {
         /* Conversion is required on 32-bit targets, but not on 64-bit ones */
         if let Some(includes) = &self.options.include {
@@ -104,7 +105,7 @@ impl<M: Monitor> Instance<'_, M> {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn run<ET>(
         &mut self,
         args: Vec<String>,
@@ -130,8 +131,8 @@ impl<M: Monitor> Instance<'_, M> {
 
         let modules = modules.prepend(edge_coverage_module);
         let mut emulator = Emulator::empty()
+            .qemu_parameters(args)
             .modules(modules)
-            .qemu_config(|_| args)
             .build()?;
         let harness = Harness::init(emulator.qemu()).expect("Error setting up harness.");
         let qemu = emulator.qemu();

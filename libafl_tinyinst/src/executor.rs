@@ -82,7 +82,7 @@ where
             }
         }
 
-        #[allow(unused_assignments)]
+        #[expect(unused_assignments)]
         let mut status = RunResult::OK;
         unsafe {
             status = self.tinyinst.run();

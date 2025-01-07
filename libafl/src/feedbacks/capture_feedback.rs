@@ -41,7 +41,6 @@ where
     S: HasCorpus + HasMetadata,
     I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
-    #[allow(clippy::wrong_self_convention)]
     #[inline]
     fn is_interesting(
         &mut self,

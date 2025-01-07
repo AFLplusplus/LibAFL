@@ -200,7 +200,7 @@ where
     }
 
     /// Handle arriving events in the broker
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
         event: &Event<S::Input>,
@@ -273,7 +273,6 @@ where
     }
 
     // Handle arriving events in the client
-    #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
     fn handle_in_client(&mut self, state: &mut S, event: Event<S::Input>) -> Result<(), Error> {
         match event {
             Event::CustomBuf { buf, tag } => {
@@ -299,7 +298,6 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
-#[allow(clippy::default_trait_access)]
 #[derive(Debug)]
 pub struct SimpleRestartingEventManager<MT, S, SP>
 where
@@ -433,7 +431,6 @@ where
 }
 
 #[cfg(feature = "std")]
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
 impl<MT, S, SP> SimpleRestartingEventManager<MT, S, SP>
 where
     S: UsesInput + Stoppable,
@@ -451,7 +448,6 @@ where
     /// Launch the simple restarting manager.
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
-    #[allow(clippy::similar_names)]
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
         S: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
@@ -519,7 +515,7 @@ where
                     return Err(Error::shutting_down());
                 }
 
-                #[allow(clippy::manual_assert)]
+                #[expect(clippy::manual_assert)]
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
                     if child_status == 9 {

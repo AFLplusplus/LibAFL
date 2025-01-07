@@ -111,7 +111,7 @@ impl<'a, EM, TE, S, Z> ConcolicTracingStage<'a, EM, TE, S, Z> {
 }
 
 #[cfg(feature = "concolic_mutation")]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
     use hashbrown::HashMap;
     use z3::{
@@ -417,8 +417,7 @@ where
                 for (index, new_byte) in mutation {
                     input_copy.bytes_mut()[index] = new_byte;
                 }
-                // Time is measured directly the `evaluate_input` function
-                fuzzer.evaluate_input(state, executor, manager, input_copy)?;
+                fuzzer.evaluate_filtered(state, executor, manager, input_copy)?;
             }
         }
         Ok(())

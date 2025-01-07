@@ -11,11 +11,12 @@ use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
 #[cfg(feature = "systemmode")]
-use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     capstone,
     modules::{
-        AddressFilter, EmulatorModule, EmulatorModuleTuple, EmulatorModules, StdAddressFilter,
+        utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        EmulatorModules,
     },
     qemu::{ArchExtras, Hook},
     Qemu,
@@ -270,6 +271,7 @@ where
         emulator_modules.get_mut::<Self>().unwrap().collectors = collectors;
     }
 
+    #[allow(clippy::needless_pass_by_value)] // no longer a problem in nightly
     fn gen_blocks_calls<ET, S>(
         qemu: Qemu,
         emulator_modules: &mut EmulatorModules<ET, S>,
@@ -298,7 +300,7 @@ where
         let mut ret_addrs: Vec<GuestAddr> = Vec::new();
 
         if let Some(h) = emulator_modules.modules().match_first_type::<Self>() {
-            #[allow(unused_mut)]
+            #[allow(unused_mut)] // cfg dependent
             let mut code = {
                 #[cfg(feature = "usermode")]
                 unsafe {
@@ -492,7 +494,7 @@ impl<'a> CallTraceCollector for OnCrashBacktraceCollector<'a>
 where
     'a: 'static,
 {
-    #[allow(clippy::unnecessary_cast)]
+    #[expect(clippy::unnecessary_cast)]
     fn on_call<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -506,7 +508,7 @@ where
         self.callstack_hash ^= pc as u64 + call_len as u64;
     }
 
-    #[allow(clippy::unnecessary_cast)]
+    #[expect(clippy::unnecessary_cast)]
     fn on_ret<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -552,6 +554,7 @@ pub struct FullBacktraceCollector {}
 impl FullBacktraceCollector {
     /// # Safety
     /// This accesses the global [`CALLSTACKS`] variable and may not be called concurrently.
+    #[expect(rustdoc::private_intra_doc_links)]
     pub unsafe fn new() -> Self {
         let callstacks_ptr = &raw mut CALLSTACKS;
         unsafe { (*callstacks_ptr) = Some(ThreadLocal::new()) };
@@ -587,7 +590,7 @@ impl FullBacktraceCollector {
 }
 
 impl CallTraceCollector for FullBacktraceCollector {
-    #[allow(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)] // dependent on the target instruction size
     fn on_call<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,
@@ -606,7 +609,7 @@ impl CallTraceCollector for FullBacktraceCollector {
         }
     }
 
-    #[allow(clippy::unnecessary_cast)]
+    #[allow(clippy::unnecessary_cast)] // dependent on the target instruction size
     fn on_ret<ET, S>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, S>,

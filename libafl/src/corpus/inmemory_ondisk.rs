@@ -442,7 +442,12 @@ impl<I> InMemoryOnDiskCorpus<I> {
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
 
-        self.store_input_from(testcase)?;
+        if let Err(err) = self.store_input_from(testcase) {
+            if self.locking {
+                return Err(err);
+            }
+            log::error!("An error occurred when trying to write a testcase without locking: {err}");
+        }
         Ok(())
     }
 
@@ -470,11 +475,14 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(miri))]
     use std::{env, fs, io::Write};
 
+    #[cfg(not(miri))]
     use super::{create_new, try_create_new};
 
     #[test]
+    #[cfg(not(miri))]
     fn test() {
         let tmp = env::temp_dir();
         let path = tmp.join("testfile.tmp");

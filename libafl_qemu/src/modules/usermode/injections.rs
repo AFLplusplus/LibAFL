@@ -23,7 +23,10 @@ use crate::SYS_execve;
 use crate::{
     elf::EasyElf,
     emu::EmulatorModules,
-    modules::{EmulatorModule, EmulatorModuleTuple, NopAddressFilter, NOP_ADDRESS_FILTER},
+    modules::{
+        utils::filters::{NopAddressFilter, NOP_ADDRESS_FILTER},
+        EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::{ArchExtras, Hook, SyscallHookResult},
     CallingConvention, Qemu,
 };
@@ -349,7 +352,8 @@ where
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 fn syscall_hook<ET, S>(
     // Our instantiated [`EmulatorModules`]
     _qemu: Qemu,

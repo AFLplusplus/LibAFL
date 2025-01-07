@@ -12,10 +12,7 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::MultiMonitor,
-    mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
-        I2SRandReplaceBinonly,
-    },
+    mutators::{havoc_mutations, scheduled::StdScheduledMutator, I2SRandReplaceBinonly},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
@@ -33,16 +30,10 @@ use libafl_bolts::{
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
-    modules::{
-        cmplog::CmpLogObserver,
-        edges::{
-            edges_map_mut_ptr, StdEdgeCoverageClassicModule, EDGES_MAP_ALLOCATED_SIZE,
-            MAX_EDGES_FOUND,
-        },
-        CmpLogModule,
-    },
+    modules::{cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule},
     // StdEmulatorDriver
 };
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 pub fn fuzz() {
     env_logger::init();
@@ -61,14 +52,26 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
 
+        // Create an observation channel using the coverage map
+        let mut edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
+                &raw mut MAX_EDGES_FOUND,
+            ))
+            .track_indices()
+        };
+
         // Choose modules to use
         let modules = tuple_list!(
-            StdEdgeCoverageClassicModule::builder().build(),
+            StdEdgeCoverageClassicModule::builder()
+                .map_observer(edges_observer.as_mut())
+                .build()?,
             CmpLogModule::default(),
         );
 
         let emu = Emulator::builder()
-            .qemu_config(|_| args)
+            .qemu_parameters(args)
             .modules(modules)
             .build()?;
 
@@ -80,16 +83,6 @@ pub fn fuzz() {
             |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
                 emulator.run(state, input).unwrap().try_into().unwrap()
             };
-
-        // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
-            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
-                "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
-                &raw mut MAX_EDGES_FOUND,
-            ))
-            .track_indices()
-        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

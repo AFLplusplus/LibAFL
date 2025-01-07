@@ -98,7 +98,7 @@ struct Opt {
 
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
-#[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
+#[expect(clippy::missing_panics_doc, clippy::too_many_lines)]
 pub extern "C" fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std

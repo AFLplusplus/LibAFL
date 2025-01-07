@@ -28,7 +28,6 @@ use libafl_bolts::{
     AsSliceMut,
 };
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     const MAP_SIZE: usize = 65536;
 

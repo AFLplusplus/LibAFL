@@ -3,43 +3,37 @@ use std::{convert::Infallible, fmt::Display};
 
 use libafl_qemu_sys::{CPUStatePtr, GuestAddr};
 
-use crate::{config::QemuConfigBuilderError, CallingConvention};
+use crate::CallingConvention;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum QemuError {
     Init(QemuInitError),
     Exit(QemuExitError),
     RW(QemuRWError),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum QemuInitError {
     MultipleInstances,
+    NoParametersProvided,
     EmptyArgs,
-    ConfigurationError(QemuConfigBuilderError),
     Infallible,
     TooManyArgs(usize),
 }
 
-impl From<Infallible> for QemuInitError {
-    fn from(_: Infallible) -> Self {
-        QemuInitError::Infallible
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum QemuExitError {
     UnknownKind, // Exit reason was not NULL, but exit kind is unknown. Should never happen.
     UnexpectedExit, // Qemu exited without going through an expected exit point. Can be caused by a crash for example.
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum QemuRWErrorKind {
     Read,
     Write,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum QemuRWErrorCause {
     WrongCallingConvention(CallingConvention, CallingConvention), // expected, given
     WrongArgument(i32),
@@ -48,8 +42,8 @@ pub enum QemuRWErrorCause {
     WrongMemoryLocation(GuestAddr, usize), // addr, size
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[derive(Clone, Debug)]
+#[expect(dead_code)]
 pub struct QemuRWError {
     kind: QemuRWErrorKind,
     cause: QemuRWErrorCause,
@@ -64,11 +58,11 @@ impl Display for QemuInitError {
             QemuInitError::MultipleInstances => {
                 write!(f, "Only one instance of the QEMU Emulator is permitted")
             }
+            QemuInitError::NoParametersProvided => {
+                write!(f, "No parameters were provided to initialize QEMU.")
+            }
             QemuInitError::EmptyArgs => {
                 write!(f, "QEMU emulator args cannot be empty")
-            }
-            QemuInitError::ConfigurationError(config_error) => {
-                write!(f, "QEMU Configuration error: {config_error}")
             }
             QemuInitError::TooManyArgs(n) => {
                 write!(
@@ -77,7 +71,7 @@ impl Display for QemuInitError {
                 )
             }
             QemuInitError::Infallible => {
-                write!(f, "Infallible error, should never be reached.")
+                panic!("Infallible error, should never be reached.")
             }
         }
     }
@@ -85,13 +79,13 @@ impl Display for QemuInitError {
 
 impl From<QemuInitError> for libafl::Error {
     fn from(err: QemuInitError) -> Self {
-        libafl::Error::runtime(format!("QEMU Init error: {err}"))
+        libafl::Error::unknown(format!("{err}"))
     }
 }
 
-impl From<QemuRWError> for libafl::Error {
-    fn from(err: QemuRWError) -> Self {
-        libafl::Error::runtime(format!("QEMU Runtime error: {err:?}"))
+impl From<Infallible> for QemuInitError {
+    fn from(_: Infallible) -> Self {
+        QemuInitError::Infallible
     }
 }
 
@@ -145,6 +139,12 @@ impl QemuRWError {
         }
 
         Ok(())
+    }
+}
+
+impl From<QemuRWError> for QemuError {
+    fn from(qemu_rw_error: QemuRWError) -> Self {
+        QemuError::RW(qemu_rw_error)
     }
 }
 

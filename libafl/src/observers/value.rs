@@ -23,7 +23,7 @@ use crate::{
 /// The intent is that the value is something with interior mutability which the target could write to even though this
 /// observer has a reference to it. Use [`RefCellValueObserver`] if using a [`RefCell`] around the value.
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct ValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
@@ -83,7 +83,7 @@ impl<T: Hash> ObserverWithHashField for ValueObserver<'_, T> {
 
 /// A simple observer with a single [`RefCell`]'d value.
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct RefCellValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,

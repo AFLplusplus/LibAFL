@@ -9,7 +9,7 @@ use std::ptr;
 #[cfg(feature = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[cfg(feature = "usermode")]
+#[cfg(any(feature = "usermode", feature = "fork"))]
 use libafl::inputs::UsesInput;
 use libafl::{
     corpus::Corpus,
@@ -358,7 +358,7 @@ where
     Z: HasObjective,
     Z::Objective: Feedback<EM, S::Input, OT, S>,
 {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         emulator: Emulator<CM, ED, ET, S, SM>,
         harness_fn: &'a mut H,

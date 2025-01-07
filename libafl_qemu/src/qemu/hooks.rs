@@ -874,7 +874,6 @@ impl QemuHooks {
     }
 
     // TODO set T lifetime to be like Emulator
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_instruction_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -905,7 +904,6 @@ impl QemuHooks {
         }
     }
 
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_edge_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -922,7 +920,6 @@ impl QemuHooks {
         }
     }
 
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_block_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -941,7 +938,6 @@ impl QemuHooks {
         }
     }
 
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_cpu_run_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -969,7 +965,6 @@ impl QemuHooks {
     ///
     /// If there is no specialized hook for a given read width, the `exec_n` will be
     /// called and its last argument will specify the access width
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1004,7 +999,6 @@ impl QemuHooks {
     }
 
     // TODO add MemOp info
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1038,7 +1032,6 @@ impl QemuHooks {
         }
     }
 
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_cmp_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1060,7 +1053,6 @@ impl QemuHooks {
         }
     }
 
-    #[allow(clippy::missing_transmute_annotations)]
     pub fn add_backdoor_hook<T: Into<HookData>>(
         &self,
         data: T,
@@ -1090,7 +1082,6 @@ impl QemuHooks {
 
 #[cfg(feature = "usermode")]
 impl QemuHooks {
-    #[allow(clippy::type_complexity)]
     pub fn add_pre_syscall_hook<T: Into<HookData>>(
         &self,
         data: T,
@@ -1126,7 +1117,6 @@ impl QemuHooks {
         }
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn add_post_syscall_hook<T: Into<HookData>>(
         &self,
         data: T,
@@ -1164,8 +1154,7 @@ impl QemuHooks {
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     pub(crate) fn set_crash_hook(self, callback: extern "C" fn(i32)) {
         unsafe {
             libafl_dump_core_hook = Some(callback);

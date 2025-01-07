@@ -7,7 +7,7 @@ use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, NopCorpus},
+    corpus::{Corpus, InMemoryCorpus},
     events::{
         launcher::Launcher, ClientDescription, EventConfig, EventRestarter,
         LlmpRestartingEventManager,
@@ -30,8 +30,8 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::{drcov::DrCovModule, StdAddressFilter},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor,
+    modules::{drcov::DrCovModule, utils::filters::StdAddressFilter},
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
     QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 
@@ -135,7 +135,7 @@ pub fn fuzz() {
             .build());
 
         let emulator = Emulator::empty()
-            .qemu_config(|_| options.args.clone())
+            .qemu_parameters(options.args.clone())
             .modules(emulator_modules)
             .build()
             .expect("QEMU initialization failed");
@@ -227,17 +227,15 @@ pub fn fuzz() {
             Err(Error::ShuttingDown)?
         }
 
-        #[allow(clippy::let_unit_value)]
         let mut feedback = ();
 
-        #[allow(clippy::let_unit_value)]
         let mut objective = ();
 
         let mut state = state.unwrap_or_else(|| {
             StdState::new(
                 StdRand::new(),
-                NopCorpus::new(),
-                NopCorpus::new(),
+                InMemoryCorpus::new(),
+                InMemoryCorpus::new(),
                 &mut feedback,
                 &mut objective,
             )

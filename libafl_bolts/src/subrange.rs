@@ -198,7 +198,7 @@ impl<'a, T> PartialSubRangeSlice<'a, T> {
     /// Consumes `PartialBytesSubInput` and returns the partial slice if it was a partial slice, None otherwise.
     #[must_use]
     pub fn partial(self) -> Option<SubRangeSlice<'a, T>> {
-        #[allow(clippy::match_wildcard_for_single_variants)]
+        #[expect(clippy::match_wildcard_for_single_variants)]
         match self {
             PartialSubRangeSlice::Partial(partial_slice) => Some(partial_slice),
             _ => None,

@@ -40,7 +40,6 @@ impl GuestMaps {
 impl Iterator for GuestMaps {
     type Item = MapInfo;
 
-    #[allow(clippy::uninit_assumed_init)]
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let mut ret = MaybeUninit::uninit();
@@ -123,7 +122,7 @@ impl CPU {
     }
 }
 
-#[allow(clippy::unused_self)]
+#[expect(clippy::unused_self)]
 impl Qemu {
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
@@ -195,7 +194,7 @@ impl Qemu {
         unsafe { mmap_next_start = start };
     }
 
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn mmap(
         self,
         addr: GuestAddr,
@@ -287,7 +286,7 @@ pub mod pybind {
         a6: u64,
         a7: u64,
     ) -> SyscallHookResult {
-        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+        unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
             || SyscallHookResult::new(None),
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);

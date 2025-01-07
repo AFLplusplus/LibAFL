@@ -15,12 +15,19 @@ use crate::{
     Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
     StdSnapshotManager,
 };
+#[cfg(doc)]
+use crate::{config::QemuConfig, Qemu};
 
-/// `Emulator` builder.
+/// An [`Emulator`] Builder.
 ///
-/// The default configuration of QEMU is always empty.
+/// It is the most common way to create a new [`Emulator`].
+/// In addition to the main components of an [`Emulator`], it expects to receive a way to initialize [`Qemu`].
+/// It must be set through [`EmulatorBuilder::qemu_parameters`].
+/// At the moment, there are two main ways to initialize QEMU:
+/// - with a QEMU-compatible CLI. It will be given to QEMU as-is. The first argument should always be a path to the running binary, as expected by execve.
+/// - with an instance of [`QemuConfig`]. It is a more programmatic way to configure [`Qemu`]. It should be built using [`QemuConfigBuilder`].
 #[derive(Clone)]
-pub struct EmulatorBuilder<CM, ED, ET, QB, S, SM>
+pub struct EmulatorBuilder<CM, ED, ET, QP, S, SM>
 where
     S: UsesInput,
 {
@@ -28,7 +35,7 @@ where
     driver: ED,
     snapshot_manager: SM,
     command_manager: CM,
-    qemu_config: QB,
+    qemu_parameters: Option<QP>,
     phantom: PhantomData<S>,
 }
 
@@ -51,7 +58,7 @@ where
             driver: NopEmulatorDriver,
             snapshot_manager: NopSnapshotManager,
             command_manager: NopCommandManager,
-            qemu_config: QemuConfigBuilder::default(),
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
@@ -72,14 +79,14 @@ where
     S::Input: HasTargetBytes,
 {
     #[must_use]
-    #[allow(clippy::should_implement_trait)]
+    #[expect(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self {
             modules: tuple_list!(),
             command_manager: StdCommandManager::default(),
             snapshot_manager: StdSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
-            qemu_config: QemuConfigBuilder::default(),
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
@@ -99,18 +106,20 @@ where
     S: State + HasExecutions + Unpin,
     S::Input: HasTargetBytes,
 {
+    #[expect(clippy::should_implement_trait)]
+    #[must_use]
     pub fn default() -> Self {
         Self {
             modules: (),
             command_manager: StdCommandManager::default(),
             snapshot_manager: FastSnapshotManager::default(),
             driver: StdEmulatorDriver::builder().build(),
-            qemu_config: QemuConfigBuilder::default(),
+            qemu_parameters: None,
             phantom: PhantomData,
         }
     }
 }
-impl<CM, ED, ET, QB, S, SM> EmulatorBuilder<CM, ED, ET, QB, S, SM>
+impl<CM, ED, ET, QP, S, SM> EmulatorBuilder<CM, ED, ET, QP, S, SM>
 where
     S: UsesInput + Unpin,
 {
@@ -119,14 +128,14 @@ where
         driver: ED,
         command_manager: CM,
         snapshot_manager: SM,
-        qemu_config: QB,
+        qemu_parameters: Option<QP>,
     ) -> Self {
         Self {
             modules,
             command_manager,
             driver,
             snapshot_manager,
-            qemu_config,
+            qemu_parameters,
             phantom: PhantomData,
         }
     }
@@ -135,10 +144,13 @@ where
     where
         CM: CommandManager<ED, ET, S, SM>,
         ET: EmulatorModuleTuple<S>,
-        QB: TryInto<QemuParams, Error = E>,
+        QP: TryInto<QemuParams, Error = E>,
         QemuInitError: From<E>,
     {
-        let qemu_params: QemuParams = self.qemu_config.try_into()?;
+        let qemu_params: QemuParams = self
+            .qemu_parameters
+            .ok_or(QemuInitError::NoParametersProvided)?
+            .try_into()?;
 
         Emulator::new(
             qemu_params,
@@ -150,36 +162,29 @@ where
     }
 }
 
-impl<CM, ED, ET, QB, S, SM> EmulatorBuilder<CM, ED, ET, QB, S, SM>
+impl<CM, ED, ET, QP, S, SM> EmulatorBuilder<CM, ED, ET, QP, S, SM>
 where
     CM: CommandManager<ED, ET, S, SM>,
     S: UsesInput + Unpin,
 {
-    /// Main QEMU config function for building `Emulator`.
-    ///
-    /// The closure takes as parameter the current qemu configuration object and must return the new
-    /// QEMU configurator. For now, two configurators are supported:
-    ///     - `QemuConfigBuilder`
-    ///     - `Vec<String>`
-    ///
-    /// Please check the documentation of `QemuConfig` for more information.
-    pub fn qemu_config<F, QB2>(
+    #[must_use]
+    pub fn qemu_parameters<QP2>(
         self,
-        qemu_config_builder: F,
-    ) -> EmulatorBuilder<CM, ED, ET, QB2, S, SM>
+        qemu_parameters: QP2,
+    ) -> EmulatorBuilder<CM, ED, ET, QP2, S, SM>
     where
-        F: FnOnce(QB) -> QB2,
+        QP2: Into<QemuParams>,
     {
         EmulatorBuilder::new(
             self.modules,
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            qemu_config_builder(self.qemu_config),
+            Some(qemu_parameters),
         )
     }
 
-    pub fn prepend_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), QB, S, SM>
+    pub fn prepend_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), QP, S, SM>
     where
         EM: EmulatorModule<S> + Unpin,
         ET: EmulatorModuleTuple<S>,
@@ -189,11 +194,11 @@ where
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_config,
+            self.qemu_parameters,
         )
     }
 
-    pub fn append_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (ET, EM), QB, S, SM>
+    pub fn append_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (ET, EM), QP, S, SM>
     where
         EM: EmulatorModule<S> + Unpin,
         ET: EmulatorModuleTuple<S>,
@@ -203,24 +208,24 @@ where
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_config,
+            self.qemu_parameters,
         )
     }
 
-    pub fn driver<ED2>(self, driver: ED2) -> EmulatorBuilder<CM, ED2, ET, QB, S, SM> {
+    pub fn driver<ED2>(self, driver: ED2) -> EmulatorBuilder<CM, ED2, ET, QP, S, SM> {
         EmulatorBuilder::new(
             self.modules,
             driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_config,
+            self.qemu_parameters,
         )
     }
 
     pub fn command_manager<CM2>(
         self,
         command_manager: CM2,
-    ) -> EmulatorBuilder<CM2, ED, ET, QB, S, SM>
+    ) -> EmulatorBuilder<CM2, ED, ET, QP, S, SM>
     where
         CM2: CommandManager<ED, ET, S, SM>,
     {
@@ -229,30 +234,30 @@ where
             self.driver,
             command_manager,
             self.snapshot_manager,
-            self.qemu_config,
+            self.qemu_parameters,
         )
     }
 
-    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<CM, ED, ET2, QB, S, SM> {
+    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<CM, ED, ET2, QP, S, SM> {
         EmulatorBuilder::new(
             modules,
             self.driver,
             self.command_manager,
             self.snapshot_manager,
-            self.qemu_config,
+            self.qemu_parameters,
         )
     }
 
     pub fn snapshot_manager<SM2>(
         self,
         snapshot_manager: SM2,
-    ) -> EmulatorBuilder<CM, ED, ET, QB, S, SM2> {
+    ) -> EmulatorBuilder<CM, ED, ET, QP, S, SM2> {
         EmulatorBuilder::new(
             self.modules,
             self.driver,
             self.command_manager,
             snapshot_manager,
-            self.qemu_config,
+            self.qemu_parameters,
         )
     }
 }

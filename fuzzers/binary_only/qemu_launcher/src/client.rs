@@ -21,7 +21,7 @@ use crate::{
     options::FuzzerOptions,
 };
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
 
@@ -44,14 +44,14 @@ impl Client<'_> {
         Ok(args)
     }
 
-    #[allow(clippy::unused_self)] // Api should look the same as args above
+    #[expect(clippy::unused_self)] // Api should look the same as args above
     pub fn env(&self) -> Vec<(String, String)> {
         env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
             .collect::<Vec<(String, String)>>()
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn run<M: Monitor>(
         &self,
         state: Option<ClientState>,

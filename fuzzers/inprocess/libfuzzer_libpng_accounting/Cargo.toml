@@ -25,6 +25,7 @@ which = "6.0.3"
 libafl = { path = "../../../libafl", features = [
   "std",
   "derive",
+  "tcp_manager",
   "llmp_compression",
   "introspection",
 ] }

@@ -385,7 +385,7 @@ mod tests {
     ///
     /// StdEdgeCoverageModule::builder().build().unwrap();
     /// ```
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn does_not_build() {}
 
     #[test]

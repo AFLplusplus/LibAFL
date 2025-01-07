@@ -31,7 +31,6 @@ pub struct ConcolicFeedback<'map> {
 
 impl<'map> ConcolicFeedback<'map> {
     /// Creates a concolic feedback from an observer
-    #[allow(unused)]
     #[must_use]
     pub fn from_observer(observer: &ConcolicObserver<'map>) -> Self {
         Self {

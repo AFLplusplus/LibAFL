@@ -40,7 +40,7 @@ fn main() {
 
     Command::new(afl_gcc_path)
         .args(["src/program.c", "-o"])
-        .arg(&format!("{}/target/release/program", &cwd))
+        .arg(format!("{}/target/release/program", &cwd))
         .arg("-fsanitize=address")
         .status()
         .unwrap();

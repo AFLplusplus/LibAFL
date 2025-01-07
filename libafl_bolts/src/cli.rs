@@ -122,7 +122,7 @@ pub enum FridaScriptBackend {
     subcommand_precedence_over_arg(true),
     args_conflicts_with_subcommands(true)
 )]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
     /// Timeout for each target execution (milliseconds)
     #[arg(short, long, default_value = "1000", value_parser = parse_timeout, help_heading = "Fuzz Options")]
