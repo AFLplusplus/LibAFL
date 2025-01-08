@@ -289,7 +289,7 @@ impl TimerStruct {
             LeaveCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
 
-            SetThreadpoolTimer(*self.ptp_timer(), Some(&ft), 0, 0);
+            SetThreadpoolTimer(*self.ptp_timer(), Some(&ft), 0, None);
         }
     }
 
@@ -375,7 +375,7 @@ impl TimerStruct {
             compiler_fence(Ordering::SeqCst);
 
             // previously this wa post_run_reset
-            SetThreadpoolTimer(*self.ptp_timer(), None, 0, 0);
+            SetThreadpoolTimer(*self.ptp_timer(), None, 0, None);
         }
     }
 }

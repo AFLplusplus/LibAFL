@@ -121,7 +121,7 @@ toml = "0.8.19" # For parsing the injections toml file
 typed-builder = "0.20.0" # Implement the builder pattern at compiletime
 uuid = { version = "1.10.0", features = ["serde", "v4"] }
 which = "6.0.3"
-windows = "0.58.0"
+windows = "0.59.0"
 z3 = "0.12.1"
 
 
