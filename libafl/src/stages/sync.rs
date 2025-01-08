@@ -17,7 +17,10 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, UsesInput},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasRand, MaybeHasClientPerfMonitor, State, Stoppable},
+    state::{
+        HasCorpus, HasExecutions, HasRand, HasSolutions, MaybeHasClientPerfMonitor, State,
+        Stoppable,
+    },
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -232,6 +235,7 @@ where
     client: LlmpEventConverter<DI, IC, ICB, S, SP>,
 }
 
+// Do not include trait bound HasSolutions to S if share_objectives is disabled
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
     EM: EventFirer<State = S>,
@@ -241,7 +245,8 @@ where
         + HasMetadata
         + Stoppable
         + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + State,
+        + State
+        + HasSolutions,
     SP: ShMemProvider,
     E: HasObservers + Executor<EM, Z, State = S>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -251,6 +256,7 @@ where
     ICB: InputConverter<From = DI, To = <S::Corpus as Corpus>::Input>,
     DI: Input,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Clone,
+    S::Solutions: Corpus<Input = S::Input>,
 {
     #[inline]
     fn perform(

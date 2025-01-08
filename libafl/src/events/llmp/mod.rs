@@ -24,6 +24,11 @@ use crate::{
     state::{HasCorpus, HasExecutions, NopState, State, Stoppable, UsesState},
     Error, HasMetadata,
 };
+#[cfg(feature = "share_objectives")]
+use crate::{
+    corpus::Testcase,
+    state::{HasCurrentTestcase, HasSolutions},
+};
 
 /// The llmp event manager
 pub mod mgr;
@@ -284,6 +289,7 @@ where
     }
 
     // Handle arriving events in the client
+    #[cfg(not(feature = "share_objectives"))]
     fn handle_in_client<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -340,7 +346,87 @@ where
         }
     }
 
+    #[cfg(feature = "share_objectives")]
+    fn handle_in_client<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+        client_id: ClientId,
+        event: Event<DI>,
+    ) -> Result<(), Error>
+    where
+        E: Executor<EM, Z, State = S> + HasObservers,
+        EM: UsesState<State = S> + EventFirer,
+        S: HasSolutions + HasCurrentTestcase,
+        S::Corpus: Corpus<Input = S::Input>,
+        S::Solutions: Corpus<Input = S::Input>,
+        for<'a> E::Observers: Deserialize<'a>,
+        Z: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
+    {
+        match event {
+            Event::NewTestcase {
+                input, forward_id, ..
+            } => {
+                log::debug!("Received new Testcase to convert from {client_id:?} (forward {forward_id:?}, forward {forward_id:?})");
+
+                let Some(converter) = self.converter_back.as_mut() else {
+                    return Ok(());
+                };
+
+                let res = fuzzer.evaluate_input_with_observers(
+                    state,
+                    executor,
+                    manager,
+                    converter.convert(input)?,
+                    false,
+                )?;
+
+                if let Some(item) = res.1 {
+                    log::info!("Added received Testcase as item #{item}");
+                }
+                Ok(())
+            }
+            Event::Objective { input, .. } => {
+                log::debug!("Received new Objective");
+
+                let Some(converter) = self.converter_back.as_mut() else {
+                    return Ok(());
+                };
+
+                let converted_input = converter.convert(input)?;
+                let mut testcase = Testcase::from(converted_input);
+                testcase.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
+
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
+
+                Ok(())
+            }
+            Event::CustomBuf { tag, buf } => {
+                for handler in &mut self.custom_buf_handlers {
+                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
+                        break;
+                    }
+                }
+                Ok(())
+            }
+            Event::Stop => Ok(()),
+            _ => Err(Error::unknown(format!(
+                "Received illegal message that message should not have arrived: {:?}.",
+                event.name()
+            ))),
+        }
+    }
+
     /// Handle arriving events in the client
+    #[cfg(not(feature = "share_objectives"))]
     pub fn process<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -352,6 +438,57 @@ where
         E: Executor<EM, Z, State = S> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
         S::Corpus: Corpus<Input = S::Input>,
+        for<'a> E::Observers: Deserialize<'a>,
+        Z: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
+    {
+        // TODO: Get around local event copy by moving handle_in_client
+        let self_id = self.llmp.sender().id();
+        let mut count = 0;
+        while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
+            assert!(
+                tag != _LLMP_TAG_EVENT_TO_BROKER,
+                "EVENT_TO_BROKER parcel should not have arrived in the client!"
+            );
+
+            if client_id == self_id {
+                continue;
+            }
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if _flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = self.compressor.decompress(msg)?;
+                &compressed
+            } else {
+                msg
+            };
+
+            let event: Event<DI> = postcard::from_bytes(event_bytes)?;
+            log::debug!("Processor received message {}", event.name_detailed());
+            self.handle_in_client(fuzzer, executor, state, manager, client_id, event)?;
+            count += 1;
+        }
+        Ok(count)
+    }
+
+    /// Handle arriving events in the client
+    #[cfg(feature = "share_objectives")]
+    pub fn process<E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+    ) -> Result<usize, Error>
+    where
+        E: Executor<EM, Z, State = S> + HasObservers,
+        EM: UsesState<State = S> + EventFirer,
+        S: HasSolutions + HasCurrentTestcase,
+        S::Corpus: Corpus<Input = S::Input>,
+        S::Solutions: Corpus<Input = S::Input>,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
             + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,

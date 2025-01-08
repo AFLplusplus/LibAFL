@@ -285,15 +285,18 @@ where
         if !self.is_main {
             // secondary node
             let mut is_tc = false;
-            // Forward to main only if new tc or heartbeat
+            // Forward to main only if new tc, heartbeat, or optionally, a new objective
             let should_be_forwarded = match &mut event {
                 Event::NewTestcase { forward_id, .. } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
                     is_tc = true;
                     true
                 }
-                Event::UpdateExecStats { .. } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
-                Event::Stop => true,
+                Event::UpdateExecStats { .. } | Event::Stop => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+
+                #[cfg(feature = "share_objectives")]
+                Event::Objective { .. } => true,
+
                 _ => false,
             };
 
@@ -677,6 +680,12 @@ where
                     log::debug!("[{}] {} was discarded...)", process::id(), event_name);
                 }
             }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { .. } => {
+                log::debug!("Received new Objective");
+            }
+
             Event::Stop => {
                 state.request_stop();
             }

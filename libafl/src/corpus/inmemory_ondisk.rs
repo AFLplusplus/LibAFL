@@ -10,8 +10,9 @@ use std::{
     fs,
     fs::{File, OpenOptions},
     io,
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
+    string::ToString,
 };
 
 use fs2::FileExt;
@@ -385,22 +386,24 @@ impl<I> InMemoryOnDiskCorpus<I> {
             testcase.input().as_ref().unwrap().generate_name()
         });
 
-        let lockfile_name = format!(".{file_name}.lock");
-        let lockfile_path = self.dir_path.join(lockfile_name);
+        let mut ctr = String::new();
+        if self.locking {
+            let lockfile_name = format!(".{file_name}");
+            let lockfile_path = self.dir_path.join(lockfile_name);
+            let lockfile = try_create_new(&lockfile_path)?.unwrap_or(File::create(&lockfile_path)?);
 
-        let mut lockfile = try_create_new(&lockfile_path)?.unwrap_or(File::open(lockfile_path)?);
+            lockfile.lock_exclusive()?;
 
-        lockfile.lock_exclusive()?;
+            // replace String herre too and try to reduce variables
+            ctr = fs::read_to_string(&lockfile_path)?;
+            if ctr.is_empty() {
+                ctr = String::from("1");
+            } else {
+                ctr = (ctr.parse::<u32>()? + 1).to_string();
+            }
 
-        let mut bfr = [0u8; 4];
-        let ctr = match lockfile.read_exact(&mut bfr) {
-            Ok(_) => u32::from_le_bytes(bfr) + 1,
-            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 1,
-            Err(e) => return Err(e.into()),
-        };
-
-        lockfile.write_all(&ctr.to_le_bytes())?;
-        lockfile.unlock()?;
+            fs::write(lockfile_path, &ctr)?;
+        }
 
         if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
@@ -408,11 +411,16 @@ impl<I> InMemoryOnDiskCorpus<I> {
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {
-            let metafile_name = format!(
-                ".{}_{}.metadata",
-                testcase.filename().as_ref().unwrap(),
-                ctr
-            );
+            let metafile_name;
+            if self.locking {
+                metafile_name = format!(
+                    ".{}_{}.metadata",
+                    testcase.filename().as_ref().unwrap(),
+                    ctr
+                );
+            } else {
+                metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());
+            }
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
             tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
@@ -444,21 +452,37 @@ impl<I> InMemoryOnDiskCorpus<I> {
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
 
-        self.store_input_from(testcase)?;
+        if let Err(err) = self.store_input_from(testcase) {
+            if self.locking {
+                return Err(err);
+            }
+            log::error!("An error occurred when trying to write a testcase without locking: {err}");
+        }
         Ok(())
     }
 
     fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         if let Some(filename) = testcase.filename() {
+            if self.locking {
+                let lockfile_path = self.dir_path.join(format!(".{filename}"));
+                let lockfile = File::open(&lockfile_path)?;
+
+                lockfile.lock_exclusive()?;
+                let ctr = fs::read_to_string(&lockfile_path)?;
+
+                if ctr == "1" {
+                    lockfile.unlock()?;
+                    drop(fs::remove_file(lockfile_path));
+                } else {
+                    fs::write(lockfile_path, (ctr.parse::<u32>()? - 1).to_string())?;
+                    return Ok(());
+                }
+            }
+
             fs::remove_file(self.dir_path.join(filename))?;
             if self.meta_format.is_some() {
                 fs::remove_file(self.dir_path.join(format!(".{filename}.metadata")))?;
             }
-            // also try to remove the corresponding `.lafl_lock` file if it still exists
-            // (even though it shouldn't exist anymore, at this point in time)
-            drop(fs::remove_file(
-                self.dir_path.join(format!(".{filename}.lafl_lock")),
-            ));
         }
         Ok(())
     }
