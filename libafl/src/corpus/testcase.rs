@@ -270,6 +270,7 @@ impl<I> Testcase<I> {
     }
 
     /// Create a new Testcase instance given an input and a `filename`
+    // Might not be needed as it will break deduplication of OnDisk Corpus
     #[inline]
     pub fn with_filename(input: I, filename: String) -> Self {
         Self {

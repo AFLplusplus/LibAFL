@@ -10,7 +10,7 @@ use std::{
     fs,
     fs::{File, OpenOptions},
     io,
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
     string::ToString,
 };
@@ -319,6 +319,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     /// Sets the filename for a [`Testcase`].
     /// If an error gets returned from the corpus (i.e., file exists), we'll have to retry with a different filename.
+    // Probably unnecessary since filename is inherently linked to input data now
     #[inline]
     pub fn rename_testcase(
         &self,
@@ -386,25 +387,25 @@ impl<I> InMemoryOnDiskCorpus<I> {
             testcase.input().as_ref().unwrap().generate_name()
         });
 
-        let mut ctr = 1;
+        // replace String with Cow
+        let mut ctr = String::new();
         if self.locking {
             let lockfile_name = format!(".{file_name}");
             let lockfile_path = self.dir_path.join(lockfile_name);
 
-            let mut lockfile =
-                try_create_new(&lockfile_path)?.unwrap_or(File::open(lockfile_path)?);
+            let lockfile = try_create_new(&lockfile_path)?.unwrap_or(File::create(&lockfile_path)?);
 
             lockfile.lock_exclusive()?;
 
-            let mut bfr = [0u8; 4];
-            ctr = match lockfile.read_exact(&mut bfr) {
-                Ok(()) => u32::from_le_bytes(bfr) + 1,
-                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 1,
-                Err(e) => return Err(e.into()),
-            };
+            // replace String herre too and try to reduce variables
+            ctr = fs::read_to_string(&lockfile_path)?;
+            if ctr.is_empty() {
+                ctr = String::from("1");
+            } else {
+                ctr = (ctr.parse::<u32>()? + 1).to_string();
+            }
 
-            lockfile.write_all(&ctr.to_le_bytes())?;
-            lockfile.unlock()?;
+            fs::write(lockfile_path, &ctr)?;
         }
 
         if testcase.file_path().is_none() {
@@ -476,8 +477,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
                     lockfile.unlock()?;
                     drop(fs::remove_file(lockfile_path));
                 } else {
-                    let n: u32 = ctr.parse()?;
-                    fs::write(lockfile_path, (n - 1).to_string())?;
+                    fs::write(lockfile_path, (ctr.parse::<u32>()? - 1).to_string())?;
                     return Ok(());
                 }
             }
