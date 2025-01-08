@@ -1546,7 +1546,7 @@ pub mod win32_shmem {
     use windows::{
         core::PCSTR,
         Win32::{
-            Foundation::{CloseHandle, BOOL, HANDLE},
+            Foundation::{CloseHandle, HANDLE},
             System::Memory::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
                 FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
@@ -1621,7 +1621,7 @@ pub mod win32_shmem {
                 // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS.0,
-                    BOOL(0),
+                    false,
                     PCSTR(map_str_bytes.as_ptr().cast_mut()),
                 )?;
 
