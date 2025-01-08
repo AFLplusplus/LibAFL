@@ -1,7 +1,7 @@
 [package]
-name = "bootloader"
+name = "qemu_intel_pt_bootloader"
 version = "0.1.0"
-authors = ["Marco Cavenati <cavenatimarco@gmail.com>"]
+authors = ["Marco Cavenati <cavenatimarco+libafl@gmail.com>"]
 edition = "2021"
 
 [dependencies]

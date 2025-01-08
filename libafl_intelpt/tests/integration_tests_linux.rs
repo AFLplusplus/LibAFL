@@ -69,11 +69,7 @@ fn intel_pt_trace_fork() {
                 None,
                 map.start() as u64,
             ) {
-                Err(e) => println!(
-                    "Error adding mapping for {:?}: {:?}, skipping",
-                    map.filename().unwrap(),
-                    e
-                ),
+                Err(e) => println!("skipping mapping of {:?}: {:?}", map.filename().unwrap(), e),
                 Ok(()) => println!(
                     "mapping for {:?} added successfully {:#x} - {:#x}",
                     map.filename().unwrap(),

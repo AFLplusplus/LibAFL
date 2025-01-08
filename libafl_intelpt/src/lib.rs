@@ -456,12 +456,6 @@ impl IntelPT {
                             let map_loc = map_ptr.add(id as usize % map_len);
                             *map_loc = (*map_loc).saturating_add(&1u8.into());
                         }
-                        // log::trace!(
-                        //     "previous block ip: {:x} current: {:x} offset: {offset:x}",
-                        //     previous_block_end_ip,
-                        //     b.ip()
-                        // );
-                        // log::trace!("writing map at {id:x} with value {:?}", *map_loc);
                         *previous_block_end_ip = b.end_ip();
                     }
 
