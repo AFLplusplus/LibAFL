@@ -39,9 +39,9 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
+use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
-use libafl_bolts::ownedref::OwnedRefMut;
-use libafl_bolts::{hash_64_fast, Error};
+use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
 #[cfg(target_os = "linux")]
 use libipt::{
     block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
@@ -851,6 +851,7 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
 }
 
 /// Convert [`PtError`] into [`Error`]
+#[cfg(target_os = "linux")]
 #[inline]
 #[must_use]
 pub fn error_from_pt_error(err: PtError) -> Error {
