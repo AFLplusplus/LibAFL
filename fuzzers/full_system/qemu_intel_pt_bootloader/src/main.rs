@@ -58,7 +58,7 @@ fn main() {
     let target_dir = env::var("TARGET_DIR").unwrap_or("target".to_string());
 
     // Configure QEMU
-    let qemu = QemuConfig::builder()
+    let qemu_config = QemuConfig::builder()
         .no_graphic(true)
         .monitor(config::Monitor::Null)
         .serial(config::Serial::Null)
@@ -67,13 +67,13 @@ fn main() {
         .drives([config::Drive::builder()
             .format(config::DiskImageFileFormat::Qcow2)
             .file(format!("{target_dir}/boot.qcow2"))
-            .build()
-            .unwrap()])
+            .build()])
         .accelerator(Accelerator::Kvm)
         //.snapshot(true) todo: doesnt work
         .default_devices(false)
         .bios("/home/marco/code/qemu-libafl-bridge/build/qemu-bundle/usr/local/share/qemu/")
-        .start_cpu(false);
+        .start_cpu(false)
+        .build();
 
     let file_path = Path::new(&target_dir)
         .join("boot.bin")
@@ -94,7 +94,7 @@ fn main() {
         .build());
 
     let emulator = EmulatorBuilder::empty()
-        .qemu_config(|_| qemu)
+        .qemu_parameters(qemu_config)
         .modules(emulator_modules)
         .build()
         .unwrap();
