@@ -10,7 +10,9 @@ use num_traits::SaturatingAdd;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind, NopPageFilter},
+    modules::{
+        utils::filters::NopPageFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind,
+    },
     EmulatorModules, NewThreadHook, Qemu, QemuParams,
 };
 
