@@ -135,7 +135,7 @@ int main() {
   // Call the target
   bool ret = FuzzMe(pbuf->data, pbuf->size);
 
-  if (ret) { kAFL_hypercall(HYPERCALL_KAFL_SUBMIT_PANIC, 0); }
+  if (ret) { kAFL_hypercall(HYPERCALL_KAFL_PANIC, 0); }
 
   kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
   // }

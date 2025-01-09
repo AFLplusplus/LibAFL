@@ -401,9 +401,9 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct SubmitPanicCommand;
+pub struct PanicCommand;
 
-impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for SubmitPanicCommand
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for PanicCommand
 where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
@@ -443,6 +443,35 @@ where
         emu.snapshot_manager_mut().check(qemu, &snapshot_id)?;
 
         Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SubmitPanicCommand;
+
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for SubmitPanicCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        _emu: &mut Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<
+        Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        // TODO: add breakpoint to submit panic addr / page and associate it with a panic command
+        unimplemented!()
     }
 }
 

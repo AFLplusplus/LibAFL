@@ -22,6 +22,7 @@ use crate::{
     sync_exit::ExitArgs,
     IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
+use crate::command::nyx::PanicCommand;
 
 fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandError> {
     let str_addr = qemu.read_reg(string_ptr_reg)? as GuestVirtAddr;
@@ -118,6 +119,26 @@ where
         _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
         Ok(SubmitPanicCommand)
+    }
+}
+
+pub struct PanicCommandParser;
+impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+for PanicCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    type OutputCommand = PanicCommand;
+    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_PANIC;
+
+    fn parse(
+        _qemu: Qemu,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        Ok(PanicCommand)
     }
 }
 
