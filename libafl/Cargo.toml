@@ -39,6 +39,7 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
+  "fs2"
 ]
 document-features = ["dep:document-features"]
 
@@ -296,6 +297,7 @@ clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 libipt = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
+fs2 = { workspace = true, optional = true }
 
 [lints]
 workspace = true

@@ -4,7 +4,7 @@
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::cell::RefCell;
 use std::{
     fs,
@@ -14,6 +14,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use fs2::FileExt;
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
@@ -379,30 +380,28 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         I: Input,
     {
-        let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
+        let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             testcase.input().as_ref().unwrap().generate_name()
         });
 
-        // New testcase, we need to save it.
-        let mut file_name = file_name_orig.clone();
+        let mut ctr = String::new();
+        if self.locking {
+            let lockfile_name = format!(".{file_name}");
+            let lockfile_path = self.dir_path.join(lockfile_name);
 
-        let mut ctr = 2;
-        let file_name = if self.locking {
-            loop {
-                let lockfile_name = format!(".{file_name}.lafl_lock");
-                let lockfile_path = self.dir_path.join(lockfile_name);
+            let lockfile = try_create_new(&lockfile_path)?.unwrap_or(File::create(&lockfile_path)?);
+            lockfile.lock_exclusive()?;
 
-                if try_create_new(lockfile_path)?.is_some() {
-                    break file_name;
-                }
-
-                file_name = format!("{file_name_orig}-{ctr}");
-                ctr += 1;
+            ctr = fs::read_to_string(&lockfile_path)?;
+            if ctr.is_empty() {
+                ctr = String::from("1");
+            } else {
+                ctr = (ctr.parse::<u32>()? + 1).to_string();
             }
-        } else {
-            file_name
-        };
+
+            fs::write(lockfile_path, &ctr)?;
+        }
 
         if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
@@ -410,7 +409,15 @@ impl<I> InMemoryOnDiskCorpus<I> {
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {
-            let metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());
+            let metafile_name = if self.locking {
+                format!(
+                    ".{}_{}.metadata",
+                    testcase.filename().as_ref().unwrap(),
+                    ctr
+                )
+            } else {
+                format!(".{}.metadata", testcase.filename().as_ref().unwrap())
+            };
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
             tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
