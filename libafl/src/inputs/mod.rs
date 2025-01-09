@@ -28,21 +28,23 @@ pub mod nautilus;
 
 use alloc::{
     boxed::Box,
-    string::{String, ToString},
+    string::String,
     vec::{Drain, Splice, Vec},
 };
 use core::{
     clone::Clone,
     fmt::Debug,
+    hash::Hash,
     marker::PhantomData,
     ops::{DerefMut, RangeBounds},
 };
 #[cfg(feature = "std")]
-use std::{fs::File, hash::Hash, io::Read, path::Path};
+use std::{fs::File, io::Read, path::Path};
 
 #[cfg(feature = "std")]
 use libafl_bolts::fs::write_file_atomic;
 use libafl_bolts::{
+    generic_hash_std,
     ownedref::{OwnedMutSlice, OwnedSlice},
     subrange::{SubRangeMutSlice, SubRangeSlice},
     Error, HasLen,
@@ -51,11 +53,9 @@ use libafl_bolts::{
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
-use crate::corpus::CorpusId;
-
 /// An input for the target
 #[cfg(not(feature = "std"))]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
     /// Write this input to the file
     fn to_file<P>(&self, _path: P) -> Result<(), Error> {
         Err(Error::not_implemented("Not supported in no_std"))
@@ -67,12 +67,14 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     }
 
     /// Generate a name for this input
-    fn generate_name(&self, id: Option<CorpusId>) -> String;
+    fn generate_name(&self) -> String {
+        format!("{:016x}", generic_hash_std(self))
+    }
 }
 
 /// An input for the target
 #[cfg(feature = "std")]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
@@ -93,7 +95,9 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     }
 
     /// Generate a name for this input, the user is responsible for making each name of testcase unique.
-    fn generate_name(&self, id: Option<CorpusId>) -> String;
+    fn generate_name(&self) -> String {
+        format!("{:016x}", generic_hash_std(self))
+    }
 }
 
 /// Convert between two input types with a state
@@ -127,12 +131,7 @@ impl NopInput {
     }
 }
 
-impl Input for NopInput {
-    fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        "nop-input".to_string()
-    }
-}
-
+impl Input for NopInput {}
 impl HasTargetBytes for NopInput {
     fn target_bytes(&self) -> OwnedSlice<u8> {
         OwnedSlice::from(vec![0])

@@ -87,7 +87,7 @@ where
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add(testcase)?;
         let testcase = &mut self.get(id).unwrap().borrow_mut();
-        self.save_testcase(testcase, id)?;
+        self.save_testcase(testcase)?;
         *testcase.input_mut() = None;
         Ok(id)
     }
@@ -97,7 +97,7 @@ where
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add_disabled(testcase)?;
         let testcase = &mut self.get_from_all(id).unwrap().borrow_mut();
-        self.save_testcase(testcase, id)?;
+        self.save_testcase(testcase)?;
         *testcase.input_mut() = None;
         Ok(id)
     }
@@ -108,7 +108,7 @@ where
         let entry = self.inner.replace(id, testcase)?;
         self.remove_testcase(&entry)?;
         let testcase = &mut self.get(id).unwrap().borrow_mut();
-        self.save_testcase(testcase, id)?;
+        self.save_testcase(testcase)?;
         *testcase.input_mut() = None;
         Ok(entry)
     }
@@ -375,13 +375,13 @@ impl<I> InMemoryOnDiskCorpus<I> {
         }
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error>
+    fn save_testcase(&self, testcase: &mut Testcase<I>) -> Result<(), Error>
     where
         I: Input,
     {
         let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name(Some(id))
+            testcase.input().as_ref().unwrap().generate_name()
         });
 
         // New testcase, we need to save it.
