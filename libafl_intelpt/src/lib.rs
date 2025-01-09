@@ -334,14 +334,14 @@ impl IntelPT {
         // https://manpages.debian.org/bookworm/manpages-dev/perf_event_open.2.en.html#data_head
         smp_rmb();
 
-        let mut data = if head_wrap >= tail_wrap {
-            unsafe {
-                let ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
+        let mut data = unsafe {
+            if head_wrap >= tail_wrap {
+                let ptr = self.perf_aux_buffer.add(tail_wrap as usize).cast::<u8>();
                 OwnedRefMut::Ref(slice::from_raw_parts_mut(ptr, len))
+            } else {
+                // Head pointer wrapped, the trace is split
+                OwnedRefMut::Owned(self.join_split_trace(head_wrap, tail_wrap))
             }
-        } else {
-            // Head pointer wrapped, the trace is split
-            OwnedRefMut::Owned(self.join_split_trace(head_wrap, tail_wrap))
         };
         #[cfg(feature = "export_raw")]
         {
@@ -398,13 +398,23 @@ impl IntelPT {
         Ok(())
     }
 
+    /// # Safety:
+    ///
+    /// The caller must ensure that `head_wrap` and `tail_wrap` have been wrapped properly, in other
+    /// words, this ensures that `head_wrap` and `tail_wrap` are < `self.perf_aux_buffer_size`.
     #[inline]
     #[must_use]
-    fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> Box<[u8]> {
-        let first_ptr = unsafe { self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8 };
+    unsafe fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> Box<[u8]> {
+        // this function is unsafe, but let's make it safe when compiling in debug mode
+        debug_assert!(head_wrap < self.perf_aux_buffer_size as u64);
+        debug_assert!(tail_wrap < self.perf_aux_buffer_size as u64);
+
+        // SAFETY: tail_wrap is guaranteed to be < `self.perf_aux_buffer_size` from the fn safety
+        // preconditions
+        let first_ptr = unsafe { self.perf_aux_buffer.add(tail_wrap as usize) }.cast::<u8>();
         let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
 
-        let second_ptr = self.perf_aux_buffer as *mut u8;
+        let second_ptr = self.perf_aux_buffer.cast::<u8>();
         let second_len = head_wrap as usize;
 
         let mut data = Box::<[u8]>::new_uninit_slice(first_len + second_len);
