@@ -18,6 +18,8 @@ use std::{
 };
 
 use libafl_bolts::os::unix_signals::Signal;
+#[cfg(feature = "systemmode")]
+use libafl_bolts::Error;
 use libafl_qemu_sys::{
     libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
     libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
@@ -814,19 +816,25 @@ impl Qemu {
     }
 
     #[cfg(feature = "systemmode")]
-    pub fn set_hw_breakpoint(&self, addr: GuestAddr) {
-        unsafe {
-            libafl_qemu_set_hw_breakpoint(addr.into());
+    pub fn set_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
+        let ret = unsafe { libafl_qemu_set_hw_breakpoint(addr.into()) };
+        match ret {
+            0 => Ok(()),
+            errno => Err(Error::unsupported(format!(
+                "Failed to set hw breakpoint errno: {errno}"
+            ))),
         }
-        // TODO don't be lame, return a Result
     }
 
     #[cfg(feature = "systemmode")]
-    pub fn remove_hw_breakpoint(&self, addr: GuestAddr) {
-        unsafe {
-            libafl_qemu_remove_hw_breakpoint(addr.into());
+    pub fn remove_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
+        let ret = unsafe { libafl_qemu_remove_hw_breakpoint(addr.into()) };
+        match ret {
+            0 => Ok(()),
+            errno => Err(Error::unsupported(format!(
+                "Failed to set hw breakpoint errno: {errno}"
+            ))),
         }
-        // TODO don't be lame, return a Result
     }
 
     pub fn entry_break(&self, addr: GuestAddr) {

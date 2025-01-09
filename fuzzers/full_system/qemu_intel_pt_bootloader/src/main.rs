@@ -99,7 +99,8 @@ fn main() {
         .build()
         .unwrap();
     let qemu = emulator.qemu();
-    qemu.set_hw_breakpoint(*BOOTLOADER_CODE.start() as GuestAddr);
+    qemu.set_hw_breakpoint(*BOOTLOADER_CODE.start() as GuestAddr)
+        .unwrap();
 
     // todo: there is smth broken somewhere, QemuExitReason::Breakpoint reports a wrong address
     unsafe {
@@ -110,9 +111,10 @@ fn main() {
             _ => panic!("Pre-harness Unexpected QEMU exit."),
         }
     }
-    qemu.remove_hw_breakpoint(*BOOTLOADER_CODE.start() as GuestAddr);
+    qemu.remove_hw_breakpoint(*BOOTLOADER_CODE.start() as GuestAddr)
+        .unwrap();
 
-    qemu.set_hw_breakpoint(BOOTLOADER_SLEEP_FN_ADDR);
+    qemu.set_hw_breakpoint(BOOTLOADER_SLEEP_FN_ADDR).unwrap();
 
     qemu.save_snapshot("bootloader_start", true);
 
