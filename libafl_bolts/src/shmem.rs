@@ -626,10 +626,7 @@ where
 pub mod unix_shmem {
     /// Mmap [`ShMem`] for Unix
     #[cfg(not(target_os = "android"))]
-    pub use default::MmapShMem;
-    /// Mmap [`ShMemProvider`] for Unix
-    #[cfg(not(target_os = "android"))]
-    pub use default::MmapShMemProvider;
+    pub use default::{MmapShMem, MmapShMemProvider, MAX_MMAP_FILENAME_LEN};
 
     #[cfg(doc)]
     use crate::shmem::{ShMem, ShMemProvider};
@@ -669,7 +666,8 @@ pub mod unix_shmem {
             Error,
         };
 
-        const MAX_MMAP_FILENAME_LEN: usize = 20;
+        /// The max number of bytes used when generating names for [`MmapShMem`]s.
+        pub const MAX_MMAP_FILENAME_LEN: usize = 20;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
@@ -1136,7 +1134,7 @@ pub mod unix_shmem {
     }
 
     /// Module containing `ashmem` shared memory support, commonly used on Android.
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(all(any(target_os = "linux", target_os = "android"), feature = "std"))]
     pub mod ashmem {
         use alloc::string::ToString;
         use core::{
@@ -1156,7 +1154,6 @@ pub mod unix_shmem {
         };
 
         /// An ashmem based impl for linux/android
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMem {
             id: ShMemId,
@@ -1275,7 +1272,6 @@ pub mod unix_shmem {
             }
         }
 
-        #[cfg(unix)]
         impl ShMem for AshmemShMem {
             fn id(&self) -> ShMemId {
                 self.id
@@ -1297,7 +1293,6 @@ pub mod unix_shmem {
         }
 
         /// [`Drop`] implementation for [`AshmemShMem`], which cleans up the mapping.
-        #[cfg(unix)]
         impl Drop for AshmemShMem {
             #[expect(trivial_numeric_casts)]
             fn drop(&mut self) {
@@ -1320,13 +1315,11 @@ pub mod unix_shmem {
         }
 
         /// A [`ShMemProvider`] which uses ashmem to provide shared memory mappings.
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMemProvider {}
 
         unsafe impl Send for AshmemShMemProvider {}
 
-        #[cfg(unix)]
         impl Default for AshmemShMemProvider {
             fn default() -> Self {
                 Self::new().unwrap()
@@ -1334,7 +1327,6 @@ pub mod unix_shmem {
         }
 
         /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
-        #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
             type ShMem = AshmemShMem;
 
@@ -1554,7 +1546,7 @@ pub mod win32_shmem {
     use windows::{
         core::PCSTR,
         Win32::{
-            Foundation::{CloseHandle, BOOL, HANDLE},
+            Foundation::{CloseHandle, HANDLE},
             System::Memory::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
                 FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
@@ -1629,7 +1621,7 @@ pub mod win32_shmem {
                 // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS.0,
-                    BOOL(0),
+                    false,
                     PCSTR(map_str_bytes.as_ptr().cast_mut()),
                 )?;
 

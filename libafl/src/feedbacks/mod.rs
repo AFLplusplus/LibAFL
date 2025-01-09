@@ -31,6 +31,9 @@ use crate::{corpus::Testcase, executors::ExitKind, observers::TimeObserver, Erro
 #[cfg(feature = "std")]
 pub mod capture_feedback;
 
+pub mod bool;
+pub use bool::BoolValueFeedback;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
@@ -53,6 +56,11 @@ pub use capture_feedback::CaptureTimeoutFeedback;
 
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
+
+#[cfg(feature = "value_bloom_feedback")]
+pub mod value_bloom;
+#[cfg(feature = "value_bloom_feedback")]
+pub use value_bloom::ValueBloomFeedback;
 
 /// Feedback which initializes a state.
 ///
@@ -932,7 +940,12 @@ where
         observers: &OT,
         testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
-        let observer = observers.get(&self.observer_handle).unwrap();
+        let Some(observer) = observers.get(&self.observer_handle) else {
+            return Err(Error::illegal_state(
+                "Observer referenced by TimeFeedback is not found in observers given to the fuzzer",
+            ));
+        };
+
         *testcase.exec_time_mut() = *observer.last_runtime();
         Ok(())
     }

@@ -1,7 +1,10 @@
 [package]
 name = "libafl_qemu_build"
 version.workspace = true
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Romain Malmain <rmalmain@pm.me>",
+]
 description = "Builder for LibAFL QEMU"
 documentation = "https://docs.rs/libafl_qemu_build"
 repository = "https://github.com/AFLplusplus/LibAFL/"
@@ -25,6 +28,8 @@ shared = []
 slirp = []  # build qemu with host libslirp (for user networking)
 
 clippy = [] # special feature for clippy, don't use in normal projects§
+
+qemu_sanitizers = [] # Enable QEMU sanitizers
 
 paranoid_debug = [
 ] # Will perform as many checks as possible. The target will be greatly slowed down.

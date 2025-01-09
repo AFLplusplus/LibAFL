@@ -184,7 +184,7 @@ windows = { workspace = true, features = [
   "Win32_System_SystemInformation",
   "Win32_System_Console",
 ] }
-windows-result = "0.2.0"
+windows-result = "0.3.0"
 
 [target.'cfg(windows)'.build-dependencies]
 windows = { workspace = true }

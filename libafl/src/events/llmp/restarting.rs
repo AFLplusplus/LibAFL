@@ -737,6 +737,13 @@ mod tests {
     #[serial]
     #[cfg_attr(miri, ignore)]
     fn test_mgr_state_restore() {
+        // # Safety
+        // The same testcase doesn't usually run twice
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            crate::stages::RetryCountRestartHelper::register();
+        }
+
         let rand = StdRand::with_seed(0);
 
         let time = TimeObserver::new("time");

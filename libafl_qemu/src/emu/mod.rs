@@ -14,12 +14,14 @@ use libafl::{
 };
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
+#[cfg(doc)]
+use crate::modules::EmulatorModule;
 use crate::{
     breakpoint::{Breakpoint, BreakpointId},
     command::{CommandError, CommandManager, NopCommandManager, StdCommandManager},
     modules::EmulatorModuleTuple,
-    sync_exit::SyncExit,
-    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk,
+    sync_exit::CustomInsn,
+    Qemu, QemuExitError, QemuExitReason, QemuHooks, QemuInitError, QemuMemoryChunk, QemuParams,
     QemuShutdownCause, Regs, CPU,
 };
 
@@ -45,6 +47,8 @@ mod systemmode;
 #[cfg(feature = "systemmode")]
 pub use systemmode::*;
 
+use crate::config::QemuConfigBuilder;
+
 #[derive(Clone, Copy)]
 pub enum GuestAddrKind {
     Physical(GuestPhysAddr),
@@ -58,8 +62,8 @@ where
 {
     QemuExit(QemuShutdownCause),               // QEMU ended for some reason.
     Breakpoint(Breakpoint<CM, ED, ET, S, SM>), // Breakpoint triggered. Contains the address of the trigger.
-    SyncExit(SyncExit<CM, ED, ET, S, SM>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
-    Timeout,                               // Timeout
+    CustomInsn(CustomInsn<CM, ED, ET, S, SM>), // Synchronous backdoor: The guest triggered a backdoor and should return to LibAFL.
+    Timeout,                                   // Timeout
 }
 
 impl<CM, ED, ET, S, SM> Clone for EmulatorExitResult<CM, ED, ET, S, SM>
@@ -73,8 +77,8 @@ where
                 EmulatorExitResult::QemuExit(qemu_exit.clone())
             }
             EmulatorExitResult::Breakpoint(bp) => EmulatorExitResult::Breakpoint(bp.clone()),
-            EmulatorExitResult::SyncExit(sync_exit) => {
-                EmulatorExitResult::SyncExit(sync_exit.clone())
+            EmulatorExitResult::CustomInsn(sync_exit) => {
+                EmulatorExitResult::CustomInsn(sync_exit.clone())
             }
             EmulatorExitResult::Timeout => EmulatorExitResult::Timeout,
         }
@@ -94,7 +98,7 @@ where
             EmulatorExitResult::Breakpoint(bp) => {
                 write!(f, "{bp:?}")
             }
-            EmulatorExitResult::SyncExit(sync_exit) => {
+            EmulatorExitResult::CustomInsn(sync_exit) => {
                 write!(f, "{sync_exit:?}")
             }
             EmulatorExitResult::Timeout => {
@@ -118,6 +122,23 @@ pub struct InputLocation {
     ret_register: Option<Regs>,
 }
 
+/// The high-level interface to [`Qemu`].
+///
+/// It embeds multiple structures aiming at making QEMU usage easier:
+///
+/// - An [`IsSnapshotManager`] implementation, implementing the QEMU snapshot method to use.
+/// - An [`EmulatorDriver`] implementation, responsible for handling the high-level control flow of QEMU runtime.
+/// - A [`CommandManager`] implementation, handling the commands received from the target.
+/// - [`EmulatorModules`], containing the [`EmulatorModule`] implementations' state.
+///
+/// Each of these fields can be set manually to finely tune how QEMU is getting handled.
+/// It is highly encouraged to build [`Emulator`] using the associated [`EmulatorBuilder`].
+/// There are two main functions to access the builder:
+///
+/// - [`Emulator::builder`] gives access to the standard [`EmulatorBuilder`], embedding all the standard components of an [`Emulator`].
+/// - [`Emulator::empty`] gives access to an empty [`EmulatorBuilder`]. This is mostly useful to create a more custom [`Emulator`].
+///
+/// Please check the documentation of [`EmulatorBuilder`] for more details.
 #[derive(Debug)]
 #[expect(clippy::type_complexity)]
 pub struct Emulator<CM, ED, ET, S, SM>
@@ -199,6 +220,16 @@ impl InputLocation {
             ret_register,
         }
     }
+
+    #[must_use]
+    pub fn mem_chunk(&self) -> &QemuMemoryChunk {
+        &self.mem_chunk
+    }
+
+    #[must_use]
+    pub fn ret_register(&self) -> &Option<Regs> {
+        &self.ret_register
+    }
 }
 
 impl From<EmulatorExitError> for EmulatorDriverError {
@@ -222,7 +253,7 @@ where
         match self {
             EmulatorExitResult::QemuExit(shutdown_cause) => write!(f, "End: {shutdown_cause:?}"),
             EmulatorExitResult::Breakpoint(bp) => write!(f, "{bp}"),
-            EmulatorExitResult::SyncExit(sync_exit) => {
+            EmulatorExitResult::CustomInsn(sync_exit) => {
                 write!(f, "Sync exit: {sync_exit:?}")
             }
             EmulatorExitResult::Timeout => {
@@ -243,8 +274,14 @@ where
     S: UsesInput,
 {
     #[must_use]
-    pub fn empty(
-    ) -> EmulatorBuilder<NopCommandManager, NopEmulatorDriver, (), S, NopSnapshotManager> {
+    pub fn empty() -> EmulatorBuilder<
+        NopCommandManager,
+        NopEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        S,
+        NopSnapshotManager,
+    > {
         EmulatorBuilder::empty()
     }
 }
@@ -255,8 +292,14 @@ where
     S::Input: HasTargetBytes,
 {
     #[must_use]
-    pub fn builder(
-    ) -> EmulatorBuilder<StdCommandManager<S>, StdEmulatorDriver, (), S, StdSnapshotManager> {
+    pub fn builder() -> EmulatorBuilder<
+        StdCommandManager<S>,
+        StdEmulatorDriver,
+        (),
+        QemuConfigBuilder,
+        S,
+        StdSnapshotManager,
+    > {
         EmulatorBuilder::default()
     }
 }
@@ -321,24 +364,36 @@ where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
-    pub fn new(
-        qemu_args: &[String],
+    #[allow(clippy::must_use_candidate, clippy::similar_names)]
+    pub fn new<T>(
+        qemu_params: T,
         modules: ET,
         driver: ED,
         snapshot_manager: SM,
         command_manager: CM,
-    ) -> Result<Self, QemuInitError> {
-        let mut emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
+    ) -> Result<Self, QemuInitError>
+    where
+        T: Into<QemuParams>,
+    {
+        let mut qemu_params = qemu_params.into();
 
-        modules.pre_qemu_init_all(&mut emulator_hooks);
+        let emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
+        let mut emulator_modules = EmulatorModules::new(emulator_hooks, modules);
 
-        let qemu = Qemu::init(qemu_args)?;
+        // TODO: fix things there properly. The biggest issue being that it creates 2 mut ref to the module with the callback being called
+        unsafe {
+            emulator_modules.modules_mut().pre_qemu_init_all(
+                EmulatorModules::<ET, S>::emulator_modules_mut_unchecked(),
+                &mut qemu_params,
+            );
+        }
+
+        let qemu = Qemu::init(qemu_params)?;
 
         unsafe {
             Ok(Self::new_with_qemu(
                 qemu,
-                emulator_hooks,
-                modules,
+                emulator_modules,
                 driver,
                 snapshot_manager,
                 command_manager,
@@ -351,17 +406,16 @@ where
     ///
     /// # Safety
     ///
-    /// pre-init qemu hooks should be run by then.
-    pub(crate) unsafe fn new_with_qemu(
+    /// pre-init qemu hooks should be run before calling this.
+    unsafe fn new_with_qemu(
         qemu: Qemu,
-        emulator_hooks: EmulatorHooks<ET, S>,
-        modules: ET,
+        emulator_modules: Pin<Box<EmulatorModules<ET, S>>>,
         driver: ED,
         snapshot_manager: SM,
         command_manager: CM,
     ) -> Self {
         let mut emulator = Emulator {
-            modules: EmulatorModules::new(qemu, emulator_hooks, modules),
+            modules: emulator_modules,
             command_manager,
             snapshot_manager,
             driver,
@@ -370,7 +424,7 @@ where
             qemu,
         };
 
-        emulator.modules.post_qemu_init_all();
+        emulator.modules.post_qemu_init_all(qemu);
 
         emulator
     }
@@ -401,7 +455,9 @@ where
             ED::pre_qemu_exec(self, input);
 
             // Run QEMU
+            log::debug!("Running QEMU...");
             let mut exit_reason = self.run_qemu();
+            log::debug!("QEMU stopped.");
 
             // Handle QEMU exit
             if let Some(exit_handler_result) =
@@ -435,7 +491,7 @@ where
                         .clone();
                     EmulatorExitResult::Breakpoint(bp.clone())
                 }
-                QemuExitReason::SyncExit => EmulatorExitResult::SyncExit(SyncExit::new(
+                QemuExitReason::SyncExit => EmulatorExitResult::CustomInsn(CustomInsn::new(
                     self.command_manager.parse(self.qemu)?,
                 )),
             }),

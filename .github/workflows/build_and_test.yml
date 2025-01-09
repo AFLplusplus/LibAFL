@@ -209,21 +209,15 @@ jobs:
         run: ./scripts/fmt_all.sh check
 
   check-md-links:
-    runs-on: ubuntu-latest
+    # fixme: use ubuntu-latest once this gets fixed https://github.com/UmbrellaDocs/action-linkspector/issues/32
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install linkspector
-        shell: bash
-        run: sudo apt-get update && sudo apt-get install -y npm && npm install -g @umbrelladocs/linkspector
       - name: Run linkspector
-        shell: bash
-        run: ./scripts/check_md_links.sh
-      # TODO: Use github action once it's fixed (https://github.com/UmbrellaDocs/action-linkspector/issues/20)
-      # - name: Run linkspector
-      #   uses: umbrelladocs/action-linkspector@v1
-      #   with:
-      #     fail_on_error: 'true'
-      #     config_file: '.github/.linkspector.yml'
+        uses: umbrelladocs/action-linkspector@v1
+        with:
+          fail_on_error: 'true'
+          config_file: '.github/.linkspector.yml'
 
   msrv:
     runs-on: ubuntu-latest
