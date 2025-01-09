@@ -103,10 +103,7 @@ where
 
 /// High-level `Emulator` modules, using `QemuHooks`.
 #[derive(Debug)]
-pub struct EmulatorModules<ET, S>
-where
-    S: UsesInput,
-{
+pub struct EmulatorModules<ET, S> {
     modules: Pin<Box<ET>>,
     hooks: EmulatorHooks<ET, S>,
     phantom: PhantomData<S>,
@@ -114,10 +111,7 @@ where
 
 /// Hook collection,
 #[derive(Debug)]
-pub struct EmulatorHooks<ET, S>
-where
-    S: UsesInput,
-{
+pub struct EmulatorHooks<ET, S> {
     qemu_hooks: QemuHooks,
 
     instruction_hooks: Vec<Pin<Box<(InstructionHookId, FatPtr)>>>,
@@ -1262,10 +1256,7 @@ where
     }
 }
 
-impl<ET, S> Drop for EmulatorModules<ET, S>
-where
-    S: UsesInput,
-{
+impl<ET, S> Drop for EmulatorModules<ET, S> {
     fn drop(&mut self) {
         // Make the global pointer null at drop time
         unsafe {

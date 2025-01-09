@@ -161,7 +161,6 @@ where
     S: UsesInput,
 {
     #[must_use]
-    #[expect(clippy::match_wildcard_for_single_variants)]
     pub fn end_of_run(&self) -> Option<ExitKind> {
         match self {
             EmulatorDriverResult::EndOfRun(exit_kind) => Some(*exit_kind),

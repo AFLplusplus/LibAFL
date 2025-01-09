@@ -58,6 +58,8 @@ err_out:
 int agent_init(int verbose) {
   host_config_t host_config;
 
+  hprintf("Nyx agent init");
+
   // set ready state
   kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
   kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
@@ -120,18 +122,23 @@ int main() {
 
   agent_init(1);
 
+  kAFL_hypercall(HYPERCALL_KAFL_SUBMIT_CR3, 0);
   kAFL_hypercall(HYPERCALL_KAFL_GET_PAYLOAD, (uint64_t)pbuf);
 
   hprintf("payload size addr: %p", &pbuf->size);
   hprintf("payload addr: %p", &pbuf->data);
 
+  // while(true) {
   kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
   kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
 
   // Call the target
   bool ret = FuzzMe(pbuf->data, pbuf->size);
 
-  kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
+  if (ret) { kAFL_hypercall(HYPERCALL_KAFL_SUBMIT_PANIC, 0); }
 
-  habort("Error: post-release code has been triggered.");
+  kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
+  // }
+
+  habort("post-release code has been triggered. Snapshot error?");
 }

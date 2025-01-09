@@ -11,8 +11,11 @@ end
 
 if eq ${harness_api} "nyx"
     set_env FEATURE nyx
-else
+elseif eq ${harness_api} "lqemu"
     set_env FEATURE ""
+else
+    echo "Unknown harness API: ${harness_api}"
+    exit 1
 end
 
 ''', '''
@@ -94,7 +97,7 @@ dependencies = ["compile_target_native", "compile_target_nyx"]
 dependencies = ["build", "compile_target"]
 script_runner = "@shell"
 script = '''
-git -C ${LINUX_BUILDER_DIR} pull
+# git -C ${LINUX_BUILDER_DIR} pull
 
 # Copy generated harness
 cp -r ${TARGET_DIR}/runtime/* ${LINUX_BUILDER_DIR}/runtime/
@@ -152,11 +155,11 @@ cp ${LINUX_BUILDER_OUT}/linux.qcow2 ${LINUX_BUILDER_OUT}/linux.qcow2.clone
 ${TARGET_DIR}/${PROFILE_DIR}/qemu_linux_process \
   -accel tcg \
   -m 4G \
-  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd" `# OVMF code pflash` \
-  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd" `# OVMF vars pflash` \
+  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_CODE.fd.clone" `# OVMF code pflash` \
+  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_VARS.fd.clone" `# OVMF vars pflash` \
   -device virtio-scsi-pci,id=scsi0 `# SCSI bus` \
   -device scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1 \
-  -blockdev driver=file,filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage `# Backend file of "disk"` \
+  -blockdev driver=file,filename="${LINUX_BUILDER_OUT}/linux.qcow2.clone",node-name=storage `# Backend file of "disk"` \
   -blockdev driver=qcow2,file=storage,node-name=disk `# QCOW2 "disk"` \
   -L "${LIBAFL_QEMU_BIOS_DIR}" \
   -nographic \

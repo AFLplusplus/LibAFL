@@ -29,10 +29,7 @@ pub struct NyxEmulatorDriver {
     hooks_locked: bool,
     #[cfg(feature = "systemmode")]
     #[builder(default = false)]
-    allow_page_on_start: bool, // when fuzzing starts, module filters will only allow the current page table.
-    #[cfg(feature = "x86_64")]
-    #[builder(default = false)]
-    process_only: bool, // adds x86_64 process address space in the address filters of every module.
+    allow_page_on_start: bool, // when fuzzing starts, all modules will only accept the current page table
     #[builder(default = false)]
     print_commands: bool,
     #[builder(default = (1024 * 1024))]
@@ -107,11 +104,6 @@ impl NyxEmulatorDriver {
     #[cfg(feature = "systemmode")]
     pub fn allow_page_on_start(&self) -> bool {
         self.allow_page_on_start
-    }
-
-    #[cfg(feature = "x86_64")]
-    pub fn is_process_only(&self) -> bool {
-        self.process_only
     }
 }
 

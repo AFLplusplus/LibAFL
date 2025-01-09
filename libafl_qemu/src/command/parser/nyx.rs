@@ -13,6 +13,7 @@ use crate::{
         nyx::{
             bindings, AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
             NyxCommandManager, PrintfCommand, ReleaseCommand, SetAgentConfigCommand,
+            SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
         },
         parser::NativeCommandParser,
         CommandError, CommandManager, NativeExitKind,
@@ -21,6 +22,20 @@ use crate::{
     sync_exit::ExitArgs,
     IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
+
+fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandError> {
+    let str_addr = qemu.read_reg(string_ptr_reg)? as GuestVirtAddr;
+
+    let mut msg_chunk: [u8; bindings::HPRINTF_MAX_SIZE as usize] =
+        [0; bindings::HPRINTF_MAX_SIZE as usize];
+    qemu.read_mem(str_addr, &mut msg_chunk)?;
+
+    Ok(CStr::from_bytes_until_nul(&msg_chunk)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string())
+}
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
@@ -63,6 +78,68 @@ where
         let payload_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2]).unwrap() as GuestVirtAddr;
 
         Ok(GetPayloadCommand::new(payload_addr))
+    }
+}
+
+pub struct SubmitCR3CommandParser;
+impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+    for SubmitCR3CommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    type OutputCommand = SubmitCR3Command;
+    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_SUBMIT_CR3;
+
+    fn parse(
+        _qemu: Qemu,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        Ok(SubmitCR3Command)
+    }
+}
+
+pub struct SubmitPanicCommandParser;
+impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+    for SubmitPanicCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    type OutputCommand = SubmitPanicCommand;
+    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_SUBMIT_PANIC;
+
+    fn parse(
+        _qemu: Qemu,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        Ok(SubmitPanicCommand)
+    }
+}
+
+pub struct UserAbortCommandParser;
+impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+    for UserAbortCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    type OutputCommand = UserAbortCommand;
+    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_USER_ABORT;
+
+    fn parse(
+        qemu: Qemu,
+        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        let msg = get_guest_string(qemu, arch_regs_map[ExitArgs::Arg2])?;
+
+        Ok(UserAbortCommand::new(msg))
     }
 }
 
@@ -176,14 +253,8 @@ where
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let str_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
+        let msg = get_guest_string(qemu, arch_regs_map[ExitArgs::Arg2])?;
 
-        let mut msg_chunk: [u8; bindings::HPRINTF_MAX_SIZE as usize] =
-            [0; bindings::HPRINTF_MAX_SIZE as usize];
-        qemu.read_mem(str_addr, &mut msg_chunk)?;
-
-        let cstr = CStr::from_bytes_until_nul(&msg_chunk).unwrap();
-
-        Ok(PrintfCommand::new(cstr.to_str().unwrap().to_string()))
+        Ok(PrintfCommand::new(msg))
     }
 }

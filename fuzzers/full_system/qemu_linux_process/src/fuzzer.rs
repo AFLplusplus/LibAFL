@@ -8,7 +8,7 @@ use libafl::state::{HasExecutions, State};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
-    executors::ShadowExecutor,
+    executors::{ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -37,17 +37,17 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
-        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
-        EmulatorModuleTuple,
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
+        utils::filters::LINUX_PROCESS_ADDRESS_RANGE, CmpLogModule, EmulatorModuleTuple,
     },
-    FastSnapshotManager, QemuInitError,
+    FastSnapshotManager, NopSnapshotManager, QemuInitError, QemuSnapshotManager,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
 fn get_emulator<ET, S>(
     args: Vec<String>,
-    modules: ET,
+    mut modules: ET,
 ) -> Result<
     Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, FastSnapshotManager>,
     QemuInitError,
@@ -57,15 +57,13 @@ where
     S: UsesInput + Unpin,
     <S as UsesInput>::Input: HasTargetBytes,
 {
+    // Allow linux process address space addresses as feedback
+    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
+
     Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
-        .driver(
-            NyxEmulatorDriver::builder()
-                .allow_page_on_start(true)
-                .process_only(true)
-                .build(),
-        )
+        .driver(NyxEmulatorDriver::builder().build())
         .command_manager(NyxCommandManager::default())
         .snapshot_manager(FastSnapshotManager::default())
         .build()
@@ -74,7 +72,7 @@ where
 #[cfg(not(feature = "nyx"))]
 fn get_emulator<ET, S>(
     args: Vec<String>,
-    modules: ET,
+    mut modules: ET,
 ) -> Result<
     Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>,
     QemuInitError,
@@ -84,7 +82,29 @@ where
     S: State + HasExecutions + Unpin,
     <S as UsesInput>::Input: HasTargetBytes,
 {
-    Emulator::builder().qemu_cli(args).modules(modules).build()
+    // Allow linux process address space addresses as feedback
+    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
+
+    Emulator::builder()
+        .qemu_parameters(args)
+        .modules(modules)
+        .build()
+}
+
+fn display_args() {
+    let args: Vec<String> = env::args().collect();
+
+    let mut arg_str = String::new();
+    for arg in args {
+        arg_str.push_str(&arg);
+        arg_str.push_str(" \\\n\t");
+    }
+    arg_str.pop();
+    arg_str.pop();
+    arg_str.pop();
+
+    log::info!("QEMU args:");
+    log::info!("\n{arg_str}");
 }
 
 pub fn fuzz() {
@@ -94,14 +114,16 @@ pub fn fuzz() {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
     };
     // Hardcoded parameters
-    let timeout = Duration::from_secs(99999999);
+    let timeout = Duration::from_secs(50);
     let broker_port = 1338;
     let cores = Cores::from_cmdline("1").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
 
+    display_args();
+
     let mut run_client = |state: Option<_>, mut mgr, _client_description| {
-        // Initialize QEMU
+        // Fetch QEMU args from program's arguments
         let args: Vec<String> = env::args().collect();
 
         // Create an observation channel using the coverage map
@@ -127,7 +149,11 @@ pub fn fuzz() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =
             |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
-                emulator.run(state, input).unwrap().try_into().unwrap()
+                if let Ok(res) = emulator.run(state, input) {
+                    res.try_into().unwrap()
+                } else {
+                    ExitKind::Ok
+                }
             };
 
         // Create an observation channel to keep track of the execution time
