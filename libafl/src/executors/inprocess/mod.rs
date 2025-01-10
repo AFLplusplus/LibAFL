@@ -438,6 +438,7 @@ pub fn run_observers_and_save_state<E, EM, OF, S, Z>(
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput,
     Z: HasObjective<Objective = OF>,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     let mut observers = executor.observers_mut();
 
@@ -497,6 +498,7 @@ where
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     Z: HasObjective<Objective = OF>
         + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
 {
