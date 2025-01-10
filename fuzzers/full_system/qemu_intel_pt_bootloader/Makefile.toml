@@ -14,6 +14,14 @@ script = '''
 mkdir -p ${TARGET_DIR}
 '''
 
+[tasks.ram_disk]
+condition = { files_not_exist = ["/mnt/libafl_qemu_tmpfs"] }
+script = "sudo mkdir -p /mnt/libafl_qemu_tmpfs && sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs"
+
+[tasks.remove_ram_disk]
+condition = { files_exist = ["/mnt/libafl_qemu_tmpfs"] }
+script = "sudo umount /mnt/libafl_qemu_tmpfs && sudo rm -r /mnt/libafl_qemu_tmpfs"
+
 [tasks.build_target]
 dependencies = ["target_dir"]
 command = "nasm"
@@ -37,16 +45,16 @@ args = [
   "-O",
   "qcow2",
   "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.bin",
-  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/boot.qcow2",
+  "/mnt/libafl_qemu_tmpfs/boot.qcow2",
 ]
+dependencies = ["build_target", "ram_disk"]
 
 [tasks.setcap]
 script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
 dependencies = ["build_fuzzer"]
 
 [tasks.run]
-command = "cargo"
-args = ["run", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
 dependencies = ["build", "setcap", "convert_target_image"]
 
 [tasks.default]

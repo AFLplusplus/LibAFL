@@ -66,7 +66,7 @@ fn main() {
         .ram_size(config::RamSize::MB(1))
         .drives([config::Drive::builder()
             .format(config::DiskImageFileFormat::Qcow2)
-            .file(format!("{target_dir}/boot.qcow2"))
+            .file("/mnt/libafl_qemu_tmpfs/boot.qcow2")
             .build()])
         .accelerator(Accelerator::Kvm)
         //.snapshot(true) todo: doesnt work
