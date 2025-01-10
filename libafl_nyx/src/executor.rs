@@ -14,7 +14,7 @@ use libafl::{
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
 use libnyx::NyxReturnValue;
 
-use crate::helper::NyxHelper;
+use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};
 
 /// executor for nyx standalone mode
 pub struct NyxExecutor<S, OT> {
@@ -88,6 +88,13 @@ where
         self.helper.nyx_process.set_input(buffer, size);
         self.helper.nyx_process.set_hprintf_fd(hprintf_fd);
 
+        unsafe {
+            if CMPLOG_ENABLED == 1 {
+                self.helper.nyx_process.option_set_redqueen_mode(true);
+                self.helper.nyx_process.option_apply();
+            }
+        }
+
         // exec will take care of trace_bits, so no need to reset
         let exit_kind = match self.helper.nyx_process.exec() {
             NyxReturnValue::Normal => ExitKind::Ok,
@@ -122,6 +129,13 @@ where
                 .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
 
             ob.observe_stdout(&stdout);
+        }
+
+        unsafe {
+            if CMPLOG_ENABLED == 1 {
+                self.helper.nyx_process.option_set_redqueen_mode(false);
+                self.helper.nyx_process.option_apply();
+            }
         }
 
         Ok(exit_kind)

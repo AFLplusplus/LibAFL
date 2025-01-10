@@ -9,6 +9,7 @@ use crate::settings::NyxSettings;
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
     pub nyx_stdout: File,
+    pub redqueen_path: String,
 
     pub timeout: Duration,
 
@@ -71,9 +72,16 @@ impl NyxHelper {
         let mut timeout = Duration::from_secs(u64::from(settings.timeout_secs));
         timeout += Duration::from_micros(u64::from(settings.timeout_micro_secs));
 
+        let redqueen_path = format!(
+            "{}/redqueen_workdir_{}/redqueen_results.txt",
+            nyx_config.workdir_path(),
+            nyx_config.worker_id()
+        );
+
         Ok(Self {
             nyx_process,
             nyx_stdout,
+            redqueen_path,
             timeout,
             bitmap_size,
             bitmap_buffer,
