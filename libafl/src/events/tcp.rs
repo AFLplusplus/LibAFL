@@ -647,7 +647,6 @@ where
             #[cfg(feature = "share_objectives")]
             Event::Objective { input, .. } => {
                 log::debug!("Received new Objective");
-
                 let mut testcase = Testcase::from(input);
                 testcase.set_parent_id_optional(*state.corpus().current());
 

@@ -471,8 +471,17 @@ where
             }
 
             #[cfg(feature = "share_objectives")]
-            Event::Objective { .. } => {
+            Event::Objective { input, .. } => {
                 log::debug!("Received new Objective");
+                let mut testcase = Testcase::from(input);
+                testcase.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
+
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
             }
 
             Event::CustomBuf { tag, buf } => {
