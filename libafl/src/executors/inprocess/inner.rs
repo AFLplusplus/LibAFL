@@ -54,11 +54,7 @@ where
     }
 }
 
-impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S>
-where
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus,
-{
+impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S> {
     type Observers = OT;
 
     #[inline]

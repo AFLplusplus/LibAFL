@@ -1,7 +1,7 @@
 //! Hooks for the executors.
 //! These will be executed right before and after the executor's harness run.
 
-use crate::{executors::HasObservers, inputs::UsesInput};
+use crate::executors::HasObservers;
 
 /// windows crash/timeout handler and asan death callback
 #[cfg(windows)]
@@ -46,10 +46,7 @@ pub trait ExecutorHooksTuple<I, S> {
     fn post_exec_all(&mut self, state: &mut S, input: &I);
 }
 
-impl<I, S> ExecutorHooksTuple<I, S> for ()
-where
-    S: UsesInput,
-{
+impl<I, S> ExecutorHooksTuple<I, S> for () {
     fn init_all<E: HasObservers>(&mut self, _state: &mut S) {}
     fn pre_exec_all(&mut self, _state: &mut S, _input: &I) {}
     fn post_exec_all(&mut self, _state: &mut S, _input: &I) {}
@@ -57,7 +54,6 @@ where
 
 impl<Head, Tail, I, S> ExecutorHooksTuple<I, S> for (Head, Tail)
 where
-    S: UsesInput,
     Head: ExecutorHook<I, S>,
     Tail: ExecutorHooksTuple<I, S>,
 {
