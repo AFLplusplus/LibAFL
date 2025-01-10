@@ -738,6 +738,7 @@ impl Qemu {
     /// The read object should have the same layout as the type of val.
     /// No checked is performed to check whether the returned object makes sense or not.
     // TODO: Use sized array when const generics are stabilized.
+    #[expect(clippy::uninit_vec)]
     pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> {
         // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
 
@@ -752,8 +753,12 @@ impl Qemu {
     }
 
     /// Write a value to memory at a guest addr, taking into account the potential indirections with the current CPU.
+    ///
+    /// # Safety
+    ///
+    /// val will be used as parameter of [`slice::from_raw_parts`], and thus must enforce the same requirements.
     pub unsafe fn write_mem_val<T>(&self, addr: GuestAddr, val: &T) -> Result<(), QemuRWError> {
-        let val_buf: &[u8] = slice::from_raw_parts(val as *const T as *const u8, size_of::<T>());
+        let val_buf: &[u8] = slice::from_raw_parts(ptr::from_ref(val) as *const u8, size_of::<T>());
         self.write_mem(addr, val_buf)?;
 
         Ok(())
