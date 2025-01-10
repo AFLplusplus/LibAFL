@@ -26,7 +26,7 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
+    inputs::{Input, UsesInput},
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, HasMetadata,
@@ -436,8 +436,13 @@ pub fn run_observers_and_save_state<E, EM, OF, S, Z>(
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput,
+    S: HasExecutions
+        + HasSolutions
+        + HasCorpus
+        + HasCurrentTestcase
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     Z: HasObjective<Objective = OF>,
+    <S::Corpus as Corpus>::Input: Input + Clone,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     let mut observers = executor.observers_mut();
@@ -497,7 +502,12 @@ where
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput,
+    S: HasExecutions
+        + HasSolutions
+        + HasCorpus
+        + HasCurrentTestcase
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Input + Clone,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     Z: HasObjective<Objective = OF>
         + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,

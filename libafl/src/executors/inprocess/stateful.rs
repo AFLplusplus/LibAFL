@@ -44,14 +44,7 @@ pub type OwnedInProcessExecutor<OT, S, ES> = StatefulGenericInProcessExecutor<
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 /// The harness can access the internal state of the executor.
-pub struct StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
-where
-    H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-{
+pub struct StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES> {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
     /// The state used as argument of the harness
@@ -63,11 +56,7 @@ where
 
 impl<H, HB, HT, OT, S, ES> Debug for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
 where
-    H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S::Input, S> + Debug,
-    S: State,
+    OT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("StatefulGenericInProcessExecutor")
@@ -75,17 +64,6 @@ where
             .field("inner", &self.inner)
             .finish_non_exhaustive()
     }
-}
-
-impl<H, HB, HT, OT, S, ES> UsesState for StatefulGenericInProcessExecutor<H, HB, HT, OT, S, ES>
-where
-    H: FnMut(&mut ES, &mut S, &S::Input) -> ExitKind + ?Sized,
-    HB: BorrowMut<H>,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-{
-    type State = S;
 }
 
 impl<EM, H, HB, HT, OT, S, Z, ES> Executor<EM, Z>

@@ -28,9 +28,9 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
+    inputs::{Input, UsesInput},
     observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
 };
 
@@ -74,8 +74,8 @@ where
 
 impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
 where
-OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-S: HasCorpus,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     /// This function marks the boundary between the fuzzer and the target
     ///
@@ -149,14 +149,17 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<EM, E::Input, E::Observers, S>,
-        S: State,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasCurrentTestcase
+            + HasCorpus
+            + HasSolutions
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
-        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
+        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        <S::Corpus as Corpus>::Input: Input + Clone,
     {
         Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks,
@@ -179,14 +182,17 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<EM, E::Input, E::Observers, S>,
-        S: State,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasCurrentTestcase
+            + HasCorpus
+            + HasSolutions
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
-        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
+        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        <S::Corpus as Corpus>::Input: Input + Clone,
     {
         let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -212,14 +218,17 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers + HasInProcessHooks<S>,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<EM, E::Input, E::Observers, S>,
-        S: State,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasCurrentTestcase
+            + HasCorpus
+            + HasSolutions
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
-        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
+        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        <S::Corpus as Corpus>::Input: Input + Clone,
     {
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
