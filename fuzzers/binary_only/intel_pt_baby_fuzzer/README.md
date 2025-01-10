@@ -12,4 +12,6 @@ After building this example with `cargo build`, you need to give to the executab
 You can run this example using `cargo run`, and you can enable the TUI feature by building and running with 
 `--features tui`.
 
+As an alternative, simply run `cargo make` to build and run the fuzzer (requires `cargo-make`).
+
 This fuzzer is compatible with Linux hosts only having an Intel PT compatible CPU.

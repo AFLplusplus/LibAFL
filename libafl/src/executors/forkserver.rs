@@ -53,43 +53,43 @@ use crate::{
 };
 
 const FORKSRV_FD: i32 = 198;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_ERROR: i32 = 0xeffe0000_u32 as i32;
 
 const FS_NEW_VERSION_MIN: u32 = 1;
 const FS_NEW_VERSION_MAX: u32 = 1;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_MAPSIZE: i32 = 1_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_AUTODTCT: i32 = 0x00000800_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_AUTODTCT: i32 = 0x10000000_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_MAP_ADDR: i32 = 2_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_SHM_OPEN: i32 = 4_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_SHMAT: i32 = 8_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_MMAP: i32 = 16_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_OLD_CMPLOG: i32 = 32_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
 
 /// Forkserver message. We'll reuse it in a testcase.
@@ -208,7 +208,7 @@ impl ConfigTarget for Command {
         }
     }
 
-    #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
+    #[expect(trivial_numeric_casts)]
     fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
@@ -314,10 +314,10 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
     ((x & 0x00fffffe) >> 1) + 1
 }
 
-#[allow(clippy::fn_params_excessive_bools)]
+#[expect(clippy::fn_params_excessive_bools)]
 impl Forkserver {
     /// Create a new [`Forkserver`]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         target: OsString,
         args: Vec<OsString>,
@@ -350,7 +350,7 @@ impl Forkserver {
     /// Create a new [`Forkserver`] that will kill child processes
     /// with the given `kill_signal`.
     /// Using `Forkserver::new(..)` will default to [`Signal::SIGTERM`].
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn with_kill_signal(
         target: OsString,
         args: Vec<OsString>,
@@ -539,7 +539,7 @@ impl Forkserver {
         #[allow(
             clippy::uninit_vec,
             reason = "The vec will be filled right after setting the length."
-        )]
+        )] // expect for some reason does not work
         unsafe {
             buf.set_len(size);
         }
@@ -805,7 +805,7 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
@@ -838,7 +838,7 @@ where
     /// Else this forkserver will pass the input to the target via `stdin`
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    #[allow(clippy::pedantic)]
+    #[expect(clippy::pedantic)]
     pub fn build<OT, S>(mut self, observers: OT) -> Result<ForkserverExecutor<TC, OT, S, SP>, Error>
     where
         OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
@@ -901,7 +901,7 @@ where
     }
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
-    #[allow(clippy::pedantic)]
+    #[expect(clippy::pedantic)]
     pub fn build_dynamic_map<A, MO, OT, S>(
         mut self,
         mut map_observer: A,
@@ -966,7 +966,7 @@ where
         })
     }
 
-    #[allow(clippy::pedantic)]
+    #[expect(clippy::pedantic)]
     fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SP::ShMem>), Error>
     where
         SP: ShMemProvider,
@@ -1039,8 +1039,8 @@ where
     }
 
     /// Intialize forkserver > v4.20c
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_sign_loss)]
     fn initialize_forkserver(
         &mut self,
         status: i32,
@@ -1138,8 +1138,7 @@ where
     }
 
     /// Intialize old forkserver. < v4.20c
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn initialize_old_forkserver(
         &mut self,
         status: i32,
@@ -1213,7 +1212,7 @@ where
         Ok(())
     }
 
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn set_map_size(&mut self, fsrv_map_size: i32) -> Result<usize, Error> {
         // When 0, we assume that map_size was filled by the user or const
         /* TODO autofill map size from the observer

@@ -14,9 +14,14 @@ use typed_builder::TypedBuilder;
 use crate::{
     command::{CommandError, CommandManager, InputCommand, IsCommand},
     modules::EmulatorModuleTuple,
-    Emulator, EmulatorExitError, EmulatorExitResult, InputLocation, IsSnapshotManager,
+    Emulator, EmulatorExitError, EmulatorExitResult, InputLocation, IsSnapshotManager, QemuError,
     QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError, SnapshotManagerError,
 };
+
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+pub mod nyx;
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+pub use nyx::{NyxEmulatorDriver, NyxEmulatorDriverBuilder};
 
 #[derive(Debug, Clone)]
 pub enum EmulatorDriverResult<CM, ED, ET, S, SM>
@@ -33,6 +38,7 @@ where
 
 #[derive(Debug, Clone)]
 pub enum EmulatorDriverError {
+    QemuError(QemuError),
     QemuExitReasonError(EmulatorExitError),
     SMError(SnapshotManagerError),
     SMCheckError(SnapshotManagerCheckError),
@@ -41,6 +47,12 @@ pub enum EmulatorDriverError {
     MultipleSnapshotDefinition,
     MultipleInputDefinition,
     SnapshotNotFound,
+}
+
+impl From<QemuError> for EmulatorDriverError {
+    fn from(error: QemuError) -> Self {
+        EmulatorDriverError::QemuError(error)
+    }
 }
 
 /// An Emulator Driver.
@@ -54,7 +66,7 @@ where
     /// Just before calling user's harness for the first time.
     /// Called only once
     fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
-        emulator.modules.first_exec_all(state);
+        emulator.modules.first_exec_all(emulator.qemu, state);
     }
 
     /// Just before calling user's harness
@@ -63,7 +75,7 @@ where
         state: &mut S,
         input: &S::Input,
     ) {
-        emulator.modules.pre_exec_all(state, input);
+        emulator.modules.pre_exec_all(emulator.qemu, state, input);
     }
 
     /// Just after returning from user's harness
@@ -78,14 +90,14 @@ where
     {
         emulator
             .modules
-            .post_exec_all(state, input, observers, exit_kind);
+            .post_exec_all(emulator.qemu, state, input, observers, exit_kind);
     }
 
     /// Just before entering QEMU
     fn pre_qemu_exec(_emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
 
     /// Just after QEMU exits
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn post_qemu_exec(
         _emulator: &mut Emulator<CM, Self, ET, S, SM>,
         _state: &mut S,
@@ -109,7 +121,7 @@ where
 }
 
 #[derive(Clone, Debug, Default, TypedBuilder)]
-#[allow(clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)] // cfg dependent
 pub struct StdEmulatorDriver {
     #[builder(default = OnceCell::new())]
     snapshot_id: OnceCell<SnapshotId>,
@@ -169,7 +181,7 @@ where
 {
     fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.first_exec_all(state);
+            emulator.modules.first_exec_all(emulator.qemu, state);
         }
     }
 
@@ -179,7 +191,7 @@ where
         input: &S::Input,
     ) {
         if !emulator.driver.hooks_locked {
-            emulator.modules.pre_exec_all(state, input);
+            emulator.modules.pre_exec_all(emulator.qemu, state, input);
         }
 
         let input_location = { emulator.driver.input_location.get().cloned() };
@@ -206,7 +218,7 @@ where
         if !emulator.driver.hooks_locked {
             emulator
                 .modules
-                .post_exec_all(state, input, observers, exit_kind);
+                .post_exec_all(emulator.qemu, state, input, observers, exit_kind);
         }
     }
 
@@ -233,7 +245,6 @@ where
             },
         };
 
-        #[allow(clippy::type_complexity)]
         let (command, ret_reg): (Option<CM::Commands>, Option<Regs>) = match &mut exit_reason {
             EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(signal) => {
@@ -253,9 +264,9 @@ where
                 return Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Timeout)))
             }
             EmulatorExitResult::Breakpoint(bp) => (bp.trigger(qemu), None),
-            EmulatorExitResult::SyncExit(sync_backdoor) => {
-                let command = sync_backdoor.command().clone();
-                (Some(command), Some(sync_backdoor.ret_reg()))
+            EmulatorExitResult::CustomInsn(custom_insn) => {
+                let command = custom_insn.command().clone();
+                (Some(command), Some(custom_insn.ret_reg()))
             }
         };
 

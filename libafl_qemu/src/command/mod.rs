@@ -32,6 +32,8 @@ use crate::{
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
+#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+pub mod nyx;
 pub mod parser;
 
 mod bindings {
@@ -231,7 +233,7 @@ where
     ///     - `ret_reg`: The register in which the guest return value should be written, if any.
     /// Returns
     ///     - `InnerHandlerResult`: How the high-level handler should behave
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn run(
         &self,
         emu: &mut Emulator<CM, ED, ET, S, SM>,
@@ -452,8 +454,8 @@ where
         // Unleash hooks if locked
         if emu.driver_mut().unlock_hooks() {
             // Prepare hooks
-            emu.modules_mut().first_exec_all(state);
-            emu.modules_mut().pre_exec_all(state, input);
+            emu.modules_mut().first_exec_all(qemu, state);
+            emu.modules_mut().pre_exec_all(qemu, state, input);
         }
 
         // Auto page filtering if option is enabled
@@ -592,7 +594,7 @@ where
     ) -> Result<Option<EmulatorDriverResult<CM, ED, ET, S, SM>>, EmulatorDriverError> {
         emu.modules_mut()
             .modules_mut()
-            .allow_page_id_all(self.page_id.clone());
+            .allow_page_id_all(self.page_id);
         Ok(None)
     }
 }

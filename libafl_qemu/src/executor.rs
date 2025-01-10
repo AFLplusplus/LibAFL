@@ -9,6 +9,8 @@ use std::ptr;
 #[cfg(feature = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(any(feature = "usermode", feature = "fork"))]
+use libafl::inputs::UsesInput;
 use libafl::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -20,7 +22,6 @@ use libafl::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
@@ -39,6 +40,8 @@ use libc::siginfo_t;
 
 #[cfg(feature = "usermode")]
 use crate::EmulatorModules;
+#[cfg(feature = "usermode")]
+use crate::Qemu;
 use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
 
 pub struct QemuExecutor<'a, CM, ED, ET, H, OT, S, SM>
@@ -182,12 +185,12 @@ where
             inner.inprocess_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<ET, S> as *const c_void;
 
-            let handler = |emulator_modules: &mut EmulatorModules<ET, S>, host_sig| {
+            let handler = |qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, S>, host_sig| {
                 eprintln!("Crashed with signal {host_sig}");
                 unsafe {
                     libafl::executors::inprocess::generic_inproc_crash_handler::<Self, EM, OF, Z>();
                 }
-                if let Some(cpu) = emulator_modules.qemu().current_cpu() {
+                if let Some(cpu) = qemu.current_cpu() {
                     eprint!("Context:\n{}", cpu.display_context());
                 }
             };
@@ -355,7 +358,7 @@ where
     Z: HasObjective,
     Z::Objective: Feedback<EM, S::Input, OT, S>,
 {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         emulator: Emulator<CM, ED, ET, S, SM>,
         harness_fn: &'a mut H,

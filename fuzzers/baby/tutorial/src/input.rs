@@ -1,3 +1,4 @@
+#![expect(unexpected_cfgs)] // deriving NewFuzzed etc. introduces these
 use std::hash::Hash;
 
 use lain::prelude::*;

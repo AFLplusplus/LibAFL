@@ -135,7 +135,7 @@ macro_rules! unwrap_option {
 macro_rules! export_rust_runtime_fn {
     // special case for expression_unreachable, because we need to be convert pointer+length to slice
     (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident; $rt_cb:path) => {
-        #[allow(clippy::missing_safety_doc)]
+        #[expect(clippy::missing_safety_doc)]
         #[no_mangle]
         pub unsafe extern "C" fn _rsym_expression_unreachable(expressions: *mut RSymExpr, num_elements: usize) {
             let slice = core::slice::from_raw_parts(expressions, num_elements);
@@ -146,7 +146,7 @@ macro_rules! export_rust_runtime_fn {
     };
     // special case for push_path_constraint, we are not returning a new expression while taking an expression as argument
     (pub fn push_path_constraint(constraint: RSymExpr, taken: bool, site_id: usize), $c_name:ident; $rt_cb:path) => {
-        #[allow(clippy::missing_safety_doc)]
+        #[expect(clippy::missing_safety_doc)]
         #[no_mangle]
         pub unsafe extern "C" fn _rsym_push_path_constraint(constraint: Option<RSymExpr>, taken: bool, site_id: usize) {
             if let Some(constraint) = constraint {
@@ -160,7 +160,7 @@ macro_rules! export_rust_runtime_fn {
     (pub fn build_integer_from_buffer(
         buffer: *mut ::std::os::raw::c_void,
         num_bits: ::std::os::raw::c_uint$(,)?) -> RSymExpr,$c_name:ident; $rt_cb:path) => {
-        #[allow(clippy::missing_safety_doc)]
+        #[expect(clippy::missing_safety_doc)]
         #[no_mangle]
         pub unsafe extern "C" fn _rsym_build_integer_from_buffer(buffer: *mut ::std::os::raw::c_void, num_bits: ::std::os::raw::c_uint) {
             $rt_cb(|rt| {
@@ -170,7 +170,7 @@ macro_rules! export_rust_runtime_fn {
     };
     // all other methods are handled by this
     (pub fn $name:ident($( $arg:ident : $(::)?$($type:ident)::+ ),*$(,)?)$( -> $($ret:ident)::+)?, $c_name:ident; $rt_cb:path) => {
-        #[allow(clippy::missing_safety_doc)]
+        #[expect(clippy::missing_safety_doc)]
         #[no_mangle]
         pub unsafe extern "C" fn $c_name( $($arg: $crate::make_symexpr_optional!($($type)::+),)* )$( -> $crate::make_symexpr_optional!($($ret)::+))? {
             $rt_cb(|rt| {
@@ -185,12 +185,12 @@ macro_rules! export_rust_runtime_fn {
 macro_rules! impl_nop_runtime_fn {
     // special case for expression_unreachable, because it has a different signature in our runtime trait than in the c interface.
     (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident;) => {
-        #[allow(clippy::default_trait_access)]
+        // #[expect(clippy::default_trait_access)]
         fn expression_unreachable(&mut self, _exprs: &[RSymExpr]) {std::default::Default::default()}
     };
 
     (pub fn $name:ident($( $arg:ident : $type:ty ),*$(,)?)$( -> $ret:ty)?, $c_name:ident;) => {
-        #[allow(clippy::default_trait_access)]
+        // #[expect(clippy::default_trait_access)]
         fn $name(&mut self, $( _ : $type),*)$( -> Option<$ret>)? {std::default::Default::default()}
     };
 }
@@ -222,7 +222,7 @@ impl<RT> OptionalRuntime<RT> {
 
 macro_rules! rust_runtime_function_declaration {
     (pub fn expression_unreachable(expressions: *mut RSymExpr, num_elements: usize), $c_name:ident;) => {
-        #[allow(clippy::default_trait_access)]
+        // #[expect(clippy::default_trait_access)]
         fn expression_unreachable(&mut self, exprs: &[RSymExpr]) {
             if let Some(inner) = &mut self.inner {
                 inner.expression_unreachable(exprs);

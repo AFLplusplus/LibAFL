@@ -25,7 +25,7 @@ use crate::{
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct TuneableScheduledMutatorMetadata {
     /// The offsets of mutators to run, in order. Clear to fall back to random,
@@ -137,7 +137,6 @@ where
         } else {
             // We will sample using the mutation probabilities.
             // Doing this outside of the original if branch to make the borrow checker happy.
-            #[allow(clippy::cast_precision_loss)]
             let coin = state.rand_mut().next_float() as f32;
 
             let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
@@ -156,7 +155,6 @@ where
         // Assumption: we can not reach this code path without previously adding this metadatum.
         let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();
 
-        #[allow(clippy::cast_possible_truncation)]
         if !metadata.mutation_ids.is_empty() {
             // using pre-set ids.
             let ret = metadata.mutation_ids[metadata.next_id.0];
@@ -174,7 +172,6 @@ where
         if !metadata.mutation_probabilities_cumulative.is_empty() {
             // We will sample using the mutation probabilities.
             // Doing this outside of the original if branch to make the borrow checker happy.
-            #[allow(clippy::cast_precision_loss)]
             let coin = state.rand_mut().next_float() as f32;
 
             let metadata = TuneableScheduledMutatorMetadata::get_mut(state).unwrap();

@@ -9,6 +9,7 @@ use libafl_qemu_sys::GuestPhysAddr;
 use crate::{
     emu::EmulatorModules,
     modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, PageFilter},
+    Qemu,
 };
 
 mod helpers;
@@ -327,8 +328,12 @@ where
     type ModulePageFilter = PF;
     const HOOKS_DO_SIDE_EFFECTS: bool = V::DO_SIDE_EFFECTS;
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         if self.use_hitcounts {
@@ -380,7 +385,7 @@ mod tests {
     ///
     /// StdEdgeCoverageModule::builder().build().unwrap();
     /// ```
-    #[allow(unused)]
+    #[expect(unused)]
     pub fn does_not_build() {}
 
     #[test]

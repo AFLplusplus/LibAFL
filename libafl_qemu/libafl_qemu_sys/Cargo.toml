@@ -1,7 +1,10 @@
 [package]
 name = "libafl_qemu_sys"
 version.workspace = true
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Romain Malmain <rmalmain@pm.me>",
+]
 description = "C to Rust bindings for the LibAFL QEMU bridge"
 documentation = "https://docs.rs/libafl_qemu_sys"
 repository = "https://github.com/AFLplusplus/LibAFL/"
@@ -52,6 +55,10 @@ shared = ["libafl_qemu_build/shared"]
 clippy = [
   "libafl_qemu_build/clippy",
 ] # special feature for clippy, don't use in normal projects
+
+qemu_sanitizers = [
+  "libafl_qemu_build/qemu_sanitizers",
+] # Compile QEMU with sanitizers enabled
 
 paranoid_debug = [
   "libafl_qemu_build/paranoid_debug",

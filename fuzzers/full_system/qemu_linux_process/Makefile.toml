@@ -1,12 +1,20 @@
 env_scripts = ['''
 #!@duckscript
 profile = get_env PROFILE
+harness_api = get_env HARNESS_API
 
 if eq ${profile} "dev"
     set_env PROFILE_DIR debug
 else
     set_env PROFILE_DIR ${profile}
 end
+
+if eq ${harness_api} "nyx"
+    set_env FEATURE nyx
+else
+    set_env FEATURE ""
+end
+
 ''', '''
 #!@duckscript
 runs_on_ci = get_env RUN_ON_CI
@@ -25,12 +33,12 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
 LIBAFL_QEMU_CLONE_DIR = { value = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge", condition = { env_not_set = [
   "LIBAFL_QEMU_DIR",
 ] } }
-
 LINUX_BUILDER_URL = "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR = { value = "${TARGET_DIR}/linux_builder", condition = { env_not_set = [
   "LINUX_BUILDER_DIR",
 ] } }
 LINUX_BUILDER_OUT = "${LINUX_BUILDER_DIR}/output"
+HARNESS_API = { value = "lqemu", condition = { env_not_set = ["HARNESS_API"] } }
 
 [tasks.target_dir]
 condition = { files_not_exist = [
@@ -51,7 +59,22 @@ script = '''
 git clone ${LINUX_BUILDER_URL} ${LINUX_BUILDER_DIR}
 '''
 
-[tasks.compile_target]
+[tasks.compile_target_nyx]
+condition = { env = { "HARNESS_API" = "nyx" } }
+dependencies = ["target_dir", "linux_builder_dir"]
+command = "clang"
+args = [
+  "-O0",
+  "-static",
+  "${WORKING_DIR}/example/harness_nyx.c",
+  "-o",
+  "${TARGET_DIR}/runtime/harness",
+  "-I",
+  "${TARGET_DIR}/${PROFILE_DIR}/include",
+]
+
+[tasks.compile_target_native]
+condition = { env = { "HARNESS_API" = "lqemu" } }
 dependencies = ["target_dir", "linux_builder_dir"]
 command = "clang"
 args = [
@@ -63,6 +86,9 @@ args = [
   "-I",
   "${TARGET_DIR}/${PROFILE_DIR}/include",
 ]
+
+[tasks.compile_target]
+dependencies = ["compile_target_native", "compile_target_nyx"]
 
 [tasks.target]
 dependencies = ["build", "compile_target"]
@@ -96,7 +122,15 @@ ${LINUX_BUILDER_DIR}/update.sh
 [tasks.build]
 dependencies = ["target_dir"]
 command = "cargo"
-args = ["build", "--profile", "${PROFILE}", "--target-dir", "${TARGET_DIR}"]
+args = [
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--target-dir",
+  "${TARGET_DIR}",
+  "--features",
+  "${FEATURE}",
+]
 
 [tasks.run]
 dependencies = ["build"]
@@ -111,15 +145,15 @@ else
   LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu
 fi
 
-cp ${LINUX_BUILDER_OUT}/OVMF_CODE.fd ${LINUX_BUILDER_OUT}/OVMF_CODE.fd.clone
-cp ${LINUX_BUILDER_OUT}/OVMF_VARS.fd ${LINUX_BUILDER_OUT}/OVMF_VARS.fd.clone
+cp ${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd ${LINUX_BUILDER_OUT}/OVMF_CODE.fd.clone
+cp ${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd ${LINUX_BUILDER_OUT}/OVMF_VARS.fd.clone
 cp ${LINUX_BUILDER_OUT}/linux.qcow2 ${LINUX_BUILDER_OUT}/linux.qcow2.clone
 
 ${TARGET_DIR}/${PROFILE_DIR}/qemu_linux_process \
   -accel tcg \
   -m 4G \
-  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_CODE.fd" `# OVMF code pflash` \
-  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_VARS.fd" `# OVMF vars pflash` \
+  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd" `# OVMF code pflash` \
+  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd" `# OVMF vars pflash` \
   -device virtio-scsi-pci,id=scsi0 `# SCSI bus` \
   -device scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1 \
   -blockdev driver=file,filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage `# Backend file of "disk"` \

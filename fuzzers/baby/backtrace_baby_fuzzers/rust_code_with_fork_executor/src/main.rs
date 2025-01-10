@@ -22,12 +22,11 @@ use libafl_bolts::{
     nonzero,
     ownedref::OwnedRefMut,
     rands::StdRand,
-    shmem::{unix_shmem, ShMem, ShMemProvider},
+    shmem::{unix_shmem, ShMemProvider},
     tuples::tuple_list,
     AsSlice, AsSliceMut,
 };
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(16).unwrap();
@@ -66,6 +65,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
+
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", signals_ptr, signals_len) };
     // Create a stacktrace observer
     let bt_observer = BacktraceObserver::new(

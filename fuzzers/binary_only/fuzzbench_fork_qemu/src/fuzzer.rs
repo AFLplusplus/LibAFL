@@ -176,7 +176,7 @@ fn fuzz(
     );
 
     let emulator = Emulator::empty()
-        .qemu_cli(args)
+        .qemu_parameters(args)
         .modules(emulator_modules)
         .build()?;
 
@@ -243,7 +243,7 @@ fn fuzz(
     let cmplog = cmp_shmem.as_slice_mut();
 
     // Beginning of a page should be properly aligned.
-    #[allow(clippy::cast_ptr_alignment)]
+    #[expect(clippy::cast_ptr_alignment)]
     let cmplog_map_ptr = cmplog
         .as_mut_ptr()
         .cast::<libafl_qemu::modules::cmplog::CmpLogMap>();

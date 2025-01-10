@@ -17,7 +17,7 @@ use std::{
 
 use backtrace::Backtrace;
 use libafl_bolts::{ownedref::OwnedRefMut, Named};
-#[allow(unused_imports)]
+#[allow(unused_imports)] // expect breaks here for some reason
 #[cfg(feature = "casr")]
 use libcasr::{
     asan::AsanStacktrace,
@@ -111,7 +111,6 @@ pub enum HarnessType {
 }
 
 /// An observer looking at the backtrace after the harness crashes
-#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BacktraceObserver<'a> {
     observer_name: Cow<'static, str>,

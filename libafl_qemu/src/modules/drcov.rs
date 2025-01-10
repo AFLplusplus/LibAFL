@@ -8,11 +8,14 @@ use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "systemmode")]
-use crate::modules::{NopPageFilter, NOP_PAGE_FILTER};
+use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
     emu::EmulatorModules,
-    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, NopAddressFilter},
+    modules::{
+        utils::filters::NopAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::Hook,
+    Qemu,
 };
 
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
@@ -120,7 +123,7 @@ impl DrCovModule<NopAddressFilter> {
 }
 impl<F> DrCovModule<F> {
     #[must_use]
-    #[allow(clippy::let_underscore_untyped)]
+    #[expect(clippy::let_underscore_untyped)]
     pub fn new(
         filter: F,
         filename: PathBuf,
@@ -168,7 +171,7 @@ impl<F> DrCovModule<F> {
                             continue 'pcs_full;
                         }
                         if *idm == *id {
-                            #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
+                            #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
                             match lengths.get(pc) {
                                 Some(block_length) => {
                                     drcov_vec.push(DrCovBasicBlock::new(
@@ -217,7 +220,7 @@ impl<F> DrCovModule<F> {
                         continue 'pcs;
                     }
 
-                    #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
+                    #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
                     match lengths.get(pc) {
                         Some(block_length) => {
                             drcov_vec.push(DrCovBasicBlock::new(
@@ -264,7 +267,7 @@ where
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
     where
         ET: EmulatorModuleTuple<S>,
     {
@@ -276,18 +279,20 @@ where
     }
 
     #[cfg(feature = "usermode")]
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         if self.module_mapping.is_none() {
             log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
 
-            let qemu = emulator_modules.qemu();
-
             let mut module_mapping: RangeMap<u64, (u16, String)> = RangeMap::new();
 
-            #[allow(clippy::unnecessary_cast)] // for GuestAddr -> u64
+            #[expect(clippy::unnecessary_cast)] // for GuestAddr -> u64
             for (i, (r, p)) in qemu
                 .mappings()
                 .filter_map(|m| {
@@ -307,8 +312,12 @@ where
     }
 
     #[cfg(feature = "systemmode")]
-    fn first_exec<ET>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
+    fn first_exec<ET>(
+        &mut self,
+        _qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<S>,
     {
         assert!(
@@ -319,6 +328,7 @@ where
 
     fn post_exec<OT, ET>(
         &mut self,
+        _qemu: Qemu,
         _emulator_modules: &mut EmulatorModules<ET, S>,
         _state: &mut S,
         _input: &S::Input,
@@ -359,6 +369,7 @@ where
 }
 
 pub fn gen_unique_block_ids<ET, F, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
@@ -398,7 +409,7 @@ where
             meta.current_id = id + 1;
             if drcov_module.full_trace {
                 // GuestAddress is u32 for 32 bit guests
-                #[allow(clippy::unnecessary_cast)]
+                #[expect(clippy::unnecessary_cast)]
                 Some(id as u64)
             } else {
                 None
@@ -407,7 +418,9 @@ where
     }
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn gen_block_lengths<ET, F, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
@@ -429,7 +442,9 @@ pub fn gen_block_lengths<ET, F, S>(
         .insert(pc, block_length);
 }
 
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn exec_trace_block<ET, F, S>(
+    _qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, S>,
     _state: Option<&mut S>,
     id: u64,

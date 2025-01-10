@@ -25,19 +25,19 @@ use crate::executors::hooks::timer::TimerStruct;
 use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(windows)]
 use crate::state::State;
+#[cfg(any(unix, windows))]
+use crate::{corpus::Corpus, observers::ObserversTuple, state::UsesState};
 use crate::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
-    observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
+    state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
 
 /// The inmem executor's handlers.
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 pub struct InProcessHooks<S> {
     /// On crash C function pointer
     #[cfg(feature = "std")]
@@ -126,7 +126,7 @@ impl<S> HasTimeout for InProcessHooks<S>
     }
 
     #[cfg(all(unix, feature = "std"))]
-    #[allow(unused)]
+    #[allow(unused_variables)] // depends on the features
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool {
         #[cfg(not(target_os = "linux"))]
         {
@@ -195,9 +195,8 @@ where
 {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
     /// Call before running a target.
-    #[allow(clippy::unused_self)]
-    #[allow(unused_variables)]
-    fn pre_exec(&mut self, state: &mut S, input: &<S::Corpus as Corpus>::Input) {
+    #[expect(unused_variables)]
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) {
         #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -210,8 +209,7 @@ where
     }
 
     /// Call after running a target.
-    #[allow(clippy::unused_self)]
-    fn post_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
         // timeout stuff
         // # Safety
         // We're calling this only once per execution, in a single thread.
@@ -224,7 +222,7 @@ impl<S> InProcessHooks<S>
 {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // for `exec_tmout` without `std`
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
@@ -239,7 +237,8 @@ impl<S> InProcessHooks<S>
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
         // This unsafe is needed in stable but not in nightly. Remove in the future(?)
-        #[allow(unused_unsafe)]
+        #[expect(unused_unsafe)]
+        #[cfg(all(not(miri), unix, feature = "std"))]
         let data = unsafe { &raw mut GLOBAL_STATE };
         #[cfg(feature = "std")]
         unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
@@ -267,7 +266,7 @@ impl<S> InProcessHooks<S>
 
     /// Create new [`InProcessHooks`].
     #[cfg(windows)]
-    #[allow(unused)]
+    #[allow(unused_variables)] // for `exec_tmout` without `std`
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
@@ -325,7 +324,7 @@ impl<S> InProcessHooks<S>
 
     /// Create a new [`InProcessHooks`]
     #[cfg(all(not(unix), not(windows)))]
-    #[allow(unused_variables)]
+    #[expect(unused_variables)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,

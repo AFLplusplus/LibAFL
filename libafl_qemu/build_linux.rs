@@ -13,7 +13,7 @@ static LIBAFL_QEMU_RUNTIME_TEST: &str = r#"
 void __libafl_qemu_testfile() {}
 "#;
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 pub fn build() {
     // Note: Unique features are checked in libafl_qemu_sys
     println!(
@@ -51,12 +51,16 @@ pub fn build() {
     let libafl_qemu_defs_hdr_name = "libafl_qemu_defs.h";
     let libafl_qemu_impl_hdr_name = "libafl_qemu_impl.h";
 
+    let nyx_hdr_name = "nyx_api.h";
+
     let libafl_runtime_dir = src_dir.join("runtime");
 
     let libafl_qemu_hdr = libafl_runtime_dir.join(libafl_qemu_hdr_name);
     let libafl_qemu_arch_hdr = libafl_runtime_dir.join(libafl_qemu_arch_hdr_name);
     let libafl_qemu_defs_hdr = libafl_runtime_dir.join(libafl_qemu_defs_hdr_name);
     let libafl_qemu_impl_hdr = libafl_runtime_dir.join(libafl_qemu_impl_hdr_name);
+
+    let nyx_hdr = libafl_runtime_dir.join(nyx_hdr_name);
 
     let libafl_runtime_testfile = out_dir.join("runtime_test.c");
     fs::write(&libafl_runtime_testfile, LIBAFL_QEMU_RUNTIME_TEST)
@@ -75,6 +79,9 @@ pub fn build() {
 
     let runtime_bindings_file = out_dir.join("libafl_qemu_bindings.rs");
     let stub_runtime_bindings_file = src_dir.join("runtime/libafl_qemu_stub_bindings.rs");
+
+    let nyx_bindings_file = out_dir.join("nyx_bindings.rs");
+    let stub_nyx_bindings_file = src_dir.join("runtime/nyx_stub_bindings.rs");
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=build_linux.rs");
@@ -121,6 +128,8 @@ pub fn build() {
     if env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
         fs::copy(&stub_runtime_bindings_file, &runtime_bindings_file)
             .expect("Could not copy stub bindings file");
+        fs::copy(&stub_nyx_bindings_file, &nyx_bindings_file)
+            .expect("Could not copy stub bindings file");
         return; // only build when we're not generating docs
     }
 
@@ -133,7 +142,6 @@ pub fn build() {
     .expect("Could not copy libafl_qemu.h to out directory.");
 
     fs::copy(
-
         libafl_qemu_arch_hdr.clone(),
         include_dir.join(libafl_qemu_arch_hdr_name),
     )
@@ -151,6 +159,12 @@ pub fn build() {
     )
     .expect("Could not copy libafl_qemu_impl.h to out directory.");
 
+    fs::copy(
+        nyx_hdr.clone(),
+        include_dir.join(nyx_hdr_name),
+    )
+        .expect("Could not copy libafl_qemu_impl.h to out directory.");
+
     bindgen::Builder::default()
         .derive_debug(true)
         .derive_default(true)
@@ -166,11 +180,33 @@ pub fn build() {
         .write_to_file(&runtime_bindings_file)
         .expect("Could not write bindings.");
 
+    bindgen::Builder::default()
+        .derive_debug(true)
+        .derive_default(true)
+        .impl_debug(true)
+        .generate_comments(true)
+        .default_enum_style(bindgen::EnumVariation::NewType {
+            is_global: true,
+            is_bitfield: true,
+        })
+        .header(nyx_hdr.display().to_string())
+        .generate()
+        .expect("Exit bindings generation failed.")
+        .write_to_file(&nyx_bindings_file)
+        .expect("Could not write bindings.");
+
     maybe_generate_stub_bindings(
         &cpu_target,
         emulation_mode,
         stub_runtime_bindings_file.as_path(),
         runtime_bindings_file.as_path(),
+    );
+
+    maybe_generate_stub_bindings(
+        &cpu_target,
+        emulation_mode,
+        stub_nyx_bindings_file.as_path(),
+        nyx_bindings_file.as_path(),
     );
 
     if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {

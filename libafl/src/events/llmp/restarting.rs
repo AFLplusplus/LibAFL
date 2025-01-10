@@ -333,7 +333,7 @@ pub enum ManagerKind {
 ///
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn setup_restarting_mgr_std<MT, S>(
     monitor: MT,
     broker_port: u16,
@@ -364,7 +364,7 @@ where
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 /// This one, additionally uses the timeobserver for the adaptive serialization
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn setup_restarting_mgr_std_adaptive<MT, S>(
     monitor: MT,
     broker_port: u16,
@@ -397,7 +397,6 @@ where
 /// The [`RestartingMgr`] is is a combination of a
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
-#[allow(clippy::default_trait_access, clippy::ignored_unit_patterns)]
 #[derive(TypedBuilder, Debug)]
 pub struct RestartingMgr<EMH, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
@@ -439,7 +438,7 @@ pub struct RestartingMgr<EMH, MT, S, SP> {
     phantom_data: PhantomData<(EMH, S)>,
 }
 
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
+#[expect(clippy::type_complexity, clippy::too_many_lines)]
 impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<S> + Copy + Clone,
@@ -612,15 +611,12 @@ where
                     return Err(Error::shutting_down());
                 }
 
-                #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() && !self.serialize_state.oom_safe() {
                     if let Err(err) = mgr.detach_from_broker(self.broker_port) {
                         log::error!("Failed to detach from broker: {err}");
                     }
                     #[cfg(unix)]
-                    if child_status == 9 {
-                        panic!("Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
-                    }
+                    assert_ne!(9, child_status, "Target received SIGKILL!. This could indicate the target crashed due to OOM, user sent SIGKILL, or the target was in an unrecoverable situation and could not save state to restart");
                     // Storing state in the last round did not work
                     panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
@@ -741,6 +737,13 @@ mod tests {
     #[serial]
     #[cfg_attr(miri, ignore)]
     fn test_mgr_state_restore() {
+        // # Safety
+        // The same testcase doesn't usually run twice
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            crate::stages::RetryCountRestartHelper::register();
+        }
+
         let rand = StdRand::with_seed(0);
 
         let time = TimeObserver::new("time");

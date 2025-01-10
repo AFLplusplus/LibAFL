@@ -36,7 +36,7 @@ use crate::{
 };
 
 /// A state metadata holding a list of tokens
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Tokens {
     // We keep a vec and a set, set for faster deduplication, vec for access
@@ -145,7 +145,7 @@ impl Tokens {
 
     /// Adds a token to a dictionary, checking it is not a duplicate
     /// Returns `false` if the token was already present and did not get added.
-    #[allow(clippy::ptr_arg)]
+    #[expect(clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
         if !self.tokens_set.insert(token.clone()) {
             return false;
@@ -437,7 +437,7 @@ where
     S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         let Some(size) = NonZero::new(size) else {
@@ -638,7 +638,7 @@ where
     S: HasMetadata + HasRand + HasMaxSize,
     I: HasMutatorBytes,
 {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let Some(size) = NonZero::new(input.bytes().len()) else {
             return Ok(MutationResult::Skipped);
@@ -847,12 +847,13 @@ impl AFLppRedQueen {
     }
 
     /// Cmplog Pattern Matching
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::too_many_lines)]
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::if_not_else)]
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(
+        clippy::cast_sign_loss,
+        clippy::too_many_arguments,
+        clippy::too_many_lines,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss
+    )]
     pub fn cmp_extend_encoding(
         &self,
         pattern: u64,
@@ -1058,7 +1059,7 @@ impl AFLppRedQueen {
                     if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
                         let mut cloned = buf.to_vec();
                         cloned[buf_idx + 1] = (repl & 0xff) as u8;
-                        cloned[buf_idx] = (repl >> 8 & 0xff) as u8;
+                        cloned[buf_idx] = ((repl >> 8) & 0xff) as u8;
                         vec.push(cloned);
                         return Ok(true);
                     }
@@ -1073,9 +1074,9 @@ impl AFLppRedQueen {
                     if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
                         let mut cloned = buf.to_vec();
                         cloned[buf_idx + 3] = (repl & 0xff) as u8;
-                        cloned[buf_idx + 2] = (repl >> 8 & 0xff) as u8;
-                        cloned[buf_idx + 1] = (repl >> 16 & 0xff) as u8;
-                        cloned[buf_idx] = (repl >> 24 & 0xff) as u8;
+                        cloned[buf_idx + 2] = ((repl >> 8) & 0xff) as u8;
+                        cloned[buf_idx + 1] = ((repl >> 16) & 0xff) as u8;
+                        cloned[buf_idx] = ((repl >> 24) & 0xff) as u8;
                         vec.push(cloned);
 
                         return Ok(true);
@@ -1092,13 +1093,13 @@ impl AFLppRedQueen {
                         let mut cloned = buf.to_vec();
 
                         cloned[buf_idx + 7] = (repl & 0xff) as u8;
-                        cloned[buf_idx + 6] = (repl >> 8 & 0xff) as u8;
-                        cloned[buf_idx + 5] = (repl >> 16 & 0xff) as u8;
-                        cloned[buf_idx + 4] = (repl >> 24 & 0xff) as u8;
-                        cloned[buf_idx + 3] = (repl >> 32 & 0xff) as u8;
-                        cloned[buf_idx + 2] = (repl >> 32 & 0xff) as u8;
-                        cloned[buf_idx + 1] = (repl >> 40 & 0xff) as u8;
-                        cloned[buf_idx] = (repl >> 48 & 0xff) as u8;
+                        cloned[buf_idx + 6] = ((repl >> 8) & 0xff) as u8;
+                        cloned[buf_idx + 5] = ((repl >> 16) & 0xff) as u8;
+                        cloned[buf_idx + 4] = ((repl >> 24) & 0xff) as u8;
+                        cloned[buf_idx + 3] = ((repl >> 32) & 0xff) as u8;
+                        cloned[buf_idx + 2] = ((repl >> 32) & 0xff) as u8;
+                        cloned[buf_idx + 1] = ((repl >> 40) & 0xff) as u8;
+                        cloned[buf_idx] = ((repl >> 48) & 0xff) as u8;
 
                         vec.push(cloned);
                         return Ok(true);
@@ -1244,7 +1245,7 @@ impl AFLppRedQueen {
     }
 
     /// rtn part from AFL++
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn rtn_extend_encoding(
         &self,
         pattern: &[u8],
@@ -1307,8 +1308,7 @@ where
     S: HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
     I: HasMutatorBytes + From<Vec<u8>>,
 {
-    #[allow(clippy::needless_range_loop)]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::needless_range_loop, clippy::too_many_lines)]
     fn multi_mutate(
         &mut self,
         state: &mut S,
@@ -1932,7 +1932,7 @@ impl AFLppRedQueen {
         }
     }
 
-    #[allow(clippy::needless_range_loop)]
+    #[expect(clippy::needless_range_loop)]
     fn try_add_autotokens(tokens: &mut Tokens, b: &[u8], shape: usize) {
         let mut cons_ff = 0;
         let mut cons_0 = 0;
