@@ -292,11 +292,7 @@ where
                     is_tc = true;
                     true
                 }
-                Event::UpdateExecStats { .. } | Event::Stop => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
-
-                #[cfg(feature = "share_objectives")]
-                Event::Objective { .. } => true,
-
+                Event::UpdateExecStats { .. } | Event::Objective { .. } | Event::Stop => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
                 _ => false,
             };
 
@@ -680,12 +676,6 @@ where
                     log::debug!("[{}] {} was discarded...)", process::id(), event_name);
                 }
             }
-
-            #[cfg(feature = "share_objectives")]
-            Event::Objective { .. } => {
-                log::debug!("Received new Objective");
-            }
-
             Event::Stop => {
                 state.request_stop();
             }

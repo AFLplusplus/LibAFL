@@ -15,6 +15,8 @@ use libafl_bolts::{
 };
 use serde::Deserialize;
 
+#[cfg(feature = "share_objectives")]
+use crate::corpus::Testcase;
 use crate::{
     corpus::Corpus,
     events::{CustomBufEventResult, CustomBufHandlerFn, Event, EventFirer},
@@ -27,9 +29,6 @@ use crate::{
     },
     Error, HasMetadata,
 };
-
-#[cfg(feature = "share_objectives")]
-use crate::corpus::Testcase;
 
 /// The llmp event manager
 pub mod mgr;
