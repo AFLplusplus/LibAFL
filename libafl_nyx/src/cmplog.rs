@@ -87,9 +87,9 @@ pub enum RedqueenBPType {
 impl RedqueenBPType {
     fn new(data: &str) -> Result<RedqueenBPType, String> {
         match data {
-            "STR" => return Ok(Self::Str),
-            "CMP" => return Ok(Self::Cmp),
-            "SUB" => return Ok(Self::Sub),
+            "STR" => Ok(Self::Str),
+            "CMP" => Ok(Self::Cmp),
+            "SUB" => Ok(Self::Sub),
             _ => Err("Unknown redqueen type".to_string()),
         }
     }
@@ -116,26 +116,26 @@ impl RedqueenEvent {
 
         let captures = RE
             .captures(line)
-            .ok_or_else(|| format!("Failed to parse Redqueen line: '{}'", line))?;
+            .ok_or_else(|| format!("Failed to parse Redqueen line: '{line}'"))?;
 
         let addr_s = captures.get(1).ok_or("Missing address field")?.as_str();
         let type_s = captures.get(2).ok_or("Missing type field")?.as_str();
         let size_s = captures.get(3).ok_or("Missing size field")?.as_str();
         let lhs_s = captures.get(4).ok_or("Missing LHS field")?.as_str();
         let rhs_s = captures.get(5).ok_or("Missing RHS field")?.as_str();
-        let imm = captures.get(6).map(|_x| true).unwrap_or(false);
+        let imm = captures.get(6).is_some_and(|_x| true);
 
-        let addr = u64::from_str_radix(addr_s, 16)
-            .map_err(|_| format!("Invalid address: '{}'", addr_s))?;
+        let addr =
+            u64::from_str_radix(addr_s, 16).map_err(|_| format!("Invalid address: '{addr_s}'"))?;
         let bp_type = RedqueenBPType::new(type_s)
-            .map_err(|e| format!("Invalid redqueen type: '{}' - {}", type_s, e))?;
+            .map_err(|e| format!("Invalid redqueen type: '{type_s}' - {e}"))?;
         let size = size_s
             .parse::<usize>()
-            .map_err(|_| format!("Invalid size: '{}'", size_s))?;
+            .map_err(|_| format!("Invalid size: '{size_s}'"))?;
         let lhs =
-            hex::decode(lhs_s).map_err(|e| format!("Failed to decode LHS: '{}' - {}", lhs_s, e))?;
+            hex::decode(lhs_s).map_err(|e| format!("Failed to decode LHS: '{lhs_s}' - {e}"))?;
         let rhs =
-            hex::decode(rhs_s).map_err(|e| format!("Failed to decode RHS: '{}' - {}", rhs_s, e))?;
+            hex::decode(rhs_s).map_err(|e| format!("Failed to decode RHS: '{rhs_s}' - {e}"))?;
 
         Ok(Self {
             addr,
@@ -158,7 +158,7 @@ fn parse_redqueen_data(data: &str) -> RedqueenInfo {
         .lines()
         .filter_map(|line| RedqueenEvent::new(line).ok())
         .collect::<Vec<_>>();
-    return RedqueenInfo { bps };
+    RedqueenInfo { bps }
 }
 
 impl TryInto<CmpValues> for RedqueenEvent {
@@ -166,55 +166,53 @@ impl TryInto<CmpValues> for RedqueenEvent {
 
     fn try_into(self) -> Result<CmpValues, Self::Error> {
         match self.bp_type {
-            RedqueenBPType::Cmp => {
-                return match self.size {
-                    8 => Ok(CmpValues::U8((
-                        *self.rhs.first().ok_or("Invalid RHS length for U8")?,
-                        *self.lhs.first().ok_or("Invalid LHS length for U8")?,
-                        self.imm,
-                    ))),
-                    16 => Ok(CmpValues::U16((
-                        u16::from_be_bytes(
-                            self.rhs
-                                .try_into()
-                                .map_err(|_| "Invalid RHS length for U16")?,
-                        ),
-                        u16::from_be_bytes(
-                            self.lhs
-                                .try_into()
-                                .map_err(|_| "Invalid LHS length for U16")?,
-                        ),
-                        self.imm,
-                    ))),
-                    32 => Ok(CmpValues::U32((
-                        u32::from_be_bytes(
-                            self.rhs
-                                .try_into()
-                                .map_err(|_| "Invalid RHS length for U32")?,
-                        ),
-                        u32::from_be_bytes(
-                            self.lhs
-                                .try_into()
-                                .map_err(|_| "Invalid LHS length for U32")?,
-                        ),
-                        self.imm,
-                    ))),
-                    64 => Ok(CmpValues::U64((
-                        u64::from_be_bytes(
-                            self.rhs
-                                .try_into()
-                                .map_err(|_| "Invalid RHS length for U64")?,
-                        ),
-                        u64::from_be_bytes(
-                            self.lhs
-                                .try_into()
-                                .map_err(|_| "Invalid LHS length for U64")?,
-                        ),
-                        self.imm,
-                    ))),
-                    _ => Err("Invalid size".to_string()),
-                }
-            }
+            RedqueenBPType::Cmp => match self.size {
+                8 => Ok(CmpValues::U8((
+                    *self.rhs.first().ok_or("Invalid RHS length for U8")?,
+                    *self.lhs.first().ok_or("Invalid LHS length for U8")?,
+                    self.imm,
+                ))),
+                16 => Ok(CmpValues::U16((
+                    u16::from_be_bytes(
+                        self.rhs
+                            .try_into()
+                            .map_err(|_| "Invalid RHS length for U16")?,
+                    ),
+                    u16::from_be_bytes(
+                        self.lhs
+                            .try_into()
+                            .map_err(|_| "Invalid LHS length for U16")?,
+                    ),
+                    self.imm,
+                ))),
+                32 => Ok(CmpValues::U32((
+                    u32::from_be_bytes(
+                        self.rhs
+                            .try_into()
+                            .map_err(|_| "Invalid RHS length for U32")?,
+                    ),
+                    u32::from_be_bytes(
+                        self.lhs
+                            .try_into()
+                            .map_err(|_| "Invalid LHS length for U32")?,
+                    ),
+                    self.imm,
+                ))),
+                64 => Ok(CmpValues::U64((
+                    u64::from_be_bytes(
+                        self.rhs
+                            .try_into()
+                            .map_err(|_| "Invalid RHS length for U64")?,
+                    ),
+                    u64::from_be_bytes(
+                        self.lhs
+                            .try_into()
+                            .map_err(|_| "Invalid LHS length for U64")?,
+                    ),
+                    self.imm,
+                ))),
+                _ => Err("Invalid size".to_string()),
+            },
             // TODO: Add encoding for `STR` and `SUB`
             _ => Err("Redqueen type not implemented".to_string()),
         }

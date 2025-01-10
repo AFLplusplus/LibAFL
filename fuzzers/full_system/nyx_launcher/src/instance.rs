@@ -1,34 +1,36 @@
 use std::{marker::PhantomData, process};
 
-use libafl::events::{
-    ClientDescription, LlmpRestartingEventManager, MonitorTypedEventManager, NopEventManager,
-};
-use libafl::executors::ShadowExecutor;
-use libafl::mutators::I2SRandReplace;
-use libafl::stages::CalibrationStage;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::EventRestarter,
-    executors::Executor,
+    events::{
+        ClientDescription, EventRestarter, LlmpRestartingEventManager, MonitorTypedEventManager,
+        NopEventManager,
+    },
+    executors::{Executor, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::Monitor,
-    mutators::{havoc_mutations, StdMOptMutator, StdScheduledMutator},
-    mutators::{tokens_mutations, Tokens},
+    mutators::{
+        havoc_mutations, tokens_mutations, I2SRandReplace, StdMOptMutator, StdScheduledMutator,
+        Tokens,
+    },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
-    stages::{power::StdPowerMutationalStage, ShadowTracingStage, StagesTuple, StdMutationalStage},
+    stages::{
+        power::StdPowerMutationalStage, CalibrationStage, ShadowTracingStage, StagesTuple,
+        StdMutationalStage,
+    },
     state::{HasCorpus, HasMaxSize, StdState, UsesState},
     Error, HasMetadata, NopFuzzer,
 };
-use libafl_bolts::shmem::StdShMemProvider;
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
+    shmem::StdShMemProvider,
     tuples::{tuple_list, Merge},
 };
 use libafl_nyx::{
@@ -54,7 +56,7 @@ pub struct Instance<'a, M: Monitor> {
     phantom: PhantomData<M>,
 }
 
-impl<'a, M: Monitor> Instance<'a, M> {
+impl<M: Monitor> Instance<'_, M> {
     pub fn run(mut self, state: Option<ClientState>) -> Result<(), Error> {
         let parent_cpu_id = self
             .options
@@ -65,7 +67,7 @@ impl<'a, M: Monitor> Instance<'a, M> {
 
         let settings = NyxSettings::builder()
             .cpu_id(self.client_description.core_id().0)
-            .parent_cpu_id(Some(parent_cpu_id.0 as usize))
+            .parent_cpu_id(Some(parent_cpu_id.0))
             .input_buffer_size(self.options.buffer_size)
             .timeout_secs(0)
             .timeout_micro_secs(self.options.timeout)

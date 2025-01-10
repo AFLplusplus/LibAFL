@@ -5,19 +5,20 @@ use std::{
 };
 
 use clap::Parser;
-
-use libafl::events::{
-    ClientDescription, EventConfig, Launcher, LlmpEventManager, LlmpRestartingEventManager,
-    MonitorTypedEventManager,
-};
 use libafl::{
+    events::{
+        ClientDescription, EventConfig, Launcher, LlmpEventManager, LlmpRestartingEventManager,
+        MonitorTypedEventManager,
+    },
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-
-use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 use libafl_bolts::{
-    core_affinity::CoreId, current_time, llmp::LlmpBroker, staterestore::StateRestorer,
+    core_affinity::CoreId,
+    current_time,
+    llmp::LlmpBroker,
+    shmem::{ShMemProvider, StdShMemProvider},
+    staterestore::StateRestorer,
     tuples::tuple_list,
 };
 #[cfg(unix)]
