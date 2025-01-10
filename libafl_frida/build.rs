@@ -56,7 +56,7 @@ fn main() {
         cmd.arg("/dll").arg(format!(
             "/OUT:{}",
             Path::new(&out_dir)
-                .join("test_harness.so")
+                .join("test_harness.dll")
                 .to_str()
                 .unwrap()
         ));
