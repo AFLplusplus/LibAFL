@@ -1,4 +1,4 @@
-use std::{ffi::CStr, mem::transmute, sync::OnceLock};
+use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::EnumMap;
 use libafl::{
@@ -12,8 +12,8 @@ use crate::{
     command::{
         nyx::{
             bindings, AcquireCommand, GetHostConfigCommand, GetPayloadCommand, NextPayloadCommand,
-            NyxCommandManager, PanicCommand, PrintfCommand, ReleaseCommand, SetAgentConfigCommand,
-            SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
+            NyxCommandManager, PanicCommand, PrintfCommand, RangeSubmitCommand, ReleaseCommand,
+            SetAgentConfigCommand, SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
         },
         parser::NativeCommandParser,
         CommandError, CommandManager, NativeExitKind,
@@ -98,6 +98,30 @@ where
         _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
         Ok(SubmitCR3Command)
+    }
+}
+
+pub struct RangeSubmitCommandParser;
+impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+    for RangeSubmitCommandParser
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    type OutputCommand = RangeSubmitCommand;
+    const COMMAND_ID: c_uint = bindings::HYPERCALL_KAFL_RANGE_SUBMIT;
+
+    fn parse(
+        qemu: Qemu,
+        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+    ) -> Result<Self::OutputCommand, CommandError> {
+        let allowed_range_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
+
+        let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr)? };
+
+        Ok(RangeSubmitCommand::new(allowed_range[0]..allowed_range[1]))
     }
 }
 
@@ -247,12 +271,8 @@ where
     ) -> Result<Self::OutputCommand, CommandError> {
         let agent_config_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
 
-        let mut agent_config_buf: [u8; size_of::<bindings::agent_config_t>()] =
-            [0; size_of::<bindings::agent_config_t>()];
-
-        qemu.read_mem(agent_config_addr, &mut agent_config_buf)?;
-
-        let agent_config: bindings::agent_config_t = unsafe { transmute(agent_config_buf) };
+        let agent_config: bindings::agent_config_t =
+            unsafe { qemu.read_mem_val(agent_config_addr)? };
 
         Ok(SetAgentConfigCommand::new(agent_config))
     }

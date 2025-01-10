@@ -55,6 +55,17 @@ err_out:
   return NULL;
 }
 
+void hrange_submit(unsigned id, uintptr_t start, uintptr_t end) {
+  uint64_t range_arg[3] __attribute__((aligned(PAGE_SIZE)));
+  memset(range_arg, 0, sizeof(range_arg));
+
+  range_arg[0] = start;
+  range_arg[1] = end;
+  range_arg[2] = id;
+
+  kAFL_hypercall(HYPERCALL_KAFL_RANGE_SUBMIT, (uintptr_t)range_arg);
+}
+
 int agent_init(int verbose) {
   host_config_t host_config;
 
@@ -123,6 +134,8 @@ int main() {
   agent_init(1);
 
   kAFL_hypercall(HYPERCALL_KAFL_SUBMIT_CR3, 0);
+  hrange_submit(0, 0x0, 0x00007fffffffffff);
+
   kAFL_hypercall(HYPERCALL_KAFL_GET_PAYLOAD, (uint64_t)pbuf);
 
   hprintf("payload size addr: %p", &pbuf->size);

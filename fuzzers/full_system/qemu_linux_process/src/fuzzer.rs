@@ -40,7 +40,8 @@ use libafl_qemu::{
         cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
         utils::filters::LINUX_PROCESS_ADDRESS_RANGE, CmpLogModule, EmulatorModuleTuple,
     },
-    FastSnapshotManager, NopSnapshotManager, QemuInitError, QemuSnapshotManager,
+    EmulatorDriverError, FastSnapshotManager, NopSnapshotManager, QemuInitError,
+    QemuSnapshotManager,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
@@ -57,9 +58,6 @@ where
     S: UsesInput + Unpin,
     <S as UsesInput>::Input: HasTargetBytes,
 {
-    // Allow linux process address space addresses as feedback
-    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
-
     Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
@@ -149,10 +147,11 @@ pub fn fuzz() {
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =
             |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
-                if let Ok(res) = emulator.run(state, input) {
-                    res.try_into().unwrap()
-                } else {
-                    ExitKind::Ok
+                match emulator.run(state, input) {
+                    Ok(res) => res.try_into().unwrap(),
+                    Err(e) => match e {
+                        _ => panic!("{e:?}"),
+                    },
                 }
             };
 

@@ -10,6 +10,7 @@ use std::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::offset_of,
+    ops::Range,
     ptr,
     slice::from_raw_parts,
 };
@@ -19,7 +20,7 @@ use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
-use libafl_qemu_sys::GuestVirtAddr;
+use libafl_qemu_sys::{GuestAddr, GuestVirtAddr};
 use libc::c_uint;
 use paste::paste;
 
@@ -27,9 +28,9 @@ use crate::{
     command::{
         parser::nyx::{
             AcquireCommandParser, GetHostConfigCommandParser, GetPayloadCommandParser,
-            NextPayloadCommandParser, PrintfCommandParser, ReleaseCommandParser,
-            SetAgentConfigCommandParser, SubmitCR3CommandParser, SubmitPanicCommandParser,
-            UserAbortCommandParser,
+            NextPayloadCommandParser, PrintfCommandParser, RangeSubmitCommandParser,
+            ReleaseCommandParser, SetAgentConfigCommandParser, SubmitCR3CommandParser,
+            SubmitPanicCommandParser, UserAbortCommandParser,
         },
         CommandError, CommandManager, IsCommand, NativeCommandParser,
     },
@@ -117,6 +118,8 @@ macro_rules! define_nyx_command_manager {
 
                     let cmd_id = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as c_uint;
 
+                    log::debug!("Received Nyx command ID: {cmd_id}");
+
                     match cmd_id {
                         // <StartPhysCommandParser as NativeCommandParser<S>>::COMMAND_ID => Ok(StdCommandManagerCommands::StartPhysCommandParserCmd(<StartPhysCommandParser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?)),
                         $(<$native_command_parser as NativeCommandParser<Self, NyxEmulatorDriver, ET, S, SM>>::COMMAND_ID => Ok(<$native_command_parser as NativeCommandParser<Self, NyxEmulatorDriver, ET, S, SM>>::parse(qemu, arch_regs_map)?.into())),+,
@@ -180,7 +183,8 @@ define_nyx_command_manager!(
         NextPayloadCommand,
         SubmitCR3Command,
         SubmitPanicCommand,
-        UserAbortCommand
+        UserAbortCommand,
+        RangeSubmitCommand
     ],
     [
         AcquireCommandParser,
@@ -192,7 +196,8 @@ define_nyx_command_manager!(
         NextPayloadCommandParser,
         SubmitCR3CommandParser,
         SubmitPanicCommandParser,
-        UserAbortCommandParser
+        UserAbortCommandParser,
+        RangeSubmitCommandParser
     ]
 );
 
@@ -397,6 +402,46 @@ where
             log::error!("No current cpu found");
             Err(EmulatorDriverError::CommandError(CommandError::WrongUsage))
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RangeSubmitCommand {
+    allowed_range: Range<GuestAddr>,
+}
+
+impl RangeSubmitCommand {
+    pub fn new(allowed_range: Range<GuestAddr>) -> Self {
+        Self { allowed_range }
+    }
+}
+
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for RangeSubmitCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        emu: &mut Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<
+        Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        log::info!("Allow address range: {:#x?}", self.allowed_range);
+        emu.modules_mut()
+            .modules_mut()
+            .allow_address_range_all(self.allowed_range.clone());
+        Ok(None)
     }
 }
 

@@ -5,7 +5,7 @@
 
 use core::{
     cmp::{Ordering, PartialOrd},
-    fmt, ptr,
+    fmt, ptr, slice,
 };
 use std::{
     ffi::{c_void, CString},
@@ -729,6 +729,34 @@ impl Qemu {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
             .write_mem(addr, buf)
+    }
+
+    /// Read a value from memory to a guest addr, taking into account the potential indirections with the current CPU.
+    ///
+    /// # Safety
+    ///
+    /// The read object should have the same layout as the type of val.
+    /// No checked is performed to check whether the returned object makes sense or not.
+    // TODO: Use sized array when const generics are stabilized.
+    pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> {
+        // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
+
+        let mut val_buf: Vec<u8> = Vec::with_capacity(size_of::<T>());
+        unsafe {
+            val_buf.set_len(size_of::<T>());
+        }
+
+        self.read_mem(addr, &mut val_buf)?;
+
+        Ok(ptr::read(val_buf.as_ptr() as *const T))
+    }
+
+    /// Write a value to memory at a guest addr, taking into account the potential indirections with the current CPU.
+    pub unsafe fn write_mem_val<T>(&self, addr: GuestAddr, val: &T) -> Result<(), QemuRWError> {
+        let val_buf: &[u8] = slice::from_raw_parts(val as *const T as *const u8, size_of::<T>());
+        self.write_mem(addr, val_buf)?;
+
+        Ok(())
     }
 
     /// Read a value from a guest address.
