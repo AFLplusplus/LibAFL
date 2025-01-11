@@ -112,7 +112,7 @@ impl<I, S> Default for CtxHook<I, S> {
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
 impl<I, S> ExecutorHook<I, S> for NgramHook<I, S> {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init(&mut self, _state: &mut S) {}
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         #[cfg(feature = "sancov_ngram4")]
         unsafe {
@@ -149,7 +149,7 @@ impl<I, S> Default for NgramHook<I, S> {
 
 #[cfg(feature = "sancov_ctx")]
 impl<I, S> ExecutorHook<I, S> for CtxHook<I, S> {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init(&mut self, _state: &mut S) {}
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         unsafe {
             __afl_prev_ctx = 0;
