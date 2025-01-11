@@ -11,8 +11,9 @@ use serde::Serialize;
 use typed_builder::TypedBuilder;
 
 use crate::{
+    corpus::Corpus,
     executors::{hooks::ExecutorHook, HasObservers},
-    inputs::UsesInput,
+    state::HasCorpus,
     Error,
 };
 
@@ -40,18 +41,18 @@ pub struct IntelPTHook<T> {
     map_len: usize,
 }
 
-impl<S, T> ExecutorHook<S> for IntelPTHook<T>
+impl<S, T> ExecutorHook<<S::Corpus as Corpus>::Input, S> for IntelPTHook<T>
 where
-    S: UsesInput + Serialize,
+    S: Serialize + HasCorpus,
     T: SaturatingAdd + From<u8> + Debug,
 {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
 
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {
         self.intel_pt.enable_tracing().unwrap();
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
+    fn post_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {
         let pt = &mut self.intel_pt;
         pt.disable_tracing().unwrap();
 

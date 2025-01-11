@@ -29,7 +29,6 @@ rustc-args = ["--cfg", "docsrs"]
 [features]
 default = [
   "std",
-  "cmin",
   "derive",
   "llmp_compression",
   "llmp_small_maps",
