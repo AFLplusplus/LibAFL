@@ -273,10 +273,7 @@ where
     }
 }
 
-impl<HT, OT, S> HasInProcessHooks<S> for GenericInProcessExecutorInner<HT, OT, S>
-where
-    S: UsesInput,
-{
+impl<HT, OT, S> HasInProcessHooks<S> for GenericInProcessExecutorInner<HT, OT, S> {
     /// the timeout handler
     #[inline]
     fn inprocess_hooks(&self) -> &InProcessHooks<S> {

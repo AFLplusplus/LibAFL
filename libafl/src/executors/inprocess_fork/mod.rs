@@ -84,28 +84,12 @@ where
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-{
+pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z> {
     harness_fn: &'a mut H,
     inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
 }
 
-impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S::Input, S> + Debug,
-    S: UsesInput,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S> + Debug,
-    EM: UsesState<State = S>,
-{
+impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z> {
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessForkExecutor")
@@ -123,20 +107,7 @@ where
     }
 }
 
-impl<H, HT, OT, S, SP, EM, Z> UsesState
-    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-    SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: UsesState<State = S>,
-{
-    type State = S;
-}
-
-impl<EM, H, HT, OT, S, SP, Z> Executor<EM, Z>
+impl<EM, H, HT, OT, S, SP, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -264,14 +235,13 @@ pub mod child_signal_handlers {
         },
         inputs::UsesInput,
         observers::ObserversTuple,
-        state::UsesState,
     };
 
     /// invokes the `post_exec_child` hook on all observer in case the child process panics
-    pub fn setup_child_panic_hook<E>()
+    pub fn setup_child_panic_hook<E, I, S>()
     where
-        E: HasObservers + UsesState,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
+        E: HasObservers,
+        E::Observers: ObserversTuple<I, S>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -280,9 +250,9 @@ pub mod child_signal_handlers {
             if !data.is_null() && (*data).is_valid() {
                 let executor = (*data).executor_mut::<E>();
                 let mut observers = executor.observers_mut();
-                let state = (*data).state_mut::<E::State>();
+                let state = (*data).state_mut::<S>();
                 // Invalidate data to not execute again the observer hooks in the crash handler
-                let input = (*data).take_current_input::<<E::State as UsesInput>::Input>();
+                let input = (*data).take_current_input::<I>();
                 observers
                     .post_exec_child_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
@@ -300,20 +270,20 @@ pub mod child_signal_handlers {
     /// It will dereference the `data` pointer and assume it's valid.
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub(crate) unsafe fn child_crash_handler<E>(
+    pub(crate) unsafe fn child_crash_handler<E, I, S>(
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers + UsesState,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
+        E: HasObservers,
+        E::Observers: ObserversTuple<I, S>,
     {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             let mut observers = executor.observers_mut();
-            let state = data.state_mut::<E::State>();
-            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+            let state = data.state_mut::<S>();
+            let input = data.take_current_input::<I>();
             observers
                 .post_exec_child_all(state, input, &ExitKind::Crash)
                 .expect("Failed to run post_exec on observers");
@@ -324,20 +294,20 @@ pub mod child_signal_handlers {
 
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub(crate) unsafe fn child_timeout_handler<E>(
+    pub(crate) unsafe fn child_timeout_handler<E, I, S>(
         #[cfg(unix)] _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers + UsesState,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
+        E: HasObservers,
+        E::Observers: ObserversTuple<I, S>,
     {
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             let mut observers = executor.observers_mut();
-            let state = data.state_mut::<E::State>();
-            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+            let state = data.state_mut::<S>();
+            let input = data.take_current_input::<I>();
             observers
                 .post_exec_child_all(state, input, &ExitKind::Timeout)
                 .expect("Failed to run post_exec on observers");
