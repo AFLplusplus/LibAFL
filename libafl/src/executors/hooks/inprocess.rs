@@ -333,7 +333,7 @@ impl<S> InProcessHooks<S> {
     /// Create a new [`InProcessHooks`]
     #[cfg(all(not(unix), not(windows)))]
     #[expect(unused_variables)]
-    pub fn new<E, EM, OF, S, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
