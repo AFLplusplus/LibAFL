@@ -176,6 +176,10 @@ impl ToolWrapper for ClangWrapper {
             }
 
             match args[i].as_ref() {
+                "--" => {
+                    i += 1;
+                    continue;
+                }
                 "--libafl-no-link" => {
                     suppress_linking += 1;
                     self.has_libafl_arg = true;
