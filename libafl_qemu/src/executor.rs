@@ -117,6 +117,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, OF, S, Z>(
                 E,
                 EM,
                 OF,
+                S,
                 Z,
             >(signal, info, context, data);
         }
