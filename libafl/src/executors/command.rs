@@ -780,7 +780,7 @@ impl CommandExecutorBuilder {
 ///     EM: UsesState,
 ///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
 ///     S: HasCorpus + HasExecutions,
-/// 	S::Corpus: Corpus<Input = BytesInput>,
+///     S::Corpus: Corpus<Input = BytesInput>,
 /// {
 ///     MyExecutor.into_executor(())
 /// }
