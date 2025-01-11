@@ -513,7 +513,7 @@ impl<CS, E, EM, F, IF, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::I
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + Executor<EM, Self, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
     E::Observers: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     EM: EventFirer<State = S>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
@@ -591,7 +591,7 @@ impl<CS, E, EM, F, IF, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + Executor<EM, Self, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
     E::Observers: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     EM: EventFirer<State = S>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
@@ -748,7 +748,6 @@ where
 impl<CS, E, EM, F, IF, OF, S, ST> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<S::Input, S>,
-    E: UsesState<State = S>,
     EM: ProgressReporter + EventProcessor<E, Self, State = S>,
     S: HasExecutions
         + HasMetadata
@@ -923,7 +922,7 @@ impl<CS, E, EM, F, IF, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input,
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: Executor<EM, Self, State = S> + HasObservers,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     EM: UsesState<State = S>,
     S: UsesInput<Input = <S::Corpus as Corpus>::Input>
@@ -977,7 +976,6 @@ impl Default for NopFuzzer {
 
 impl<E, EM, S, ST> Fuzzer<E, EM, S, ST> for NopFuzzer
 where
-    E: UsesState,
     EM: ProgressReporter<State = S> + EventProcessor<E, Self>,
     ST: StagesTuple<E, EM, S, Self>,
     S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId + UsesInput,

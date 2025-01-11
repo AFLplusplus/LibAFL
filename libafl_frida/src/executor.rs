@@ -7,18 +7,19 @@ use frida_gum::{
     stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
 };
-#[cfg(windows)]
 use libafl::{
     corpus::Corpus,
-    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
-    state::{HasCorpus, HasSolutions},
-};
-use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{HasTargetBytes, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{NopTargetBytesConverter, TargetBytesConverter, UsesInput},
     observers::ObserversTuple,
-    state::{HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions, UsesState},
     Error,
+};
+#[cfg(windows)]
+use libafl::{
+    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
+    inputs::Input,
+    state::{HasCurrentTestcase, HasSolutions},
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
 
@@ -29,14 +30,7 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use crate::windows_hooks::initialize;
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
-where
-    H: FnMut(&S::Input) -> ExitKind,
-    TC: TargetBytesConverter<Input = S::Input>,
-    S: State,
-    OT: ObserversTuple<S::Input, S>,
-    'b: 'a,
-{
+pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC> {
     base: InProcessExecutor<'a, H, OT, S>,
     /// `thread_id` for the Stalker
     thread_id: Option<u32>,
@@ -51,10 +45,7 @@ where
 
 impl<H, OT, RT, S, TC> Debug for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
 where
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State,
-    TC: TargetBytesConverter<Input = S::Input>,
-    OT: ObserversTuple<S::Input, S> + Debug,
+    OT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
@@ -65,14 +56,14 @@ where
     }
 }
 
-impl<EM, H, OT, RT, S, TC, Z> Executor<EM, Z>
+impl<EM, H, OT, RT, S, TC, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State + HasExecutions,
-    TC: TargetBytesConverter<Input = S::Input>,
-    OT: ObserversTuple<S::Input, S>,
+    H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
+    S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    TC: TargetBytesConverter<Input = <S::Corpus as Corpus>::Input>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     RT: FridaRuntimeTuple,
 {
     /// Instruct the target about the input and run
@@ -80,9 +71,9 @@ where
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         let target_bytes = self.target_bytes_converter.to_target_bytes(input);
         self.helper.pre_exec(target_bytes.as_slice())?;
@@ -122,23 +113,7 @@ where
     }
 }
 
-impl<H, OT, RT, S, TC> UsesState for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
-where
-    H: FnMut(&S::Input) -> ExitKind,
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-    TC: TargetBytesConverter<Input = S::Input>,
-{
-    type State = S;
-}
-
-impl<H, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
-where
-    H: FnMut(&S::Input) -> ExitKind,
-    TC: TargetBytesConverter<Input = S::Input>,
-    S: State,
-    OT: ObserversTuple<S::Input, S>,
-{
+impl<H, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC> {
     type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -152,12 +127,18 @@ where
 }
 
 impl<'a, 'b, 'c, H, OT, RT, S>
-    FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, NopTargetBytesConverter<S::Input>>
+    FridaInProcessExecutor<
+        'a,
+        'b,
+        'c,
+        H,
+        OT,
+        RT,
+        S,
+        NopTargetBytesConverter<<S::Corpus as Corpus>::Input>,
+    >
 where
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State,
-    S::Input: HasTargetBytes,
-    OT: ObserversTuple<S::Input, S>,
+    S: HasCorpus,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
@@ -194,10 +175,6 @@ where
 
 impl<'a, 'b, 'c, H, OT, RT, S, TC> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
 where
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State,
-    TC: TargetBytesConverter<Input = S::Input>,
-    OT: ObserversTuple<S::Input, S>,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
@@ -257,13 +234,17 @@ where
 impl<'a, 'b, 'c, H, OT, RT, S, TC> HasInProcessHooks<S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
 where
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State + HasSolutions + HasCorpus + HasExecutions,
-    TC: TargetBytesConverter<Input = S::Input>,
-    OT: ObserversTuple<S::Input, S>,
+    H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
+    S: HasSolutions
+        + HasCorpus
+        + HasCurrentTestcase
+        + HasExecutions
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Input,
+    TC: TargetBytesConverter<Input = <S::Corpus as Corpus>::Input>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     RT: FridaRuntimeTuple,
-    <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
-    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     /// the timeout handler
     #[inline]
