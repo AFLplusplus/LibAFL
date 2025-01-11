@@ -80,8 +80,7 @@ use core::marker::PhantomData;
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
 #[derive(Debug, Clone, Copy)]
-pub struct NgramHook<I, S>
-{
+pub struct NgramHook<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 
@@ -93,8 +92,7 @@ pub struct CtxHook<I, S> {
 }
 
 #[cfg(feature = "sancov_ctx")]
-impl<I, S> CtxHook<I, S>
-{
+impl<I, S> CtxHook<I, S> {
     /// The constructor for this struct
     #[must_use]
     pub fn new() -> Self {
@@ -105,8 +103,7 @@ impl<I, S> CtxHook<I, S>
 }
 
 #[cfg(feature = "sancov_ctx")]
-impl<I, S> Default for CtxHook<I, S>
-{
+impl<I, S> Default for CtxHook<I, S> {
     fn default() -> Self {
         Self::new()
     }
@@ -114,8 +111,7 @@ impl<I, S> Default for CtxHook<I, S>
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-impl<I, S> ExecutorHook<I, S> for NgramHook<I, S>
-{
+impl<I, S> ExecutorHook<I, S> for NgramHook<I, S> {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         #[cfg(feature = "sancov_ngram4")]
@@ -133,8 +129,7 @@ impl<I, S> ExecutorHook<I, S> for NgramHook<I, S>
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-impl<I, S> NgramHook<I, S>
-{
+impl<I, S> NgramHook<I, S> {
     /// The constructor for this struct
     #[must_use]
     pub fn new() -> Self {
@@ -146,16 +141,14 @@ impl<I, S> NgramHook<I, S>
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
-impl<I, S> Default for NgramHook<I, S>
-{
+impl<I, S> Default for NgramHook<I, S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[cfg(feature = "sancov_ctx")]
-impl<I, S> ExecutorHook<I, S> for CtxHook<I, S>
-{
+impl<I, S> ExecutorHook<I, S> for CtxHook<I, S> {
     fn init<E: HasObservers>(&mut self, _state: &mut S) {}
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         unsafe {

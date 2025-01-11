@@ -36,8 +36,7 @@ impl<I, S> CallHook<I, S> {
     }
 }
 
-impl<I, S> ExecutorHook<I, S> for CallHook<I, S>
-{
+impl<I, S> ExecutorHook<I, S> for CallHook<I, S> {
     fn init(&mut self, _state: &mut S) {}
 
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {

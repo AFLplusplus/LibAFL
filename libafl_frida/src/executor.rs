@@ -7,12 +7,6 @@ use frida_gum::{
     stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
 };
-#[cfg(windows)]
-use libafl::{
-    corpus::Corpus,
-    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
-    state::{HasCorpus, HasSolutions},
-};
 use libafl::{
     corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -20,6 +14,12 @@ use libafl::{
     observers::ObserversTuple,
     state::{HasCorpus, HasExecutions, UsesState},
     Error,
+};
+#[cfg(windows)]
+use libafl::{
+    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
+    inputs::Input,
+    state::{HasCurrentTestcase, HasSolutions},
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
 
@@ -234,13 +234,17 @@ where
 impl<'a, 'b, 'c, H, OT, RT, S, TC> HasInProcessHooks<S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
 where
-    H: FnMut(&S::Input) -> ExitKind,
-    S: State + HasSolutions + HasCorpus + HasExecutions,
-    TC: TargetBytesConverter<Input = S::Input>,
-    OT: ObserversTuple<S::Input, S>,
+    H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
+    S: HasSolutions
+        + HasCorpus
+        + HasCurrentTestcase
+        + HasExecutions
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Input,
+    TC: TargetBytesConverter<Input = <S::Corpus as Corpus>::Input>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     RT: FridaRuntimeTuple,
-    <S as HasSolutions>::Solutions: Corpus<Input = S::Input>, //delete me
-    <<S as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
 {
     /// the timeout handler
     #[inline]
