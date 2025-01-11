@@ -4,8 +4,6 @@ version = "0.14.1"
 authors = ["Konstantin Bücheler <buecheko@protonmail.com>"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
 default = ["std"]
 std = []
@@ -20,7 +18,14 @@ opt-level = 3
 debug = true
 
 [build-dependencies]
-vergen = { version = "8.2.1", features = ["build", "cargo", "git", "gitcl", "rustc", "si"] }
+vergen = { version = "8.2.1", features = [
+  "build",
+  "cargo",
+  "git",
+  "gitcl",
+  "rustc",
+  "si",
+] }
 
 [dependencies]
 clap = { version = "4.5.18", features = ["derive", "string"] }
@@ -28,8 +33,8 @@ libafl = { path = "../../../libafl", features = ["tui_monitor"] }
 libafl_bolts = { path = "../../../libafl_bolts", features = [
   "errors_backtrace",
 ] }
-libafl_nyx = { path = "../../../libafl_nyx/"}
-log = {version = "0.4.20" }
+libafl_nyx = { path = "../../../libafl_nyx/" }
+log = { version = "0.4.20" }
 nix = { version = "0.29.0", features = ["fs"] }
 rangemap = { version = "1.5.1" }
 readonly = { version = "0.2.12" }
