@@ -10,12 +10,7 @@ use num_traits::SaturatingAdd;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
-use crate::{
-    corpus::Corpus,
-    executors::{hooks::ExecutorHook, HasObservers},
-    state::HasCorpus,
-    Error,
-};
+use crate::{corpus::Corpus, executors::hooks::ExecutorHook, state::HasCorpus, Error};
 
 /// Info of a binary's section that can be used during `Intel PT` traces decoding
 #[derive(Debug, Clone, PartialEq, Eq)]

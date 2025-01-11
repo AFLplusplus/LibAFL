@@ -9,8 +9,6 @@ use std::ptr;
 #[cfg(feature = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[cfg(any(feature = "usermode", feature = "fork"))]
-use libafl::inputs::UsesInput;
 use libafl::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -22,7 +20,7 @@ use libafl::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::Input,
+    inputs::{Input, UsesInput},
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
     Error, ExecutionProcessor, HasScheduler,
