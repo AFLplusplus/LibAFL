@@ -723,7 +723,6 @@ where
         load_config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -748,7 +747,6 @@ where
         config: &mut LoadConfig<I, Self, Z>,
     ) -> Result<ExecuteInputResult, Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -783,7 +781,6 @@ where
         mut config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -848,7 +845,6 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -876,7 +872,6 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -903,7 +898,6 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -929,7 +923,6 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -956,7 +949,6 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -998,7 +990,6 @@ where
         cores: &Cores,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -1093,7 +1084,6 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
@@ -1132,7 +1122,6 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
@@ -1150,7 +1139,6 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
