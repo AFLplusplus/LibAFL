@@ -1,9 +1,7 @@
 use core::marker::PhantomData;
 
 use hashbrown::HashMap;
-use libafl::{
-    executors::hooks::ExecutorHook,
-};
+use libafl::executors::hooks::ExecutorHook;
 use once_cell::sync::Lazy;
 /// The list of functions that this execution has observed
 pub static mut FUNCTION_LIST: Lazy<HashMap<usize, usize>> = Lazy::new(HashMap::new);
