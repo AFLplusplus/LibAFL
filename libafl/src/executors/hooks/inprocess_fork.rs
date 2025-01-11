@@ -41,7 +41,7 @@ where
     S: HasCorpus,
 {
     /// Init this hook
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init(&mut self, _state: &mut S) {}
 
     /// Call before running a target.
     fn pre_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {

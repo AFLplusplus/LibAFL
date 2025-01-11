@@ -22,11 +22,11 @@ pub unsafe extern "C" fn __libafl_target_call_hook(id: usize) {
 
 /// The empty struct to clear the `FUNCTION_LIST` before the execution
 #[derive(Debug, Clone, Copy, Default)]
-pub struct CallHook<S> {
-    phantom: PhantomData<S>,
+pub struct CallHook<I, S> {
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> CallHook<S> {
+impl<I, S> CallHook<I, S> {
     /// The constructor
     #[must_use]
     pub fn new() -> Self {
@@ -36,13 +36,11 @@ impl<S> CallHook<S> {
     }
 }
 
-impl<S> ExecutorHook<S> for CallHook<S>
-where
-    S: UsesInput,
+impl<I, S> ExecutorHook<I, S> for CallHook<I, S>
 {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init(&mut self, _state: &mut S) {}
 
-    fn pre_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         // clear it before the execution
         // # Safety
         // This typically happens while no other execution happens.
@@ -54,5 +52,5 @@ where
         }
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &<S as UsesInput>::Input) {}
+    fn post_exec(&mut self, _state: &mut S, _input: &I) {}
 }

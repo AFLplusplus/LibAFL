@@ -191,7 +191,7 @@ impl<S> ExecutorHook<<S::Corpus as Corpus>::Input, S> for InProcessHooks<S>
 where
     S: HasCorpus,
 {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.
     #[expect(unused_variables)]
     fn pre_exec(&mut self, state: &mut S, input: &<S::Corpus as Corpus>::Input) {

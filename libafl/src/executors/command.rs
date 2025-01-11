@@ -472,7 +472,7 @@ where
 
         self.observers.pre_exec_child_all(state, input)?;
         if *state.executions() == 1 {
-            self.hooks.init_all::<Self>(state);
+            self.hooks.init_all(state);
         }
         self.hooks.pre_exec_all(state, input);
 

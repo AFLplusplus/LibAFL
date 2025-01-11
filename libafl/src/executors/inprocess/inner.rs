@@ -228,7 +228,7 @@ where
     {
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
-        hooks.init_all::<Self>(state);
+        hooks.init_all(state);
 
         #[cfg(windows)]
         // Some initialization necessary for windows.
