@@ -23,8 +23,6 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
-#[cfg(windows)]
-use crate::state::State;
 #[cfg(any(unix, windows))]
 use crate::{corpus::Corpus, observers::ObserversTuple};
 use crate::{
@@ -271,14 +269,18 @@ impl<S> InProcessHooks<S> {
     #[allow(unused_variables)] // for `exec_tmout` without `std`
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<EM, E::Input, E::Observers, E::State>,
-        E::State: State + HasExecutions + HasSolutions + HasCorpus,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<S as UsesInput>::Input, S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasExecutions
+            + HasSolutions
+            + HasCorpus
+            + HasCurrentTestcase
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
-        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
+        <S::Corpus as Corpus>::Input: Input + Clone,
+        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     {
         let ret;
         #[cfg(feature = "std")]
@@ -288,6 +290,7 @@ impl<S> InProcessHooks<S> {
                 E,
                 EM,
                 OF,
+                S,
                 Z,
             >();
             setup_exception_handler(data)?;
@@ -297,6 +300,7 @@ impl<S> InProcessHooks<S> {
                     E,
                     EM,
                     OF,
+                    S,
                     Z,
                 > as *const _;
             let timeout_handler =
@@ -304,6 +308,7 @@ impl<S> InProcessHooks<S> {
                     E,
                     EM,
                     OF,
+                    S,
                     Z,
                 > as *const c_void;
             let timer = TimerStruct::new(exec_tmout, timeout_handler);
