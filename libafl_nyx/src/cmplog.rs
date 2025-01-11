@@ -78,14 +78,14 @@ impl Named for NyxCmpObserver {
 
 // Based on https://github.com/nyx-fuzz/spec-fuzzer/blob/main/rust_fuzzer/src/runner.rs
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum RedqueenBPType {
+pub enum RedqueenBpType {
     Str,
     Cmp,
     Sub,
 }
 
-impl RedqueenBPType {
-    fn new(data: &str) -> Result<RedqueenBPType, String> {
+impl RedqueenBpType {
+    fn new(data: &str) -> Result<RedqueenBpType, String> {
         match data {
             "STR" => Ok(Self::Str),
             "CMP" => Ok(Self::Cmp),
@@ -98,7 +98,7 @@ impl RedqueenBPType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 struct RedqueenEvent {
     pub addr: u64,
-    pub bp_type: RedqueenBPType,
+    pub bp_type: RedqueenBpType,
     pub size: usize,
     pub lhs: Vec<u8>,
     pub rhs: Vec<u8>,
@@ -127,7 +127,7 @@ impl RedqueenEvent {
 
         let addr =
             u64::from_str_radix(addr_s, 16).map_err(|_| format!("Invalid address: '{addr_s}'"))?;
-        let bp_type = RedqueenBPType::new(type_s)
+        let bp_type = RedqueenBpType::new(type_s)
             .map_err(|e| format!("Invalid redqueen type: '{type_s}' - {e}"))?;
         let size = size_s
             .parse::<usize>()
@@ -166,7 +166,7 @@ impl TryInto<CmpValues> for RedqueenEvent {
 
     fn try_into(self) -> Result<CmpValues, Self::Error> {
         match self.bp_type {
-            RedqueenBPType::Cmp => match self.size {
+            RedqueenBpType::Cmp => match self.size {
                 8 => Ok(CmpValues::U8((
                     *self.rhs.first().ok_or("Invalid RHS length for U8")?,
                     *self.lhs.first().ok_or("Invalid LHS length for U8")?,
