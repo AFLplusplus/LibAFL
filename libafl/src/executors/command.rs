@@ -46,9 +46,11 @@ use nix::{
 use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
+#[cfg(target_os = "linux")]
+use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     corpus::Corpus,
-    executors::{hooks::ExecutorHooksTuple, Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::{HasCorpus, HasExecutions},

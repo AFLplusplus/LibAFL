@@ -24,8 +24,9 @@ use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(any(unix, windows))]
-use crate::{corpus::Corpus, observers::ObserversTuple};
+use crate::observers::ObserversTuple;
 use crate::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
@@ -332,12 +333,12 @@ impl<S> InProcessHooks<S> {
     /// Create a new [`InProcessHooks`]
     #[cfg(all(not(unix), not(windows)))]
     #[expect(unused_variables)]
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF, S, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<EM, E::Input, E::Observers, E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF>,
     {
         #[cfg_attr(miri, allow(unused_variables))]
