@@ -491,6 +491,9 @@ where
                 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                 node_id,
             },
+            _ => {
+                return Ok(());
+            }
         };
         let serialized = postcard::to_allocvec(&converted_event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
