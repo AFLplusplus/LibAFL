@@ -390,10 +390,11 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let lockfile_name = format!(".{file_name}");
             let lockfile_path = self.dir_path.join(lockfile_name);
 
-            let lockfile = try_create_new(&lockfile_path)?.unwrap_or(File::create(&lockfile_path)?);
+            let lockfile = try_create_new(&lockfile_path)?
+                .unwrap_or(OpenOptions::new().write(true).open(&lockfile_path)?);
             lockfile.lock_exclusive()?;
 
-            ctr = fs::read_to_string(&lockfile_path)?;
+            ctr = fs::read_to_string(&lockfile_path)?.trim().to_string();
             if ctr.is_empty() {
                 ctr = String::from("1");
             } else {
