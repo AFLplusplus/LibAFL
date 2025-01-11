@@ -22,7 +22,7 @@ debug = true
 [build-dependencies]
 anyhow = "1.0.89"
 bindgen = "0.70.1"
-cc = "1.1.21"
+cc = "=1.2.7" # fix me later
 
 [dependencies]
 libafl = { path = "../../../libafl", features = ["tui_monitor"] }
