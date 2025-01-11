@@ -46,7 +46,7 @@ where
     S: Serialize + HasCorpus,
     T: SaturatingAdd + From<u8> + Debug,
 {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init(&mut self, _state: &mut S) {}
 
     fn pre_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {
         self.intel_pt.enable_tracing().unwrap();
