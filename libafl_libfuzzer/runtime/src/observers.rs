@@ -158,13 +158,6 @@ where
     }
 }
 
-impl<M, O> UsesState for MappedEdgeMapObserver<M, O>
-where
-    M: UsesState,
-{
-    type State = M::State;
-}
-
 impl<M, O, S> Observer<S::Input, S> for MappedEdgeMapObserver<M, O>
 where
     M: Observer<S::Input, S> + Debug,

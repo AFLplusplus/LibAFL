@@ -22,7 +22,7 @@ use crate::{
     nonzero,
     observers::{MapObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasRand, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -68,10 +68,7 @@ pub struct ColorizationStage<C, E, EM, O, S, Z> {
     phantom: PhantomData<(E, EM, O, E, S, Z)>,
 }
 
-impl<C, E, EM, O, S, Z> Named for ColorizationStage<C, E, EM, O, S, Z>
-where
-    E: UsesState,
-{
+impl<C, E, EM, O, S, Z> Named for ColorizationStage<C, E, EM, O, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -80,7 +77,7 @@ where
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, E, EM, O, S, Z>
 where
     EM: EventFirer<State = S>,
-    E: HasObservers + Executor<EM, Z, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     S: HasCorpus
         + HasMetadata
         + HasRand
@@ -162,7 +159,7 @@ where
     EM: EventFirer<State = S>,
     O: MapObserver,
     C: AsRef<O> + Named,
-    E: HasObservers + Executor<EM, Z, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasMetadata

@@ -3429,9 +3429,7 @@ where
                             &broker_shmem_description,
                         );
                     }
-                    ListenerStream::Empty() => {
-                        continue;
-                    }
+                    ListenerStream::Empty() => {}
                 };
             }
         });

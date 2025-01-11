@@ -31,7 +31,7 @@ where
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,
-    E: HasObservers + UsesState<State = S>,
+    E: HasObservers,
     EM: ProgressReporter<State = S> + EventProcessor<E, F>,
     ST: StagesTuple<E, EM, S, F>,
 {

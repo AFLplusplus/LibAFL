@@ -410,7 +410,7 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z, State = S> + HasObservers,
+        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers: ObserversTuple<S::Input, S> + Serialize,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
@@ -608,7 +608,7 @@ where
     S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
     S::Corpus: Corpus<Input = S::Input>,
     SP: ShMemProvider,
-    E: HasObservers + Executor<Self, Z, State = S>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
@@ -666,7 +666,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<Self, Z, State = S>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
