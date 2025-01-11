@@ -463,7 +463,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if let Some(filename) = testcase.filename() {
             if self.locking {
                 let lockfile_path = self.dir_path.join(format!(".{filename}"));
-                let lockfile = File::open(&lockfile_path)?;
+                let lockfile = OpenOptions::new().write(true).open(&lockfile_path)?;
 
                 lockfile.lock_exclusive()?;
                 let ctr = fs::read_to_string(&lockfile_path)?;
@@ -472,8 +472,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
                     lockfile.unlock()?;
                     drop(fs::remove_file(lockfile_path));
                 } else {
-                    let n: u32 = ctr.parse()?;
-                    fs::write(lockfile_path, (n - 1).to_string())?;
+                    fs::write(lockfile_path, (ctr.parse::<u32>()? - 1).to_string())?;
                     return Ok(());
                 }
             }
