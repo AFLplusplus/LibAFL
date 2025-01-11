@@ -280,7 +280,7 @@ where
     ) -> Result<Self, Error> {
         let default_hooks = InChildProcessHooks::new::<Self>()?;
         let mut hooks = tuple_list!(default_hooks).merge(userhooks);
-        hooks.init_all::<Self>(state);
+        hooks.init_all(state);
 
         let itimerval = parse_itimerval(timeout);
 
