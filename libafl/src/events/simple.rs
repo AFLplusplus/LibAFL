@@ -1,6 +1,6 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
 use core::{
@@ -20,7 +20,7 @@ use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRes
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
+use super::ProgressReporter;
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -54,8 +54,6 @@ where
     monitor: MT,
     /// The events that happened since the last `handle_in_broker`
     events: Vec<Event<S::Input>>,
-    /// The custom buf handler
-    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     phantom: PhantomData<S>,
 }
 
@@ -139,22 +137,6 @@ where
 {
 }
 
-impl<MT, S> HasCustomBufHandlers for SimpleEventManager<MT, S>
-where
-    MT: Monitor, //CE: CustomEvent<I, OT>,
-    S: State,
-{
-    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<
-            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
-        >,
-    ) {
-        self.custom_buf_handlers.push(handler);
-    }
-}
-
 impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
@@ -194,7 +176,6 @@ where
         Self {
             monitor,
             events: vec![],
-            custom_buf_handlers: vec![],
             phantom: PhantomData,
         }
     }
@@ -267,7 +248,6 @@ where
                 log::log!((*severity_level).into(), "{message}");
                 Ok(BrokerEventResult::Handled)
             }
-            Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
             Event::Stop => Ok(BrokerEventResult::Forward),
         }
     }
@@ -275,12 +255,6 @@ where
     // Handle arriving events in the client
     fn handle_in_client(&mut self, state: &mut S, event: Event<S::Input>) -> Result<(), Error> {
         match event {
-            Event::CustomBuf { buf, tag } => {
-                for handler in &mut self.custom_buf_handlers {
-                    handler(state, &tag, &buf)?;
-                }
-                Ok(())
-            }
             Event::Stop => {
                 state.request_stop();
                 Ok(())
@@ -392,21 +366,6 @@ where
     S: State + HasExecutions + HasMetadata + HasLastReportTime + Serialize,
     SP: ShMemProvider,
 {
-}
-
-#[cfg(feature = "std")]
-impl<MT, S, SP> HasCustomBufHandlers for SimpleRestartingEventManager<MT, S, SP>
-where
-    MT: Monitor,
-    S: State,
-    SP: ShMemProvider,
-{
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
-    ) {
-        self.simple_event_mgr.add_custom_buf_handler(handler);
-    }
 }
 
 #[cfg(feature = "std")]
