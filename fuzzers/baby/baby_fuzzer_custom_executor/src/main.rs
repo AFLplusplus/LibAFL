@@ -7,19 +7,19 @@ use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    corpus::{InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::HasTargetBytes,
+    inputs::{HasTargetBytes, UsesInput},
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
-    state::{HasExecutions, State, StdState, UsesState},
+    state::{HasCorpus, HasExecutions, StdState, UsesState},
 };
 use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 
@@ -35,11 +35,11 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-struct CustomExecutor<S: State> {
+struct CustomExecutor<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S: State> CustomExecutor<S> {
+impl<S> CustomExecutor<S> {
     pub fn new(_state: &S) -> Self {
         Self {
             phantom: PhantomData,
@@ -47,22 +47,18 @@ impl<S: State> CustomExecutor<S> {
     }
 }
 
-impl<S: State> UsesState for CustomExecutor<S> {
-    type State = S;
-}
-
-impl<EM, S, Z> Executor<EM, Z> for CustomExecutor<S>
+impl<EM, S, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for CustomExecutor<S>
 where
     EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    Self::Input: HasTargetBytes,
+    S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, libafl::Error> {
         // We need to keep track of the exec count.
         *state.executions_mut() += 1;

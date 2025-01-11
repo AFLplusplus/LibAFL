@@ -338,7 +338,10 @@ impl<S> InProcessHooks<S> {
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus,
+        S: HasExecutions
+            + HasSolutions
+            + HasCorpus
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
     {
         #[cfg_attr(miri, allow(unused_variables))]
