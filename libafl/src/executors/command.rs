@@ -745,7 +745,7 @@ impl CommandExecutorBuilder {
 /// # Example
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
+/// use libafl::{Error, corpus::Corpus, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{HasCorpus, UsesState, HasExecutions}};
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
@@ -775,10 +775,12 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
+/// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
 ///     EM: UsesState,
 ///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
+///     S: HasCorpus + HasExecutions,
+/// 	S::Corpus: Corpus<Input = BytesInput>,
 /// {
 ///     MyExecutor.into_executor(())
 /// }
@@ -865,7 +867,7 @@ mod tests {
             Executor,
         },
         fuzzer::NopFuzzer,
-        inputs::BytesInput,
+        inputs::{BytesInput, NopInput},
         monitors::SimpleMonitor,
         state::NopState,
     };
@@ -873,9 +875,10 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_builder() {
-        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
-            log::info!("{status}");
-        }));
+        let mut mgr: SimpleEventManager<_, NopState<NopInput>> =
+            SimpleEventManager::new(SimpleMonitor::new(|status| {
+                log::info!("{status}");
+            }));
 
         let mut executor = CommandExecutor::builder();
         executor

@@ -294,7 +294,7 @@ where
         event: Event<DI>,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
         S::Corpus: Corpus<Input = S::Input>,
         for<'a> E::Observers: Deserialize<'a>,
@@ -349,7 +349,7 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         EM: UsesState<State = S> + EventFirer,
         S::Corpus: Corpus<Input = S::Input>,
         for<'a> E::Observers: Deserialize<'a>,

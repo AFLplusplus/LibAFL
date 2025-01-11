@@ -367,7 +367,7 @@ impl<E, EM, EMH, S, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, 
 where
     EM: AdaptiveSerializer + EventProcessor<E, Z> + EventFirer<State = S> + HasEventManagerId,
     EMH: EventManagerHooksTuple<S>,
-    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers:
         ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
@@ -402,7 +402,7 @@ where
 
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
 where
-    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers:
         ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
@@ -532,7 +532,7 @@ where
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers:
             ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
@@ -582,7 +582,7 @@ where
         event: Event<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers:
             ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,

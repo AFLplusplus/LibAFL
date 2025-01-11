@@ -14,16 +14,13 @@ use nix::unistd::{fork, ForkResult};
 
 use super::hooks::ExecutorHooksTuple;
 use crate::{
-    events::{EventFirer, EventRestarter},
+    corpus::Corpus,
     executors::{
         hooks::inprocess_fork::InProcessForkExecutorGlobalData,
         inprocess_fork::inner::GenericInProcessForkExecutorInner, Executor, ExitKind, HasObservers,
     },
-    feedbacks::Feedback,
-    fuzzer::HasObjective,
-    inputs::UsesInput,
     observers::ObserversTuple,
-    state::{HasExecutions, HasSolutions, State, UsesState},
+    state::{HasCorpus, HasExecutions},
     Error,
 };
 
@@ -46,16 +43,10 @@ pub mod stateful;
 pub type InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> =
     GenericInProcessForkExecutor<'a, H, (), OT, S, SP, EM, Z>;
 
-impl<'a, H, OT, S, SP, EM, Z, OF> InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>
+impl<'a, H, OT, S, SP, EM, Z> InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: State,
-    OT: ObserversTuple<S::Input, S>,
-    SP: ShMemProvider,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<EM, S::Input, OT, S>,
-    S: HasSolutions,
-    Z: HasObjective<Objective = OF>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
@@ -89,7 +80,12 @@ pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z> {
     inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
 }
 
-impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z> {
+impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
+where
+    HT: Debug,
+    OT: Debug,
+    SP: Debug,
+{
     #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessForkExecutor")
@@ -110,20 +106,19 @@ impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, 
 impl<EM, H, HT, OT, S, SP, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    OT: ObserversTuple<S::Input, S> + Debug,
-    S: State + HasExecutions,
+    H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind + Sized,
+    S: HasCorpus + HasExecutions,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple<S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
     #[inline]
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -147,16 +142,11 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z, OF> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<'a, H, HT, OT, S, SP, EM, Z> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
 where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple<S>,
-    OT: ObserversTuple<S::Input, S>,
-    SP: ShMemProvider,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<EM, S::Input, OT, S>,
-    S: State + HasSolutions,
-    Z: HasObjective<Objective = OF>,
+    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
     #[expect(clippy::too_many_arguments)]
@@ -200,13 +190,6 @@ where {
 
 impl<H, HT, OT, S, SP, EM, Z> HasObservers
     for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
-where
-    H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    HT: ExecutorHooksTuple<S>,
-    S: State,
-    OT: ObserversTuple<S::Input, S>,
-    SP: ShMemProvider,
-    EM: UsesState<State = S>,
 {
     type Observers = OT;
     #[inline]
@@ -233,7 +216,6 @@ pub mod child_signal_handlers {
             hooks::inprocess_fork::{InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA},
             ExitKind, HasObservers,
         },
-        inputs::UsesInput,
         observers::ObserversTuple,
     };
 
@@ -400,7 +382,7 @@ mod tests {
         let input = NopInput {};
         let mut fuzzer = NopFuzzer::new();
         let mut state = NopState::new();
-        let mut mgr = SimpleEventManager::printing();
+        let mut mgr: SimpleEventManager<_, NopState<NopInput>> = SimpleEventManager::printing();
         in_process_fork_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();

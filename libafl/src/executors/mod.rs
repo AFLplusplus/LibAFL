@@ -221,24 +221,14 @@ mod test {
         let nonempty_input = BytesInput::new(vec![1u8]);
         let mut executor = NopExecutor::new();
         let mut fuzzer = NopFuzzer::new();
-
-        let mut state = NopState::new();
+        let mut mgr: NopEventManager<NopState<BytesInput>> = NopEventManager::new();
+        let mut state: NopState<BytesInput> = NopState::new();
 
         executor
-            .run_target(
-                &mut fuzzer,
-                &mut state,
-                &mut NopEventManager::new(),
-                &empty_input,
-            )
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &empty_input)
             .unwrap_err();
         executor
-            .run_target(
-                &mut fuzzer,
-                &mut state,
-                &mut NopEventManager::new(),
-                &nonempty_input,
-            )
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &nonempty_input)
             .unwrap();
     }
 }
