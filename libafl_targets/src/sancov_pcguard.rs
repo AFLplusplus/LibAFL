@@ -10,7 +10,7 @@ use core::{mem::align_of, slice};
     feature = "sancov_ctx",
     feature = "sancov_ngram8"
 ))]
-use libafl::executors::{hooks::ExecutorHook, HasObservers};
+use libafl::executors::hooks::ExecutorHook;
 
 #[cfg(any(
     feature = "pointer_maps",

@@ -2,8 +2,7 @@ use core::marker::PhantomData;
 
 use hashbrown::HashMap;
 use libafl::{
-    executors::{hooks::ExecutorHook, HasObservers},
-    inputs::UsesInput,
+    executors::hooks::ExecutorHook,
 };
 use once_cell::sync::Lazy;
 /// The list of functions that this execution has observed
