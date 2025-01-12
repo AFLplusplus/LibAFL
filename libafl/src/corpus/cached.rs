@@ -1,7 +1,7 @@
 //! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
 use alloc::{collections::vec_deque::VecDeque, string::String};
-use core::{cell::RefCell, hash::Hash};
+use core::cell::RefCell;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub struct CachedOnDiskCorpus<I> {
 
 impl<I> CachedOnDiskCorpus<I>
 where
-    I: Input + Hash,
+    I: Input,
 {
     fn cache_testcase<'a>(
         &'a self,
@@ -57,7 +57,7 @@ where
 }
 impl<I> Corpus for CachedOnDiskCorpus<I>
 where
-    I: Input + Hash,
+    I: Input,
 {
     type Input = I;
 
@@ -181,7 +181,7 @@ where
 
 impl<I> HasTestcase for CachedOnDiskCorpus<I>
 where
-    I: Input + Hash,
+    I: Input,
 {
     fn testcase(&self, id: CorpusId) -> Result<core::cell::Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())

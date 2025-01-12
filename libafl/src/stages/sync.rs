@@ -4,7 +4,7 @@ use alloc::{
     borrow::{Cow, ToOwned},
     vec::Vec,
 };
-use core::{hash::Hash, marker::PhantomData, time::Duration};
+use core::{marker::PhantomData, time::Duration};
 use std::path::{Path, PathBuf};
 
 use libafl_bolts::{current_time, fs::find_new_files_rec, shmem::ShMemProvider, Named};
@@ -249,8 +249,8 @@ where
         + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     IC: InputConverter<From = <S::Corpus as Corpus>::Input, To = DI>,
     ICB: InputConverter<From = DI, To = <S::Corpus as Corpus>::Input>,
-    DI: Input + Hash,
-    <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Clone + Hash,
+    DI: Input,
+    <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Clone,
 {
     #[inline]
     fn perform(

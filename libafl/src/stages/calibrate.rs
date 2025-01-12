@@ -5,7 +5,7 @@ use alloc::{
     string::ToString,
     vec::Vec,
 };
-use core::{fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
 use libafl_bolts::{current_time, impl_serdeany, tuples::Handle, AsIter, Named};
@@ -103,7 +103,7 @@ where
         + HasCurrentCorpusId
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Input + Hash,
+    <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]
     #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]

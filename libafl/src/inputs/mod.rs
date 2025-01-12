@@ -55,7 +55,7 @@ use serde::{Deserialize, Serialize};
 
 /// An input for the target
 #[cfg(not(feature = "std"))]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
     /// Write this input to the file
     fn to_file<P>(&self, _path: P) -> Result<(), Error> {
         Err(Error::not_implemented("Not supported in no_std"))
@@ -65,11 +65,16 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     fn from_file<P>(_path: P) -> Result<Self, Error> {
         Err(Error::not_implemented("Not supprted in no_std"))
     }
+
+    /// Generate a name for this input
+    fn generate_name(&self) -> String {
+        format!("{:016x}", generic_hash_std(self))
+    }
 }
 
 /// An input for the target
 #[cfg(feature = "std")]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
@@ -88,11 +93,11 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
         file.read_to_end(&mut bytes)?;
         Ok(postcard::from_bytes(&bytes)?)
     }
-}
 
-// Generate a name for given input
-pub fn generate_name<I: Hash>(input: I) -> String {
-    format!("{:016x}", generic_hash_std(&input))
+    /// Generate a name for this input, the user is responsible for making each name of testcase unique.
+    fn generate_name(&self) -> String {
+        format!("{:016x}", generic_hash_std(self))
+    }
 }
 
 /// Convert between two input types with a state

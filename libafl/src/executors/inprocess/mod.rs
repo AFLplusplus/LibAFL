@@ -7,7 +7,6 @@ use core::{
     borrow::BorrowMut,
     ffi::c_void,
     fmt::{self, Debug, Formatter},
-    hash::Hash,
     marker::PhantomData,
     ptr,
     time::Duration,

@@ -1,6 +1,6 @@
 //! Hooks called on broker side
 use alloc::vec::Vec;
-use core::{hash::Hash, marker::PhantomData};
+use core::marker::PhantomData;
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
@@ -90,7 +90,7 @@ where
 
 impl<I, MT> StdLlmpEventHook<I, MT>
 where
-    I: Input + Hash,
+    I: Input,
     MT: Monitor,
 {
     /// Create an event broker from a raw broker.

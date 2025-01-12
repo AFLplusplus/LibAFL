@@ -5,7 +5,6 @@ use core::mem::zeroed;
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
-    hash::Hash,
     marker::PhantomData,
     ptr::{self, null_mut},
     time::Duration,
@@ -237,7 +236,7 @@ where
         E::State: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF>,
         <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone + Hash, //delete me
+        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
     {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.

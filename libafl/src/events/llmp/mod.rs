@@ -1,7 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 use alloc::{boxed::Box, vec::Vec};
-use core::{hash::Hash, marker::PhantomData, time::Duration};
+use core::{marker::PhantomData, time::Duration};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
@@ -258,7 +258,7 @@ where
     SP: ShMemProvider,
     IC: InputConverter<From = S::Input, To = DI>,
     ICB: InputConverter<From = DI, To = S::Input>,
-    DI: Input + Hash,
+    DI: Input,
 {
     // TODO other new_* routines
 

@@ -8,7 +8,7 @@
 // 4. The "main broker", the gathers the stats from the fuzzer clients and broadcast the newly found testcases from the main evaluator.
 
 use alloc::{boxed::Box, string::String, vec::Vec};
-use core::{fmt::Debug, hash::Hash, time::Duration};
+use core::{fmt::Debug, time::Duration};
 use std::{marker::PhantomData, process};
 
 #[cfg(feature = "llmp_compression")]
@@ -495,7 +495,7 @@ where
     #[cfg(feature = "llmp_compression")]
     fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
     where
-        I: Input + Hash,
+        I: Input,
     {
         let serialized = postcard::to_allocvec(event)?;
         let flags = LLMP_FLAG_INITIALIZED;

@@ -8,7 +8,6 @@
 use alloc::string::String;
 use core::{
     cell::{Ref, RefCell, RefMut},
-    hash::Hash,
     time::Duration,
 };
 use std::path::{Path, PathBuf};
@@ -59,7 +58,7 @@ pub struct OnDiskCorpus<I> {
 
 impl<I> Corpus for OnDiskCorpus<I>
 where
-    I: Input + Hash,
+    I: Input,
 {
     type Input = I;
     /// Returns the number of all enabled entries
@@ -177,7 +176,7 @@ where
 
 impl<I> HasTestcase for OnDiskCorpus<I>
 where
-    I: Input + Hash,
+    I: Input,
 {
     fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())

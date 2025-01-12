@@ -6,10 +6,14 @@
 #[cfg(feature = "regex")]
 use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-use core::cell::RefCell;
 #[cfg(feature = "regex")]
 use core::str::from_utf8;
+use core::{
+    cell::RefCell,
+    hash::{BuildHasher, Hasher},
+};
 
+use ahash::RandomState;
 use hashbrown::HashMap;
 use libafl_bolts::{Error, HasLen};
 #[cfg(feature = "regex")]
@@ -195,7 +199,17 @@ pub struct EncodedInput {
     codes: Vec<u32>,
 }
 
-impl Input for EncodedInput {}
+impl Input for EncodedInput {
+    /// Generate a name for this input
+    #[must_use]
+    fn generate_name(&self) -> String {
+        let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
+        for code in &self.codes {
+            hasher.write(&code.to_le_bytes());
+        }
+        format!("{:016x}", hasher.finish())
+    }
+}
 
 /// Rc Ref-cell from Input
 impl From<EncodedInput> for Rc<RefCell<EncodedInput>> {

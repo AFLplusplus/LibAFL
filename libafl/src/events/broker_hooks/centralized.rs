@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::{fmt::Debug, hash::Hash, marker::PhantomData};
+use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
@@ -77,7 +77,7 @@ impl<I> Debug for CentralizedLlmpHook<I> {
 
 impl<I> CentralizedLlmpHook<I>
 where
-    I: Input + Hash,
+    I: Input,
 {
     /// Create an event broker from a raw broker.
     pub fn new() -> Result<Self, Error> {
