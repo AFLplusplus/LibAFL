@@ -1,9 +1,7 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
 use alloc::{string::ToString, vec::Vec};
-use core::{fmt::Debug, time::Duration};
-#[cfg(feature = "std")]
-use std::hash::Hash;
+use core::{fmt::Debug, hash::Hash, time::Duration};
 
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
@@ -317,7 +315,7 @@ where
     F: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    <S::Corpus as Corpus>::Input: Input,
+    <S::Corpus as Corpus>::Input: Input + Hash,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     fn check_results(
@@ -525,7 +523,7 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasExecutions
         + HasLastFoundTime,
-    <S::Corpus as Corpus>::Input: Input,
+    <S::Corpus as Corpus>::Input: Input + Hash,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
@@ -603,7 +601,7 @@ where
         + HasLastFoundTime
         + HasExecutions
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    <S::Corpus as Corpus>::Input: Input,
+    <S::Corpus as Corpus>::Input: Input + Hash,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     IF: InputFilter<<S::Corpus as Corpus>::Input>,
 {

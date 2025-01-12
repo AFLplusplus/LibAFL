@@ -5,7 +5,7 @@
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
 use alloc::string::{String, ToString};
-use core::cell::RefCell;
+use core::{cell::RefCell, hash::Hash};
 use std::{
     fs,
     fs::{File, OpenOptions},
@@ -25,7 +25,7 @@ use super::{
 };
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
-    inputs::Input,
+    inputs::{generate_name, Input},
     Error, HasMetadata,
 };
 
@@ -62,7 +62,7 @@ pub struct InMemoryOnDiskCorpus<I> {
 
 impl<I> Corpus for InMemoryOnDiskCorpus<I>
 where
-    I: Input,
+    I: Input + Hash,
 {
     type Input = I;
 
@@ -214,7 +214,7 @@ where
 
 impl<I> HasTestcase for InMemoryOnDiskCorpus<I>
 where
-    I: Input,
+    I: Input + Hash,
 {
     fn testcase(
         &self,
@@ -378,11 +378,11 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     fn save_testcase(&self, testcase: &mut Testcase<I>) -> Result<(), Error>
     where
-        I: Input,
+        I: Input + Hash,
     {
         let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name()
+            generate_name(testcase.input().as_ref().unwrap())
         });
 
         let mut ctr = String::new();
@@ -469,7 +469,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
                 let ctr = fs::read_to_string(&lockfile_path)?;
 
                 if ctr == "1" {
-                    lockfile.unlock()?;
+                    FileExt::unlock(&lockfile)?;
                     drop(fs::remove_file(lockfile_path));
                 } else {
                     fs::write(lockfile_path, (ctr.parse::<u32>()? - 1).to_string())?;

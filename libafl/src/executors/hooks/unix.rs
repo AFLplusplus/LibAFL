@@ -2,7 +2,7 @@
 #[cfg(unix)]
 pub mod unix_signal_handler {
     use alloc::{boxed::Box, string::String, vec::Vec};
-    use core::mem::transmute;
+    use core::{hash::Hash, mem::transmute};
     use std::{io::Write, panic};
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
@@ -19,7 +19,7 @@ pub mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::{generate_name, UsesInput},
         observers::ObserversTuple,
         state::{HasCorpus, HasExecutions, HasSolutions, UsesState},
     };
@@ -216,7 +216,7 @@ pub mod unix_signal_handler {
                 let mut bsod = Vec::new();
                 {
                     let mut writer = std::io::BufWriter::new(&mut bsod);
-                    let _ = writeln!(writer, "input: {:?}", input.generate_name());
+                    // let _ = writeln!(writer, "input: {:?}", generate_name(&input));
                     let bsod = libafl_bolts::minibsod::generate_minibsod(
                         &mut writer,
                         signal,

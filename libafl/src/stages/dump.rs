@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    inputs::Input,
+    inputs::{generate_name, Input},
     stages::Stage,
     state::{HasCorpus, HasRand, HasSolutions},
     Error, HasMetadata,
@@ -106,7 +106,7 @@ where
         [
             Some(id.0.to_string()),
             testcase.filename().clone(),
-            testcase.input().as_ref().map(|t| t.generate_name()),
+            // testcase.input().as_ref().map(|t| generate_name(&t)),
         ]
         .iter()
         .flatten()

@@ -6,6 +6,7 @@ use core::{
     borrow::BorrowMut,
     cell::{Ref, RefMut},
     fmt::Debug,
+    hash::Hash,
     marker::PhantomData,
     time::Duration,
 };
@@ -628,7 +629,7 @@ impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
 #[cfg(feature = "std")]
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
-    I: Input,
+    I: Input + Hash,
     C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
     SC: Corpus<Input = <Self as UsesInput>::Input>,
@@ -1078,7 +1079,7 @@ where
 
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
-    I: Input,
+    I: Input + Hash,
     C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
     SC: Corpus<Input = <Self as UsesInput>::Input>,
@@ -1210,7 +1211,7 @@ impl StdState<NopInput, InMemoryCorpus<NopInput>, StdRand, InMemoryCorpus<NopInp
     /// Potentially good for testing.
     pub fn nop<I>() -> Result<StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>, Error>
     where
-        I: Input,
+        I: Input + Hash,
     {
         StdState::new(
             StdRand::with_seed(0),

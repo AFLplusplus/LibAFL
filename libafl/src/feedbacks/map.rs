@@ -5,6 +5,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::simd::prelude::SimdOrd;
 use core::{
     fmt::Debug,
+    hash::Hash,
     marker::PhantomData,
     ops::{BitAnd, BitOr, Deref, DerefMut},
 };
@@ -402,6 +403,7 @@ where
     OT: MatchName,
     R: Reducer<O::Entry>,
     S: HasNamedMetadata + UsesInput, // delete me
+    <S as UsesInput>::Input: Hash,
 {
     #[rustversion::nightly]
     default fn is_interesting(

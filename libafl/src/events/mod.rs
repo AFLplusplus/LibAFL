@@ -22,7 +22,7 @@ pub mod broker_hooks;
 use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
 use core::{
     fmt,
-    hash::{BuildHasher, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
     marker::PhantomData,
     time::Duration,
 };
@@ -47,7 +47,7 @@ use uuid::Uuid;
 use crate::state::HasClientPerfMonitor;
 use crate::{
     executors::ExitKind,
-    inputs::Input,
+    inputs::{generate_name, Input},
     monitors::UserStats,
     observers::ObserversTuple,
     state::{HasExecutions, HasLastReportTime, State},
@@ -266,7 +266,7 @@ where
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub enum Event<I>
 where
-    I: Input,
+    I: Input + Hash,
 {
     // TODO use an ID to keep track of the original index in the sender Corpus
     // The sender can then use it to send Testcase metadata with CustomEvent
@@ -355,7 +355,7 @@ where
 
 impl<I> Event<I>
 where
-    I: Input,
+    I: Input + Hash,
 {
     /// Event's corresponding name
     pub fn name(&self) -> &str {
@@ -379,7 +379,7 @@ where
     fn name_detailed(&self) -> Cow<'static, str> {
         match self {
             Event::NewTestcase { input, .. } => {
-                Cow::Owned(format!("Testcase {}", input.generate_name()))
+                Cow::Owned(format!("Testcase {}", generate_name(input)))
             }
             Event::UpdateExecStats { .. } => Cow::Borrowed("Client Heartbeat"),
             Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),
