@@ -1,10 +1,10 @@
 use core::{marker::PhantomData, ptr, time::Duration};
 
 use libafl::{
+    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::HasTargetBytes,
-    observers::ObserversTuple,
-    state::{HasExecutions, State, UsesState},
+    inputs::{HasTargetBytes, UsesInput},
+    state::{HasCorpus, HasExecutions, UsesState},
     Error,
 };
 use libafl_bolts::{
@@ -48,20 +48,21 @@ where
     }
 }
 
-impl<EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<S, SP, OT>
+impl<EM, S, SP, OT, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+    for TinyInstExecutor<S, SP, OT>
 where
     EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    S::Input: HasTargetBytes,
+    S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: HasTargetBytes,
     SP: ShMemProvider,
 {
     #[inline]
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
         match &self.map {
@@ -317,9 +318,7 @@ where
 
 impl<S, SP, OT> HasObservers for TinyInstExecutor<S, SP, OT>
 where
-    S: State,
     SP: ShMemProvider,
-    OT: ObserversTuple<S::Input, S>,
 {
     type Observers = OT;
 
@@ -330,11 +329,4 @@ where
     fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         RefIndexable::from(&mut self.observers)
     }
-}
-impl<S, SP, OT> UsesState for TinyInstExecutor<S, SP, OT>
-where
-    S: State,
-    SP: ShMemProvider,
-{
-    type State = S;
 }

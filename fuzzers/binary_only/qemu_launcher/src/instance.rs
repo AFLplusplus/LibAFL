@@ -323,7 +323,6 @@ impl<M: Monitor> Instance<'_, M> {
     where
         Z: Fuzzer<E, ClientMgr<M>, ClientState, ST>
             + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
-        E: UsesState<State = ClientState>,
         ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
     {
         let corpus_dirs = [self.options.input_dir()];

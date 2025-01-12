@@ -23,16 +23,15 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
-#[cfg(windows)]
-use crate::state::State;
 #[cfg(any(unix, windows))]
-use crate::{corpus::Corpus, observers::ObserversTuple, state::UsesState};
+use crate::observers::ObserversTuple;
 use crate::{
+    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
-    inputs::UsesInput,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    inputs::{Input, UsesInput},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
 
@@ -84,10 +83,7 @@ pub trait HasTimeout {
     fn handle_timeout(&mut self, data: &mut InProcessExecutorHandlerData) -> bool;
 }
 
-impl<S> HasTimeout for InProcessHooks<S>
-where
-    S: UsesInput,
-{
+impl<S> HasTimeout for InProcessHooks<S> {
     #[cfg(feature = "std")]
     fn timer(&self) -> &TimerStruct {
         &self.timer
@@ -191,14 +187,14 @@ where
     }
 }
 
-impl<S> ExecutorHook<S> for InProcessHooks<S>
+impl<S> ExecutorHook<<S::Corpus as Corpus>::Input, S> for InProcessHooks<S>
 where
-    S: UsesInput,
+    S: HasCorpus,
 {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.
     #[expect(unused_variables)]
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input) {
+    fn pre_exec(&mut self, state: &mut S, input: &<S::Corpus as Corpus>::Input) {
         #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -211,7 +207,7 @@ where
     }
 
     /// Call after running a target.
-    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {
+    fn post_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {
         // timeout stuff
         // # Safety
         // We're calling this only once per execution, in a single thread.
@@ -220,23 +216,24 @@ where
     }
 }
 
-impl<S> InProcessHooks<S>
-where
-    S: UsesInput,
-{
+impl<S> InProcessHooks<S> {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)] // for `exec_tmout` without `std`
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<EM, E::Input, E::Observers, E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<S as UsesInput>::Input, S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasExecutions
+            + HasSolutions
+            + HasCorpus
+            + HasCurrentTestcase
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
-        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
+        <S::Corpus as Corpus>::Input: Input + Clone,
+        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
@@ -245,7 +242,7 @@ where
         #[cfg(all(not(miri), unix, feature = "std"))]
         let data = unsafe { &raw mut GLOBAL_STATE };
         #[cfg(feature = "std")]
-        unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
+        unix_signal_handler::setup_panic_hook::<E, EM, OF, S, Z>();
         // # Safety
         // Setting up the signal handlers with a pointer to the `GLOBAL_STATE` which should not be NULL at this point.
         // We are the sole users of `GLOBAL_STATE` right now, and only dereference it in case of Segfault/Panic.
@@ -257,10 +254,10 @@ where
         compiler_fence(Ordering::SeqCst);
         Ok(Self {
             #[cfg(feature = "std")]
-            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>
+            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, S, Z>
                 as *const c_void,
             #[cfg(feature = "std")]
-            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
+            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, S, Z>
                 as *const _,
             #[cfg(feature = "std")]
             timer: TimerStruct::new(exec_tmout),
@@ -273,14 +270,18 @@ where
     #[allow(unused_variables)] // for `exec_tmout` without `std`
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        E::Observers: ObserversTuple<<E::State as UsesInput>::Input, E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<EM, E::Input, E::Observers, E::State>,
-        E::State: State + HasExecutions + HasSolutions + HasCorpus,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        E::Observers: ObserversTuple<<S as UsesInput>::Input, S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasExecutions
+            + HasSolutions
+            + HasCorpus
+            + HasCurrentTestcase
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
-        <<E as UsesState>::State as HasSolutions>::Solutions: Corpus<Input = E::Input>, //delete me
-        <<<E as UsesState>::State as HasCorpus>::Corpus as Corpus>::Input: Clone,       //delete me
+        <S::Corpus as Corpus>::Input: Input + Clone,
+        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     {
         let ret;
         #[cfg(feature = "std")]
@@ -290,6 +291,7 @@ where
                 E,
                 EM,
                 OF,
+                S,
                 Z,
             >();
             setup_exception_handler(data)?;
@@ -299,6 +301,7 @@ where
                     E,
                     EM,
                     OF,
+                    S,
                     Z,
                 > as *const _;
             let timeout_handler =
@@ -306,6 +309,7 @@ where
                     E,
                     EM,
                     OF,
+                    S,
                     Z,
                 > as *const c_void;
             let timer = TimerStruct::new(exec_tmout, timeout_handler);
@@ -331,10 +335,13 @@ where
     #[expect(unused_variables)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, Z> + HasObservers + HasInProcessHooks<E::State>,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<EM, E::Input, E::Observers, E::State>,
-        E::State: HasExecutions + HasSolutions + HasCorpus,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+        S: HasExecutions
+            + HasSolutions
+            + HasCorpus
+            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
     {
         #[cfg_attr(miri, allow(unused_variables))]

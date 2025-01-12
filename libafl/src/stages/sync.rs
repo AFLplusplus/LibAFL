@@ -243,7 +243,7 @@ where
         + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + State,
     SP: ShMemProvider,
-    E: HasObservers + Executor<EM, Z, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
         + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
