@@ -48,15 +48,7 @@ pub enum PacketType {
     Reset = 0x2,
 }
 
-impl Input for PacketData {
-    fn generate_name(&self, id: Option<CorpusId>) -> String {
-        if let Some(id) = id {
-            format!("id_{}", id.0)
-        } else {
-            "id_unknown".into()
-        }
-    }
-}
+impl Input for PacketData {}
 
 impl HasTargetBytes for PacketData {
     #[inline]
