@@ -141,17 +141,17 @@ int main() {
   hprintf("payload size addr: %p", &pbuf->size);
   hprintf("payload addr: %p", &pbuf->data);
 
-  // while(true) {
-  kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
-  kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
+  while(true) {
+    kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
+    kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
 
-  // Call the target
-  bool ret = FuzzMe(pbuf->data, pbuf->size);
+    // Call the target
+    bool ret = FuzzMe(pbuf->data, pbuf->size);
 
-  if (ret) { kAFL_hypercall(HYPERCALL_KAFL_PANIC, 0); }
+    if (ret) { kAFL_hypercall(HYPERCALL_KAFL_PANIC, 0); }
 
-  kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
-  // }
+    kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
+  }
 
   habort("post-release code has been triggered. Snapshot error?");
 }

@@ -14,7 +14,6 @@ use std::{
     ptr,
     slice::from_raw_parts,
 };
-
 use enum_map::EnumMap;
 use libafl::{
     executors::ExitKind,
@@ -40,6 +39,7 @@ use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
     IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
+use crate::command::parser::nyx::PanicCommandParser;
 
 pub(crate) mod bindings {
     #![allow(non_upper_case_globals)]
@@ -111,12 +111,11 @@ macro_rules! define_nyx_command_manager {
                 #[deny(unreachable_patterns)]
                 fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError> {
                     let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
-                    let nyx_backdoor = qemu.read_reg(arch_regs_map[ExitArgs::Cmd])? as c_uint;
+                    let nyx_backdoor = qemu.read_reg(Regs::Rax)? as c_uint;
+                    let cmd_id = qemu.read_reg(Regs::Rbx)? as c_uint;
 
                     // Check nyx backdoor correctness
                     debug_assert_eq!(nyx_backdoor, 0x1f);
-
-                    let cmd_id = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as c_uint;
 
                     log::debug!("Received Nyx command ID: {cmd_id}");
 
@@ -182,6 +181,7 @@ define_nyx_command_manager!(
         GetPayloadCommand,
         NextPayloadCommand,
         SubmitCR3Command,
+        PanicCommand,
         SubmitPanicCommand,
         UserAbortCommand,
         RangeSubmitCommand
@@ -196,6 +196,7 @@ define_nyx_command_manager!(
         NextPayloadCommandParser,
         SubmitCR3CommandParser,
         SubmitPanicCommandParser,
+        PanicCommandParser,
         UserAbortCommandParser,
         RangeSubmitCommandParser
     ]
@@ -438,6 +439,14 @@ where
         EmulatorDriverError,
     > {
         log::info!("Allow address range: {:#x?}", self.allowed_range);
+
+        const EMPTY_RANGE: Range<GuestAddr> = 0..0;
+
+        if self.allowed_range == EMPTY_RANGE {
+            log::warn!("The given range is {:#x?}, which is most likely invalid. It is most likely a guest error.", EMPTY_RANGE);
+            log::warn!("Hint: make sure the range is not getting optimized out (the volatile keyword may help you).");
+        }
+
         emu.modules_mut()
             .modules_mut()
             .allow_address_range_all(self.allowed_range.clone());

@@ -73,9 +73,9 @@ where
 
     fn parse(
         qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let payload_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2]).unwrap() as GuestVirtAddr;
+        let payload_addr = qemu.read_reg(Regs::Rcx).unwrap() as GuestVirtAddr;
 
         Ok(GetPayloadCommand::new(payload_addr))
     }
@@ -115,9 +115,9 @@ where
 
     fn parse(
         qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let allowed_range_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
+        let allowed_range_addr = qemu.read_reg(Regs::Rcx)? as GuestVirtAddr;
 
         let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr)? };
 
@@ -179,9 +179,9 @@ where
 
     fn parse(
         qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let msg = get_guest_string(qemu, arch_regs_map[ExitArgs::Arg2])?;
+        let msg = get_guest_string(qemu, Regs::Rcx)?;
 
         Ok(UserAbortCommand::new(msg))
     }
@@ -242,9 +242,9 @@ where
 
     fn parse(
         qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let host_config_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
+        let host_config_addr = qemu.read_reg(Regs::Rcx)? as GuestVirtAddr;
 
         Ok(GetHostConfigCommand::new(QemuMemoryChunk::virt(
             host_config_addr,
@@ -267,9 +267,9 @@ where
 
     fn parse(
         qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let agent_config_addr = qemu.read_reg(arch_regs_map[ExitArgs::Arg2])? as GuestVirtAddr;
+        let agent_config_addr = qemu.read_reg(Regs::Rcx)? as GuestVirtAddr;
 
         let agent_config: bindings::agent_config_t =
             unsafe { qemu.read_mem_val(agent_config_addr)? };
@@ -291,9 +291,9 @@ where
 
     fn parse(
         qemu: Qemu,
-        arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
+        _arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
     ) -> Result<Self::OutputCommand, CommandError> {
-        let msg = get_guest_string(qemu, arch_regs_map[ExitArgs::Arg2])?;
+        let msg = get_guest_string(qemu, Regs::Rcx)?;
 
         Ok(PrintfCommand::new(msg))
     }

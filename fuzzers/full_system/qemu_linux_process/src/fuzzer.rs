@@ -5,22 +5,7 @@ use std::{env, path::PathBuf, process};
 
 #[cfg(not(feature = "nyx"))]
 use libafl::state::{HasExecutions, State};
-use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{launcher::Launcher, EventConfig},
-    executors::{ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, UsesInput},
-    monitors::MultiMonitor,
-    mutators::{havoc_mutations, I2SRandReplaceBinonly, StdScheduledMutator},
-    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{ShadowTracingStage, StdMutationalStage},
-    state::{HasCorpus, StdState},
-    Error,
-};
+use libafl::{corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus}, events::{launcher::Launcher, EventConfig}, executors::{ExitKind, ShadowExecutor}, feedback_and_fast, feedback_or, feedback_or_fast, feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback}, fuzzer::{Fuzzer, StdFuzzer}, inputs::{BytesInput, HasTargetBytes, UsesInput}, monitors::MultiMonitor, mutators::{havoc_mutations, I2SRandReplaceBinonly, StdScheduledMutator}, observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver}, schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler}, stages::{ShadowTracingStage, StdMutationalStage}, state::{HasCorpus, StdState}, Error};
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
@@ -48,9 +33,9 @@ use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND}
 #[cfg(feature = "nyx")]
 fn get_emulator<ET, S>(
     args: Vec<String>,
-    mut modules: ET,
+    modules: ET,
 ) -> Result<
-    Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, FastSnapshotManager>,
+    Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, NopSnapshotManager>,
     QemuInitError,
 >
 where
@@ -63,7 +48,7 @@ where
         .modules(modules)
         .driver(NyxEmulatorDriver::builder().build())
         .command_manager(NyxCommandManager::default())
-        .snapshot_manager(FastSnapshotManager::default())
+        .snapshot_manager(NopSnapshotManager::default())
         .build()
 }
 
@@ -170,8 +155,13 @@ pub fn fuzz() {
             TimeFeedback::new(&time_observer)
         );
 
+        let map_feedback = MaxMapFeedback::new(&edges_observer);
+
         // A feedback to choose if an input is a solution or not
-        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_and_fast!(
+            feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+            map_feedback,
+        );
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
