@@ -723,7 +723,6 @@ where
         load_config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -748,12 +747,17 @@ where
         config: &mut LoadConfig<I, Self, Z>,
     ) -> Result<ExecuteInputResult, Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
-        log::info!("Loading file {:?} ...", &path);
-        let input = (config.loader)(fuzzer, self, path)?;
+        log::info!("Loading file {path:?} ...");
+        let input = match (config.loader)(fuzzer, self, path) {
+            Ok(input) => input,
+            Err(err) => {
+                log::error!("Skipping input that we could not load from {path:?}: {err:?}");
+                return Ok(ExecuteInputResult::None);
+            }
+        };
         if config.forced {
             let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
             Ok(ExecuteInputResult::Corpus)
@@ -777,7 +781,6 @@ where
         mut config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -842,7 +845,6 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -870,7 +872,6 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -897,7 +898,6 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -923,7 +923,6 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -950,7 +949,6 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -992,7 +990,6 @@ where
         cores: &Cores,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -1087,7 +1084,6 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
@@ -1126,7 +1122,6 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
@@ -1144,7 +1139,6 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
@@ -1271,6 +1265,18 @@ impl<I> HasMaxSize for NopState<I> {
 
     fn set_max_size(&mut self, _max_size: usize) {
         unimplemented!("NopState doesn't allow setting a max size")
+    }
+}
+
+impl<I> HasCorpus for NopState<I> {
+    type Corpus = InMemoryCorpus<I>;
+
+    fn corpus(&self) -> &Self::Corpus {
+        unimplemented!("Unimplemented for NopState!");
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        unimplemented!("Unimplemented for No[State!");
     }
 }
 

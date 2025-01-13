@@ -43,13 +43,12 @@ use crate::observers::{
     get_asan_runtime_flags, get_asan_runtime_flags_with_log_path, AsanBacktraceObserver,
 };
 use crate::{
+    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{
-        BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter, UsesInput,
-    },
+    inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
-    state::{HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions},
     Error,
 };
 
@@ -662,8 +661,8 @@ impl ForkserverExecutor<(), (), (), UnixShMemProvider> {
 
 impl<TC, OT, S, SP> ForkserverExecutor<TC, OT, S, SP>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
     SP: ShMemProvider,
     TC: TargetBytesConverter,
 {
@@ -842,9 +841,9 @@ where
     #[expect(clippy::pedantic)]
     pub fn build<OT, S>(mut self, observers: OT) -> Result<ForkserverExecutor<TC, OT, S, SP>, Error>
     where
-        OT: ObserversTuple<S::Input, S>,
-        S: UsesInput,
-        S::Input: Input,
+        OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        S: HasCorpus,
+        <S::Corpus as Corpus>::Input: Input,
         TC: TargetBytesConverter,
         SP: ShMemProvider,
     {
@@ -910,10 +909,10 @@ where
     ) -> Result<ForkserverExecutor<TC, (A, OT), S, SP>, Error>
     where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
-        A: Observer<S::Input, S> + AsMut<MO>,
-        OT: ObserversTuple<S::Input, S> + Prepend<MO>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
+        A: Observer<<S::Corpus as Corpus>::Input, S> + AsMut<MO>,
+        OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Prepend<MO>,
+        <S::Corpus as Corpus>::Input: Input + HasTargetBytes,
+        S: HasCorpus,
         SP: ShMemProvider,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
@@ -1580,21 +1579,21 @@ impl Default
     }
 }
 
-impl<EM, TC, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<TC, OT, S, SP>
+impl<EM, TC, OT, S, SP, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+    for ForkserverExecutor<TC, OT, S, SP>
 where
-    OT: ObserversTuple<S::Input, S>,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     SP: ShMemProvider,
-    S: State + HasExecutions,
-    TC: TargetBytesConverter<Input = S::Input>,
-    EM: UsesState<State = S>,
+    S: HasCorpus + HasExecutions,
+    TC: TargetBytesConverter<Input = <S::Corpus as Corpus>::Input>,
 {
     #[inline]
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         self.execute_input(state, input)
     }
@@ -1615,18 +1614,10 @@ where
     }
 }
 
-impl<TC, OT, S, SP> UsesState for ForkserverExecutor<TC, OT, S, SP>
-where
-    S: State,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-
 impl<TC, OT, S, SP> HasObservers for ForkserverExecutor<TC, OT, S, SP>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
     SP: ShMemProvider,
 {
     type Observers = OT;
@@ -1654,7 +1645,9 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
+        corpus::NopCorpus,
         executors::forkserver::{ForkserverExecutor, FAILED_TO_START_FORKSERVER_MSG},
+        inputs::BytesInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
@@ -1684,7 +1677,7 @@ mod tests {
             .coverage_map_size(MAP_SIZE)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
-            .build::<_, ()>(tuple_list!(edges_observer));
+            .build::<_, NopCorpus<BytesInput>>(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {

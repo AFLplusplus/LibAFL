@@ -144,7 +144,7 @@ fn exec_rustc(args: &[&str]) -> String {
 
 fn find_rustc_llvm_version() -> Option<i32> {
     let output = exec_rustc(&["--verbose", "--version"]);
-    let ver = output.split(':').last().unwrap().trim();
+    let ver = output.split(':').next_back().unwrap().trim();
     if let Some(major) = ver.split('.').collect::<Vec<&str>>().first() {
         if let Ok(res) = major.parse::<i32>() {
             return Some(res);

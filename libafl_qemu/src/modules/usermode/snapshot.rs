@@ -393,6 +393,20 @@ impl SnapshotModule {
 
             log::debug!("Start restore");
 
+            let new_brk = qemu.get_brk();
+            if new_brk < self.brk {
+                // The heap has shrunk below the snapshotted brk value. We need to remap those pages in the target.
+                // The next for loop will restore their content if needed.
+                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
+                log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
+                drop(qemu.map_fixed(
+                    aligned_new_brk,
+                    (self.brk - aligned_new_brk) as usize,
+                    MmapPerms::ReadWrite,
+                ));
+            }
+
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
@@ -524,7 +538,12 @@ impl SnapshotModule {
         }
     }
 
-    pub fn change_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn change_mapped_perms(
+        &mut self,
+        start: GuestAddr,
+        mut size: usize,
+        perms: Option<MmapPerms>,
+    ) {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
@@ -851,18 +870,8 @@ where
             h.access(a0, a1 as usize);
         }
         SYS_brk => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-            if h.brk != result && result != 0 && result > h.initial_brk {
-                /* brk has changed, and it doesn't shrink below initial_brk. We change mapping from the snapshotted initial brk address to the new target_brk
-                 * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
-                 * It is safe to assume RW perms here
-                 */
-                h.change_mapped(
-                    h.initial_brk,
-                    (result - h.initial_brk) as usize,
-                    Some(MmapPerms::ReadWrite),
-                );
-            }
+            // We don't handle brk here. It is handled in the reset function only when it's needed.
+            log::debug!("New brk ({:#x?}) received.", result);
         }
         // mmap syscalls
         sys_const => {
@@ -898,7 +907,7 @@ where
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-                    h.change_mapped(a0, a1 as usize, Some(prot));
+                    h.change_mapped_perms(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
                 let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();

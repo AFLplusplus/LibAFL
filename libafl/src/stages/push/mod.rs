@@ -256,7 +256,7 @@ where
         + HasNamedMetadata
         + HasMetadata
         + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = S> + EventRestarter + HasEventManagerId + ProgressReporter<State = S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     PS: PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>,

@@ -64,7 +64,7 @@ impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<C, EM, O, E::
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    E: Executor<EM, Z, State = S> + HasObservers,
+    E: Executor<EM, BytesInput, S, Z> + HasObservers,
     E::Observers: ObserversTuple<BytesInput, S>,
     S: HasExecutions
         + HasMetadata
@@ -348,6 +348,7 @@ where
         + HasCorpus
         + MaybeHasClientPerfMonitor
         + UsesInput<Input = BytesInput>,
+    S::Corpus: Corpus<Input = BytesInput>,
     OT: ObserversTuple<BytesInput, S>,
     EM: UsesState<State = S>,
 {
@@ -375,7 +376,7 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers: ObserversTuple<BytesInput, S>,
     {
         start_timer!(state);
@@ -417,7 +418,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -455,7 +456,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     {
         let mut index = 0;
         while index < payload.len() {
