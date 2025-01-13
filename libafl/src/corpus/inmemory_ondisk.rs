@@ -469,7 +469,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
                 let ctr = fs::read_to_string(&lockfile_path)?;
 
                 if ctr == "1" {
-                    lockfile.unlock()?;
+                    FileExt::unlock(&lockfile)?;
                     drop(fs::remove_file(lockfile_path));
                 } else {
                     fs::write(lockfile_path, (ctr.parse::<u32>()? - 1).to_string())?;

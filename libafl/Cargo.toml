@@ -39,7 +39,6 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
-  "fs2"
 ]
 document-features = ["dep:document-features"]
 
@@ -60,6 +59,7 @@ std = [
   "libafl_bolts/std",
   "typed-builder",
   "fastbloom",
+  "fs2"
 ]
 
 ## Tracks the Feedbacks and the Objectives that were interesting for a Testcase
@@ -285,6 +285,8 @@ const_panic = { version = "0.2.9", default-features = false } # similarly, for f
 pyo3 = { workspace = true, optional = true }
 regex-syntax = { version = "0.8.4", optional = true } # For nautilus
 
+fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
+
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
@@ -297,7 +299,6 @@ clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 libipt = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
-fs2 = { workspace = true, optional = true }
 
 [lints]
 workspace = true
