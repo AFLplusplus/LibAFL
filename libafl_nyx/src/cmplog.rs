@@ -132,10 +132,8 @@ impl RedqueenEvent {
         let size = size_s
             .parse::<usize>()
             .map_err(|_| format!("Invalid size: '{size_s}'"))?;
-        let lhs =
-            hex::decode(lhs_s).map_err(|e| format!("Failed to decode LHS: '{lhs_s}' - {e}"))?;
-        let rhs =
-            hex::decode(rhs_s).map_err(|e| format!("Failed to decode RHS: '{rhs_s}' - {e}"))?;
+        let lhs = hex_to_bytes(lhs_s).ok_or("Decoding LHS failed")?;
+        let rhs = hex_to_bytes(rhs_s).ok_or("Decoding RHS failed")?;
 
         Ok(Self {
             addr,
@@ -145,6 +143,20 @@ impl RedqueenEvent {
             rhs,
             imm,
         })
+    }
+}
+
+fn hex_to_bytes(s: &str) -> Option<Vec<u8>> {
+    if s.len() % 2 == 0 {
+        (0..s.len())
+            .step_by(2)
+            .map(|i| {
+                s.get(i..i + 2)
+                    .and_then(|sub| u8::from_str_radix(sub, 16).ok())
+            })
+            .collect()
+    } else {
+        None
     }
 }
 
