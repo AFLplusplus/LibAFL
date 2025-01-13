@@ -10,6 +10,16 @@ use libafl_qemu_sys::{GuestAddr, GuestPhysAddr};
 
 use crate::Qemu;
 
+// TODO: make a better arch-specific / os-specific system. only works for x86_64 for now.
+#[cfg(feature = "x86_64")]
+pub const LINUX_PROCESS_ADDRESS_RANGE: Range<u64> = 0..0x0000_7fff_ffff_ffff;
+#[cfg(feature = "x86_64")]
+pub const LINUX_KERNEL_ADDRESS_RANGE: Range<u64> = 0xFFFFFFFF80000000..0xFFFFFFFF9FFFFFFF;
+
+/// Generic Filter that can be:
+/// - an allow list: allow nothing but the given list
+/// - a deny list: allow anything but the given list
+/// - none: allow everything (no filtering applied)
 #[derive(Debug, Clone)]
 pub enum FilterList<T> {
     AllowList(T),
@@ -59,17 +69,22 @@ where
     }
 }
 
+/// An address filter list.
+///
+/// It will allow anything in the registered ranges, and deny anything else.
+/// If there is no range registered, it will allow anything.
 #[derive(Clone, Debug, Default)]
 pub struct AddressFilterVec {
     // ideally, we should use a tree
     registered_addresses: Vec<Range<GuestAddr>>,
 }
+
 #[derive(Clone, Debug)]
 pub struct StdAddressFilter(FilterList<AddressFilterVec>);
 
 impl Default for StdAddressFilter {
     fn default() -> Self {
-        Self(FilterList::None)
+        Self::allow_list(Vec::new())
     }
 }
 
@@ -101,7 +116,10 @@ impl AddressFilterVec {
 impl AddressFilter for AddressFilterVec {
     fn register(&mut self, address_range: Range<GuestAddr>) {
         self.registered_addresses.push(address_range);
-        Qemu::get().unwrap().flush_jit();
+
+        if let Some(qemu) = Qemu::get() {
+            qemu.flush_jit();
+        }
     }
 
     fn allowed(&self, addr: &GuestAddr) -> bool {
@@ -129,6 +147,10 @@ impl AddressFilter for StdAddressFilter {
     }
 }
 
+/// A page filter list.
+///
+/// It will allow anything in the registered pages, and deny anything else.
+/// If there is no page registered, it will allow anything.
 #[derive(Clone, Debug)]
 pub struct PageFilterVec {
     registered_pages: HashSet<GuestPhysAddr>,
@@ -141,6 +163,19 @@ pub struct StdPageFilter(FilterList<PageFilterVec>);
 #[cfg(feature = "usermode")]
 pub type StdPageFilter = NopPageFilter;
 
+#[cfg(feature = "systemmode")]
+impl StdPageFilter {
+    #[must_use]
+    pub fn allow_list(registered_pages: PageFilterVec) -> Self {
+        StdPageFilter(FilterList::AllowList(registered_pages))
+    }
+
+    #[must_use]
+    pub fn deny_list(registered_pages: PageFilterVec) -> Self {
+        StdPageFilter(FilterList::DenyList(registered_pages))
+    }
+}
+
 impl Default for PageFilterVec {
     fn default() -> Self {
         Self {
@@ -152,20 +187,23 @@ impl Default for PageFilterVec {
 #[cfg(feature = "systemmode")]
 impl Default for StdPageFilter {
     fn default() -> Self {
-        Self(FilterList::None)
+        Self::allow_list(PageFilterVec::default())
     }
 }
 
 impl PageFilter for PageFilterVec {
     fn register(&mut self, page_id: GuestPhysAddr) {
         self.registered_pages.insert(page_id);
-        Qemu::get().unwrap().flush_jit();
+
+        if let Some(qemu) = Qemu::get() {
+            qemu.flush_jit();
+        }
     }
 
     fn allowed(&self, paging_id: &GuestPhysAddr) -> bool {
-        // if self.allowed_pages.is_empty() {
-        //     return true;
-        // }
+        if self.registered_pages.is_empty() {
+            return true;
+        }
 
         self.registered_pages.contains(paging_id)
     }
@@ -219,3 +257,171 @@ pub(crate) static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
     UnsafeCell::new(NopAddressFilter);
 #[cfg(feature = "systemmode")]
 pub(crate) static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::new(NopPageFilter);
+
+#[cfg(all(feature = "systemmode", test))]
+mod tests {
+    use libafl::{
+        inputs::{NopInput, UsesInput},
+        state::NopState,
+        HasMetadata,
+    };
+    use libafl_bolts::tuples::tuple_list;
+
+    use crate::modules::{
+        utils::filters::{
+            AddressFilter, NopAddressFilter, NopPageFilter, PageFilter, StdAddressFilter,
+            StdPageFilter,
+        },
+        EmulatorModule, EmulatorModuleTuple,
+    };
+
+    #[derive(Clone, Debug)]
+    struct DummyModule<AF, PF> {
+        address_filter: AF,
+        page_filter: PF,
+    }
+
+    impl<S, AF, PF> EmulatorModule<S> for DummyModule<AF, PF>
+    where
+        AF: AddressFilter + 'static,
+        PF: PageFilter + 'static,
+        S: Unpin + UsesInput + HasMetadata,
+    {
+        type ModuleAddressFilter = AF;
+        type ModulePageFilter = PF;
+
+        fn address_filter(&self) -> &Self::ModuleAddressFilter {
+            &self.address_filter
+        }
+
+        fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+            &mut self.address_filter
+        }
+
+        fn page_filter(&self) -> &Self::ModulePageFilter {
+            &self.page_filter
+        }
+
+        fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+            &mut self.page_filter
+        }
+    }
+
+    fn gen_module<AF, PF, S>(
+        af: AF,
+        pf: PF,
+    ) -> impl EmulatorModule<S, ModuleAddressFilter = AF, ModulePageFilter = PF>
+    where
+        AF: AddressFilter,
+        PF: PageFilter,
+        S: HasMetadata + UsesInput + Unpin,
+    {
+        DummyModule {
+            address_filter: af,
+            page_filter: pf,
+        }
+    }
+
+    macro_rules! test_module {
+        ($modules:ident, $Id:tt) => {
+            assert!($modules.$Id.address_filter().allowed(&0x100));
+            assert!($modules.$Id.address_filter().allowed(&0x101));
+            assert!($modules.$Id.address_filter().allowed(&0x1ff));
+            assert!($modules.$Id.address_filter().allowed(&0x301));
+
+            assert!(!$modules.$Id.address_filter().allowed(&0xff));
+            assert!(!$modules.$Id.address_filter().allowed(&0x200));
+            assert!(!$modules.$Id.address_filter().allowed(&0x201));
+
+            assert!($modules.$Id.page_filter().allowed(&0xaaaa));
+            assert!($modules.$Id.page_filter().allowed(&0xbbbb));
+
+            assert!(!$modules.$Id.page_filter().allowed(&0xcccc));
+        };
+    }
+
+    #[test]
+    fn test_filter_nop() {
+        let module = gen_module::<NopAddressFilter, NopPageFilter, NopState<NopInput>>(
+            NopAddressFilter,
+            NopPageFilter,
+        );
+        let mut modules = tuple_list!(module);
+
+        modules.allow_address_range_all(0x100..0x200);
+        modules.allow_address_range_all(0x300..0x400);
+
+        modules.allow_page_id_all(0xaaaa);
+        modules.allow_page_id_all(0xbbbb);
+
+        assert!(modules.0.address_filter().allowed(&0xff));
+        assert!(modules.0.address_filter().allowed(&0x200));
+        assert!(modules.0.address_filter().allowed(&0x201));
+        assert!(modules.0.address_filter().allowed(&0x300));
+
+        assert!(modules.0.page_filter().allowed(&0xaaaa));
+        assert!(modules.0.page_filter().allowed(&0xbbbb));
+        assert!(modules.0.page_filter().allowed(&0xcccc));
+    }
+
+    #[test]
+    fn test_filters_simple() {
+        let module = gen_module::<StdAddressFilter, StdPageFilter, NopState<NopInput>>(
+            StdAddressFilter::default(),
+            StdPageFilter::default(),
+        );
+        let mut modules = tuple_list!(module);
+
+        assert!(modules.0.address_filter().allowed(&0x000));
+        assert!(modules.0.address_filter().allowed(&0x100));
+        assert!(modules.0.address_filter().allowed(&0x200));
+        assert!(modules.0.address_filter().allowed(&0xffffffff));
+
+        assert!(modules.0.page_filter().allowed(&0xabcd));
+
+        modules.allow_address_range_all(0x100..0x200);
+        modules.allow_address_range_all(0x300..0x400);
+
+        modules.allow_page_id_all(0xaaaa);
+        modules.allow_page_id_all(0xbbbb);
+
+        assert!(modules.0.address_filter().allowed(&0x100));
+        assert!(modules.0.address_filter().allowed(&0x101));
+        assert!(modules.0.address_filter().allowed(&0x1ff));
+        assert!(modules.0.address_filter().allowed(&0x301));
+
+        assert!(!modules.0.address_filter().allowed(&0xff));
+        assert!(!modules.0.address_filter().allowed(&0x200));
+        assert!(!modules.0.address_filter().allowed(&0x201));
+
+        assert!(modules.0.page_filter().allowed(&0xaaaa));
+        assert!(modules.0.page_filter().allowed(&0xbbbb));
+
+        assert!(!modules.0.page_filter().allowed(&0xcccc));
+    }
+
+    #[test]
+    fn test_filters_multiple() {
+        let module1 = gen_module::<StdAddressFilter, StdPageFilter, NopState<NopInput>>(
+            StdAddressFilter::default(),
+            StdPageFilter::default(),
+        );
+        let module2 = gen_module::<StdAddressFilter, StdPageFilter, NopState<NopInput>>(
+            StdAddressFilter::default(),
+            StdPageFilter::default(),
+        );
+        let module3 = gen_module::<StdAddressFilter, StdPageFilter, NopState<NopInput>>(
+            StdAddressFilter::default(),
+            StdPageFilter::default(),
+        );
+        let mut modules = tuple_list!(module1, module2, module3);
+
+        modules.allow_address_range_all(0x100..0x200);
+        modules.allow_address_range_all(0x300..0x400);
+
+        modules.allow_page_id_all(0xaaaa);
+        modules.allow_page_id_all(0xbbbb);
+
+        test_module!(modules, 0);
+    }
+}

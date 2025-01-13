@@ -82,7 +82,7 @@ where
         let emulator_modules = EmulatorModules::<ET, S>::emulator_modules_mut().unwrap();
         let qemu = Qemu::get_unchecked();
 
-        let crash_hooks_ptr = &raw mut emulator_modules.hooks.crash_hooks;
+        let crash_hooks_ptr = &raw mut emulator_modules.hooks.hook_collection.crash_hooks;
 
         for crash_hook in &mut (*crash_hooks_ptr) {
             match crash_hook {
@@ -103,23 +103,14 @@ where
 
 /// High-level `Emulator` modules, using `QemuHooks`.
 #[derive(Debug)]
-pub struct EmulatorModules<ET, S>
-where
-    S: UsesInput,
-{
+pub struct EmulatorModules<ET, S> {
     modules: Pin<Box<ET>>,
     hooks: EmulatorHooks<ET, S>,
     phantom: PhantomData<S>,
 }
 
-/// Hook collection,
 #[derive(Debug)]
-pub struct EmulatorHooks<ET, S>
-where
-    S: UsesInput,
-{
-    qemu_hooks: QemuHooks,
-
+struct EmulatorHookCollection<ET, S> {
     instruction_hooks: Vec<Pin<Box<(InstructionHookId, FatPtr)>>>,
     backdoor_hooks: Vec<Pin<Box<(BackdoorHookId, FatPtr)>>>,
     edge_hooks: Vec<Pin<Box<TcgHookState<1, EdgeHookId>>>>,
@@ -144,6 +135,42 @@ where
     phantom: PhantomData<(ET, S)>,
 }
 
+impl<ET, S> Default for EmulatorHookCollection<ET, S> {
+    fn default() -> Self {
+        Self {
+            instruction_hooks: Vec::default(),
+            backdoor_hooks: Vec::default(),
+            edge_hooks: Vec::default(),
+            block_hooks: Vec::default(),
+            read_hooks: Vec::default(),
+            write_hooks: Vec::default(),
+            cmp_hooks: Vec::default(),
+
+            cpu_run_hooks: Vec::default(),
+
+            new_thread_hooks: Vec::default(),
+
+            #[cfg(feature = "usermode")]
+            pre_syscall_hooks: Vec::default(),
+
+            #[cfg(feature = "usermode")]
+            post_syscall_hooks: Vec::default(),
+
+            #[cfg(feature = "usermode")]
+            crash_hooks: Vec::default(),
+
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// Hook collection,
+#[derive(Debug)]
+pub struct EmulatorHooks<ET, S> {
+    qemu_hooks: QemuHooks,
+    hook_collection: EmulatorHookCollection<ET, S>,
+}
+
 impl<ET, S> EmulatorHooks<ET, S>
 where
     S: UsesInput + Unpin,
@@ -152,27 +179,7 @@ where
     pub fn new(qemu_hooks: QemuHooks) -> Self {
         Self {
             qemu_hooks,
-            phantom: PhantomData,
-            instruction_hooks: Vec::new(),
-            backdoor_hooks: Vec::new(),
-            edge_hooks: Vec::new(),
-            block_hooks: Vec::new(),
-            read_hooks: Vec::new(),
-            write_hooks: Vec::new(),
-            cmp_hooks: Vec::new(),
-
-            cpu_run_hooks: Vec::new(),
-
-            new_thread_hooks: Vec::new(),
-
-            #[cfg(feature = "usermode")]
-            pre_syscall_hooks: Vec::new(),
-
-            #[cfg(feature = "usermode")]
-            post_syscall_hooks: Vec::new(),
-
-            #[cfg(feature = "usermode")]
-            crash_hooks: Vec::new(),
+            hook_collection: EmulatorHookCollection::default(),
         }
     }
 
@@ -189,11 +196,13 @@ where
     ) -> InstructionHookId {
         let fat: FatPtr = unsafe { transmute(hook) };
 
-        self.instruction_hooks
+        self.hook_collection
+            .instruction_hooks
             .push(Box::pin((InstructionHookId::invalid(), fat)));
 
         unsafe {
             let hook_state = &raw mut self
+                .hook_collection
                 .instruction_hooks
                 .last_mut()
                 .unwrap()
@@ -207,7 +216,8 @@ where
                 closure_instruction_hook_wrapper::<ET, S>,
                 invalidate_block,
             );
-            self.instruction_hooks
+            self.hook_collection
+                .instruction_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -275,15 +285,18 @@ where
                 unsafe extern "C" fn(&mut TcgHookState<1, EdgeHookId>, id: u64)
             );
 
-            self.edge_hooks.push(Box::pin(TcgHookState::new(
-                EdgeHookId::invalid(),
-                hook_to_repr!(generation_hook),
-                HookRepr::Empty,
-                [hook_to_repr!(execution_hook)],
-            )));
+            self.hook_collection
+                .edge_hooks
+                .push(Box::pin(TcgHookState::new(
+                    EdgeHookId::invalid(),
+                    hook_to_repr!(generation_hook),
+                    HookRepr::Empty,
+                    [hook_to_repr!(execution_hook)],
+                )));
 
             let hook_state = &mut *ptr::from_mut::<TcgHookState<1, EdgeHookId>>(
-                self.edge_hooks
+                self.hook_collection
+                    .edge_hooks
                     .last_mut()
                     .unwrap()
                     .as_mut()
@@ -292,7 +305,8 @@ where
 
             let id = self.qemu_hooks.add_edge_hooks(hook_state, gen, exec);
 
-            self.edge_hooks
+            self.hook_collection
+                .edge_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -332,15 +346,18 @@ where
                 unsafe extern "C" fn(&mut TcgHookState<1, BlockHookId>, id: u64)
             );
 
-            self.block_hooks.push(Box::pin(TcgHookState::new(
-                BlockHookId::invalid(),
-                hook_to_repr!(generation_hook),
-                hook_to_repr!(post_generation_hook),
-                [hook_to_repr!(execution_hook)],
-            )));
+            self.hook_collection
+                .block_hooks
+                .push(Box::pin(TcgHookState::new(
+                    BlockHookId::invalid(),
+                    hook_to_repr!(generation_hook),
+                    hook_to_repr!(post_generation_hook),
+                    [hook_to_repr!(execution_hook)],
+                )));
 
             let hook_state = &mut *ptr::from_mut::<TcgHookState<1, BlockHookId>>(
-                self.block_hooks
+                self.hook_collection
+                    .block_hooks
                     .last_mut()
                     .unwrap()
                     .as_mut()
@@ -351,7 +368,8 @@ where
                 .qemu_hooks
                 .add_block_hooks(hook_state, gen, postgen, exec);
 
-            self.block_hooks
+            self.hook_collection
+                .block_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -380,14 +398,17 @@ where
                 unsafe extern "C" fn(&mut HookState<CpuRunHookId>, cpu: CPUStatePtr)
             );
 
-            self.cpu_run_hooks.push(Box::pin(HookState::new(
-                CpuRunHookId::invalid(),
-                hook_to_repr!(pre_exec_hook),
-                hook_to_repr!(post_exec_hook),
-            )));
+            self.hook_collection
+                .cpu_run_hooks
+                .push(Box::pin(HookState::new(
+                    CpuRunHookId::invalid(),
+                    hook_to_repr!(pre_exec_hook),
+                    hook_to_repr!(post_exec_hook),
+                )));
 
             let hook_state = &mut *ptr::from_mut::<HookState<CpuRunHookId>>(
-                self.cpu_run_hooks
+                self.hook_collection
+                    .cpu_run_hooks
                     .last_mut()
                     .unwrap()
                     .as_mut()
@@ -398,7 +419,8 @@ where
                 .qemu_hooks
                 .add_cpu_run_hooks(hook_state, pre_run, post_run);
 
-            self.cpu_run_hooks
+            self.hook_collection
+                .cpu_run_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -461,21 +483,24 @@ where
                 )
             );
 
-            self.read_hooks.push(Box::pin(TcgHookState::new(
-                ReadHookId::invalid(),
-                hook_to_repr!(generation_hook),
-                HookRepr::Empty,
-                [
-                    hook_to_repr!(execution_hook_1),
-                    hook_to_repr!(execution_hook_2),
-                    hook_to_repr!(execution_hook_4),
-                    hook_to_repr!(execution_hook_8),
-                    hook_to_repr!(execution_hook_n),
-                ],
-            )));
+            self.hook_collection
+                .read_hooks
+                .push(Box::pin(TcgHookState::new(
+                    ReadHookId::invalid(),
+                    hook_to_repr!(generation_hook),
+                    HookRepr::Empty,
+                    [
+                        hook_to_repr!(execution_hook_1),
+                        hook_to_repr!(execution_hook_2),
+                        hook_to_repr!(execution_hook_4),
+                        hook_to_repr!(execution_hook_8),
+                        hook_to_repr!(execution_hook_n),
+                    ],
+                )));
 
             let hook_state = &mut *ptr::from_mut::<TcgHookState<5, ReadHookId>>(
-                self.read_hooks
+                self.hook_collection
+                    .read_hooks
                     .last_mut()
                     .unwrap()
                     .as_mut()
@@ -486,7 +511,8 @@ where
                 .qemu_hooks
                 .add_read_hooks(hook_state, gen, exec1, exec2, exec4, exec8, execn);
 
-            self.read_hooks
+            self.hook_collection
+                .read_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -549,21 +575,24 @@ where
                 )
             );
 
-            self.write_hooks.push(Box::pin(TcgHookState::new(
-                WriteHookId::invalid(),
-                hook_to_repr!(generation_hook),
-                HookRepr::Empty,
-                [
-                    hook_to_repr!(execution_hook_1),
-                    hook_to_repr!(execution_hook_2),
-                    hook_to_repr!(execution_hook_4),
-                    hook_to_repr!(execution_hook_8),
-                    hook_to_repr!(execution_hook_n),
-                ],
-            )));
+            self.hook_collection
+                .write_hooks
+                .push(Box::pin(TcgHookState::new(
+                    WriteHookId::invalid(),
+                    hook_to_repr!(generation_hook),
+                    HookRepr::Empty,
+                    [
+                        hook_to_repr!(execution_hook_1),
+                        hook_to_repr!(execution_hook_2),
+                        hook_to_repr!(execution_hook_4),
+                        hook_to_repr!(execution_hook_8),
+                        hook_to_repr!(execution_hook_n),
+                    ],
+                )));
 
             let hook_state = &mut *ptr::from_mut::<TcgHookState<5, WriteHookId>>(
-                self.write_hooks
+                self.hook_collection
+                    .write_hooks
                     .last_mut()
                     .unwrap()
                     .as_mut()
@@ -574,7 +603,8 @@ where
                 .qemu_hooks
                 .add_write_hooks(hook_state, gen, exec1, exec2, exec4, exec8, execn);
 
-            self.write_hooks
+            self.hook_collection
+                .write_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -624,20 +654,23 @@ where
                 unsafe extern "C" fn(&mut TcgHookState<4, CmpHookId>, id: u64, v0: u64, v1: u64)
             );
 
-            self.cmp_hooks.push(Box::pin(TcgHookState::new(
-                CmpHookId::invalid(),
-                hook_to_repr!(generation_hook),
-                HookRepr::Empty,
-                [
-                    hook_to_repr!(execution_hook_1),
-                    hook_to_repr!(execution_hook_2),
-                    hook_to_repr!(execution_hook_4),
-                    hook_to_repr!(execution_hook_8),
-                ],
-            )));
+            self.hook_collection
+                .cmp_hooks
+                .push(Box::pin(TcgHookState::new(
+                    CmpHookId::invalid(),
+                    hook_to_repr!(generation_hook),
+                    HookRepr::Empty,
+                    [
+                        hook_to_repr!(execution_hook_1),
+                        hook_to_repr!(execution_hook_2),
+                        hook_to_repr!(execution_hook_4),
+                        hook_to_repr!(execution_hook_8),
+                    ],
+                )));
 
             let hook_state = &mut *ptr::from_mut::<TcgHookState<4, CmpHookId>>(
-                self.cmp_hooks
+                self.hook_collection
+                    .cmp_hooks
                     .last_mut()
                     .unwrap()
                     .as_mut()
@@ -648,7 +681,8 @@ where
                 .qemu_hooks
                 .add_cmp_hooks(hook_state, gen, exec1, exec2, exec4, exec8);
 
-            self.cmp_hooks
+            self.hook_collection
+                .cmp_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -664,10 +698,12 @@ where
     pub unsafe fn backdoor_closure(&mut self, hook: BackdoorHookClosure<ET, S>) -> BackdoorHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            self.backdoor_hooks
+            self.hook_collection
+                .backdoor_hooks
                 .push(Box::pin((BackdoorHookId::invalid(), fat)));
 
             let hook_state = &raw mut self
+                .hook_collection
                 .backdoor_hooks
                 .last_mut()
                 .unwrap()
@@ -679,7 +715,8 @@ where
                 .qemu_hooks
                 .add_backdoor_hook(&mut *hook_state, closure_backdoor_hook_wrapper::<ET, S>);
 
-            self.backdoor_hooks
+            self.hook_collection
+                .backdoor_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -736,10 +773,12 @@ where
     ) -> NewThreadHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            self.new_thread_hooks
+            self.hook_collection
+                .new_thread_hooks
                 .push(Box::pin((NewThreadHookId::invalid(), fat)));
 
             let hook_state = &raw mut self
+                .hook_collection
                 .new_thread_hooks
                 .last_mut()
                 .unwrap()
@@ -750,7 +789,8 @@ where
             let id = self
                 .qemu_hooks
                 .add_new_thread_hook(&mut *hook_state, closure_new_thread_hook_wrapper::<ET, S>);
-            self.new_thread_hooks
+            self.hook_collection
+                .new_thread_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -794,10 +834,12 @@ where
         unsafe {
             let fat: FatPtr = transmute(hook);
 
-            self.pre_syscall_hooks
+            self.hook_collection
+                .pre_syscall_hooks
                 .push(Box::pin((PreSyscallHookId::invalid(), fat)));
 
             let hook_state = &raw mut self
+                .hook_collection
                 .pre_syscall_hooks
                 .last_mut()
                 .unwrap()
@@ -808,7 +850,9 @@ where
             let id = self
                 .qemu_hooks
                 .add_pre_syscall_hook(&mut *hook_state, closure_pre_syscall_hook_wrapper::<ET, S>);
-            self.pre_syscall_hooks
+
+            self.hook_collection
+                .pre_syscall_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -845,10 +889,12 @@ where
     ) -> PostSyscallHookId {
         unsafe {
             let fat: FatPtr = transmute(hook);
-            self.post_syscall_hooks
+            self.hook_collection
+                .post_syscall_hooks
                 .push(Box::pin((PostSyscallHookId::invalid(), fat)));
 
             let hooks_state = &raw mut self
+                .hook_collection
                 .post_syscall_hooks
                 .last_mut()
                 .unwrap()
@@ -860,7 +906,8 @@ where
                 &mut *hooks_state,
                 closure_post_syscall_hook_wrapper::<ET, S>,
             );
-            self.post_syscall_hooks
+            self.hook_collection
+                .post_syscall_hooks
                 .last_mut()
                 .unwrap()
                 .as_mut()
@@ -874,7 +921,8 @@ where
         // # Safety
         // Will cast the valid hook to a ptr.
         self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
-        self.crash_hooks
+        self.hook_collection
+            .crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
     }
 
@@ -883,17 +931,10 @@ where
         // Will cast the hook to a [`FatPtr`].
         unsafe {
             self.qemu_hooks.set_crash_hook(crash_hook_wrapper::<ET, S>);
-            self.crash_hooks.push(HookRepr::Closure(transmute(hook)));
+            self.hook_collection
+                .crash_hooks
+                .push(HookRepr::Closure(transmute(hook)));
         }
-    }
-}
-
-impl<ET, S> Default for EmulatorHooks<ET, S>
-where
-    S: Unpin + UsesInput,
-{
-    fn default() -> Self {
-        Self::new(QemuHooks::get().unwrap())
     }
 }
 
@@ -1085,7 +1126,12 @@ where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
-    pub(super) fn new(emulator_hooks: EmulatorHooks<ET, S>, modules: ET) -> Pin<Box<Self>> {
+    /// Create a new [`EmulatorModules`]
+    ///
+    /// # Safety
+    ///
+    /// Only one such struct should be ever created.
+    pub(super) unsafe fn new(emulator_hooks: EmulatorHooks<ET, S>, modules: ET) -> Pin<Box<Self>> {
         let mut modules = Box::pin(Self {
             modules: Box::pin(modules),
             hooks: emulator_hooks,
@@ -1262,12 +1308,11 @@ where
     }
 }
 
-impl<ET, S> Drop for EmulatorModules<ET, S>
-where
-    S: UsesInput,
-{
+impl<ET, S> Drop for EmulatorModules<ET, S> {
     fn drop(&mut self) {
         // Make the global pointer null at drop time
+        // # Safety
+        // There can only be one EmulatorModules.
         unsafe {
             EMULATOR_MODULES = ptr::null_mut();
         }

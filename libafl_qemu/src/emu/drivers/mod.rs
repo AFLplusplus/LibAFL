@@ -18,9 +18,15 @@ use crate::{
     QemuShutdownCause, Regs, SnapshotId, SnapshotManagerCheckError, SnapshotManagerError,
 };
 
-#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+#[cfg(all(
+    any(cpu_target = "i386", cpu_target = "x86_64"),
+    feature = "systemmode"
+))]
 pub mod nyx;
-#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+#[cfg(all(
+    any(cpu_target = "i386", cpu_target = "x86_64"),
+    feature = "systemmode"
+))]
 pub use nyx::{NyxEmulatorDriver, NyxEmulatorDriverBuilder};
 
 #[derive(Debug, Clone)]
@@ -34,6 +40,9 @@ where
 
     /// The run is over and the emulator is ready for the next iteration.
     EndOfRun(ExitKind),
+
+    /// Internal shutdown request
+    ShutdownRequest,
 }
 
 #[derive(Debug, Clone)]
@@ -296,6 +305,10 @@ where
                 Err(format!("Unhandled QEMU exit: {:?}", &unhandled_qemu_exit))
             }
             EmulatorDriverResult::EndOfRun(exit_kind) => Ok(exit_kind),
+            EmulatorDriverResult::ShutdownRequest => {
+                log::warn!("Shutdown request. Stopping fuzzing...");
+                std::process::exit(CTRL_C_EXIT);
+            }
         }
     }
 }
