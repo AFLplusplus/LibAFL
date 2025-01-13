@@ -12,6 +12,7 @@ use libafl::{
     executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
     inputs::Input,
     state::{HasCurrentTestcase, HasSolutions},
+    corpus::Corpus,
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -221,8 +222,8 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, OT, RT, S, TC> HasInProcessHooks<S>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
+impl<'a, 'b, 'c, H, I, OT, RT, S, TC> HasInProcessHooks<I, S>
+    for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
 where
     H: FnMut(&I) -> ExitKind,
     S: HasSolutions + HasCorpus + HasCurrentTestcase + HasExecutions + UsesInput<Input = I>,
@@ -234,13 +235,13 @@ where
 {
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks<S> {
+    fn inprocess_hooks(&self) -> &InProcessHooks<I, S> {
         &self.base.hooks().0
     }
 
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S> {
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<I, S> {
         &mut self.base.hooks_mut().0
     }
 }

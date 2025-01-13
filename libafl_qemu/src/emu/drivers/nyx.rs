@@ -2,7 +2,7 @@ use std::{cell::OnceCell, cmp::min, ptr, slice::from_raw_parts};
 
 use libafl::{
     executors::ExitKind,
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::ObserversTuple,
 };
 use libafl_bolts::os::CTRL_C_EXIT;
@@ -107,24 +107,25 @@ impl NyxEmulatorDriver {
     }
 }
 
-impl<CM, ET, S, SM> EmulatorDriver<CM, ET, S, SM> for NyxEmulatorDriver
+impl<C, CM, ET, I, S, SM> EmulatorDriver<C, CM, ET, I, S, SM> for NyxEmulatorDriver
 where
-    CM: CommandManager<NyxEmulatorDriver, ET, S, SM>,
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    C: IsCommand<CM::Commands, CM, Self, ET, I, S, SM>,
+    CM: CommandManager<C, Self, ET, I, S, SM, Commands = C>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
-    fn first_harness_exec(emulator: &mut Emulator<CM, Self, ET, S, SM>, state: &mut S) {
+    fn first_harness_exec(emulator: &mut Emulator<C, CM, Self, ET, I, S, SM>, state: &mut S) {
         if !emulator.driver.hooks_locked {
             emulator.modules.first_exec_all(emulator.qemu, state);
         }
     }
 
     fn pre_harness_exec(
-        emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        emulator: &mut Emulator<C, CM, Self, ET, I, S, SM>,
         state: &mut S,
-        input: &S::Input,
+        input: &I,
     ) {
         if !emulator.driver.hooks_locked {
             emulator.modules.pre_exec_all(emulator.qemu, state, input);
@@ -138,13 +139,13 @@ where
     }
 
     fn post_harness_exec<OT>(
-        emulator: &mut Emulator<CM, Self, ET, S, SM>,
-        input: &S::Input,
+        emulator: &mut Emulator<C, CM, Self, ET, I, S, SM>,
+        input: &I,
         observers: &mut OT,
         state: &mut S,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S::Input, S>,
+        OT: ObserversTuple<I, S>,
     {
         if !emulator.driver.hooks_locked {
             emulator
@@ -153,14 +154,14 @@ where
         }
     }
 
-    fn pre_qemu_exec(_emulator: &mut Emulator<CM, Self, ET, S, SM>, _input: &S::Input) {}
+    fn pre_qemu_exec(_emulator: &mut Emulator<C, CM, Self, ET, I, S, SM>, _input: &I) {}
 
     fn post_qemu_exec(
-        emulator: &mut Emulator<CM, Self, ET, S, SM>,
+        emulator: &mut Emulator<C, CM, Self, ET, I, S, SM>,
         state: &mut S,
-        exit_reason: &mut Result<EmulatorExitResult<CM, Self, ET, S, SM>, EmulatorExitError>,
-        input: &S::Input,
-    ) -> Result<Option<EmulatorDriverResult<CM, Self, ET, S, SM>>, EmulatorDriverError> {
+        exit_reason: &mut Result<EmulatorExitResult<C>, EmulatorExitError>,
+        input: &I,
+    ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emulator.qemu();
 
         let mut exit_reason = match exit_reason {
@@ -176,7 +177,7 @@ where
             },
         };
 
-        let (command, ret_reg): (Option<CM::Commands>, Option<Regs>) = match &mut exit_reason {
+        let (command, ret_reg): (Option<C>, Option<Regs>) = match &mut exit_reason {
             EmulatorExitResult::QemuExit(shutdown_cause) => match shutdown_cause {
                 QemuShutdownCause::HostSignal(signal) => {
                     signal.handle();

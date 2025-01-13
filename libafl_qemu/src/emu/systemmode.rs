@@ -1,11 +1,9 @@
 use std::fmt::Debug;
 
 use hashbrown::HashMap;
-use libafl::inputs::UsesInput;
 use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
-    command::CommandManager,
     emu::{IsSnapshotManager, QemuSnapshotCheckResult},
     DeviceSnapshotFilter, Emulator, Qemu, SnapshotId, SnapshotManagerError,
 };
@@ -166,11 +164,7 @@ impl IsSnapshotManager for FastSnapshotManager {
     }
 }
 
-impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
     /// Write a value to a phsical guest address, including ROM areas.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {

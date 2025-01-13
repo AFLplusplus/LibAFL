@@ -135,6 +135,18 @@ args = [
   "${FEATURE}",
 ]
 
+[tasks.test]
+script_runner = "@shell"
+script = '''
+# TODO: Run real test, not only building.
+
+# LibAFL QEMU API
+HARNESS_API=lqemu cargo make build
+
+# Nyx API
+HARNESS_API=nyx cargo make build
+'''
+
 [tasks.run]
 dependencies = ["build"]
 script_runner = "@shell"

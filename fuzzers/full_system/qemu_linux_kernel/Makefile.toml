@@ -138,6 +138,24 @@ ${TARGET_DIR}/${PROFILE_DIR}/qemu_linux_kernel \
   -serial null
 '''
 
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+# TODO: Run real test, not only building.
+
+# LibAFL QEMU API
+HARNESS_API=lqemu cargo make build
+
+# Nyx API
+HARNESS_API=nyx cargo make build
+'''
+
+[tasks.test]
+description = "Run a test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
 [tasks.debug]
 dependencies = ["build"]
 command = "time"
