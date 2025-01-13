@@ -14,6 +14,7 @@ use std::{
     ptr,
     slice::from_raw_parts,
 };
+
 use enum_map::EnumMap;
 use libafl::{
     executors::ExitKind,
@@ -27,9 +28,9 @@ use crate::{
     command::{
         parser::nyx::{
             AcquireCommandParser, GetHostConfigCommandParser, GetPayloadCommandParser,
-            NextPayloadCommandParser, PrintfCommandParser, RangeSubmitCommandParser,
-            ReleaseCommandParser, SetAgentConfigCommandParser, SubmitCR3CommandParser,
-            SubmitPanicCommandParser, UserAbortCommandParser,
+            NextPayloadCommandParser, PanicCommandParser, PrintfCommandParser,
+            RangeSubmitCommandParser, ReleaseCommandParser, SetAgentConfigCommandParser,
+            SubmitCR3CommandParser, SubmitPanicCommandParser, UserAbortCommandParser,
         },
         CommandError, CommandManager, IsCommand, NativeCommandParser,
     },
@@ -39,7 +40,6 @@ use crate::{
     Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
     IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
-use crate::command::parser::nyx::PanicCommandParser;
 
 pub(crate) mod bindings {
     #![allow(non_upper_case_globals)]

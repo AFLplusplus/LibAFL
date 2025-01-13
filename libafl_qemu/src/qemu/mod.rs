@@ -51,6 +51,7 @@ pub use systemmode::*;
 
 mod hooks;
 pub use hooks::*;
+use libafl_bolts::vec_init;
 
 static mut QEMU_IS_INITIALIZED: bool = false;
 
@@ -742,12 +743,7 @@ impl Qemu {
     pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> {
         // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
 
-        let mut val_buf: Vec<u8> = Vec::with_capacity(size_of::<T>());
-        unsafe {
-            val_buf.set_len(size_of::<T>());
-        }
-
-        self.read_mem(addr, &mut val_buf)?;
+        let val_buf: Vec<u8> = vec_init(size_of::<T>(), |buf| self.read_mem(addr, buf))?;
 
         Ok(ptr::read(val_buf.as_ptr() as *const T))
     }

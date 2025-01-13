@@ -3,6 +3,8 @@
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
+#[cfg(not(feature = "nyx"))]
+use libafl::state::{HasExecutions, State};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
@@ -10,7 +12,7 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::BytesInput,
+    inputs::{BytesInput, HasTargetBytes, Input, UsesInput},
     monitors::MultiMonitor,
     mutators::{havoc_mutations, scheduled::StdScheduledMutator, I2SRandReplaceBinonly},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
@@ -19,7 +21,6 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
-use libafl::{inputs::{HasTargetBytes, Input, UsesInput}};
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,
@@ -28,18 +29,21 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
-use libafl_qemu::{emu::Emulator, executor::QemuExecutor, modules::{cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule}, FastSnapshotManager, NopSnapshotManager, QemuInitError, StdEmulatorDriver};
-use libafl_qemu::command::StdCommandManager;
-use libafl_qemu::modules::EmulatorModuleTuple;
-use libafl_qemu::modules::utils::filters::LINUX_PROCESS_ADDRESS_RANGE;
-use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
-
 #[cfg(feature = "nyx")]
 use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
+use libafl_qemu::{
+    command::StdCommandManager,
+    emu::Emulator,
+    executor::QemuExecutor,
+    modules::{
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
+        utils::filters::LINUX_PROCESS_ADDRESS_RANGE, CmpLogModule, EmulatorModuleTuple,
+    },
+    FastSnapshotManager, NopSnapshotManager, QemuInitError, StdEmulatorDriver,
+};
 #[cfg(not(feature = "nyx"))]
 use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
-#[cfg(not(feature = "nyx"))]
-use libafl::state::{HasExecutions, State};
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
 fn get_emulator<ET, S>(

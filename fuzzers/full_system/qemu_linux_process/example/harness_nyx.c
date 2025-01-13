@@ -141,7 +141,7 @@ int main() {
   hprintf("payload size addr: %p", &pbuf->size);
   hprintf("payload addr: %p", &pbuf->data);
 
-  while(true) {
+  while (true) {
     kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
     kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
 

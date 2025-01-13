@@ -1310,6 +1310,27 @@ pub mod pybind {
     }
 }
 
+/// Create a [`Vec`] of the given type with nb_elts elements, initialized in place.
+/// The closure must initialize [`Vec`] (of size nb_elts * sizeo_of::<T>()).
+///
+/// # Safety
+///
+/// The input closure should fully initialize the new [`Vec`], not leaving any uninitialized bytes.
+// TODO: Use MaybeUninit API at some point.
+pub unsafe fn vec_init<E, F, T>(nb_elts: usize, init_fn: F) -> Result<Vec<T>, E>
+where
+    F: FnOnce(&mut Vec<T>) -> Result<(), E>,
+{
+    let mut val_buf: Vec<T> = Vec::with_capacity(nb_elts);
+    unsafe {
+        val_buf.set_len(nb_elts);
+    }
+
+    init_fn(&mut val_buf)?;
+
+    Ok(val_buf)
+}
+
 #[cfg(test)]
 mod tests {
 

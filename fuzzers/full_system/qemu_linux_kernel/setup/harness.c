@@ -113,7 +113,6 @@ static int harness_uevent(const struct device    *dev,
   return 0;
 }
 
-
 #ifdef USE_NYX
 /**
  * Allocate page-aligned memory
@@ -143,7 +142,7 @@ err_out:
 
 static void hrange_submit(unsigned id, uintptr_t start, uintptr_t end) {
   volatile uint64_t range_arg[3] __attribute__((aligned(PAGE_SIZE)));
-  memset((void*) range_arg, 0, sizeof(range_arg));
+  memset((void *)range_arg, 0, sizeof(range_arg));
 
   range_arg[0] = start;
   range_arg[1] = end;
@@ -165,12 +164,11 @@ static int agent_init(int verbose) {
 
   if (verbose) {
     printk("GET_HOST_CONFIG\n");
-    printk("\thost magic:  0x%x, version: 0x%x\n",
-            host_config.host_magic, host_config.host_version);
-    printk("\tbitmap size: 0x%x, ijon:    0x%x\n",
-            host_config.bitmap_size, host_config.ijon_bitmap_size);
-    printk("\tpayload size: %u KB\n",
-            host_config.payload_buffer_size / 1024);
+    printk("\thost magic:  0x%x, version: 0x%x\n", host_config.host_magic,
+           host_config.host_version);
+    printk("\tbitmap size: 0x%x, ijon:    0x%x\n", host_config.bitmap_size,
+           host_config.ijon_bitmap_size);
+    printk("\tpayload size: %u KB\n", host_config.payload_buffer_size / 1024);
     printk("\tworker id: %d\n", host_config.worker_id);
   }
 
@@ -268,9 +266,7 @@ static int harness_open(struct inode *inode, struct file *file) {
 #elif defined(USE_NYX)
   hprintf("harness: Device open. x509_fn_addr: 0x%lx", x509_fn_addr);
 
-  if (!x509_fn_addr || !asn1_ber_decoder_addr) {
-    habort("Invalid ranges");
-  }
+  if (!x509_fn_addr || !asn1_ber_decoder_addr) { habort("Invalid ranges"); }
 
   kAFL_payload *pbuf = malloc_resident_pages(PAYLOAD_MAX_SIZE / PAGE_SIZE);
 
@@ -286,37 +282,37 @@ static int harness_open(struct inode *inode, struct file *file) {
   hprintf("payload addr: %p", &pbuf->data);
 
 #else
-#error No API specified.
+  #error No API specified.
 #endif
 
   // int ret;
   // uintptr_t start_addr = 0, end_addr = 0;
 
-  // ret = lqemu_symfinder_widen_range("x509_cert_parse", &start_addr, &end_addr);
-  // if (ret) {
+  // ret = lqemu_symfinder_widen_range("x509_cert_parse", &start_addr,
+  // &end_addr); if (ret) {
   //   printk("error while handling range");
   //   return ret;
   // }
 
   while (true) {
-    #if defined(USE_LQEMU)
-      uint8_t *data = input_buf;
-      size_t  size = libafl_qemu_start_virt(data, PAYLOAD_MAX_SIZE);
-    #elif defined(USE_NYX)
-      kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
-      kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
+#if defined(USE_LQEMU)
+    uint8_t *data = input_buf;
+    size_t   size = libafl_qemu_start_virt(data, PAYLOAD_MAX_SIZE);
+#elif defined(USE_NYX)
+    kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
+    kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
 
-      size_t  size = pbuf->size;
-      uint8_t *data = pbuf->data;
-    #endif
+    size_t   size = pbuf->size;
+    uint8_t *data = pbuf->data;
+#endif
 
     struct x509_certificate *cert_ret = x509_cert_parse(data, size);
 
-    #if defined(USE_LQEMU)
-      libafl_qemu_end(LIBAFL_QEMU_END_OK);
-    #elif defined(USE_NYX)
-      kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
-    #endif
+#if defined(USE_LQEMU)
+    libafl_qemu_end(LIBAFL_QEMU_END_OK);
+#elif defined(USE_NYX)
+    kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
+#endif
   }
 
   return 0;

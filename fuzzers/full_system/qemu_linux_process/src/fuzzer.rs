@@ -5,7 +5,22 @@ use std::{env, path::PathBuf, process};
 
 #[cfg(not(feature = "nyx"))]
 use libafl::state::{HasExecutions, State};
-use libafl::{corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus}, events::{launcher::Launcher, EventConfig}, executors::{ExitKind, ShadowExecutor}, feedback_and_fast, feedback_or, feedback_or_fast, feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback}, fuzzer::{Fuzzer, StdFuzzer}, inputs::{BytesInput, HasTargetBytes, UsesInput}, monitors::MultiMonitor, mutators::{havoc_mutations, I2SRandReplaceBinonly, StdScheduledMutator}, observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver}, schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler}, stages::{ShadowTracingStage, StdMutationalStage}, state::{HasCorpus, StdState}, Error};
+use libafl::{
+    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    events::{launcher::Launcher, EventConfig},
+    executors::{ExitKind, ShadowExecutor},
+    feedback_and_fast, feedback_or, feedback_or_fast,
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    fuzzer::{Fuzzer, StdFuzzer},
+    inputs::{BytesInput, HasTargetBytes, UsesInput},
+    monitors::MultiMonitor,
+    mutators::{havoc_mutations, I2SRandReplaceBinonly, StdScheduledMutator},
+    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
+    stages::{ShadowTracingStage, StdMutationalStage},
+    state::{HasCorpus, StdState},
+    Error,
+};
 use libafl_bolts::{
     core_affinity::Cores,
     current_nanos,

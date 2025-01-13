@@ -96,7 +96,15 @@ ${LINUX_BUILDER_DIR}/update.sh
 [tasks.build]
 dependencies = ["target_dir"]
 command = "cargo"
-args = ["build", "--profile", "${PROFILE}", "--target-dir", "${TARGET_DIR}", "--features", "${FEATURE}"]
+args = [
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--target-dir",
+  "${TARGET_DIR}",
+  "--features",
+  "${FEATURE}",
+]
 
 [tasks.run]
 dependencies = ["build"]
