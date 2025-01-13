@@ -120,7 +120,7 @@ where
     ) -> Result<usize, Error> {
         let count = self.events.len();
         while let Some(event) = self.events.pop() {
-            self.handle_in_client(state, event)?;
+            self.handle_in_client(state, &event)?;
         }
         Ok(count)
     }
@@ -253,7 +253,8 @@ where
     }
 
     // Handle arriving events in the client
-    fn handle_in_client(&mut self, state: &mut S, event: Event<S::Input>) -> Result<(), Error> {
+    #[allow(clippy::unused_self)]
+    fn handle_in_client(&mut self, state: &mut S, event: &Event<S::Input>) -> Result<(), Error> {
         match event {
             Event::Stop => {
                 state.request_stop();

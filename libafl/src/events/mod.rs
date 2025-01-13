@@ -19,6 +19,8 @@ pub use llmp::*;
 pub mod tcp;
 
 pub mod broker_hooks;
+#[cfg(feature = "introspection")]
+use alloc::boxed::Box;
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     fmt,
