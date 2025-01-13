@@ -46,17 +46,17 @@ use libafl_qemu::{
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
-fn get_emulator<ET, S>(
+fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
 ) -> Result<
-    Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, NopSnapshotManager>,
+    Emulator<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, NopSnapshotManager>,
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    <S as UsesInput>::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    S: Unpin,
+    I: HasTargetBytes,
 {
     Emulator::empty()
         .qemu_parameters(args)
@@ -68,17 +68,17 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-fn get_emulator<ET, S>(
+fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     mut modules: ET,
 ) -> Result<
-    Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>,
+    Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, I, S, FastSnapshotManager>,
     QemuInitError,
 >
 where
     ET: EmulatorModuleTuple<S>,
+    I: HasTargetBytes + Unpin,
     S: State + HasExecutions + Unpin,
-    <S as UsesInput>::Input: HasTargetBytes,
 {
     // Allow linux process address space addresses as feedback
     modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);

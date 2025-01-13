@@ -1,10 +1,7 @@
 use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::EnumMap;
-use libafl::{
-    executors::ExitKind,
-    inputs::HasTargetBytes,
-};
+use libafl::{executors::ExitKind, inputs::HasTargetBytes};
 use libafl_qemu_sys::GuestVirtAddr;
 use libc::c_uint;
 

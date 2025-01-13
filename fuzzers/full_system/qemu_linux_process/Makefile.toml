@@ -135,7 +135,7 @@ args = [
   "${FEATURE}",
 ]
 
-[tasks.test]
+[tasks.test_unix]
 script_runner = "@shell"
 script = '''
 # TODO: Run real test, not only building.
@@ -146,6 +146,12 @@ HARNESS_API=lqemu cargo make build
 # Nyx API
 HARNESS_API=nyx cargo make build
 '''
+
+[tasks.test]
+description = "Run a test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
 
 [tasks.run]
 dependencies = ["build"]

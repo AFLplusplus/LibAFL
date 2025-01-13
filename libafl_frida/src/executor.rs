@@ -9,10 +9,10 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::{
+    corpus::Corpus,
     executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
     inputs::Input,
     state::{HasCurrentTestcase, HasSolutions},
-    corpus::Corpus,
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},

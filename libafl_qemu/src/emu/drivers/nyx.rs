@@ -1,10 +1,6 @@
 use std::{cell::OnceCell, cmp::min, ptr, slice::from_raw_parts};
 
-use libafl::{
-    executors::ExitKind,
-    inputs::HasTargetBytes,
-    observers::ObserversTuple,
-};
+use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple};
 use libafl_bolts::os::CTRL_C_EXIT;
 use typed_builder::TypedBuilder;
 

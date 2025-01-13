@@ -32,7 +32,10 @@ use libafl_bolts::{
 #[cfg(feature = "nyx")]
 use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
 #[cfg(not(feature = "nyx"))]
-use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver, modules::utils::filters::LINUX_PROCESS_ADDRESS_RANGE};
+use libafl_qemu::{
+    command::StdCommandManager, modules::utils::filters::LINUX_PROCESS_ADDRESS_RANGE,
+    StdEmulatorDriver,
+};
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
@@ -146,10 +149,11 @@ pub fn fuzz() {
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness =
-            |emulator: &mut Emulator<_, _, _, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
-                emulator.run(state, input).unwrap().try_into().unwrap()
-            };
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
+                           state: &mut _,
+                           input: &BytesInput| unsafe {
+            emulator.run(state, input).unwrap().try_into().unwrap()
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

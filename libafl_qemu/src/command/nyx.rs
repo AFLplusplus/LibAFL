@@ -422,10 +422,7 @@ where
         _state: &mut S,
         _input: &I,
         _ret_reg: Option<Regs>,
-    ) -> Result<
-        Option<EmulatorDriverResult<C>>,
-        EmulatorDriverError,
-    > {
+    ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         log::info!("Allow address range: {:#x?}", self.allowed_range);
 
         const EMPTY_RANGE: Range<GuestAddr> = 0..0;
@@ -551,7 +548,8 @@ where
 
 #[derive(Debug, Clone)]
 pub struct ReleaseCommand;
-impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM> for ReleaseCommand
+impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
+    for ReleaseCommand
 where
     ET: EmulatorModuleTuple<I, S>,
     I: HasTargetBytes + Unpin,
@@ -568,10 +566,7 @@ where
         _state: &mut S,
         _input: &I,
         _ret_reg: Option<Regs>,
-    ) -> Result<
-        Option<EmulatorDriverResult<C>>,
-        EmulatorDriverError,
-    > {
+    ) -> Result<Option<EmulatorDriverResult<C>>, EmulatorDriverError> {
         let qemu = emu.qemu();
 
         if emu.command_manager().has_started() {
