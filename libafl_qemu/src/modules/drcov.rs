@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple, HasMetadata};
+use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
 use libafl_qemu_sys::{GuestAddr, GuestUsize};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
@@ -258,23 +258,24 @@ where
     }
 }
 
-impl<F, S> EmulatorModule<S> for DrCovModule<F>
+impl<F, I, S> EmulatorModule<I, S> for DrCovModule<F>
 where
     F: AddressFilter,
-    S: Unpin + UsesInput + HasMetadata,
+    I: Unpin,
+    S: Unpin + HasMetadata,
 {
     type ModuleAddressFilter = F;
     #[cfg(feature = "systemmode")]
     type ModulePageFilter = NopPageFilter;
 
-    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         emulator_modules.blocks(
-            Hook::Function(gen_unique_block_ids::<ET, F, S>),
-            Hook::Function(gen_block_lengths::<ET, F, S>),
-            Hook::Function(exec_trace_block::<ET, F, S>),
+            Hook::Function(gen_unique_block_ids::<ET, F, I, S>),
+            Hook::Function(gen_block_lengths::<ET, F, I, S>),
+            Hook::Function(exec_trace_block::<ET, F, I, S>),
         );
     }
 
@@ -282,10 +283,10 @@ where
     fn first_exec<ET>(
         &mut self,
         qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         if self.module_mapping.is_none() {
             log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
@@ -315,10 +316,10 @@ where
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         assert!(
             self.module_mapping.is_some(),
@@ -329,14 +330,14 @@ where
     fn post_exec<OT, ET>(
         &mut self,
         _qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S::Input, S>,
-        ET: EmulatorModuleTuple<S>,
+        OT: ObserversTuple<I, S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         self.write();
     }
@@ -368,16 +369,17 @@ where
     }
 }
 
-pub fn gen_unique_block_ids<ET, F, S>(
+pub fn gen_unique_block_ids<ET, F, I, S>(
     _qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
+    ET: EmulatorModuleTuple<I, S>,
     F: AddressFilter,
-    S: Unpin + UsesInput + HasMetadata,
-    ET: EmulatorModuleTuple<S>,
+    I: Unpin,
+    S: Unpin + HasMetadata,
 {
     let drcov_module = emulator_modules.get::<DrCovModule<F>>().unwrap();
     if !drcov_module.must_instrument(pc) {
@@ -419,16 +421,17 @@ where
 }
 
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
-pub fn gen_block_lengths<ET, F, S>(
+pub fn gen_block_lengths<ET, F, I, S>(
     _qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     block_length: GuestUsize,
 ) where
+    ET: EmulatorModuleTuple<I, S>,
     F: AddressFilter,
-    S: Unpin + UsesInput + HasMetadata,
-    ET: EmulatorModuleTuple<S>,
+    I: Unpin,
+    S: Unpin + HasMetadata,
 {
     let drcov_module = emulator_modules.get::<DrCovModule<F>>().unwrap();
     if !drcov_module.must_instrument(pc) {
@@ -443,15 +446,16 @@ pub fn gen_block_lengths<ET, F, S>(
 }
 
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
-pub fn exec_trace_block<ET, F, S>(
+pub fn exec_trace_block<ET, F, I, S>(
     _qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
 ) where
+    ET: EmulatorModuleTuple<I, S>,
     F: AddressFilter,
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput + HasMetadata,
+    I: Unpin,
+    S: Unpin + HasMetadata,
 {
     if emulator_modules.get::<DrCovModule<F>>().unwrap().full_trace {
         DRCOV_IDS.lock().unwrap().as_mut().unwrap().push(id);

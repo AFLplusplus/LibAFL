@@ -7,19 +7,18 @@ use frida_gum::{
     stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
 };
-use libafl::{
-    corpus::Corpus,
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{NopTargetBytesConverter, TargetBytesConverter, UsesInput},
-    observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, UsesState},
-    Error,
-};
 #[cfg(windows)]
 use libafl::{
     executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
     inputs::Input,
     state::{HasCurrentTestcase, HasSolutions},
+};
+use libafl::{
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    inputs::{NopTargetBytesConverter, TargetBytesConverter, UsesInput},
+    observers::ObserversTuple,
+    state::{HasCorpus, HasExecutions, UsesState},
+    Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
 
@@ -30,8 +29,8 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use crate::windows_hooks::initialize;
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC> {
-    base: InProcessExecutor<'a, H, OT, S>,
+pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC> {
+    base: InProcessExecutor<'a, H, I, OT, S>,
     /// `thread_id` for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
@@ -43,7 +42,7 @@ pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC> {
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<H, OT, RT, S, TC> Debug for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
+impl<H, I, OT, RT, S, TC> Debug for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
 where
     OT: Debug,
 {
@@ -56,14 +55,14 @@ where
     }
 }
 
-impl<EM, H, OT, RT, S, TC, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC>
+impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
+    for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
 where
     EM: UsesState<State = S>,
-    H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
-    S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    TC: TargetBytesConverter<Input = <S::Corpus as Corpus>::Input>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    H: FnMut(&I) -> ExitKind,
+    S: HasCorpus + HasExecutions + UsesInput<Input = I>,
+    TC: TargetBytesConverter<Input = I>,
+    OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
 {
     /// Instruct the target about the input and run
@@ -73,7 +72,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         let target_bytes = self.target_bytes_converter.to_target_bytes(input);
         self.helper.pre_exec(target_bytes.as_slice())?;
@@ -113,7 +112,7 @@ where
     }
 }
 
-impl<H, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT, RT, S, TC> {
+impl<H, I, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC> {
     type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -126,17 +125,8 @@ impl<H, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, OT
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S>
-    FridaInProcessExecutor<
-        'a,
-        'b,
-        'c,
-        H,
-        OT,
-        RT,
-        S,
-        NopTargetBytesConverter<<S::Corpus as Corpus>::Input>,
-    >
+impl<'a, 'b, 'c, H, I, OT, RT, S>
+    FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, NopTargetBytesConverter<I>>
 where
     S: HasCorpus,
     RT: FridaRuntimeTuple,
@@ -144,7 +134,7 @@ where
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, OT, S>,
+        base: InProcessExecutor<'a, H, I, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(
@@ -159,7 +149,7 @@ where
     /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
     pub fn on_thread(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, OT, S>,
+        base: InProcessExecutor<'a, H, I, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
         thread_id: u32,
     ) -> Self {
@@ -173,14 +163,14 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S, TC> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
+impl<'a, 'b, 'c, H, I, OT, RT, S, TC> FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
 where
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn with_target_bytes_converter(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, OT, S>,
+        base: InProcessExecutor<'a, H, I, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
         thread_id: Option<u32>,
         target_bytes_converter: TC,
@@ -234,16 +224,12 @@ where
 impl<'a, 'b, 'c, H, OT, RT, S, TC> HasInProcessHooks<S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
 where
-    H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
-    S: HasSolutions
-        + HasCorpus
-        + HasCurrentTestcase
-        + HasExecutions
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
-    <S::Corpus as Corpus>::Input: Input,
-    TC: TargetBytesConverter<Input = <S::Corpus as Corpus>::Input>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    H: FnMut(&I) -> ExitKind,
+    S: HasSolutions + HasCorpus + HasCurrentTestcase + HasExecutions + UsesInput<Input = I>,
+    S::Solutions: Corpus<Input = I>,
+    I: Input,
+    TC: TargetBytesConverter<Input = I>,
+    OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
 {
     /// the timeout handler

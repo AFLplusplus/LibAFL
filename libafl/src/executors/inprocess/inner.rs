@@ -1,7 +1,6 @@
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
-    marker::PhantomData,
     ptr::{self, null, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
@@ -35,15 +34,14 @@ use crate::{
 };
 
 /// The internal state of `GenericInProcessExecutor`.
-pub struct GenericInProcessExecutorInner<HT, OT, S> {
+pub struct GenericInProcessExecutorInner<HT, I, OT, S> {
     /// The observers, observing each run
     pub(super) observers: OT,
     // Crash and timeout hah
-    pub(super) hooks: (InProcessHooks<S>, HT),
-    phantom: PhantomData<S>,
+    pub(super) hooks: (InProcessHooks<I, S>, HT),
 }
 
-impl<HT, OT, S> Debug for GenericInProcessExecutorInner<HT, OT, S>
+impl<HT, I, OT, S> Debug for GenericInProcessExecutorInner<HT, I, OT, S>
 where
     OT: Debug,
 {
@@ -54,7 +52,7 @@ where
     }
 }
 
-impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S> {
+impl<HT, I, OT, S> HasObservers for GenericInProcessExecutorInner<HT, I, OT, S> {
     type Observers = OT;
 
     #[inline]
@@ -68,9 +66,9 @@ impl<HT, OT, S> HasObservers for GenericInProcessExecutorInner<HT, OT, S> {
     }
 }
 
-impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
+impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
 where
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus,
 {
     /// This function marks the boundary between the fuzzer and the target
@@ -84,7 +82,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
         executor_ptr: *const c_void,
     ) {
         unsafe {
@@ -119,7 +117,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
-        _input: &<S::Corpus as Corpus>::Input,
+        _input: &I,
     ) {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -130,10 +128,10 @@ where
     }
 }
 
-impl<HT, OT, S> GenericInProcessExecutorInner<HT, OT, S>
+impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
 where
-    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    HT: ExecutorHooksTuple<I, S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus + HasExecutions + HasSolutions,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -145,17 +143,14 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasCurrentTestcase
-            + HasCorpus
-            + HasSolutions
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        I: Input + Clone,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasCurrentTestcase + HasCorpus + HasSolutions + UsesInput<Input = I>,
+        S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
     {
         Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks,
@@ -178,17 +173,14 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasCurrentTestcase
-            + HasCorpus
-            + HasSolutions
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        I: Input + Clone,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasCurrentTestcase + HasCorpus + HasSolutions + UsesInput<Input = I>,
+        S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
     {
         let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
@@ -214,17 +206,14 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasCurrentTestcase
-            + HasCorpus
-            + HasSolutions
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasCurrentTestcase + HasCorpus + HasSolutions + UsesInput<Input = I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
+        S::Solutions: Corpus<Input = I>,
+        I: Input + Clone,
     {
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
@@ -253,36 +242,32 @@ where
             *hooks.0.millis_sec_mut() = timeout.as_millis() as i64;
         }
 
-        Ok(Self {
-            observers,
-            hooks,
-            phantom: PhantomData,
-        })
+        Ok(Self { observers, hooks })
     }
 
     /// The inprocess handlers
     #[inline]
-    pub fn hooks(&self) -> &(InProcessHooks<S>, HT) {
+    pub fn hooks(&self) -> &(InProcessHooks<I, S>, HT) {
         &self.hooks
     }
 
     /// The inprocess handlers (mutable)
     #[inline]
-    pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<S>, HT) {
+    pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<I, S>, HT) {
         &mut self.hooks
     }
 }
 
-impl<HT, OT, S> HasInProcessHooks<S> for GenericInProcessExecutorInner<HT, OT, S> {
+impl<HT, I, OT, S> HasInProcessHooks<I, S> for GenericInProcessExecutorInner<HT, I, OT, S> {
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks<S> {
+    fn inprocess_hooks(&self) -> &InProcessHooks<I, S> {
         &self.hooks.0
     }
 
     /// the timeout handler
     #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<S> {
+    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<I, S> {
         &mut self.hooks.0
     }
 }
