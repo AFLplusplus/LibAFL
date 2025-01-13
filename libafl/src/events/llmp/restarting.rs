@@ -191,7 +191,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
@@ -219,7 +219,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,

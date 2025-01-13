@@ -34,7 +34,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
-        MaybeHasClientPerfMonitor, State, UsesState,
+        MaybeHasClientPerfMonitor, State,
     },
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
@@ -63,7 +63,7 @@ where
         + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
         + HasFeedback,
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + UsesState<State = S>,
+    E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     EM: EventFirer<State = S>,
     FF: FeedbackFactory<F, E::Observers>,
@@ -134,7 +134,7 @@ where
         + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
         + HasFeedback,
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + UsesState<State = S>,
+    E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     EM: EventFirer<State = S>,
     FF: FeedbackFactory<F, E::Observers>,

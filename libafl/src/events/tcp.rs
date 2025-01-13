@@ -601,7 +601,7 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z, State = S> + HasObservers,
+        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers: Serialize + ObserversTuple<S::Input, S>,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
@@ -740,7 +740,7 @@ where
 
 impl<E, EMH, S, Z> EventProcessor<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers + Executor<Self, Z, State = S>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
@@ -815,7 +815,7 @@ where
 
 impl<E, EMH, S, Z> EventManager<E, Z> for TcpEventManager<EMH, S>
 where
-    E: HasObservers + Executor<Self, Z, State = S>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: Serialize + ObserversTuple<S::Input, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
@@ -956,7 +956,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, <S::Corpus as Corpus>::Input, S, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     EMH: EventManagerHooksTuple<S>,
@@ -977,7 +977,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for TcpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<TcpEventManager<EMH, S>, Z, State = S>,
+    E: HasObservers + Executor<TcpEventManager<EMH, S>, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,

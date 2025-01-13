@@ -12,6 +12,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
+    inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
@@ -131,7 +132,11 @@ pub fn main() {
         .timeout(Duration::from_secs(2))
         .build();
     let mut executor =
-        command_configurator.into_executor_with_hooks(tuple_list!(observer), tuple_list!(hook));
+        <PTraceCommandConfigurator as CommandConfigurator<BytesInput, _>>::into_executor_with_hooks(
+            command_configurator,
+            tuple_list!(observer),
+            tuple_list!(hook),
+        );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());
