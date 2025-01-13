@@ -9,10 +9,11 @@ use libafl_bolts::ClientId;
 pub fn main() {
     let mut monitor = TuiMonitor::builder().build();
 
-    let mut client_stats = ClientStats::default();
-
-    client_stats.corpus_size = 1024;
-    client_stats.executions = 512;
+    let client_stats = ClientStats {
+        corpus_size: 1024,
+        executions: 512,
+        ..ClientStats::default()
+    };
 
     monitor.display("Test", ClientId(0));
     sleep(Duration::from_secs(10));

@@ -588,7 +588,7 @@ impl Display for AFLPlotData<'_> {
     }
 }
 impl AFLPlotData<'_> {
-    fn get_header() -> &'static str {
+    fn header() -> &'static str {
         "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found"
     }
 }
@@ -767,10 +767,10 @@ where
             // check if it contains any data
             let file = File::open(path)?;
             if BufReader::new(file).lines().next().is_none() {
-                std::fs::write(path, AFLPlotData::get_header())?;
+                std::fs::write(path, AFLPlotData::header())?;
             }
         } else {
-            std::fs::write(path, AFLPlotData::get_header())?;
+            std::fs::write(path, AFLPlotData::header())?;
         }
         Ok(())
     }
