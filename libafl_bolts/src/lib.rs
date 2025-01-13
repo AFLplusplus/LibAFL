@@ -1324,9 +1324,7 @@ where
     F: FnOnce(&mut Vec<T>) -> Result<(), E>,
 {
     let mut new_vec: Vec<T> = Vec::with_capacity(nb_elts);
-    unsafe {
-        new_vec.set_len(nb_elts);
-    }
+    new_vec.set_len(nb_elts);
 
     init_fn(&mut new_vec)?;
 
