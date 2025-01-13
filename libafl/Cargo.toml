@@ -59,7 +59,7 @@ std = [
   "libafl_bolts/std",
   "typed-builder",
   "fastbloom",
-  "fs2"
+  "fs2",
 ]
 
 ## Tracks the Feedbacks and the Objectives that were interesting for a Testcase

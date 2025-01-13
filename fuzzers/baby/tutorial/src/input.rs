@@ -2,10 +2,7 @@
 use std::hash::Hash;
 
 use lain::prelude::*;
-use libafl::{
-    corpus::CorpusId,
-    inputs::{HasTargetBytes, Input},
-};
+use libafl::inputs::{HasTargetBytes, Input};
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
