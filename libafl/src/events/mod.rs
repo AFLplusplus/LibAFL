@@ -19,7 +19,9 @@ pub use llmp::*;
 pub mod tcp;
 
 pub mod broker_hooks;
-use alloc::{borrow::Cow, boxed::Box, string::String, vec::Vec};
+#[cfg(feature = "introspection")]
+use alloc::boxed::Box;
+use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::{
     fmt,
     hash::{BuildHasher, Hasher},
@@ -152,15 +154,6 @@ impl fmt::Display for LogSeverity {
             LogSeverity::Error => write!(f, "Error"),
         }
     }
-}
-
-/// The result of a custom buf handler added using [`HasCustomBufHandlers::add_custom_buf_handler`]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CustomBufEventResult {
-    /// Exit early from event handling
-    Handled,
-    /// Call the next handler, if available
-    Next,
 }
 
 /// Indicate if an event worked or not
@@ -337,13 +330,6 @@ where
         /// `PhantomData`
         phantom: PhantomData<I>,
     },
-    /// Sends a custom buffer to other clients
-    CustomBuf {
-        /// The buffer
-        buf: Vec<u8>,
-        /// Tag of this buffer
-        tag: String,
-    },
     /// Exit gracefully
     Stop,
     /*/// A custom type
@@ -367,7 +353,6 @@ where
             Event::UpdatePerfMonitor { .. } => "PerfMonitor",
             Event::Objective { .. } => "Objective",
             Event::Log { .. } => "Log",
-            Event::CustomBuf { .. } => "CustomBuf",
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
@@ -387,7 +372,6 @@ where
             Event::UpdatePerfMonitor { .. } => Cow::Borrowed("PerfMonitor"),
             Event::Objective { .. } => Cow::Borrowed("Objective"),
             Event::Log { .. } => Cow::Borrowed("Log"),
-            Event::CustomBuf { .. } => Cow::Borrowed("CustomBuf"),
             Event::Stop => Cow::Borrowed("Stop"),
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
@@ -598,15 +582,6 @@ where
 {
 }
 
-/// The handler function for custom buffers exchanged via [`EventManager`]
-type CustomBufHandlerFn<S> = dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>;
-
-/// Supports custom buf handlers to handle `CustomBuf` events.
-pub trait HasCustomBufHandlers: UsesState {
-    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<Self::State>>);
-}
-
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
 pub struct NopEventManager<S> {
@@ -676,19 +651,6 @@ where
 impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
     S: State + HasExecutions + HasLastReportTime + HasMetadata
 {
-}
-
-impl<S> HasCustomBufHandlers for NopEventManager<S>
-where
-    S: State,
-{
-    fn add_custom_buf_handler(
-        &mut self,
-        _handler: Box<
-            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
-        >,
-    ) {
-    }
 }
 
 impl<S> ProgressReporter for NopEventManager<S> where
@@ -813,22 +775,6 @@ where
     EM: EventManager<E, Z>,
     Self::State: HasLastReportTime + HasExecutions + HasMetadata,
 {
-}
-
-impl<EM, M> HasCustomBufHandlers for MonitorTypedEventManager<EM, M>
-where
-    Self: UsesState,
-    EM: HasCustomBufHandlers<State = Self::State>,
-{
-    #[inline]
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<
-            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
-        >,
-    ) {
-        self.inner.add_custom_buf_handler(handler);
-    }
 }
 
 impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>

@@ -1,6 +1,6 @@
 //! TCP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
@@ -38,15 +38,13 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     corpus::Corpus,
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple,
-        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
-        ProgressReporter,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -399,7 +397,7 @@ where
                 log::log!((*severity_level).into(), "{message}");
                 Ok(BrokerEventResult::Handled)
             }
-            Event::CustomBuf { .. } | Event::Stop => Ok(BrokerEventResult::Forward),
+            Event::Stop => Ok(BrokerEventResult::Forward),
             //_ => Ok(BrokerEventResult::Forward),
         }
     }
@@ -420,8 +418,6 @@ where
     tcp: TcpStream,
     /// Our `CientId`
     client_id: ClientId,
-    /// The custom buf handler
-    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "tcp_compression")]
     compressor: GzipCompressor,
     /// The configuration defines this specific fuzzer.
@@ -519,7 +515,6 @@ where
             compressor: GzipCompressor::new(),
             configuration,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
         })
     }
 
@@ -641,13 +636,6 @@ where
                 if let Some(item) = _res.1 {
                     *state.imported_mut() += 1;
                     log::info!("Added received Testcase as item #{item}");
-                }
-            }
-            Event::CustomBuf { tag, buf } => {
-                for handler in &mut self.custom_buf_handlers {
-                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
-                        break;
-                    }
                 }
             }
             Event::Stop => {
@@ -824,19 +812,6 @@ where
     Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
         + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
 {
-}
-
-impl<EMH, S> HasCustomBufHandlers for TcpEventManager<EMH, S>
-where
-    EMH: EventManagerHooksTuple<S>,
-    S: State,
-{
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
-    ) {
-        self.custom_buf_handlers.push(handler);
-    }
 }
 
 impl<EMH, S> ProgressReporter for TcpEventManager<EMH, S>
