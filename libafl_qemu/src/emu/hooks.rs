@@ -146,27 +146,7 @@ where
     pub fn new(qemu_hooks: QemuHooks) -> Self {
         Self {
             qemu_hooks,
-            phantom: PhantomData,
-            instruction_hooks: Vec::new(),
-            backdoor_hooks: Vec::new(),
-            edge_hooks: Vec::new(),
-            block_hooks: Vec::new(),
-            read_hooks: Vec::new(),
-            write_hooks: Vec::new(),
-            cmp_hooks: Vec::new(),
-
-            cpu_run_hooks: Vec::new(),
-
-            new_thread_hooks: Vec::new(),
-
-            #[cfg(feature = "usermode")]
-            pre_syscall_hooks: Vec::new(),
-
-            #[cfg(feature = "usermode")]
-            post_syscall_hooks: Vec::new(),
-
-            #[cfg(feature = "usermode")]
-            crash_hooks: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -1079,7 +1059,12 @@ where
     ET: EmulatorModuleTuple<S>,
     S: UsesInput + Unpin,
 {
-    pub(super) fn new(emulator_hooks: EmulatorHooks<ET, S>, modules: ET) -> Pin<Box<Self>> {
+    /// Create a new [`EmulatorModules`]
+    ///
+    /// # Safety
+    ///
+    /// Only one such struct should be ever created.
+    pub(super) unsafe fn new(emulator_hooks: EmulatorHooks<ET, S>, modules: ET) -> Pin<Box<Self>> {
         let mut modules = Box::pin(Self {
             modules: Box::pin(modules),
             hooks: emulator_hooks,

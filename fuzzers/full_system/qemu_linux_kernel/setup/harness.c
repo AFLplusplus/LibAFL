@@ -18,9 +18,7 @@
   #include "nyx_api.h"
 #endif
 
-#define MAX_DEV 1
-
-#define PAYLOAD_MAX_SIZE 4096
+#define PAYLOAD_MAX_SIZE 65536
 
 static int harness_open(struct inode *inode, struct file *file);
 static int harness_release(struct inode *inode, struct file *file);
@@ -42,13 +40,16 @@ static struct mychar_device_data harness_data;
 #define KPROBE_PRE_HANDLER(fname) \
   static int __kprobes fname(struct kprobe *p, struct pt_regs *regs)
 
-long unsigned int kln_addr = 0;
-unsigned long (*kln_pointer)(const char *name) = NULL;
+// kallsyms_lookup_name function address
+static long unsigned int kallsyms_lookup_name_addr = 0;
+
+// kallsyms_lookup_name function
+static unsigned long (*kall_syms_lookup_name_fn)(const char *name) = NULL;
 
 static struct kprobe kp0, kp1;
 
 KPROBE_PRE_HANDLER(handler_pre0) {
-  kln_addr = (--regs->ip);
+  kallsyms_lookup_name_addr = (--regs->ip);
 
   return 0;
 }
@@ -95,14 +96,15 @@ static int harness_find_kallsyms_lookup(void) {
   unregister_kprobe(&kp1);
 
 #ifdef USE_NYX
-  hprintf("kallsyms_lookup_name address = 0x%lx\n", kln_addr);
+  hprintf("kallsyms_lookup_name address = 0x%lx\n", kallsyms_lookup_name_addr);
 #elif DEFINED(USE_LQEMU)
-  lqprintf("kallsyms_lookup_name address = 0x%lx\n", kln_addr);
+  lqprintf("kallsyms_lookup_name address = 0x%lx\n", kallsyms_lookup_name_addr);
 #endif
 
-  if (kln_addr == 0) { return -1; }
+  if (kallsyms_lookup_name_addr == 0) { return -1; }
 
-  kln_pointer = (unsigned long (*)(const char *name))kln_addr;
+  kall_syms_lookup_name_fn =
+      (unsigned long (*)(const char *name))kallsyms_lookup_name_addr;
 
   return ret;
 }
@@ -140,15 +142,14 @@ err_out:
   return NULL;
 }
 
-static void hrange_submit(unsigned id, uintptr_t start, uintptr_t end) {
-  volatile uint64_t range_arg[3] __attribute__((aligned(PAGE_SIZE)));
-  memset((void *)range_arg, 0, sizeof(range_arg));
+static volatile __attribute__((aligned(PAGE_SIZE))) uint64_t range_args[3];
 
-  range_arg[0] = start;
-  range_arg[1] = end;
-  range_arg[2] = id;
+static void hrange_submit(unsigned id, unsigned long start, unsigned long end) {
+  range_args[0] = start;
+  range_args[1] = end;
+  range_args[2] = id;
 
-  kAFL_hypercall(HYPERCALL_KAFL_RANGE_SUBMIT, (uintptr_t)range_arg);
+  kAFL_hypercall(HYPERCALL_KAFL_RANGE_SUBMIT, (unsigned long)range_args);
 }
 
 static int agent_init(int verbose) {
@@ -234,7 +235,10 @@ static int __init harness_init(void) {
 
   err = harness_find_kallsyms_lookup();
 
-  if (err < 0) { return err; }
+  if (err < 0) {
+    habort("error while trying to find kallsyms");
+    return err;
+  }
 
   return 0;
 }
@@ -249,8 +253,13 @@ static void __exit harness_exit(void) {
 }
 
 static int harness_open(struct inode *inode, struct file *file) {
-  unsigned long x509_fn_addr = kln_pointer("x509_cert_parse");
-  unsigned long asn1_ber_decoder_addr = kln_pointer("asn1_ber_decoder");
+  unsigned long x509_fn_addr = kall_syms_lookup_name_fn("x509_cert_parse");
+  unsigned long asn1_ber_decoder_addr =
+      kall_syms_lookup_name_fn("asn1_ber_decoder");
+  unsigned long x509_get_sig_params_addr =
+      kall_syms_lookup_name_fn("x509_get_sig_params");
+
+  hprintf("action 0: %p", x509_decoder.actions[0]);
 
 #if defined(USE_LQEMU)
   lqprintf("harness: Device open\n");
@@ -264,7 +273,10 @@ static int harness_open(struct inode *inode, struct file *file) {
   input_buf[0] = 0xff;  // init page
 
 #elif defined(USE_NYX)
-  hprintf("harness: Device open. x509_fn_addr: 0x%lx", x509_fn_addr);
+  hprintf("harness: Device open.");
+  hprintf("\tx509_cert_parse: %p", x509_fn_addr);
+  hprintf("\tasn1_ber_decoder: %p", asn1_ber_decoder_addr);
+  hprintf("\tx509_get_sig_params: %p", x509_get_sig_params_addr);
 
   if (!x509_fn_addr || !asn1_ber_decoder_addr) { habort("Invalid ranges"); }
 
@@ -275,6 +287,7 @@ static int harness_open(struct inode *inode, struct file *file) {
   // kAFL_hypercall(HYPERCALL_KAFL_SUBMIT_CR3, 0);
   hrange_submit(0, x509_fn_addr, x509_fn_addr + 0x1000);
   hrange_submit(1, asn1_ber_decoder_addr, asn1_ber_decoder_addr + 0x1000);
+  hrange_submit(2, x509_get_sig_params_addr, x509_get_sig_params_addr + 0x1000);
 
   kAFL_hypercall(HYPERCALL_KAFL_GET_PAYLOAD, (uintptr_t)pbuf);
 
@@ -302,11 +315,12 @@ static int harness_open(struct inode *inode, struct file *file) {
     kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
     kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
 
-    size_t   size = pbuf->size;
-    uint8_t *data = pbuf->data;
+    size_t                  size = pbuf->size;
+    const volatile uint8_t *data = pbuf->data;
 #endif
 
-    struct x509_certificate *cert_ret = x509_cert_parse(data, size);
+    __maybe_unused struct x509_certificate *cert_ret =
+        x509_cert_parse((const void *)data, size);
 
 #if defined(USE_LQEMU)
     libafl_qemu_end(LIBAFL_QEMU_END_OK);

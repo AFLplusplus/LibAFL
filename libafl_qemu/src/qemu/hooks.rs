@@ -863,7 +863,7 @@ impl QemuHooks {
     /// Should not be used out of Qemu itself.
     /// Prefer `Qemu::get` for a safe version of this method.
     #[must_use]
-    pub unsafe fn get_unchecked() -> Self {
+    pub(crate) unsafe fn get_unchecked() -> Self {
         QemuHooks { _private: () }
     }
 
