@@ -465,7 +465,7 @@ where
                 .expect("fuzzer_stats file must have a parent!")
                 .join(".fuzzer_stats_tmp");
             std::fs::write(&tmp_file, stats.to_string())?;
-            _ = std::fs::copy(&tmp_file, &stats_file_path)?;
+            _ = std::fs::copy(&tmp_file, stats_file_path)?;
             std::fs::remove_file(tmp_file)?;
         }
         Ok(())

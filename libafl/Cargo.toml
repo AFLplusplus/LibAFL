@@ -204,7 +204,7 @@ nautilus = [
 [[example]]
 name = "tui_mock"
 path = "./examples/tui_mock/main.rs"
-required-features = ["std","tui_monitor"]
+required-features = ["std", "tui_monitor"]
 
 [build-dependencies]
 rustversion = "1.0.17"

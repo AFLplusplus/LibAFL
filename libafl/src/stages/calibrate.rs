@@ -27,9 +27,9 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata,
 };
 
-/// AFL++'s CAL_CYCLES_FAST + 1
+/// AFL++'s `CAL_CYCLES_FAST` + 1
 const CAL_STAGE_START: usize = 4;
-/// AFL++'s CAL_CYCLES + 1
+/// AFL++'s `CAL_CYCLES` + 1
 const CAL_STAGE_MAX: usize = 8;
 
 /// Default name for `CalibrationStage`; derived from AFL++
