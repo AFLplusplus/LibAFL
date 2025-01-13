@@ -12,7 +12,7 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, Input, UsesInput},
+    inputs::{BytesInput, HasTargetBytes, UsesInput},
     monitors::MultiMonitor,
     mutators::{havoc_mutations, scheduled::StdScheduledMutator, I2SRandReplaceBinonly},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
@@ -32,14 +32,13 @@ use libafl_bolts::{
 #[cfg(feature = "nyx")]
 use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
 use libafl_qemu::{
-    command::StdCommandManager,
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
         cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
-        utils::filters::LINUX_PROCESS_ADDRESS_RANGE, CmpLogModule, EmulatorModuleTuple,
+        CmpLogModule, EmulatorModuleTuple,
     },
-    FastSnapshotManager, NopSnapshotManager, QemuInitError, StdEmulatorDriver,
+    FastSnapshotManager, NopSnapshotManager, QemuInitError,
 };
 #[cfg(not(feature = "nyx"))]
 use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
@@ -89,6 +88,7 @@ where
         .build()
 }
 
+#[allow(unused)]
 fn display_args() {
     let args: Vec<String> = env::args().collect();
 

@@ -259,7 +259,7 @@ static int harness_open(struct inode *inode, struct file *file) {
   unsigned long x509_get_sig_params_addr =
       kall_syms_lookup_name_fn("x509_get_sig_params");
 
-  hprintf("action 0: %p", x509_decoder.actions[0]);
+  // hprintf("action 0: %p", x509_decoder.actions[0]);
 
 #if defined(USE_LQEMU)
   lqprintf("harness: Device open\n");
