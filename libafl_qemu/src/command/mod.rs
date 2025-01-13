@@ -32,7 +32,10 @@ use crate::{
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
 };
 
-#[cfg(any(cpu_target = "i386", cpu_target = "x86_64"))]
+#[cfg(all(
+    any(cpu_target = "i386", cpu_target = "x86_64"),
+    feature = "systemmode"
+))]
 pub mod nyx;
 pub mod parser;
 
@@ -251,6 +254,7 @@ pub enum CommandError {
     TestDifference(GuestReg, GuestReg), // received, expected
     StartedTwice,
     EndBeforeStart,
+    WrongUsage,
 }
 
 impl From<QemuRWError> for CommandError {
@@ -461,16 +465,10 @@ where
         // Auto page filtering if option is enabled
         #[cfg(feature = "systemmode")]
         if emu.driver_mut().allow_page_on_start() {
-            if let Some(page_id) = qemu.current_cpu().unwrap().current_paging_id() {
-                emu.modules_mut().modules_mut().allow_page_id_all(page_id);
+            if let Some(paging_id) = qemu.current_cpu().unwrap().current_paging_id() {
+                log::info!("Filter: allow page ID {paging_id}.");
+                emu.modules_mut().modules_mut().allow_page_id_all(paging_id);
             }
-        }
-
-        #[cfg(feature = "x86_64")]
-        if emu.driver_mut().is_process_only() {
-            emu.modules_mut()
-                .modules_mut()
-                .allow_address_range_all(crate::PROCESS_ADDRESS_RANGE);
         }
 
         // Make sure JIT cache is empty just before starting

@@ -161,7 +161,6 @@ where
     S: UsesInput,
 {
     #[must_use]
-    #[expect(clippy::match_wildcard_for_single_variants)]
     pub fn end_of_run(&self) -> Option<ExitKind> {
         match self {
             EmulatorDriverResult::EndOfRun(exit_kind) => Some(*exit_kind),
@@ -377,9 +376,20 @@ where
     {
         let mut qemu_params = qemu_params.into();
 
+        // # Safety
+        // `QemuHooks` can be used without QEMU being fully initialized, we make sure to only call
+        // functions that do not depend on whether QEMU is well-initialized or not.
         let emulator_hooks = unsafe { EmulatorHooks::new(QemuHooks::get_unchecked()) };
-        let mut emulator_modules = EmulatorModules::new(emulator_hooks, modules);
 
+        // # Safety
+        // This is the only call to `EmulatorModules::new`.
+        // Since Emulator can only be created once, we fulfil the conditions to call this function.
+        let mut emulator_modules = unsafe { EmulatorModules::new(emulator_hooks, modules) };
+
+        // # Safety
+        // This is mostly safe, but can cause issues if module hooks call to emulator_modules.modules_mut().
+        // In that case, it would cause the creation of a double mutable reference.
+        // We need to refactor Modules to avoid such problem in the future at some point.
         // TODO: fix things there properly. The biggest issue being that it creates 2 mut ref to the module with the callback being called
         unsafe {
             emulator_modules.modules_mut().pre_qemu_init_all(
@@ -390,6 +400,8 @@ where
 
         let qemu = Qemu::init(qemu_params)?;
 
+        // # Safety
+        // Pre-init hooks have been called above.
         unsafe {
             Ok(Self::new_with_qemu(
                 qemu,

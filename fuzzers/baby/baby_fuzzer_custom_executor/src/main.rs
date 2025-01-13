@@ -18,7 +18,7 @@ use libafl::{
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
     state::{HasCorpus, HasExecutions, StdState, UsesState},
 };
 use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
@@ -86,6 +86,12 @@ pub fn main() {
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
 
+    let calibration_stage = CalibrationStage::new(&feedback);
+    let stats_stage = AflStatsStage::builder()
+        .map_observer(&observer)
+        .build()
+        .unwrap();
+
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and_fast!(
         // Look for crashes.
@@ -151,7 +157,11 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut stages = tuple_list!(
+        calibration_stage,
+        StdMutationalStage::new(mutator),
+        stats_stage
+    );
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)

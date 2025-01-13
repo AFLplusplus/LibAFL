@@ -10,6 +10,8 @@ edition = "2021"
 [features]
 shared = ["libafl_qemu/shared"]
 
+nyx = []
+
 [profile.release]
 incremental = true
 debug = true
@@ -26,6 +28,7 @@ libafl_qemu = { path = "../../../libafl_qemu", default-features = false, feature
 ] }
 libafl_targets = { path = "../../../libafl_targets" }
 env_logger = "0.11.5"
+log = "0.4.22"
 
 [build-dependencies]
 libafl_qemu_build = { path = "../../../libafl_qemu/libafl_qemu_build" }
