@@ -24,14 +24,13 @@ use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(any(unix, windows))]
-use crate::observers::ObserversTuple;
+use crate::{corpus::Corpus, inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
 use crate::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
-    inputs::{Input, UsesInput},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+    inputs::UsesInput,
+    state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
 
@@ -329,7 +328,7 @@ impl<I, S> InProcessHooks<I, S> {
     #[expect(unused_variables)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<S>,
+        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions + HasCorpus + UsesInput<Input = I>,
