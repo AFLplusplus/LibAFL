@@ -1317,6 +1317,7 @@ pub mod pybind {
 ///
 /// The input closure should fully initialize the new [`Vec`], not leaving any uninitialized bytes.
 // TODO: Use MaybeUninit API at some point.
+#[cfg(feature = "alloc")]
 #[expect(clippy::uninit_vec)]
 pub unsafe fn vec_init<E, F, T>(nb_elts: usize, init_fn: F) -> Result<Vec<T>, E>
 where
