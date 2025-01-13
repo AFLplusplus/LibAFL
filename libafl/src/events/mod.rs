@@ -52,7 +52,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime, State},
+    state::{HasExecutions, HasLastReportTime},
     Error, HasMetadata,
 };
 #[cfg(feature = "scalability_introspection")]
@@ -117,9 +117,7 @@ pub struct EventManagerId(
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{
-    inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStageId, state::UsesState,
-};
+use crate::{inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStageId};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -257,10 +255,7 @@ where
 /// Events sent around in the library
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum Event<I>
-where
-    I: Input,
-{
+pub enum Event<I> {
     // TODO use an ID to keep track of the original index in the sender Corpus
     // The sender can then use it to send Testcase metadata with CustomEvent
     /// A fuzzer found a new testcase. Rejoice!
@@ -339,10 +334,7 @@ where
     },*/
 }
 
-impl<I> Event<I>
-where
-    I: Input,
-{
+impl<I> Event<I> {
     /// Event's corresponding name
     pub fn name(&self) -> &str {
         match self {
@@ -361,7 +353,10 @@ where
     }
 
     /// Event's corresponding name with additional info
-    fn name_detailed(&self) -> Cow<'static, str> {
+    fn name_detailed(&self) -> Cow<'static, str>
+    where
+        I: Input,
+    {
         match self {
             Event::NewTestcase { input, .. } => {
                 Cow::Owned(format!("Testcase {}", input.generate_name(None)))
@@ -386,7 +381,7 @@ where
 }
 
 /// [`EventFirer`] fires an event.
-pub trait EventFirer: UsesState {
+pub trait EventFirer<I, S> {
     /// Send off an [`Event`] to the broker
     ///
     /// For multi-processed managers, such as [`LlmpEventManager`],
@@ -395,17 +390,13 @@ pub trait EventFirer: UsesState {
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-case.
-    fn fire(
-        &mut self,
-        state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error>;
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
     fn log(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         severity_level: LogSeverity,
         message: String,
     ) -> Result<(), Error> {
@@ -419,14 +410,6 @@ pub trait EventFirer: UsesState {
         )
     }
 
-    /// Serialize all observers for this type and manager
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
-    {
-        Ok(Some(postcard::to_allocvec(observers)?))
-    }
-
     /// Get the configuration
     fn configuration(&self) -> EventConfig {
         EventConfig::AlwaysUnique
@@ -436,130 +419,208 @@ pub trait EventFirer: UsesState {
     fn should_send(&self) -> bool;
 }
 
-/// [`ProgressReporter`] report progress to the broker.
-pub trait ProgressReporter: EventFirer
+/// Serialize all observers for this type and manager
+/// Serialize the observer using the `time_factor` and `percentage_threshold`.
+/// These parameters are unique to each of the different types of `EventManager`
+pub(crate) fn serialize_observers_adaptive<EM, S, OT>(
+    manager: &mut EM,
+    observers: &OT,
+    time_factor: u32,
+    percentage_threshold: usize,
+) -> Result<Option<Vec<u8>>, Error>
 where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
+    EM: AdaptiveSerializer,
+    OT: MatchNameRef + Serialize,
 {
+    match manager.time_ref() {
+        Some(t) => {
+            let exec_time = observers
+                .get(t)
+                .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
+                .unwrap();
+
+            let mut must_ser = (manager.serialization_time() + manager.deserialization_time())
+                * time_factor
+                < exec_time;
+            if must_ser {
+                *manager.should_serialize_cnt_mut() += 1;
+            }
+
+            if manager.serializations_cnt() > 32 {
+                must_ser = (manager.should_serialize_cnt() * 100 / manager.serializations_cnt())
+                    > percentage_threshold;
+            }
+
+            if manager.serialization_time() == Duration::ZERO
+                || must_ser
+                || manager.serializations_cnt().trailing_zeros() >= 8
+            {
+                let start = current_time();
+                let ser = postcard::to_allocvec(observers)?;
+                *manager.serialization_time_mut() = current_time() - start;
+
+                *manager.serializations_cnt_mut() += 1;
+                Ok(Some(ser))
+            } else {
+                *manager.serializations_cnt_mut() += 1;
+                Ok(None)
+            }
+        }
+        None => Ok(None),
+    }
+}
+
+/// Default implementation of [`ProgressReporter::maybe_report_progress`] for implementors with the
+/// given constraints
+pub fn default_maybe_report_progress<PR, S>(
+    reporter: &mut PR,
+    state: &mut S,
+    monitor_timeout: Duration,
+) -> Result<(), Error>
+where
+    PR: ProgressReporter<S>,
+    S: HasMetadata + HasExecutions + HasLastReportTime,
+{
+    let Some(last_report_time) = state.last_report_time() else {
+        // this is the first time we execute, no need to report progress just yet.
+        *state.last_report_time_mut() = Some(current_time());
+        return Ok(());
+    };
+    let cur = current_time();
+    // default to 0 here to avoid crashes on clock skew
+    if cur.checked_sub(*last_report_time).unwrap_or_default() > monitor_timeout {
+        // report_progress sets a new `last_report_time` internally.
+        reporter.report_progress(state)?;
+    }
+    Ok(())
+}
+
+/// Default implementation of [`ProgressReporter::report_progress`] for implementors with the
+/// given constraints
+pub fn default_report_progress<I, PR, S>(reporter: &mut PR, state: &mut S) -> Result<(), Error>
+where
+    PR: EventFirer<I, S>,
+    S: HasExecutions + HasLastReportTime,
+{
+    let executions = *state.executions();
+    let cur = current_time();
+
+    // Default no introspection implmentation
+    #[cfg(not(feature = "introspection"))]
+    reporter.fire(
+        state,
+        Event::UpdateExecStats {
+            executions,
+            time: cur,
+            phantom: PhantomData,
+        },
+    )?;
+
+    // If performance monitor are requested, fire the `UpdatePerfMonitor` event
+    #[cfg(feature = "introspection")]
+    {
+        state
+            .introspection_monitor_mut()
+            .set_current_time(libafl_bolts::cpu::read_time_counter());
+
+        // Send the current monitor over to the manager. This `.clone` shouldn't be
+        // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
+        reporter.fire(
+            state,
+            Event::UpdatePerfMonitor {
+                executions,
+                time: cur,
+                introspection_monitor: Box::new(state.introspection_monitor().clone()),
+                phantom: PhantomData,
+            },
+        )?;
+    }
+
+    // If we are measuring scalability stuff..
+    #[cfg(feature = "scalability_introspection")]
+    {
+        let imported_with_observer = state.scalability_monitor().testcase_with_observers;
+        let imported_without_observer = state.scalability_monitor().testcase_without_observers;
+
+        reporter.fire(
+            state,
+            Event::UpdateUserStats {
+                name: Cow::from("total imported"),
+                value: UserStats::new(
+                    UserStatsValue::Number(
+                        (imported_with_observer + imported_without_observer) as u64,
+                    ),
+                    AggregatorOps::Avg,
+                ),
+                phantom: PhantomData,
+            },
+        )?;
+    }
+
+    *state.last_report_time_mut() = Some(cur);
+
+    Ok(())
+}
+
+/// [`ProgressReporter`] report progress to the broker.
+pub trait ProgressReporter<S> {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
     /// Will return an [`Error`], if the stats could not be sent.
     fn maybe_report_progress(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         monitor_timeout: Duration,
-    ) -> Result<(), Error> {
-        let Some(last_report_time) = state.last_report_time() else {
-            // this is the first time we execute, no need to report progress just yet.
-            *state.last_report_time_mut() = Some(current_time());
-            return Ok(());
-        };
-        let cur = current_time();
-        // default to 0 here to avoid crashes on clock skew
-        if cur.checked_sub(*last_report_time).unwrap_or_default() > monitor_timeout {
-            // report_progress sets a new `last_report_time` internally.
-            self.report_progress(state)?;
-        }
-        Ok(())
-    }
+    ) -> Result<(), Error>;
 
     /// Send off an info/monitor/heartbeat message to the broker.
     /// Will return an [`Error`], if the stats could not be sent.
-    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        let executions = *state.executions();
-        let cur = current_time();
-
-        // Default no introspection implmentation
-        #[cfg(not(feature = "introspection"))]
-        self.fire(
-            state,
-            Event::UpdateExecStats {
-                executions,
-                time: cur,
-                phantom: PhantomData,
-            },
-        )?;
-
-        // If performance monitor are requested, fire the `UpdatePerfMonitor` event
-        #[cfg(feature = "introspection")]
-        {
-            state
-                .introspection_monitor_mut()
-                .set_current_time(libafl_bolts::cpu::read_time_counter());
-
-            // Send the current monitor over to the manager. This `.clone` shouldn't be
-            // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
-            self.fire(
-                state,
-                Event::UpdatePerfMonitor {
-                    executions,
-                    time: cur,
-                    introspection_monitor: Box::new(state.introspection_monitor().clone()),
-                    phantom: PhantomData,
-                },
-            )?;
-        }
-
-        // If we are measuring scalability stuff..
-        #[cfg(feature = "scalability_introspection")]
-        {
-            let imported_with_observer = state.scalability_monitor().testcase_with_observers;
-            let imported_without_observer = state.scalability_monitor().testcase_without_observers;
-
-            self.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: Cow::from("total imported"),
-                    value: UserStats::new(
-                        UserStatsValue::Number(
-                            (imported_with_observer + imported_without_observer) as u64,
-                        ),
-                        AggregatorOps::Avg,
-                    ),
-                    phantom: PhantomData,
-                },
-            )?;
-        }
-
-        *state.last_report_time_mut() = Some(cur);
-
-        Ok(())
-    }
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
 /// Restartable trait
-pub trait EventRestarter: UsesState {
+pub trait EventRestarter<S> {
     /// For restarting event managers, implement a way to forward state to their next peers.
     /// You *must* ensure that [`HasCurrentStageId::on_restart`] will be invoked in this method, by you
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
-    #[inline]
-    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
-        state.on_restart()?;
-        self.await_restart_safe();
-        Ok(())
-    }
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error>;
+}
 
+/// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
+/// constraints
+pub fn default_on_restart<S>(
+    restarter: &mut (impl EventRestarter<S> + ManagerExit),
+    state: &mut S,
+) -> Result<(), Error>
+where
+    S: HasCurrentStageId,
+{
+    state.on_restart()?;
+    restarter.await_restart_safe();
+    Ok(())
+}
+
+pub trait CanSerializeObserver<OT> {
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>;
+}
+
+/// Routines called before exiting
+pub trait ManagerExit {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
-
     /// Block until we are safe to exit, usually called inside `on_restart`.
     #[inline]
     fn await_restart_safe(&mut self) {}
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, Z>: UsesState {
+pub trait EventProcessor<E, S, Z> {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        executor: &mut E,
-    ) -> Result<usize, Error>;
+    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
 
     /// Shutdown gracefully; typically without saving state.
     fn on_shutdown(&mut self) -> Result<(), Error>;
@@ -573,71 +634,44 @@ pub trait HasEventManagerId {
     fn mgr_id(&self) -> EventManagerId;
 }
 
-/// [`EventManager`] is the main communications hub.
-/// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, Z>:
-    EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
-where
-    Self::State: HasMetadata + HasExecutions + HasLastReportTime,
-{
-}
-
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
-#[derive(Copy, Clone, Debug)]
-pub struct NopEventManager<S> {
-    phantom: PhantomData<S>,
-}
+#[derive(Copy, Clone, Debug, Default)]
+pub struct NopEventManager {}
 
-impl<S> NopEventManager<S> {
+impl NopEventManager {
     /// Creates a new [`NopEventManager`]
     #[must_use]
     pub fn new() -> Self {
-        NopEventManager {
-            phantom: PhantomData,
-        }
+        NopEventManager {}
     }
 }
 
-impl<S> Default for NopEventManager<S> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<S> UsesState for NopEventManager<S>
-where
-    S: State,
-{
-    type State = S;
-}
-
-impl<S> EventFirer for NopEventManager<S>
-where
-    S: State,
-{
+impl<I, S> EventFirer<I, S> for NopEventManager {
     fn should_send(&self) -> bool {
         true
     }
 
-    fn fire(
-        &mut self,
-        _state: &mut Self::State,
-        _event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<S> EventRestarter for NopEventManager<S> where S: State {}
-
-impl<E, S, Z> EventProcessor<E, Z> for NopEventManager<S>
+impl<S> EventRestarter<S> for NopEventManager
 where
-    S: State + HasExecutions,
+    S: HasCurrentStageId,
 {
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        default_on_restart(self, state)
+    }
+}
+
+impl ManagerExit for NopEventManager {}
+
+impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
     fn process(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        _state: &mut S,
         _executor: &mut E,
     ) -> Result<usize, Error> {
         Ok(0)
@@ -648,17 +682,30 @@ where
     }
 }
 
-impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
-    S: State + HasExecutions + HasLastReportTime + HasMetadata
+impl<OT> CanSerializeObserver<OT> for NopEventManager
+where
+    OT: Serialize,
 {
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
 }
 
-impl<S> ProgressReporter for NopEventManager<S> where
-    S: State + HasExecutions + HasLastReportTime + HasMetadata
-{
+impl<S> ProgressReporter<S> for NopEventManager {
+    fn maybe_report_progress(
+        &mut self,
+        state: &mut S,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
-impl<S> HasEventManagerId for NopEventManager<S> {
+impl HasEventManagerId for NopEventManager {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId(0)
     }
@@ -667,62 +714,48 @@ impl<S> HasEventManagerId for NopEventManager<S> {
 /// An [`EventManager`] type that wraps another manager, but captures a `monitor` type as well.
 /// This is useful to keep the same API between managers with and without an internal `monitor`.
 #[derive(Copy, Clone, Debug)]
-pub struct MonitorTypedEventManager<EM, M> {
+pub struct MonitorTypedEventManager<EM> {
     inner: EM,
-    phantom: PhantomData<M>,
 }
 
-impl<EM, M> MonitorTypedEventManager<EM, M> {
+impl<EM> MonitorTypedEventManager<EM> {
     /// Creates a new [`EventManager`] that wraps another manager, but captures a `monitor` type as well.
     #[must_use]
     pub fn new(inner: EM) -> Self {
-        MonitorTypedEventManager {
-            inner,
-            phantom: PhantomData,
-        }
+        MonitorTypedEventManager { inner }
     }
 }
 
-impl<EM, M> UsesState for MonitorTypedEventManager<EM, M>
+impl<EM, OT> CanSerializeObserver<OT> for MonitorTypedEventManager<EM>
 where
-    EM: UsesState,
+    OT: Serialize,
 {
-    type State = EM::State;
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        Ok(Some(postcard::to_allocvec(observers)?))
+    }
 }
 
-impl<EM, M> EventFirer for MonitorTypedEventManager<EM, M>
+impl<EM, I, S> EventFirer<I, S> for MonitorTypedEventManager<EM>
 where
-    EM: EventFirer,
+    EM: EventFirer<I, S>,
 {
     fn should_send(&self) -> bool {
         true
     }
 
     #[inline]
-    fn fire(
-        &mut self,
-        state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
 
     #[inline]
     fn log(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         severity_level: LogSeverity,
         message: String,
     ) -> Result<(), Error> {
         self.inner.log(state, severity_level, message)
-    }
-
-    #[inline]
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: ObserversTuple<<Self as UsesInput>::Input, Self::State> + Serialize,
-    {
-        self.inner.serialize_observers(observers)
     }
 
     #[inline]
@@ -731,15 +764,20 @@ where
     }
 }
 
-impl<EM, M> EventRestarter for MonitorTypedEventManager<EM, M>
+impl<EM, S> EventRestarter<S> for MonitorTypedEventManager<EM>
 where
-    EM: EventRestarter,
+    EM: EventRestarter<S>,
 {
     #[inline]
-    fn on_restart(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.on_restart(state)
     }
+}
 
+impl<EM> ManagerExit for MonitorTypedEventManager<EM>
+where
+    EM: ManagerExit,
+{
     #[inline]
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.inner.send_exiting()
@@ -751,17 +789,12 @@ where
     }
 }
 
-impl<E, EM, M, Z> EventProcessor<E, Z> for MonitorTypedEventManager<EM, M>
+impl<E, EM, S, Z> EventProcessor<E, S, Z> for MonitorTypedEventManager<EM>
 where
-    EM: EventProcessor<E, Z>,
+    EM: EventProcessor<E, S, Z>,
 {
     #[inline]
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        executor: &mut E,
-    ) -> Result<usize, Error> {
+    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.inner.process(fuzzer, state, executor)
     }
 
@@ -770,35 +803,26 @@ where
     }
 }
 
-impl<E, EM, M, Z> EventManager<E, Z> for MonitorTypedEventManager<EM, M>
+impl<EM, S> ProgressReporter<S> for MonitorTypedEventManager<EM>
 where
-    EM: EventManager<E, Z>,
-    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
-{
-}
-
-impl<EM, M> ProgressReporter for MonitorTypedEventManager<EM, M>
-where
-    Self: UsesState,
-    EM: ProgressReporter<State = Self::State>,
-    Self::State: HasLastReportTime + HasExecutions + HasMetadata,
+    EM: ProgressReporter<S>,
 {
     #[inline]
     fn maybe_report_progress(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
         self.inner.maybe_report_progress(state, monitor_timeout)
     }
 
     #[inline]
-    fn report_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.report_progress(state)
     }
 }
 
-impl<EM, M> HasEventManagerId for MonitorTypedEventManager<EM, M>
+impl<EM> HasEventManagerId for MonitorTypedEventManager<EM>
 where
     EM: HasEventManagerId,
 {

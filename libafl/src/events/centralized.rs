@@ -46,11 +46,8 @@ pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]
-pub struct CentralizedEventManager<EM, EMH, S, SP>
+pub struct CentralizedEventManager<EM, EMH, SP>
 where
-    EM: UsesState<State = S>,
-    EMH: EventManagerHooksTuple<S>,
-    S: State,
     SP: ShMemProvider,
 {
     inner: EM,
@@ -61,17 +58,9 @@ where
     time_ref: Option<Handle<TimeObserver>>,
     hooks: EMH,
     is_main: bool,
-    phantom: PhantomData<S>,
 }
 
-impl
-    CentralizedEventManager<
-        NopEventManager<NopState<NopInput>>,
-        (),
-        NopState<NopInput>,
-        NopShMemProvider,
-    >
-{
+impl CentralizedEventManager<NopEventManager, (), NopShMemProvider> {
     /// Creates a builder for [`CentralizedEventManager`]
     #[must_use]
     pub fn builder() -> CentralizedEventManagerBuilder {
@@ -105,17 +94,14 @@ impl CentralizedEventManagerBuilder {
     }
 
     /// Creates a new [`CentralizedEventManager`].
-    pub fn build_from_client<EM, EMH, S, SP>(
+    pub fn build_from_client<EM, EMH, SP>(
         self,
         inner: EM,
         hooks: EMH,
         client: LlmpClient<SP>,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
-        EM: UsesState<State = S>,
-        EMH: EventManagerHooksTuple<S>,
-        S: State,
         SP: ShMemProvider,
     {
         Ok(CentralizedEventManager {
@@ -126,7 +112,6 @@ impl CentralizedEventManagerBuilder {
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
             time_ref: time_obs,
             is_main: self.is_main,
-            phantom: PhantomData,
         })
     }
 
@@ -134,96 +119,53 @@ impl CentralizedEventManagerBuilder {
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    pub fn build_on_port<EM, EMH, S, SP>(
+    pub fn build_on_port<EM, EMH, SP>(
         self,
         inner: EM,
         hooks: EMH,
         shmem_provider: SP,
         port: u16,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
-        EM: UsesState<State = S>,
-        EMH: EventManagerHooksTuple<S>,
-        S: State,
         SP: ShMemProvider,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(CentralizedEventManager {
-            inner,
-            hooks,
-            client,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            time_ref: time_obs,
-            is_main: self.is_main,
-            phantom: PhantomData,
-        })
+        Self::build_from_client(self, inner, hooks, client, time_obs)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
     /// stored by [`LlmpClient::to_env()`].
-    pub fn build_existing_client_from_env<EM, EMH, S, SP>(
+    pub fn build_existing_client_from_env<EM, EMH, SP>(
         self,
         inner: EM,
         hooks: EMH,
         shmem_provider: SP,
         env_name: &str,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
-        EM: UsesState<State = S>,
-        EMH: EventManagerHooksTuple<S>,
-        S: State,
         SP: ShMemProvider,
     {
-        Ok(CentralizedEventManager {
-            inner,
-            hooks,
-            client: LlmpClient::on_existing_from_env(shmem_provider, env_name)?,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            time_ref: time_obs,
-            is_main: self.is_main,
-            phantom: PhantomData,
-        })
+        let client = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
+        Self::build_from_client(self, inner, hooks, client, time_obs)
     }
 
     /// Create an existing client from description
-    pub fn existing_client_from_description<EM, EMH, S, SP>(
+    pub fn existing_client_from_description<EM, EMH, SP>(
         self,
         inner: EM,
         hooks: EMH,
         shmem_provider: SP,
         description: &LlmpClientDescription,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, SP>, Error>
     where
-        EM: UsesState<State = S>,
-        EMH: EventManagerHooksTuple<S>,
-        S: State,
         SP: ShMemProvider,
     {
-        Ok(CentralizedEventManager {
-            inner,
-            hooks,
-            client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            time_ref: time_obs,
-            is_main: self.is_main,
-            phantom: PhantomData,
-        })
+        let client = LlmpClient::existing_client_from_description(shmem_provider, description)?;
+        Self::build_from_client(self, inner, hooks, client, time_obs)
     }
-}
-impl<EM, EMH, S, SP> UsesState for CentralizedEventManager<EM, EMH, S, SP>
-where
-    EM: UsesState<State = S>,
-    EMH: EventManagerHooksTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-{
-    type State = EM::State;
 }
 
 impl<EM, EMH, S, SP> AdaptiveSerializer for CentralizedEventManager<EM, EMH, S, SP>

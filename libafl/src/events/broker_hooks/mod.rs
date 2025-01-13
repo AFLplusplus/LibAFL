@@ -14,7 +14,6 @@ use libafl_bolts::{
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     events::{llmp::LLMP_TAG_EVENT_TO_BOTH, BrokerEventResult, Event},
-    inputs::Input,
     monitors::Monitor,
     Error,
 };
@@ -42,8 +41,6 @@ pub struct StdLlmpEventHook<I, MT> {
 
 impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT>
 where
-    I: Input,
-    MT: Monitor,
     SP: ShMemProvider,
 {
     fn on_new_message(
@@ -88,11 +85,7 @@ where
     }
 }
 
-impl<I, MT> StdLlmpEventHook<I, MT>
-where
-    I: Input,
-    MT: Monitor,
-{
+impl<I, MT> StdLlmpEventHook<I, MT> {
     /// Create an event broker from a raw broker.
     pub fn new(monitor: MT) -> Result<Self, Error> {
         Ok(Self {

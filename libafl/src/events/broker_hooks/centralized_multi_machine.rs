@@ -1,10 +1,4 @@
-use std::{
-    fmt::{Debug, Display},
-    marker::PhantomData,
-    slice,
-    sync::Arc,
-    vec::Vec,
-};
+use std::{fmt::Debug, marker::PhantomData, slice, sync::Arc, vec::Vec};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
@@ -15,19 +9,15 @@ use libafl_bolts::{
     ClientId, Error,
 };
 use tokio::{
-    net::ToSocketAddrs,
     runtime::Runtime,
     sync::{RwLock, RwLockWriteGuard},
     task::JoinHandle,
 };
 
-use crate::{
-    events::{
-        centralized::_LLMP_TAG_TO_MAIN,
-        multi_machine::{MultiMachineMsg, TcpMultiMachineState},
-        Event,
-    },
-    inputs::Input,
+use crate::events::{
+    centralized::_LLMP_TAG_TO_MAIN,
+    multi_machine::{MultiMachineMsg, TcpMultiMachineState},
+    Event,
 };
 
 /// Makes a raw pointer send + sync.
@@ -70,10 +60,7 @@ impl<T> NullLock<T> {
 /// It is responsible for receiving messages from other neighbours.
 /// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
-pub struct TcpMultiMachineLlmpSenderHook<A, I>
-where
-    I: Input,
-{
+pub struct TcpMultiMachineLlmpSenderHook<A, I> {
     /// the actual state of the broker hook
     shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
     /// the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
@@ -85,10 +72,7 @@ where
 /// It is responsible for receiving messages from other neighbours.
 /// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
-pub struct TcpMultiMachineLlmpReceiverHook<A, I>
-where
-    I: Input,
-{
+pub struct TcpMultiMachineLlmpReceiverHook<A, I> {
     /// the actual state of the broker hook
     shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
     /// the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
@@ -96,11 +80,7 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<A, I> TcpMultiMachineLlmpSenderHook<A, I>
-where
-    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
-    I: Input + Send + Sync + 'static,
-{
+impl<A, I> TcpMultiMachineLlmpSenderHook<A, I> {
     /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     pub(crate) fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
@@ -114,11 +94,7 @@ where
     }
 }
 
-impl<A, I> TcpMultiMachineLlmpReceiverHook<A, I>
-where
-    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
-    I: Input + Send + Sync + 'static,
-{
+impl<A, I> TcpMultiMachineLlmpReceiverHook<A, I> {
     /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     ///
     /// # Safety
@@ -160,9 +136,7 @@ where
 
 impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpSenderHook<A, I>
 where
-    A: Clone + Debug + Display + ToSocketAddrs + Send + Sync + 'static,
     SP: ShMemProvider,
-    I: Input + Send + Sync + 'static,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.
     fn on_new_message(
@@ -222,9 +196,7 @@ where
 
 impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpReceiverHook<A, I>
 where
-    A: Clone + Debug + Display + ToSocketAddrs + Send + Sync + 'static,
     SP: ShMemProvider,
-    I: Input + Send + Sync + 'static,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.
     fn on_new_message(

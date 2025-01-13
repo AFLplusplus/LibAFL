@@ -11,10 +11,7 @@ use libafl_bolts::{
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
-use crate::{
-    events::{BrokerEventResult, Event, _LLMP_TAG_TO_MAIN},
-    inputs::Input,
-};
+use crate::events::{BrokerEventResult, Event, _LLMP_TAG_TO_MAIN};
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
 pub struct CentralizedLlmpHook<I> {
@@ -25,7 +22,6 @@ pub struct CentralizedLlmpHook<I> {
 
 impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I>
 where
-    I: Input,
     SP: ShMemProvider,
 {
     fn on_new_message(
@@ -75,10 +71,7 @@ impl<I> Debug for CentralizedLlmpHook<I> {
     }
 }
 
-impl<I> CentralizedLlmpHook<I>
-where
-    I: Input,
-{
+impl<I> CentralizedLlmpHook<I> {
     /// Create an event broker from a raw broker.
     pub fn new() -> Result<Self, Error> {
         Ok(Self {

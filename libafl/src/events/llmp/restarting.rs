@@ -24,9 +24,9 @@ use libafl_bolts::{
     os::CTRL_C_EXIT,
     shmem::{ShMemProvider, StdShMemProvider},
     staterestore::StateRestorer,
-    tuples::{tuple_list, Handle},
+    tuples::{tuple_list, Handle, MatchNameRef},
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use typed_builder::TypedBuilder;
 
 #[cfg(all(unix, not(miri)))]
@@ -34,25 +34,24 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     corpus::Corpus,
     events::{
-        launcher::ClientDescription, AdaptiveSerializer, Event, EventConfig, EventFirer,
-        EventManager, EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
-        HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ProgressReporter,
+        default_maybe_report_progress, default_report_progress, launcher::ClientDescription,
+        serialize_observers_adaptive, AdaptiveSerializer, CanSerializeObserver, Event, EventConfig,
+        EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
+        HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ManagerExit, ProgressReporter,
         StdLlmpEventHook,
     },
-    executors::{Executor, HasObservers},
-    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
-    inputs::UsesInput,
+    executors::HasObservers,
+    inputs::Input,
     monitors::Monitor,
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, State, UsesState},
-    Error, HasMetadata,
+    observers::TimeObserver,
+    state::{HasCorpus, HasImported, Stoppable},
+    Error,
 };
 
 /// A manager that can restart on the fly, storing states in-between (in `on_restart`)
 #[derive(Debug)]
 pub struct LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: State,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -67,7 +66,6 @@ where
 impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider,
-    S: State,
 {
     fn serialization_time(&self) -> Duration {
         self.llmp_mgr.serialization_time()
@@ -100,47 +98,36 @@ where
     }
 }
 
-impl<EMH, S, SP> UsesState for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, S, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: State,
     SP: ShMemProvider,
 {
-    type State = S;
+    fn maybe_report_progress(
+        &mut self,
+        state: &mut S,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error> {
+        default_maybe_report_progress(self, state, monitor_timeout)
+    }
+
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        default_report_progress(self, state)
+    }
 }
 
-impl<EMH, S, SP> ProgressReporter for LlmpRestartingEventManager<EMH, S, SP>
-where
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
-{
-}
-
-impl<EMH, S, SP> EventFirer for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider,
-    S: State,
-    //CE: CustomEvent<I>,
 {
     fn should_send(&self) -> bool {
         self.llmp_mgr.should_send()
     }
 
-    fn fire(
-        &mut self,
-        state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)?;
         self.intermediate_save()?;
         Ok(())
-    }
-
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
-    {
-        self.llmp_mgr.serialize_observers(observers)
     }
 
     fn configuration(&self) -> EventConfig {
@@ -148,19 +135,22 @@ where
     }
 }
 
-impl<EMH, S, SP> EventRestarter for LlmpRestartingEventManager<EMH, S, SP>
+#[cfg(feature = "std")]
+impl<EMH, OT, S, SP> CanSerializeObserver<OT> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: State + HasExecutions,
+    SP: ShMemProvider,
+    OT: Serialize + MatchNameRef,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        serialize_observers_adaptive::<Self, S, OT>(self, observers, 2, 80)
+    }
+}
+
+impl<EMH, S, SP> EventRestarter<S> for LlmpRestartingEventManager<EMH, S, SP>
+where
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
-    /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
-    /// Otherwise, the OS may already have removed the shared maps,
-    #[inline]
-    fn await_restart_safe(&mut self) {
-        self.llmp_mgr.await_restart_safe();
-    }
-
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         state.on_restart()?;
@@ -180,31 +170,35 @@ where
         self.await_restart_safe();
         Ok(())
     }
+}
 
+impl<EMH, S, SP> ManagerExit for LlmpRestartingEventManager<EMH, S, SP>
+where
+    SP: ShMemProvider,
+{
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
         // Also inform the broker that we are about to exit.
         // This way, the broker can clean up the pages, and eventually exit.
         self.llmp_mgr.send_exiting()
     }
+
+    /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
+    /// Otherwise, the OS may already have removed the shared maps,
+    #[inline]
+    fn await_restart_safe(&mut self) {
+        self.llmp_mgr.await_restart_safe();
+    }
 }
 
-impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
+impl<E, EMH, S, SP, Z> EventProcessor<E, S, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S, Z>,
-    E::Observers: ObserversTuple<S::Input, S> + Serialize,
-    for<'a> E::Observers: Deserialize<'a>,
-    EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
-    S::Corpus: Corpus<Input = S::Input>,
-    SP: ShMemProvider,
-    Z: ExecutionProcessor<
-            LlmpEventManager<EMH, S, SP>,
-            <S::Corpus as Corpus>::Input,
-            E::Observers,
-            S,
-        > + EvaluatorObservers<E, LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S>
-        + Evaluator<E, LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S>,
+    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
+    E: HasObservers,
+    E::Observers: DeserializeOwned,
+    S: HasCorpus + HasImported + Stoppable + Serialize,
+    <S::Corpus as Corpus>::Input: DeserializeOwned + Input,
+    S::Corpus: Serialize,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         let res = self.llmp_mgr.process(fuzzer, state, executor)?;
@@ -217,28 +211,8 @@ where
     }
 }
 
-impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
-where
-    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S, Z>,
-    E::Observers: ObserversTuple<S::Input, S> + Serialize,
-    for<'a> E::Observers: Deserialize<'a>,
-    EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported + HasCorpus,
-    S::Corpus: Corpus<Input = S::Input>,
-    SP: ShMemProvider,
-    Z: ExecutionProcessor<
-            LlmpEventManager<EMH, S, SP>,
-            <S::Corpus as Corpus>::Input,
-            E::Observers,
-            S,
-        > + EvaluatorObservers<E, LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S>
-        + Evaluator<E, LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S>,
-{
-}
-
 impl<EMH, S, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: State,
     SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -254,7 +228,6 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 impl<EMH, S, SP> LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: State,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
@@ -334,7 +307,6 @@ pub fn setup_restarting_mgr_std<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -366,7 +338,6 @@ pub fn setup_restarting_mgr_std_adaptive<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: State,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -428,9 +399,9 @@ pub struct RestartingMgr<EMH, MT, S, SP> {
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
 impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
-    EMH: EventManagerHooksTuple<S> + Copy + Clone,
+    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S> + Copy + Clone,
     SP: ShMemProvider,
-    S: State,
+    S: HasCorpus,
     MT: Monitor + Clone,
 {
     /// Launch the broker and the clients and fuzz
