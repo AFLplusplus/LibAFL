@@ -31,17 +31,17 @@ use libafl_bolts::{
 };
 #[cfg(feature = "nyx")]
 use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
+#[cfg(not(feature = "nyx"))]
+use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
-        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
-        CmpLogModule, EmulatorModuleTuple,
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
+        EmulatorModuleTuple,
     },
     FastSnapshotManager, NopSnapshotManager, QemuInitError,
 };
-#[cfg(not(feature = "nyx"))]
-use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
