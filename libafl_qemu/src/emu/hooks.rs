@@ -1259,6 +1259,8 @@ where
 impl<ET, S> Drop for EmulatorModules<ET, S> {
     fn drop(&mut self) {
         // Make the global pointer null at drop time
+        // # Safety
+        // There can only be one EmulatorModules.
         unsafe {
             EMULATOR_MODULES = ptr::null_mut();
         }

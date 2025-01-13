@@ -119,6 +119,8 @@ where
     ) -> Result<Self::OutputCommand, CommandError> {
         let allowed_range_addr = qemu.read_reg(Regs::Rcx)? as GuestVirtAddr;
 
+        // # Safety
+        // Range submit is represented with an array of 3 u64 in the Nyx API.
         let allowed_range: [u64; 3] = unsafe { qemu.read_mem_val(allowed_range_addr)? };
 
         Ok(RangeSubmitCommand::new(allowed_range[0]..allowed_range[1]))
@@ -271,6 +273,8 @@ where
     ) -> Result<Self::OutputCommand, CommandError> {
         let agent_config_addr = qemu.read_reg(Regs::Rcx)? as GuestVirtAddr;
 
+        // # Safety
+        // We use the C struct directly to get the agent config
         let agent_config: bindings::agent_config_t =
             unsafe { qemu.read_mem_val(agent_config_addr)? };
 
