@@ -5,7 +5,6 @@ use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
-use libafl_bolts::{vec_init, AsSliceMut};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
@@ -17,7 +16,7 @@ use crate::{
     },
     modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
-    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver,
+    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
 
 #[cfg(all(
@@ -295,16 +294,10 @@ where
 
         let total_size = str_size + 1;
 
-        let str_copy: Vec<u8> = unsafe {
-            vec_init(total_size, |buf| {
-                let mem_chunk =
-                    QemuMemoryChunk::virt(buf_addr as GuestVirtAddr, total_size as GuestReg, cpu);
+        let mem_chunk =
+            QemuMemoryChunk::virt(buf_addr as GuestVirtAddr, total_size as GuestReg, cpu);
 
-                mem_chunk.read(qemu, buf.as_slice_mut())?;
-
-                Ok::<(), QemuRWError>(())
-            })?
-        };
+        let str_copy: Vec<u8> = mem_chunk.read_vec(qemu)?;
 
         let c_str: &CStr = CStr::from_bytes_with_nul(str_copy.as_slice()).unwrap();
 
