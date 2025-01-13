@@ -10,6 +10,7 @@ use std::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::offset_of,
+    ops::Range,
     ptr,
     slice::from_raw_parts,
 };
@@ -19,7 +20,7 @@ use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
-use libafl_qemu_sys::GuestVirtAddr;
+use libafl_qemu_sys::{GuestAddr, GuestVirtAddr};
 use libc::c_uint;
 use paste::paste;
 
@@ -27,8 +28,9 @@ use crate::{
     command::{
         parser::nyx::{
             AcquireCommandParser, GetHostConfigCommandParser, GetPayloadCommandParser,
-            NextPayloadCommandParser, PrintfCommandParser, ReleaseCommandParser,
-            SetAgentConfigCommandParser,
+            NextPayloadCommandParser, PanicCommandParser, PrintfCommandParser,
+            RangeSubmitCommandParser, ReleaseCommandParser, SetAgentConfigCommandParser,
+            SubmitCR3CommandParser, SubmitPanicCommandParser, UserAbortCommandParser,
         },
         CommandError, CommandManager, IsCommand, NativeCommandParser,
     },
@@ -109,12 +111,13 @@ macro_rules! define_nyx_command_manager {
                 #[deny(unreachable_patterns)]
                 fn parse(&self, qemu: Qemu) -> Result<Self::Commands, CommandError> {
                     let arch_regs_map: &'static EnumMap<ExitArgs, Regs> = get_exit_arch_regs();
-                    let nyx_backdoor = qemu.read_reg(arch_regs_map[ExitArgs::Cmd])? as c_uint;
+                    let nyx_backdoor = qemu.read_reg(Regs::Rax)? as c_uint;
+                    let cmd_id = qemu.read_reg(Regs::Rbx)? as c_uint;
 
                     // Check nyx backdoor correctness
                     debug_assert_eq!(nyx_backdoor, 0x1f);
 
-                    let cmd_id = qemu.read_reg(arch_regs_map[ExitArgs::Arg1])? as c_uint;
+                    log::debug!("Received Nyx command ID: {cmd_id}");
 
                     match cmd_id {
                         // <StartPhysCommandParser as NativeCommandParser<S>>::COMMAND_ID => Ok(StdCommandManagerCommands::StartPhysCommandParserCmd(<StartPhysCommandParser as NativeCommandParser<S>>::parse(qemu, arch_regs_map)?)),
@@ -176,7 +179,12 @@ define_nyx_command_manager!(
         SetAgentConfigCommand,
         PrintfCommand,
         GetPayloadCommand,
-        NextPayloadCommand
+        NextPayloadCommand,
+        SubmitCR3Command,
+        PanicCommand,
+        SubmitPanicCommand,
+        UserAbortCommand,
+        RangeSubmitCommand
     ],
     [
         AcquireCommandParser,
@@ -185,7 +193,12 @@ define_nyx_command_manager!(
         SetAgentConfigCommandParser,
         PrintfCommandParser,
         GetPayloadCommandParser,
-        NextPayloadCommandParser
+        NextPayloadCommandParser,
+        SubmitCR3CommandParser,
+        SubmitPanicCommandParser,
+        PanicCommandParser,
+        UserAbortCommandParser,
+        RangeSubmitCommandParser
     ]
 );
 
@@ -309,52 +322,248 @@ where
         Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
         EmulatorDriverError,
     > {
-        if emu.command_manager_mut().start() {
-            return Err(EmulatorDriverError::CommandError(
-                CommandError::StartedTwice,
-            ));
-        }
-
         let qemu = emu.qemu();
 
-        // Snapshot VM
-        let snapshot_id = emu.snapshot_manager_mut().save(qemu);
+        if !emu.command_manager_mut().start() {
+            log::debug!("Creating snapshot.");
 
-        // Set snapshot ID to restore to after fuzzing ends
-        emu.driver_mut()
-            .set_snapshot_id(snapshot_id)
-            .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
+            // Snapshot VM
+            let snapshot_id = emu.snapshot_manager_mut().save(qemu);
+
+            // Set snapshot ID to restore to after fuzzing ends
+            emu.driver_mut()
+                .set_snapshot_id(snapshot_id)
+                .map_err(|_| EmulatorDriverError::MultipleSnapshotDefinition)?;
+
+            // Unleash hooks if locked
+            if emu.driver_mut().unlock_hooks() {
+                // Prepare hooks
+                emu.modules_mut().first_exec_all(qemu, state);
+                emu.modules_mut().pre_exec_all(qemu, state, input);
+            }
+
+            // Auto page filtering if option is enabled
+            #[cfg(feature = "systemmode")]
+            if emu.driver_mut().allow_page_on_start() {
+                if let Some(paging_id) = qemu.current_cpu().unwrap().current_paging_id() {
+                    log::info!("Filter: allow page ID {paging_id}.");
+                    emu.modules_mut().modules_mut().allow_page_id_all(paging_id);
+                }
+            }
+
+            // Make sure JIT cache is empty just before starting
+            qemu.flush_jit();
+
+            log::info!("Fuzzing starts");
+        }
 
         // write nyx input to vm
         emu.driver().write_input(qemu, input)?;
 
-        // Unleash hooks if locked
-        if emu.driver_mut().unlock_hooks() {
-            // Prepare hooks
-            emu.modules_mut().first_exec_all(qemu, state);
-            emu.modules_mut().pre_exec_all(qemu, state, input);
-        }
-
-        // Auto page filtering if option is enabled
-        #[cfg(feature = "systemmode")]
-        if emu.driver_mut().allow_page_on_start() {
-            if let Some(page_id) = qemu.current_cpu().unwrap().current_paging_id() {
-                emu.modules_mut().modules_mut().allow_page_id_all(page_id);
-            }
-        }
-
-        #[cfg(feature = "x86_64")]
-        if emu.driver_mut().is_process_only() {
-            emu.modules_mut()
-                .modules_mut()
-                .allow_address_range_all(crate::PROCESS_ADDRESS_RANGE);
-        }
-
-        // Make sure JIT cache is empty just before starting
-        qemu.flush_jit();
-
-        log::info!("Fuzzing starts");
         Ok(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SubmitCR3Command;
+
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for SubmitCR3Command
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        emu: &mut Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<
+        Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        let qemu = emu.qemu();
+
+        if let Some(current_cpu) = qemu.current_cpu() {
+            if let Some(paging_id) = current_cpu.current_paging_id() {
+                log::info!("Filter: allow page ID {paging_id}.");
+                emu.modules_mut().modules_mut().allow_page_id_all(paging_id);
+                Ok(None)
+            } else {
+                log::warn!("No paging id found for current cpu");
+                Err(EmulatorDriverError::CommandError(CommandError::WrongUsage))
+            }
+        } else {
+            log::error!("No current cpu found");
+            Err(EmulatorDriverError::CommandError(CommandError::WrongUsage))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RangeSubmitCommand {
+    allowed_range: Range<GuestAddr>,
+}
+
+impl RangeSubmitCommand {
+    pub fn new(allowed_range: Range<GuestAddr>) -> Self {
+        Self { allowed_range }
+    }
+}
+
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for RangeSubmitCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        emu: &mut Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<
+        Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        log::info!("Allow address range: {:#x?}", self.allowed_range);
+
+        const EMPTY_RANGE: Range<GuestAddr> = 0..0;
+
+        if self.allowed_range == EMPTY_RANGE {
+            log::warn!("The given range is {:#x?}, which is most likely invalid. It is most likely a guest error.", EMPTY_RANGE);
+            log::warn!("Hint: make sure the range is not getting optimized out (the volatile keyword may help you).");
+        }
+
+        emu.modules_mut()
+            .modules_mut()
+            .allow_address_range_all(self.allowed_range.clone());
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PanicCommand;
+
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for PanicCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        emu: &mut Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<
+        Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        let qemu = emu.qemu();
+
+        if !emu.command_manager_mut().has_started() {
+            return Err(EmulatorDriverError::CommandError(
+                CommandError::EndBeforeStart,
+            ));
+        }
+
+        let snapshot_id = emu
+            .driver_mut()
+            .snapshot_id()
+            .ok_or(EmulatorDriverError::SnapshotNotFound)?;
+
+        log::debug!("Restoring snapshot");
+        emu.snapshot_manager_mut().restore(qemu, &snapshot_id)?;
+
+        emu.snapshot_manager_mut().check(qemu, &snapshot_id)?;
+
+        Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Crash)))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SubmitPanicCommand;
+
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for SubmitPanicCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        _emu: &mut Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<
+        Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        // TODO: add breakpoint to submit panic addr / page and associate it with a panic command
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UserAbortCommand {
+    content: String,
+}
+
+impl UserAbortCommand {
+    pub fn new(content: String) -> Self {
+        Self { content }
+    }
+}
+
+impl<ET, S, SM> IsCommand<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM> for UserAbortCommand
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    S::Input: HasTargetBytes,
+    SM: IsSnapshotManager,
+{
+    fn usable_at_runtime(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &self,
+        _emu: &mut Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>,
+        _state: &mut S,
+        _input: &S::Input,
+        _ret_reg: Option<Regs>,
+    ) -> Result<
+        Option<EmulatorDriverResult<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>>,
+        EmulatorDriverError,
+    > {
+        log::error!("Nyx Guest Abort: {}", self.content);
+
+        Ok(Some(EmulatorDriverResult::ShutdownRequest))
     }
 }
 
@@ -384,11 +593,14 @@ where
         let qemu = emu.qemu();
 
         if emu.command_manager().has_started() {
+            log::debug!("Release: end of fuzzing run. Restoring...");
+
             let snapshot_id = emu
                 .driver_mut()
                 .snapshot_id()
                 .ok_or(EmulatorDriverError::SnapshotNotFound)?;
 
+            log::debug!("Restoring snapshot");
             emu.snapshot_manager_mut().restore(qemu, &snapshot_id)?;
 
             #[cfg(feature = "paranoid_debug")]
@@ -396,6 +608,8 @@ where
 
             Ok(Some(EmulatorDriverResult::EndOfRun(ExitKind::Ok)))
         } else {
+            log::debug!("Early release. Skipping...");
+
             Ok(None)
         }
     }

@@ -1,6 +1,5 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::{boxed::Box, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 
 #[cfg(feature = "llmp_compression")]
@@ -17,7 +16,7 @@ use serde::Deserialize;
 
 use crate::{
     corpus::Corpus,
-    events::{CustomBufEventResult, CustomBufHandlerFn, Event, EventFirer},
+    events::{Event, EventFirer},
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter, NopInput, NopInputConverter, UsesInput},
@@ -96,8 +95,6 @@ where
     throttle: Option<Duration>,
     llmp: LlmpClient<SP>,
     last_sent: Duration,
-    /// The custom buf handler
-    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     converter: Option<IC>,
@@ -165,7 +162,6 @@ impl LlmpEventConverterBuilder {
             converter,
             converter_back,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
         })
     }
 
@@ -195,7 +191,6 @@ impl LlmpEventConverterBuilder {
             converter,
             converter_back,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
         })
     }
 
@@ -225,7 +220,6 @@ impl LlmpEventConverterBuilder {
             converter,
             converter_back,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
         })
     }
 }
@@ -321,14 +315,6 @@ where
 
                 if let Some(item) = res.1 {
                     log::info!("Added received Testcase as item #{item}");
-                }
-                Ok(())
-            }
-            Event::CustomBuf { tag, buf } => {
-                for handler in &mut self.custom_buf_handlers {
-                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
-                        break;
-                    }
                 }
                 Ok(())
             }
@@ -449,7 +435,6 @@ where
                 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                 node_id,
             },
-            Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {
                 return Ok(());
             }
@@ -506,7 +491,6 @@ where
                 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
                 node_id,
             },
-            Event::CustomBuf { buf, tag } => Event::CustomBuf { buf, tag },
             _ => {
                 return Ok(());
             }

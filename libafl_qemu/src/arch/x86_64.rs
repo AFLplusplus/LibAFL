@@ -1,4 +1,4 @@
-use std::{mem::size_of, ops::Range, sync::OnceLock};
+use std::{mem::size_of, sync::OnceLock};
 
 use capstone::arch::BuildsCapstone;
 use enum_map::{enum_map, EnumMap};
@@ -64,8 +64,6 @@ pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
 }
 
 pub type GuestReg = u64;
-
-pub const PROCESS_ADDRESS_RANGE: Range<u64> = 0..0x0000_7fff_ffff_ffff;
 
 impl crate::ArchExtras for crate::CPU {
     fn read_return_address(&self) -> Result<GuestReg, QemuRWError> {

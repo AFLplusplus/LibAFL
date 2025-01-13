@@ -55,8 +55,21 @@ err_out:
   return NULL;
 }
 
+void hrange_submit(unsigned id, uintptr_t start, uintptr_t end) {
+  uint64_t range_arg[3] __attribute__((aligned(PAGE_SIZE)));
+  memset(range_arg, 0, sizeof(range_arg));
+
+  range_arg[0] = start;
+  range_arg[1] = end;
+  range_arg[2] = id;
+
+  kAFL_hypercall(HYPERCALL_KAFL_RANGE_SUBMIT, (uintptr_t)range_arg);
+}
+
 int agent_init(int verbose) {
   host_config_t host_config;
+
+  hprintf("Nyx agent init");
 
   // set ready state
   kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
@@ -120,18 +133,25 @@ int main() {
 
   agent_init(1);
 
+  kAFL_hypercall(HYPERCALL_KAFL_SUBMIT_CR3, 0);
+  hrange_submit(0, 0x0, 0x00007fffffffffff);
+
   kAFL_hypercall(HYPERCALL_KAFL_GET_PAYLOAD, (uint64_t)pbuf);
 
   hprintf("payload size addr: %p", &pbuf->size);
   hprintf("payload addr: %p", &pbuf->data);
 
-  kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
-  kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
+  while (true) {
+    kAFL_hypercall(HYPERCALL_KAFL_NEXT_PAYLOAD, 0);
+    kAFL_hypercall(HYPERCALL_KAFL_ACQUIRE, 0);
 
-  // Call the target
-  bool ret = FuzzMe(pbuf->data, pbuf->size);
+    // Call the target
+    bool ret = FuzzMe(pbuf->data, pbuf->size);
 
-  kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
+    if (ret) { kAFL_hypercall(HYPERCALL_KAFL_PANIC, 0); }
 
-  habort("Error: post-release code has been triggered.");
+    kAFL_hypercall(HYPERCALL_KAFL_RELEASE, 0);
+  }
+
+  habort("post-release code has been triggered. Snapshot error?");
 }

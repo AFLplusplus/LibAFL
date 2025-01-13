@@ -3,6 +3,8 @@
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
+#[cfg(not(feature = "nyx"))]
+use libafl::state::{HasExecutions, State};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
@@ -10,7 +12,7 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::BytesInput,
+    inputs::{BytesInput, HasTargetBytes, UsesInput},
     monitors::MultiMonitor,
     mutators::{havoc_mutations, scheduled::StdScheduledMutator, I2SRandReplaceBinonly},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
@@ -27,13 +29,81 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
+#[cfg(feature = "nyx")]
+use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
+#[cfg(not(feature = "nyx"))]
+use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
-    modules::{cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule},
-    // StdEmulatorDriver
+    modules::{
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
+        EmulatorModuleTuple,
+    },
+    FastSnapshotManager, NopSnapshotManager, QemuInitError,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+
+#[cfg(feature = "nyx")]
+fn get_emulator<ET, S>(
+    args: Vec<String>,
+    modules: ET,
+) -> Result<
+    Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, NopSnapshotManager>,
+    QemuInitError,
+>
+where
+    ET: EmulatorModuleTuple<S>,
+    S: UsesInput + Unpin,
+    <S as UsesInput>::Input: HasTargetBytes,
+{
+    Emulator::empty()
+        .qemu_parameters(args)
+        .modules(modules)
+        .driver(NyxEmulatorDriver::builder().build())
+        .command_manager(NyxCommandManager::default())
+        .snapshot_manager(NopSnapshotManager::default())
+        .build()
+}
+
+#[cfg(not(feature = "nyx"))]
+fn get_emulator<ET, S>(
+    args: Vec<String>,
+    mut modules: ET,
+) -> Result<
+    Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>,
+    QemuInitError,
+>
+where
+    ET: EmulatorModuleTuple<S>,
+    S: State + HasExecutions + Unpin,
+    <S as UsesInput>::Input: HasTargetBytes,
+{
+    // Allow linux process address space addresses as feedback
+    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
+
+    Emulator::builder()
+        .qemu_parameters(args)
+        .modules(modules)
+        .build()
+}
+
+#[allow(unused)]
+fn display_args() {
+    let args: Vec<String> = env::args().collect();
+
+    let mut arg_str = String::new();
+    for arg in args {
+        arg_str.push_str(&arg);
+        arg_str.push_str(" \\\n\t");
+    }
+    arg_str.pop();
+    arg_str.pop();
+    arg_str.pop();
+
+    log::info!("QEMU args:");
+    log::info!("\n{arg_str}");
+}
 
 pub fn fuzz() {
     env_logger::init();
@@ -70,10 +140,7 @@ pub fn fuzz() {
             CmpLogModule::default(),
         );
 
-        let emu = Emulator::builder()
-            .qemu_parameters(args)
-            .modules(modules)
-            .build()?;
+        let emu = get_emulator(args, modules)?;
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
