@@ -739,7 +739,6 @@ impl Qemu {
     /// The read object should have the same layout as the type of val.
     /// No checked is performed to check whether the returned object makes sense or not.
     // TODO: Use sized array when const generics are stabilized.
-    #[expect(clippy::uninit_vec)]
     pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> {
         // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
 

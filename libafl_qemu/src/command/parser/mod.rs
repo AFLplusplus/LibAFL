@@ -5,7 +5,7 @@ use libafl::{
     executors::ExitKind,
     inputs::{HasTargetBytes, UsesInput},
 };
-use libafl_bolts::AsSliceMut;
+use libafl_bolts::{vec_init, AsSliceMut};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
@@ -17,7 +17,7 @@ use crate::{
     },
     modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
-    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
+    GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver,
 };
 
 #[cfg(all(
@@ -282,7 +282,6 @@ where
     type OutputCommand = LqprintfCommand;
     const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF.0;
 
-    #[expect(clippy::uninit_vec)]
     fn parse(
         qemu: Qemu,
         arch_regs_map: &'static EnumMap<ExitArgs, Regs>,
@@ -296,15 +295,16 @@ where
 
         let total_size = str_size + 1;
 
-        let mut str_copy: Vec<u8> = unsafe {
-            let mut res = Vec::<u8>::with_capacity(total_size);
-            res.set_len(total_size);
-            res
-        };
+        let str_copy: Vec<u8> = unsafe {
+            vec_init(total_size, |buf| {
+                let mem_chunk =
+                    QemuMemoryChunk::virt(buf_addr as GuestVirtAddr, total_size as GuestReg, cpu);
 
-        let mem_chunk =
-            QemuMemoryChunk::virt(buf_addr as GuestVirtAddr, total_size as GuestReg, cpu);
-        mem_chunk.read(qemu, str_copy.as_slice_mut())?;
+                mem_chunk.read(qemu, buf.as_slice_mut())?;
+
+                Ok::<(), QemuRWError>(())
+            })?
+        };
 
         let c_str: &CStr = CStr::from_bytes_with_nul(str_copy.as_slice()).unwrap();
 
