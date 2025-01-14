@@ -1,7 +1,7 @@
 // Based on the example of setting hooks: Https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
 use std::ffi::c_void;
 
-use frida_gum::{interceptor::Interceptor, Gum, Module, NativePointer};
+use frida_gum::{interceptor::Interceptor, Gum, Process, NativePointer};
 use libafl_bolts::os::windows_exceptions::{
     handle_exception, IsProcessorFeaturePresent, UnhandledExceptionFilter, EXCEPTION_POINTERS,
     PROCESSOR_FEATURE_ID,
@@ -21,16 +21,16 @@ unsafe extern "C" fn unhandled_exception_filter_detour(
 }
 /// Initialize the hooks
 pub fn initialize(gum: &Gum) {
-    let module = Module::obtain(gum);
+    let module = Process::obtain(gum).find_module_by_name("kernel32.dll").unwrap();
     let is_processor_feature_present =
-        module.find_export_by_name(Some("kernel32.dll"), "IsProcessorFeaturePresent");
+        module.find_export_by_name("IsProcessorFeaturePresent");
     let is_processor_feature_present = is_processor_feature_present.unwrap();
     assert!(
         !is_processor_feature_present.is_null(),
         "IsProcessorFeaturePresent not found"
     );
     let unhandled_exception_filter =
-        module.find_export_by_name(Some("kernel32.dll"), "UnhandledExceptionFilter");
+        module.find_export_by_name("UnhandledExceptionFilter");
     let unhandled_exception_filter = unhandled_exception_filter.unwrap();
     assert!(
         !unhandled_exception_filter.is_null(),
