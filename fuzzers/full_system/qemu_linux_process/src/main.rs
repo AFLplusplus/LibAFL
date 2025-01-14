@@ -1,6 +1,6 @@
 //! A systemmode linux kernel example
 //!
-#[cfg(all(target_os = "linux"))]
+#[cfg(target_os = "linux")]
 mod fuzzer;
 
 #[cfg(target_os = "linux")]

@@ -231,7 +231,7 @@ where
                     }
                 };
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>,
                                    _state: &mut _,
                                    input: &BytesInput| {
                     let target = input.target_bytes();
@@ -352,7 +352,7 @@ where
                     .build()
                     .unwrap());
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>,
                                    _state: &mut _,
                                    input: &BytesInput| {
                     let target = input.target_bytes();

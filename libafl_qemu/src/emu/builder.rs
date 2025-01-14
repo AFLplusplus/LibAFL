@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use libafl::{
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     state::{HasExecutions, State},
 };
 use libafl_bolts::tuples::{tuple_list, Append, Prepend};
@@ -9,7 +9,7 @@ use libafl_bolts::tuples::{tuple_list, Append, Prepend};
 #[cfg(feature = "systemmode")]
 use crate::FastSnapshotManager;
 use crate::{
-    command::{CommandManager, NopCommandManager, StdCommandManager},
+    command::{NopCommandManager, StdCommandManager},
     config::QemuConfigBuilder,
     modules::{EmulatorModule, EmulatorModuleTuple},
     Emulator, NopEmulatorDriver, NopSnapshotManager, QemuInitError, QemuParams, StdEmulatorDriver,
@@ -27,29 +27,26 @@ use crate::{config::QemuConfig, Qemu};
 /// - with a QEMU-compatible CLI. It will be given to QEMU as-is. The first argument should always be a path to the running binary, as expected by execve.
 /// - with an instance of [`QemuConfig`]. It is a more programmatic way to configure [`Qemu`]. It should be built using [`QemuConfigBuilder`].
 #[derive(Clone)]
-pub struct EmulatorBuilder<CM, ED, ET, QP, S, SM>
-where
-    S: UsesInput,
-{
+pub struct EmulatorBuilder<C, CM, ED, ET, QP, I, S, SM> {
     modules: ET,
     driver: ED,
     snapshot_manager: SM,
     command_manager: CM,
     qemu_parameters: Option<QP>,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(C, I, S)>,
 }
 
-impl<S>
+impl<C, I, S>
     EmulatorBuilder<
+        C,
         NopCommandManager,
         NopEmulatorDriver,
         (),
         QemuConfigBuilder,
+        I,
         S,
         NopSnapshotManager,
     >
-where
-    S: UsesInput,
 {
     #[must_use]
     pub fn empty() -> Self {
@@ -65,18 +62,20 @@ where
 }
 
 #[cfg(feature = "usermode")]
-impl<S>
+impl<C, I, S>
     EmulatorBuilder<
+        C,
         StdCommandManager<S>,
         StdEmulatorDriver,
         (),
         QemuConfigBuilder,
+        I,
         S,
         StdSnapshotManager,
     >
 where
     S: State + HasExecutions + Unpin,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     #[must_use]
     #[expect(clippy::should_implement_trait)]
@@ -93,18 +92,20 @@ where
 }
 
 #[cfg(feature = "systemmode")]
-impl<S>
+impl<C, I, S>
     EmulatorBuilder<
+        C,
         StdCommandManager<S>,
         StdEmulatorDriver,
         (),
         QemuConfigBuilder,
+        I,
         S,
         StdSnapshotManager,
     >
 where
     S: State + HasExecutions + Unpin,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     #[expect(clippy::should_implement_trait)]
     #[must_use]
@@ -119,9 +120,10 @@ where
         }
     }
 }
-impl<CM, ED, ET, QP, S, SM> EmulatorBuilder<CM, ED, ET, QP, S, SM>
+impl<C, CM, ED, ET, QP, I, S, SM> EmulatorBuilder<C, CM, ED, ET, QP, I, S, SM>
 where
-    S: UsesInput + Unpin,
+    I: Unpin,
+    S: Unpin,
 {
     fn new(
         modules: ET,
@@ -140,10 +142,10 @@ where
         }
     }
 
-    pub fn build<E>(self) -> Result<Emulator<CM, ED, ET, S, SM>, QemuInitError>
+    #[allow(clippy::type_complexity)]
+    pub fn build<E>(self) -> Result<Emulator<C, CM, ED, ET, I, S, SM>, QemuInitError>
     where
-        CM: CommandManager<ED, ET, S, SM>,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         QP: TryInto<QemuParams, Error = E>,
         QemuInitError: From<E>,
     {
@@ -162,16 +164,16 @@ where
     }
 }
 
-impl<CM, ED, ET, QP, S, SM> EmulatorBuilder<CM, ED, ET, QP, S, SM>
+impl<C, CM, ED, ET, QP, I, S, SM> EmulatorBuilder<C, CM, ED, ET, QP, I, S, SM>
 where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput + Unpin,
+    I: Unpin,
+    S: Unpin,
 {
     #[must_use]
     pub fn qemu_parameters<QP2>(
         self,
         qemu_parameters: QP2,
-    ) -> EmulatorBuilder<CM, ED, ET, QP2, S, SM>
+    ) -> EmulatorBuilder<C, CM, ED, ET, QP2, I, S, SM>
     where
         QP2: Into<QemuParams>,
     {
@@ -184,10 +186,13 @@ where
         )
     }
 
-    pub fn prepend_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (EM, ET), QP, S, SM>
+    pub fn prepend_module<EM>(
+        self,
+        module: EM,
+    ) -> EmulatorBuilder<C, CM, ED, (EM, ET), QP, I, S, SM>
     where
-        EM: EmulatorModule<S> + Unpin,
-        ET: EmulatorModuleTuple<S>,
+        EM: EmulatorModule<I, S> + Unpin,
+        ET: EmulatorModuleTuple<I, S>,
     {
         EmulatorBuilder::new(
             self.modules.prepend(module),
@@ -198,10 +203,10 @@ where
         )
     }
 
-    pub fn append_module<EM>(self, module: EM) -> EmulatorBuilder<CM, ED, (ET, EM), QP, S, SM>
+    pub fn append_module<EM>(self, module: EM) -> EmulatorBuilder<C, CM, ED, (ET, EM), QP, I, S, SM>
     where
-        EM: EmulatorModule<S> + Unpin,
-        ET: EmulatorModuleTuple<S>,
+        EM: EmulatorModule<I, S> + Unpin,
+        ET: EmulatorModuleTuple<I, S>,
     {
         EmulatorBuilder::new(
             self.modules.append(module),
@@ -212,7 +217,7 @@ where
         )
     }
 
-    pub fn driver<ED2>(self, driver: ED2) -> EmulatorBuilder<CM, ED2, ET, QP, S, SM> {
+    pub fn driver<ED2>(self, driver: ED2) -> EmulatorBuilder<C, CM, ED2, ET, QP, I, S, SM> {
         EmulatorBuilder::new(
             self.modules,
             driver,
@@ -225,10 +230,7 @@ where
     pub fn command_manager<CM2>(
         self,
         command_manager: CM2,
-    ) -> EmulatorBuilder<CM2, ED, ET, QP, S, SM>
-    where
-        CM2: CommandManager<ED, ET, S, SM>,
-    {
+    ) -> EmulatorBuilder<C, CM2, ED, ET, QP, I, S, SM> {
         EmulatorBuilder::new(
             self.modules,
             self.driver,
@@ -238,7 +240,7 @@ where
         )
     }
 
-    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<CM, ED, ET2, QP, S, SM> {
+    pub fn modules<ET2>(self, modules: ET2) -> EmulatorBuilder<C, CM, ED, ET2, QP, I, S, SM> {
         EmulatorBuilder::new(
             modules,
             self.driver,
@@ -251,7 +253,7 @@ where
     pub fn snapshot_manager<SM2>(
         self,
         snapshot_manager: SM2,
-    ) -> EmulatorBuilder<CM, ED, ET, QP, S, SM2> {
+    ) -> EmulatorBuilder<C, CM, ED, ET, QP, I, S, SM2> {
         EmulatorBuilder::new(
             self.modules,
             self.driver,

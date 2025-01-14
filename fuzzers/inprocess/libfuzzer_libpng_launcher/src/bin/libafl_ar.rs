@@ -25,11 +25,11 @@ pub fn main() {
                 Configuration::UndefinedBehaviorSanitizer,
             ]))
             .run()
-            .expect("Failed to run the wrapped libtool")
+            .expect("Failed to run the wrapped ar")
         {
             std::process::exit(code);
         }
     } else {
-        panic!("LibAFL libtool: No Arguments given");
+        panic!("LibAFL ar: No Arguments given");
     }
 }

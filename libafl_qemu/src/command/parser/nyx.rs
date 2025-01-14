@@ -1,10 +1,7 @@
 use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::EnumMap;
-use libafl::{
-    executors::ExitKind,
-    inputs::{HasTargetBytes, UsesInput},
-};
+use libafl::{executors::ExitKind, inputs::HasTargetBytes};
 use libafl_qemu_sys::GuestVirtAddr;
 use libc::c_uint;
 
@@ -16,7 +13,7 @@ use crate::{
             SetAgentConfigCommand, SubmitCR3Command, SubmitPanicCommand, UserAbortCommand,
         },
         parser::NativeCommandParser,
-        CommandError, CommandManager, NativeExitKind,
+        CommandError, NativeExitKind,
     },
     modules::EmulatorModuleTuple,
     sync_exit::ExitArgs,
@@ -40,11 +37,9 @@ fn get_guest_string(qemu: Qemu, string_ptr_reg: Regs) -> Result<String, CommandE
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
 pub struct AcquireCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for AcquireCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM> for AcquireCommandParser
 where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     type OutputCommand = AcquireCommand;
 
@@ -59,12 +54,12 @@ where
 }
 
 pub struct GetPayloadCommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for GetPayloadCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = GetPayloadCommand;
@@ -82,12 +77,12 @@ where
 }
 
 pub struct SubmitCR3CommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3CommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = SubmitCR3Command;
@@ -102,12 +97,12 @@ where
 }
 
 pub struct RangeSubmitCommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = RangeSubmitCommand;
@@ -128,12 +123,12 @@ where
 }
 
 pub struct SubmitPanicCommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for SubmitPanicCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = SubmitPanicCommand;
@@ -148,12 +143,12 @@ where
 }
 
 pub struct PanicCommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for PanicCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = PanicCommand;
@@ -168,12 +163,12 @@ where
 }
 
 pub struct UserAbortCommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for UserAbortCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = UserAbortCommand;
@@ -190,12 +185,12 @@ where
 }
 
 pub struct NextPayloadCommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = NextPayloadCommand;
@@ -211,12 +206,12 @@ where
 }
 
 pub struct ReleaseCommandParser;
-impl<ET, S, SM> NativeCommandParser<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for ReleaseCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = ReleaseCommand;
@@ -232,11 +227,10 @@ where
 }
 
 pub struct GetHostConfigCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for GetHostConfigCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
+    for GetHostConfigCommandParser
 where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     type OutputCommand = GetHostConfigCommand;
 
@@ -257,11 +251,10 @@ where
 }
 
 pub struct SetAgentConfigCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for SetAgentConfigCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
+    for SetAgentConfigCommandParser
 where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     type OutputCommand = SetAgentConfigCommand;
 
@@ -283,11 +276,9 @@ where
 }
 
 pub struct PrintfCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for PrintfCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM> for PrintfCommandParser
 where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     type OutputCommand = PrintfCommand;
 
