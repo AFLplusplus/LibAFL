@@ -71,7 +71,7 @@ cc = { version = "1.1.21", features = ["parallel"] }
 rustversion = "1.0.17"
 
 [dependencies]
-libafl = { workspace = true, features = [] }
+libafl = { workspace = true, features = [], default-features = false }
 libafl_bolts = { workspace = true, features = [] }
 libc = { workspace = true }
 hashbrown = { workspace = true, default-features = true }
