@@ -1544,7 +1544,7 @@ impl AsanRuntime {
                 backtrace,
             ))
         };
-        if AsanErrors::get_mut_blocking().report_error(self._gum.unwrap(), error) {
+        if AsanErrors::get_mut_blocking().report_error(error) {
             panic!("ASAN: Crashing target!");
         }
         self.enable_hooks();

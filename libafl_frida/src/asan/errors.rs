@@ -349,7 +349,7 @@ impl AsanErrors {
                     let invocation = Interceptor::current_invocation();
                     let cpu_context = invocation.cpu_context();
                     if let Some(module_details) =
-                        Process::obtain(&Gum::obtain()).find_module_by_address(*_pc as u64)
+                        Process::obtain(&Gum::obtain()).find_module_by_address(*_pc)
                     {
                         writeln!(
                             output,
