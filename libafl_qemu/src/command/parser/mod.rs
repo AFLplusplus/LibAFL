@@ -1,10 +1,7 @@
 use std::{ffi::CStr, sync::OnceLock};
 
 use enum_map::{enum_map, EnumMap};
-use libafl::{
-    executors::ExitKind,
-    inputs::{HasTargetBytes, UsesInput},
-};
+use libafl::{executors::ExitKind, inputs::HasTargetBytes};
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestVirtAddr};
 use libc::c_uint;
 
@@ -27,12 +24,8 @@ pub mod nyx;
 
 pub static EMU_EXIT_KIND_MAP: OnceLock<EnumMap<NativeExitKind, Option<ExitKind>>> = OnceLock::new();
 
-pub trait NativeCommandParser<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
-    type OutputCommand: IsCommand<CM, ED, ET, S, SM>;
+pub trait NativeCommandParser<C, CM, ED, ET, I, S, SM> {
+    type OutputCommand: IsCommand<C, CM, ED, ET, I, S, SM>;
 
     const COMMAND_ID: c_uint;
 
@@ -43,11 +36,10 @@ where
 }
 
 pub struct InputPhysCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for InputPhysCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
+    for InputPhysCommandParser
 where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     type OutputCommand = InputCommand;
 
@@ -72,11 +64,10 @@ where
 }
 
 pub struct InputVirtCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for InputVirtCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
+    for InputVirtCommandParser
 where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-    S::Input: HasTargetBytes,
+    I: HasTargetBytes,
 {
     type OutputCommand = InputCommand;
 
@@ -98,12 +89,12 @@ where
 
 pub struct StartPhysCommandParser;
 
-impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartPhysCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = StartCommand;
@@ -127,12 +118,12 @@ where
 
 pub struct StartVirtCommandParser;
 
-impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartVirtCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = StartCommand;
@@ -155,11 +146,12 @@ where
 }
 
 pub struct SaveCommandParser;
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for SaveCommandParser
+impl<C, CM, ET, I, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver, ET, I, S, SM>
+    for SaveCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput + Unpin,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = SaveCommand;
@@ -175,10 +167,10 @@ where
 }
 
 pub struct LoadCommandParser;
-impl<CM, ET, S, SM> NativeCommandParser<CM, StdEmulatorDriver, ET, S, SM> for LoadCommandParser
+impl<C, CM, ET, I, S, SM> NativeCommandParser<C, CM, StdEmulatorDriver, ET, I, S, SM>
+    for LoadCommandParser
 where
-    CM: CommandManager<StdEmulatorDriver, ET, S, SM>,
-    S: UsesInput,
+    CM: CommandManager<C, StdEmulatorDriver, ET, I, S, SM>,
     SM: IsSnapshotManager,
 {
     type OutputCommand = LoadCommand;
@@ -195,12 +187,12 @@ where
 
 pub struct EndCommandParser;
 
-impl<ET, S, SM> NativeCommandParser<StdCommandManager<S>, StdEmulatorDriver, ET, S, SM>
+impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for EndCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    S::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
     SM: IsSnapshotManager,
 {
     type OutputCommand = EndCommand;
@@ -229,10 +221,8 @@ where
 }
 
 pub struct VersionCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for VersionCommandParser
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
+    for VersionCommandParser
 {
     type OutputCommand = VersionCommand;
 
@@ -249,12 +239,12 @@ where
 }
 
 pub struct VaddrFilterAllowRangeCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM>
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
     for VaddrFilterAllowRangeCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput + Unpin,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     type OutputCommand = AddressAllowCommand;
 
@@ -272,11 +262,11 @@ where
 }
 
 pub struct LqprintfCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for LqprintfCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM> for LqprintfCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput + Unpin,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     type OutputCommand = LqprintfCommand;
     const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_LQPRINTF.0;
@@ -306,11 +296,11 @@ where
 }
 
 pub struct TestCommandParser;
-impl<CM, ED, ET, S, SM> NativeCommandParser<CM, ED, ET, S, SM> for TestCommandParser
+impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM> for TestCommandParser
 where
-    ET: EmulatorModuleTuple<S>,
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput + Unpin,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     type OutputCommand = TestCommand;
     const COMMAND_ID: c_uint = bindings::LibaflQemuCommand_LIBAFL_QEMU_COMMAND_TEST.0;

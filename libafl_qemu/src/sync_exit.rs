@@ -1,9 +1,8 @@
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 use enum_map::Enum;
-use libafl::inputs::UsesInput;
 
-use crate::{command::CommandManager, get_exit_arch_regs, GuestReg, Regs, CPU};
+use crate::{get_exit_arch_regs, GuestReg, Regs, CPU};
 
 #[derive(Debug, Clone, Enum)]
 pub enum ExitArgs {
@@ -17,48 +16,19 @@ pub enum ExitArgs {
     Arg6,
 }
 
-pub struct CustomInsn<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
-    command: CM::Commands,
+#[derive(Clone, Debug)]
+pub struct CustomInsn<C> {
+    command: C,
 }
 
-impl<CM, ED, ET, S, SM> Clone for CustomInsn<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
-    fn clone(&self) -> Self {
-        Self {
-            command: self.command.clone(),
-        }
-    }
-}
-
-impl<CM, ED, ET, S, SM> Debug for CustomInsn<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Sync Exit")
-    }
-}
-
-impl<CM, ED, ET, S, SM> CustomInsn<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> CustomInsn<C> {
     #[must_use]
-    pub fn new(command: CM::Commands) -> Self {
+    pub fn new(command: C) -> Self {
         Self { command }
     }
 
     #[must_use]
-    pub fn command(&self) -> &CM::Commands {
+    pub fn command(&self) -> &C {
         &self.command
     }
 

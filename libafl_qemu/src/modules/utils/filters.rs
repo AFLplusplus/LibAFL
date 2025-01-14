@@ -260,11 +260,7 @@ pub(crate) static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::n
 
 #[cfg(all(feature = "systemmode", test))]
 mod tests {
-    use libafl::{
-        inputs::{NopInput, UsesInput},
-        state::NopState,
-        HasMetadata,
-    };
+    use libafl::{inputs::NopInput, state::NopState, HasMetadata};
     use libafl_bolts::tuples::tuple_list;
 
     use crate::modules::{
@@ -281,11 +277,12 @@ mod tests {
         page_filter: PF,
     }
 
-    impl<S, AF, PF> EmulatorModule<S> for DummyModule<AF, PF>
+    impl<I, S, AF, PF> EmulatorModule<I, S> for DummyModule<AF, PF>
     where
         AF: AddressFilter + 'static,
         PF: PageFilter + 'static,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: Unpin + HasMetadata,
     {
         type ModuleAddressFilter = AF;
         type ModulePageFilter = PF;
@@ -307,14 +304,15 @@ mod tests {
         }
     }
 
-    fn gen_module<AF, PF, S>(
+    fn gen_module<AF, PF, I, S>(
         af: AF,
         pf: PF,
-    ) -> impl EmulatorModule<S, ModuleAddressFilter = AF, ModulePageFilter = PF>
+    ) -> impl EmulatorModule<I, S, ModuleAddressFilter = AF, ModulePageFilter = PF>
     where
         AF: AddressFilter,
         PF: PageFilter,
-        S: HasMetadata + UsesInput + Unpin,
+        I: Unpin,
+        S: HasMetadata + Unpin,
     {
         DummyModule {
             address_filter: af,

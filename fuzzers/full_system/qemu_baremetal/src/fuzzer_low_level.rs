@@ -146,7 +146,7 @@ pub fn fuzz() {
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness =
-            |emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            |emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
                 let target = input.target_bytes();
                 let mut buf = target.as_slice();
                 let len = buf.len();
