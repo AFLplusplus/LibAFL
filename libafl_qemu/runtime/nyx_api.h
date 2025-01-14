@@ -96,12 +96,12 @@
 #define KAFL_MODE_32 1
 #define KAFL_MODE_16 2
 
-typedef struct {
+typedef volatile struct {
   int32_t size;
   uint8_t data[];
 } kAFL_payload;
 
-typedef struct {
+typedef volatile struct {
   uint64_t ip[4];
   uint64_t size[4];
   uint8_t  enabled[4];
@@ -154,7 +154,7 @@ typedef struct {
   /* more to come */
 } __attribute__((packed)) host_config_t;
 
-typedef struct {
+typedef volatile struct {
   uint32_t agent_magic;
   uint32_t agent_version;
   uint8_t  agent_timeout_detection;

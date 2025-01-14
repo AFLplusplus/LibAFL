@@ -3,7 +3,7 @@
 //! When the target crashes, a watch process (the parent) will
 //! restart/refork it.
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     marker::PhantomData,
     num::NonZeroUsize,
@@ -34,10 +34,10 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     corpus::Corpus,
     events::{
-        launcher::ClientDescription, AdaptiveSerializer, CustomBufEventResult, Event, EventConfig,
-        EventFirer, EventManager, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasCustomBufHandlers, HasEventManagerId, LlmpEventManager,
-        LlmpShouldSaveState, ProgressReporter, StdLlmpEventHook,
+        launcher::ClientDescription, AdaptiveSerializer, Event, EventConfig, EventFirer,
+        EventManager, EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
+        HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ProgressReporter,
+        StdLlmpEventHook,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -191,7 +191,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
@@ -219,7 +219,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, Z, State = S>,
+    E: HasObservers + Executor<LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
@@ -243,19 +243,6 @@ where
 {
     fn mgr_id(&self) -> EventManagerId {
         self.llmp_mgr.mgr_id()
-    }
-}
-
-impl<EMH, S, SP> HasCustomBufHandlers for LlmpRestartingEventManager<EMH, S, SP>
-where
-    S: State,
-    SP: ShMemProvider,
-{
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
-    ) {
-        self.llmp_mgr.add_custom_buf_handler(handler);
     }
 }
 

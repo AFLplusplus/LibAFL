@@ -17,10 +17,11 @@ use crate::{
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
+    inputs::{Input, UsesInput},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::{HasCorpus, HasExecutions},
     Error, HasMetadata, HasScheduler,
 };
 
@@ -28,19 +29,17 @@ use crate::{
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<C, E, O, T, TS> {
+pub struct MapCorpusMinimizer<C, E, O, S, T, TS> {
     observer_handle: Handle<C>,
-    phantom: PhantomData<(E, O, T, TS)>,
+    phantom: PhantomData<(E, O, S, T, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<C, E, O, T> = MapCorpusMinimizer<C, E, O, T, LenTimeMulTestcaseScore>;
+pub type StdCorpusMinimizer<C, E, O, S, T> =
+    MapCorpusMinimizer<C, E, O, S, T, LenTimeMulTestcaseScore>;
 
-impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
+impl<C, E, O, S, T, TS> MapCorpusMinimizer<C, E, O, S, T, TS>
 where
-    E: UsesState,
-    E::State: HasCorpus + HasMetadata,
-    TS: TestcaseScore<E::State>,
     C: Named,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
@@ -53,15 +52,14 @@ where
     }
 }
 
-impl<C, E, O, T, TS> MapCorpusMinimizer<C, E, O, T, TS>
+impl<C, E, O, S, T, TS> MapCorpusMinimizer<C, E, O, S, T, TS>
 where
-    E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
-    E::State: HasMetadata + HasCorpus + HasExecutions,
-    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = E::Input>,
+    S: HasMetadata + HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Input,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<E::State>,
+    TS: TestcaseScore<S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]
@@ -70,14 +68,15 @@ where
         fuzzer: &mut Z,
         executor: &mut E,
         manager: &mut EM,
-        state: &mut E::State,
+        state: &mut S,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers,
-        E::Observers: ObserversTuple<E::Input, E::State>,
-        CS: Scheduler<E::Input, E::State> + RemovableScheduler<E::Input, E::State>,
-        EM: EventFirer<State = E::State>,
-        Z: HasScheduler<E::Input, E::State, Scheduler = CS>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        CS: Scheduler<<S::Corpus as Corpus>::Input, S>
+            + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+        EM: EventFirer<State = S>,
+        Z: HasScheduler<<S::Corpus as Corpus>::Input, S, Scheduler = CS>,
     {
         // don't delete this else it won't work after restart
         let current = *state.corpus().current();

@@ -84,7 +84,7 @@ impl<I> TimeoutsToVerify<I> {
 impl<E, EM, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, S>
 where
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasTimeout,
     EM: UsesState<State = S>,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + UsesInput<Input = <S::Corpus as Corpus>::Input>,

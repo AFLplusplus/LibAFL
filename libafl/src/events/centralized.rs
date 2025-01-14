@@ -7,7 +7,7 @@
 // 3. The "main evaluator", the evaluator node that will evaluate all the testcases pass by the centralized event manager to see if the testcases are worth propagating
 // 4. The "main broker", the gathers the stats from the fuzzer clients and broadcast the newly found testcases from the main evaluator.
 
-use alloc::{boxed::Box, string::String, vec::Vec};
+use alloc::{string::String, vec::Vec};
 use core::{fmt::Debug, time::Duration};
 use std::{marker::PhantomData, process};
 
@@ -30,9 +30,9 @@ use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     corpus::Corpus,
     events::{
-        AdaptiveSerializer, CustomBufEventResult, Event, EventConfig, EventFirer, EventManager,
-        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
-        HasCustomBufHandlers, HasEventManagerId, LogSeverity, ProgressReporter,
+        AdaptiveSerializer, Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, LogSeverity,
+        ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -367,7 +367,7 @@ impl<E, EM, EMH, S, SP, Z> EventProcessor<E, Z> for CentralizedEventManager<EM, 
 where
     EM: AdaptiveSerializer + EventProcessor<E, Z> + EventFirer<State = S> + HasEventManagerId,
     EMH: EventManagerHooksTuple<S>,
-    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers:
         ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
@@ -402,7 +402,7 @@ where
 
 impl<E, EM, EMH, S, SP, Z> EventManager<E, Z> for CentralizedEventManager<EM, EMH, S, SP>
 where
-    E: HasObservers + Executor<Self, Z, State = Self::State>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers:
         ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
@@ -415,24 +415,6 @@ where
     Z: EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
         + ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>,
 {
-}
-
-impl<EM, EMH, S, SP> HasCustomBufHandlers for CentralizedEventManager<EM, EMH, S, SP>
-where
-    EM: HasCustomBufHandlers<State = S>,
-    EMH: EventManagerHooksTuple<S>,
-    S: State,
-    SP: ShMemProvider,
-{
-    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<
-            dyn FnMut(&mut Self::State, &str, &[u8]) -> Result<CustomBufEventResult, Error>,
-        >,
-    ) {
-        self.inner.add_custom_buf_handler(handler);
-    }
 }
 
 impl<EM, EMH, S, SP> ProgressReporter for CentralizedEventManager<EM, EMH, S, SP>
@@ -532,7 +514,7 @@ where
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers:
             ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,
@@ -582,7 +564,7 @@ where
         event: Event<<<Self as UsesState>::State as UsesInput>::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z, State = <Self as UsesState>::State> + HasObservers,
+        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers:
             ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State> + Serialize,
         <Self as UsesState>::State: UsesInput + HasExecutions + HasMetadata,

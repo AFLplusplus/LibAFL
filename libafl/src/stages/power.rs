@@ -79,7 +79,7 @@ where
 
 impl<E, F, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     EM: UsesState<State = S>,
     F: TestcaseScore<S>,
     M: Mutator<I, S>,
@@ -121,7 +121,7 @@ where
 
 impl<E, F, EM, I, M, S, Z> PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     EM: UsesState<State = S>,
     F: TestcaseScore<S>,
     I: Input,

@@ -3,7 +3,7 @@
 
 #[cfg(feature = "std")]
 use alloc::string::ToString;
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::{marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::TcpStream;
@@ -33,9 +33,8 @@ use crate::{
     corpus::Corpus,
     events::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        AdaptiveSerializer, CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig,
-        EventFirer, EventManager, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
+        AdaptiveSerializer, Event, EventConfig, EventFirer, EventManager, EventManagerHooksTuple,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
@@ -64,8 +63,6 @@ where
     hooks: EMH,
     /// The LLMP client for inter process communication
     llmp: LlmpClient<SP>,
-    /// The custom buf handler
-    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     /// The configuration defines this specific fuzzer.
@@ -168,7 +165,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             should_serialize_cnt: 0,
             time_ref,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
             event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
@@ -203,7 +199,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             should_serialize_cnt: 0,
             time_ref,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
             event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
@@ -238,7 +233,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             should_serialize_cnt: 0,
             time_ref,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
             event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
@@ -271,7 +265,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             should_serialize_cnt: 0,
             time_ref,
             phantom: PhantomData,
-            custom_buf_handlers: vec![],
             event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
         })
     }
@@ -410,7 +403,7 @@ where
         event: Event<S::Input>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z, State = S> + HasObservers,
+        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers: ObserversTuple<S::Input, S> + Serialize,
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
@@ -466,13 +459,6 @@ where
                         log::debug!("Added received Testcase {evt_name} as item #{item}");
                     } else {
                         log::debug!("Testcase {evt_name} was discarded");
-                    }
-                }
-            }
-            Event::CustomBuf { tag, buf } => {
-                for handler in &mut self.custom_buf_handlers {
-                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
-                        break;
                     }
                 }
             }
@@ -608,7 +594,7 @@ where
     S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
     S::Corpus: Corpus<Input = S::Input>,
     SP: ShMemProvider,
-    E: HasObservers + Executor<Self, Z, State = S>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
@@ -666,7 +652,7 @@ where
 
 impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpEventManager<EMH, S, SP>
 where
-    E: HasObservers + Executor<Self, Z, State = S>,
+    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
@@ -677,19 +663,6 @@ where
         + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
         + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
 {
-}
-
-impl<EMH, S, SP> HasCustomBufHandlers for LlmpEventManager<EMH, S, SP>
-where
-    S: State,
-    SP: ShMemProvider,
-{
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
-    ) {
-        self.custom_buf_handlers.push(handler);
-    }
 }
 
 impl<EMH, S, SP> ProgressReporter for LlmpEventManager<EMH, S, SP>

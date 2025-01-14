@@ -27,6 +27,14 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata,
 };
 
+/// AFL++'s `CAL_CYCLES_FAST` + 1
+const CAL_STAGE_START: usize = 4;
+/// AFL++'s `CAL_CYCLES` + 1
+const CAL_STAGE_MAX: usize = 8;
+
+/// Default name for `CalibrationStage`; derived from AFL++
+pub const CALIBRATION_STAGE_NAME: &str = "calibration";
+
 /// The metadata to keep unstable entries
 /// Formula is same as AFL++: number of unstable entries divided by the number of filled entries.
 #[cfg_attr(
@@ -69,8 +77,6 @@ impl Default for UnstableEntriesMetadata {
     }
 }
 
-/// Default name for `CalibrationStage`; derived from AFL++
-pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
 pub struct CalibrationStage<C, E, O, OT, S> {
@@ -83,12 +89,9 @@ pub struct CalibrationStage<C, E, O, OT, S> {
     phantom: PhantomData<(E, O, OT, S)>,
 }
 
-const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
-const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
-
 impl<C, E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, O, OT, S>
 where
-    E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = S>,
     O: MapObserver,
     C: AsRef<O>,
