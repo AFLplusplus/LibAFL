@@ -895,7 +895,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[expect(clippy::cmp_null)]
     pub fn hook_check_realloc(&mut self, ptr: *mut c_void, _size: usize) -> bool {
         self.allocator_mut().is_managed(ptr)
     }
@@ -928,7 +927,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[expect(clippy::cmp_null)]
     #[cfg(target_vendor = "apple")]
     pub fn hook_check_reallocf(&mut self, ptr: *mut c_void, _size: usize) -> bool {
         self.allocator_mut().is_managed(ptr)
@@ -1091,6 +1089,8 @@ impl AsanRuntime {
     }
     #[inline]
     #[cfg(target_vendor = "apple")]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(non_snake_case)]
     pub fn hook__os_log_impl(
         &mut self,
         _original: extern "C" fn(
@@ -1111,6 +1111,8 @@ impl AsanRuntime {
     }
     #[inline]
     #[cfg(target_vendor = "apple")]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(non_snake_case)]
     pub fn hook__os_log_fault_impl(
         &mut self,
         _original: extern "C" fn(
@@ -1131,6 +1133,8 @@ impl AsanRuntime {
     }
     #[inline]
     #[cfg(target_vendor = "apple")]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(non_snake_case)]
     pub fn hook__os_log_error_impl(
         &mut self,
         _original: extern "C" fn(
@@ -1151,6 +1155,8 @@ impl AsanRuntime {
     }
     #[inline]
     #[cfg(target_vendor = "apple")]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(non_snake_case)]
     pub fn hook__os_log_debug_impl(
         &mut self,
         _original: extern "C" fn(
@@ -2571,27 +2577,27 @@ impl AsanRuntime {
         p4: *const c_void,
         n: usize,
     ) {
-        if !self.allocator_mut().check_shadow(s, n) {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
+        if !self.allocator_mut().check_shadow(s, n)
+            && AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern4".to_string(),
                 self.real_address_for_stalked(self.pc()),
                 s as usize,
                 n,
                 Backtrace::new(),
-            ))) {
-                panic!("ASAN: Crashing target!");
-            };
+            )))
+        {
+            panic!("ASAN: Crashing target!");
         }
-        if !self.allocator_mut().check_shadow(p4, n / 4) {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
+        if !self.allocator_mut().check_shadow(p4, n / 4)
+            && AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern4".to_string(),
                 self.real_address_for_stalked(self.pc()),
                 p4 as usize,
                 n / 4,
                 Backtrace::new(),
-            ))) {
-                panic!("ASAN: Crashing target!");
-            };
+            )))
+        {
+            panic!("ASAN: Crashing target!");
         }
         original(s, p4, n);
     }
@@ -2605,27 +2611,27 @@ impl AsanRuntime {
         p8: *const c_void,
         n: usize,
     ) {
-        if !self.allocator_mut().check_shadow(s, n) {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
+        if !self.allocator_mut().check_shadow(s, n)
+            && AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern8".to_string(),
                 self.real_address_for_stalked(self.pc()),
                 s as usize,
                 n,
                 Backtrace::new(),
-            ))) {
-                panic!("ASAN: Crashing target!");
-            };
+            )))
+        {
+            panic!("ASAN: Crashing target!");
         }
-        if !self.allocator_mut().check_shadow(p8, n / 8) {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
+        if !self.allocator_mut().check_shadow(p8, n / 8)
+            && AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern8".to_string(),
                 self.real_address_for_stalked(self.pc()),
                 p8 as usize,
                 n / 8,
                 Backtrace::new(),
-            ))) {
-                panic!("ASAN: Crashing target!");
-            };
+            )))
+        {
+            panic!("ASAN: Crashing target!");
         }
         original(s, p8, n);
     }
@@ -2639,27 +2645,27 @@ impl AsanRuntime {
         p16: *const c_void,
         n: usize,
     ) {
-        if !self.allocator_mut().check_shadow(s, n) {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
+        if !self.allocator_mut().check_shadow(s, n)
+            && AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern16".to_string(),
                 self.real_address_for_stalked(self.pc()),
                 s as usize,
                 n,
                 Backtrace::new(),
-            ))) {
-                panic!("ASAN: Crashing target!");
-            };
+            )))
+        {
+            panic!("ASAN: Crashing target!");
         }
-        if !self.allocator_mut().check_shadow(p16, n / 16) {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
+        if !self.allocator_mut().check_shadow(p16, n / 16)
+            && AsanErrors::get_mut_blocking().report_error(AsanError::BadFuncArgWrite((
                 "memset_pattern16".to_string(),
                 self.real_address_for_stalked(self.pc()),
                 p16 as usize,
                 n / 16,
                 Backtrace::new(),
-            ))) {
-                panic!("ASAN: Crashing target!");
-            };
+            )))
+        {
+            panic!("ASAN: Crashing target!");
         }
         original(s, p16, n);
     }

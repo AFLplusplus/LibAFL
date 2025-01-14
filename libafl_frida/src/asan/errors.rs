@@ -298,6 +298,7 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let fault_address: i64 = fault_address.try_into().unwrap();
                 let metadata_address: i64 = error.metadata.address.try_into().unwrap();
+                #[allow(clippy::cast_possible_wrap)]
                 let offset: i64 =
                     fault_address - (metadata_address + MmapOptions::page_size() as i64);
                 let direction = if offset > 0 { "right" } else { "left" };
@@ -565,7 +566,6 @@ impl AsanErrors {
 
         self.errors.push(error);
 
-        #[expect(clippy::manual_assert)]
         !self.continue_on_error
     }
 }

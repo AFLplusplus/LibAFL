@@ -104,7 +104,7 @@ unsafe fn thread_local_initted() -> bool {
         "mrs {tid}, TPIDRRO_EL0",
         tid = out(reg) tid,
     );
-    tid = tid & 0xffff_ffff_ffff_fff8;
+    tid &= 0xffff_ffff_ffff_fff8;
     let tlsptr = tid as *const u64;
     tlsptr.add(0x102).read() != 0u64
 }
@@ -1543,6 +1543,7 @@ impl AsanRuntime {
                 backtrace,
             ))
         };
+        #[allow(clippy::manual_assert)]
         if AsanErrors::get_mut_blocking().report_error(error) {
             panic!("ASAN: Crashing target!");
         }
