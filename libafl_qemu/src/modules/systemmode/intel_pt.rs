@@ -34,8 +34,9 @@ impl IntelPTModule {
     }
 }
 
-impl<S, T> EmulatorModule<S> for IntelPTModule<T>
+impl<I, S, T> EmulatorModule<I, S> for IntelPTModule<T>
 where
+    I: Unpin,
     S: Unpin + UsesInput + HasMetadata,
     T: SaturatingAdd + From<u8> + Debug + 'static,
 {
@@ -44,13 +45,13 @@ where
 
     fn pre_qemu_init<ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _qemu_params: &mut QemuParams,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         emulator_modules
-            .thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, S, T>))
+            .thread_creation(NewThreadHook::Function(intel_pt_new_thread::<ET, I, S, T>))
             .unwrap();
         // TODO emulator_modules.thread_teradown
     }
@@ -58,11 +59,11 @@ where
     fn pre_exec<ET>(
         &mut self,
         _qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
         pt.enable_tracing().unwrap();
@@ -71,14 +72,14 @@ where
     fn post_exec<OT, ET>(
         &mut self,
         _qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _observers: &mut OT,
         _exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S::Input, S>,
-        ET: EmulatorModuleTuple<S>,
+        OT: ObserversTuple<I, S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         let pt = self.pt.as_mut().expect("Intel PT module not initialized.");
         pt.disable_tracing().unwrap();
@@ -143,15 +144,16 @@ where
     }
 }
 
-pub fn intel_pt_new_thread<ET, S, T>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+pub fn intel_pt_new_thread<ET, I, S, T>(
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _env: CPUArchStatePtr,
     tid: u32,
 ) -> bool
 where
+    I: Unpin,
     S: HasMetadata + Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
     T: Debug + 'static,
 {
     let intel_pt_module = emulator_modules
