@@ -26,7 +26,7 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
         ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
-    state::{HasCorpus, StdState, UsesState},
+    state::{HasCorpus, StdState},
     Error, HasMetadata, NopFuzzer,
 };
 #[cfg(not(feature = "simplemgr"))]
@@ -106,14 +106,14 @@ impl<M: Monitor> Instance<'_, M> {
     }
 
     #[expect(clippy::too_many_lines)]
-    pub fn run<ET, I>(
+    pub fn run<ET>(
         &mut self,
         args: Vec<String>,
         modules: ET,
         state: Option<ClientState>,
     ) -> Result<(), Error>
     where
-        ET: EmulatorModuleTuple<I, ClientState> + Debug,
+        ET: EmulatorModuleTuple<BytesInput, ClientState> + Debug,
     {
         // Create an observation channel using the coverage map
         let mut edges_observer = unsafe {
@@ -138,7 +138,7 @@ impl<M: Monitor> Instance<'_, M> {
         let qemu = emulator.qemu();
 
         // update address filter after qemu has been initialized
-        <EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0> as EmulatorModule<I, ClientState>>::update_address_filter(emulator.modules_mut()
+        <EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0> as EmulatorModule<BytesInput, ClientState>>::update_address_filter(emulator.modules_mut()
             .modules_mut()
             .match_first_type_mut::<EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0>>()
             .expect("Could not find back the edge module"), qemu, self.coverage_filter(qemu)?);
