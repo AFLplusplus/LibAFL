@@ -24,7 +24,7 @@ use libafl::{
         power::StdPowerMutationalStage, CalibrationStage, ShadowTracingStage, StagesTuple,
         StdMutationalStage,
     },
-    state::{HasCorpus, HasMaxSize, StdState, UsesState},
+    state::{HasCorpus, HasMaxSize, StdState},
     Error, HasMetadata, NopFuzzer,
 };
 use libafl_bolts::{
@@ -229,7 +229,6 @@ impl<M: Monitor> Instance<'_, M> {
     where
         Z: Fuzzer<E, ClientMgr<M>, ClientState, ST>
             + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
-        E: UsesState<State = ClientState> + Executor<ClientMgr<M>, Z>,
         ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
     {
         let corpus_dirs = [self.options.input_dir()];
