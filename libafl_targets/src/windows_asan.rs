@@ -30,20 +30,20 @@ extern "C" {
 ///
 /// # Safety
 /// Calls the unsafe `__sanitizer_set_death_callback` symbol, but should be safe to call otherwise.
-pub unsafe fn setup_asan_callback<E, EM, OF, S, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
+pub unsafe fn setup_asan_callback<E, EM, I, OF, S, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<State = S> + EventRestarter<State = S>,
-    OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions
         + HasSolutions
         + HasCurrentTestcase
         + HasCorpus
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        + UsesInput<Input = I>,
+    S::Solutions: Corpus<Input = I>,
     Z: HasObjective<Objective = OF>,
-    <S::Corpus as Corpus>::Input: Input + Clone,
+    I: Input + Clone,
 {
-    __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, OF, S, Z>));
+    __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, I, OF, S, Z>));
 }

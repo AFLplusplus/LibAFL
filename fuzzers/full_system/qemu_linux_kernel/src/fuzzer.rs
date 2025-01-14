@@ -12,7 +12,7 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, UsesInput},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{havoc_mutations, scheduled::StdScheduledMutator, I2SRandReplaceBinonly},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
@@ -32,7 +32,10 @@ use libafl_bolts::{
 #[cfg(feature = "nyx")]
 use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
 #[cfg(not(feature = "nyx"))]
-use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
+use libafl_qemu::{
+    command::StdCommandManager, modules::utils::filters::LINUX_PROCESS_ADDRESS_RANGE,
+    StdEmulatorDriver,
+};
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
@@ -45,17 +48,17 @@ use libafl_qemu::{
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
-fn get_emulator<ET, S>(
+fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
 ) -> Result<
-    Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, NopSnapshotManager>,
+    Emulator<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, NopSnapshotManager>,
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    <S as UsesInput>::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
 {
     Emulator::empty()
         .qemu_parameters(args)
@@ -67,17 +70,17 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-fn get_emulator<ET, S>(
+fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     mut modules: ET,
 ) -> Result<
-    Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>,
+    Emulator<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, FastSnapshotManager>,
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
     S: State + HasExecutions + Unpin,
-    <S as UsesInput>::Input: HasTargetBytes,
 {
     // Allow linux process address space addresses as feedback
     modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
@@ -146,10 +149,11 @@ pub fn fuzz() {
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness =
-            |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
-                emulator.run(state, input).unwrap().try_into().unwrap()
-            };
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
+                           state: &mut _,
+                           input: &BytesInput| unsafe {
+            emulator.run(state, input).unwrap().try_into().unwrap()
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
