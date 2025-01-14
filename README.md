@@ -80,6 +80,10 @@ LibAFL is written and maintained by
 
 Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for the contributing guideline.
 
+## Debugging
+
+Your fuzzer doesn't work as expected? Try reading [DEBUGGING.md](./docs/src/DEBUGGING.md) to understand how to debug your problems.
+
 ## Cite
 If you use LibAFL for your academic work, please cite the following paper:
 
