@@ -11,7 +11,6 @@ use std::{collections::BTreeMap, ffi::c_void};
 
 use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
-use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
 #[cfg(target_vendor = "apple")]
 use mach_sys::{
@@ -59,9 +58,9 @@ pub struct Allocator {
     /// Whether we've pre allocated a shadow mapping:
     using_pre_allocated_shadow_mapping: bool,
     /// All tracked allocations
-    allocations: HashMap<usize, AllocationMetadata>,
+    allocations: BTreeMap<usize, AllocationMetadata>,
     /// All mappings
-    mappings: HashMap<usize, MmapMut>,
+    mappings: BTreeMap<usize, MmapMut>,
     /// The shadow memory pages
     shadow_pages: RangeSet<usize>,
     /// A list of allocations
@@ -171,7 +170,6 @@ impl Allocator {
     #[must_use]
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
-        log::trace!("alloc");
         let mut is_malloc_zero = false;
         let size = if size == 0 {
             is_malloc_zero = true;
@@ -249,7 +247,7 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        log::trace!(
+        log::info!(
             "serving address: {:#x}, size: {:#x}",
             address as usize,
             size
@@ -260,21 +258,26 @@ impl Allocator {
     /// Releases the allocation at the given address.
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        log::trace!("release {:?}", ptr);
+        log::info!("release {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
-                AsanErrors::get_mut_blocking()
-                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
+                if AsanErrors::get_mut_blocking()
+                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())))
+                {
+                    panic!("ASAN: Crashing target!");
+                }
             }
             return;
         };
 
         if metadata.freed {
-            AsanErrors::get_mut_blocking().report_error(AsanError::DoubleFree((
+            if AsanErrors::get_mut_blocking().report_error(AsanError::DoubleFree((
                 ptr as usize,
                 metadata.clone(),
                 Backtrace::new(),
-            )));
+            ))) {
+                panic!("ASAN: Crashing target!");
+            }
         }
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
@@ -316,7 +319,7 @@ impl Allocator {
     /// Resets the allocator contents
     pub fn reset(&mut self) {
         let mut tmp_allocations = Vec::new();
-        for (address, mut allocation) in self.allocations.drain() {
+        while let Some((address, mut allocation)) = self.allocations.pop_first() {
             if !allocation.freed {
                 tmp_allocations.push(allocation);
                 continue;
@@ -580,8 +583,20 @@ impl Allocator {
     pub fn check_for_leaks(&self) {
         for metadata in self.allocations.values() {
             if !metadata.freed {
-                AsanErrors::get_mut_blocking()
-                    .report_error(AsanError::Leak((metadata.address, metadata.clone())));
+                if AsanErrors::get_mut_blocking()
+                    .report_error(AsanError::Leak((metadata.address, metadata.clone())))
+                {
+                    unsafe {
+                        println!(
+                            "{:x?}",
+                            std::slice::from_raw_parts(
+                                metadata.address as *const u8,
+                                metadata.size
+                            )
+                        );
+                    };
+                    panic!("ASAN: Crashing target!");
+                };
             }
         }
     }
@@ -818,10 +833,10 @@ impl Default for Allocator {
             page_size,
             pre_allocated_shadow_mappings: Vec::new(),
             using_pre_allocated_shadow_mapping: false,
-            mappings: HashMap::new(),
+            mappings: BTreeMap::new(),
             shadow_offset: 0,
             shadow_bit: 0,
-            allocations: HashMap::new(),
+            allocations: BTreeMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: BTreeMap::new(),
             largest_allocation: 0,
