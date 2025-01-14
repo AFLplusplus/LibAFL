@@ -260,24 +260,19 @@ impl Allocator {
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         log::info!("release {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
-            if !ptr.is_null() {
-                if AsanErrors::get_mut_blocking()
-                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())))
-                {
-                    panic!("ASAN: Crashing target!");
-                }
+            if !ptr.is_null() && AsanErrors::get_mut_blocking()
+                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new()))) {
+                panic!("ASAN: Crashing target!");
             }
             return;
         };
 
-        if metadata.freed {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::DoubleFree((
+        if metadata.freed && AsanErrors::get_mut_blocking().report_error(AsanError::DoubleFree((
                 ptr as usize,
                 metadata.clone(),
                 Backtrace::new(),
             ))) {
-                panic!("ASAN: Crashing target!");
-            }
+            panic!("ASAN: Crashing target!");
         }
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
@@ -582,21 +577,18 @@ impl Allocator {
     /// Checks if any of the allocations has not been freed
     pub fn check_for_leaks(&self) {
         for metadata in self.allocations.values() {
-            if !metadata.freed {
-                if AsanErrors::get_mut_blocking()
-                    .report_error(AsanError::Leak((metadata.address, metadata.clone())))
-                {
-                    unsafe {
-                        println!(
-                            "{:x?}",
-                            std::slice::from_raw_parts(
-                                metadata.address as *const u8,
-                                metadata.size
-                            )
-                        );
-                    };
-                    panic!("ASAN: Crashing target!");
+            if !metadata.freed && AsanErrors::get_mut_blocking()
+                    .report_error(AsanError::Leak((metadata.address, metadata.clone()))) {
+                unsafe {
+                    println!(
+                        "{:x?}",
+                        std::slice::from_raw_parts(
+                            metadata.address as *const u8,
+                            metadata.size
+                        )
+                    );
                 };
+                panic!("ASAN: Crashing target!");
             }
         }
     }

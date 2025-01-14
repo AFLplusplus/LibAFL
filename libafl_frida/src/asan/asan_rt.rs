@@ -1401,20 +1401,19 @@ impl AsanRuntime {
                     backtrace,
                 ))
             };
+            #[allow(clippy::manual_assert)]
             if AsanErrors::get_mut_blocking().report_error(error) {
                 panic!("ASAN: Crashing target!");
             }
 
             // This is not even a mem instruction??
-        } else {
-            if AsanErrors::get_mut_blocking().report_error(AsanError::Unknown((
-                self.regs,
-                actual_pc,
-                (None, None, 0, fault_address),
-                backtrace,
-            ))) {
-                panic!("ASAN: Crashing target!");
-            }
+        } else if AsanErrors::get_mut_blocking().report_error(AsanError::Unknown((
+            self.regs,
+            actual_pc,
+            (None, None, 0, fault_address),
+            backtrace,
+        ))) {
+            panic!("ASAN: Crashing target!");
         }
 
         // log::info!("ASAN Error, attach the debugger!");
