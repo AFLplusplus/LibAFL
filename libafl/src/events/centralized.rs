@@ -207,7 +207,8 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> EventFirer<<S::Corpus as Corpus>::Input, S> for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, S, SP> EventFirer<<S::Corpus as Corpus>::Input, S>
+    for CentralizedEventManager<EM, EMH, S, SP>
 where
     EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
     EMH: EventManagerHooksTuple<<<S as HasCorpus>::Corpus as Corpus>::Input, S>,
@@ -220,7 +221,11 @@ where
     }
 
     #[expect(clippy::match_same_arms)]
-    fn fire(&mut self, state: &mut S, mut event: Event<<S::Corpus as Corpus>::Input>) -> Result<(), Error> {
+    fn fire(
+        &mut self,
+        state: &mut S,
+        mut event: Event<<S::Corpus as Corpus>::Input>,
+    ) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
             let mut is_tc = false;

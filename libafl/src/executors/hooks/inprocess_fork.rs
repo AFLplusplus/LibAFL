@@ -14,7 +14,6 @@ use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
 use libc::siginfo_t;
 
 use crate::{
-    corpus::Corpus,
     executors::{
         common_signals,
         hooks::ExecutorHook,
@@ -28,15 +27,15 @@ use crate::{
 
 /// The inmem fork executor's hooks.
 #[derive(Debug)]
-pub struct InChildProcessHooks<S> {
+pub struct InChildProcessHooks<I, S> {
     /// On crash C function pointer
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
     pub timeout_handler: *const c_void,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> ExecutorHook<<S::Corpus as Corpus>::Input, S> for InChildProcessHooks<S>
+impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S>
 where
     S: HasCorpus,
 {
@@ -44,7 +43,7 @@ where
     fn init(&mut self, _state: &mut S) {}
 
     /// Call before running a target.
-    fn pre_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         unsafe {
             let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             (*data).crash_handler = self.crash_handler;
@@ -53,15 +52,15 @@ where
         }
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &<S::Corpus as Corpus>::Input) {}
+    fn post_exec(&mut self, _state: &mut S, _input: &I) {}
 }
 
-impl<S> InChildProcessHooks<S> {
+impl<I, S> InChildProcessHooks<I, S> {
     /// Create new [`InChildProcessHooks`].
     pub fn new<E>() -> Result<Self, Error>
     where
         E: HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        E::Observers: ObserversTuple<I, S>,
         S: HasCorpus,
     {
         #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
@@ -72,16 +71,10 @@ impl<S> InChildProcessHooks<S> {
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
-                crash_handler: child_signal_handlers::child_crash_handler::<
-                    E,
-                    <S::Corpus as Corpus>::Input,
-                    S,
-                > as *const c_void,
-                timeout_handler: child_signal_handlers::child_timeout_handler::<
-                    E,
-                    <S::Corpus as Corpus>::Input,
-                    S,
-                > as *const c_void,
+                crash_handler: child_signal_handlers::child_crash_handler::<E, I, S>
+                    as *const c_void,
+                timeout_handler: child_signal_handlers::child_timeout_handler::<E, I, S>
+                    as *const c_void,
                 phantom: PhantomData,
             })
         }

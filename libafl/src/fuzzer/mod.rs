@@ -14,7 +14,9 @@ use serde::Serialize;
 use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
+    events::{
+        CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::{Input, UsesInput},
@@ -24,7 +26,8 @@ use crate::{
     stages::{HasCurrentStageId, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
+        HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -923,9 +926,7 @@ where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions
-        + HasCorpus
-        + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasCorpus + MaybeHasClientPerfMonitor,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(

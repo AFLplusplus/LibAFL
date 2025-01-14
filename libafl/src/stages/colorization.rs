@@ -78,11 +78,7 @@ impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, E, EM, O, S,
 where
     EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
-    S: HasCorpus
-        + HasMetadata
-        + HasRand
-        + HasNamedMetadata
-        + HasCurrentCorpusId,
+    S: HasCorpus + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
     O: MapObserver,
@@ -160,11 +156,7 @@ where
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
-        + HasMetadata
-        + HasRand
-        + HasCurrentCorpusId
-        + HasCurrentTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase,
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
 {
     #[inline]

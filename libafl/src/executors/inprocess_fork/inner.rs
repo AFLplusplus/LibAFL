@@ -20,7 +20,6 @@ use nix::{
 #[cfg(all(unix, not(target_os = "linux")))]
 use crate::executors::hooks::timer::{setitimer, Itimerval, Timeval, ITIMER_REAL};
 use crate::{
-    corpus::Corpus,
     executors::{
         hooks::{
             inprocess_fork::{InChildProcessHooks, FORK_EXECUTOR_GLOBAL_DATA},
@@ -34,18 +33,18 @@ use crate::{
 };
 
 /// Inner state of GenericInProcessExecutor-like structures.
-pub struct GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z> {
-    pub(super) hooks: (InChildProcessHooks<S>, HT),
+pub struct GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z> {
+    pub(super) hooks: (InChildProcessHooks<I, S>, HT),
     pub(super) shmem_provider: SP,
     pub(super) observers: OT,
     #[cfg(target_os = "linux")]
     pub(super) itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
     pub(super) itimerval: Itimerval,
-    pub(super) phantom: PhantomData<(S, EM, Z)>,
+    pub(super) phantom: PhantomData<(I, S, EM, Z)>,
 }
 
-impl<HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<HT, I, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
 where
     HT: Debug,
     OT: Debug,
@@ -106,19 +105,19 @@ fn parse_itimerval(timeout: Duration) -> Itimerval {
     }
 }
 
-impl<EM, HT, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<EM, HT, I, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
+    HT: ExecutorHooksTuple<I, S>,
     S: HasCorpus,
     SP: ShMemProvider,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<I, S>,
 {
     pub(super) unsafe fn pre_run_target_child(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<(), Error> {
         self.shmem_provider.post_fork(true)?;
 
@@ -153,7 +152,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) {
         self.observers
             .post_exec_child_all(state, input, &ExitKind::Ok)
@@ -198,21 +197,15 @@ where
     }
 }
 
-impl<HT, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    HT: ExecutorHooksTuple<I, S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
-    pub fn enter_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _event_mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
-    ) {
+    pub fn enter_target(&mut self, _fuzzer: &mut Z, state: &mut S, _event_mgr: &mut EM, input: &I) {
         unsafe {
             let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
@@ -238,7 +231,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut S,
         _event_mgr: &mut EM,
-        _input: &<S::Corpus as Corpus>::Input,
+        _input: &I,
     ) {
         // do nothing
     }
@@ -294,8 +287,8 @@ where
     }
 }
 
-impl<HT, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>
+impl<HT, I, OT, S, SP, EM, Z> HasObservers
+    for GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
 {
     type Observers = OT;
 

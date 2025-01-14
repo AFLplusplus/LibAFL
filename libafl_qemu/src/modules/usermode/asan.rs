@@ -3,7 +3,7 @@
 use std::{borrow::Cow, env, fs, path::PathBuf, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
-use libafl::{executors::ExitKind, inputs::UsesInput, observers::ObserversTuple};
+use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
@@ -810,19 +810,20 @@ impl AsanModule {
     }
 }
 
-impl<S> EmulatorModule<S> for AsanModule
+impl<I, S> EmulatorModule<I, S> for AsanModule
 where
-    S: Unpin + UsesInput,
+    I: Unpin,
+    S: Unpin,
 {
     type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
     fn pre_qemu_init<ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         qemu_params: &mut QemuParams,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         let mut args: Vec<String> = qemu_params.to_cli();
 
@@ -874,52 +875,52 @@ where
         *qemu_params = QemuParams::Cli(args);
     }
 
-    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
-        emulator_modules.pre_syscalls(Hook::Function(qasan_fake_syscall::<ET, S>));
+        emulator_modules.pre_syscalls(Hook::Function(qasan_fake_syscall::<ET, I, S>));
 
         if self.rt.error_callback.is_some() {
-            emulator_modules.crash_function(oncrash_asan::<ET, S>);
+            emulator_modules.crash_function(oncrash_asan::<ET, I, S>);
         }
     }
 
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         emulator_modules.reads(
-            Hook::Function(gen_readwrite_asan::<ET, S>),
-            Hook::Function(trace_read_asan::<ET, S, 1>),
-            Hook::Function(trace_read_asan::<ET, S, 2>),
-            Hook::Function(trace_read_asan::<ET, S, 4>),
-            Hook::Function(trace_read_asan::<ET, S, 8>),
-            Hook::Function(trace_read_n_asan::<ET, S>),
+            Hook::Function(gen_readwrite_asan::<ET, I, S>),
+            Hook::Function(trace_read_asan::<ET, I, S, 1>),
+            Hook::Function(trace_read_asan::<ET, I, S, 2>),
+            Hook::Function(trace_read_asan::<ET, I, S, 4>),
+            Hook::Function(trace_read_asan::<ET, I, S, 8>),
+            Hook::Function(trace_read_n_asan::<ET, I, S>),
         );
 
         if emulator_modules.get::<SnapshotModule>().is_none() {
             emulator_modules.writes(
-                Hook::Function(gen_readwrite_asan::<ET, S>),
-                Hook::Function(trace_write_asan::<ET, S, 1>),
-                Hook::Function(trace_write_asan::<ET, S, 2>),
-                Hook::Function(trace_write_asan::<ET, S, 4>),
-                Hook::Function(trace_write_asan::<ET, S, 8>),
-                Hook::Function(trace_write_n_asan::<ET, S>),
+                Hook::Function(gen_readwrite_asan::<ET, I, S>),
+                Hook::Function(trace_write_asan::<ET, I, S, 1>),
+                Hook::Function(trace_write_asan::<ET, I, S, 2>),
+                Hook::Function(trace_write_asan::<ET, I, S, 4>),
+                Hook::Function(trace_write_asan::<ET, I, S, 8>),
+                Hook::Function(trace_write_n_asan::<ET, I, S>),
             );
         } else {
             // track writes for both modules as opt
             emulator_modules.writes(
-                Hook::Function(gen_write_asan_snapshot::<ET, S>),
-                Hook::Function(trace_write_asan_snapshot::<ET, S, 1>),
-                Hook::Function(trace_write_asan_snapshot::<ET, S, 2>),
-                Hook::Function(trace_write_asan_snapshot::<ET, S, 4>),
-                Hook::Function(trace_write_asan_snapshot::<ET, S, 8>),
-                Hook::Function(trace_write_n_asan_snapshot::<ET, S>),
+                Hook::Function(gen_write_asan_snapshot::<ET, I, S>),
+                Hook::Function(trace_write_asan_snapshot::<ET, I, S, 1>),
+                Hook::Function(trace_write_asan_snapshot::<ET, I, S, 2>),
+                Hook::Function(trace_write_asan_snapshot::<ET, I, S, 4>),
+                Hook::Function(trace_write_asan_snapshot::<ET, I, S, 8>),
+                Hook::Function(trace_write_n_asan_snapshot::<ET, I, S>),
             );
         }
     }
@@ -927,11 +928,11 @@ where
     fn pre_exec<ET>(
         &mut self,
         qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         if self.empty {
             self.rt.snapshot(qemu);
@@ -942,14 +943,14 @@ where
     fn post_exec<OT, ET>(
         &mut self,
         qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
         _observers: &mut OT,
         exit_kind: &mut ExitKind,
     ) where
-        OT: ObserversTuple<S::Input, S>,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
+        OT: ObserversTuple<I, S>,
     {
         if self.reset(qemu) == AsanRollback::HasLeaks {
             *exit_kind = ExitKind::Crash;
@@ -965,30 +966,32 @@ where
     }
 }
 
-pub fn oncrash_asan<ET, S>(
+pub fn oncrash_asan<ET, I, S>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     target_sig: i32,
 ) where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
     h.rt.report(qemu, pc, AsanError::Signal(target_sig));
 }
 
-pub fn gen_readwrite_asan<ET, S>(
+pub fn gen_readwrite_asan<ET, I, S>(
     _qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     if h.must_instrument(pc) {
@@ -998,75 +1001,80 @@ where
     }
 }
 
-pub fn trace_read_asan<ET, S, const N: usize>(
+pub fn trace_read_asan<ET, I, S, const N: usize>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.read::<N>(qemu, id as GuestAddr, addr);
 }
 
-pub fn trace_read_n_asan<ET, S>(
+pub fn trace_read_n_asan<ET, I, S>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
-pub fn trace_write_asan<ET, S, const N: usize>(
+pub fn trace_write_asan<ET, I, S, const N: usize>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.write::<N>(qemu, id as GuestAddr, addr);
 }
 
-pub fn trace_write_n_asan<ET, S>(
+pub fn trace_write_n_asan<ET, I, S>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
 }
 
-pub fn gen_write_asan_snapshot<ET, S>(
+pub fn gen_write_asan_snapshot<ET, I, S>(
     _qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
     _addr: *mut TCGTemp,
     _info: MemAccessInfo,
 ) -> Option<u64>
 where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     if h.must_instrument(pc) {
@@ -1076,15 +1084,16 @@ where
     }
 }
 
-pub fn trace_write_asan_snapshot<ET, S, const N: usize>(
+pub fn trace_write_asan_snapshot<ET, I, S, const N: usize>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     if id != 0 {
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
@@ -1094,16 +1103,17 @@ pub fn trace_write_asan_snapshot<ET, S, const N: usize>(
     h.access(addr, N);
 }
 
-pub fn trace_write_n_asan_snapshot<ET, S>(
+pub fn trace_write_n_asan_snapshot<ET, I, S>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     if id != 0 {
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
@@ -1114,9 +1124,9 @@ pub fn trace_write_n_asan_snapshot<ET, S>(
 }
 
 #[expect(clippy::too_many_arguments)]
-pub fn qasan_fake_syscall<ET, S>(
+pub fn qasan_fake_syscall<ET, I, S>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: GuestAddr,
@@ -1129,8 +1139,9 @@ pub fn qasan_fake_syscall<ET, S>(
     _a7: GuestAddr,
 ) -> SyscallHookResult
 where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     if sys_num == QASAN_FAKESYS_NR {
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();

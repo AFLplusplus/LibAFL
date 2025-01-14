@@ -77,19 +77,16 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, OF, S, Z>()
+    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions
-            + HasSolutions
-            + HasCurrentTestcase
-            + HasCorpus,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
+        S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
+        I: Input + Clone,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -100,11 +97,11 @@ pub mod unix_signal_handler {
                 // We are fuzzing!
                 let executor = (*data).executor_mut::<E>();
                 let state = (*data).state_mut::<S>();
-                let input = (*data).take_current_input::<<S::Corpus as Corpus>::Input>();
+                let input = (*data).take_current_input::<I>();
                 let fuzzer = (*data).fuzzer_mut::<Z>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                run_observers_and_save_state::<E, EM, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -126,23 +123,20 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_timeout_handler<E, EM, OF, S, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasInProcessHooks<S> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions
-            + HasSolutions
-            + HasCurrentTestcase
-            + HasCorpus,
+        E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
         Z: HasObjective<Objective = OF>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        I: Input + Clone,
+        S::Solutions: Corpus<Input = I>,
     {
         // this stuff is for batch timeout
         if !data.executor_ptr.is_null()
@@ -163,11 +157,11 @@ pub mod unix_signal_handler {
         let state = data.state_mut::<S>();
         let event_mgr = data.event_mgr_mut::<EM>();
         let fuzzer = data.fuzzer_mut::<Z>();
-        let input = data.take_current_input::<<S::Corpus as Corpus>::Input>();
+        let input = data.take_current_input::<I>();
 
         log::error!("Timeout in fuzz run.");
 
-        run_observers_and_save_state::<E, EM, OF, S, Z>(
+        run_observers_and_save_state::<E, EM, I, OF, S, Z>(
             executor,
             state,
             input,
@@ -186,23 +180,20 @@ pub mod unix_signal_handler {
     /// # Safety
     /// Well, signal handling is not safe
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_crash_handler<E, EM, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions
-            + HasSolutions
-            + HasCorpus
-            + HasCurrentTestcase,
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
         Z: HasObjective<Objective = OF>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        I: Input + Clone,
+        S::Solutions: Corpus<Input = I>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {
@@ -217,7 +208,7 @@ pub mod unix_signal_handler {
             let state = data.state_mut::<S>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let fuzzer = data.fuzzer_mut::<Z>();
-            let input = data.take_current_input::<<S::Corpus as Corpus>::Input>();
+            let input = data.take_current_input::<I>();
 
             log::error!("Child crashed!");
 
@@ -242,7 +233,7 @@ pub mod unix_signal_handler {
                 }
             }
 
-            run_observers_and_save_state::<E, EM, OF, S, Z>(
+            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                 executor,
                 state,
                 input,

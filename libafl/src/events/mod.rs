@@ -52,7 +52,7 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
-    state::{HasExecutions, HasLastReportTime, HasCorpus},
+    state::{HasCorpus, HasExecutions, HasLastReportTime},
     Error, HasMetadata,
 };
 #[cfg(feature = "scalability_introspection")]
@@ -254,8 +254,7 @@ where
 // TODO remove forward_id as not anymore needed for centralized
 /// Events sent around in the library
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum Event<I> 
-{
+pub enum Event<I> {
     // TODO use an ID to keep track of the original index in the sender Corpus
     // The sender can then use it to send Testcase metadata with CustomEvent
     /// A fuzzer found a new testcase. Rejoice!

@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use serde::de::DeserializeOwned;
 use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(feature = "llmp_compression")]
@@ -9,6 +8,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     ClientId, Error,
 };
+use serde::de::DeserializeOwned;
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;

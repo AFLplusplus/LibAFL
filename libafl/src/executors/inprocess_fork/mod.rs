@@ -14,7 +14,6 @@ use nix::unistd::{fork, ForkResult};
 
 use super::hooks::ExecutorHooksTuple;
 use crate::{
-    corpus::Corpus,
     executors::{
         hooks::inprocess_fork::InProcessForkExecutorGlobalData,
         inprocess_fork::inner::GenericInProcessForkExecutorInner, Executor, ExitKind, HasObservers,
@@ -40,12 +39,12 @@ pub mod stateful;
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub type InProcessForkExecutor<'a, H, OT, S, SP, EM, Z> =
-    GenericInProcessForkExecutor<'a, H, (), OT, S, SP, EM, Z>;
+pub type InProcessForkExecutor<'a, H, I, OT, S, SP, EM, Z> =
+    GenericInProcessForkExecutor<'a, H, (), I, OT, S, SP, EM, Z>;
 
-impl<'a, H, OT, S, SP, EM, Z> InProcessForkExecutor<'a, H, OT, S, SP, EM, Z>
+impl<'a, H, I, OT, S, SP, EM, Z> InProcessForkExecutor<'a, H, I, OT, S, SP, EM, Z>
 where
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus,
 {
     /// The constructor for `InProcessForkExecutor`
@@ -75,12 +74,13 @@ where
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub struct GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z> {
+pub struct GenericInProcessForkExecutor<'a, H, HT, I, OT, S, SP, EM, Z> {
     harness_fn: &'a mut H,
-    inner: GenericInProcessForkExecutorInner<HT, OT, S, SP, EM, Z>,
+    inner: GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>,
 }
 
-impl<H, HT, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, I, OT, S, SP, EM, Z> Debug
+    for GenericInProcessForkExecutor<'_, H, HT, I, OT, S, SP, EM, Z>
 where
     HT: Debug,
     OT: Debug,
@@ -103,14 +103,14 @@ where
     }
 }
 
-impl<EM, H, HT, OT, S, SP, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
+impl<EM, H, HT, I, OT, S, SP, Z> Executor<EM, I, S, Z>
+    for GenericInProcessForkExecutor<'_, H, HT, I, OT, S, SP, EM, Z>
 where
-    H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind + Sized,
+    H: FnMut(&I) -> ExitKind + Sized,
     S: HasCorpus + HasExecutions,
     SP: ShMemProvider,
-    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    HT: ExecutorHooksTuple<I, S>,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn run_target(
@@ -118,7 +118,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -142,10 +142,10 @@ where
     }
 }
 
-impl<'a, H, HT, OT, S, SP, EM, Z> GenericInProcessForkExecutor<'a, H, HT, OT, S, SP, EM, Z>
+impl<'a, H, HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutor<'a, H, HT, I, OT, S, SP, EM, Z>
 where
-    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    HT: ExecutorHooksTuple<I, S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus,
 {
     /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
@@ -188,8 +188,8 @@ where {
     }
 }
 
-impl<H, HT, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutor<'_, H, HT, OT, S, SP, EM, Z>
+impl<H, HT, I, OT, S, SP, EM, Z> HasObservers
+    for GenericInProcessForkExecutor<'_, H, HT, I, OT, S, SP, EM, Z>
 {
     type Observers = OT;
     #[inline]
@@ -356,7 +356,7 @@ mod tests {
         };
 
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
-        let default = InChildProcessHooks::nop();
+        let default = InChildProcessHooks::<NopInput, NopState<NopInput>>::nop();
         #[cfg(target_os = "linux")]
         let mut in_process_fork_executor = GenericInProcessForkExecutor {
             harness_fn: &mut harness,
@@ -382,7 +382,8 @@ mod tests {
         let input = NopInput {};
         let mut fuzzer = NopFuzzer::new();
         let mut state = NopState::new();
-        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> = SimpleEventManager::printing();
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
+            SimpleEventManager::printing();
         in_process_fork_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();

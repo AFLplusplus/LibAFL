@@ -1,4 +1,4 @@
-use libafl::{inputs::UsesInput, HasMetadata};
+use libafl::HasMetadata;
 
 use super::{
     helpers::{gen_hashed_edge_ids, trace_edge_hitcount_ptr, trace_edge_single_ptr},
@@ -31,28 +31,30 @@ impl<AF, PF, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
 {
     const DO_SIDE_EFFECTS: bool = false;
 
-    fn fn_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn fn_hitcount<ET, I, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
     {
         emulator_modules.edges(
-            Hook::Function(gen_hashed_edge_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
+            Hook::Function(gen_hashed_edge_ids::<AF, ET, PF, I, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Raw(trace_edge_hitcount_ptr),
         );
     }
 
-    fn fn_no_hitcount<ET, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn fn_no_hitcount<ET, I, S>(&mut self, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
     {
         emulator_modules.edges(
-            Hook::Function(gen_hashed_edge_ids::<AF, ET, PF, S, Self, IS_CONST_MAP, MAP_SIZE>),
+            Hook::Function(gen_hashed_edge_ids::<AF, ET, PF, I, S, Self, IS_CONST_MAP, MAP_SIZE>),
             Hook::Raw(trace_edge_single_ptr),
         );
     }

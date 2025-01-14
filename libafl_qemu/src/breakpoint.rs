@@ -8,49 +8,25 @@ use std::{
     },
 };
 
-use libafl::inputs::UsesInput;
 use libafl_qemu_sys::GuestAddr;
 
-use crate::{command::CommandManager, Qemu};
+use crate::Qemu;
 
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BreakpointId(u64);
 
 // TODO: distinguish breakpoints with IDs instead of addresses to avoid collisions.
-pub struct Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+#[derive(Clone)]
+pub struct Breakpoint<C> {
     id: BreakpointId,
     addr: GuestAddr,
-    cmd: Option<CM::Commands>,
+    cmd: Option<C>,
     disable_on_trigger: bool,
     enabled: bool,
 }
 
-impl<CM, ED, ET, S, SM> Clone for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            addr: self.addr,
-            cmd: self.cmd.clone(),
-            disable_on_trigger: self.disable_on_trigger,
-            enabled: self.enabled,
-        }
-    }
-}
-
-impl<CM, ED, ET, S, SM> Debug for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> Debug for Breakpoint<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "BP {:?} @ addr {:?}", self.id, self.addr)
     }
@@ -71,68 +47,39 @@ impl Default for BreakpointId {
     }
 }
 
-impl<CM, ED, ET, S, SM> Hash for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> Hash for Breakpoint<C> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
 
-impl<CM, ED, ET, S, SM> PartialEq for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> PartialEq for Breakpoint<C> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl<CM, ED, ET, S, SM> Eq for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
-}
+impl<C> Eq for Breakpoint<C> {}
 
-impl<CM, ED, ET, S, SM> Display for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> Display for Breakpoint<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Breakpoint @vaddr 0x{:x}", self.addr)
     }
 }
 
-impl<CM, ED, ET, S, SM> Borrow<BreakpointId> for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> Borrow<BreakpointId> for Breakpoint<C> {
     fn borrow(&self) -> &BreakpointId {
         &self.id
     }
 }
 
-impl<CM, ED, ET, S, SM> Borrow<GuestAddr> for Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> Borrow<GuestAddr> for Breakpoint<C> {
     fn borrow(&self) -> &GuestAddr {
         &self.addr
     }
 }
 
-impl<CM, ED, ET, S, SM> Breakpoint<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C> Breakpoint<C> {
     // Emu will return with the breakpoint as exit reason.
     #[must_use]
     pub fn without_command(addr: GuestAddr, disable_on_trigger: bool) -> Self {
@@ -147,7 +94,7 @@ where
 
     // Emu will execute the command when it meets the breakpoint.
     #[must_use]
-    pub fn with_command(addr: GuestAddr, cmd: CM::Commands, disable_on_trigger: bool) -> Self {
+    pub fn with_command(addr: GuestAddr, cmd: C, disable_on_trigger: bool) -> Self {
         Self {
             id: BreakpointId::new(),
             addr,
@@ -181,7 +128,10 @@ where
         }
     }
 
-    pub fn trigger(&mut self, qemu: Qemu) -> Option<CM::Commands> {
+    pub fn trigger(&mut self, qemu: Qemu) -> Option<C>
+    where
+        C: Clone,
+    {
         if self.disable_on_trigger {
             self.disable(qemu);
         }

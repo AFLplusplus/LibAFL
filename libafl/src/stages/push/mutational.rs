@@ -190,7 +190,7 @@ where
 
 impl<EM, M, OT, S, Z> Iterator for StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    EM: ProgressReporter<S> +  EventFirer<<S::Corpus as Corpus>::Input, S>,
+    EM: ProgressReporter<S> + EventFirer<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasMetadata
         + HasExecutions
