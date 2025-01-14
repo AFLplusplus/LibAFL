@@ -9,6 +9,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     ClientId,
 };
+use serde::de::DeserializeOwned;
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
@@ -41,7 +42,9 @@ pub struct StdLlmpEventHook<I, MT> {
 
 impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT>
 where
+    I: DeserializeOwned,
     SP: ShMemProvider,
+    MT: Monitor,
 {
     fn on_new_message(
         &mut self,
@@ -85,7 +88,10 @@ where
     }
 }
 
-impl<I, MT> StdLlmpEventHook<I, MT> {
+impl<I, MT> StdLlmpEventHook<I, MT>
+where
+    MT: Monitor,
+{
     /// Create an event broker from a raw broker.
     pub fn new(monitor: MT) -> Result<Self, Error> {
         Ok(Self {

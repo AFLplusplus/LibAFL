@@ -79,13 +79,10 @@ where
 impl<EM, M, OT, S, Z> PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>
     for StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
         + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>,
-    S: HasCorpus
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + HasRand
-        + MaybeHasClientPerfMonitor,
+    S: HasCorpus + HasRand + MaybeHasClientPerfMonitor,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     <S::Corpus as Corpus>::Input: Input + Clone,
@@ -193,7 +190,7 @@ where
 
 impl<EM, M, OT, S, Z> Iterator for StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    EM: ProgressReporter<State = S>,
+    EM: ProgressReporter<S> +  EventFirer<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasMetadata
         + HasExecutions
@@ -216,14 +213,13 @@ where
 
 impl<EM, M, OT, S, Z> StdMutationalPushStage<EM, M, OT, S, Z>
 where
-    EM: ProgressReporter<State = S>,
+    EM: ProgressReporter<S> + EventFirer<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasMetadata
         + HasExecutions
         + HasLastReportTime
         + HasRand
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Clone + Debug + Input,

@@ -229,12 +229,12 @@ where
     ICB: InputConverter<From = DI, To = S::Input>,
     DI: Input,
 {
-    client: LlmpEventConverter<DI, IC, ICB, S, SP>,
+    client: LlmpEventConverter<IC, ICB, S, SP>,
 }
 
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
 where
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions
         + HasCorpus
         + HasRand
@@ -333,7 +333,7 @@ where
 {
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
-    pub fn new(client: LlmpEventConverter<DI, IC, ICB, S, SP>) -> Self {
+    pub fn new(client: LlmpEventConverter<IC, ICB, S, SP>) -> Self {
         Self { client }
     }
 }

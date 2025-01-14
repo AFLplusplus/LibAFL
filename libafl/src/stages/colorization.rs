@@ -17,7 +17,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::{HasMutatorBytes, UsesInput},
+    inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     nonzero,
     observers::{MapObserver, ObserversTuple},
@@ -76,14 +76,13 @@ impl<C, E, EM, O, S, Z> Named for ColorizationStage<C, E, EM, O, S, Z> {
 
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, E, EM, O, S, Z>
 where
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     S: HasCorpus
         + HasMetadata
         + HasRand
         + HasNamedMetadata
-        + HasCurrentCorpusId
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentCorpusId,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
     O: MapObserver,
@@ -156,7 +155,7 @@ libafl_bolts::impl_serdeany!(TaintMetadata);
 
 impl<C, E, EM, O, S, Z> ColorizationStage<C, E, EM, O, S, Z>
 where
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     O: MapObserver,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
@@ -165,8 +164,7 @@ where
         + HasMetadata
         + HasRand
         + HasCurrentCorpusId
-        + HasCurrentTestcase
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentTestcase,
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
 {
     #[inline]

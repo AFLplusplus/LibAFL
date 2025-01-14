@@ -17,7 +17,7 @@ use crate::{
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
@@ -56,7 +56,7 @@ impl<C, E, O, S, T, TS> MapCorpusMinimizer<C, E, O, S, T, TS>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
-    S: HasMetadata + HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S: HasMetadata + HasCorpus + HasExecutions,
     <S::Corpus as Corpus>::Input: Input,
     T: Copy + Hash + Eq,
     TS: TestcaseScore<S>,

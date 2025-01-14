@@ -24,14 +24,16 @@ use super::{default_on_restart, ProgressReporter};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
+    corpus::Corpus,
     events::{
         default_maybe_report_progress, default_report_progress, BrokerEventResult,
         CanSerializeObserver, Event, EventFirer, EventManagerId, EventProcessor, EventRestarter,
         HasEventManagerId, ManagerExit,
     },
     monitors::Monitor,
-    state::Stoppable,
-    Error,
+    stages::HasCurrentStageId,
+    state::{HasExecutions, HasLastReportTime, Stoppable},
+    Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{
@@ -54,7 +56,11 @@ pub struct SimpleEventManager<I, MT, S> {
     phantom: PhantomData<S>,
 }
 
-impl<I, MT, S> Debug for SimpleEventManager<I, MT, S> {
+impl<I, MT, S> Debug for SimpleEventManager<I, MT, S>
+where
+    MT: Debug,
+    I: Debug,
+{
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SimpleEventManager")
             //.field("custom_buf_handlers", self.custom_buf_handlers)
@@ -64,7 +70,12 @@ impl<I, MT, S> Debug for SimpleEventManager<I, MT, S> {
     }
 }
 
-impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S> {
+impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
+where
+    I: Debug,
+    MT: Monitor,
+    S: Stoppable,
+{
     fn should_send(&self) -> bool {
         true
     }
@@ -78,15 +89,23 @@ impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S> {
     }
 }
 
-impl<I, MT, S> ManagerExit for SimpleEventManager<I, MT, S> where S: HasCorpus {}
+impl<I, MT, S> ManagerExit for SimpleEventManager<I, MT, S> {}
 
-impl<I, MT, S> EventRestarter<S> for SimpleEventManager<I, MT, S> {
+impl<I, MT, S> EventRestarter<S> for SimpleEventManager<I, MT, S>
+where
+    S: HasCurrentStageId,
+{
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         default_on_restart(self, state)
     }
 }
 
-impl<E, I, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, MT, S> {
+impl<E, I, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, MT, S>
+where
+    I: Debug,
+    MT: Monitor,
+    S: Stoppable,
+{
     fn process(
         &mut self,
         _fuzzer: &mut Z,
@@ -114,7 +133,13 @@ where
     }
 }
 
-impl<I, MT, S> ProgressReporter<S> for SimpleEventManager<I, MT, S> {
+impl<I, MT, S> ProgressReporter<S> for SimpleEventManager<I, MT, S>
+where
+    I: Debug,
+    MT: Monitor,
+    S: HasMetadata + HasExecutions + HasLastReportTime + Stoppable + HasCorpus,
+    S::Corpus: Corpus<Input = I>,
+{
     fn maybe_report_progress(
         &mut self,
         state: &mut S,
@@ -135,7 +160,11 @@ impl<I, MT, S> HasEventManagerId for SimpleEventManager<I, MT, S> {
 }
 
 #[cfg(feature = "std")]
-impl<I, S> SimpleEventManager<I, SimplePrintingMonitor, S> {
+impl<I, S> SimpleEventManager<I, SimplePrintingMonitor, S>
+where
+    I: Debug,
+    S: Stoppable,
+{
     /// Creates a [`SimpleEventManager`] that just prints to `stdout`.
     #[must_use]
     pub fn printing() -> Self {
@@ -143,7 +172,12 @@ impl<I, S> SimpleEventManager<I, SimplePrintingMonitor, S> {
     }
 }
 
-impl<I, MT, S> SimpleEventManager<I, MT, S> {
+impl<I, MT, S> SimpleEventManager<I, MT, S>
+where
+    I: Debug,
+    MT: Monitor,
+    S: Stoppable,
+{
     /// Creates a new [`SimpleEventManager`].
     pub fn new(monitor: MT) -> Self {
         Self {
@@ -255,7 +289,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SP> {
+impl<I, MT, S, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SP>
+where
+    I: Debug,
+    MT: Monitor,
+    S: Stoppable,
+    SP: ShMemProvider,
+{
     fn should_send(&self) -> bool {
         true
     }
@@ -266,7 +306,12 @@ impl<I, MT, S, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, S
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventRestarter<S> for SimpleRestartingEventManager<I, MT, S, SP> {
+impl<I, MT, S, SP> EventRestarter<S> for SimpleRestartingEventManager<I, MT, S, SP>
+where
+    SP: ShMemProvider,
+    S: HasCurrentStageId + Serialize,
+    MT: Monitor,
+{
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         state.on_restart()?;
@@ -303,7 +348,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, MT, S, SP, Z> EventProcessor<E, S, Z> for SimpleRestartingEventManager<I, MT, S, SP> {
+impl<E, I, MT, S, SP, Z> EventProcessor<E, S, Z> for SimpleRestartingEventManager<I, MT, S, SP>
+where
+    I: Debug,
+    MT: Monitor,
+    SP: ShMemProvider,
+    S: Stoppable,
+{
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.inner.process(fuzzer, state, executor)
     }
@@ -314,7 +365,14 @@ impl<E, I, MT, S, SP, Z> EventProcessor<E, S, Z> for SimpleRestartingEventManage
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> ProgressReporter<S> for SimpleRestartingEventManager<I, MT, S, SP> {
+impl<I, MT, S, SP> ProgressReporter<S> for SimpleRestartingEventManager<I, MT, S, SP>
+where
+    I: Debug,
+    MT: Monitor,
+    SP: ShMemProvider,
+    S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + HasCorpus,
+    S::Corpus: Corpus<Input = I>,
+{
     fn maybe_report_progress(
         &mut self,
         state: &mut S,
@@ -334,13 +392,16 @@ where
     SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
-        self.simple_event_mgr.mgr_id()
+        self.inner.mgr_id()
     }
 }
 
 #[cfg(feature = "std")]
 impl<I, MT, S, SP> SimpleRestartingEventManager<I, MT, S, SP>
 where
+    I: Debug,
+    MT: Monitor,
+    S: Stoppable,
     SP: ShMemProvider,
 {
     /// Creates a new [`SimpleEventManager`].

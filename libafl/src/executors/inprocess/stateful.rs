@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -30,17 +29,6 @@ use crate::{
 /// The internal state of the executor is made available to the harness.
 pub type StatefulInProcessExecutor<'a, H, OT, S, ES> =
     StatefulGenericInProcessExecutor<H, &'a mut H, (), OT, S, ES>;
-
-/// The process executor simply calls a target function, as boxed `FnMut` trait object
-/// The internal state of the executor is made available to the harness.
-pub type OwnedInProcessExecutor<OT, S, ES> = StatefulGenericInProcessExecutor<
-    dyn FnMut(&mut ES, &<S as UsesInput>::Input) -> ExitKind,
-    Box<dyn FnMut(&mut ES, &<S as UsesInput>::Input) -> ExitKind>,
-    (),
-    OT,
-    S,
-    ES,
->;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 /// The harness can access the internal state of the executor.
@@ -140,7 +128,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -168,7 +156,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -207,7 +195,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -267,7 +255,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -297,7 +285,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -333,7 +321,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {

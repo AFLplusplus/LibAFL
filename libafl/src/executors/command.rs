@@ -877,7 +877,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_builder() {
-        let mut mgr: SimpleEventManager<_, NopState<NopInput>> =
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::new(SimpleMonitor::new(|status| {
                 log::info!("{status}");
             }));

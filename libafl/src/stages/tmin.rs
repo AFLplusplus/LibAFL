@@ -65,7 +65,7 @@ where
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasMetadata
@@ -75,8 +75,7 @@ where
         + HasMaxSize
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Hash + HasLen,
@@ -136,7 +135,7 @@ where
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasMetadata
@@ -147,8 +146,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Hash + HasLen + Input,

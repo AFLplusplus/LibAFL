@@ -39,11 +39,12 @@ use crate::{
         HasEventManagerId, ManagerExit, ProgressReporter,
     },
     executors::HasObservers,
-    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
+    fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput},
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasCorpus, HasImported, NopState, State, Stoppable},
-    Error,
+    observers::TimeObserver,
+    stages::HasCurrentStageId,
+    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, NopState, State, Stoppable},
+    Error, HasMetadata,
 };
 
 /// Default initial capacity of the event buffer - 4KB
@@ -165,7 +166,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
     where
         SP: ShMemProvider,
-        S: State,
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Self::build_from_client(self, llmp, configuration, time_ref)
@@ -183,7 +183,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
     where
         SP: ShMemProvider,
-        S: State,
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Self::build_from_client(self, llmp, configuration, time_ref)
@@ -199,7 +198,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
     where
         SP: ShMemProvider,
-        S: State,
     {
         let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
         Self::build_from_client(self, llmp, configuration, time_ref)
@@ -348,6 +346,8 @@ where
         <S::Corpus as Corpus>::Input: Input,
         E: HasObservers,
         E::Observers: DeserializeOwned,
+        Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
+            + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
     {
         log::trace!("Got event in client: {} from {client_id:?}", event.name());
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
@@ -367,38 +367,32 @@ where
                 #[cfg(feature = "std")]
                 log::debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
 
-                if self.always_interesting {
-                    let item = fuzzer.add_input(state, executor, self, input)?;
-                    log::debug!("Added received Testcase as item #{item}");
-                } else {
-                    let res = if client_config.match_with(&self.configuration)
-                        && observers_buf.is_some()
+                let res = if client_config.match_with(&self.configuration)
+                    && observers_buf.is_some()
+                {
+                    let start = current_time();
+                    let observers: E::Observers =
+                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                     {
-                        let start = current_time();
-                        let observers: E::Observers =
-                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        {
-                            self.deserialization_time = current_time() - start;
-                        }
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_with_observers += 1;
-                        }
-                        fuzzer
-                            .evaluate_execution(state, self, input, &observers, &exit_kind, false)?
-                    } else {
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_without_observers += 1;
-                        }
-                        fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
-                    };
-                    if let Some(item) = res.1 {
-                        *state.imported_mut() += 1;
-                        log::debug!("Added received Testcase {evt_name} as item #{item}");
-                    } else {
-                        log::debug!("Testcase {evt_name} was discarded");
+                        self.deserialization_time = current_time() - start;
                     }
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_with_observers += 1;
+                    }
+                    fuzzer.evaluate_execution(state, self, input, &observers, &exit_kind, false)?
+                } else {
+                    #[cfg(feature = "scalability_introspection")]
+                    {
+                        state.scalability_monitor_mut().testcase_without_observers += 1;
+                    }
+                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
+                };
+                if let Some(item) = res.1 {
+                    *state.imported_mut() += 1;
+                    log::debug!("Added received Testcase {evt_name} as item #{item}");
+                } else {
+                    log::debug!("Testcase {evt_name} was discarded");
                 }
             }
             Event::Stop => {
@@ -428,6 +422,7 @@ impl<EMH, S: State, SP: ShMemProvider> LlmpEventManager<EMH, S, SP> {
 
 impl<EMH, I, S, SP> EventFirer<I, S> for LlmpEventManager<EMH, S, SP>
 where
+    I: Serialize,
     SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
@@ -492,6 +487,7 @@ where
 impl<EMH, S, SP> EventRestarter<S> for LlmpEventManager<EMH, S, SP>
 where
     SP: ShMemProvider,
+    S: HasCurrentStageId,
 {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         default_on_restart(self, state)
@@ -517,6 +513,9 @@ where
     S: HasCorpus + HasImported + Stoppable,
     EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: DeserializeOwned + Input,
+    SP: ShMemProvider,
+    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
+        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -542,7 +541,7 @@ where
             } else {
                 msg
             };
-            let event: Event<S::Input> = postcard::from_bytes(event_bytes)?;
+            let event: Event<<S::Corpus as Corpus>::Input> = postcard::from_bytes(event_bytes)?;
             log::debug!("Received event in normal llmp {}", event.name_detailed());
 
             // If the message comes from another machine, do not
@@ -564,7 +563,9 @@ where
 
 impl<EMH, S, SP> ProgressReporter<S> for LlmpEventManager<EMH, S, SP>
 where
+    S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus,
     SP: ShMemProvider,
+    <S::Corpus as Corpus>::Input: Serialize,
 {
     fn maybe_report_progress(
         &mut self,

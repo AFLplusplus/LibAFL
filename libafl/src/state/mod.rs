@@ -723,7 +723,7 @@ where
         load_config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         if let Some(remaining) = self.remaining_initial_files.as_ref() {
@@ -747,7 +747,7 @@ where
         config: &mut LoadConfig<I, Self, Z>,
     ) -> Result<ExecuteInputResult, Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         log::info!("Loading file {path:?} ...");
@@ -781,7 +781,7 @@ where
         mut config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         loop {
@@ -845,7 +845,7 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
@@ -872,7 +872,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -898,7 +898,7 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
@@ -923,7 +923,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -949,7 +949,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -990,7 +990,7 @@ where
         cores: &Cores,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         if self.multicore_inputs_processed.unwrap_or(false) {
@@ -1084,7 +1084,7 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -1122,7 +1122,7 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
@@ -1139,7 +1139,7 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {

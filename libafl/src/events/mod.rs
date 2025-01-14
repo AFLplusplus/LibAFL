@@ -48,11 +48,11 @@ use uuid::Uuid;
 #[cfg(feature = "introspection")]
 use crate::state::HasClientPerfMonitor;
 use crate::{
+    corpus::Corpus,
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
-    observers::ObserversTuple,
-    state::{HasExecutions, HasLastReportTime},
+    state::{HasExecutions, HasLastReportTime, HasCorpus},
     Error, HasMetadata,
 };
 #[cfg(feature = "scalability_introspection")]
@@ -117,7 +117,7 @@ pub struct EventManagerId(
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{inputs::UsesInput, observers::TimeObserver, stages::HasCurrentStageId};
+use crate::{observers::TimeObserver, stages::HasCurrentStageId};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -254,8 +254,8 @@ where
 // TODO remove forward_id as not anymore needed for centralized
 /// Events sent around in the library
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum Event<I> {
+pub enum Event<I> 
+{
     // TODO use an ID to keep track of the original index in the sender Corpus
     // The sender can then use it to send Testcase metadata with CustomEvent
     /// A fuzzer found a new testcase. Rejoice!
@@ -497,10 +497,10 @@ where
 
 /// Default implementation of [`ProgressReporter::report_progress`] for implementors with the
 /// given constraints
-pub fn default_report_progress<I, PR, S>(reporter: &mut PR, state: &mut S) -> Result<(), Error>
+pub fn default_report_progress<EM, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
 where
-    PR: EventFirer<I, S>,
-    S: HasExecutions + HasLastReportTime,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    S: HasExecutions + HasLastReportTime + HasCorpus,
 {
     let executions = *state.executions();
     let cur = current_time();
@@ -694,13 +694,13 @@ where
 impl<S> ProgressReporter<S> for NopEventManager {
     fn maybe_report_progress(
         &mut self,
-        state: &mut S,
-        monitor_timeout: Duration,
+        _state: &mut S,
+        _monitor_timeout: Duration,
     ) -> Result<(), Error> {
         Ok(())
     }
 
-    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
+    fn report_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -854,56 +854,6 @@ pub trait AdaptiveSerializer {
 
     /// A [`Handle`] to the time observer to determine the `time_factor`
     fn time_ref(&self) -> &Option<Handle<TimeObserver>>;
-
-    /// Serialize the observer using the `time_factor` and `percentage_threshold`.
-    /// These parameters are unique to each of the different types of `EventManager`
-    fn serialize_observers_adaptive<S, OT>(
-        &mut self,
-        observers: &OT,
-        time_factor: u32,
-        percentage_threshold: usize,
-    ) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: ObserversTuple<S::Input, S> + Serialize,
-        S: UsesInput,
-    {
-        match self.time_ref() {
-            Some(t) => {
-                let exec_time = observers
-                    .get(t)
-                    .map(|o| o.last_runtime().unwrap_or(Duration::ZERO))
-                    .unwrap();
-
-                let mut must_ser = (self.serialization_time() + self.deserialization_time())
-                    * time_factor
-                    < exec_time;
-                if must_ser {
-                    *self.should_serialize_cnt_mut() += 1;
-                }
-
-                if self.serializations_cnt() > 32 {
-                    must_ser = (self.should_serialize_cnt() * 100 / self.serializations_cnt())
-                        > percentage_threshold;
-                }
-
-                if self.serialization_time() == Duration::ZERO
-                    || must_ser
-                    || self.serializations_cnt().trailing_zeros() >= 8
-                {
-                    let start = current_time();
-                    let ser = postcard::to_allocvec(observers)?;
-                    *self.serialization_time_mut() = current_time() - start;
-
-                    *self.serializations_cnt_mut() += 1;
-                    Ok(Some(ser))
-                } else {
-                    *self.serializations_cnt_mut() += 1;
-                    Ok(None)
-                }
-            }
-            None => Ok(None),
-        }
-    }
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use libafl_bolts::{
     shmem::{NopShMemProvider, ShMemProvider},
     ClientId,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     corpus::Corpus,
@@ -228,6 +228,7 @@ where
 
 impl<IC, ICB, S, SP> LlmpEventConverter<IC, ICB, S, SP>
 where
+    S: HasCorpus,
     SP: ShMemProvider,
 {
     // TODO other new_* routines
@@ -265,7 +266,7 @@ where
     ) -> Result<(), Error>
     where
         ICB: InputConverter<To = <S::Corpus as Corpus>::Input, From = DI>,
-        S: HasCorpus,
+        Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
     {
         match event {
             Event::NewTestcase {
@@ -307,9 +308,9 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        DI: DeserializeOwned + Input,
         ICB: InputConverter<To = <S::Corpus as Corpus>::Input, From = DI>,
-        S: HasCorpus,
+        DI: DeserializeOwned + Input,
+        Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
@@ -347,8 +348,10 @@ where
 impl<IC, ICB, S, SP> EventFirer<<S::Corpus as Corpus>::Input, S>
     for LlmpEventConverter<IC, ICB, S, SP>
 where
-    S: HasCorpus,
     IC: InputConverter<From = <S::Corpus as Corpus>::Input>,
+    S: HasCorpus,
+    SP: ShMemProvider,
+    IC::To: Serialize,
 {
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {

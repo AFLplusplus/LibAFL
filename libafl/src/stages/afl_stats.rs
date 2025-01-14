@@ -26,7 +26,6 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::EventFirer,
     executors::HasObservers,
-    inputs::UsesInput,
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
@@ -238,7 +237,7 @@ pub struct AFLPlotData<'a> {
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     Z: HasScheduler<<S::Corpus as Corpus>::Input, S>,
     S: HasImported
         + HasCorpus
@@ -247,8 +246,7 @@ where
         + HasExecutions
         + HasNamedMetadata
         + Stoppable
-        + HasCurrentCorpusId
-        + UsesInput,
+        + HasCurrentCorpusId,
     E::Observers: MatchNameRef,
     O: MapObserver,
     C: AsRef<O> + Named,
@@ -417,7 +415,7 @@ where
 impl<C, E, EM, O, S, Z> AflStatsStage<C, E, EM, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     S: HasImported + HasCorpus + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,
@@ -641,7 +639,7 @@ pub struct AflStatsStageBuilder<C, E, EM, O, S, Z> {
 impl<C, E, EM, O, S, Z> AflStatsStageBuilder<C, E, EM, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     S: HasImported + HasCorpus + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,

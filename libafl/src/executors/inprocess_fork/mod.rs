@@ -382,7 +382,7 @@ mod tests {
         let input = NopInput {};
         let mut fuzzer = NopFuzzer::new();
         let mut state = NopState::new();
-        let mut mgr: SimpleEventManager<_, NopState<NopInput>> = SimpleEventManager::printing();
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> = SimpleEventManager::printing();
         in_process_fork_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();

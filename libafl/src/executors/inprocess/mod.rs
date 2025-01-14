@@ -28,7 +28,7 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, HasMetadata,
@@ -45,14 +45,6 @@ pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H
 /// The inprocess executor that allows hooks
 pub type HookableInProcessExecutor<'a, H, HT, OT, S> =
     GenericInProcessExecutor<H, &'a mut H, HT, OT, S>;
-/// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
-    dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
-    Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
-    (),
-    OT,
-    S,
->;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 pub struct GenericInProcessExecutor<H, HB, HT, OT, S> {
@@ -125,7 +117,6 @@ where
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasCurrentTestcase
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasExecutions
         + HasSolutions,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
@@ -140,7 +131,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -166,7 +157,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -203,7 +194,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -232,7 +223,6 @@ where
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus
         + HasCurrentTestcase
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasExecutions
         + HasSolutions,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
@@ -248,7 +238,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -275,7 +265,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -308,7 +298,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -383,13 +373,12 @@ pub fn run_observers_and_save_state<E, EM, OF, S, Z>(
 ) where
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasExecutions
         + HasSolutions
         + HasCorpus
-        + HasCurrentTestcase
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentTestcase,
     Z: HasObjective<Objective = OF>,
     <S::Corpus as Corpus>::Input: Input + Clone,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
@@ -449,13 +438,12 @@ pub unsafe fn generic_inproc_crash_handler<E, EM, OF, S, Z>()
 where
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasExecutions
         + HasSolutions
         + HasCorpus
-        + HasCurrentTestcase
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentTestcase,
     <S::Corpus as Corpus>::Input: Input + Clone,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     Z: HasObjective<Objective = OF>
@@ -493,15 +481,11 @@ mod tests {
         events::NopEventManager,
         executors::{Executor, ExitKind, InProcessExecutor},
         feedbacks::CrashFeedback,
-        inputs::{NopInput, UsesInput},
+        inputs::NopInput,
         schedulers::RandScheduler,
         state::{NopState, StdState},
         StdFuzzer,
     };
-
-    impl UsesInput for () {
-        type Input = NopInput;
-    }
 
     #[test]
     fn test_inmem_exec() {

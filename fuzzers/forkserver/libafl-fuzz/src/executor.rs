@@ -8,7 +8,6 @@ use std::{
 use libafl::{
     corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
-    inputs::UsesInput,
     state::{HasCorpus, UsesState},
     Error,
 };
@@ -263,7 +262,7 @@ pub enum SupportedExecutors<S, OT, FSV, NYX> {
 impl<S, OT, FSV, NYX, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for SupportedExecutors<S, OT, FSV, NYX>
 where
-    S: HasCorpus + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S: HasCorpus,
     EM: UsesState<State = S>,
     NYX: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
@@ -340,7 +339,7 @@ pub enum SupportedExecutors<S, OT, FSV> {
 impl<S, OT, FSV, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for SupportedExecutors<S, OT, FSV>
 where
-    S: HasCorpus + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S: HasCorpus
     EM: UsesState<State = S>,
     FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
 {

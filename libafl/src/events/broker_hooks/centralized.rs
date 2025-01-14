@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use serde::de::DeserializeOwned;
 use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(feature = "llmp_compression")]
@@ -22,6 +23,7 @@ pub struct CentralizedLlmpHook<I> {
 
 impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I>
 where
+    I: DeserializeOwned,
     SP: ShMemProvider,
 {
     fn on_new_message(

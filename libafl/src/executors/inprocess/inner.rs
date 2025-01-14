@@ -28,7 +28,7 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
@@ -147,12 +147,11 @@ where
     where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
         S: HasCurrentTestcase
             + HasCorpus
-            + HasSolutions
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+            + HasSolutions,
         Z: HasObjective<Objective = OF>,
         S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
         <S::Corpus as Corpus>::Input: Input + Clone,
@@ -180,12 +179,11 @@ where
     where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
         S: HasCurrentTestcase
             + HasCorpus
-            + HasSolutions
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+            + HasSolutions,
         Z: HasObjective<Objective = OF>,
         S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
         <S::Corpus as Corpus>::Input: Input + Clone,
@@ -216,12 +214,11 @@ where
     where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
         S: HasCurrentTestcase
             + HasCorpus
-            + HasSolutions
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+            + HasSolutions,
         Z: HasObjective<Objective = OF>,
         S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
         <S::Corpus as Corpus>::Input: Input + Clone,

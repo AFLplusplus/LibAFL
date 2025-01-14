@@ -1,4 +1,10 @@
-use std::{fmt::Debug, marker::PhantomData, slice, sync::Arc, vec::Vec};
+use std::{
+    fmt::{Debug, Display},
+    marker::PhantomData,
+    slice,
+    sync::Arc,
+    vec::Vec,
+};
 
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
@@ -8,16 +14,21 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     ClientId, Error,
 };
+use serde::Serialize;
 use tokio::{
+    net::ToSocketAddrs,
     runtime::Runtime,
     sync::{RwLock, RwLockWriteGuard},
     task::JoinHandle,
 };
 
-use crate::events::{
-    centralized::_LLMP_TAG_TO_MAIN,
-    multi_machine::{MultiMachineMsg, TcpMultiMachineState},
-    Event,
+use crate::{
+    events::{
+        centralized::_LLMP_TAG_TO_MAIN,
+        multi_machine::{MultiMachineMsg, TcpMultiMachineState},
+        Event,
+    },
+    inputs::Input,
 };
 
 /// Makes a raw pointer send + sync.
@@ -94,7 +105,11 @@ impl<A, I> TcpMultiMachineLlmpSenderHook<A, I> {
     }
 }
 
-impl<A, I> TcpMultiMachineLlmpReceiverHook<A, I> {
+impl<A, I> TcpMultiMachineLlmpReceiverHook<A, I>
+where
+    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
+    I: Serialize,
+{
     /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     ///
     /// # Safety
@@ -136,6 +151,8 @@ impl<A, I> TcpMultiMachineLlmpReceiverHook<A, I> {
 
 impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpSenderHook<A, I>
 where
+    I: Input,
+    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     SP: ShMemProvider,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.
@@ -196,6 +213,8 @@ where
 
 impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpReceiverHook<A, I>
 where
+    I: Input,
+    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     SP: ShMemProvider,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.

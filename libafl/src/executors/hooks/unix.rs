@@ -19,7 +19,7 @@ pub mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
         state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     };
@@ -81,13 +81,12 @@ pub mod unix_signal_handler {
     where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
         S: HasExecutions
             + HasSolutions
             + HasCurrentTestcase
-            + HasCorpus
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+            + HasCorpus,
         S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
         Z: HasObjective<Objective = OF>,
         <S::Corpus as Corpus>::Input: Input + Clone,
@@ -135,13 +134,12 @@ pub mod unix_signal_handler {
     ) where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasInProcessHooks<S> + HasObservers,
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
         S: HasExecutions
             + HasSolutions
             + HasCurrentTestcase
-            + HasCorpus
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+            + HasCorpus,
         Z: HasObjective<Objective = OF>,
         <S::Corpus as Corpus>::Input: Input + Clone,
         S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
@@ -196,13 +194,12 @@ pub mod unix_signal_handler {
     ) where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
         S: HasExecutions
             + HasSolutions
             + HasCorpus
-            + HasCurrentTestcase
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+            + HasCurrentTestcase,
         Z: HasObjective<Objective = OF>,
         <S::Corpus as Corpus>::Input: Input + Clone,
         S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,

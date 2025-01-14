@@ -30,7 +30,7 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
@@ -223,14 +223,13 @@ impl<S> InProcessHooks<S> {
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasInProcessHooks<S>,
-        E::Observers: ObserversTuple<<S as UsesInput>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S> + EventRestarter<S>,
         OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
         S: HasExecutions
             + HasSolutions
             + HasCorpus
-            + HasCurrentTestcase
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+            + HasCurrentTestcase,
         Z: HasObjective<Objective = OF>,
         <S::Corpus as Corpus>::Input: Input + Clone,
         S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
