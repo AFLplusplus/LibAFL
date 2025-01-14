@@ -260,11 +260,7 @@ pub(crate) static mut NOP_PAGE_FILTER: UnsafeCell<NopPageFilter> = UnsafeCell::n
 
 #[cfg(all(feature = "systemmode", test))]
 mod tests {
-    use libafl::{
-        inputs::{NopInput},
-        state::NopState,
-        HasMetadata,
-    };
+    use libafl::{inputs::NopInput, state::NopState, HasMetadata};
     use libafl_bolts::tuples::tuple_list;
 
     use crate::modules::{
