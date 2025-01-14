@@ -62,7 +62,7 @@ frida-gum-sys = { version = "0.15.1", features = [
   "event-sink",
   "invocation-listener",
 ] }
-frida-gum = { version = "0.15.1", features = [
+frida-gum = { version = "0.16.0", features = [
   "event-sink",
   "invocation-listener",
   "module-names",
