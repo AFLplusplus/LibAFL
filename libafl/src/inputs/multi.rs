@@ -160,7 +160,7 @@ where
             self.names
                 .iter()
                 .cloned()
-                .zip(self.parts.iter().map(|i| i.generate_name()))
+                .zip(self.parts.iter().map(Input::generate_name))
                 .map(|(name, generated)| format!("{name}-{generated}"))
                 .collect::<Vec<_>>()
                 .join(",")

@@ -10,8 +10,7 @@ use std::{
     fs,
     fs::{File, OpenOptions},
     io,
-    io::Write,
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -35,7 +34,11 @@ use crate::{
 /// If the create fails for _any_ reason, including, but not limited to, a preexisting existing file of that name,
 /// it will instead return the respective [`io::Error`].
 fn create_new<P: AsRef<Path>>(path: P) -> Result<File, io::Error> {
-    OpenOptions::new().write(true).read(true).create_new(true).open(path)
+    OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create_new(true)
+        .open(path)
 }
 
 /// Tries to create the given `path` and returns `None` _only_ if the file already existed.
@@ -391,8 +394,12 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let lockfile_name = format!(".{file_name}");
             let lockfile_path = self.dir_path.join(lockfile_name);
 
-            let mut lockfile = try_create_new(&lockfile_path)?
-                .unwrap_or(OpenOptions::new().write(true).read(true).open(&lockfile_path)?);
+            let mut lockfile = try_create_new(&lockfile_path)?.unwrap_or(
+                OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .open(&lockfile_path)?,
+            );
             lockfile.lock_exclusive()?;
 
             lockfile.read_to_string(&mut ctr)?;
@@ -465,7 +472,10 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if let Some(filename) = testcase.filename() {
             if self.locking {
                 let lockfile_path = self.dir_path.join(format!(".{filename}"));
-                let mut lockfile = OpenOptions::new().write(true).read(true).open(&lockfile_path)?;
+                let mut lockfile = OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .open(&lockfile_path)?;
 
                 lockfile.lock_exclusive()?;
                 let mut ctr = String::new();
