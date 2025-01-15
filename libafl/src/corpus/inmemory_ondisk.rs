@@ -11,6 +11,7 @@ use std::{
     fs::{File, OpenOptions},
     io,
     io::Write,
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -34,7 +35,7 @@ use crate::{
 /// If the create fails for _any_ reason, including, but not limited to, a preexisting existing file of that name,
 /// it will instead return the respective [`io::Error`].
 fn create_new<P: AsRef<Path>>(path: P) -> Result<File, io::Error> {
-    OpenOptions::new().write(true).create_new(true).open(path)
+    OpenOptions::new().write(true).read(true).create_new(true).open(path)
 }
 
 /// Tries to create the given `path` and returns `None` _only_ if the file already existed.
@@ -390,18 +391,19 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let lockfile_name = format!(".{file_name}");
             let lockfile_path = self.dir_path.join(lockfile_name);
 
-            let lockfile = try_create_new(&lockfile_path)?
-                .unwrap_or(OpenOptions::new().write(true).open(&lockfile_path)?);
+            let mut lockfile = try_create_new(&lockfile_path)?
+                .unwrap_or(OpenOptions::new().write(true).read(true).open(&lockfile_path)?);
             lockfile.lock_exclusive()?;
 
-            ctr = fs::read_to_string(&lockfile_path)?.trim().to_string();
+            lockfile.read_to_string(&mut ctr)?;
+            ctr = ctr.trim().to_string();
             if ctr.is_empty() {
                 ctr = String::from("1");
             } else {
                 ctr = (ctr.parse::<u32>()? + 1).to_string();
             }
 
-            fs::write(lockfile_path, &ctr)?;
+            lockfile.write_all(ctr.as_bytes())?;
         }
 
         if testcase.file_path().is_none() {
@@ -463,16 +465,18 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if let Some(filename) = testcase.filename() {
             if self.locking {
                 let lockfile_path = self.dir_path.join(format!(".{filename}"));
-                let lockfile = OpenOptions::new().write(true).open(&lockfile_path)?;
+                let mut lockfile = OpenOptions::new().write(true).read(true).open(&lockfile_path)?;
 
                 lockfile.lock_exclusive()?;
-                let ctr = fs::read_to_string(&lockfile_path)?;
+                let mut ctr = String::new();
+                lockfile.read_to_string(&mut ctr)?;
+                ctr = ctr.trim().to_string();
 
                 if ctr == "1" {
                     FileExt::unlock(&lockfile)?;
                     drop(fs::remove_file(lockfile_path));
                 } else {
-                    fs::write(lockfile_path, (ctr.parse::<u32>()? - 1).to_string())?;
+                    lockfile.write_all(&(ctr.parse::<u32>()? - 1).to_le_bytes())?;
                     return Ok(());
                 }
             }
