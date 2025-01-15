@@ -7,10 +7,7 @@ use std::{cell::RefCell, ops::Add, pin::Pin};
 
 use hashbrown::HashMap;
 use libafl::{
-    executors::ExitKind,
-    inputs::HasTargetBytes,
-    observers::ObserversTuple,
-    state::{HasExecutions, State},
+    executors::ExitKind, inputs::HasTargetBytes, observers::ObserversTuple, state::HasExecutions,
 };
 use libafl_qemu_sys::{GuestAddr, GuestPhysAddr, GuestUsize, GuestVirtAddr};
 
@@ -253,7 +250,7 @@ impl<C, I, S> Emulator<C, NopCommandManager, NopEmulatorDriver, (), I, S, NopSna
 
 impl<C, I, S> Emulator<C, StdCommandManager<S>, StdEmulatorDriver, (), I, S, StdSnapshotManager>
 where
-    S: State + HasExecutions + Unpin,
+    S: HasExecutions + Unpin,
     I: HasTargetBytes,
 {
     #[must_use]

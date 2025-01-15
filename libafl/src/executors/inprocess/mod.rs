@@ -28,7 +28,7 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, HasMetadata,
@@ -124,7 +124,7 @@ impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus + HasCurrentTestcase + UsesInput<Input = I> + HasExecutions + HasSolutions,
+    S: HasCorpus + HasCurrentTestcase + HasExecutions + HasSolutions,
     S::Solutions: Corpus<Input = I>,
     I: Input,
 {
@@ -137,7 +137,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -163,7 +163,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -200,7 +200,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -227,7 +227,7 @@ where
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus + HasCurrentTestcase + UsesInput<Input = I> + HasExecutions + HasSolutions,
+    S: HasCorpus + HasCurrentTestcase + HasExecutions + HasSolutions,
     S::Solutions: Corpus<Input = I>,
     I: Input,
 {
@@ -241,7 +241,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -268,7 +268,8 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -301,7 +302,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -378,9 +379,9 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
 ) where
     E: Executor<EM, I, S, Z> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     Z: HasObjective<Objective = OF>,
     I: Input + Clone,
     S::Solutions: Corpus<Input = I>,
@@ -440,9 +441,9 @@ pub unsafe fn generic_inproc_crash_handler<E, EM, I, OF, S, Z>()
 where
     E: Executor<EM, I, S, Z> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     I: Input + Clone,
     S::Solutions: Corpus<Input = I>,
     Z: HasObjective<Objective = OF> + ExecutionProcessor<EM, I, E::Observers, S>,
@@ -479,15 +480,11 @@ mod tests {
         events::NopEventManager,
         executors::{Executor, ExitKind, InProcessExecutor},
         feedbacks::CrashFeedback,
-        inputs::{NopInput, UsesInput},
+        inputs::NopInput,
         schedulers::RandScheduler,
         state::{NopState, StdState},
         StdFuzzer,
     };
-
-    impl UsesInput for () {
-        type Input = NopInput;
-    }
 
     #[test]
     fn test_inmem_exec() {

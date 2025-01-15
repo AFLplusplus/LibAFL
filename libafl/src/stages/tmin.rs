@@ -22,7 +22,7 @@ use crate::{
     events::EventFirer,
     executors::{ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle, StateInitializer},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     observers::{MapObserver, ObserversTuple},
@@ -34,7 +34,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
-        MaybeHasClientPerfMonitor, State,
+        MaybeHasClientPerfMonitor,
     },
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
@@ -65,7 +65,7 @@ where
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasMetadata
@@ -75,8 +75,7 @@ where
         + HasMaxSize
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Hash + HasLen,
@@ -136,7 +135,7 @@ where
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasMetadata
@@ -147,8 +146,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Hash + HasLen + Input,
@@ -364,7 +362,6 @@ impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for MapEqualityFeedback<C, M, S>
 where
     M: MapObserver,
     C: AsRef<M>,
-    S: State,
     OT: MatchName,
 {
     fn is_interesting(
@@ -424,8 +421,8 @@ impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqual
 where
     M: MapObserver,
     C: AsRef<M> + Handled,
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers

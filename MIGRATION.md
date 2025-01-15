@@ -11,6 +11,10 @@
   - Related: `EmulatorBuilder` uses a single function to provide a `Qemu` initializer: `EmulatorBuilder::qemu_parameters`. For now, it can be either a `Vec<String>` or a `QemuConfig` instance.
   - Related: Qemu's `AsanModule` does not need any special call to `Qemu` init methods anymore. It is now possible to simply initialize `AsanModule` (or `AsanGuestModule`) with a reference to the environment as parameter.
   - `CustomBufHandlers` has been deleted. Please use `EventManagerHooksTuple` from now on.
+  - The `UsesState` and `UsesInput` traits have been removed in favor of regular Generics.
+  - For the structs/traits that used to use `UsesState`, we bring back the generic for the state.
+  - For `UsesState`, you can access to the input type through `HasCorpus` and `Corpus` traits
+
 # 0.14.0 -> 0.14.1
 - Removed `with_observers` from `Executor` trait.
 - `MmapShMemProvider::new_shmem_persistent` has been removed in favour of `MmapShMem::persist`. You probably want to do something like this: `let shmem = MmapShMemProvider::new()?.new_shmem(size)?.persist()?;`

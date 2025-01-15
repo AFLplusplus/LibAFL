@@ -7,7 +7,7 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, NopCorpus},
-    events::{EventRestarter, SimpleRestartingEventManager},
+    events::{EventRestarter, ManagerExit, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,

@@ -18,7 +18,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
@@ -92,7 +92,7 @@ pub struct CalibrationStage<C, E, O, OT, S> {
 impl<C, E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, O, OT, S>
 where
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     O: MapObserver,
     C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry:
@@ -103,8 +103,7 @@ where
         + HasNamedMetadata
         + HasExecutions
         + HasCurrentTestcase
-        + HasCurrentCorpusId
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentCorpusId,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Input,
 {

@@ -29,7 +29,6 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
-    inputs::UsesInput,
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
@@ -222,9 +221,9 @@ impl<I, S> InProcessHooks<I, S> {
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
         S::Solutions: Corpus<Input = I>,
@@ -266,10 +265,10 @@ impl<I, S> InProcessHooks<I, S> {
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
         S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
     {
@@ -329,9 +328,9 @@ impl<I, S> InProcessHooks<I, S> {
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions + HasCorpus,
         Z: HasObjective<Objective = OF>,
     {
         #[cfg_attr(miri, allow(unused_variables))]
@@ -469,7 +468,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     critical: null_mut(),
 };
 
-/// Get the inprocess [`crate::state::State`]
+/// Get the inprocess State
 ///
 /// # Safety
 /// Only safe if not called twice and if the state is not accessed from another borrow while this one is alive.
@@ -478,7 +477,7 @@ pub unsafe fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
 
-/// Get the [`crate::events::EventManager`]
+/// Get the `EventManager`
 ///
 /// # Safety
 /// Only safe if not called twice and if the event manager is not accessed from another borrow while this one is alive.

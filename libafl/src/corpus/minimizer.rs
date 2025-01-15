@@ -17,7 +17,7 @@ use crate::{
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
@@ -56,7 +56,7 @@ impl<C, E, O, S, T, TS> MapCorpusMinimizer<C, E, O, S, T, TS>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
-    S: HasMetadata + HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S: HasMetadata + HasCorpus + HasExecutions,
     <S::Corpus as Corpus>::Input: Input,
     T: Copy + Hash + Eq,
     TS: TestcaseScore<S>,
@@ -75,7 +75,7 @@ where
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
         CS: Scheduler<<S::Corpus as Corpus>::Input, S>
             + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S>,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
         Z: HasScheduler<<S::Corpus as Corpus>::Input, S, Scheduler = CS>,
     {
         // don't delete this else it won't work after restart

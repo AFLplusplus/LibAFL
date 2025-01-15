@@ -14,6 +14,7 @@ use libafl_bolts::{
     shmem::ShMemProvider,
     ClientId, Error,
 };
+use serde::Serialize;
 use tokio::{
     net::ToSocketAddrs,
     runtime::Runtime,
@@ -70,10 +71,7 @@ impl<T> NullLock<T> {
 /// It is responsible for receiving messages from other neighbours.
 /// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
-pub struct TcpMultiMachineLlmpSenderHook<A, I>
-where
-    I: Input,
-{
+pub struct TcpMultiMachineLlmpSenderHook<A, I> {
     /// the actual state of the broker hook
     shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
     /// the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
@@ -85,10 +83,7 @@ where
 /// It is responsible for receiving messages from other neighbours.
 /// Please check [`crate::events::multi_machine`] for more information.
 #[derive(Debug)]
-pub struct TcpMultiMachineLlmpReceiverHook<A, I>
-where
-    I: Input,
-{
+pub struct TcpMultiMachineLlmpReceiverHook<A, I> {
     /// the actual state of the broker hook
     shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
     /// the tokio runtime used to interact with other machines. Keep it outside to avoid locking it.
@@ -96,11 +91,7 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<A, I> TcpMultiMachineLlmpSenderHook<A, I>
-where
-    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
-    I: Input + Send + Sync + 'static,
-{
+impl<A, I> TcpMultiMachineLlmpSenderHook<A, I> {
     /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     pub(crate) fn new(
         shared_state: Arc<RwLock<TcpMultiMachineState<A>>>,
@@ -117,7 +108,7 @@ where
 impl<A, I> TcpMultiMachineLlmpReceiverHook<A, I>
 where
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
-    I: Input + Send + Sync + 'static,
+    I: Serialize,
 {
     /// Should not be created alone. Use [`TcpMultiMachineHooksBuilder`] instead.
     ///
@@ -160,9 +151,9 @@ where
 
 impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpSenderHook<A, I>
 where
-    A: Clone + Debug + Display + ToSocketAddrs + Send + Sync + 'static,
+    I: Input,
+    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     SP: ShMemProvider,
-    I: Input + Send + Sync + 'static,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.
     fn on_new_message(
@@ -222,9 +213,9 @@ where
 
 impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpReceiverHook<A, I>
 where
-    A: Clone + Debug + Display + ToSocketAddrs + Send + Sync + 'static,
+    I: Input,
+    A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
     SP: ShMemProvider,
-    I: Input + Send + Sync + 'static,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.
     fn on_new_message(

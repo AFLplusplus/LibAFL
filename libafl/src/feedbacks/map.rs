@@ -21,13 +21,13 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 use crate::{
-    corpus::Testcase,
+    corpus::{Corpus, Testcase},
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
-    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver},
+    state::HasCorpus,
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -395,13 +395,13 @@ where
 impl<C, EM, I, N, O, OT, R, S> Feedback<EM, I, OT, S> for MapFeedback<C, N, O, R>
 where
     C: CanTrack + AsRef<O>,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     N: IsNovel<O::Entry>,
     O: MapObserver + for<'it> AsIter<'it, Item = O::Entry>,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadata + UsesInput, // delete me
+    S: HasNamedMetadata + HasCorpus, // delete me
 {
     #[rustversion::nightly]
     default fn is_interesting(
@@ -538,10 +538,10 @@ where
 impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer>
 where
     C: CanTrack + AsRef<O>,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadata + UsesInput,
+    S: HasNamedMetadata + HasCorpus,
 {
     fn is_interesting(
         &mut self,

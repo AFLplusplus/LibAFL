@@ -17,10 +17,9 @@ use libafl::{
         SimpleRestartingEventManager,
     },
     executors::ExitKind,
-    inputs::UsesInput,
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     stages::{HasCurrentStageId, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
     Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
@@ -65,12 +64,11 @@ where
     F: Fuzzer<E, EM, S, ST>,
     S: HasMetadata
         + HasExecutions
-        + UsesInput
         + HasSolutions
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,
-    EM: ProgressReporter<State = S> + EventProcessor<E, F>,
+    EM: ProgressReporter<S> + EventProcessor<E, S, F>,
     ST: StagesTuple<E, EM, S, F>,
 {
     if let Some(solution) = state.solutions().last() {
@@ -113,7 +111,7 @@ where
     fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
         let (state, mgr): (
             Option<StdState<_, _, _, _>>,
-            SimpleRestartingEventManager<_, StdState<_, _, _, _>, _>,
+            SimpleRestartingEventManager<_, _, StdState<_, _, _, _>, _>,
         ) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider) {
             // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
             Ok(res) => res,

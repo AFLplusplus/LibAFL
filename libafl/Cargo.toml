@@ -71,9 +71,6 @@ value_bloom_feedback = ["fastbloom", "fastbloom/serde"]
 ## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = []
 
-## Collects stats about scalability
-scalability_introspection = []
-
 ## Expose `libafl::prelude` for access without additional using directives
 prelude = ["libafl_bolts/prelude"]
 
