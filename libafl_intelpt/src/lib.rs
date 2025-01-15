@@ -44,8 +44,8 @@ use libafl_bolts::Error;
 use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
 #[cfg(target_os = "linux")]
 use libipt::{
-    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
-    ConfigBuilder, Cpu, PtError, PtErrorCode, Status,
+    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Cpu,
+    PtEncoderDecoder, PtError, PtErrorCode, Status,
 };
 #[cfg(target_os = "linux")]
 pub use libipt::{Asid, Image, SectionCache};
@@ -334,6 +334,7 @@ impl IntelPT {
         // https://manpages.debian.org/bookworm/manpages-dev/perf_event_open.2.en.html#data_head
         smp_rmb();
 
+        // todo: Just use a pointer
         let mut data = unsafe {
             if head_wrap >= tail_wrap {
                 let ptr = self.perf_aux_buffer.add(tail_wrap as usize).cast::<u8>();
@@ -348,21 +349,20 @@ impl IntelPT {
             self.last_decode_trace = data.as_ref().to_vec();
         }
 
-        let mut config = ConfigBuilder::new(data.as_mut()).map_err(error_from_pt_error)?;
-        config.filter(self.ip_filters_to_addr_filter());
-        if let Some(cpu) = &*CURRENT_CPU {
-            config.cpu(*cpu);
+        let mut builder = unsafe {
+            BlockDecoder::builder().buffer_from_raw(data.as_mut().as_mut_ptr(), data.as_ref().len())
         }
-        let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
-        config.flags(flags);
-        let mut decoder = BlockDecoder::new(&config.finish()).map_err(error_from_pt_error)?;
+        .filter(self.ip_filters_to_addr_filter())
+        .set_end_on_call(true)
+        .set_end_on_jump(true);
+        if let Some(cpu) = &*CURRENT_CPU {
+            builder = builder.cpu(*cpu);
+        }
+
+        let mut decoder = builder.build().map_err(error_from_pt_error)?;
         decoder.set_image(image).map_err(error_from_pt_error)?;
         if let Some(rm) = read_memory {
-            decoder
-                .image()
-                .map_err(error_from_pt_error)?
-                .set_callback(Some(rm))
-                .map_err(error_from_pt_error)?;
+            decoder.image().set_callback(Some(rm))
         }
 
         let mut previous_block_end_ip = 0;
@@ -431,7 +431,7 @@ impl IntelPT {
 
     #[inline]
     fn decode_blocks<T>(
-        decoder: &mut BlockDecoder<()>,
+        decoder: &mut BlockDecoder,
         status: &mut Status,
         previous_block_end_ip: &mut u64,
         skip: u64,
@@ -454,7 +454,7 @@ impl IntelPT {
                 };
             }
 
-            match decoder.next() {
+            match decoder.decode_next() {
                 Ok((b, s)) => {
                     *status = s;
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
