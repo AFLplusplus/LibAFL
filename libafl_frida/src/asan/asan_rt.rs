@@ -655,7 +655,7 @@ impl AsanRuntime {
         macro_rules! hook_heap_windows {
             ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking allocator functions in {}", $libname);
-            for export in process.find_module_by_name($libname).enumerate_exports() {
+            for export in process.find_module_by_name($libname).expect("Failed to find module").enumerate_exports() {
                 // log::trace!("- {}", export.name);
                 match &export.name[..] {
                     "NtGdiCreateCompatibleDC" => {
