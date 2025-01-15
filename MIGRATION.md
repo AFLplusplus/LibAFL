@@ -1,5 +1,5 @@
 
-# 0.14.1 -> 0.15.0
+# 0.15.0 -> 0.15.0
 - `MmapShMem::new` and `MmapShMemProvider::new_shmem_with_id` now take `AsRef<Path>` instead of a byte array for the filename/id.
 - The closure passed to a `DumpToDiskStage` now provides the `Testcase` instead of just the `Input`.
 - `StatsStage` is deleted, and it is superceded by `AflStatsStage`
@@ -15,7 +15,7 @@
   - For the structs/traits that used to use `UsesState`, we bring back the generic for the state.
   - For `UsesState`, you can access to the input type through `HasCorpus` and `Corpus` traits
 
-# 0.14.0 -> 0.14.1
+# 0.14.0 -> 0.15.0
 - Removed `with_observers` from `Executor` trait.
 - `MmapShMemProvider::new_shmem_persistent` has been removed in favour of `MmapShMem::persist`. You probably want to do something like this: `let shmem = MmapShMemProvider::new()?.new_shmem(size)?.persist()?;`
 

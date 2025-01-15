@@ -1,10 +1,10 @@
 [build-system]
-requires = ["maturin[patchelf]>=0.14.10,<0.15"]
+requires = ["maturin[patchelf]>=0.15.00,<0.15"]
 build-backend = "maturin"
 
 [project]
 name = "PyLibAFL"
-version = "0.14.1"
+version = "0.15.0"
 description = "Advanced Fuzzing Library for Python"
 readme = "README.md"
 requires-python = ">=3.8"
