@@ -263,7 +263,6 @@ impl<S, OT, FSV, NYX, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for SupportedExecutors<S, OT, FSV, NYX>
 where
     S: HasCorpus,
-    EM: UsesState<State = S>,
     NYX: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
 {
