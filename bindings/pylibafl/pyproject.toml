@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin[patchelf]>=0.15.00,<0.15"]
+requires = ["maturin[patchelf]>=0.14.10,<0.15"]
 build-backend = "maturin"
 
 [project]
