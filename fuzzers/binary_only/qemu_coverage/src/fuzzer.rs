@@ -10,7 +10,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus},
     events::{
         launcher::Launcher, ClientDescription, EventConfig, EventRestarter,
-        LlmpRestartingEventManager,
+        LlmpRestartingEventManager, ManagerExit,
     },
     executors::ExitKind,
     fuzzer::StdFuzzer,
