@@ -1188,7 +1188,7 @@ impl AsanRuntime {
         #[cfg(not(windows))]
         hook_func!("libc", libc, strdup, (s: *const c_char), *mut c_char);
         #[cfg(windows)]
-        hook_func!(_strdup, (s: *const c_char), *mut c_char);
+        hook_func!("libc", libc, _strdup, (s: *const c_char), *mut c_char);
         hook_func!("libc", libc, strlen, (s: *const c_char), usize);
         hook_func!("libc", libc, strnlen, (s: *const c_char, n: usize), usize);
         hook_func!(
