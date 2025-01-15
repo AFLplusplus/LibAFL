@@ -4,10 +4,9 @@ use libafl::{
     events::{EventProcessor, ProgressReporter, SimpleEventManager},
     executors::HasObservers,
     feedbacks::MapFeedbackMetadata,
-    inputs::UsesInput,
     monitors::SimpleMonitor,
     stages::{HasCurrentStageId, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, Stoppable, UsesState},
+    state::{HasExecutions, HasLastReportTime, Stoppable},
     Error, Fuzzer, HasMetadata, HasNamedMetadata,
 };
 
@@ -27,12 +26,11 @@ where
     S: HasMetadata
         + HasNamedMetadata
         + HasExecutions
-        + UsesInput
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,
     E: HasObservers,
-    EM: ProgressReporter<State = S> + EventProcessor<E, F>,
+    EM: ProgressReporter<S> + EventProcessor<E, S, F>,
     ST: StagesTuple<E, EM, S, F>,
 {
     let meta = state

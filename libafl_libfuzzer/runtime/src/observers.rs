@@ -7,10 +7,10 @@ use std::{
 
 use ahash::AHasher;
 use libafl::{
+    corpus::Corpus,
     executors::ExitKind,
-    inputs::UsesInput,
     observers::{MapObserver, Observer, TimeObserver},
-    state::UsesState,
+    state::HasCorpus,
     Error,
 };
 use libafl_bolts::{AsIter, HasLen, Named};
@@ -158,13 +158,17 @@ where
     }
 }
 
-impl<M, O, S> Observer<S::Input, S> for MappedEdgeMapObserver<M, O>
+impl<M, O, S> Observer<<S::Corpus as Corpus>::Input, S> for MappedEdgeMapObserver<M, O>
 where
-    M: Observer<S::Input, S> + Debug,
-    O: Observer<S::Input, S> + Debug,
-    S: UsesInput,
+    S: HasCorpus,
+    M: Observer<<S::Corpus as Corpus>::Input, S> + Debug,
+    O: Observer<<S::Corpus as Corpus>::Input, S> + Debug,
 {
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+    ) -> Result<(), Error> {
         self.inner.pre_exec(state, input)?;
         self.value_observer.pre_exec(state, input)
     }
@@ -172,7 +176,7 @@ where
     fn post_exec(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.inner.post_exec(state, input, exit_kind)?;
@@ -255,12 +259,16 @@ impl Named for SizeValueObserver {
     }
 }
 
-impl<S> Observer<S::Input, S> for SizeValueObserver
+impl<S> Observer<<S::Corpus as Corpus>::Input, S> for SizeValueObserver
 where
-    S: UsesInput,
-    S::Input: HasLen,
+    S: HasCorpus,
+    <S::Corpus as Corpus>::Input: HasLen,
 {
-    fn pre_exec(&mut self, _state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        _state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+    ) -> Result<(), Error> {
         self.size = input.len();
         Ok(())
     }
@@ -299,18 +307,22 @@ impl Named for TimeValueObserver {
     }
 }
 
-impl<S> Observer<S::Input, S> for TimeValueObserver
+impl<S> Observer<<S::Corpus as Corpus>::Input, S> for TimeValueObserver
 where
-    S: UsesInput,
+    S: HasCorpus,
 {
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+    ) -> Result<(), Error> {
         self.time_obs.pre_exec(state, input)
     }
 
     fn post_exec(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.time_obs.post_exec(state, input, exit_kind)?;
@@ -361,12 +373,16 @@ impl Named for SizeTimeValueObserver {
     }
 }
 
-impl<S> Observer<S::Input, S> for SizeTimeValueObserver
+impl<S> Observer<<S::Corpus as Corpus>::Input, S> for SizeTimeValueObserver
 where
-    S: UsesInput,
-    S::Input: HasLen,
+    S: HasCorpus,
+    <S::Corpus as Corpus>::Input: HasLen,
 {
-    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+    ) -> Result<(), Error> {
         self.size_obs.pre_exec(state, input)?;
         self.time_obs.pre_exec(state, input)
     }
@@ -374,7 +390,7 @@ where
     fn post_exec(
         &mut self,
         state: &mut S,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.time_obs.post_exec(state, input, exit_kind)?;

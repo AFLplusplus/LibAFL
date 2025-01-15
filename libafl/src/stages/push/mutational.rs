@@ -18,7 +18,7 @@ use crate::{
     events::{EventFirer, ProgressReporter},
     executors::ExitKind,
     fuzzer::STATS_TIMEOUT_DEFAULT,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::Mutator,
     nonzero,
@@ -196,8 +196,7 @@ where
         + HasExecutions
         + HasLastReportTime
         + HasRand
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Clone + Debug + Input,

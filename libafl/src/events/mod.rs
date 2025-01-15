@@ -599,7 +599,9 @@ where
     Ok(())
 }
 
+/// The class that implements this must be able to serialize an observer.
 pub trait CanSerializeObserver<OT> {
+    /// Do serialize the observer
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>;
 }
 

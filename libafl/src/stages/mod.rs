@@ -49,7 +49,7 @@ pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
     events::EventProcessor,
-    state::{HasExecutions, State, Stoppable},
+    state::{HasExecutions, Stoppable},
     Error, HasNamedMetadata,
 };
 
@@ -249,7 +249,7 @@ impl<E, EM, S, Z> IntoVec<Box<dyn Stage<E, EM, S, Z>>> for Vec<Box<dyn Stage<E, 
 impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn Stage<E, EM, S, Z>>>
 where
     EM: EventProcessor<E, S, Z>,
-    S: HasCurrentStageId + State,
+    S: HasCurrentStageId + Stoppable,
 {
     /// Performs all stages in the `Vec`
     /// Checks after every stage if state wants to stop

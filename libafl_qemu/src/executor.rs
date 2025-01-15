@@ -20,9 +20,9 @@ use libafl::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State},
     Error, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "fork")]
@@ -92,11 +92,11 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
 ) where
     E: HasObservers + HasInProcessHooks<I, S> + Executor<EM, I, S, Z>,
     E::Observers: ObserversTuple<I, S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions + HasCorpus + Unpin + HasCurrentTestcase + UsesInput<Input = I>,
+    S: HasExecutions + HasSolutions + HasCorpus + Unpin + HasCurrentTestcase,
     I: Input,
     S::Solutions: Corpus<Input = I>,
     Z: HasObjective<Objective = OF>,
@@ -152,7 +152,7 @@ where
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     I: Input + Unpin,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus + Unpin + HasExecutions + HasSolutions + State<Input = I>,
+    S: HasCorpus + Unpin + HasExecutions + HasSolutions + HasCurrentTestcase,
     S::Solutions: Corpus<Input = I>,
 {
     pub fn new<EM, OF, Z>(
@@ -168,7 +168,7 @@ where
         C: Clone,
         CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
         ED: EmulatorDriver<C, CM, ET, I, S, SM>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF> + HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
         <S as HasCorpus>::Corpus: Corpus<Input = I>,
@@ -248,12 +248,11 @@ where
     C: Clone,
     CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
     ED: EmulatorDriver<C, CM, ET, I, S, SM>,
-    EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<I, S>,
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     I: Unpin,
     OT: ObserversTuple<I, S>,
-    S: State + HasExecutions + Unpin + HasCorpus,
+    S: HasExecutions + Unpin + HasCorpus,
 {
     fn run_target(
         &mut self,
@@ -290,7 +289,7 @@ where
     ET: EmulatorModuleTuple<I, S>,
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     OT: ObserversTuple<I, S>,
-    S: State + HasCorpus,
+    S: HasCorpus,
 {
     type Observers = OT;
     #[inline]
@@ -318,12 +317,11 @@ impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> Debug
 where
     C: Debug,
     CM: Debug,
-    EM: UsesState<State = S>,
     ED: Debug,
     ET: EmulatorModuleTuple<I, S> + Debug,
     OT: ObserversTuple<I, S> + Debug,
     I: Debug,
-    S: UsesInput<Input = I> + Debug,
+    S: Debug,
     SM: Debug,
     SP: ShMemProvider,
 {
@@ -339,7 +337,7 @@ where
 impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
     QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
 where
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
     S: State + HasSolutions + HasCorpus,
@@ -404,7 +402,7 @@ where
     C: Clone,
     CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
     ED: EmulatorDriver<C, CM, ET, I, S, SM>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &I) -> ExitKind,
     OF: Feedback<EM, I, OT, S>,
@@ -439,22 +437,9 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> UsesState
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
-where
-    ET: EmulatorModuleTuple<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: State,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-
-#[cfg(feature = "fork")]
 impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> HasObservers
     for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
 where
-    EM: UsesState<State = S>,
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
     S: State,

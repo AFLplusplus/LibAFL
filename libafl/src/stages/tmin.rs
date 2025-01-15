@@ -22,7 +22,7 @@ use crate::{
     events::EventFirer,
     executors::{ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle, StateInitializer},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     observers::{MapObserver, ObserversTuple},
@@ -34,7 +34,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
-        MaybeHasClientPerfMonitor, State,
+        MaybeHasClientPerfMonitor,
     },
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
@@ -362,7 +362,6 @@ impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for MapEqualityFeedback<C, M, S>
 where
     M: MapObserver,
     C: AsRef<M>,
-    S: State,
     OT: MatchName,
 {
     fn is_interesting(
@@ -422,8 +421,8 @@ impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqual
 where
     M: MapObserver,
     C: AsRef<M> + Handled,
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers

@@ -26,7 +26,6 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::{Event, EventFirer},
     executors::HasObservers,
-    inputs::UsesInput,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
@@ -240,7 +239,7 @@ pub struct AFLPlotData<'a> {
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     Z: HasScheduler<<S::Corpus as Corpus>::Input, S>,
     S: HasImported
         + HasCorpus

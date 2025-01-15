@@ -548,9 +548,6 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     monitor: MT,
     /// The configuration
     configuration: EventConfig,
-    /// Consider this testcase as interesting always if true
-    #[builder(default = false)]
-    always_interesting: bool,
     /// The 'main' function to run for each secondary client forked. This probably shouldn't return
     #[builder(default, setter(strip_option))]
     secondary_run_client: Option<CF>,
@@ -651,7 +648,6 @@ where
             |centralized_launcher: &Self, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
                 let builder = RestartingMgr::<(), MT, S, SP>::builder()
-                    .always_interesting(centralized_launcher.always_interesting)
                     .shmem_provider(centralized_launcher.shmem_provider.clone())
                     .broker_port(centralized_launcher.broker_port)
                     .kind(ManagerKind::Client { client_description })

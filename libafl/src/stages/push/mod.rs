@@ -26,7 +26,6 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
-    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::{RetryCountRestartHelper, Stage},
@@ -254,8 +253,7 @@ where
         + HasLastReportTime
         + HasCurrentCorpusId
         + HasNamedMetadata
-        + HasMetadata
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasMetadata,
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<<S::Corpus as Corpus>::Input, S>
         + EventRestarter<S>

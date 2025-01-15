@@ -19,7 +19,7 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -310,12 +310,7 @@ impl<CS, EM, F, IF, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Inp
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<OT>,
-    S: HasCorpus
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + HasCurrentTestcase
-        + HasSolutions
-        + HasLastFoundTime,
+    S: HasCorpus + MaybeHasClientPerfMonitor + HasCurrentTestcase + HasSolutions + HasLastFoundTime,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
@@ -524,7 +519,6 @@ where
         + HasSolutions
         + MaybeHasClientPerfMonitor
         + HasCurrentTestcase
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasExecutions
         + HasLastFoundTime,
     <S::Corpus as Corpus>::Input: Input,
@@ -603,8 +597,7 @@ where
         + MaybeHasClientPerfMonitor
         + HasCurrentTestcase
         + HasLastFoundTime
-        + HasExecutions
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasExecutions,
     <S::Corpus as Corpus>::Input: Input,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     IF: InputFilter<<S::Corpus as Corpus>::Input>,
@@ -976,7 +969,7 @@ impl<E, EM, S, ST> Fuzzer<E, EM, S, ST> for NopFuzzer
 where
     EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
     ST: StagesTuple<E, EM, S, Self>,
-    S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId + UsesInput,
+    S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId,
 {
     fn fuzz_one(
         &mut self,

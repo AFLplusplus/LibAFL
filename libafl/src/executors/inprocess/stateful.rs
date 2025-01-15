@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -19,7 +20,7 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
@@ -123,7 +124,7 @@ impl<'a, H, I, OT, S, ES> StatefulInProcessExecutor<'a, H, I, OT, S, ES>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+    S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     I: Clone + Input,
     S::Solutions: Corpus<Input = I>,
 {
@@ -137,7 +138,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -165,7 +166,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -204,7 +205,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -245,12 +246,7 @@ where
     HT: ExecutorHooksTuple<I, S>,
     I: Input + Clone,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus
-        + HasExecutions
-        + HasSolutions
-        + HasCorpus
-        + HasCurrentTestcase
-        + UsesInput<Input = I>,
+    S: HasCorpus + HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
     S::Solutions: Corpus<Input = I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -264,7 +260,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -294,7 +290,7 @@ where
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
@@ -330,7 +326,7 @@ where
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {

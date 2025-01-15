@@ -11,7 +11,7 @@ use std::{
 
 use libafl::{
     corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes, UsesInput},
+    inputs::{BytesInput, HasMutatorBytes},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
@@ -152,7 +152,7 @@ where
     F: Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool,
     M: ScheduledMutator<BytesInput, S>,
     M::Mutations: MutatorsTuple<BytesInput, S>,
-    S: HasMaxSize + UsesInput<Input = BytesInput>,
+    S: HasMaxSize,
 {
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize {
         let mut new_size = 0; // if access fails, the new len is zero
@@ -290,12 +290,12 @@ impl<S, SM> Named for LLVMCustomMutator<S, SM, false> {
 
 impl<S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<S, SM, false>
 where
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
+    S: HasRand + HasMaxSize + 'static,
     SM: ScheduledMutator<BytesInput, S> + 'static,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
     #[inline]
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut BytesInput) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
     }
 }
@@ -303,15 +303,15 @@ where
 impl<S, SM> ScheduledMutator<BytesInput, S> for LLVMCustomMutator<S, SM, false>
 where
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
+    S:  HasRand + HasMaxSize + 'static,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
-    fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
+    fn iterations(&self, state: &mut S, input: &BytesInput) -> u64 {
         let mutator = self.mutator.deref().borrow();
         mutator.iterations(state, input)
     }
 
-    fn schedule(&self, state: &mut S, input: &S::Input) -> MutationId {
+    fn schedule(&self, state: &mut S, input: &BytesInput) -> MutationId {
         let mutator = self.mutator.deref().borrow();
         mutator.schedule(state, input)
     }
@@ -319,7 +319,7 @@ where
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut BytesInput,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
         let len_orig = input.bytes().len();
@@ -367,13 +367,13 @@ impl<S, SM> Named for LLVMCustomMutator<S, SM, true> {
 
 impl<S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<S, SM, true>
 where
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
+    S: HasRand + HasMaxSize + HasCorpus + 'static,
     SM: ScheduledMutator<BytesInput, S> + 'static,
     S::Corpus: Corpus<Input = BytesInput>,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
     #[inline]
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut BytesInput) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
     }
 }
@@ -381,16 +381,16 @@ where
 impl<S, SM> ScheduledMutator<BytesInput, S> for LLVMCustomMutator<S, SM, true>
 where
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
+    S: HasRand + HasMaxSize + HasCorpus + 'static,
     S::Corpus: Corpus<Input = BytesInput>,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
-    fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
+    fn iterations(&self, state: &mut S, input: &BytesInput) -> u64 {
         let mutator = self.mutator.deref().borrow();
         mutator.iterations(state, input)
     }
 
-    fn schedule(&self, state: &mut S, input: &S::Input) -> MutationId {
+    fn schedule(&self, state: &mut S, input: &BytesInput) -> MutationId {
         let mutator = self.mutator.deref().borrow();
         mutator.schedule(state, input)
     }
@@ -398,7 +398,7 @@ where
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut BytesInput,
     ) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing

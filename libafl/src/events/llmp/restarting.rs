@@ -378,9 +378,6 @@ pub struct RestartingMgr<EMH, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
-    #[builder(default = false)]
-    /// Consider this testcase as interesting always if true
-    always_interesting: bool,
     /// The configuration
     configuration: EventConfig,
     /// The monitor to use

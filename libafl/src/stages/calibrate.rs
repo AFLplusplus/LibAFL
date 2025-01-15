@@ -18,7 +18,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
@@ -103,8 +103,7 @@ where
         + HasNamedMetadata
         + HasExecutions
         + HasCurrentTestcase
-        + HasCurrentCorpusId
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentCorpusId,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Input,
 {

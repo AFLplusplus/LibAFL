@@ -17,13 +17,13 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, UsesInput},
+    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes},
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
+    state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -71,10 +71,8 @@ where
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = BytesInput>,
+        + MaybeHasClientPerfMonitor,
     S::Corpus: Corpus<Input = BytesInput>,
-    EM: UsesState<State = S>,
 {
     #[inline]
     #[expect(clippy::too_many_lines)]
@@ -343,14 +341,9 @@ impl<C, EM, O, OT, S, Z> GeneralizationStage<C, EM, O, OT, S, Z>
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    S: HasExecutions
-        + HasMetadata
-        + HasCorpus
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = BytesInput>,
+    S: HasExecutions + HasMetadata + HasCorpus + MaybeHasClientPerfMonitor,
     S::Corpus: Corpus<Input = BytesInput>,
     OT: ObserversTuple<BytesInput, S>,
-    EM: UsesState<State = S>,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]

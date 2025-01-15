@@ -43,7 +43,7 @@ use crate::{
     inputs::{Input, NopInput},
     observers::TimeObserver,
     stages::HasCurrentStageId,
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, NopState, State, Stoppable},
+    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, NopState, Stoppable},
     Error, HasMetadata,
 };
 
@@ -411,7 +411,7 @@ where
     }
 }
 
-impl<EMH, S: State, SP: ShMemProvider> LlmpEventManager<EMH, S, SP> {
+impl<EMH, S, SP: ShMemProvider> LlmpEventManager<EMH, S, SP> {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
     /// We are no longer allowed to send anything afterwards.
