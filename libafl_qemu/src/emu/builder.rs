@@ -101,7 +101,7 @@ impl<C, I, S>
         StdSnapshotManager,
     >
 where
-    S: State + HasExecutions + Unpin,
+    S: HasExecutions + Unpin,
     I: HasTargetBytes,
 {
     #[expect(clippy::should_implement_trait)]

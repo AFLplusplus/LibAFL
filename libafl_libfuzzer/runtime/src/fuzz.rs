@@ -19,7 +19,7 @@ use libafl::{
     executors::ExitKind,
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     stages::{HasCurrentStageId, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable, UsesState},
+    state::{HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
     Error, Fuzzer, HasMetadata,
 };
 use libafl_bolts::{
