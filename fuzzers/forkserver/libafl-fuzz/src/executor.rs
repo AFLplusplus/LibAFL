@@ -8,7 +8,7 @@ use std::{
 use libafl::{
     corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
-    state::{HasCorpus, UsesState},
+    state::HasCorpus,
     Error,
 };
 use libafl_bolts::tuples::RefIndexable;
@@ -340,7 +340,6 @@ impl<S, OT, FSV, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for SupportedExecutors<S, OT, FSV>
 where
     S: HasCorpus,
-    EM: UsesState<State = S>,
     FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
 {
     fn run_target(
@@ -348,7 +347,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
