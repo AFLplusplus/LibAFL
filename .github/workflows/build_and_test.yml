@@ -238,7 +238,7 @@ jobs:
     needs:
       - fuzzers-preflight
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [ ubuntu-24.04 ]
         fuzzer:
@@ -290,7 +290,7 @@ jobs:
           - ./fuzzers/structure_aware/forkserver_simple_nautilus
 
           # In-process
-          - ./fuzzers/fuzz_anything/cargo_fuzz
+          # - ./fuzzers/fuzz_anything/cargo_fuzz # Revive after they fix rustc
           # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
