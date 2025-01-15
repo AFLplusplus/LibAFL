@@ -30,6 +30,7 @@ use typed_builder::TypedBuilder;
 use {
     crate::events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
     alloc::string::ToString,
+    inputs::Input,
     libafl_bolts::{
         core_affinity::get_core_ids,
         llmp::{Broker, Brokers, LlmpBroker},
@@ -53,7 +54,6 @@ use crate::{
         llmp::{LlmpRestartingEventManager, LlmpShouldSaveState, ManagerKind, RestartingMgr},
         EventConfig, EventManagerHooksTuple,
     },
-    inputs::Input,
     monitors::Monitor,
     observers::TimeObserver,
     state::HasCorpus,

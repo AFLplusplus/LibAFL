@@ -303,7 +303,7 @@ where
 impl<S, SM> ScheduledMutator<BytesInput, S> for LLVMCustomMutator<S, SM, false>
 where
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S:  HasRand + HasMaxSize + 'static,
+    S: HasRand + HasMaxSize + 'static,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
     fn iterations(&self, state: &mut S, input: &BytesInput) -> u64 {

@@ -36,10 +36,7 @@ where
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions
-        + HasSolutions
-        + HasCurrentTestcase
-        + HasCorpus,
+    S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
     S::Solutions: Corpus<Input = I>,
     Z: HasObjective<Objective = OF>,
     I: Input + Clone,
