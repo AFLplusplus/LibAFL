@@ -31,7 +31,7 @@ use crate::{
     common::HasMetadata,
     corpus::Corpus,
     events::{
-        default_maybe_report_progress, default_report_progress, serialize_observers_adaptive,
+        serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
         AdaptiveSerializer, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
         EventProcessor, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
     },
@@ -363,11 +363,11 @@ where
         state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
-        default_maybe_report_progress(self, state, monitor_timeout)
+        std_maybe_report_progress(self, state, monitor_timeout)
     }
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        default_report_progress(self, state)
+        std_report_progress(self, state)
     }
 }
 

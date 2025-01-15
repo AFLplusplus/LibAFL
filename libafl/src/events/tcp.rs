@@ -38,15 +38,14 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use super::{default_maybe_report_progress, default_report_progress, ManagerExit};
+use super::{std_maybe_report_progress, std_report_progress, ManagerExit};
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     corpus::Corpus,
     events::{
-        default_on_restart, BrokerEventResult, Event, EventConfig, EventFirer,
-        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
-        ProgressReporter,
+        std_on_restart, BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple,
+        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -685,7 +684,7 @@ where
     S: HasCurrentStageId,
 {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        default_on_restart(self, state)
+        std_on_restart(self, state)
     }
 }
 
@@ -785,11 +784,11 @@ where
         state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
-        default_maybe_report_progress(self, state, monitor_timeout)
+        std_maybe_report_progress(self, state, monitor_timeout)
     }
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        default_report_progress(self, state)
+        std_report_progress(self, state)
     }
 }
 
@@ -826,11 +825,11 @@ where
         state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
-        default_maybe_report_progress(self, state, monitor_timeout)
+        std_maybe_report_progress(self, state, monitor_timeout)
     }
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        default_report_progress(self, state)
+        std_report_progress(self, state)
     }
 }
 

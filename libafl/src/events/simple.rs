@@ -18,15 +18,15 @@ use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRes
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::{default_on_restart, ProgressReporter};
+use super::{std_on_restart, ProgressReporter};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     corpus::Corpus,
     events::{
-        default_maybe_report_progress, default_report_progress, BrokerEventResult,
-        CanSerializeObserver, Event, EventFirer, EventManagerId, EventProcessor, EventRestarter,
-        HasEventManagerId, ManagerExit,
+        std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
+        Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        ManagerExit,
     },
     monitors::Monitor,
     stages::HasCurrentStageId,
@@ -100,7 +100,7 @@ where
     S: HasCurrentStageId,
 {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        default_on_restart(self, state)
+        std_on_restart(self, state)
     }
 }
 
@@ -154,11 +154,11 @@ where
         state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
-        default_maybe_report_progress(self, state, monitor_timeout)
+        std_maybe_report_progress(self, state, monitor_timeout)
     }
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        default_report_progress(self, state)
+        std_report_progress(self, state)
     }
 }
 
@@ -396,11 +396,11 @@ where
         state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
-        default_maybe_report_progress(self, state, monitor_timeout)
+        std_maybe_report_progress(self, state, monitor_timeout)
     }
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        default_report_progress(self, state)
+        std_report_progress(self, state)
     }
 }
 

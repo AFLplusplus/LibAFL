@@ -463,7 +463,7 @@ where
 
 /// Default implementation of [`ProgressReporter::maybe_report_progress`] for implementors with the
 /// given constraints
-pub fn default_maybe_report_progress<PR, S>(
+pub fn std_maybe_report_progress<PR, S>(
     reporter: &mut PR,
     state: &mut S,
     monitor_timeout: Duration,
@@ -488,7 +488,7 @@ where
 
 /// Default implementation of [`ProgressReporter::report_progress`] for implementors with the
 /// given constraints
-pub fn default_report_progress<EM, I, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
+pub fn std_report_progress<EM, I, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
 where
     EM: EventFirer<I, S>,
     S: HasExecutions + HasLastReportTime + HasCorpus<I> + MaybeHasClientPerfMonitor,
@@ -537,6 +537,7 @@ pub trait ProgressReporter<S> {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
     /// Will return an [`Error`], if the stats could not be sent.
+    /// [`std_maybe_report_progress`] is the standard implementation that you can call.
     fn maybe_report_progress(
         &mut self,
         state: &mut S,
@@ -545,6 +546,7 @@ pub trait ProgressReporter<S> {
 
     /// Send off an info/monitor/heartbeat message to the broker.
     /// Will return an [`Error`], if the stats could not be sent.
+    /// [`std_report_progress`] is the standard implementation that you can call.
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
@@ -553,12 +555,13 @@ pub trait EventRestarter<S> {
     /// For restarting event managers, implement a way to forward state to their next peers.
     /// You *must* ensure that [`HasCurrentStageId::on_restart`] will be invoked in this method, by you
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
+    /// [`std_on_restart`] is the standard implementation that you can call.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
 /// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
 /// constraints
-pub fn default_on_restart<S>(
+pub fn std_on_restart<S>(
     restarter: &mut (impl EventRestarter<S> + ManagerExit),
     state: &mut S,
 ) -> Result<(), Error>
@@ -630,7 +633,7 @@ where
     S: HasCurrentStageId,
 {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        default_on_restart(self, state)
+        std_on_restart(self, state)
     }
 }
 
@@ -691,19 +694,23 @@ impl HasEventManagerId for NopEventManager {
 /// An `EventManager` type that wraps another manager, but captures a `monitor` type as well.
 /// This is useful to keep the same API between managers with and without an internal `monitor`.
 #[derive(Copy, Clone, Debug)]
-pub struct MonitorTypedEventManager<EM> {
+pub struct MonitorTypedEventManager<EM, M> {
     inner: EM,
+    phantom: PhantomData<M>,
 }
 
-impl<EM> MonitorTypedEventManager<EM> {
+impl<EM, M> MonitorTypedEventManager<EM, M> {
     /// Creates a new `EventManager` that wraps another manager, but captures a `monitor` type as well.
     #[must_use]
     pub fn new(inner: EM) -> Self {
-        MonitorTypedEventManager { inner }
+        MonitorTypedEventManager {
+            inner,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<EM, OT> CanSerializeObserver<OT> for MonitorTypedEventManager<EM>
+impl<EM, M, OT> CanSerializeObserver<OT> for MonitorTypedEventManager<EM, M>
 where
     OT: Serialize,
 {
@@ -712,7 +719,7 @@ where
     }
 }
 
-impl<EM, I, S> EventFirer<I, S> for MonitorTypedEventManager<EM>
+impl<EM, I, M, S> EventFirer<I, S> for MonitorTypedEventManager<EM, M>
 where
     EM: EventFirer<I, S>,
 {
@@ -741,7 +748,7 @@ where
     }
 }
 
-impl<EM, S> EventRestarter<S> for MonitorTypedEventManager<EM>
+impl<EM, M, S> EventRestarter<S> for MonitorTypedEventManager<EM, M>
 where
     EM: EventRestarter<S>,
 {
@@ -751,7 +758,7 @@ where
     }
 }
 
-impl<EM> ManagerExit for MonitorTypedEventManager<EM>
+impl<EM, M> ManagerExit for MonitorTypedEventManager<EM, M>
 where
     EM: ManagerExit,
 {
@@ -766,7 +773,7 @@ where
     }
 }
 
-impl<E, EM, S, Z> EventProcessor<E, S, Z> for MonitorTypedEventManager<EM>
+impl<E, EM, M, S, Z> EventProcessor<E, S, Z> for MonitorTypedEventManager<EM, M>
 where
     EM: EventProcessor<E, S, Z>,
 {
@@ -780,7 +787,7 @@ where
     }
 }
 
-impl<EM, S> ProgressReporter<S> for MonitorTypedEventManager<EM>
+impl<EM, M, S> ProgressReporter<S> for MonitorTypedEventManager<EM, M>
 where
     EM: ProgressReporter<S>,
 {
@@ -799,7 +806,7 @@ where
     }
 }
 
-impl<EM> HasEventManagerId for MonitorTypedEventManager<EM>
+impl<EM, M> HasEventManagerId for MonitorTypedEventManager<EM, M>
 where
     EM: HasEventManagerId,
 {

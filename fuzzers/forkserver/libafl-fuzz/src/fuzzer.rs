@@ -83,7 +83,7 @@ type LibaflFuzzManager = CentralizedEventManager<
     StdShMemProvider,
 >;
 #[cfg(feature = "fuzzbench")]
-type LibaflFuzzManager<F> = SimpleEventManager<SimpleMonitor<F>, LibaflFuzzState>;
+type LibaflFuzzManager<F> = SimpleEventManager<BytesInput, SimpleMonitor<F>, LibaflFuzzState>;
 
 macro_rules! define_run_client {
     ($state: ident, $mgr: ident, $fuzzer_dir: ident, $core_id: ident, $opt:ident, $is_main_node: ident, $body:block) => {
