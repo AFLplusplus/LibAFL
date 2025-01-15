@@ -28,8 +28,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 #[cfg(all(unix, feature = "fork"))]
 use {
-    crate::events::{
-        centralized::CentralizedEventManager, inputs::Input, CentralizedLlmpHook, StdLlmpEventHook,
+    crate::{
+        events::{centralized::CentralizedEventManager, CentralizedLlmpHook, StdLlmpEventHook},
+        inputs::Input,
     },
     alloc::string::ToString,
     libafl_bolts::{
