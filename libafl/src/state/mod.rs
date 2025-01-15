@@ -28,8 +28,6 @@ pub use stack::StageStack;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "scalability_introspection")]
-use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},

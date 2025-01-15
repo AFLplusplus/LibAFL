@@ -30,7 +30,6 @@ libafl = { path = "../../../libafl", features = [
   "prelude",
   "gzip",
   "regex",
-  "scalability_introspection",
 ] }
 libafl_bolts = { path = "../../../libafl_bolts", features = [
   "errors_backtrace",

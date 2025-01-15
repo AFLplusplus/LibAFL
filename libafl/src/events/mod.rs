@@ -44,8 +44,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
-#[cfg(feature = "scalability_introspection")]
-use crate::monitors::{AggregatorOps, UserStatsValue};
 use crate::{
     corpus::Corpus,
     executors::ExitKind,
