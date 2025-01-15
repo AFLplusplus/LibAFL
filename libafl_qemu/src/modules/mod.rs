@@ -53,7 +53,7 @@ pub mod utils;
 /// of the fuzzer's execution.
 ///
 /// The typical sequence of these hooks execution during a fuzzing session is as follows:
-/// ```rust
+/// ```rust,ignore
 /// pre_qemu_init()
 /// // Qemu initialization (in the Emulator)
 /// post_qemu_init()
@@ -71,7 +71,7 @@ pub mod utils;
 ///
 /// Users typically add hooks, monitoring, or other instrumentation to the **fuzzing target** in [`EmulatorModule`]
 /// For example:
-/// ```rust
+/// ```rust,ignore
 /// fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
 /// where
 ///     ET: EmulatorModuleTuple<I, S>,
