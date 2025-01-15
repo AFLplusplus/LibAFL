@@ -22,7 +22,7 @@ use libafl::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
     },
     fuzzer::StdFuzzer,
-    inputs::{BytesInput, NopTargetBytesConverter, UsesInput},
+    inputs::{BytesInput, NopTargetBytesConverter},
     mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -658,9 +658,9 @@ pub fn run_fuzzer_with_stages<E, EM, S, ST, Z>(
 ) -> Result<(), Error>
 where
     Z: Fuzzer<E, EM, S, ST>,
-    EM: ProgressReporter<State = S>,
+    EM: ProgressReporter<S>,
     ST: StagesTuple<E, EM, S, Z>,
-    S: HasLastReportTime + HasExecutions + HasMetadata + UsesInput,
+    S: HasLastReportTime + HasExecutions + HasMetadata,
 {
     if opt.bench_just_one {
         fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;

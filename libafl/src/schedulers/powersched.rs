@@ -16,7 +16,7 @@ use crate::{
         on_add_metadata_default, on_evaluation_metadata_default, on_next_metadata_default,
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
-    state::{HasCorpus, State},
+    state::HasCorpus,
     Error, HasMetadata,
 };
 
@@ -327,7 +327,7 @@ impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
 
 impl<C, I, O, S> Scheduler<I, S> for PowerQueueScheduler<C, O>
 where
-    S: HasCorpus + HasMetadata + HasTestcase + State,
+    S: HasCorpus + HasMetadata + HasTestcase,
     O: MapObserver,
     C: AsRef<O>,
 {

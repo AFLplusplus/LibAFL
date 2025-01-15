@@ -36,42 +36,13 @@ use crate::{
     feedbacks::StateInitializer,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::{Input, NopInput, UsesInput},
+    inputs::{Input, NopInput},
     stages::{HasCurrentStageId, HasNestedStageStatus, StageId},
     Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
-
-/// The [`State`] of the fuzzer.
-/// Contains all important information about the current run.
-/// Will be used to restart the fuzzing process at any time.
-pub trait State:
-    UsesInput
-    + Serialize
-    + DeserializeOwned
-    + MaybeHasClientPerfMonitor
-    + MaybeHasScalabilityMonitor
-    + HasCurrentCorpusId
-    + HasCurrentStageId
-    + Stoppable
-{
-}
-
-/// Structs which implement this trait are aware of the state. This is used for type enforcement.
-pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
-    /// The state known by this type.
-    type State: State;
-}
-
-// blanket impl which automatically defines UsesInput for anything that implements UsesState
-impl<KS> UsesInput for KS
-where
-    KS: UsesState,
-{
-    type Input = <KS::State as UsesInput>::Input;
-}
 
 /// Trait for elements offering a corpus
 pub trait HasCorpus {
@@ -296,22 +267,6 @@ pub struct StdState<I, C, R, SC> {
     phantom: PhantomData<I>,
 }
 
-impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
-impl<I, C, R, SC> State for StdState<I, C, R, SC>
-where
-    C: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
-    R: Rand,
-    SC: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
-    Self: UsesInput,
-{
-}
-
 impl<I, C, R, SC> HasRand for StdState<I, C, R, SC>
 where
     R: Rand,
@@ -368,7 +323,8 @@ where
 impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
 where
     I: Input,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    C: Corpus,
+    SC: Corpus<Input = C::Input>,
 {
     type Solutions = SC;
 
@@ -629,9 +585,9 @@ impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    C: Corpus,
+    SC: Corpus<Input = C::Input>,
 {
     /// Decide if the state must load the inputs
     pub fn must_load_initial_inputs(&self) -> bool {
@@ -723,7 +679,7 @@ where
         load_config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         if let Some(remaining) = self.remaining_initial_files.as_ref() {
@@ -747,7 +703,7 @@ where
         config: &mut LoadConfig<I, Self, Z>,
     ) -> Result<ExecuteInputResult, Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         log::info!("Loading file {path:?} ...");
@@ -781,7 +737,7 @@ where
         mut config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         loop {
@@ -845,7 +801,7 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
@@ -872,7 +828,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -898,7 +854,7 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
@@ -923,7 +879,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -949,7 +905,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -990,7 +946,7 @@ where
         cores: &Cores,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         if self.multicore_inputs_processed.unwrap_or(false) {
@@ -1070,9 +1026,9 @@ where
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
+    C: Corpus<Input = I>,
     R: Rand,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    SC: Corpus<Input = I>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,
@@ -1084,8 +1040,8 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
-        G: Generator<<Self as UsesInput>::Input, Self>,
+        EM: EventFirer<I, Self>,
+        G: Generator<C::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         let mut added = 0;
@@ -1122,8 +1078,8 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
-        G: Generator<<Self as UsesInput>::Input, Self>,
+        EM: EventFirer<I, Self>,
+        G: Generator<C::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
@@ -1139,8 +1095,8 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        EM: EventFirer<State = Self>,
-        G: Generator<<Self as UsesInput>::Input, Self>,
+        EM: EventFirer<I, Self>,
+        G: Generator<C::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
@@ -1280,13 +1236,6 @@ impl<I> HasCorpus for NopState<I> {
     }
 }
 
-impl<I> UsesInput for NopState<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
 impl<I> HasExecutions for NopState<I> {
     fn executions(&self) -> &u64 {
         &self.execution
@@ -1352,8 +1301,6 @@ impl<I> HasRand for NopState<I> {
         &mut self.rand
     }
 }
-
-impl<I> State for NopState<I> where I: Input {}
 
 impl<I> HasCurrentCorpusId for NopState<I> {
     fn set_corpus_id(&mut self, _id: CorpusId) -> Result<(), Error> {

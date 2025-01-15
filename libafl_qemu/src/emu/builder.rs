@@ -1,9 +1,6 @@
 use std::marker::PhantomData;
 
-use libafl::{
-    inputs::HasTargetBytes,
-    state::{HasExecutions, State},
-};
+use libafl::{inputs::HasTargetBytes, state::HasExecutions};
 use libafl_bolts::tuples::{tuple_list, Append, Prepend};
 
 #[cfg(feature = "systemmode")]
@@ -74,7 +71,7 @@ impl<C, I, S>
         StdSnapshotManager,
     >
 where
-    S: State + HasExecutions + Unpin,
+    S: HasExecutions + Unpin,
     I: HasTargetBytes,
 {
     #[must_use]
