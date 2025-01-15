@@ -670,11 +670,11 @@ pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
 
 impl<C, E, EM, I, O, S, Z> AflStatsStageBuilder<C, E, EM, I, O, S, Z>
 where
-    E: HasObservers,
-    EM: EventFirer<I>,
-    S: HasImported + HasCorpus<I> + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
+    E: HasObservers,
+    EM: EventFirer<I, S>,
     O: MapObserver,
+    S: HasImported + HasCorpus<I> + HasMetadata + HasExecutions,
 {
     fn new() -> Self {
         Self {

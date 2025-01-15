@@ -10,7 +10,6 @@ use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
     executors::{Executor, HasObservers, HasTimeout},
     inputs::BytesInput,
     observers::ObserversTuple,
@@ -24,11 +23,11 @@ use crate::{
 /// Note: Will NOT work with in process executors due to the potential for restarts/crashes when
 /// running inputs.
 #[derive(Debug)]
-pub struct VerifyTimeoutsStage<E, S> {
+pub struct VerifyTimeoutsStage<E, I, S> {
     doubled_timeout: Duration,
     original_timeout: Duration,
     capture_timeouts: Rc<RefCell<bool>>,
-    phantom: PhantomData<(E, S)>,
+    phantom: PhantomData<(E, I, S)>,
 }
 
 impl<E, S> VerifyTimeoutsStage<E, S> {
@@ -81,13 +80,13 @@ impl<I> TimeoutsToVerify<I> {
     }
 }
 
-impl<E, EM, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, S>
+impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, I, S>
 where
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasTimeout,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasMetadata,
-    <S::Corpus as Corpus>::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
+    E::Observers: ObserversTuple<I, S>,
+    E: Executor<EM, I, S, Z> + HasObservers + HasTimeout,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasMetadata,
+    I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     fn perform(
         &mut self,
@@ -97,7 +96,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         let mut timeouts = state
-            .metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new)
+            .metadata_or_insert_with(TimeoutsToVerify::<I>::new)
             .clone();
         if timeouts.count() == 0 {
             return Ok(());
@@ -110,9 +109,9 @@ where
         executor.set_timeout(self.original_timeout);
         *self.capture_timeouts.borrow_mut() = true;
         let res = state
-            .metadata_mut::<TimeoutsToVerify<<S::Corpus as Corpus>::Input>>()
+            .metadata_mut::<TimeoutsToVerify<I>>()
             .unwrap();
-        *res = TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new();
+        *res = TimeoutsToVerify::<I>::new();
         Ok(())
     }
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {

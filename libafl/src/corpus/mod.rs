@@ -161,7 +161,7 @@ pub trait Corpus<I>: Sized {
     fn last(&self) -> Option<CorpusId>;
 
     /// An iterator over very active corpus id
-    fn ids(&self) -> CorpusIdIterator<'_, I, Self> {
+    fn ids(&self) -> CorpusIdIterator<'_, Self, I> {
         CorpusIdIterator {
             corpus: self,
             cur: self.first(),
@@ -212,10 +212,7 @@ pub trait HasCurrentCorpusId {
 
 /// [`Iterator`] over the ids of a [`Corpus`]
 #[derive(Debug)]
-pub struct CorpusIdIterator<'a, C, I>
-where
-    C: Corpus<I>,
-{
+pub struct CorpusIdIterator<'a, C, I> {
     corpus: &'a C,
     cur: Option<CorpusId>,
     cur_back: Option<CorpusId>,

@@ -1,4 +1,4 @@
-//! An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
+//! An event manager that forwards all events to other attached fuzzers on shared maps or via tcp,
 //! using low-level message passing, [`libafl_bolts::llmp`].
 
 #[cfg(feature = "std")]
@@ -45,14 +45,17 @@ use crate::{
     inputs::{Input, NopInput},
     observers::TimeObserver,
     stages::HasCurrentStageId,
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, NopState, Stoppable},
+    state::{
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
+        NopState, Stoppable,
+    },
     Error, HasMetadata,
 };
 
 /// Default initial capacity of the event buffer - 4KB
 const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
 
-/// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
+/// An `EventManager` that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, `llmp`.
 pub struct LlmpEventManager<EMH, I, S, SP>
 where
@@ -321,7 +324,7 @@ where
         self.llmp.describe()
     }
 
-    /// Write the config for a client [`EventManager`] to env vars, a new
+    /// Write the config for a client `EventManager` to env vars, a new
     /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
@@ -378,16 +381,8 @@ where
                     {
                         self.deserialization_time = current_time() - start;
                     }
-                    #[cfg(feature = "scalability_introspection")]
-                    {
-                        state.scalability_monitor_mut().testcase_with_observers += 1;
-                    }
                     fuzzer.evaluate_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
-                    #[cfg(feature = "scalability_introspection")]
-                    {
-                        state.scalability_monitor_mut().testcase_without_observers += 1;
-                    }
                     fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
                 };
                 if let Some(item) = res.1 {
@@ -569,7 +564,7 @@ where
 
 impl<EMH, I, S, SP> ProgressReporter<S> for LlmpEventManager<EMH, I, S, SP>
 where
-    S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus<I>,
+    S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus<I> + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
     I: Serialize,
 {

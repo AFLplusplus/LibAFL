@@ -19,20 +19,20 @@ use crate::{
 ///
 /// This stage can be used to construct black-box (e.g., grammar-based) fuzzers.
 #[derive(Debug)]
-pub struct GenStage<G, S, Z>(G, PhantomData<(S, Z)>);
+pub struct GenStage<G, I, S, Z>(G, PhantomData<(I, S, Z)>);
 
-impl<G, S, Z> GenStage<G, S, Z> {
+impl<G, I, S, Z> GenStage<G, I, S, Z> {
     /// Create a new [`GenStage`].
     pub fn new(g: G) -> Self {
         Self(g, PhantomData)
     }
 }
 
-impl<E, EM, G, S, Z> Stage<E, EM, S, Z> for GenStage<G, S, Z>
+impl<E, EM, G, I, S, Z> Stage<E, EM, S, Z> for GenStage<G, I, S, Z>
 where
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand,
-    G: Generator<<S::Corpus as Corpus>::Input, S>,
+    G: Generator<I, S>,
+    S: HasCorpus<I> + HasRand,
+    Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
     fn perform(

@@ -83,7 +83,7 @@ impl LlmpShouldSaveState {
 }
 
 /// A manager-like llmp client that converts between input types
-pub struct LlmpEventConverter<IC, ICB, S, SP>
+pub struct LlmpEventConverter<I, IC, ICB, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -94,7 +94,7 @@ where
     compressor: GzipCompressor,
     converter: Option<IC>,
     converter_back: Option<ICB>,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
 impl

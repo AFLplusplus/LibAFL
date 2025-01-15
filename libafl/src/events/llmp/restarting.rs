@@ -47,7 +47,10 @@ use crate::{
     monitors::Monitor,
     observers::TimeObserver,
     stages::HasCurrentStageId,
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, Stoppable},
+    state::{
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
+        Stoppable,
+    },
     Error,
 };
 
@@ -102,7 +105,12 @@ where
 
 impl<EMH, I, S, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
-    S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus + Serialize,
+    S: HasExecutions
+        + HasLastReportTime
+        + HasMetadata
+        + HasCorpus<I>
+        + Serialize
+        + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
     I: Serialize,
 {
@@ -126,7 +134,7 @@ where
     SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
-        <LlmpEventManager<EMH, S, SP> as EventFirer<I, S>>::should_send(&self.llmp_mgr)
+        <LlmpEventManager<EMH, I, S, SP> as EventFirer<I, S>>::should_send(&self.llmp_mgr)
     }
 
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
@@ -137,7 +145,7 @@ where
     }
 
     fn configuration(&self) -> EventConfig {
-        <LlmpEventManager<EMH, S, SP> as EventFirer<I, S>>::configuration(&self.llmp_mgr)
+        <LlmpEventManager<EMH, I, S, SP> as EventFirer<I, S>>::configuration(&self.llmp_mgr)
     }
 }
 
@@ -411,7 +419,7 @@ pub struct RestartingMgr<EMH, MT, S, SP> {
 }
 
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
-impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
+impl<EMH, MT, I, S, SP> RestartingMgr<EMH, MT, I, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     SP: ShMemProvider,
@@ -467,7 +475,7 @@ where
                             return Err(Error::shutting_down());
                         }
                         LlmpConnection::IsClient { client } => {
-                            let mgr: LlmpEventManager<EMH, S, SP> = LlmpEventManager::builder()
+                            let mgr: LlmpEventManager<EMH, I, S, SP> = LlmpEventManager::builder()
                                 .hooks(self.hooks)
                                 .build_from_client(
                                     client,

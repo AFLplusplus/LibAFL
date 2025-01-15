@@ -39,7 +39,9 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput},
     observers::TimeObserver,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, NopState, Stoppable},
+    state::{
+        HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, NopState, Stoppable,
+    },
     Error,
 };
 
@@ -347,7 +349,12 @@ impl<EM, EMH, S, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH, S,
 where
     EM: EventFirer<<S::Corpus as Corpus>::Input, S> + HasEventManagerId,
     EMH: EventManagerHooksTuple<<<S as HasCorpus>::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + HasCorpus,
+    S: HasExecutions
+        + HasMetadata
+        + HasLastReportTime
+        + Stoppable
+        + HasCorpus
+        + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Input,
     SP: ShMemProvider,
 {
@@ -383,7 +390,7 @@ where
         self.client.describe()
     }
 
-    /// Write the config for a client [`EventManager`] to env vars, a new
+    /// Write the config for a client `EventManager` to env vars, a new
     /// client can reattach using [`CentralizedEventManagerBuilder::build_existing_client_from_env()`].
     pub fn to_env(&self, env_name: &str) {
         self.client.to_env(env_name).unwrap();
@@ -519,10 +526,6 @@ where
                     if client_config.match_with(&self.configuration()) && observers_buf.is_some() {
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_with_observers += 1;
-                        }
                         log::debug!(
                             "[{}] Running fuzzer with event {}",
                             process::id(),
@@ -537,10 +540,6 @@ where
                             false,
                         )?
                     } else {
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_without_observers += 1;
-                        }
                         log::debug!(
                             "[{}] Running fuzzer with event {}",
                             process::id(),

@@ -914,26 +914,6 @@ pub struct ClientPerfMonitor {
     timer_start: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-/// Count the imported testcase from other nodes that came with observers
-pub struct ScalabilityMonitor {
-    /// Imported testcase received with observer
-    pub testcase_with_observers: usize,
-    /// Imported testcase received without observer
-    pub testcase_without_observers: usize,
-}
-
-impl ScalabilityMonitor {
-    /// Constructor
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            testcase_with_observers: 0,
-            testcase_without_observers: 0,
-        }
-    }
-}
-
 /// Various features that are measured for performance
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[repr(u8)]

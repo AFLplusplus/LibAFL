@@ -164,9 +164,8 @@ impl<E, EM, I, M, S, Z> MutationalStage<S> for TuneableMutationalStage<E, EM, I,
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase<I>,
-    I: MutatedTransform<I, S> + Clone,
-    I: Input,
+    S: HasCorpus<I> + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase<I>,
+    I: MutatedTransform<I, S> + Clone + Input,
 {
     type Mutator = M;
     /// The mutator, added to this stage
@@ -464,7 +463,7 @@ impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus + HasRand + HasNamedMetadata,
+    S: HasCorpus<I> + HasRand + HasNamedMetadata,
 {
     /// Creates a new transforming mutational stage
     #[must_use]

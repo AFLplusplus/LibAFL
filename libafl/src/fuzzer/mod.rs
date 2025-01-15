@@ -749,7 +749,8 @@ where
         + HasTestcase<I>
         + HasCurrentCorpusId
         + HasCurrentStageId
-        + Stoppable,
+        + Stoppable
+        + MaybeHasClientPerfMonitor,
     ST: StagesTuple<E, EM, S, Self>,
 {
     fn fuzz_one(

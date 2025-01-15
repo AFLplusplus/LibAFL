@@ -37,11 +37,11 @@ use crate::{
 /// Should be stored inside a `[Rc<RefCell<_>>`]
 #[derive(Clone, Debug)]
 pub struct PushStageSharedState<EM, I, OT, S, Z> {
-    /// The [`crate::state::State`]
+    /// The state
     pub state: S,
     /// The [`crate::fuzzer::Fuzzer`] instance
     pub fuzzer: Z,
-    /// The [`crate::events::EventManager`]
+    /// The event manager
     pub event_mgr: EM,
     /// The [`crate::observers::ObserversTuple`]
     pub observers: OT,
@@ -206,13 +206,13 @@ pub trait PushStage<EM, I, OT, S, Z> {
 
 /// Allows us to use a [`PushStage`] as a normal [`Stage`]
 #[derive(Debug)]
-pub struct PushStageAdapter<CS, EM, OT, PS, Z> {
+pub struct PushStageAdapter<CS, EM, I, OT, PS, Z> {
     name: Cow<'static, str>,
     push_stage: PS,
-    phantom: PhantomData<(CS, EM, OT, Z)>,
+    phantom: PhantomData<(CS, EM, I, OT, Z)>,
 }
 
-impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z> {
+impl<CS, EM, I, OT, PS, Z> PushStageAdapter<CS, EM, I, OT, PS, Z> {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
     #[must_use]
@@ -244,27 +244,27 @@ impl<CS, EM, OT, PS, Z> Named for PushStageAdapter<CS, EM, OT, PS, Z> {
     }
 }
 
-impl<CS, E, EM, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
+impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, Z>
 where
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    CS: Scheduler<I, S>,
     S: HasExecutions
         + HasRand
-        + HasCorpus
+        + HasCorpus<I>
         + HasLastReportTime
         + HasCurrentCorpusId
         + HasNamedMetadata
         + HasMetadata,
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<I, S>
         + EventRestarter<S>
         + HasEventManagerId
         + ProgressReporter<S>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    PS: PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>,
-    Z: ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
-        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
-        + EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, OT>
-        + HasScheduler<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<I, S>,
+    PS: PushStage<EM, I, OT, S, Z>,
+    Z: ExecutesInput<E, EM, I, S>
+        + ExecutionProcessor<EM, I, OT, S>
+        + EvaluatorObservers<E, EM, I, OT>
+        + HasScheduler<I, S>,
 {
     fn perform(
         &mut self,

@@ -54,7 +54,10 @@ use crate::{
     monitors::Monitor,
     observers::ObserversTuple,
     stages::HasCurrentStageId,
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, Stoppable},
+    state::{
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
+        Stoppable,
+    },
     Error, HasMetadata,
 };
 
@@ -406,7 +409,7 @@ where
     }
 }
 
-/// An [`EventManager`] that forwards all events to other attached via tcp.
+/// An `EventManager` that forwards all events to other attached via tcp.
 pub struct TcpEventManager<EMH, S> {
     /// We send message every `throttle` second
     throttle: Option<Duration>,
@@ -564,7 +567,7 @@ where
     EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions + HasMetadata + HasImported + HasCorpus + Stoppable,
 {
-    /// Write the client id for a client [`EventManager`] to env vars
+    /// Write the client id for a client `EventManager` to env vars
     pub fn to_env(&self, env_name: &str) {
         env::set_var(env_name, format!("{}", self.client_id.0));
     }
@@ -604,16 +607,8 @@ where
                 {
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    #[cfg(feature = "scalability_introspection")]
-                    {
-                        state.scalability_monitor_mut().testcase_with_observers += 1;
-                    }
                     fuzzer.evaluate_execution(state, self, input, &observers, &exit_kind, false)?
                 } else {
-                    #[cfg(feature = "scalability_introspection")]
-                    {
-                        state.scalability_monitor_mut().testcase_without_observers += 1;
-                    }
                     fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
                 };
                 if let Some(item) = _res.1 {
@@ -783,7 +778,7 @@ impl<EMH, S> ProgressReporter<S> for TcpEventManager<EMH, S>
 where
     EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Serialize,
-    S: HasExecutions + HasMetadata + HasLastReportTime + HasCorpus,
+    S: HasExecutions + HasMetadata + HasLastReportTime + HasCorpus + MaybeHasClientPerfMonitor,
 {
     fn maybe_report_progress(
         &mut self,
@@ -822,7 +817,7 @@ where
 impl<EMH, S, SP> ProgressReporter<S> for TcpRestartingEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasMetadata + HasExecutions + HasLastReportTime + HasCorpus,
+    S: HasMetadata + HasExecutions + HasLastReportTime + HasCorpus + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Serialize,
     SP: ShMemProvider,
 {
@@ -1015,7 +1010,7 @@ pub fn setup_restarting_mgr_tcp<MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus + DeserializeOwned,
+    S: HasExecutions + HasMetadata + HasImported + HasCorpus + DeserializeOwned + Stoppable,
     <S::Corpus as Corpus>::Input: Input,
 {
     TcpRestartingMgr::builder()

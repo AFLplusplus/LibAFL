@@ -28,8 +28,6 @@ pub use stack::StageStack;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "scalability_introspection")]
-use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -123,29 +121,6 @@ impl<T> MaybeHasClientPerfMonitor for T {}
 
 #[cfg(feature = "introspection")]
 impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
-
-/// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(feature = "scalability_introspection")]
-pub trait MaybeHasScalabilityMonitor: HasScalabilityMonitor {}
-/// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(not(feature = "scalability_introspection"))]
-pub trait MaybeHasScalabilityMonitor {}
-
-#[cfg(not(feature = "scalability_introspection"))]
-impl<T> MaybeHasScalabilityMonitor for T {}
-
-#[cfg(feature = "scalability_introspection")]
-impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
-
-/// Trait for offering a [`ScalabilityMonitor`]
-#[cfg(feature = "scalability_introspection")]
-pub trait HasScalabilityMonitor {
-    /// Ref to [`ScalabilityMonitor`]
-    fn scalability_monitor(&self) -> &ScalabilityMonitor;
-
-    /// Mutable ref to [`ScalabilityMonitor`]
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor;
-}
 
 /// Trait for the execution counter
 pub trait HasExecutions {
@@ -241,8 +216,6 @@ pub struct StdState<I, C, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
-    #[cfg(feature = "scalability_introspection")]
-    scalability_monitor: ScalabilityMonitor,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -322,8 +295,8 @@ where
 
 impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
 where
+    C: Corpus<I>,
     I: Input,
-    C: Corpus,
     SC: Corpus<I>,
 {
     type Solutions = SC;
@@ -585,9 +558,9 @@ impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
 #[cfg(feature = "std")]
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
+    C: Corpus<I>,
     I: Input,
     R: Rand,
-    C: Corpus,
     SC: Corpus<I>,
 {
     /// Decide if the state must load the inputs
@@ -1026,8 +999,8 @@ where
 
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
-    I: Input,
     C: Corpus<I>,
+    I: Input,
     R: Rand,
     SC: Corpus<I>,
 {
@@ -1042,7 +1015,7 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        G: Generator<C::Input, Self>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         let mut added = 0;
@@ -1080,7 +1053,7 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        G: Generator<C::Input, Self>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
@@ -1097,7 +1070,7 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        G: Generator<C::Input, Self>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
@@ -1130,8 +1103,6 @@ where
             stop_requested: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
-            #[cfg(feature = "scalability_introspection")]
-            scalability_monitor: ScalabilityMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
@@ -1175,17 +1146,6 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         &mut self.introspection_monitor
-    }
-}
-
-#[cfg(feature = "scalability_introspection")]
-impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        &self.scalability_monitor
-    }
-
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
-        &mut self.scalability_monitor
     }
 }
 
@@ -1338,17 +1298,6 @@ impl<I> HasClientPerfMonitor for NopState<I> {
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!();
-    }
-}
-
-#[cfg(feature = "scalability_introspection")]
-impl<I> HasScalabilityMonitor for NopState<I> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        unimplemented!();
-    }
-
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
         unimplemented!();
     }
 }

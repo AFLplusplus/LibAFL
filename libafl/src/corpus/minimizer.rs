@@ -75,7 +75,7 @@ where
         E::Observers: ObserversTuple<I, S>,
         CS: Scheduler<I, S>
             + RemovableScheduler<I, S>,
-        EM: EventFirer<State = S>,
+        EM: EventFirer<I, S>,
         Z: HasScheduler<I, S, Scheduler = CS>,
     {
         // don't delete this else it won't work after restart

@@ -79,7 +79,7 @@ where
 impl<E, F, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers,
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
     S: HasCorpus<I>
         + HasMetadata
@@ -118,7 +118,7 @@ where
 impl<E, F, EM, I, M, S, Z> PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers,
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
     I: MutatedTransform<I, S> + Clone + Input,

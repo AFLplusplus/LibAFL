@@ -68,11 +68,10 @@ where
     E::Observers: ObserversTuple<BytesInput, S>,
     S: HasExecutions
         + HasMetadata
-        + HasCorpus<I>
+        + HasCorpus<BytesInput>
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    S::Corpus: Corpus<Input = BytesInput>,
 {
     #[inline]
     #[expect(clippy::too_many_lines)]
@@ -327,21 +326,21 @@ where
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::should_restart(state, &self.name, 3)
+        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
     }
 
     #[inline]
     fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
     }
 }
 
-impl<C, EM, I, O, OT, S, Z> GeneralizationStage<C, EM, I, O, OT, S, Z>
+impl<C, EM, O, OT, S, Z> GeneralizationStage<C, EM, BytesInput, O, OT, S, Z>
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    S: HasExecutions + HasMetadata + HasCorpus<I> + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasMetadata + HasCorpus<BytesInput> + MaybeHasClientPerfMonitor,
     OT: ObserversTuple<BytesInput, S>,
 {
     /// Create a new [`GeneralizationStage`].

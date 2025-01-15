@@ -102,7 +102,7 @@ where
         + HasMetadata
         + HasNamedMetadata
         + HasExecutions
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasCurrentCorpusId,
     Z: Evaluator<E, EM, I, S>,
     I: Input,
@@ -382,11 +382,11 @@ where
 
 impl<C, E, I, O, OT, S> CalibrationStage<C, E, I, O, OT, S>
 where
+    C: AsRef<O>,
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
-    C: AsRef<O>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]

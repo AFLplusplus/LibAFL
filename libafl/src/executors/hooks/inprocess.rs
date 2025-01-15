@@ -24,7 +24,7 @@ use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
 #[cfg(any(unix, windows))]
-use crate::{corpus::Corpus, inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
+use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
@@ -467,7 +467,7 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     critical: null_mut(),
 };
 
-/// Get the inprocess [`crate::state::State`]
+/// Get the inprocess State
 ///
 /// # Safety
 /// Only safe if not called twice and if the state is not accessed from another borrow while this one is alive.
@@ -476,7 +476,7 @@ pub unsafe fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
 
-/// Get the [`crate::events::EventManager`]
+/// Get the `EventManager`
 ///
 /// # Safety
 /// Only safe if not called twice and if the event manager is not accessed from another borrow while this one is alive.

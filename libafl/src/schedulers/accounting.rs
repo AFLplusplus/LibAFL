@@ -179,9 +179,9 @@ where
 {
     /// Update the `Corpus` score
     #[expect(clippy::cast_possible_wrap)]
-    pub fn update_accounting_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
+    pub fn update_accounting_score<I, S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        S: HasCorpus + HasMetadata,
+        S: HasCorpus<I> + HasMetadata,
     {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
@@ -266,9 +266,9 @@ where
     }
 
     /// Cull the `Corpus`
-    pub fn accounting_cull<S>(&self, state: &S) -> Result<(), Error>
+    pub fn accounting_cull<I, S>(&self, state: &S) -> Result<(), Error>
     where
-        S: HasCorpus + HasMetadata,
+        S: HasCorpus<I> + HasMetadata,
     {
         let Some(top_rated) = state.metadata_map().get::<TopAccountingMetadata>() else {
             return Ok(());

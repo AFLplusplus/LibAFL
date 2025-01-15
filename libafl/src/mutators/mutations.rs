@@ -1657,7 +1657,7 @@ mod tests {
         )
     }
 
-    fn test_state() -> impl HasCorpus + HasMetadata + HasRand + HasMaxSize {
+    fn test_state() -> impl HasCorpus<BytesInput> + HasMetadata + HasRand + HasMaxSize {
         let rand = StdRand::with_seed(1337);
         let mut corpus = InMemoryCorpus::new();
 

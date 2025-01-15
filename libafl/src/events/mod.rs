@@ -1,4 +1,4 @@
-//! An [`EventManager`] manages all events that go to other instances of the fuzzer.
+//! An `EventManager` manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
 pub mod events_hooks;
@@ -44,20 +44,12 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
-#[cfg(feature = "introspection")]
-use crate::state::HasClientPerfMonitor;
 use crate::{
-    corpus::Corpus,
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
-    state::{HasCorpus, HasExecutions, HasLastReportTime},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
     Error, HasMetadata,
-};
-#[cfg(feature = "scalability_introspection")]
-use crate::{
-    monitors::{AggregatorOps, UserStatsValue},
-    state::HasScalabilityMonitor,
 };
 
 /// Multi-machine mode
@@ -104,7 +96,7 @@ impl SignalHandler for ShutdownSignalData {
 }
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
-/// by `1` in multiprocessed [`EventManager`]s, such as [`LlmpEventManager`].
+/// by `1` in multiprocessed `EventManagers`, such as [`LlmpEventManager`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EventManagerId(
@@ -496,10 +488,10 @@ where
 
 /// Default implementation of [`ProgressReporter::report_progress`] for implementors with the
 /// given constraints
-pub fn default_report_progress<EM, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
+pub fn default_report_progress<EM, I, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
 where
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasLastReportTime + HasCorpus,
+    EM: EventFirer<I, S>,
+    S: HasExecutions + HasLastReportTime + HasCorpus<I> + MaybeHasClientPerfMonitor,
 {
     let executions = *state.executions();
     let cur = current_time();
@@ -530,27 +522,6 @@ where
                 executions,
                 time: cur,
                 introspection_monitor: Box::new(state.introspection_monitor().clone()),
-                phantom: PhantomData,
-            },
-        )?;
-    }
-
-    // If we are measuring scalability stuff..
-    #[cfg(feature = "scalability_introspection")]
-    {
-        let imported_with_observer = state.scalability_monitor().testcase_with_observers;
-        let imported_without_observer = state.scalability_monitor().testcase_without_observers;
-
-        reporter.fire(
-            state,
-            Event::UpdateUserStats {
-                name: Cow::from("total imported"),
-                value: UserStats::new(
-                    UserStatsValue::Number(
-                        (imported_with_observer + imported_without_observer) as u64,
-                    ),
-                    AggregatorOps::Avg,
-                ),
                 phantom: PhantomData,
             },
         )?;
@@ -623,11 +594,11 @@ pub trait EventProcessor<E, S, Z> {
     /// Shutdown gracefully; typically without saving state.
     fn on_shutdown(&mut self) -> Result<(), Error>;
 }
-/// The id of this [`EventManager`].
-/// For multi processed [`EventManager`]s,
+/// The id of this `EventManager`.
+/// For multi processed `EventManagers`,
 /// each connected client should have a unique ids.
 pub trait HasEventManagerId {
-    /// The id of this manager. For Multiprocessed [`EventManager`]s,
+    /// The id of this manager. For Multiprocessed `EventManagers`,
     /// each client should have a unique ids.
     fn mgr_id(&self) -> EventManagerId;
 }
@@ -717,7 +688,7 @@ impl HasEventManagerId for NopEventManager {
     }
 }
 
-/// An [`EventManager`] type that wraps another manager, but captures a `monitor` type as well.
+/// An `EventManager` type that wraps another manager, but captures a `monitor` type as well.
 /// This is useful to keep the same API between managers with and without an internal `monitor`.
 #[derive(Copy, Clone, Debug)]
 pub struct MonitorTypedEventManager<EM> {
@@ -725,7 +696,7 @@ pub struct MonitorTypedEventManager<EM> {
 }
 
 impl<EM> MonitorTypedEventManager<EM> {
-    /// Creates a new [`EventManager`] that wraps another manager, but captures a `monitor` type as well.
+    /// Creates a new `EventManager` that wraps another manager, but captures a `monitor` type as well.
     #[must_use]
     pub fn new(inner: EM) -> Self {
         MonitorTypedEventManager { inner }

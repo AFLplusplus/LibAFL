@@ -73,7 +73,7 @@ pub fn on_add_metadata_default<CS, I, S>(
 ) -> Result<(), Error>
 where
     CS: AflScheduler,
-    S: HasTestcase<I> + HasCorpus,
+    S: HasTestcase<I> + HasCorpus<I>,
 {
     let current_id = *state.corpus().current();
 
@@ -133,7 +133,7 @@ where
 /// Called when choosing the next [`Testcase`]
 pub fn on_next_metadata_default<I, S>(state: &mut S) -> Result<(), Error>
 where
-    S: HasCorpus + HasTestcase<I>,
+    S: HasCorpus<I> + HasTestcase<I>,
 {
     let current_id = *state.corpus().current();
 
@@ -215,7 +215,7 @@ pub struct RandScheduler<S> {
 
 impl<I, S> Scheduler<I, S> for RandScheduler<S>
 where
-    S: HasCorpus + HasRand,
+    S: HasCorpus<I> + HasRand,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id

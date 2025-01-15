@@ -28,7 +28,7 @@ pub struct LenTimeMulTestcaseScore {}
 
 impl<I, S> TestcaseScore<I, S> for LenTimeMulTestcaseScore
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
     I: HasLen,
 {
     #[expect(clippy::cast_precision_loss)]
@@ -54,7 +54,7 @@ pub struct CorpusPowerTestcaseScore {}
 
 impl<I, S> TestcaseScore<I, S> for CorpusPowerTestcaseScore
 where
-    S: HasCorpus + HasMetadata,
+    S: HasCorpus<I> + HasMetadata,
 {
     /// Compute the `power` we assign to each corpus entry
     #[expect(clippy::cast_precision_loss, clippy::too_many_lines)]
@@ -269,9 +269,9 @@ where
 #[derive(Debug, Clone)]
 pub struct CorpusWeightTestcaseScore {}
 
-impl<I, S> TestcaseScore<S> for CorpusWeightTestcaseScore
+impl<I, S> TestcaseScore<I, S> for CorpusWeightTestcaseScore
 where
-    S: HasCorpus + HasMetadata,
+    S: HasCorpus<I> + HasMetadata,
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[expect(clippy::cast_precision_loss)]
