@@ -1,12 +1,9 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, marker::PhantomData};
 #[cfg(feature = "std")]
-use core::{
-    sync::atomic::{compiler_fence, Ordering},
-    time::Duration,
-};
+use core::sync::atomic::{compiler_fence, Ordering};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use libafl_bolts::os::startable_self;
@@ -18,7 +15,8 @@ use libafl_bolts::ClientId;
 #[cfg(feature = "std")]
 use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRestorer};
 #[cfg(feature = "std")]
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use super::{default_on_restart, ProgressReporter};
 #[cfg(all(unix, feature = "std", not(miri)))]
@@ -32,13 +30,13 @@ use crate::{
     },
     monitors::Monitor,
     stages::HasCurrentStageId,
-    state::{HasExecutions, HasLastReportTime, Stoppable},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, Stoppable},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{
     monitors::{ClientStats, SimplePrintingMonitor},
-    state::{HasCorpus, HasSolutions},
+    state::HasSolutions,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -89,7 +87,13 @@ where
     }
 }
 
-impl<I, MT, S> ManagerExit for SimpleEventManager<I, MT, S> {}
+impl<I, MT, S> ManagerExit for SimpleEventManager<I, MT, S> {
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn await_restart_safe(&mut self) {}
+}
 
 impl<I, MT, S> EventRestarter<S> for SimpleEventManager<I, MT, S>
 where
@@ -326,6 +330,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<I, MT, OT, S, SP> CanSerializeObserver<OT> for SimpleRestartingEventManager<I, MT, S, SP>
 where
     SP: ShMemProvider,
@@ -345,6 +350,9 @@ where
         self.staterestorer.send_exiting();
         Ok(())
     }
+    /// Block until we are safe to exit, usually called inside `on_restart`.
+    #[inline]
+    fn await_restart_safe(&mut self) {}
 }
 
 #[cfg(feature = "std")]

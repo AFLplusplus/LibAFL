@@ -161,7 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .arg(&archive_path)
         .stdout(Stdio::piped())
         .spawn()
-        .expect("llvm-nm does not work (are you using nightly? or did you install by rustup component add llvm-tools?) {:#?} {:#?}");
+        .expect("llvm-nm does not work (are you using nightly? or did you install by rustup component add llvm-tools?)");
 
     let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
 

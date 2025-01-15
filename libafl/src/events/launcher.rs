@@ -385,7 +385,7 @@ where
     where
         S: DeserializeOwned + HasCorpus + Serialize,
         <S::Corpus as Corpus>::Input: DeserializeOwned,
-        EMH: EventManagerHooksTuple<S> + Clone + Copy,
+        EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S> + Clone + Copy,
         CF: FnOnce(
             Option<S>,
             LlmpRestartingEventManager<EMH, S, SP>,

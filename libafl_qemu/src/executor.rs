@@ -22,7 +22,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions, State},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "fork")]
@@ -340,7 +340,7 @@ where
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: State + HasSolutions + HasCorpus,
+    S: HasSolutions + HasCorpus,
     SP: ShMemProvider,
     Z: HasObjective,
     Z::Objective: Feedback<EM, I, OT, S>,
@@ -408,7 +408,7 @@ where
     OF: Feedback<EM, I, OT, S>,
     OT: ObserversTuple<I, S> + Debug,
     I: Input + Unpin,
-    S: State + HasExecutions + Unpin + HasCorpus,
+    S: HasExecutions + Unpin + HasCorpus,
     SP: ShMemProvider,
     Z: HasObjective<Objective = OF>,
 {
@@ -442,7 +442,6 @@ impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> HasObservers
 where
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: State,
     SP: ShMemProvider,
 {
     type Observers = OT;

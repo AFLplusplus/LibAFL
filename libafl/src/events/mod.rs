@@ -37,10 +37,9 @@ pub use launcher::*;
 use libafl_bolts::os::unix_signals::{siginfo_t, ucontext_t, Signal, SignalHandler};
 #[cfg(all(unix, feature = "std"))]
 use libafl_bolts::os::CTRL_C_EXIT;
-use libafl_bolts::{
-    current_time,
-    tuples::{Handle, MatchNameRef},
-};
+#[cfg(feature = "std")]
+use libafl_bolts::tuples::MatchNameRef;
+use libafl_bolts::{current_time, tuples::Handle};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
@@ -421,7 +420,8 @@ pub trait EventFirer<I, S> {
 /// Serialize all observers for this type and manager
 /// Serialize the observer using the `time_factor` and `percentage_threshold`.
 /// These parameters are unique to each of the different types of `EventManager`
-pub(crate) fn serialize_observers_adaptive<EM, S, OT>(
+#[cfg(feature = "std")]
+pub(crate) fn serialize_observers_adaptive<EM, OT>(
     manager: &mut EM,
     observers: &OT,
     time_factor: u32,
@@ -609,12 +609,9 @@ pub trait CanSerializeObserver<OT> {
 pub trait ManagerExit {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
-    fn send_exiting(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
+    fn send_exiting(&mut self) -> Result<(), Error>;
     /// Block until we are safe to exit, usually called inside `on_restart`.
-    #[inline]
-    fn await_restart_safe(&mut self) {}
+    fn await_restart_safe(&mut self);
 }
 
 /// [`EventProcessor`] process all the incoming messages
@@ -666,7 +663,15 @@ where
     }
 }
 
-impl ManagerExit for NopEventManager {}
+impl ManagerExit for NopEventManager {
+    /// Send information that this client is exiting.
+    /// No need to restart us any longer, and no need to print an error, either.
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+    /// Block until we are safe to exit, usually called inside `on_restart`.
+    fn await_restart_safe(&mut self) {}
+}
 
 impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
     fn process(

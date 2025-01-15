@@ -149,7 +149,7 @@ where
     OT: Serialize + MatchNameRef,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        serialize_observers_adaptive::<Self, S, OT>(self, observers, 2, 80)
+        serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)
     }
 }
 

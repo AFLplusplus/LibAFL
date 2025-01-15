@@ -288,7 +288,7 @@ where
     OT: Serialize + MatchNameRef,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        serialize_observers_adaptive::<EM, S, OT>(
+        serialize_observers_adaptive::<EM, OT>(
             &mut self.inner,
             observers,
             4, // twice as much as the normal llmp em's value cuz it does this job twice.

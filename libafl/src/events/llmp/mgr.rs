@@ -8,6 +8,8 @@ use core::{marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
+#[cfg(feature = "std")]
+use libafl_bolts::tuples::MatchNameRef;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -17,7 +19,7 @@ use libafl_bolts::{
     current_time,
     llmp::{LlmpClient, LlmpClientDescription, LLMP_FLAG_FROM_MM},
     shmem::{NopShMemProvider, ShMemProvider},
-    tuples::{Handle, MatchNameRef},
+    tuples::Handle,
     ClientId,
 };
 #[cfg(feature = "std")]
@@ -29,14 +31,15 @@ use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
+#[cfg(feature = "std")]
+use crate::events::{serialize_observers_adaptive, CanSerializeObserver};
 use crate::{
     corpus::Corpus,
     events::{
         default_maybe_report_progress, default_on_restart, default_report_progress,
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        serialize_observers_adaptive, AdaptiveSerializer, CanSerializeObserver, Event, EventConfig,
-        EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
-        HasEventManagerId, ManagerExit, ProgressReporter,
+        AdaptiveSerializer, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -211,7 +214,7 @@ where
     OT: Serialize + MatchNameRef,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
-        serialize_observers_adaptive::<Self, S, OT>(self, observers, 2, 80)
+        serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)
     }
 }
 
@@ -503,6 +506,10 @@ where
     fn await_restart_safe(&mut self) {
         // wait until we can drop the message safely.
         self.llmp.await_safe_to_unmap_blocking();
+    }
+
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.llmp.sender_mut().send_exiting()
     }
 }
 
