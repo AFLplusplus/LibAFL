@@ -1,15 +1,22 @@
 //! Keep stats, and display them to the user. Usually used in a broker, or main node, of some sort.
 
 pub mod multi;
+pub use multi::MultiMonitor;
 
 #[cfg(feature = "std")]
 pub mod disk;
+#[cfg(feature = "std")]
+pub use disk::{OnDiskJsonMonitor, OnDiskTomlMonitor};
 
 #[cfg(feature = "std")]
 pub mod disk_aggregate;
+#[cfg(feature = "std")]
+pub use disk_aggregate::OnDiskJsonAggregateMonitor;
 
 #[cfg(all(feature = "tui_monitor", feature = "std"))]
 pub mod tui;
+#[cfg(all(feature = "tui_monitor", feature = "std"))]
+pub use tui::TuiMonitor;
 
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub mod prometheus;
@@ -24,17 +31,9 @@ use core::{fmt, fmt::Write, time::Duration};
 
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
-pub use multi::MultiMonitor;
-#[cfg(all(feature = "std", feature = "prometheus_monitor"))]
+#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub use prometheus::PrometheusMonitor;
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "std", feature = "tui_monitor"))]
-pub use tui::TuiMonitor;
-#[cfg(feature = "std")]
-pub use {
-    disk::{OnDiskJsonMonitor, OnDiskTomlMonitor},
-    disk_aggregate::OnDiskJsonAggregateMonitor,
-};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
