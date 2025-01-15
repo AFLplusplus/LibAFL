@@ -62,7 +62,7 @@ nix = { workspace = true, default-features = true, features = ["mman"] }
 libc = { workspace = true }
 hashbrown = { workspace = true, default-features = true }
 rangemap = { workspace = true }
-frida-gum-sys = { version = "0.15.1", features = [
+frida-gum-sys = { version = "0.16.5", features = [
   "event-sink",
   "invocation-listener",
 ] }
