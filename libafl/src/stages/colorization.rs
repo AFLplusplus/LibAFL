@@ -20,7 +20,7 @@ use crate::{
     inputs::HasMutatorBytes,
     mutators::mutations::buffer_copy,
     nonzero,
-    observers::{MapObserver, ObserversTuple},
+    observers::{ObserversTuple, SimpleHash},
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
@@ -81,7 +81,7 @@ where
     S: HasCorpus + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
-    O: MapObserver,
+    O: SimpleHash,
     C: AsRef<O> + Named,
 {
     #[inline]
@@ -152,7 +152,7 @@ libafl_bolts::impl_serdeany!(TaintMetadata);
 impl<C, E, EM, O, S, Z> ColorizationStage<C, E, EM, O, S, Z>
 where
     EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    O: MapObserver,
+    O: SimpleHash,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,

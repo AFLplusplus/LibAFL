@@ -15,7 +15,7 @@ use libafl_bolts::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, Observer, VarLenMapObserver},
+    observers::{map::MapObserver, Observer, SimpleHash, VarLenMapObserver},
     Error,
 };
 
@@ -75,6 +75,16 @@ impl<T> AsMut<Self> for VariableMapObserver<'_, T> {
     }
 }
 
+impl<T> SimpleHash for VariableMapObserver<'_, T>
+where
+    T: Hash,
+{
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+    }
+}
+
 impl<T> MapObserver for VariableMapObserver<'_, T>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
@@ -111,11 +121,6 @@ where
             }
         }
         res
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map

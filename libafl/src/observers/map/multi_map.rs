@@ -16,7 +16,7 @@ use meminterval::IntervalTree;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, DifferentialObserver, Observer},
+    observers::{map::MapObserver, DifferentialObserver, Observer, SimpleHash},
     Error,
 };
 
@@ -84,6 +84,16 @@ impl<T, const DIFFERENTIAL: bool> AsMut<Self> for MultiMapObserver<'_, T, DIFFER
     }
 }
 
+impl<T, const DIFFERENTIAL: bool> SimpleHash for MultiMapObserver<'_, T, DIFFERENTIAL>
+where
+    T: Hash,
+{
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+    }
+}
+
 impl<T, const DIFFERENTIAL: bool> MapObserver for MultiMapObserver<'_, T, DIFFERENTIAL>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
@@ -122,11 +132,6 @@ where
             }
         }
         res
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     fn reset_map(&mut self) -> Result<(), Error> {

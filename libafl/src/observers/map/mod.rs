@@ -338,6 +338,12 @@ pub mod macros {
     }
 }
 
+/// Can calculate a simple hash function, usually used in conjunction with a [`MapObserver`]
+pub trait SimpleHash {
+    /// Compute the hash of the map without needing to provide a hasher
+    fn hash_simple(&self) -> u64;
+}
+
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
@@ -368,9 +374,6 @@ pub trait MapObserver:
 
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64;
-
-    /// Compute the hash of the map without needing to provide a hasher
-    fn hash_simple(&self) -> u64;
 
     /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
@@ -492,6 +495,16 @@ impl<T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'_, T, DIFFEREN
     }
 }
 
+impl<T, const DIFFERENTIAL: bool> SimpleHash for StdMapObserver<'_, T, DIFFERENTIAL>
+where
+    T: Hash,
+{
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+    }
+}
+
 impl<T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'_, T, DIFFERENTIAL>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
@@ -524,11 +537,6 @@ where
     #[inline]
     fn usable_count(&self) -> usize {
         self.as_slice().len()
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]

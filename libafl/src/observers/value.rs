@@ -12,7 +12,7 @@ use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::Observer;
+use super::{Observer, SimpleHash};
 use crate::{
     observers::{MapObserver, ObserverWithHashField},
     Error,
@@ -289,6 +289,18 @@ impl<T> AsMut<Self> for RefCellValueObserver<'_, T> {
         self
     }
 }
+
+impl<T> SimpleHash for RefCellValueObserver<'_, T>
+where
+    T: Hash,
+{
+    /// Panics if the contained value is already mutably borrowed (calls
+    /// [`RefCell::borrow`]).
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+    }
+}
+
 impl<T, A> MapObserver for RefCellValueObserver<'_, A>
 where
     T: PartialEq + Copy + Hash + Default + DeserializeOwned + Serialize + Debug,
@@ -306,12 +318,6 @@ where
     /// [`RefCell::borrow_mut`]).
     fn set(&mut self, idx: usize, val: Self::Entry) {
         self.get_ref_mut()[idx] = val;
-    }
-
-    /// Panics if the contained value is already mutably borrowed (calls
-    /// [`RefCell::borrow`]).
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Panics if the contained value is already mutably borrowed (calls

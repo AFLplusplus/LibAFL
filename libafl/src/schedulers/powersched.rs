@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    observers::MapObserver,
+    observers::{MapObserver, SimpleHash},
     schedulers::{
         on_add_metadata_default, on_evaluation_metadata_default, on_next_metadata_default,
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
@@ -328,7 +328,7 @@ impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
 impl<C, I, O, S> Scheduler<I, S> for PowerQueueScheduler<C, O>
 where
     S: HasCorpus + HasMetadata + HasTestcase,
-    O: MapObserver,
+    O: SimpleHash,
     C: AsRef<O>,
 {
     /// Called when a [`Testcase`] is added to the corpus

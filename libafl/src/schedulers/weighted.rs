@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use super::powersched::PowerSchedule;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    observers::MapObserver,
+    observers::SimpleHash,
     random_corpus_id,
     schedulers::{
         on_add_metadata_default, on_evaluation_metadata_default, on_next_metadata_default,
@@ -309,7 +309,7 @@ impl<C, F, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for WeightedSchedule
 where
     C: AsRef<O> + Named,
     F: TestcaseScore<S>,
-    O: MapObserver,
+    O: SimpleHash,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     /// Called when a [`Testcase`] is added to the corpus

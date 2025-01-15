@@ -35,7 +35,7 @@ pub use tuneable::*;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    observers::MapObserver,
+    observers::SimpleHash,
     random_corpus_id,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
@@ -109,7 +109,7 @@ where
     CS: AflScheduler,
     CS::MapObserverRef: AsRef<O>,
     S: HasMetadata,
-    O: MapObserver,
+    O: SimpleHash,
     OT: MatchName,
 {
     let observer = observers

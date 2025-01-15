@@ -12,7 +12,7 @@ use libafl_bolts::{AsSlice, AsSliceMut, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, Observer},
+    observers::{map::MapObserver, Observer, SimpleHash},
     Error,
 };
 
@@ -70,6 +70,16 @@ impl<T> AsMut<Self> for OwnedMapObserver<T> {
     }
 }
 
+impl<T> SimpleHash for OwnedMapObserver<T>
+where
+    T: Hash,
+{
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
+    }
+}
+
 impl<T> MapObserver for OwnedMapObserver<T>
 where
     T: PartialEq + Copy + Hash + Serialize + DeserializeOwned + Debug,
@@ -103,11 +113,6 @@ where
     #[inline]
     fn usable_count(&self) -> usize {
         self.as_slice().len()
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]

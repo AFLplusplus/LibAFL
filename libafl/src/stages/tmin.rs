@@ -25,7 +25,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple},
+    observers::{MapObserver, ObserversTuple, SimpleHash},
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
@@ -360,7 +360,7 @@ impl<C, M, S> StateInitializer<S> for MapEqualityFeedback<C, M, S> {}
 
 impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for MapEqualityFeedback<C, M, S>
 where
-    M: MapObserver,
+    M: SimpleHash,
     C: AsRef<M>,
     OT: MatchName,
 {
@@ -419,7 +419,7 @@ impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
 
 impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqualityFactory<C, M, S>
 where
-    M: MapObserver,
+    M: SimpleHash,
     C: AsRef<M> + Handled,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus,

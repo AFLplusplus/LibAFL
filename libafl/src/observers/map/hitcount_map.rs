@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     executors::ExitKind,
     observers::{
-        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, VarLenMapObserver,
+        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, SimpleHash,
+        VarLenMapObserver,
     },
     Error,
 };
@@ -184,6 +185,16 @@ impl<M> AsMut<Self> for HitcountsMapObserver<M> {
     }
 }
 
+impl<M> SimpleHash for HitcountsMapObserver<M>
+where
+    M: SimpleHash,
+{
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
+    }
+}
+
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
@@ -219,11 +230,6 @@ where
     #[inline]
     fn reset_map(&mut self) -> Result<(), Error> {
         self.base.reset_map()
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        self.base.hash_simple()
     }
 
     fn to_vec(&self) -> Vec<u8> {
@@ -406,6 +412,16 @@ impl<M> AsMut<Self> for HitcountsIterableMapObserver<M> {
     }
 }
 
+impl<M> SimpleHash for HitcountsIterableMapObserver<M>
+where
+    M: SimpleHash,
+{
+    #[inline]
+    fn hash_simple(&self) -> u64 {
+        self.base.hash_simple()
+    }
+}
+
 impl<M> MapObserver for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
@@ -443,10 +459,6 @@ where
         self.base.reset_map()
     }
 
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        self.base.hash_simple()
-    }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
     }
