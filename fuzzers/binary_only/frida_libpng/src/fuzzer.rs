@@ -83,16 +83,9 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // println!("{:?}", mgr.mgr_id());
 
         let lib = unsafe { libloading::Library::new(options.clone().harness.unwrap()).unwrap() };
-        let init_func: libloading::Symbol<
-            unsafe extern "C" fn(argc: *const usize, argv: *const *const *const u8),
-        > = unsafe { lib.get("LLVMFuzzerInitialize".as_bytes()).unwrap() };
         let target_func: libloading::Symbol<
             unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
         > = unsafe { lib.get(options.harness_function.as_bytes()).unwrap() };
-
-        unsafe {
-            init_func(std::ptr::null(), std::ptr::null());
-        }
 
         let mut frida_harness = |input: &BytesInput| {
             let target = input.target_bytes();
@@ -261,7 +254,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
-        // .stdout_file(Some(&options.stdout))
+        .stdout_file(Some(&options.stdout))
         .remote_broker_addr(options.remote_broker_addr)
         .build()
         .launch()
