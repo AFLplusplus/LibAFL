@@ -1,7 +1,6 @@
 //! Keep stats, and display them to the user. Usually used in a broker, or main node, of some sort.
 
 pub mod multi;
-pub use multi::MultiMonitor;
 
 #[cfg(feature = "std")]
 pub mod disk;
@@ -25,6 +24,7 @@ use core::{fmt, fmt::Write, time::Duration};
 
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
+pub use multi::MultiMonitor;
 #[cfg(all(feature = "std", feature = "prometheus_monitor"))]
 pub use prometheus::PrometheusMonitor;
 use serde::{Deserialize, Serialize};
@@ -326,15 +326,15 @@ impl fmt::Display for UserStatsValue {
 /// Prettifies float values for human-readable output
 fn prettify_float(value: f64) -> String {
     let (value, suffix) = match value {
-        value if value >= 1000000.0 => (value / 1000000.0, "M"),
-        value if value >= 1000.0 => (value / 1000.0, "k"),
+        value if value >= 1_000_000.0 => (value / 1_000_000.0, "M"),
+        value if value >= 1_000.0 => (value / 1_000.0, "k"),
         value => (value, ""),
     };
     match value {
-        value if value >= 1000000.0 => {
+        value if value >= 1_000_000.0 => {
             format!("{value:.2}{suffix}")
         }
-        value if value >= 1000.0 => {
+        value if value >= 1_000.0 => {
             format!("{value:.1}{suffix}")
         }
         value if value >= 100.0 => {
