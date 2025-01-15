@@ -571,6 +571,7 @@ impl AsanRuntime {
             };
         }
 
+        #[allow(unused_macro_rules)]
         macro_rules! hook_func_with_check {
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty, $always_enabled:expr) => {
                 paste::paste! {
