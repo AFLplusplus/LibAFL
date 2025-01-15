@@ -53,20 +53,19 @@ use crate::{
 
 /// A manager that can restart on the fly, storing states in-between (in `on_restart`)
 #[derive(Debug)]
-pub struct LlmpRestartingEventManager<EMH, S, SP>
+pub struct LlmpRestartingEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
-    //CE: CustomEvent<I>,
 {
     /// The embedded LLMP event manager
-    llmp_mgr: LlmpEventManager<EMH, S, SP>,
+    llmp_mgr: LlmpEventManager<EMH, I, S, SP>,
     /// The staterestorer to serialize the state for the next runner
     staterestorer: StateRestorer<SP>,
     /// Decide if the state restorer must save the serialized state
     save_state: LlmpShouldSaveState,
 }
 
-impl<EMH, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -101,11 +100,11 @@ where
     }
 }
 
-impl<EMH, S, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus + Serialize,
     SP: ShMemProvider,
-    <S::Corpus as Corpus>::Input: Serialize,
+    I: Serialize,
 {
     fn maybe_report_progress(
         &mut self,
@@ -198,21 +197,21 @@ where
     }
 }
 
-impl<E, EMH, S, SP, Z> EventProcessor<E, S, Z> for LlmpRestartingEventManager<EMH, S, SP>
+impl<E, EMH, I, S, SP, Z> EventProcessor<E, S, Z> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
+    EMH: EventManagerHooksTuple<I, S>,
     E: HasObservers,
     E::Observers: DeserializeOwned,
-    S: HasCorpus + HasImported + Stoppable + Serialize,
-    <S::Corpus as Corpus>::Input: DeserializeOwned + Input,
+    S: HasCorpus<I> + HasImported + Stoppable + Serialize,
+    I: DeserializeOwned + Input,
     S::Corpus: Serialize,
     SP: ShMemProvider,
     Z: ExecutionProcessor<
             LlmpEventManager<EMH, S, SP>,
-            <S::Corpus as Corpus>::Input,
+            I,
             E::Observers,
             S,
-        > + EvaluatorObservers<E, LlmpEventManager<EMH, S, SP>, <S::Corpus as Corpus>::Input, S>,
+        > + EvaluatorObservers<E, LlmpEventManager<EMH, S, SP>, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         let res = self.llmp_mgr.process(fuzzer, state, executor)?;
@@ -225,7 +224,7 @@ where
     }
 }
 
-impl<EMH, S, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -322,7 +321,7 @@ pub fn setup_restarting_mgr_std<MT, S>(
 where
     MT: Monitor + Clone,
     S: HasCorpus + Serialize + DeserializeOwned,
-    <S::Corpus as Corpus>::Input: DeserializeOwned,
+    I: DeserializeOwned,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -355,7 +354,7 @@ pub fn setup_restarting_mgr_std_adaptive<MT, S>(
 where
     MT: Monitor + Clone,
     S: HasCorpus + Serialize + DeserializeOwned,
-    <S::Corpus as Corpus>::Input: DeserializeOwned,
+    I: DeserializeOwned,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -414,10 +413,10 @@ pub struct RestartingMgr<EMH, MT, S, SP> {
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
 impl<EMH, MT, S, SP> RestartingMgr<EMH, MT, S, SP>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S> + Copy + Clone,
+    EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     SP: ShMemProvider,
     S: HasCorpus + Serialize + DeserializeOwned,
-    <S::Corpus as Corpus>::Input: DeserializeOwned,
+    I: DeserializeOwned,
     MT: Monitor + Clone,
 {
     /// Launch the broker and the clients and fuzz
@@ -451,7 +450,7 @@ where
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
                             let llmp_hook =
-                                StdLlmpEventHook::<<S::Corpus as Corpus>::Input, MT>::new(
+                                StdLlmpEventHook::<I, MT>::new(
                                     self.monitor.take().unwrap(),
                                 )?;
 

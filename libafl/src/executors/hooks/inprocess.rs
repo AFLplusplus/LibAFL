@@ -223,10 +223,9 @@ impl<I, S> InProcessHooks<I, S> {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
+        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
-        S::Solutions: Corpus<Input = I>,
     {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.

@@ -45,9 +45,9 @@ use crate::{
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus {
+pub trait HasCorpus<I> {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus;
+    type Corpus: Corpus<I>;
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
@@ -56,9 +56,9 @@ pub trait HasCorpus {
 }
 
 // Reflexivity
-impl<C> HasCorpus for C
+impl<I, C> HasCorpus<I> for C
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     type Corpus = Self;
 
@@ -80,9 +80,9 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions {
+pub trait HasSolutions<I> {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus;
+    type Solutions: Corpus<I>;
 
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
@@ -286,9 +286,9 @@ where
     }
 }
 
-impl<I, C, R, SC> HasCorpus for StdState<I, C, R, SC>
+impl<I, C, R, SC> HasCorpus<I> for StdState<I, C, R, SC>
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     type Corpus = C;
 
@@ -305,17 +305,17 @@ where
     }
 }
 
-impl<I, C, R, SC> HasTestcase for StdState<I, C, R, SC>
+impl<I, C, R, SC> HasTestcase<I> for StdState<I, C, R, SC>
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<C::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
         Ok(self.corpus().get(id)?.borrow())
     }
 
     /// To get mutable testcase
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
@@ -324,7 +324,7 @@ impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
 where
     I: Input,
     C: Corpus,
-    SC: Corpus<Input = C::Input>,
+    SC: Corpus<I>,
 {
     type Solutions = SC;
 
@@ -466,12 +466,12 @@ impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
 }
 
 /// Has information about the current [`Testcase`] we are fuzzing
-pub trait HasCurrentTestcase: HasCorpus {
+pub trait HasCurrentTestcase<I>: HasCorpus<I> {
     /// Gets the current [`Testcase`] we are fuzzing
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     fn current_testcase(&self)
-        -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+        -> Result<Ref<'_, Testcase<I>>, Error>;
     //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
 
     /// Gets the current [`Testcase`] we are fuzzing (mut)
@@ -479,7 +479,7 @@ pub trait HasCurrentTestcase: HasCorpus {
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
     fn current_testcase_mut(
         &self,
-    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    ) -> Result<RefMut<'_, Testcase<I>>, Error>;
     //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
 
     /// Gets a cloned representation of the current [`Testcase`].
@@ -489,17 +489,18 @@ pub trait HasCurrentTestcase: HasCorpus {
     /// # Note
     /// This allocates memory and copies the contents!
     /// For performance reasons, if you just need to access the testcase, use [`Self::current_testcase`] instead.
-    fn current_input_cloned(&self) -> Result<<Self::Corpus as Corpus>::Input, Error>;
+    fn current_input_cloned(&self) -> Result<I, Error>;
 }
 
-impl<T> HasCurrentTestcase for T
+impl<I, T> HasCurrentTestcase<I> for T
 where
-    T: HasCorpus + HasCurrentCorpusId,
-    <Self::Corpus as Corpus>::Input: Clone,
+    T: HasCorpus<I> + HasCurrentCorpusId,
+    T::Corpus: Corpus<I>,
+    I: Clone,
 {
     fn current_testcase(
         &self,
-    ) -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    ) -> Result<Ref<'_, Testcase<I>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::key_not_found(
                 "We are not currently processing a testcase",
@@ -511,7 +512,7 @@ where
 
     fn current_testcase_mut(
         &self,
-    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    ) -> Result<RefMut<'_, Testcase<I>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "We are not currently processing a testcase",
@@ -521,7 +522,7 @@ where
         Ok(self.corpus().get(corpus_id)?.borrow_mut())
     }
 
-    fn current_input_cloned(&self) -> Result<<Self::Corpus as Corpus>::Input, Error> {
+    fn current_input_cloned(&self) -> Result<I, Error> {
         let mut testcase = self.current_testcase_mut()?;
         Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
     }
@@ -587,7 +588,7 @@ where
     I: Input,
     R: Rand,
     C: Corpus,
-    SC: Corpus<Input = C::Input>,
+    SC: Corpus<I>,
 {
     /// Decide if the state must load the inputs
     pub fn must_load_initial_inputs(&self) -> bool {
@@ -1026,9 +1027,9 @@ where
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = I>,
+    C: Corpus<I>,
     R: Rand,
-    SC: Corpus<Input = I>,
+    SC: Corpus<I>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,

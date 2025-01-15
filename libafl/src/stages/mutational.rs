@@ -27,11 +27,10 @@ use crate::{
 // TODO multi mutators stage
 
 /// Action performed after the un-transformed input is executed (e.g., updating metadata)
-#[expect(unused_variables)]
 pub trait MutatedTransformPost<S>: Sized {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
-    fn post_exec(self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+    fn post_exec(self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -61,8 +60,7 @@ where
 impl<I, S> MutatedTransform<I, S> for I
 where
     I: Input + Clone,
-    S: HasCorpus,
-    S::Corpus: Corpus<Input = I>,
+    S: HasCorpus<I>,
 {
     type Post = ();
 
@@ -149,16 +147,16 @@ impl<E, EM, I, M, S, Z> Named for StdMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I>
         + HasRand
         + HasMetadata
         + HasExecutions
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
+    I: MutatedTransform<I, S> + Clone,
+    I: Input,
 {
     #[inline]
     fn perform(
@@ -185,12 +183,12 @@ where
     }
 }
 
-impl<E, EM, M, S, Z> StdMutationalStage<E, EM, <S::Corpus as Corpus>::Input, M, S, Z>
+impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
-    M: Mutator<<S::Corpus as Corpus>::Input, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
-    <S::Corpus as Corpus>::Input: Input + Clone,
+    M: Mutator<I, S>,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
+    I: Input + Clone,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -208,10 +206,10 @@ where
 impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
+    I: MutatedTransform<I, S> + Clone,
+    I: Input,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -308,10 +306,10 @@ impl<E, EM, I, M, S, Z> Named for MultiMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<E, EM, I, M, S, Z>
 where
     M: MultiMutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
+    I: MutatedTransform<I, S> + Clone,
+    I: Input,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

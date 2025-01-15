@@ -75,7 +75,7 @@ libafl_bolts::impl_serdeany!(FuzzTime);
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<C, E, EM, O, S, Z> {
+pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
     map_observer_handle: Handle<C>,
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
@@ -114,7 +114,7 @@ pub struct AflStatsStage<C, E, EM, O, S, Z> {
     autotokens_enabled: bool,
     /// The core we are bound to
     core_id: CoreId,
-    phantom_data: PhantomData<(O, E, EM, S, Z)>,
+    phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -236,13 +236,14 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, I, O, S, Z>
 where
+    C: AsRef<O> + Named,
     E: HasObservers,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<I, S>,
+    Z: HasScheduler<I, S>,
     S: HasImported
-        + HasCorpus
+        + HasCorpus<I>
         + HasMetadata
         + HasStartTime
         + HasExecutions
@@ -441,17 +442,17 @@ where
     }
 }
 
-impl<C, E, EM, O, S, Z> AflStatsStage<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> AflStatsStage<C, E, EM, I, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    S: HasImported + HasCorpus + HasMetadata + HasExecutions,
+    EM: EventFirer<I, S>,
+    S: HasImported + HasCorpus<I> + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,
 {
     /// Builder for `AflStatsStage`
     #[must_use]
-    pub fn builder() -> AflStatsStageBuilder<C, E, EM, O, S, Z> {
+    pub fn builder() -> AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
         AflStatsStageBuilder::new()
     }
 
@@ -479,13 +480,13 @@ where
         Ok(())
     }
 
-    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
+    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<I>) {
         if testcase.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
+    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<I>) {
         if let Some(exec_time) = testcase.exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
@@ -497,7 +498,7 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
+    fn maybe_update_max_depth(&mut self, testcase: &Testcase<I>) {
         if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
@@ -512,7 +513,7 @@ where
     #[cfg(feature = "track_hit_feedbacks")]
     fn maybe_update_last_crash(
         &mut self,
-        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
+        testcase: &Testcase<I>,
         state: &S,
     ) {
         #[cfg(feature = "track_hit_feedbacks")]
@@ -528,7 +529,7 @@ where
     #[cfg(feature = "track_hit_feedbacks")]
     fn maybe_update_last_hang(
         &mut self,
-        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
+        testcase: &Testcase<I>,
         state: &S,
     ) {
         if testcase
@@ -652,7 +653,7 @@ pub fn get_run_cmdline() -> Cow<'static, str> {
 
 /// The Builder for `AflStatsStage`
 #[derive(Debug)]
-pub struct AflStatsStageBuilder<C, E, EM, O, S, Z> {
+pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     core_id: Option<CoreId>,
@@ -664,14 +665,14 @@ pub struct AflStatsStageBuilder<C, E, EM, O, S, Z> {
     banner: String,
     version: String,
     target_mode: String,
-    phantom_data: PhantomData<(O, E, EM, S, Z)>,
+    phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
 }
 
-impl<C, E, EM, O, S, Z> AflStatsStageBuilder<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> AflStatsStageBuilder<C, E, EM, I, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    S: HasImported + HasCorpus + HasMetadata + HasExecutions,
+    EM: EventFirer<I>,
+    S: HasImported + HasCorpus<I> + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,
 {
@@ -785,7 +786,8 @@ where
     /// Cannot create the plot file (if provided)
     /// No `MapObserver` supplied to the builder
     /// No `stats_file_path` provieded
-    pub fn build(self) -> Result<AflStatsStage<C, E, EM, O, S, Z>, Error> {
+    #[allow(clippy::type_complexity)]
+    pub fn build(self) -> Result<AflStatsStage<C, E, EM, I, O, S, Z>, Error> {
         if self.map_observer_handle.is_none() {
             return Err(Error::illegal_argument("Must set `map_observer`"));
         }

@@ -148,8 +148,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase + HasCorpus + HasSolutions,
-        S::Solutions: Corpus<Input = I>,
+        S: HasCurrentTestcase<I> + HasCorpus<I> + HasSolutions<I>,
         Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic::<E, EM, OF, Z>(
@@ -178,8 +177,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase + HasCorpus + HasSolutions,
-        S::Solutions: Corpus<Input = I>,
+        S: HasCurrentTestcase<I> + HasCorpus<I> + HasSolutions<I>,
         Z: HasObjective<Objective = OF>,
     {
         let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
@@ -210,9 +208,8 @@ where
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase + HasCorpus + HasSolutions,
+        S: HasCurrentTestcase<I> + HasCorpus<I> + HasSolutions<I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = I>,
         I: Input + Clone,
     {
         let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;

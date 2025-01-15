@@ -327,7 +327,7 @@ impl<C, O> HasQueueCycles for PowerQueueScheduler<C, O> {
 
 impl<C, I, O, S> Scheduler<I, S> for PowerQueueScheduler<C, O>
 where
-    S: HasCorpus + HasMetadata + HasTestcase,
+    S: HasCorpus<I> + HasMetadata + HasTestcase<I>,
     O: MapObserver,
     C: AsRef<O>,
 {

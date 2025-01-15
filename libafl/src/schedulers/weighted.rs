@@ -305,12 +305,12 @@ impl<C, F, O> HasQueueCycles for WeightedScheduler<C, F, O> {
     }
 }
 
-impl<C, F, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for WeightedScheduler<C, F, O>
+impl<C, F, I, O, S> Scheduler<I, S> for WeightedScheduler<C, F, O>
 where
     C: AsRef<O> + Named,
     F: TestcaseScore<S>,
     O: MapObserver,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
+    S: HasCorpus + HasMetadata + HasRand + HasTestcase<I>,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -322,7 +322,7 @@ where
     fn on_evaluation<OT>(
         &mut self,
         state: &mut S,
-        _input: &<S::Corpus as Corpus>::Input,
+        _input: &I,
         observers: &OT,
     ) -> Result<(), Error>
     where

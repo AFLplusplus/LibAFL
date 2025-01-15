@@ -1,4 +1,4 @@
-//! A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
+//! A [`MutationalStage`] where the mutator iteration can be tuned at runtime
 
 use alloc::string::{String, ToString};
 use core::{marker::PhantomData, time::Duration};
@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    corpus::Corpus,
     inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
@@ -149,7 +148,7 @@ where
     reset_by_name(state, STD_TUNEABLE_MUTATIONAL_STAGE_NAME)
 }
 
-/// A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
+/// A [`MutationalStage`] where the mutator iteration can be tuned at runtime
 #[derive(Clone, Debug)]
 pub struct TuneableMutationalStage<E, EM, I, M, S, Z> {
     /// The mutator we use
@@ -164,10 +163,10 @@ pub struct TuneableMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> MutationalStage<S> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase<I>,
+    I: MutatedTransform<I, S> + Clone,
+    I: Input,
 {
     type Mutator = M;
     /// The mutator, added to this stage
@@ -196,16 +195,15 @@ where
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I>
         + HasRand
         + HasNamedMetadata
         + HasMetadata
         + HasExecutions
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
+    I: MutatedTransform<I, S> + Clone + Input,
 {
     #[inline]
     fn perform(
@@ -235,16 +233,15 @@ where
 impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I>
         + HasRand
         + HasNamedMetadata
         + HasExecutions
         + HasMetadata
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
+    I: MutatedTransform<I, S> + Clone + Input,
 {
     /// Runs this (mutational) stage for the given `testcase`
     /// Exactly the same functionality as [`MutationalStage::perform_mutational`], but with added timeout support.
@@ -466,7 +463,7 @@ where
 impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
+    Z: Evaluator<E, EM, I, S>,
     S: HasCorpus + HasRand + HasNamedMetadata,
 {
     /// Creates a new transforming mutational stage

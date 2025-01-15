@@ -68,7 +68,7 @@ where
     E::Observers: ObserversTuple<BytesInput, S>,
     S: HasExecutions
         + HasMetadata
-        + HasCorpus
+        + HasCorpus<I>
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
@@ -337,12 +337,11 @@ where
     }
 }
 
-impl<C, EM, O, OT, S, Z> GeneralizationStage<C, EM, O, OT, S, Z>
+impl<C, EM, I, O, OT, S, Z> GeneralizationStage<C, EM, I, O, OT, S, Z>
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    S: HasExecutions + HasMetadata + HasCorpus + MaybeHasClientPerfMonitor,
-    S::Corpus: Corpus<Input = BytesInput>,
+    S: HasExecutions + HasMetadata + HasCorpus<I> + MaybeHasClientPerfMonitor,
     OT: ObserversTuple<BytesInput, S>,
 {
     /// Create a new [`GeneralizationStage`].
@@ -369,7 +368,7 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+        E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<BytesInput, S>,
     {
         start_timer!(state);
@@ -411,7 +410,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
+        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -449,7 +448,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
+        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
     {
         let mut index = 0;
         while index < payload.len() {

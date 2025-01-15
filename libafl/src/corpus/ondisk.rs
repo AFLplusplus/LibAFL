@@ -56,11 +56,10 @@ pub struct OnDiskCorpus<I> {
     inner: CachedOnDiskCorpus<I>,
 }
 
-impl<I> Corpus for OnDiskCorpus<I>
+impl<I> Corpus<I> for OnDiskCorpus<I>
 where
     I: Input,
 {
-    type Input = I;
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -96,12 +95,6 @@ where
         self.inner.replace(id, testcase)
     }
 
-    /// Peek the next free corpus id
-    #[inline]
-    fn peek_free_id(&self) -> CorpusId {
-        self.inner.peek_free_id()
-    }
-
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
@@ -135,6 +128,12 @@ where
     #[inline]
     fn next(&self, id: CorpusId) -> Option<CorpusId> {
         self.inner.next(id)
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        self.inner.peek_free_id()
     }
 
     #[inline]
@@ -174,7 +173,7 @@ where
     }
 }
 
-impl<I> HasTestcase for OnDiskCorpus<I>
+impl<I> HasTestcase<I> for OnDiskCorpus<I>
 where
     I: Input,
 {

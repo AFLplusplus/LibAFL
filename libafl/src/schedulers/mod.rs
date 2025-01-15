@@ -66,14 +66,14 @@ pub trait RemovableScheduler<I, S> {
 }
 
 /// Called when a [`Testcase`] is evaluated
-pub fn on_add_metadata_default<CS, S>(
+pub fn on_add_metadata_default<CS, I, S>(
     scheduler: &mut CS,
     state: &mut S,
     id: CorpusId,
 ) -> Result<(), Error>
 where
     CS: AflScheduler,
-    S: HasTestcase + HasCorpus,
+    S: HasTestcase<I> + HasCorpus,
 {
     let current_id = *state.corpus().current();
 
@@ -131,9 +131,9 @@ where
 }
 
 /// Called when choosing the next [`Testcase`]
-pub fn on_next_metadata_default<S>(state: &mut S) -> Result<(), Error>
+pub fn on_next_metadata_default<I, S>(state: &mut S) -> Result<(), Error>
 where
-    S: HasCorpus + HasTestcase,
+    S: HasCorpus + HasTestcase<I>,
 {
     let current_id = *state.corpus().current();
 

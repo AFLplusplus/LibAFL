@@ -83,8 +83,7 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
@@ -133,10 +132,9 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
-        S::Solutions: Corpus<Input = I>,
     {
         // this stuff is for batch timeout
         if !data.executor_ptr.is_null()
@@ -190,7 +188,7 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
+        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
         S::Solutions: Corpus<Input = I>,

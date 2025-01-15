@@ -15,8 +15,7 @@ pub struct NopCorpus<I> {
     phantom: PhantomData<I>,
 }
 
-impl<I> Corpus for NopCorpus<I> {
-    type Input = I;
+impl<I> Corpus<I> for NopCorpus<I> {
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -76,12 +75,6 @@ impl<I> Corpus for NopCorpus<I> {
         &self.empty
     }
 
-    /// Peek the next free corpus id
-    #[inline]
-    fn peek_free_id(&self) -> CorpusId {
-        CorpusId::from(0_usize)
-    }
-
     /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
@@ -91,6 +84,12 @@ impl<I> Corpus for NopCorpus<I> {
     #[inline]
     fn next(&self, _id: CorpusId) -> Option<CorpusId> {
         None
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        CorpusId::from(0_usize)
     }
 
     #[inline]

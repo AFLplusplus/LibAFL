@@ -11,7 +11,7 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::Input,
     mark_feature_time,
@@ -24,20 +24,20 @@ use crate::{
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct TracingStage<EM, TE, S, Z> {
+pub struct TracingStage<EM, I, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,
-    phantom: PhantomData<(EM, TE, S, Z)>,
+    phantom: PhantomData<(EM, I, TE, S, Z)>,
 }
 
-impl<EM, TE, S, Z> TracingStage<EM, TE, S, Z>
+impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z>
 where
-    TE: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers,
+    TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
-        + HasCorpus
+        + HasCorpus<I>
         + HasNamedMetadata
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
@@ -72,16 +72,16 @@ where
     }
 }
 
-impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for TracingStage<EM, TE, S, Z>
+impl<E, EM, I, TE, S, Z> Stage<E, EM, S, Z> for TracingStage<EM, I, TE, S, Z>
 where
-    TE: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers,
+    TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
-        + HasCorpus
+        + HasCorpus<I>
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    <S::Corpus as Corpus>::Input: Input,
+    I: Input,
 {
     #[inline]
     fn perform(
@@ -103,7 +103,7 @@ where
     }
 }
 
-impl<EM, TE, S, Z> Named for TracingStage<EM, TE, S, Z> {
+impl<EM, I, TE, S, Z> Named for TracingStage<EM, I, TE, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -114,7 +114,7 @@ static mut TRACING_STAGE_ID: usize = 0;
 /// The name for tracing stage
 pub static TRACING_STAGE_NAME: &str = "tracing";
 
-impl<EM, TE, S, Z> TracingStage<EM, TE, S, Z> {
+impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
@@ -144,9 +144,9 @@ impl<EM, TE, S, Z> TracingStage<EM, TE, S, Z> {
 
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
-pub struct ShadowTracingStage<E, EM, SOT, S, Z> {
+pub struct ShadowTracingStage<E, EM, I, SOT, S, Z> {
     name: Cow<'static, str>,
-    phantom: PhantomData<(E, EM, SOT, S, Z)>,
+    phantom: PhantomData<(E, EM, I, SOT, S, Z)>,
 }
 
 /// The counter for giving this stage unique id
@@ -154,23 +154,23 @@ static mut SHADOW_TRACING_STAGE_ID: usize = 0;
 /// Name for shadow tracing stage
 pub static SHADOW_TRACING_STAGE_NAME: &str = "shadow";
 
-impl<E, EM, SOT, S, Z> Named for ShadowTracingStage<E, EM, SOT, S, Z> {
+impl<E, EM, I, SOT, S, Z> Named for ShadowTracingStage<E, EM, I, SOT, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, SOT, S, Z> Stage<ShadowExecutor<E, S, SOT>, EM, S, Z>
-    for ShadowTracingStage<E, EM, SOT, S, Z>
+impl<E, EM, I, SOT, S, Z> Stage<ShadowExecutor<E, S, SOT>, EM, S, Z>
+    for ShadowTracingStage<E, EM, I, SOT, S, Z>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<I, S>,
+    SOT: ObserversTuple<I, S>,
     S: HasExecutions
-        + HasCorpus
+        + HasCorpus<I>
         + HasNamedMetadata
         + Debug
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
@@ -219,11 +219,11 @@ where
     }
 }
 
-impl<E, EM, SOT, S, Z> ShadowTracingStage<E, EM, SOT, S, Z>
+impl<E, EM, I, SOT, S, Z> ShadowTracingStage<E, EM, I, SOT, S, Z>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    S: HasExecutions + HasCorpus,
-    SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    S: HasExecutions + HasCorpus<I>,
+    SOT: ObserversTuple<I, S>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, S, SOT>) -> Self {

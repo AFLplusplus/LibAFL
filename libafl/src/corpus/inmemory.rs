@@ -1,7 +1,7 @@
 //! In-memory corpus, keeps all test cases in memory at all times
 
 use alloc::vec::Vec;
-use core::cell::RefCell;
+use core::cell::{RefCell, Ref, RefMut};
 
 use serde::{Deserialize, Serialize};
 
@@ -314,9 +314,7 @@ pub struct InMemoryCorpus<I> {
     current: Option<CorpusId>,
 }
 
-impl<I> Corpus for InMemoryCorpus<I> {
-    type Input = I;
-
+impl<I> Corpus<I> for InMemoryCorpus<I> {
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -454,18 +452,18 @@ impl<I> Corpus for InMemoryCorpus<I> {
     }
 }
 
-impl<I> HasTestcase for InMemoryCorpus<I> {
+impl<I> HasTestcase<I> for InMemoryCorpus<I> {
     fn testcase(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    ) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
     fn testcase_mut(
         &self,
         id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    ) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }

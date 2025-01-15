@@ -11,7 +11,7 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -26,6 +26,7 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
+use crate::corpus::Corpus;
 
 /// The unique id for this stage
 static mut POWER_MUTATIONAL_STAGE_ID: usize = 0;
@@ -48,8 +49,8 @@ impl<E, F, EM, I, M, S, Z> Named for PowerMutationalStage<E, F, EM, I, M, S, Z> 
 
 impl<E, F, EM, I, M, S, Z> MutationalStage<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    S: HasCurrentTestcase,
-    F: TestcaseScore<S>,
+    S: HasCurrentTestcase<I>,
+    F: TestcaseScore<I, S>,
 {
     type Mutator = M;
     /// The mutator, added to this stage
@@ -77,20 +78,19 @@ where
 
 impl<E, F, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    E: Executor<EM, I, S, Z> + HasObservers,
     F: TestcaseScore<S>,
     M: Mutator<I, S>,
-    S: HasCorpus
+    S: HasCorpus<I>
         + HasMetadata
         + HasRand
         + HasExecutions
         + HasNamedMetadata
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
-    <S::Corpus as Corpus>::Input: Input,
+    Z: Evaluator<E, EM, I, S>,
+    I: MutatedTransform<I, S> + Clone + Input,
 {
     #[inline]
     #[expect(clippy::let_and_return)]
@@ -117,14 +117,12 @@ where
 
 impl<E, F, EM, I, M, S, Z> PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    E: Executor<EM, I, S, Z> + HasObservers,
     F: TestcaseScore<S>,
-    I: Input,
     M: Mutator<I, S>,
-    S: HasCorpus + HasMetadata + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Input,
+    S: HasCorpus<I> + HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
+    I: MutatedTransform<I, S> + Clone + Input,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
