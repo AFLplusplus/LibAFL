@@ -409,7 +409,7 @@ where
     }
 }
 
-/// An EventManager that forwards all events to other attached via tcp.
+/// An `EventManager` that forwards all events to other attached via tcp.
 pub struct TcpEventManager<EMH, S> {
     /// We send message every `throttle` second
     throttle: Option<Duration>,
@@ -567,7 +567,7 @@ where
     EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions + HasMetadata + HasImported + HasCorpus + Stoppable,
 {
-    /// Write the client id for a client EventManager to env vars
+    /// Write the client id for a client `EventManager` to env vars
     pub fn to_env(&self, env_name: &str) {
         env::set_var(env_name, format!("{}", self.client_id.0));
     }

@@ -431,7 +431,7 @@ where
     }
 
     /// Launch the simple restarting manager.
-    /// This EventManager is simple and single threaded,
+    /// This `EventManager` is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where

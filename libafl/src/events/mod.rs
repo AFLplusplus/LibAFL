@@ -1,4 +1,4 @@
-//! An EventManager manages all events that go to other instances of the fuzzer.
+//! An `EventManager` manages all events that go to other instances of the fuzzer.
 //! The messages are commonly information about new Testcases as well as stats and other [`Event`]s.
 
 pub mod events_hooks;
@@ -99,7 +99,7 @@ impl SignalHandler for ShutdownSignalData {
 }
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
-/// by `1` in multiprocessed EventManagers, such as [`LlmpEventManager`].
+/// by `1` in multiprocessed `EventManagers`, such as [`LlmpEventManager`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EventManagerId(
@@ -597,11 +597,11 @@ pub trait EventProcessor<E, S, Z> {
     /// Shutdown gracefully; typically without saving state.
     fn on_shutdown(&mut self) -> Result<(), Error>;
 }
-/// The id of this EventManager.
-/// For multi processed EventManagers,
+/// The id of this `EventManager`.
+/// For multi processed `EventManagers`,
 /// each connected client should have a unique ids.
 pub trait HasEventManagerId {
-    /// The id of this manager. For Multiprocessed EventManagers,
+    /// The id of this manager. For Multiprocessed `EventManagers`,
     /// each client should have a unique ids.
     fn mgr_id(&self) -> EventManagerId;
 }
@@ -691,7 +691,7 @@ impl HasEventManagerId for NopEventManager {
     }
 }
 
-/// An EventManager type that wraps another manager, but captures a `monitor` type as well.
+/// An `EventManager` type that wraps another manager, but captures a `monitor` type as well.
 /// This is useful to keep the same API between managers with and without an internal `monitor`.
 #[derive(Copy, Clone, Debug)]
 pub struct MonitorTypedEventManager<EM> {
@@ -699,7 +699,7 @@ pub struct MonitorTypedEventManager<EM> {
 }
 
 impl<EM> MonitorTypedEventManager<EM> {
-    /// Creates a new EventManager that wraps another manager, but captures a `monitor` type as well.
+    /// Creates a new `EventManager` that wraps another manager, but captures a `monitor` type as well.
     #[must_use]
     pub fn new(inner: EM) -> Self {
         MonitorTypedEventManager { inner }

@@ -477,7 +477,7 @@ pub unsafe fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
 
-/// Get the EventManager
+/// Get the `EventManager`
 ///
 /// # Safety
 /// Only safe if not called twice and if the event manager is not accessed from another borrow while this one is alive.

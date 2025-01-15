@@ -56,7 +56,7 @@ use crate::{
 /// Default initial capacity of the event buffer - 4KB
 const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
 
-/// An EventManager that forwards all events to other attached fuzzers on shared maps or via tcp,
+/// An `EventManager` that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, `llmp`.
 pub struct LlmpEventManager<EMH, S, SP>
 where
@@ -325,7 +325,7 @@ where
         self.llmp.describe()
     }
 
-    /// Write the config for a client EventManager to env vars, a new
+    /// Write the config for a client `EventManager` to env vars, a new
     /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
