@@ -12,7 +12,7 @@ use alloc::{
 use arrayvec::ArrayVec;
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::CorpusId, inputs::Input};
+use crate::inputs::Input;
 
 /// An input composed of multiple parts. Use in situations where subcomponents are not necessarily
 /// related, or represent distinct parts of the input.
