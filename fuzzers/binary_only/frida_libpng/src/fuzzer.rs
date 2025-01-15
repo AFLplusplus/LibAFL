@@ -256,9 +256,8 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         .broker_port(options.broker_port)
         .remote_broker_addr(options.remote_broker_addr);
 
-        #[cfg(not(windows))]
-        let builder = builder.stdout_file(Some(&options.stdout));
+    #[cfg(not(windows))]
+    let builder = builder.stdout_file(Some(&options.stdout));
 
-        builder.build()
-        .launch()
+    builder.build().launch()
 }
