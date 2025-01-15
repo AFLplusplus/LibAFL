@@ -76,12 +76,10 @@ where
     }
 }
 
-impl<EM, M, OT, S, Z> PushStage<EM, I, OT, S, Z>
-    for StdMutationalPushStage<EM, M, OT, S, Z>
+impl<EM, M, OT, S, Z> PushStage<EM, I, OT, S, Z> for StdMutationalPushStage<EM, M, OT, S, Z>
 where
     EM: EventFirer<I, S>,
-    Z: HasScheduler<I, S>
-        + ExecutionProcessor<EM, I, OT, S>,
+    Z: HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
     S: HasCorpus + HasRand + MaybeHasClientPerfMonitor,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S> + Serialize,
@@ -93,9 +91,7 @@ where
     }
 
     #[inline]
-    fn push_stage_helper_mut(
-        &mut self,
-    ) -> &mut PushStageHelper<EM, I, OT, S, Z> {
+    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<EM, I, OT, S, Z> {
         &mut self.psh
     }
 
@@ -200,8 +196,7 @@ where
     OT: ObserversTuple<I, S> + Serialize,
     M: Mutator<I, S>,
     I: Clone + Debug + Input,
-    Z: HasScheduler<I, S>
-        + ExecutionProcessor<EM, I, OT, S>,
+    Z: HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
 {
     type Item = Result<I, Error>;
 
@@ -222,17 +217,14 @@ where
     OT: ObserversTuple<I, S> + Serialize,
     M: Mutator<I, S>,
     I: Clone + Debug + Input,
-    Z: HasScheduler<I, S>
-        + ExecutionProcessor<EM, I, OT, S>,
+    Z: HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
 {
     /// Creates a new default mutational stage
     #[must_use]
     #[expect(clippy::type_complexity)]
     pub fn new(
         mutator: M,
-        shared_state: Rc<
-            RefCell<Option<PushStageSharedState<EM, I, OT, S, Z>>>,
-        >,
+        shared_state: Rc<RefCell<Option<PushStageSharedState<EM, I, OT, S, Z>>>>,
         exit_kind: Rc<Cell<Option<ExitKind>>>,
     ) -> Self {
         Self {

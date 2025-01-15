@@ -319,12 +319,7 @@ where
         Ok(())
     }
 
-    fn on_evaluation<OT>(
-        &mut self,
-        state: &mut S,
-        _input: &I,
-        observers: &OT,
-    ) -> Result<(), Error>
+    fn on_evaluation<OT>(&mut self, state: &mut S, _input: &I, observers: &OT) -> Result<(), Error>
     where
         OT: MatchName,
     {

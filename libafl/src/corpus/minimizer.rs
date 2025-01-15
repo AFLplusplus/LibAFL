@@ -73,8 +73,7 @@ where
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        CS: Scheduler<I, S>
-            + RemovableScheduler<I, S>,
+        CS: Scheduler<I, S> + RemovableScheduler<I, S>,
         EM: EventFirer<I, S>,
         Z: HasScheduler<I, S, Scheduler = CS>,
     {

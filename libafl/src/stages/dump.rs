@@ -75,8 +75,7 @@ where
 }
 
 /// Implementation for `DumpToDiskStage` with a default `generate_filename` function.
-impl<CB1, EM, I, S, Z>
-    DumpToDiskStage<CB1, fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
+impl<CB1, EM, I, S, Z> DumpToDiskStage<CB1, fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
 where
     S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
     I: Input,
@@ -97,10 +96,7 @@ where
 
     /// Default `generate_filename` function.
     #[expect(clippy::trivially_copy_pass_by_ref)]
-    fn generate_filename(
-        testcase: &Testcase<I>,
-        id: &CorpusId,
-    ) -> String {
+    fn generate_filename(testcase: &Testcase<I>, id: &CorpusId) -> String {
         [
             Some(id.0.to_string()),
             testcase.filename().clone(),

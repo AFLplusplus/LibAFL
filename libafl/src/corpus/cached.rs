@@ -1,7 +1,7 @@
 //! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
 use alloc::{collections::vec_deque::VecDeque, string::String};
-use core::cell::{RefCell, Ref, RefMut};
+use core::cell::{Ref, RefCell, RefMut};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};

@@ -5,7 +5,7 @@
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
-use core::cell::{RefCell, Ref, RefMut};
+use core::cell::{Ref, RefCell, RefMut};
 use std::{
     fs,
     fs::{File, OpenOptions},
@@ -213,17 +213,11 @@ impl<I> HasTestcase<I> for InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<Ref<Testcase<I>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<Testcase<I>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }

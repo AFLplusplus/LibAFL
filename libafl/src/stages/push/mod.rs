@@ -255,10 +255,7 @@ where
         + HasNamedMetadata
         + HasMetadata,
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<I, S>
-        + EventRestarter<S>
-        + HasEventManagerId
-        + ProgressReporter<S>,
+    EM: EventFirer<I, S> + EventRestarter<S> + HasEventManagerId + ProgressReporter<S>,
     OT: ObserversTuple<I, S>,
     PS: PushStage<EM, I, OT, S, Z>,
     Z: ExecutesInput<E, EM, I, S>

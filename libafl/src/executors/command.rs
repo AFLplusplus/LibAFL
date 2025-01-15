@@ -335,11 +335,7 @@ where
     T: CommandConfigurator<I> + Debug,
     OT: ObserversTuple<I, S>,
 {
-    fn execute_input_with_command(
-        &mut self,
-        state: &mut S,
-        input: &I,
-    ) -> Result<ExitKind, Error> {
+    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
@@ -424,8 +420,7 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<EM, OT, I, S, T, Z, HT> Executor<EM, I, S, Z>
-    for CommandExecutor<OT, S, T, HT, Pid>
+impl<EM, OT, I, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<OT, S, T, HT, Pid>
 where
     S: HasCorpus + HasExecutions,
     T: CommandConfigurator<I, Pid> + Debug,
@@ -735,9 +730,12 @@ impl CommandExecutorBuilder {
             timeout: self.timeout,
             command,
         };
-        Ok(<StdCommandConfigurator as CommandConfigurator<
-            I,
-        >>::into_executor::<OT, S>(configurator, observers))
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<I>>::into_executor::<OT, S>(
+                configurator,
+                observers,
+            ),
+        )
     }
 }
 

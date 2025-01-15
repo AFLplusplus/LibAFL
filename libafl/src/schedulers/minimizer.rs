@@ -79,11 +79,9 @@ pub struct MinimizerScheduler<CS, F, I, M, S> {
     phantom: PhantomData<(F, I, M, S)>,
 }
 
-impl<CS, F, M, I, O, S> RemovableScheduler<I, S>
-    for MinimizerScheduler<CS, F, I, M, O>
+impl<CS, F, M, I, O, S> RemovableScheduler<I, S> for MinimizerScheduler<CS, F, I, M, O>
 where
-    CS: RemovableScheduler<I, S>
-        + Scheduler<I, S>,
+    CS: RemovableScheduler<I, S> + Scheduler<I, S>,
     F: TestcaseScore<I, S>,
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -202,12 +200,7 @@ where
     }
 
     /// An input has been evaluated
-    fn on_evaluation<OT>(
-        &mut self,
-        state: &mut S,
-        input: &I,
-        observers: &OT,
-    ) -> Result<(), Error>
+    fn on_evaluation<OT>(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error>
     where
         OT: MatchName,
     {

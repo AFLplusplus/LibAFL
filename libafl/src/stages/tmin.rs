@@ -56,7 +56,8 @@ pub struct StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> {
     phantom: PhantomData<(E, EM, F, I, S, Z)>,
 }
 
-impl<E, EM, F, FF, I, M, S, Z> Stage<E, EM, S, Z> for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
+impl<E, EM, F, FF, I, M, S, Z> Stage<E, EM, S, Z>
+    for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
 where
     Z: HasScheduler<I, S>
         + ExecutionProcessor<EM, I, E::Observers, S>
@@ -188,10 +189,7 @@ where
         }
 
         start_timer!(state);
-        let transformed = I::try_transform_from(
-            state.current_testcase_mut()?.borrow_mut(),
-            state,
-        )?;
+        let transformed = I::try_transform_from(state.current_testcase_mut()?.borrow_mut(), state)?;
         let mut base = state.current_input_cloned()?;
         // potential post operation if base is replaced by a shorter input
         let mut base_post = None;

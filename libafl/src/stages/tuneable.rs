@@ -164,7 +164,12 @@ impl<E, EM, I, M, S, Z> MutationalStage<S> for TuneableMutationalStage<E, EM, I,
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I> + HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase<I>,
+    S: HasCorpus<I>
+        + HasRand
+        + HasNamedMetadata
+        + HasMetadata
+        + HasExecutions
+        + HasCurrentTestcase<I>,
     I: MutatedTransform<I, S> + Clone + Input,
 {
     type Mutator = M;

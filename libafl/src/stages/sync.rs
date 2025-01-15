@@ -165,8 +165,7 @@ impl<CB, E, EM, S, Z> SyncFromDiskStage<CB, E, EM, S, Z> {
 }
 
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
-pub type SyncFromDiskFunction<I, S, Z> =
-    fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
+pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
 
 impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<S, Z>, E, EM, I, S, Z>
 where
@@ -177,11 +176,7 @@ where
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dirs: Vec<PathBuf>, interval: Duration) -> Self {
-        fn load_callback<S: HasCorpus<I>, Z>(
-            _: &mut Z,
-            _: &mut S,
-            p: &Path,
-        ) -> Result<I, Error>
+        fn load_callback<S: HasCorpus<I>, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error>
         where
             I: Input,
         {
@@ -238,8 +233,7 @@ where
     ICB: InputConverter<From = DI, To = I>,
     S: HasExecutions + HasCorpus<I> + HasRand + HasMetadata + Stoppable + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
-    Z: EvaluatorObservers<E, EM, I, S>
-    + ExecutionProcessor<EM, I, E::Observers, S>,
+    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
     #[inline]
     fn perform(

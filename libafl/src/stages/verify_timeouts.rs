@@ -108,9 +108,7 @@ where
         }
         executor.set_timeout(self.original_timeout);
         *self.capture_timeouts.borrow_mut() = true;
-        let res = state
-            .metadata_mut::<TimeoutsToVerify<I>>()
-            .unwrap();
+        let res = state.metadata_mut::<TimeoutsToVerify<I>>().unwrap();
         *res = TimeoutsToVerify::<I>::new();
         Ok(())
     }

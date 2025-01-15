@@ -1,7 +1,7 @@
 //! In-memory corpus, keeps all test cases in memory at all times
 
 use alloc::vec::Vec;
-use core::cell::{RefCell, Ref, RefMut};
+use core::cell::{Ref, RefCell, RefMut};
 
 use serde::{Deserialize, Serialize};
 
@@ -453,17 +453,11 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
 }
 
 impl<I> HasTestcase<I> for InMemoryCorpus<I> {
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<Ref<Testcase<I>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<Testcase<I>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }

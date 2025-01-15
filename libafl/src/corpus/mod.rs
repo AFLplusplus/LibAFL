@@ -124,11 +124,7 @@ pub trait Corpus<I>: Sized {
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error>;
 
     /// Replaces the [`Testcase`] at the given idx, returning the existing.
-    fn replace(
-        &mut self,
-        id: CorpusId,
-        testcase: Testcase<I>,
-    ) -> Result<Testcase<I>, Error>;
+    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error>;

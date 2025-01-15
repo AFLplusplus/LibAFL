@@ -351,8 +351,7 @@ where
         I: Input,
         E: HasObservers,
         E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, I, E::Observers, S>
-            + EvaluatorObservers<E, Self, I, S>,
+        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
         log::trace!("Got event in client: {} from {client_id:?}", event.name());
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
@@ -515,8 +514,7 @@ where
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned + Input,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<Self, I, E::Observers, S>
-        + EvaluatorObservers<E, Self, I, S>,
+    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client

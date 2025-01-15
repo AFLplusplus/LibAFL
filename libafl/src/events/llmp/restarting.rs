@@ -214,12 +214,8 @@ where
     I: DeserializeOwned + Input,
     S::Corpus: Serialize,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<
-            LlmpEventManager<EMH, S, SP>,
-            I,
-            E::Observers,
-            S,
-        > + EvaluatorObservers<E, LlmpEventManager<EMH, S, SP>, I, S>,
+    Z: ExecutionProcessor<LlmpEventManager<EMH, S, SP>, I, E::Observers, S>
+        + EvaluatorObservers<E, LlmpEventManager<EMH, S, SP>, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         let res = self.llmp_mgr.process(fuzzer, state, executor)?;
@@ -458,9 +454,7 @@ where
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
                             let llmp_hook =
-                                StdLlmpEventHook::<I, MT>::new(
-                                    self.monitor.take().unwrap(),
-                                )?;
+                                StdLlmpEventHook::<I, MT>::new(self.monitor.take().unwrap())?;
 
                             // Yep, broker. Just loop here.
                             log::info!(

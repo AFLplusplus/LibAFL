@@ -357,7 +357,7 @@ pub struct GrimoireRandomDeleteMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<I, S> Mutator<GeneralizedInputMetadata, I, S> for GrimoireRandomDeleteMutator
+impl<I> Mutator<GeneralizedInputMetadata, I, S> for GrimoireRandomDeleteMutator
 where
     S: HasMetadata + HasRand + HasCorpus<I>,
 {

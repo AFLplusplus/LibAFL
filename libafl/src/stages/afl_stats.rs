@@ -511,11 +511,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_crash(
-        &mut self,
-        testcase: &Testcase<I>,
-        state: &S,
-    ) {
+    fn maybe_update_last_crash(&mut self, testcase: &Testcase<I>, state: &S) {
         #[cfg(feature = "track_hit_feedbacks")]
         if testcase
             .hit_objectives()
@@ -527,11 +523,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_hang(
-        &mut self,
-        testcase: &Testcase<I>,
-        state: &S,
-    ) {
+    fn maybe_update_last_hang(&mut self, testcase: &Testcase<I>, state: &S) {
         if testcase
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))

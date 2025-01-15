@@ -206,10 +206,7 @@ mod tests {
     where
         S: HasCorpus<I>,
     {
-        fn compute(
-            _state: &S,
-            _: &mut Testcase<I>,
-        ) -> Result<f64, Error> {
+        fn compute(_state: &S, _: &mut Testcase<I>) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

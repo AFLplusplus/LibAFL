@@ -14,7 +14,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::HasCurrentCorpusId,
+    corpus::{Corpus, HasCurrentCorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasMutatorBytes,
@@ -25,7 +25,6 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
 };
-use crate::corpus::Corpus;
 
 // Bigger range is better
 #[derive(Debug, PartialEq, Eq)]

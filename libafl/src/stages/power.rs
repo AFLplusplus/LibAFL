@@ -11,7 +11,7 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    corpus::HasCurrentCorpusId,
+    corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -26,7 +26,6 @@ use crate::{
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
-use crate::corpus::Corpus;
 
 /// The unique id for this stage
 static mut POWER_MUTATIONAL_STAGE_ID: usize = 0;

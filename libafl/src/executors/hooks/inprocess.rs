@@ -23,8 +23,6 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
-#[cfg(any(unix, windows))]
-use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
@@ -32,6 +30,8 @@ use crate::{
     state::{HasCorpus, HasExecutions, HasSolutions},
     Error, HasObjective,
 };
+#[cfg(any(unix, windows))]
+use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
 
 /// The inmem executor's handlers.
 #[expect(missing_debug_implementations)]

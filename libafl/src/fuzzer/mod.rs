@@ -305,8 +305,7 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
     EM: EventFirer<I, S> + CanSerializeObserver<OT>,
@@ -506,8 +505,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> EvaluatorObservers<E, EM, I, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, OF, S> EvaluatorObservers<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -582,8 +580,7 @@ impl<I: Hash> InputFilter<I> for BloomInputFilter {
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> Evaluator<E, EM, I, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -725,11 +722,7 @@ where
         Ok(id)
     }
 
-    fn add_disabled_input(
-        &mut self,
-        state: &mut S,
-        input: I,
-    ) -> Result<CorpusId, Error> {
+    fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
         let mut testcase = Testcase::from(input.clone());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
@@ -912,8 +905,7 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> ExecutesInput<E, EM, I, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers,
