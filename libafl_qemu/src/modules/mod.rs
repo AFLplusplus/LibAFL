@@ -83,7 +83,6 @@ pub mod utils;
 /// ```
 /// For more details on adding hooks to the **fuzzing target**, including function signatures,
 /// return values, please refer to the [`EmulatorModules`].
-
 // TODO remove 'static when specialization will be stable
 pub trait EmulatorModule<I, S>: 'static + Debug {
     type ModuleAddressFilter: AddressFilter;
