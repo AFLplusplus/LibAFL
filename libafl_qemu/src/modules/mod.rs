@@ -59,7 +59,7 @@ pub mod utils;
 /// post_qemu_init()
 /// // Harness initialization
 /// first_exec()
-/// 
+///
 /// // The following loop is executed for every fuzzing iteration
 /// pre_exec()
 /// // Harness execution
@@ -72,7 +72,7 @@ pub mod utils;
 /// Users typically add hooks, monitoring, or other instrumentation to the **fuzzing target** in [`EmulatorModule`]
 /// For example:
 /// ```rust
-/// fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>) 
+/// fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
 /// where
 ///     ET: EmulatorModuleTuple<I, S>,
 /// {
