@@ -25,11 +25,10 @@ use core::{fmt, fmt::Write, time::Duration};
 
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
-#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+#[cfg(all(feature = "std", feature = "prometheus_monitor"))]
 pub use prometheus::PrometheusMonitor;
-#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "tui_monitor", feature = "std"))]
+#[cfg(all(feature = "std", feature = "tui_monitor"))]
 pub use tui::TuiMonitor;
 #[cfg(feature = "std")]
 pub use {
