@@ -14,10 +14,7 @@ use crate::monitors::{Aggregator, ClientStats, Monitor};
 
 /// A monitor that wraps another monitor and logs aggregated stats to a JSON file.
 #[derive(Clone)]
-pub struct OnDiskJsonAggregateMonitor<M>
-where
-    M: Monitor,
-{
+pub struct OnDiskJsonAggregateMonitor<M> {
     base: M,
     aggregator: Aggregator,
     json_path: PathBuf,
@@ -27,7 +24,7 @@ where
 
 impl<M> Debug for OnDiskJsonAggregateMonitor<M>
 where
-    M: Monitor + Debug,
+    M: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("OnDiskJsonAggregateMonitor")
@@ -103,10 +100,7 @@ where
     }
 }
 
-impl<M> OnDiskJsonAggregateMonitor<M>
-where
-    M: Monitor,
-{
+impl<M> OnDiskJsonAggregateMonitor<M> {
     /// Creates a new [`OnDiskJsonAggregateMonitor`]
     pub fn new<P>(base: M, json_path: P) -> Self
     where
