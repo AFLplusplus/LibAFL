@@ -19,6 +19,13 @@ use core::{fmt, fmt::Write, time::Duration};
 
 #[cfg(feature = "std")]
 pub use disk::{OnDiskJsonMonitor, OnDiskTomlMonitor};
+
+// Add our new module
+#[cfg(feature = "std")]
+pub mod disk_aggregate;
+#[cfg(feature = "std")]
+pub use disk_aggregate::OnDiskJsonAggregateMonitor;
+
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde::{Deserialize, Serialize};
