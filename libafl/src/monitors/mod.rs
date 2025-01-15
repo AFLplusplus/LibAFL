@@ -3,32 +3,39 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
+#[cfg(feature = "std")]
+pub mod disk;
+
+#[cfg(feature = "std")]
+pub mod disk_aggregate;
+
 #[cfg(all(feature = "tui_monitor", feature = "std"))]
 pub mod tui;
 
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub mod prometheus;
-use alloc::string::ToString;
 
-#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
-pub use prometheus::PrometheusMonitor;
-#[cfg(feature = "std")]
-pub mod disk;
-use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
+use alloc::{
+    borrow::Cow,
+    fmt::Debug,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt, fmt::Write, time::Duration};
-
-#[cfg(feature = "std")]
-pub use disk::{OnDiskJsonMonitor, OnDiskTomlMonitor};
-
-// Add our new module
-#[cfg(feature = "std")]
-pub mod disk_aggregate;
-#[cfg(feature = "std")]
-pub use disk_aggregate::OnDiskJsonAggregateMonitor;
 
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
+#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+pub use prometheus::PrometheusMonitor;
+#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
+#[cfg(all(feature = "tui_monitor", feature = "std"))]
+pub use tui::TuiMonitor;
+#[cfg(feature = "std")]
+pub use {
+    disk::{OnDiskJsonMonitor, OnDiskTomlMonitor},
+    disk_aggregate::OnDiskJsonAggregateMonitor,
+};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
@@ -320,15 +327,15 @@ impl fmt::Display for UserStatsValue {
 /// Prettifies float values for human-readable output
 fn prettify_float(value: f64) -> String {
     let (value, suffix) = match value {
-        value if value >= 1_000_000.0 => (value / 1_000_000.0, "M"),
-        value if value >= 1_000.0 => (value / 1_000.0, "k"),
+        value if value >= 1000000.0 => (value / 1000000.0, "M"),
+        value if value >= 1000.0 => (value / 1000.0, "k"),
         value => (value, ""),
     };
     match value {
-        value if value >= 1_000_000.0 => {
+        value if value >= 1000000.0 => {
             format!("{value:.2}{suffix}")
         }
-        value if value >= 1_000.0 => {
+        value if value >= 1000.0 => {
             format!("{value:.1}{suffix}")
         }
         value if value >= 100.0 => {
