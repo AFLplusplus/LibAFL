@@ -247,15 +247,18 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         Ok(())
     };
 
-    Launcher::builder()
+    let builder = Launcher::builder()
         .configuration(EventConfig::AlwaysUnique)
         .shmem_provider(shmem_provider)
         .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&options.cores)
         .broker_port(options.broker_port)
-        .stdout_file(Some(&options.stdout))
-        .remote_broker_addr(options.remote_broker_addr)
-        .build()
+        .remote_broker_addr(options.remote_broker_addr);
+
+        #[cfg(not(windows))]
+        let builder = builder.stdout_file(Some(&options.stdout));
+
+        builder.build()
         .launch()
 }
