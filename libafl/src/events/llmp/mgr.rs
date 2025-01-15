@@ -36,10 +36,10 @@ use crate::events::{serialize_observers_adaptive, CanSerializeObserver};
 use crate::{
     corpus::Corpus,
     events::{
-        default_maybe_report_progress, default_on_restart, default_report_progress,
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        AdaptiveSerializer, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
+        std_maybe_report_progress, std_on_restart, std_report_progress, AdaptiveSerializer, Event,
+        EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -488,7 +488,7 @@ where
     S: HasCurrentStageId,
 {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        default_on_restart(self, state)
+        std_on_restart(self, state)
     }
 }
 
@@ -574,11 +574,11 @@ where
         state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
-        default_maybe_report_progress(self, state, monitor_timeout)
+        std_maybe_report_progress(self, state, monitor_timeout)
     }
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        default_report_progress(self, state)
+        std_report_progress(self, state)
     }
 }
 

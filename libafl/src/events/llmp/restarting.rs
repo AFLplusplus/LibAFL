@@ -35,8 +35,8 @@ use crate::{
     common::HasMetadata,
     corpus::Corpus,
     events::{
-        default_maybe_report_progress, default_report_progress, launcher::ClientDescription,
-        serialize_observers_adaptive, AdaptiveSerializer, CanSerializeObserver, Event, EventConfig,
+        launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
+        std_report_progress, AdaptiveSerializer, CanSerializeObserver, Event, EventConfig,
         EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
         HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ManagerExit, ProgressReporter,
         StdLlmpEventHook,
@@ -59,7 +59,6 @@ use crate::{
 pub struct LlmpRestartingEventManager<EMH, S, SP>
 where
     SP: ShMemProvider,
-    //CE: CustomEvent<I>,
 {
     /// The embedded LLMP event manager
     llmp_mgr: LlmpEventManager<EMH, S, SP>,
@@ -120,11 +119,11 @@ where
         state: &mut S,
         monitor_timeout: Duration,
     ) -> Result<(), Error> {
-        default_maybe_report_progress(self, state, monitor_timeout)
+        std_maybe_report_progress(self, state, monitor_timeout)
     }
 
     fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        default_report_progress(self, state)
+        std_report_progress(self, state)
     }
 }
 
