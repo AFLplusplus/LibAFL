@@ -30,7 +30,7 @@ use crate::{
     },
     monitors::Monitor,
     stages::HasCurrentStageId,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, Stoppable},
+    state::{HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
@@ -141,7 +141,12 @@ impl<I, MT, S> ProgressReporter<S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
-    S: HasMetadata + HasExecutions + HasLastReportTime + Stoppable + HasCorpus,
+    S: HasMetadata
+        + HasExecutions
+        + HasLastReportTime
+        + Stoppable
+        + HasCorpus
+        + MaybeHasClientPerfMonitor,
     S::Corpus: Corpus<Input = I>,
 {
     fn maybe_report_progress(
@@ -378,7 +383,12 @@ where
     I: Debug,
     MT: Monitor,
     SP: ShMemProvider,
-    S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + HasCorpus,
+    S: HasExecutions
+        + HasMetadata
+        + HasLastReportTime
+        + Stoppable
+        + HasCorpus
+        + MaybeHasClientPerfMonitor,
     S::Corpus: Corpus<Input = I>,
 {
     fn maybe_report_progress(
@@ -421,7 +431,7 @@ where
     }
 
     /// Launch the simple restarting manager.
-    /// This [`EventManager`] is simple and single threaded,
+    /// This EventManager is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where

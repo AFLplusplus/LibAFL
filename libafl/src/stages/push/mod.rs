@@ -37,11 +37,11 @@ use crate::{
 /// Should be stored inside a `[Rc<RefCell<_>>`]
 #[derive(Clone, Debug)]
 pub struct PushStageSharedState<EM, I, OT, S, Z> {
-    /// The [`crate::state::State`]
+    /// The state
     pub state: S,
     /// The [`crate::fuzzer::Fuzzer`] instance
     pub fuzzer: Z,
-    /// The [`crate::events::EventManager`]
+    /// The event manager
     pub event_mgr: EM,
     /// The [`crate::observers::ObserversTuple`]
     pub observers: OT,

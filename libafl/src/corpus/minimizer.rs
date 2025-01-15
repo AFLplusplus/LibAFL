@@ -75,7 +75,7 @@ where
         E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
         CS: Scheduler<<S::Corpus as Corpus>::Input, S>
             + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S>,
+        EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
         Z: HasScheduler<<S::Corpus as Corpus>::Input, S, Scheduler = CS>,
     {
         // don't delete this else it won't work after restart

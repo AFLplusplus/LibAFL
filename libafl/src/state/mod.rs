@@ -124,29 +124,6 @@ impl<T> MaybeHasClientPerfMonitor for T {}
 #[cfg(feature = "introspection")]
 impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
 
-/// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(feature = "scalability_introspection")]
-pub trait MaybeHasScalabilityMonitor: HasScalabilityMonitor {}
-/// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(not(feature = "scalability_introspection"))]
-pub trait MaybeHasScalabilityMonitor {}
-
-#[cfg(not(feature = "scalability_introspection"))]
-impl<T> MaybeHasScalabilityMonitor for T {}
-
-#[cfg(feature = "scalability_introspection")]
-impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
-
-/// Trait for offering a [`ScalabilityMonitor`]
-#[cfg(feature = "scalability_introspection")]
-pub trait HasScalabilityMonitor {
-    /// Ref to [`ScalabilityMonitor`]
-    fn scalability_monitor(&self) -> &ScalabilityMonitor;
-
-    /// Mutable ref to [`ScalabilityMonitor`]
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor;
-}
-
 /// Trait for the execution counter
 pub trait HasExecutions {
     /// The executions counter
@@ -241,8 +218,6 @@ pub struct StdState<I, C, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
-    #[cfg(feature = "scalability_introspection")]
-    scalability_monitor: ScalabilityMonitor,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -1129,8 +1104,6 @@ where
             stop_requested: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
-            #[cfg(feature = "scalability_introspection")]
-            scalability_monitor: ScalabilityMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
@@ -1174,17 +1147,6 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         &mut self.introspection_monitor
-    }
-}
-
-#[cfg(feature = "scalability_introspection")]
-impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        &self.scalability_monitor
-    }
-
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
-        &mut self.scalability_monitor
     }
 }
 
@@ -1337,17 +1299,6 @@ impl<I> HasClientPerfMonitor for NopState<I> {
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!();
-    }
-}
-
-#[cfg(feature = "scalability_introspection")]
-impl<I> HasScalabilityMonitor for NopState<I> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        unimplemented!();
-    }
-
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
         unimplemented!();
     }
 }

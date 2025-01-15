@@ -47,7 +47,10 @@ use crate::{
     monitors::Monitor,
     observers::TimeObserver,
     stages::HasCurrentStageId,
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, Stoppable},
+    state::{
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
+        Stoppable,
+    },
     Error,
 };
 
@@ -103,7 +106,12 @@ where
 
 impl<EMH, S, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, S, SP>
 where
-    S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus + Serialize,
+    S: HasExecutions
+        + HasLastReportTime
+        + HasMetadata
+        + HasCorpus
+        + Serialize
+        + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
     <S::Corpus as Corpus>::Input: Serialize,
 {

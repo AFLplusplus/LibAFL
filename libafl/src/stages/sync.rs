@@ -230,7 +230,7 @@ where
 impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<IC, ICB, S, SP>
 where
     EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasCorpus + HasRand + HasMetadata + Stoppable,
+    S: HasExecutions + HasCorpus + HasRand + HasMetadata + Stoppable + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     for<'a> E::Observers: Deserialize<'a>,
