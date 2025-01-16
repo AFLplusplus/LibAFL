@@ -362,7 +362,7 @@ impl IntelPT {
         let mut decoder = builder.build().map_err(error_from_pt_error)?;
         decoder.set_image(image).map_err(error_from_pt_error)?;
         if let Some(rm) = read_memory {
-            decoder.image().set_callback(Some(rm))
+            decoder.image().set_callback(Some(rm));
         }
 
         let mut previous_block_end_ip = 0;

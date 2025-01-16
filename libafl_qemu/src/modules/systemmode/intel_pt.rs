@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use libafl::{inputs::UsesInput, observers::ObserversTuple, Error, HasMetadata};
+use libafl::{observers::ObserversTuple, Error, HasMetadata};
 use libafl_intelpt::{error_from_pt_error, Image, IntelPT, IntelPTBuilder, SectionCache};
 use libafl_qemu_sys::{CPUArchStatePtr, GuestAddr};
 use num_traits::SaturatingAdd;
@@ -38,7 +38,7 @@ impl IntelPTModule {
 impl<I, S, T> EmulatorModule<I, S> for IntelPTModule<T>
 where
     I: Unpin,
-    S: Unpin + UsesInput + HasMetadata,
+    S: Unpin + HasMetadata,
     T: SaturatingAdd + From<u8> + Debug + 'static,
 {
     type ModuleAddressFilter = Self;
@@ -153,7 +153,7 @@ pub fn intel_pt_new_thread<ET, I, S, T>(
 ) -> bool
 where
     I: Unpin,
-    S: HasMetadata + Unpin + UsesInput,
+    S: HasMetadata + Unpin,
     ET: EmulatorModuleTuple<I, S>,
     T: Debug + 'static,
 {
