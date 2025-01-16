@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     nonzero,
@@ -170,7 +169,7 @@ where
         + HasMetadata
         + HasExecutions
         + HasCurrentTestcase<I>,
-    I: MutatedTransform<I, S> + Clone + Input,
+    I: MutatedTransform<I, S> + Clone,
 {
     type Mutator = M;
     /// The mutator, added to this stage
@@ -207,7 +206,7 @@ where
         + HasExecutions
         + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<I, S> + Clone + Input,
+    I: MutatedTransform<I, S> + Clone,
 {
     #[inline]
     fn perform(
@@ -245,7 +244,7 @@ where
         + HasMetadata
         + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<I, S> + Clone + Input,
+    I: MutatedTransform<I, S> + Clone,
 {
     /// Runs this (mutational) stage for the given `testcase`
     /// Exactly the same functionality as [`MutationalStage::perform_mutational`], but with added timeout support.

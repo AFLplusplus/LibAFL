@@ -14,7 +14,6 @@ use crate::{
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
-    inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
@@ -89,7 +88,7 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
-    I: MutatedTransform<I, S> + Clone + Input,
+    I: MutatedTransform<I, S> + Clone,
 {
     #[inline]
     #[expect(clippy::let_and_return)]
@@ -120,7 +119,7 @@ where
     F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<I, S> + Clone + Input,
+    I: MutatedTransform<I, S> + Clone,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]

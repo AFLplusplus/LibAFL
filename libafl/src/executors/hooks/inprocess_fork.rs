@@ -3,10 +3,10 @@ use alloc::vec::Vec;
 use core::{
     ffi::c_void,
     marker::PhantomData,
+    mem::transmute,
     ptr::null,
     sync::atomic::{compiler_fence, Ordering},
 };
-use std::intrinsics::transmute;
 
 #[cfg(not(miri))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;

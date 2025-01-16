@@ -42,10 +42,7 @@ impl<S> MutatedTransformPost<S> for () {}
 ///
 /// This trait is implemented such that all testcases inherently transform to their inputs, should
 /// the input be cloneable.
-pub trait MutatedTransform<I, S>: Sized
-where
-    I: Input,
-{
+pub trait MutatedTransform<I, S>: Sized {
     /// Type indicating actions to be taken after the post-transformation input is executed
     type Post: MutatedTransformPost<S>;
 
@@ -59,7 +56,7 @@ where
 // reflexive definition
 impl<I, S> MutatedTransform<I, S> for I
 where
-    I: Input + Clone,
+    I: Clone,
     S: HasCorpus<I>,
 {
     type Post = ();
@@ -155,7 +152,7 @@ where
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    I: Clone + Input + MutatedTransform<I, S>,
+    I: Clone + MutatedTransform<I, S>,
 {
     #[inline]
     fn perform(
@@ -207,7 +204,7 @@ where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I> + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
-    I: Clone + Input + MutatedTransform<I, S>,
+    I: Clone + MutatedTransform<I, S>,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -306,7 +303,7 @@ where
     M: MultiMutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I> + HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
-    I: Clone + Input + MutatedTransform<I, S>,
+    I: Clone + MutatedTransform<I, S>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
