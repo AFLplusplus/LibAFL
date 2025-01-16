@@ -216,7 +216,7 @@ pub mod unix_signal_handler {
                 let mut bsod = Vec::new();
                 {
                     let mut writer = std::io::BufWriter::new(&mut bsod);
-                    let _ = writeln!(writer, "input: {:?}", input.generate_name(None));
+                    let _ = writeln!(writer, "input: {:?}", input.generate_name());
                     let bsod = libafl_bolts::minibsod::generate_minibsod(
                         &mut writer,
                         signal,
