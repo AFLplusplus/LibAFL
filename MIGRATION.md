@@ -14,7 +14,8 @@
 - Trait restrictions have been simplified
   - The `UsesState` and `UsesInput` traits have been removed in favor of regular Generics.
   - For the structs/traits that used to use `UsesState`, we bring back the generic for the state.
-  - For `UsesState`, you can access to the input type through `HasCorpus` and `Corpus` traits
+  - `Input` is now only accessible through generic. `Input` associated types have been definitely removed.
+  - `HasCorpus` bound has been removed in many places it was unused before.
   - The `State` trait is now private in favour of individual and more specific traits
 - Restrictions from certain schedulers and stages that required their inner observer to implement `MapObserver` have been lifted in favor of requiring `Hash`
   - Related: removed `hash_simple` from `MapObserver`
