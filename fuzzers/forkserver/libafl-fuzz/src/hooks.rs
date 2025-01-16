@@ -1,5 +1,4 @@
 use libafl::{
-    corpus::Corpus,
     events::{Event, EventManagerHook},
     state::{HasCorpus, Stoppable},
     Error,

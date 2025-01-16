@@ -231,7 +231,7 @@ unsafe fn fuzz(
             })(state, mgr, client_description)
         } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 

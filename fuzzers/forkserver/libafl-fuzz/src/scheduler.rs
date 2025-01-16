@@ -17,7 +17,7 @@ impl<I, Q, S, W> RemovableScheduler<I, S> for SupportedSchedulers<Q, W>
 where
     Q: Scheduler<I, S> + RemovableScheduler<I, S>,
     W: Scheduler<I, S> + RemovableScheduler<I, S>,
-    S: HasTestcase,
+    S: HasTestcase<I>,
 {
     fn on_remove(
         &mut self,
@@ -43,7 +43,7 @@ impl<I, Q, S, W> Scheduler<I, S> for SupportedSchedulers<Q, W>
 where
     Q: Scheduler<I, S>,
     W: Scheduler<I, S>,
-    S: HasCorpus<I> + HasTestcase,
+    S: HasCorpus<I> + HasTestcase<I>,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         match self {

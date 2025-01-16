@@ -4,7 +4,7 @@ use std::{
 };
 
 use libafl::{
-    corpus::{Corpus, Testcase},
+    corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackFactory, StateInitializer},
     state::HasCorpus,
