@@ -16,6 +16,8 @@
   - For the structs/traits that used to use `UsesState`, we bring back the generic for the state.
   - For `UsesState`, you can access to the input type through `HasCorpus` and `Corpus` traits
   - The `State` trait is now private in favour of individual and more specific traits
+- Restrictions from certain schedulers and stages that required their inner observer to implement `MapObserver` have been lifted in favor of requiring `Hash`
+  - Related: removed `hash_simple` from `MapObserver`
 
 # 0.14.0 -> 0.14.1
 - Removed `with_observers` from `Executor` trait.
