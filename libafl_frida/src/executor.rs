@@ -18,7 +18,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{NopTargetBytesConverter, TargetBytesConverter},
     observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};

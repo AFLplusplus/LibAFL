@@ -52,7 +52,7 @@ use typed_builder::TypedBuilder;
 use crate::{harness::Harness, options::FuzzerOptions};
 
 pub type ClientState =
-    StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(feature = "simplemgr")]
 pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;

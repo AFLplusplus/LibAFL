@@ -73,7 +73,7 @@ use crate::{
 };
 
 pub type LibaflFuzzState =
-    StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<CachedOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(not(feature = "fuzzbench"))]
 type LibaflFuzzManager = CentralizedEventManager<
