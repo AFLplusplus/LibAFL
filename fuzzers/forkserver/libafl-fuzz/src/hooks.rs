@@ -11,15 +11,15 @@ pub struct LibAflFuzzEventHook {
     exit_on_solution: bool,
 }
 
-impl<S> EventManagerHook<<S::Corpus as Corpus>::Input, S> for LibAflFuzzEventHook
+impl<I, S> EventManagerHook<I, S> for LibAflFuzzEventHook
 where
-    S: HasCorpus + Stoppable,
+    S: HasCorpus<I> + Stoppable,
 {
     fn pre_exec(
         &mut self,
         state: &mut S,
         _client_id: ClientId,
-        event: &Event<<S::Corpus as Corpus>::Input>,
+        event: &Event<I>,
     ) -> Result<bool, Error> {
         if self.exit_on_solution && matches!(event, Event::Objective { .. }) {
             // TODO: dump state
