@@ -9,8 +9,7 @@ use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus},
     events::{
-        launcher::Launcher, ClientDescription, EventConfig, EventRestarter,
-        LlmpRestartingEventManager, ManagerExit,
+        launcher::Launcher, ClientDescription, EventConfig, LlmpRestartingEventManager, ManagerExit,
     },
     executors::ExitKind,
     fuzzer::StdFuzzer,
@@ -31,7 +30,7 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     modules::{drcov::DrCovModule, utils::filters::StdAddressFilter},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor,
     QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 
@@ -124,7 +123,7 @@ pub fn fuzz() {
     env::remove_var("LD_LIBRARY_PATH");
 
     let mut run_client = |state: Option<_>,
-                          mut mgr: LlmpRestartingEventManager<_, _, _>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _, _>,
                           client_description: ClientDescription| {
         let mut cov_path = options.coverage_path.clone();
 
