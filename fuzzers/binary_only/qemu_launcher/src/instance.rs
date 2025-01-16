@@ -241,9 +241,9 @@ impl<M: Monitor> Instance<'_, M> {
 
             executor
                 .run_target(
-                    &mut NopFuzzer::new(),
+                    &mut fuzzer,
                     &mut state,
-                    &mut NopEventManager::new(),
+                    &mut self.mgr,
                     &input,
                 )
                 .expect("Error running target");
