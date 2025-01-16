@@ -155,8 +155,7 @@ where
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<I, S> + Clone,
-    I: Input,
+    I: Clone + Input + MutatedTransform<I, S>,
 {
     #[inline]
     fn perform(
@@ -208,8 +207,7 @@ where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I> + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
-    I: MutatedTransform<I, S> + Clone,
-    I: Input,
+    I: Clone + Input + MutatedTransform<I, S>,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -308,8 +306,7 @@ where
     M: MultiMutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I> + HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
-    I: MutatedTransform<I, S> + Clone,
-    I: Input,
+    I: Clone + Input + MutatedTransform<I, S>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

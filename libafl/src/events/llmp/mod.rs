@@ -98,6 +98,7 @@ where
 
 impl
     LlmpEventConverter<
+        NopInput,
         NopInputConverter<NopInput>,
         NopInputConverter<NopInput>,
         NopState<NopInput>,
@@ -207,10 +208,9 @@ impl LlmpEventConverterBuilder {
 
 impl<I, IC, ICB, S, SP> Debug for LlmpEventConverter<I, IC, ICB, S, SP>
 where
-    ICB: Debug,
-    IC: Debug,
-    S: Debug,
     SP: ShMemProvider,
+    IC: Debug,
+    ICB: Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventConverter");
@@ -349,7 +349,7 @@ impl<I, IC, ICB, S, SP> EventFirer<I, S>
     for LlmpEventConverter<I, IC, ICB, S, SP>
 where
     IC: InputConverter<From = I>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
     SP: ShMemProvider,
     IC::To: Serialize,
 {

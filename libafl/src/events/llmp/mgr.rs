@@ -346,7 +346,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        S: HasCorpus + HasImported + Stoppable,
+        S: HasCorpus<I> + HasImported + Stoppable,
         EMH: EventManagerHooksTuple<I, S>,
         I: Input,
         E: HasObservers,

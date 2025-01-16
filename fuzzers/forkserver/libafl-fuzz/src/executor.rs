@@ -259,20 +259,19 @@ pub enum SupportedExecutors<S, OT, FSV, NYX> {
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+impl<S, OT, FSV, NYX, EM, Z> Executor<EM, I, S, Z>
     for SupportedExecutors<S, OT, FSV, NYX>
 where
     S: HasCorpus,
-    EM: UsesState<State = S>,
-    NYX: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
-    FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+    NYX: Executor<EM, I, S, Z>,
+    FSV: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
@@ -336,18 +335,18 @@ pub enum SupportedExecutors<S, OT, FSV> {
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+impl<S, OT, FSV, EM, Z> Executor<EM, I, S, Z>
     for SupportedExecutors<S, OT, FSV>
 where
     S: HasCorpus,
-    FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+    FSV: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),

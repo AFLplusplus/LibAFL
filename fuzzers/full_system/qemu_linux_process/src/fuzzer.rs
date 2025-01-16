@@ -4,7 +4,7 @@ use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
 #[cfg(not(feature = "nyx"))]
-use libafl::state::{HasExecutions, State};
+use libafl::state::HasExecutions;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
