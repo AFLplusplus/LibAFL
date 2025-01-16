@@ -81,7 +81,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     };
 
     let mut run_client = |state: Option<_>,
-                          mgr: LlmpRestartingEventManager<_, _, _>,
+                          mgr: LlmpRestartingEventManager<_, _, _, _>,
                           client_description: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
@@ -100,7 +100,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         };
 
         // if options.asan && options.asan_cores.contains(client_description.core_id()) {
-        (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, _client_description| {
+        (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _, _>, _client_description| {
             let gum = Gum::obtain();
 
             let coverage = CoverageRuntime::new();
