@@ -18,7 +18,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::HasMutatorBytes,
+    inputs::{HasMutatorBytes, HasMutatorResizableBytes},
     mutators::mutations::buffer_copy,
     nonzero,
     observers::ObserversTuple,
@@ -81,7 +81,7 @@ where
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     S: HasCorpus + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
+    <S::Corpus as Corpus>::Input: HasMutatorResizableBytes + Clone,
     O: Hash,
     C: AsRef<O> + Named,
 {
@@ -158,7 +158,7 @@ where
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
+    <S::Corpus as Corpus>::Input: HasMutatorResizableBytes + Clone,
 {
     #[inline]
     fn colorize(

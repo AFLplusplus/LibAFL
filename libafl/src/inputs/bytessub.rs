@@ -11,7 +11,7 @@ use libafl_bolts::{
     HasLen,
 };
 
-use crate::inputs::HasMutatorBytes;
+use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
@@ -37,14 +37,15 @@ use crate::inputs::HasMutatorBytes;
 /// assert_eq!(bytes_input.bytes()[1], 42);
 /// ```
 ///
-/// Growing or shrinking the sub input will grow or shrink the parent input,
+/// If inputs implement the [`HasMutatorResizableBytes`] trait, growing or shrinking the sub input
+/// will grow or shrink the parent input,
 /// and keep elements around the current range untouched / move them accordingly.
 ///
 /// For example:
 /// ```rust
 /// # extern crate alloc;
 /// # extern crate libafl;
-/// # use libafl::inputs::{BytesInput, HasMutatorBytes};
+/// # use libafl::inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes};
 /// # use alloc::vec::Vec;
 /// #
 /// # #[cfg(not(feature = "std"))]
@@ -109,7 +110,12 @@ where
     fn bytes_mut(&mut self) -> &mut [u8] {
         &mut self.parent_input.bytes_mut()[self.range.clone()]
     }
+}
 
+impl<I> HasMutatorResizableBytes for BytesSubInput<'_, I>
+where
+    I: HasMutatorResizableBytes,
+{
     fn resize(&mut self, new_len: usize, value: u8) {
         let start_index = self.range.start;
         let end_index = self.range.end;
@@ -208,7 +214,7 @@ mod tests {
     use libafl_bolts::HasLen;
 
     use crate::{
-        inputs::{BytesInput, HasMutatorBytes, NopInput},
+        inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes, NopInput},
         mutators::{havoc_mutations_no_crossover, MutatorsTuple},
         state::NopState,
     };
