@@ -1305,7 +1305,7 @@ impl AFLppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
-    S: HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
+    S: HasMetadata + HasRand + HasMaxSize + HasCorpus<I> + HasCurrentCorpusId,
     I: HasMutatorBytes + From<Vec<u8>>,
 {
     #[expect(clippy::needless_range_loop, clippy::too_many_lines)]

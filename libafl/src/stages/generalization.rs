@@ -62,10 +62,10 @@ impl<C, EM, O, OT, S, Z> Named for GeneralizationStage<C, EM, O, OT, S, Z> {
 
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<C, EM, O, E::Observers, S, Z>
 where
-    O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
     E: Executor<EM, BytesInput, S, Z> + HasObservers,
     E::Observers: ObserversTuple<BytesInput, S>,
+    O: MapObserver,
     S: HasExecutions
         + HasMetadata
         + HasCorpus<BytesInput>

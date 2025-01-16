@@ -23,7 +23,7 @@ pub use mutational::StdMutationalPushStage;
 
 use crate::{
     common::HasNamedMetadata,
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId},
+    corpus::{CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,

@@ -74,7 +74,7 @@ where
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus + HasExecutions,
+    S: HasCorpus<I> + HasExecutions,
 {
     fn run_target(
         &mut self,
@@ -106,7 +106,7 @@ where
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     type Observers = OT;
     #[inline]

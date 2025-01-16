@@ -37,7 +37,7 @@ pub struct InChildProcessHooks<I, S> {
 
 impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     /// Init this hook
     fn init(&mut self, _state: &mut S) {}
@@ -61,7 +61,7 @@ impl<I, S> InChildProcessHooks<I, S> {
     where
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        S: HasCorpus,
+        S: HasCorpus<I>,
     {
         #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {

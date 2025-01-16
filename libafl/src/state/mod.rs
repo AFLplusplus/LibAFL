@@ -285,25 +285,6 @@ where
     }
 }
 
-impl<I, C, R, SC> HasCorpus<I> for StdState<I, C, R, SC>
-where
-    C: Corpus<I>,
-{
-    type Corpus = C;
-
-    /// Returns the corpus
-    #[inline]
-    fn corpus(&self) -> &Self::Corpus {
-        &self.corpus
-    }
-
-    /// Returns the mutable corpus
-    #[inline]
-    fn corpus_mut(&mut self) -> &mut Self::Corpus {
-        &mut self.corpus
-    }
-}
-
 impl<I, C, R, SC> HasTestcase<I> for StdState<I, C, R, SC>
 where
     C: Corpus<I>,
@@ -319,7 +300,7 @@ where
     }
 }
 
-impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
+impl<I, C, R, SC> HasSolutions<I> for StdState<I, C, R, SC>
 where
     C: Corpus<I>,
     I: Input,

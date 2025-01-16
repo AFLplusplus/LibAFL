@@ -420,7 +420,7 @@ where
     M: MapObserver,
     C: AsRef<M> + Handled,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
         let obs = observers

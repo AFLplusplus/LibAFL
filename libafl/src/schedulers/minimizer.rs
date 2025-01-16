@@ -418,10 +418,10 @@ where
 }
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerScheduler<CS, M, O> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore, M, O>;
+pub type LenTimeMinimizerScheduler<CS, I, M, O> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore, I, M, O>;
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerScheduler<CS, O> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore, MapIndexesMetadata, O>;
+pub type IndexesLenTimeMinimizerScheduler<CS, I, O> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore, I, MapIndexesMetadata, O>;

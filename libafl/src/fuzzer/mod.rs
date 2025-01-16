@@ -309,12 +309,11 @@ impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer
 where
     CS: Scheduler<I, S>,
     EM: EventFirer<I, S> + CanSerializeObserver<OT>,
-    S: HasCorpus + MaybeHasClientPerfMonitor + HasCurrentTestcase + HasSolutions + HasLastFoundTime,
     F: Feedback<EM, I, OT, S>,
+    I: Input,
     OF: Feedback<EM, I, OT, S>,
     OT: ObserversTuple<I, S> + Serialize,
-    I: Input,
-    S::Solutions: Corpus<Input = I>,
+    S: HasCorpus<I> + MaybeHasClientPerfMonitor + HasCurrentTestcase<I> + HasSolutions<I> + HasLastFoundTime,
 {
     fn check_results(
         &mut self,
@@ -910,7 +909,7 @@ where
     CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
-    S: HasExecutions + HasCorpus + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasCorpus<I> + MaybeHasClientPerfMonitor,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(

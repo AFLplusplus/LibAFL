@@ -15,7 +15,6 @@ use libafl_bolts::{
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    corpus::Corpus,
     events::{Event, EventFirer},
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
@@ -134,12 +133,12 @@ impl LlmpEventConverterBuilder {
     }
 
     /// Create a event converter from a raw llmp client
-    pub fn build_from_client<IC, ICB, S, SP>(
+    pub fn build_from_client<I, IC, ICB, S, SP>(
         self,
         llmp: LlmpClient<SP>,
         converter: Option<IC>,
         converter_back: Option<ICB>,
-    ) -> Result<LlmpEventConverter<IC, ICB, S, SP>, Error>
+    ) -> Result<LlmpEventConverter<I, IC, ICB, S, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -157,13 +156,13 @@ impl LlmpEventConverterBuilder {
 
     /// Create a client from port and the input converters
     #[cfg(feature = "std")]
-    pub fn build_on_port<IC, ICB, S, SP>(
+    pub fn build_on_port<I, IC, ICB, S, SP>(
         self,
         shmem_provider: SP,
         port: u16,
         converter: Option<IC>,
         converter_back: Option<ICB>,
-    ) -> Result<LlmpEventConverter<IC, ICB, S, SP>, Error>
+    ) -> Result<LlmpEventConverter<I, IC, ICB, S, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -182,13 +181,13 @@ impl LlmpEventConverterBuilder {
 
     /// If a client respawns, it may reuse the existing connection, previously stored by [`LlmpClient::to_env()`].
     #[cfg(feature = "std")]
-    pub fn build_existing_client_from_env<IC, ICB, S, SP>(
+    pub fn build_existing_client_from_env<I, IC, ICB, S, SP>(
         self,
         shmem_provider: SP,
         env_name: &str,
         converter: Option<IC>,
         converter_back: Option<ICB>,
-    ) -> Result<LlmpEventConverter<IC, ICB, S, SP>, Error>
+    ) -> Result<LlmpEventConverter<I, IC, ICB, S, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -206,11 +205,12 @@ impl LlmpEventConverterBuilder {
     }
 }
 
-impl<IC, ICB, S, SP> Debug for LlmpEventConverter<IC, ICB, S, SP>
+impl<I, IC, ICB, S, SP> Debug for LlmpEventConverter<I, IC, ICB, S, SP>
 where
-    SP: ShMemProvider,
     ICB: Debug,
     IC: Debug,
+    S: Debug,
+    SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventConverter");
@@ -226,9 +226,9 @@ where
     }
 }
 
-impl<IC, ICB, S, SP> LlmpEventConverter<IC, ICB, S, SP>
+impl<I, IC, ICB, S, SP> LlmpEventConverter<I, IC, ICB, S, SP>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
     SP: ShMemProvider,
 {
     // TODO other new_* routines
@@ -265,8 +265,8 @@ where
         event: Event<DI>,
     ) -> Result<(), Error>
     where
-        ICB: InputConverter<To = <S::Corpus as Corpus>::Input, From = DI>,
-        Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
+        ICB: InputConverter<To = I, From = DI>,
+        Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
             Event::NewTestcase {
@@ -308,9 +308,9 @@ where
         manager: &mut EM,
     ) -> Result<usize, Error>
     where
-        ICB: InputConverter<To = <S::Corpus as Corpus>::Input, From = DI>,
+        ICB: InputConverter<To = I, From = DI>,
         DI: DeserializeOwned + Input,
-        Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>,
+        Z: EvaluatorObservers<E, EM, I, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
@@ -345,10 +345,10 @@ where
     }
 }
 
-impl<IC, ICB, S, SP> EventFirer<<S::Corpus as Corpus>::Input, S>
-    for LlmpEventConverter<IC, ICB, S, SP>
+impl<I, IC, ICB, S, SP> EventFirer<I, S>
+    for LlmpEventConverter<I, IC, ICB, S, SP>
 where
-    IC: InputConverter<From = <S::Corpus as Corpus>::Input>,
+    IC: InputConverter<From = I>,
     S: HasCorpus,
     SP: ShMemProvider,
     IC::To: Serialize,
@@ -365,7 +365,7 @@ where
     fn fire(
         &mut self,
         _state: &mut S,
-        event: Event<<S::Corpus as Corpus>::Input>,
+        event: Event<I>,
     ) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
@@ -421,7 +421,7 @@ where
     fn fire(
         &mut self,
         _state: &mut S,
-        event: Event<<S::Corpus as Corpus>::Input>,
+        event: Event<I>,
     ) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());

@@ -18,15 +18,15 @@ use crate::{
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
-pub struct ShadowExecutor<E, S, SOT> {
+pub struct ShadowExecutor<E, I, S, SOT> {
     /// The wrapped executor
     executor: E,
     /// The shadow observers
     shadow_observers: SOT,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<E, S, SOT> Debug for ShadowExecutor<E, S, SOT>
+impl<E, I, S, SOT> Debug for ShadowExecutor<E, I, S, SOT>
 where
     E: Debug,
     SOT: Debug,
@@ -39,11 +39,11 @@ where
     }
 }
 
-impl<E, S, SOT> ShadowExecutor<E, S, SOT>
+impl<E, I, S, SOT> ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers,
-    S: HasCorpus,
-    SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus<I>,
+    SOT: ObserversTuple<I, S>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
@@ -67,25 +67,25 @@ where
     }
 }
 
-impl<E, EM, S, SOT, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+impl<E, EM, I, S, SOT, Z> Executor<EM, I, I, S, Z>
     for ShadowExecutor<E, S, SOT>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    E: Executor<EM, I, S, Z> + HasObservers,
     S: HasCorpus,
-    SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    SOT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<E, S, SOT> HasTimeout for ShadowExecutor<E, S, SOT>
+impl<E, I, S, SOT> HasTimeout for ShadowExecutor<E, I, S, SOT>
 where
     E: HasTimeout,
 {
@@ -99,11 +99,11 @@ where
     }
 }
 
-impl<E, S, SOT> HasObservers for ShadowExecutor<E, S, SOT>
+impl<E, I, S, SOT> HasObservers for ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers,
-    S: HasCorpus,
-    SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus<I>,
+    SOT: ObserversTuple<I, S>,
 {
     type Observers = E::Observers;
     #[inline]

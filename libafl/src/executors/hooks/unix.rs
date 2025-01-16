@@ -191,7 +191,6 @@ pub mod unix_signal_handler {
         S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
-        S::Solutions: Corpus<Input = I>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {

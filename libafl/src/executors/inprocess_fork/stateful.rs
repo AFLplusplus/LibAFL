@@ -31,7 +31,7 @@ pub type StatefulInProcessForkExecutor<'a, H, I, OT, S, SP, ES, EM, Z> =
 impl<'a, H, I, OT, S, SP, ES, EM, Z> StatefulInProcessForkExecutor<'a, H, I, OT, S, SP, ES, EM, Z>
 where
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     #[expect(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
@@ -99,7 +99,7 @@ impl<EM, H, HT, I, OT, S, SP, Z, ES> Executor<EM, I, S, Z>
 where
     H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     HT: ExecutorHooksTuple<I, S>,
-    S: HasCorpus + HasExecutions,
+    S: HasCorpus<I> + HasExecutions,
     SP: ShMemProvider,
     OT: ObserversTuple<I, S>,
 {
@@ -138,7 +138,7 @@ impl<'a, H, HT, I, OT, S, SP, ES, EM, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     /// Creates a new [`StatefulGenericInProcessForkExecutor`] with custom hooks
     #[expect(clippy::too_many_arguments)]

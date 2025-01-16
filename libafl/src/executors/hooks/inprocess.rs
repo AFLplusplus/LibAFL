@@ -187,7 +187,7 @@ impl<I, S> HasTimeout for InProcessHooks<I, S> {
 
 impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.

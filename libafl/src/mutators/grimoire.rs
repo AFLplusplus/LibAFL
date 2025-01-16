@@ -25,13 +25,13 @@ const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];
 const MAX_RECURSIVE_REPLACEMENT_LEN: usize = 64 << 10;
 const CHOOSE_SUBINPUT_PROB: f64 = 0.5;
 
-fn extend_with_random_generalized<S>(
+fn extend_with_random_generalized<I, S>(
     state: &mut S,
     items: &mut Vec<GeneralizedItem>,
     gap_indices: &mut Vec<usize>,
 ) -> Result<MutationResult, Error>
 where
-    S: HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus<I>,
 {
     let id = random_corpus_id!(state.corpus(), state.rand_mut());
 
@@ -122,7 +122,7 @@ pub struct GrimoireExtensionMutator {
 
 impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireExtensionMutator
 where
-    S: HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
 {
     fn mutate(
         &mut self,
@@ -163,7 +163,7 @@ pub struct GrimoireRecursiveReplacementMutator {
 
 impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireRecursiveReplacementMutator
 where
-    S: HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
 {
     fn mutate(
         &mut self,
@@ -239,7 +239,7 @@ pub struct GrimoireStringReplacementMutator {}
 
 impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireStringReplacementMutator
 where
-    S: HasMetadata + HasRand + HasCorpus,
+    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
 {
     fn mutate(
         &mut self,
@@ -357,9 +357,9 @@ pub struct GrimoireRandomDeleteMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<I> Mutator<GeneralizedInputMetadata, I, S> for GrimoireRandomDeleteMutator
+impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireRandomDeleteMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<I>,
+    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
 {
     fn mutate(
         &mut self,

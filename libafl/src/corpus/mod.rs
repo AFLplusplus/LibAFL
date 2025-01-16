@@ -215,7 +215,7 @@ pub struct CorpusIdIterator<'a, C, I> {
     phantom: PhantomData<I>,
 }
 
-impl<I, C> Iterator for CorpusIdIterator<'_, I, C>
+impl<C, I> Iterator for CorpusIdIterator<'_, C, I>
 where
     C: Corpus<I>,
 {
@@ -231,7 +231,7 @@ where
     }
 }
 
-impl<I, C> DoubleEndedIterator for CorpusIdIterator<'_, I, C>
+impl<C, I> DoubleEndedIterator for CorpusIdIterator<'_, C, I>
 where
     C: Corpus<I>,
 {

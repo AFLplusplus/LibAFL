@@ -20,17 +20,17 @@ pub struct WithObservers<E, OT, S> {
     phantom: PhantomData<S>,
 }
 
-impl<E, EM, OT, S, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for WithObservers<E, OT, S>
+impl<E, EM, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, OT, S>
 where
     S: HasCorpus,
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+    E: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
@@ -38,8 +38,8 @@ where
 
 impl<E, OT, S> HasObservers for WithObservers<E, OT, S>
 where
-    S: HasCorpus,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus<I>,
+    OT: ObserversTuple<I, S>,
 {
     type Observers = OT;
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {

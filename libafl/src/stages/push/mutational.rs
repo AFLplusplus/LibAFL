@@ -76,11 +76,11 @@ where
     }
 }
 
-impl<EM, M, OT, S, Z> PushStage<EM, I, OT, S, Z> for StdMutationalPushStage<EM, M, OT, S, Z>
+impl<EM, M, I, OT, S, Z> PushStage<EM, I, OT, S, Z> for StdMutationalPushStage<EM, M, I, OT, S, Z>
 where
     EM: EventFirer<I, S>,
     Z: HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
-    S: HasCorpus + HasRand + MaybeHasClientPerfMonitor,
+    S: HasCorpus<I> + HasRand + MaybeHasClientPerfMonitor,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S> + Serialize,
     I: Input + Clone,
@@ -184,10 +184,10 @@ where
     }
 }
 
-impl<EM, M, OT, S, Z> Iterator for StdMutationalPushStage<EM, M, OT, S, Z>
+impl<EM, M, I, OT, S, Z> Iterator for StdMutationalPushStage<EM, M, I, OT, S, Z>
 where
     EM: ProgressReporter<S> + EventFirer<I, S>,
-    S: HasCorpus
+    S: HasCorpus<I>
         + HasMetadata
         + HasExecutions
         + HasLastReportTime
@@ -205,10 +205,10 @@ where
     }
 }
 
-impl<EM, M, OT, S, Z> StdMutationalPushStage<EM, M, OT, S, Z>
+impl<EM, M, I, OT, S, Z> StdMutationalPushStage<EM, M, I, OT, S, Z>
 where
     EM: ProgressReporter<S> + EventFirer<I, S>,
-    S: HasCorpus
+    S: HasCorpus<I>
         + HasMetadata
         + HasExecutions
         + HasLastReportTime

@@ -108,7 +108,7 @@ fn parse_itimerval(timeout: Duration) -> Itimerval {
 impl<EM, HT, I, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
     SP: ShMemProvider,
     OT: ObserversTuple<I, S>,
 {
@@ -201,7 +201,7 @@ impl<HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, I, OT, S, SP
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.

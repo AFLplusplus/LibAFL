@@ -365,8 +365,7 @@ pub struct CrossoverMutator;
 
 impl<I, S> Mutator<I, S> for CrossoverMutator
 where
-    S: HasRand + HasCorpus,
-    S::Corpus: Corpus<Input = I>,
+    S: HasRand + HasCorpus<I>,
     I: Copy,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -402,8 +401,8 @@ impl<F> MappedCrossoverMutator<F> {
 
 impl<I, S, F> Mutator<I, S> for MappedCrossoverMutator<F>
 where
-    S: HasRand + HasCorpus,
-    for<'b> F: Fn(&'b <S::Corpus as Corpus>::Input) -> &'b I,
+    S: HasRand + HasCorpus<I>,
+    for<'b> F: Fn(&'b I) -> &'b I,
     I: Clone,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {

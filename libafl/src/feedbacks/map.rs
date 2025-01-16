@@ -395,13 +395,13 @@ where
 impl<C, EM, I, N, O, OT, R, S> Feedback<EM, I, OT, S> for MapFeedback<C, N, O, R>
 where
     C: CanTrack + AsRef<O>,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<I, S>,
     N: IsNovel<O::Entry>,
     O: MapObserver + for<'it> AsIter<'it, Item = O::Entry>,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadata + HasCorpus, // delete me
+    S: HasNamedMetadata + HasCorpus<I>, // delete me
 {
     #[rustversion::nightly]
     default fn is_interesting(
@@ -538,10 +538,10 @@ where
 impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer>
 where
     C: CanTrack + AsRef<O>,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<I, S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadata + HasCorpus,
+    S: HasNamedMetadata + HasCorpus<I>,
 {
     fn is_interesting(
         &mut self,

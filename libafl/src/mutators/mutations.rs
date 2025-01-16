@@ -1125,9 +1125,8 @@ impl CrossoverInsertMutator {
 
 impl<I, S> Mutator<I, S> for CrossoverInsertMutator
 where
-    S: HasCorpus + HasRand + HasMaxSize,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes,
     I: HasMutatorBytes,
+    S: HasCorpus<I> + HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1217,9 +1216,8 @@ impl CrossoverReplaceMutator {
 
 impl<I, S> Mutator<I, S> for CrossoverReplaceMutator
 where
-    S: HasCorpus + HasRand,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes,
     I: HasMutatorBytes,
+    S: HasCorpus<I> + HasRand,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1314,10 +1312,10 @@ impl<F, O> MappedCrossoverInsertMutator<F, O> {
 
 impl<S, F, I, O> Mutator<I, S> for MappedCrossoverInsertMutator<F, O>
 where
-    S: HasCorpus + HasMaxSize + HasRand,
+    F: Fn(&I) -> &O,
     I: HasMutatorBytes,
     O: IntoOptionBytes,
-    F: Fn(&<S::Corpus as Corpus>::Input) -> &O,
+    S: HasCorpus<I> + HasMaxSize + HasRand,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1403,10 +1401,10 @@ impl<F, O> MappedCrossoverReplaceMutator<F, O> {
 
 impl<S, F, I, O> Mutator<I, S> for MappedCrossoverReplaceMutator<F, O>
 where
-    S: HasCorpus + HasMaxSize + HasRand,
+    F: Fn(&I) -> &O,
     I: HasMutatorBytes,
     O: IntoOptionBytes,
-    F: Fn(&<S::Corpus as Corpus>::Input) -> &O,
+    S: HasCorpus<I> + HasMaxSize + HasRand,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1493,7 +1491,6 @@ pub struct SpliceMutator;
 impl<I, S> Mutator<I, S> for SpliceMutator
 where
     S: HasCorpus + HasRand,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes,
     I: HasMutatorBytes,
 {
     #[expect(clippy::cast_sign_loss)]
