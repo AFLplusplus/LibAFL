@@ -3,24 +3,36 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
+#[cfg(feature = "std")]
+pub mod disk;
+#[cfg(feature = "std")]
+pub use disk::{OnDiskJsonMonitor, OnDiskTomlMonitor};
+
+#[cfg(feature = "std")]
+pub mod disk_aggregate;
+#[cfg(feature = "std")]
+pub use disk_aggregate::OnDiskJsonAggregateMonitor;
+
 #[cfg(all(feature = "tui_monitor", feature = "std"))]
 pub mod tui;
+#[cfg(all(feature = "tui_monitor", feature = "std"))]
+pub use tui::TuiMonitor;
 
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub mod prometheus;
-use alloc::string::ToString;
 
-#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
-pub use prometheus::PrometheusMonitor;
-#[cfg(feature = "std")]
-pub mod disk;
-use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
+use alloc::{
+    borrow::Cow,
+    fmt::Debug,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt, fmt::Write, time::Duration};
 
-#[cfg(feature = "std")]
-pub use disk::{OnDiskJsonMonitor, OnDiskTomlMonitor};
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
+#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+pub use prometheus::PrometheusMonitor;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "afl_exec_sec")]
@@ -900,26 +912,6 @@ pub struct ClientPerfMonitor {
 
     /// Current time set by `start_timer`
     timer_start: Option<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-/// Count the imported testcase from other nodes that came with observers
-pub struct ScalabilityMonitor {
-    /// Imported testcase received with observer
-    pub testcase_with_observers: usize,
-    /// Imported testcase received without observer
-    pub testcase_without_observers: usize,
-}
-
-impl ScalabilityMonitor {
-    /// Constructor
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            testcase_with_observers: 0,
-            testcase_without_observers: 0,
-        }
-    }
 }
 
 /// Various features that are measured for performance

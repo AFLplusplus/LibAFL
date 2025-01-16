@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::monitors::PerfFeature;
 use crate::{
     corpus::Corpus,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     nonzero,
@@ -203,8 +203,7 @@ where
         + HasMetadata
         + HasExecutions
         + HasCurrentTestcase
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
 {
@@ -243,8 +242,7 @@ where
         + HasExecutions
         + HasMetadata
         + HasCurrentTestcase
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
 {

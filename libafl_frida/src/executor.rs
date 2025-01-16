@@ -16,9 +16,9 @@ use libafl::{
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{NopTargetBytesConverter, TargetBytesConverter, UsesInput},
+    inputs::{NopTargetBytesConverter, TargetBytesConverter},
     observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::{HasCorpus, HasExecutions},
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
@@ -59,9 +59,8 @@ where
 impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
     for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
 where
-    EM: UsesState<State = S>,
     H: FnMut(&I) -> ExitKind,
-    S: HasCorpus + HasExecutions + UsesInput<Input = I>,
+    S: HasCorpus + HasExecutions,
     TC: TargetBytesConverter<Input = I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
@@ -226,7 +225,7 @@ impl<'a, 'b, 'c, H, I, OT, RT, S, TC> HasInProcessHooks<I, S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
 where
     H: FnMut(&I) -> ExitKind,
-    S: HasSolutions + HasCorpus + HasCurrentTestcase + HasExecutions + UsesInput<Input = I>,
+    S: HasSolutions + HasCorpus + HasCurrentTestcase + HasExecutions,
     S::Solutions: Corpus<Input = I>,
     I: Input,
     TC: TargetBytesConverter<Input = I>,

@@ -3,8 +3,8 @@ use core::{marker::PhantomData, ptr, time::Duration};
 use libafl::{
     corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, UsesInput},
-    state::{HasCorpus, HasExecutions, UsesState},
+    inputs::HasTargetBytes,
+    state::{HasCorpus, HasExecutions},
     Error,
 };
 use libafl_bolts::{
@@ -51,8 +51,7 @@ where
 impl<EM, S, SP, OT, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
     for TinyInstExecutor<S, SP, OT>
 where
-    EM: UsesState<State = S>,
-    S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S: HasCorpus + HasExecutions,
     <S::Corpus as Corpus>::Input: HasTargetBytes,
     SP: ShMemProvider,
 {

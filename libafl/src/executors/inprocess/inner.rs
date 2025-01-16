@@ -27,7 +27,7 @@ use crate::{
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     observers::ObserversTuple,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
@@ -145,10 +145,10 @@ where
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase + HasCorpus + HasSolutions + UsesInput<Input = I>,
+        S: HasCurrentTestcase + HasCorpus + HasSolutions,
         S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
     {
@@ -175,10 +175,10 @@ where
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase + HasCorpus + HasSolutions + UsesInput<Input = I>,
+        S: HasCurrentTestcase + HasCorpus + HasSolutions,
         S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
     {
@@ -208,9 +208,9 @@ where
     where
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase + HasCorpus + HasSolutions + UsesInput<Input = I>,
+        S: HasCurrentTestcase + HasCorpus + HasSolutions,
         Z: HasObjective<Objective = OF>,
         S::Solutions: Corpus<Input = I>,
         I: Input + Clone,

@@ -43,7 +43,6 @@ libafl = { path = "../../../libafl", default-features = false, features = [
   "prelude",
   "gzip",
   "regex",
-  "scalability_introspection",
   "multi_machine",
   "errors_backtrace",
 ] }

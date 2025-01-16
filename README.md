@@ -78,7 +78,9 @@ LibAFL is written and maintained by
  * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
  * [Romain Malmain](https://github.com/rmalmain) <rmalmain@pm.me>
 
-Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for the contributing guideline.
+## Contributing
+
+Please check out **[CONTRIBUTING.md](CONTRIBUTING.md)** for the contributing guideline.
 
 ## Debugging
 

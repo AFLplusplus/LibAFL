@@ -17,10 +17,9 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
-    inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage, TracingStage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]
@@ -57,9 +56,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>,
+        + MaybeHasClientPerfMonitor,
 {
     #[inline]
     fn perform(
@@ -387,8 +384,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + MaybeHasClientPerfMonitor
-        + HasCurrentCorpusId
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentCorpusId,
 {
     #[inline]
     fn perform(

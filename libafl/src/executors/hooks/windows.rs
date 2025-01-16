@@ -17,7 +17,7 @@ pub mod windows_asan_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
         state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     };
@@ -28,10 +28,10 @@ pub mod windows_asan_handler {
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
         S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
     {
@@ -136,7 +136,7 @@ pub mod windows_exception_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
         state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     };
@@ -186,10 +186,10 @@ pub mod windows_exception_handler {
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
         S::Solutions: Corpus<Input = I>,
         Z: HasObjective<Objective = OF>,
     {
@@ -249,10 +249,10 @@ pub mod windows_exception_handler {
     ) where
         E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
         Z: HasObjective<Objective = OF>,
         S::Solutions: Corpus<Input = I>,
     {
@@ -319,10 +319,10 @@ pub mod windows_exception_handler {
     ) where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
         Z: HasObjective<Objective = OF>,
         S::Solutions: Corpus<Input = I>,
     {

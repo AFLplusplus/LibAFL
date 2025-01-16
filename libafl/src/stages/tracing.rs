@@ -13,12 +13,12 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasNamedMetadata,
 };
 
@@ -38,9 +38,7 @@ where
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentTestcase
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>, //delete me
+        + MaybeHasClientPerfMonitor,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
@@ -82,9 +80,7 @@ where
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>,
+        + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]
@@ -176,9 +172,7 @@ where
         + Debug
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>,
+        + MaybeHasClientPerfMonitor,
 {
     #[inline]
     fn perform(
@@ -228,9 +222,8 @@ where
 impl<E, EM, SOT, S, Z> ShadowTracingStage<E, EM, SOT, S, Z>
 where
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    S: HasExecutions + HasCorpus + UsesInput,
+    S: HasExecutions + HasCorpus,
     SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    EM: UsesState<State = S>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, S, SOT>) -> Self {
