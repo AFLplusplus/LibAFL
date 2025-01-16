@@ -61,7 +61,7 @@ impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
 where
     H: FnMut(&I) -> ExitKind,
     S: HasCorpus<I> + HasExecutions,
-    TC: TargetBytesConverter<Input = I>,
+    TC: TargetBytesConverter<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
 {

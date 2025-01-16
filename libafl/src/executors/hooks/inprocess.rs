@@ -329,7 +329,7 @@ impl<I, S> InProcessHooks<I, S> {
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus,
+        S: HasExecutions + HasSolutions<I> + HasCorpus<I>,
         Z: HasObjective<Objective = OF>,
     {
         #[cfg_attr(miri, allow(unused_variables))]

@@ -44,7 +44,7 @@ use crate::observers::{
 };
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{BytesInput, Input, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::{HasCorpus, HasExecutions},
@@ -663,7 +663,7 @@ where
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I>,
     SP: ShMemProvider,
-    TC: TargetBytesConverter,
+    TC: TargetBytesConverter<I>,
 {
     /// The `target` binary that's going to run.
     pub fn target(&self) -> &OsString {
@@ -697,7 +697,7 @@ where
 
     /// Execute input and increase the execution counter.
     #[inline]
-    fn execute_input(&mut self, state: &mut S, input: &TC::Input) -> Result<ExitKind, Error>
+    fn execute_input(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error>
     where
         S: HasExecutions,
     {
@@ -708,7 +708,7 @@ where
 
     /// Execute input, but side-step the execution counter.
     #[inline]
-    fn execute_input_uncounted(&mut self, input: &TC::Input) -> Result<ExitKind, Error> {
+    fn execute_input_uncounted(&mut self, input: &I) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
@@ -847,7 +847,7 @@ where
         OT: ObserversTuple<I, S>,
         S: HasCorpus<I>,
         SP: ShMemProvider,
-        TC: TargetBytesConverter,
+        TC: TargetBytesConverter<I>,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
@@ -1542,7 +1542,7 @@ impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
 
 impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
     /// Shmem provider for forkserver's shared memory testcase feature.
-    pub fn target_bytes_converter<TC2: TargetBytesConverter>(
+    pub fn target_bytes_converter<I, TC2: TargetBytesConverter<I>>(
         self,
         target_bytes_converter: TC2,
     ) -> ForkserverExecutorBuilder<'a, TC2, SP> {
@@ -1586,7 +1586,7 @@ where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
     S: HasCorpus<I> + HasExecutions,
-    TC: TargetBytesConverter<Input = I>,
+    TC: TargetBytesConverter<I>,
 {
     #[inline]
     fn run_target(

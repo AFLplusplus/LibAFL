@@ -1,7 +1,6 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
-use core::{cell::RefCell, fmt};
-use std::marker::PhantomData;
+use core::{cell::RefCell, fmt, marker::PhantomData};
 
 use serde::{Deserialize, Serialize};
 
