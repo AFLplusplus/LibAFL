@@ -367,7 +367,7 @@ static mut SIMPLE_CONCOLIC_MUTATIONAL_ID: usize = 0;
 pub const SIMPLE_CONCOLIC_MUTATIONAL_NAME: &str = "concolicmutation";
 
 #[cfg(feature = "concolic_mutation")]
-impl<Z> Named for SimpleConcolicMutationalStage<Z> {
+impl<I, Z> Named for SimpleConcolicMutationalStage<I, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -379,10 +379,10 @@ where
     Z: Evaluator<E, EM, I, S>,
     I: HasMutatorBytes + Clone,
     S: HasExecutions
-        + HasCorpus
+        + HasCorpus<I>
         + HasMetadata
         + HasNamedMetadata
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor
         + HasCurrentCorpusId,
 {
@@ -434,7 +434,7 @@ where
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<Z> SimpleConcolicMutationalStage<Z> {
+impl<I, Z> SimpleConcolicMutationalStage<I, Z> {
     #[must_use]
     /// Construct this stage
     pub fn new() -> Self {

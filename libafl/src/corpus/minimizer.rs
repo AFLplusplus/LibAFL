@@ -35,10 +35,10 @@ pub struct MapCorpusMinimizer<C, E, I, O, S, T, TS> {
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<C, E, O, S, T> =
-    MapCorpusMinimizer<C, E, O, S, T, LenTimeMulTestcaseScore>;
+pub type StdCorpusMinimizer<C, E, I, O, S, T> =
+    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcaseScore>;
 
-impl<C, E, O, S, T, TS> MapCorpusMinimizer<C, E, O, S, T, TS>
+impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
 where
     C: Named,
 {
@@ -56,10 +56,10 @@ impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
-    S: HasMetadata + HasCorpus<I> + HasExecutions,
     I: Input,
+    S: HasMetadata + HasCorpus<I> + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<S>,
+    TS: TestcaseScore<I, S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]

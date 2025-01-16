@@ -8,7 +8,6 @@ use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
     inputs::{BytesInput, HasTargetBytes},
     stages::Stage,
     state::{HasCorpus, HasCurrentTestcase},
@@ -71,17 +70,17 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> UnicodeIdentificationMetadata {
 
 /// Stage which identifies potential strings in the provided input
 #[derive(Debug)]
-pub struct UnicodeIdentificationStage<S> {
-    phantom: PhantomData<S>,
+pub struct UnicodeIdentificationStage<I, S> {
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> Default for UnicodeIdentificationStage<S> {
+impl<I, S> Default for UnicodeIdentificationStage<I, S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> UnicodeIdentificationStage<S> {
+impl<I, S> UnicodeIdentificationStage<I, S> {
     /// Create a new instance of the string identification stage
     #[must_use]
     pub fn new() -> Self {
@@ -91,8 +90,8 @@ impl<S> UnicodeIdentificationStage<S> {
     }
     fn identify_unicode_in_current_testcase(state: &mut S) -> Result<(), Error>
     where
-        S: HasCurrentTestcase,
-        <S::Corpus as Corpus>::Input: HasTargetBytes,
+        S: HasCurrentTestcase<I>,
+        I: HasTargetBytes,
     {
         let mut tc = state.current_testcase_mut()?;
         if tc.has_metadata::<UnicodeIdentificationMetadata>() {
@@ -109,10 +108,9 @@ impl<S> UnicodeIdentificationStage<S> {
     }
 }
 
-impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage<S>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage<BytesInput, S>
 where
-    S: HasCorpus + HasCurrentTestcase,
-    S::Corpus: Corpus<Input = BytesInput>,
+    S: HasCorpus<BytesInput> + HasCurrentTestcase<BytesInput>,
 {
     fn perform(
         &mut self,
