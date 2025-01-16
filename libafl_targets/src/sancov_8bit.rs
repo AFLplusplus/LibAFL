@@ -83,7 +83,6 @@ mod observers {
         slice::{from_raw_parts, Iter, IterMut},
     };
 
-    use ahash::RandomState;
     use libafl::{
         observers::{DifferentialObserver, MapObserver, Observer},
         Error,
