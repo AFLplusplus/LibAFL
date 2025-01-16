@@ -349,7 +349,7 @@ pub mod macros {
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver:
-    HasLen + Named + Serialize + DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
+    HasLen + Named + Serialize + DeserializeOwned + AsRef<Self> + AsMut<Self>
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
