@@ -11,7 +11,7 @@ use std::{
 
 use libafl::{
     corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },

@@ -17,7 +17,10 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes},
+    inputs::{
+        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes,
+        HasMutatorResizableBytes,
+    },
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
