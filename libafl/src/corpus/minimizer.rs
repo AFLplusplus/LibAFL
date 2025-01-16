@@ -56,7 +56,7 @@ impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
-    S: HasMetadata + HasCorpus + HasExecutions,
+    S: HasMetadata + HasCorpus<I> + HasExecutions,
     I: Input,
     T: Copy + Hash + Eq,
     TS: TestcaseScore<S>,

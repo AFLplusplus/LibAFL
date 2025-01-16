@@ -18,7 +18,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
     inputs::Input,
-    state::HasCorpus,
     Error,
 };
 
@@ -55,21 +54,6 @@ pub struct OnDiskCorpus<I> {
     dir_path: PathBuf,
     /// We wrapp a cached corpus and set its size to 1.
     inner: CachedOnDiskCorpus<I>,
-}
-
-impl<I> HasCorpus<I> for OnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Corpus = Self;
-
-    fn corpus(&self) -> &Self::Corpus {
-        self
-    }
-
-    fn corpus_mut(&mut self) -> &mut Self::Corpus {
-        self
-    }
 }
 
 impl<I> Corpus<I> for OnDiskCorpus<I>

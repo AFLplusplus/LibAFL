@@ -838,14 +838,12 @@ where
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[expect(clippy::pedantic)]
-    pub fn build<OT, I, S>(
+    pub fn build<I, OT, S>(
         mut self,
         observers: OT,
     ) -> Result<ForkserverExecutor<I, OT, S, SP, TC>, Error>
     where
-        I: Input,
         OT: ObserversTuple<I, S>,
-        S: HasCorpus<I>,
         SP: ShMemProvider,
         TC: TargetBytesConverter<I>,
     {
@@ -1678,7 +1676,7 @@ mod tests {
             .coverage_map_size(MAP_SIZE)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
-            .build::<_, BytesInput, NopCorpus<BytesInput>>(tuple_list!(edges_observer));
+            .build::<BytesInput, _, NopCorpus<BytesInput>>(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {

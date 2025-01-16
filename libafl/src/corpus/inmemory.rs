@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use super::HasTestcase;
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    state::HasCorpus,
     Error,
 };
 
@@ -315,19 +314,6 @@ pub struct InMemoryCorpus<I> {
     current: Option<CorpusId>,
 }
 
-// Reflexivity
-impl<I> HasCorpus<I> for InMemoryCorpus<I> {
-    type Corpus = Self;
-
-    fn corpus(&self) -> &Self::Corpus {
-        self
-    }
-
-    fn corpus_mut(&mut self) -> &mut Self::Corpus {
-        self
-    }
-}
-
 impl<I> Corpus<I> for InMemoryCorpus<I> {
     /// Returns the number of all enabled entries
     #[inline]
@@ -412,15 +398,15 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
         &mut self.current
     }
 
+    #[inline]
+    fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        self.storage.enabled.next(id)
+    }
+
     /// Peek the next free corpus id
     #[inline]
     fn peek_free_id(&self) -> CorpusId {
         self.storage.peek_free_id()
-    }
-
-    #[inline]
-    fn next(&self, id: CorpusId) -> Option<CorpusId> {
-        self.storage.enabled.next(id)
     }
 
     #[inline]

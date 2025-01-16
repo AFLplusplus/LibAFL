@@ -79,23 +79,6 @@ where
 {
 }
 
-// TODO: reuse this when negative trait bounds or specialization are stabilized
-// // Reflexivity
-// impl<C, I> HasCorpus<I> for C
-// where
-//     C: Corpus<I>,
-// {
-//     type Corpus = Self;
-//
-//     fn corpus(&self) -> &Self::Corpus {
-//         self
-//     }
-//
-//     fn corpus_mut(&mut self) -> &mut Self::Corpus {
-//         self
-//     }
-// }
-
 /// Interact with the maximum size
 pub trait HasMaxSize {
     /// The maximum size hint for items and mutations returned

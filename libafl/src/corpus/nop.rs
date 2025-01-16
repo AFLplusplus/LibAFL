@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
-    state::HasCorpus,
     Error,
 };
 
@@ -14,18 +13,6 @@ use crate::{
 pub struct NopCorpus<I> {
     empty: Option<CorpusId>,
     phantom: PhantomData<I>,
-}
-
-impl<I> HasCorpus<I> for NopCorpus<I> {
-    type Corpus = Self;
-
-    fn corpus(&self) -> &Self::Corpus {
-        self
-    }
-
-    fn corpus_mut(&mut self) -> &mut Self::Corpus {
-        self
-    }
 }
 
 impl<I> Corpus<I> for NopCorpus<I> {

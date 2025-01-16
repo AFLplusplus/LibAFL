@@ -12,7 +12,6 @@ use crate::{
         HasTestcase, Testcase,
     },
     inputs::Input,
-    state::HasCorpus,
     Error,
 };
 
@@ -54,22 +53,6 @@ where
             self.cached_indexes.borrow_mut().push_back(id);
         }
         Ok(())
-    }
-}
-
-// Reflexivity
-impl<I> HasCorpus<I> for CachedOnDiskCorpus<I>
-where
-    I: Input,
-{
-    type Corpus = Self;
-
-    fn corpus(&self) -> &Self::Corpus {
-        self
-    }
-
-    fn corpus_mut(&mut self) -> &mut Self::Corpus {
-        self
     }
 }
 
