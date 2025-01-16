@@ -11,7 +11,7 @@ use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
     nonzero,
     stages::{
