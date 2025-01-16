@@ -322,12 +322,14 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     /// Sets the filename for a [`Testcase`].
     /// If an error gets returned from the corpus (i.e., file exists), we'll have to retry with a different filename.
+    /// Renaming testcases will most likely cause duplicate testcases to not be handled correctly
+    /// if testcases with the same input are not given the same filename.
+    /// Only rename when you know what you are doing.
     #[inline]
-    pub fn rename_testcase(
-        &self,
-        testcase: &mut Testcase<I>,
-        filename: String,
-    ) -> Result<(), Error> {
+    pub fn rename_testcase(&self, testcase: &mut Testcase<I>, filename: String) -> Result<(), Error>
+    where
+        I: Input,
+    {
         if testcase.filename().is_some() {
             // We are renaming!
 
@@ -340,36 +342,10 @@ impl<I> InMemoryOnDiskCorpus<I> {
                 return Ok(());
             }
 
-            if self.locking {
-                let new_lock_filename = format!(".{new_filename}.lafl_lock");
-
-                // Try to create lock file for new testcases
-                if let Err(err) = create_new(self.dir_path.join(&new_lock_filename)) {
-                    *testcase.filename_mut() = Some(old_filename);
-                    return Err(Error::illegal_state(format!(
-                        "Unable to create lock file {new_lock_filename} for new testcase: {err}"
-                    )));
-                }
-            }
-
             let new_file_path = self.dir_path.join(&new_filename);
-
-            fs::rename(testcase.file_path().as_ref().unwrap(), &new_file_path)?;
-
-            let new_metadata_path = {
-                if let Some(old_metadata_path) = testcase.metadata_path() {
-                    // We have metadata. Let's rename it.
-                    let new_metadata_path = self.dir_path.join(format!(".{new_filename}.metadata"));
-                    fs::rename(old_metadata_path, &new_metadata_path)?;
-
-                    Some(new_metadata_path)
-                } else {
-                    None
-                }
-            };
-
-            *testcase.metadata_path_mut() = new_metadata_path;
+            self.remove_testcase(testcase)?;
             *testcase.filename_mut() = Some(new_filename);
+            self.save_testcase(testcase)?;
             *testcase.file_path_mut() = Some(new_file_path);
 
             Ok(())
@@ -470,6 +446,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         if let Some(filename) = testcase.filename() {
+            let mut ctr = String::new();
             if self.locking {
                 let lockfile_path = self.dir_path.join(format!(".{filename}"));
                 let mut lockfile = OpenOptions::new()
@@ -478,7 +455,6 @@ impl<I> InMemoryOnDiskCorpus<I> {
                     .open(&lockfile_path)?;
 
                 lockfile.lock_exclusive()?;
-                let mut ctr = String::new();
                 lockfile.read_to_string(&mut ctr)?;
                 ctr = ctr.trim().to_string();
 
@@ -493,7 +469,11 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
             fs::remove_file(self.dir_path.join(filename))?;
             if self.meta_format.is_some() {
-                fs::remove_file(self.dir_path.join(format!(".{filename}.metadata")))?;
+                if self.locking {
+                    fs::remove_file(self.dir_path.join(format!(".{filename}_{ctr}.metadata")))?;
+                } else {
+                    fs::remove_file(self.dir_path.join(format!(".{filename}.metadata")))?;
+                }
             }
         }
         Ok(())
