@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
 use libafl::{
-    corpus::{Corpus, Testcase},
+    corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata, StateInitializer},
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::HasCorpus,
     Error, HasMetadata,
 };
 use libafl_bolts::{Named, SerdeAny};
@@ -32,8 +31,8 @@ where
     }
 }
 
-pub type PacketLenMinimizerScheduler<CS, S> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata, S>;
+pub type PacketLenMinimizerScheduler<CS, I, S> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, I, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {
