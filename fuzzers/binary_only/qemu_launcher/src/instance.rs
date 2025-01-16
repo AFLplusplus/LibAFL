@@ -55,7 +55,7 @@ pub type ClientState =
     StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(feature = "simplemgr")]
-pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;
+pub type ClientMgr<M> = SimpleEventManager<BytesInput, M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
 pub type ClientMgr<M> =
     MonitorTypedEventManager<LlmpRestartingEventManager<(), ClientState, StdShMemProvider>, M>;
