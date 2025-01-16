@@ -9,7 +9,6 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
-        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
@@ -126,7 +125,6 @@ pub mod windows_exception_handler {
     };
 
     use crate::{
-        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
