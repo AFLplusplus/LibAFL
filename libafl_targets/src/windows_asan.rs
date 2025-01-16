@@ -6,7 +6,7 @@ use libafl::{
     feedbacks::Feedback,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     HasObjective,
 };
 

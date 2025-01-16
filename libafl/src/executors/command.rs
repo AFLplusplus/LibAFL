@@ -880,7 +880,7 @@ mod tests {
         executor
             .run_target(
                 &mut NopFuzzer::new(),
-                &mut NopState::new(),
+                &mut NopState::<NopInput>::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )
