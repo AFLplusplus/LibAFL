@@ -45,7 +45,7 @@ use crate::observers::{
 use crate::{
     corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{BytesInput, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::{HasCorpus, HasExecutions},
@@ -911,7 +911,7 @@ where
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         A: Observer<<S::Corpus as Corpus>::Input, S> + AsMut<MO>,
         OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Prepend<MO>,
-        <S::Corpus as Corpus>::Input: Input + HasTargetBytes,
+        <S::Corpus as Corpus>::Input: Input,
         S: HasCorpus,
         SP: ShMemProvider,
     {
