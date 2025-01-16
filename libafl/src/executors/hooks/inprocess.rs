@@ -267,8 +267,7 @@ impl<I, S> InProcessHooks<I, S> {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         let ret;

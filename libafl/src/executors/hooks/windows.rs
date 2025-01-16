@@ -31,8 +31,7 @@ pub mod windows_asan_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
         Z: HasObjective<Objective = OF>,
     {
         let data = &raw mut GLOBAL_STATE;
@@ -189,8 +188,7 @@ pub mod windows_exception_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
         Z: HasObjective<Objective = OF>,
     {
         let old_hook = panic::take_hook();
@@ -252,9 +250,8 @@ pub mod windows_exception_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = I>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -322,9 +319,8 @@ pub mod windows_exception_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
+        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = I>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
