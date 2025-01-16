@@ -10,7 +10,6 @@ use libafl_bolts::tuples::RefIndexable;
 
 use super::HasTimeout;
 use crate::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
     state::HasCorpus,

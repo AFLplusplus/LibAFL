@@ -14,7 +14,7 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::HasCurrentCorpusId,
     events::EventFirer,
     executors::{Executor, HasObservers},
     inputs::HasMutatorBytes,

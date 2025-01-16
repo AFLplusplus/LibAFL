@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 
 use super::HasTimeout;
 use crate::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     observers::{DifferentialObserversTuple, ObserversTuple},
     state::HasCorpus,

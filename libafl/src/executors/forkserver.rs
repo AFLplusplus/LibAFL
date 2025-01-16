@@ -43,7 +43,6 @@ use crate::observers::{
     get_asan_runtime_flags, get_asan_runtime_flags_with_log_path, AsanBacktraceObserver,
 };
 use crate::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
@@ -904,7 +903,7 @@ where
     }
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
-    #[expect(clippy::pedantic)]
+    #[expect(clippy::pedantic, clippy::type_complexity)]
     pub fn build_dynamic_map<A, MO, OT, I, S>(
         mut self,
         mut map_observer: A,
@@ -1679,7 +1678,7 @@ mod tests {
             .coverage_map_size(MAP_SIZE)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
-            .build::<_, NopCorpus<BytesInput>>(tuple_list!(edges_observer));
+            .build::<_, BytesInput, NopCorpus<BytesInput>>(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {

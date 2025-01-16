@@ -29,7 +29,6 @@ use super::{CanSerializeObserver, ManagerExit, NopEventManager};
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     common::HasMetadata,
-    corpus::Corpus,
     events::{
         serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
         AdaptiveSerializer, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
@@ -425,10 +424,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
-    where
-        I: Input,
-    {
+    fn forward_to_main(&mut self, event: &Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
         self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
         Ok(())

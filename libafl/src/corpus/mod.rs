@@ -1,5 +1,12 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
+use core::{cell::RefCell, fmt};
+use std::marker::PhantomData;
+
+use serde::{Deserialize, Serialize};
+
+use crate::Error;
+
 pub mod testcase;
 pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 
@@ -23,16 +30,11 @@ pub use cached::CachedOnDiskCorpus;
 
 #[cfg(all(feature = "cmin", unix))]
 pub mod minimizer;
-use core::{cell::RefCell, fmt};
-use std::marker::PhantomData;
 
 pub mod nop;
 #[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;
-use serde::{Deserialize, Serialize};
-
-use crate::Error;
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

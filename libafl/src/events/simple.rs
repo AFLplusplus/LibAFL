@@ -22,7 +22,6 @@ use super::{std_on_restart, ProgressReporter};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
-    corpus::Corpus,
     events::{
         std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
         Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,

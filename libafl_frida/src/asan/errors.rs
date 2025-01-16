@@ -13,7 +13,7 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
 use libafl::{
-    corpus::{Corpus, Testcase},
+    corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
@@ -648,16 +648,16 @@ pub struct AsanErrorsFeedback<S> {
 
 impl<S> StateInitializer<S> for AsanErrorsFeedback<S> {}
 
-impl<EM, OT, S> Feedback<EM, <S::Corpus as Corpus>::Input, OT, S> for AsanErrorsFeedback<S>
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for AsanErrorsFeedback<S>
 where
-    S: HasCorpus + Debug,
+    S: HasCorpus<I> + Debug,
     OT: MatchNameRef,
 {
     fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S::Corpus as Corpus>::Input,
+        _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
@@ -678,7 +678,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<<S::Corpus as Corpus>::Input>,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
@@ -687,11 +687,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(
-        &mut self,
-        _state: &mut S,
-        _input: &<S::Corpus as Corpus>::Input,
-    ) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }

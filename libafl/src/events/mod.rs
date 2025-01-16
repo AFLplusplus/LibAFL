@@ -45,7 +45,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    corpus::Corpus,
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,

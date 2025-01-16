@@ -1323,10 +1323,10 @@ impl<I> HasClientPerfMonitor for NopState<I> {
 
 #[cfg(test)]
 mod test {
-    use crate::{inputs::BytesInput, state::StdState};
+    use crate::state::StdState;
 
     #[test]
     fn test_std_state() {
-        StdState::nop::<BytesInput>().expect("couldn't instantiate the test state");
+        StdState::nop().expect("couldn't instantiate the test state");
     }
 }

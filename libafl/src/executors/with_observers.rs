@@ -5,7 +5,6 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::tuples::RefIndexable;
 
 use crate::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
     state::HasCorpus,

@@ -11,7 +11,6 @@ use core::{
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
 use crate::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},

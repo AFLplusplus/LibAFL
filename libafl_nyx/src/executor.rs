@@ -5,7 +5,6 @@ use std::{
 };
 
 use libafl::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
@@ -39,18 +38,18 @@ impl NyxExecutor<(), ()> {
     }
 }
 
-impl<EM, S, Z, OT> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for NyxExecutor<S, OT>
+impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for NyxExecutor<S, OT>
 where
-    S: HasCorpus + HasExecutions,
-    <S::Corpus as Corpus>::Input: HasTargetBytes,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus<I> + HasExecutions,
+    I: HasTargetBytes,
+    OT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 

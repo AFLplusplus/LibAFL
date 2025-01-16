@@ -33,7 +33,6 @@ use typed_builder::TypedBuilder;
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     common::HasMetadata,
-    corpus::Corpus,
     events::{
         launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
         std_report_progress, AdaptiveSerializer, CanSerializeObserver, Event, EventConfig,
