@@ -14,15 +14,15 @@ use crate::{
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 #[derive(Debug)]
-pub struct WithObservers<E, OT, S> {
+pub struct WithObservers<E, I, OT, S> {
     executor: E,
     observers: OT,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<E, EM, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, OT, S>
+impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, I, OT, S>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
     E: Executor<EM, I, S, Z>,
 {
     fn run_target(
@@ -36,7 +36,7 @@ where
     }
 }
 
-impl<E, OT, S> HasObservers for WithObservers<E, OT, S>
+impl<E, I, OT, S> HasObservers for WithObservers<E, I, OT, S>
 where
     S: HasCorpus<I>,
     OT: ObserversTuple<I, S>,
@@ -51,7 +51,7 @@ where
     }
 }
 
-impl<E, OT, S> WithObservers<E, OT, S> {
+impl<E, I, OT, S> WithObservers<E, I, OT, S> {
     /// Wraps the given [`Executor`] with the given [`ObserversTuple`] to implement [`HasObservers`].
     ///
     /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by

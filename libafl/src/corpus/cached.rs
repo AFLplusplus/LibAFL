@@ -96,7 +96,7 @@ where
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases.
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
         let testcase = self.inner.remove(id)?;
         self.cached_indexes.borrow_mut().retain(|e| *e != id);
         Ok(testcase)
@@ -111,7 +111,7 @@ where
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get_from_all(id)? };
         self.cache_testcase(testcase, id)?;
         Ok(testcase)
@@ -167,12 +167,12 @@ where
     }
 
     #[inline]
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         self.inner.load_input_into(testcase)
     }
 
     #[inline]
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.store_input_from(testcase)
     }
 }

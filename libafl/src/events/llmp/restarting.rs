@@ -127,10 +127,10 @@ where
     }
 }
 
-impl<EMH, I, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     I: Serialize,
-    S: HasCorpus + Serialize,
+    S: HasCorpus<I> + Serialize,
     SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
@@ -150,7 +150,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<EMH, OT, S, SP> CanSerializeObserver<OT> for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, OT, S, SP> CanSerializeObserver<OT> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
     OT: Serialize + MatchNameRef,
@@ -160,7 +160,7 @@ where
     }
 }
 
-impl<EMH, S, SP> EventRestarter<S> for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> EventRestarter<S> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
     S: Serialize + HasCurrentStageId,
@@ -186,7 +186,7 @@ where
     }
 }
 
-impl<EMH, S, SP> ManagerExit for LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> ManagerExit for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -243,13 +243,16 @@ const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
-impl<EMH, S, SP> LlmpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> LlmpRestartingEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
     S: Serialize,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
-    pub fn new(llmp_mgr: LlmpEventManager<EMH, S, SP>, staterestorer: StateRestorer<SP>) -> Self {
+    pub fn new(
+        llmp_mgr: LlmpEventManager<EMH, I, S, SP>,
+        staterestorer: StateRestorer<SP>,
+    ) -> Self {
         Self {
             llmp_mgr,
             staterestorer,
@@ -259,7 +262,7 @@ where
 
     /// Create a new runner specifying if it must save the serialized state on restart.
     pub fn with_save_state(
-        llmp_mgr: LlmpEventManager<EMH, S, SP>,
+        llmp_mgr: LlmpEventManager<EMH, I, S, SP>,
         staterestorer: StateRestorer<SP>,
         save_state: LlmpShouldSaveState,
     ) -> Self {
@@ -311,20 +314,20 @@ pub enum ManagerKind {
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[expect(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<MT, S>(
+pub fn setup_restarting_mgr_std<MT, I, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
 ) -> Result<
     (
         Option<S>,
-        LlmpRestartingEventManager<(), S, StdShMemProvider>,
+        LlmpRestartingEventManager<(), I, S, StdShMemProvider>,
     ),
     Error,
 >
 where
     MT: Monitor + Clone,
-    S: HasCorpus + Serialize + DeserializeOwned,
+    S: HasCorpus<I> + Serialize + DeserializeOwned,
     I: DeserializeOwned,
 {
     RestartingMgr::builder()
@@ -343,7 +346,7 @@ where
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 /// This one, additionally uses the timeobserver for the adaptive serialization
 #[expect(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std_adaptive<MT, S>(
+pub fn setup_restarting_mgr_std_adaptive<MT, I, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
@@ -351,13 +354,13 @@ pub fn setup_restarting_mgr_std_adaptive<MT, S>(
 ) -> Result<
     (
         Option<S>,
-        LlmpRestartingEventManager<(), S, StdShMemProvider>,
+        LlmpRestartingEventManager<(), I, S, StdShMemProvider>,
     ),
     Error,
 >
 where
     MT: Monitor + Clone,
-    S: HasCorpus + Serialize + DeserializeOwned,
+    S: HasCorpus<I> + Serialize + DeserializeOwned,
     I: DeserializeOwned,
 {
     RestartingMgr::builder()
@@ -377,7 +380,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<EMH, MT, S, SP> {
+pub struct RestartingMgr<EMH, MT, I, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
@@ -411,7 +414,7 @@ pub struct RestartingMgr<EMH, MT, S, SP> {
     #[builder(default = None)]
     time_ref: Option<Handle<TimeObserver>>,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(EMH, S)>,
+    phantom_data: PhantomData<(EMH, I, S)>,
 }
 
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
@@ -419,12 +422,14 @@ impl<EMH, MT, I, S, SP> RestartingMgr<EMH, MT, I, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     SP: ShMemProvider,
-    S: HasCorpus + Serialize + DeserializeOwned,
+    S: HasCorpus<I> + Serialize + DeserializeOwned,
     I: DeserializeOwned,
     MT: Monitor + Clone,
 {
     /// Launch the broker and the clients and fuzz
-    pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<EMH, S, SP>), Error> {
+    pub fn launch(
+        &mut self,
+    ) -> Result<(Option<S>, LlmpRestartingEventManager<EMH, I, S, SP>), Error> {
         // We start ourselves as child process to actually fuzz
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()

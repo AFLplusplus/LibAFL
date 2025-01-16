@@ -67,11 +67,10 @@ where
     }
 }
 
-impl<E, EM, I, S, SOT, Z> Executor<EM, I, I, S, Z>
-    for ShadowExecutor<E, S, SOT>
+impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
 where
     E: Executor<EM, I, S, Z> + HasObservers,
-    S: HasCorpus,
+    S: HasCorpus<I>,
     SOT: ObserversTuple<I, S>,
 {
     fn run_target(

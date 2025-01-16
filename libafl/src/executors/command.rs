@@ -279,7 +279,7 @@ where
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, I, S, T, HT = (), C = Child> {
+pub struct CommandExecutor<I, OT, S, T, HT = (), C = Child> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
@@ -306,7 +306,7 @@ impl CommandExecutor<(), (), (), ()> {
     }
 }
 
-impl<OT, I, S, T, HT, C> Debug for CommandExecutor<OT, I, S, T, HT, C>
+impl<I, OT, S, T, HT, C> Debug for CommandExecutor<I, I, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
@@ -321,7 +321,7 @@ where
     }
 }
 
-impl<OT, I, S, T, HT, C> CommandExecutor<OT, I, S, T, HT, C> {
+impl<I, OT, S, T, HT, C> CommandExecutor<I, OT, S, T, HT, C> {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.configurer
@@ -329,7 +329,7 @@ impl<OT, I, S, T, HT, C> CommandExecutor<OT, I, S, T, HT, C> {
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<OT, I, S, T> CommandExecutor<OT, I, S, T>
+impl<I, OT, S, T> CommandExecutor<I, OT, I, S, T>
 where
     S: HasExecutions + HasCorpus,
     T: CommandConfigurator<I> + Debug,
@@ -385,7 +385,7 @@ where
     }
 }
 
-impl<EM, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<OT, S, T>
+impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T>
 where
     S: HasExecutions + HasCorpus,
     T: CommandConfigurator<I> + Debug,
@@ -403,7 +403,7 @@ where
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> HasTimeout for CommandExecutor<I, OT, S, T>
 where
     S: HasCorpus,
     T: CommandConfigurator<I>,
@@ -420,12 +420,12 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<EM, OT, I, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<OT, S, T, HT, Pid>
+impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T, HT, Pid>
 where
+    HT: ExecutorHooksTuple<I, S>,
+    OT: MatchName + ObserversTuple<I, S>,
     S: HasCorpus + HasExecutions,
     T: CommandConfigurator<I, Pid> + Debug,
-    OT: MatchName + ObserversTuple<I, S>,
-    HT: ExecutorHooksTuple<I, S>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -495,9 +495,9 @@ where
     }
 }
 
-impl<OT, I, S, T, HT, C> HasObservers for CommandExecutor<OT, I, S, T, HT, C>
+impl<I, OT, S, T, HT, C> HasObservers for CommandExecutor<I, OT, S, T, HT, C>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
     OT: ObserversTuple<I, S>,
 {
     type Observers = OT;
@@ -676,10 +676,10 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<OT, S>(
+    pub fn build<I, OT, S>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
+    ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
     where
         S: HasCorpus,
         I: HasTargetBytes,
@@ -812,7 +812,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, I, S, Self, (), C> {
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<I, OT, S, Self, (), C> {
         CommandExecutor {
             configurer: self,
             observers,
@@ -826,7 +826,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
         self,
         observers: OT,
         hooks: HT,
-    ) -> CommandExecutor<OT, I, S, Self, HT, C> {
+    ) -> CommandExecutor<I, OT, S, Self, HT, C> {
         CommandExecutor {
             configurer: self,
             observers,

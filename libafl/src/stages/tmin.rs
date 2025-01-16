@@ -388,12 +388,12 @@ where
 
 /// A feedback factory for ensuring that the maps for minimized inputs are the same
 #[derive(Debug, Clone)]
-pub struct MapEqualityFactory<C, M, S> {
+pub struct MapEqualityFactory<C, I, M, S> {
     map_ref: Handle<C>,
-    phantom: PhantomData<(C, M, S)>,
+    phantom: PhantomData<(C, I, M, S)>,
 }
 
-impl<C, M, S> MapEqualityFactory<C, M, S>
+impl<C, I, M, S> MapEqualityFactory<C, I, M, S>
 where
     M: MapObserver,
     C: AsRef<M> + Handled,
@@ -407,7 +407,7 @@ where
     }
 }
 
-impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
+impl<C, I, M, S> HasObserverHandle for MapEqualityFactory<C, I, M, S> {
     type Observer = C;
 
     fn observer_handle(&self) -> &Handle<C> {
@@ -415,7 +415,8 @@ impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
     }
 }
 
-impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqualityFactory<C, M, S>
+impl<C, I, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT>
+    for MapEqualityFactory<C, I, M, S>
 where
     M: MapObserver,
     C: AsRef<M> + Handled,

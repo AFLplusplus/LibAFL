@@ -79,32 +79,6 @@ where
 {
 }
 
-/// The trait that implements the very standard capability of a state.
-/// This state contains important information about the current run
-/// and can be used to restart the fuzzing process at any time.
-///
-/// This [`State`] is here for documentation purpose.
-/// You should *NOT* implement this trait for any of your struct,
-/// but when you implement your customized state, you can look at this trait to see what would be needed.
-#[allow(dead_code)]
-trait State:
-    Serialize
-    + DeserializeOwned
-    + MaybeHasClientPerfMonitor
-    + HasCurrentCorpusId
-    + HasCurrentStageId
-    + Stoppable
-{
-}
-
-impl<I, C, R, SC> State for StdState<I, C, R, SC>
-where
-    C: Serialize + DeserializeOwned,
-    R: Rand,
-    SC: Serialize + DeserializeOwned,
-{
-}
-
 // Reflexivity
 impl<I, C> HasCorpus<I> for C
 where

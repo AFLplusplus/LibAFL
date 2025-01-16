@@ -45,7 +45,7 @@ pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 #[derive(Clone, Debug)]
 pub struct StdMutationalPushStage<EM, M, I, OT, S, Z>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
     I: Clone + Debug,
 {
     current_corpus_id: Option<CorpusId>,

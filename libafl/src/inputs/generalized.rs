@@ -130,4 +130,7 @@ where
     }
 }
 
-impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata where S: HasCorpus<GeneralizedInputMetadata> {}
+impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata where
+    S: HasCorpus<GeneralizedInputMetadata>
+{
+}

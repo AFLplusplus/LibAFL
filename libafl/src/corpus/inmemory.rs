@@ -358,7 +358,7 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
         let mut testcase = self.storage.enabled.remove(id);
         if testcase.is_none() {
             testcase = self.storage.disabled.remove(id);
@@ -378,7 +378,7 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let mut testcase = self.storage.enabled.get(id);
         if testcase.is_none() {
             testcase = self.storage.disabled.get(id);
@@ -441,13 +441,13 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     }
 
     #[inline]
-    fn load_input_into(&self, _: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, _: &mut Testcase<I>) -> Result<(), Error> {
         // Inputs never get evicted, nothing to load here.
         Ok(())
     }
 
     #[inline]
-    fn store_input_from(&self, _: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, _: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 }

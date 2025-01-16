@@ -313,7 +313,11 @@ where
     I: Input,
     OF: Feedback<EM, I, OT, S>,
     OT: ObserversTuple<I, S> + Serialize,
-    S: HasCorpus<I> + MaybeHasClientPerfMonitor + HasCurrentTestcase<I> + HasSolutions<I> + HasLastFoundTime,
+    S: HasCorpus<I>
+        + MaybeHasClientPerfMonitor
+        + HasCurrentTestcase<I>
+        + HasSolutions<I>
+        + HasLastFoundTime,
 {
     fn check_results(
         &mut self,

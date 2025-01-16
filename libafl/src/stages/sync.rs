@@ -60,7 +60,7 @@ pub struct SyncFromDiskStage<CB, E, EM, I, S, Z> {
     phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<CB, E, EM, S, Z> Named for SyncFromDiskStage<CB, E, EM, S, Z> {
+impl<CB, E, EM, I, S, Z> Named for SyncFromDiskStage<CB, E, EM, I, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -77,6 +77,18 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: Needs proper crash handling for when an imported testcase crashes
+        // For now, Make sure we don't get stuck crashing on this testcase
+        RetryCountRestartHelper::no_retry(state, &self.name)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
+    }
+
     #[inline]
     fn perform(
         &mut self,
@@ -136,21 +148,9 @@ where
 
         Ok(())
     }
-
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: Needs proper crash handling for when an imported testcase crashes
-        // For now, Make sure we don't get stuck crashing on this testcase
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
 }
 
-impl<CB, E, EM, S, Z> SyncFromDiskStage<CB, E, EM, S, Z> {
+impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
     pub fn new(sync_dirs: Vec<PathBuf>, load_callback: CB, interval: Duration, name: &str) -> Self {
@@ -167,7 +167,7 @@ impl<CB, E, EM, S, Z> SyncFromDiskStage<CB, E, EM, S, Z> {
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
 pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
 
-impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<S, Z>, E, EM, I, S, Z>
+impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
     I: Input,
     S: HasCorpus<I>,
@@ -176,9 +176,10 @@ where
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dirs: Vec<PathBuf>, interval: Duration) -> Self {
-        fn load_callback<S: HasCorpus<I>, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error>
+        fn load_callback<I, S, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error>
         where
             I: Input,
+            S: HasCorpus<I>,
         {
             Input::from_file(p)
         }
@@ -186,7 +187,7 @@ where
             interval,
             name: Cow::Borrowed(SYNC_FROM_DISK_STAGE_NAME),
             sync_dirs,
-            load_callback: load_callback::<_, _>,
+            load_callback: load_callback::<_, _, _>,
             phantom: PhantomData,
         }
     }
@@ -235,6 +236,18 @@ where
     SP: ShMemProvider,
     Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
+    #[inline]
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
+        // No restart handling needed - does not execute the target.
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
+        // Not needed - does not execute the target.
+        Ok(())
+    }
+
     #[inline]
     fn perform(
         &mut self,
@@ -292,27 +305,15 @@ where
         state.introspection_monitor_mut().finish_stage();
         Ok(())
     }
-
-    #[inline]
-    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
-        // No restart handling needed - does not execute the target.
-        Ok(true)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
-        // Not needed - does not execute the target.
-        Ok(())
-    }
 }
 
-impl<IC, ICB, S, SP> SyncFromBrokerStage<IC, ICB, S, SP>
+impl<I, IC, ICB, S, SP> SyncFromBrokerStage<I, IC, ICB, S, SP>
 where
     SP: ShMemProvider,
 {
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
-    pub fn new(client: LlmpEventConverter<IC, ICB, S, SP>) -> Self {
+    pub fn new(client: LlmpEventConverter<I, IC, ICB, S, SP>) -> Self {
         Self { client }
     }
 }

@@ -345,8 +345,7 @@ where
     }
 }
 
-impl<I, IC, ICB, S, SP> EventFirer<I, S>
-    for LlmpEventConverter<I, IC, ICB, S, SP>
+impl<I, IC, ICB, S, SP> EventFirer<I, S> for LlmpEventConverter<I, IC, ICB, S, SP>
 where
     IC: InputConverter<From = I>,
     S: HasCorpus<I>,
@@ -362,11 +361,7 @@ where
     }
 
     #[cfg(feature = "llmp_compression")]
-    fn fire(
-        &mut self,
-        _state: &mut S,
-        event: Event<I>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }
@@ -418,11 +413,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(
-        &mut self,
-        _state: &mut S,
-        event: Event<I>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         if self.converter.is_none() {
             return Ok(());
         }

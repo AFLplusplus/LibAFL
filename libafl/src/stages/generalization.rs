@@ -48,10 +48,10 @@ pub static GENERALIZATION_STAGE_NAME: &str = "generalization";
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct GeneralizationStage<C, EM, O, OT, S, Z> {
+pub struct GeneralizationStage<C, EM, I, O, OT, S, Z> {
     name: Cow<'static, str>,
     map_observer_handle: Handle<C>,
-    phantom: PhantomData<(EM, O, OT, S, Z)>,
+    phantom: PhantomData<(EM, I, O, OT, S, Z)>,
 }
 
 impl<C, EM, O, OT, S, Z> Named for GeneralizationStage<C, EM, O, OT, S, Z> {
@@ -60,7 +60,8 @@ impl<C, EM, O, OT, S, Z> Named for GeneralizationStage<C, EM, O, OT, S, Z> {
     }
 }
 
-impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<C, EM, O, E::Observers, S, Z>
+impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z>
+    for GeneralizationStage<C, EM, BytesInput, O, E::Observers, S, Z>
 where
     C: CanTrack + AsRef<O> + Named,
     E: Executor<EM, BytesInput, S, Z> + HasObservers,
@@ -367,7 +368,7 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers,
+        E: Executor<EM, BytesInput, S, Z> + HasObservers,
         E::Observers: ObserversTuple<BytesInput, S>,
     {
         start_timer!(state);
@@ -409,7 +410,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+        E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -447,7 +448,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+        E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
     {
         let mut index = 0;
         while index < payload.len() {

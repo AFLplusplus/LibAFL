@@ -180,7 +180,7 @@ where
         self.inner.nth_from_all(nth)
     }
 
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         if testcase.input_mut().is_none() {
             let Some(file_path) = testcase.file_path().as_ref() else {
                 return Err(Error::illegal_argument(
@@ -193,7 +193,7 @@ where
         Ok(())
     }
 
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         // Store the input to disk
         let Some(file_path) = testcase.file_path() else {
             return Err(Error::illegal_argument(

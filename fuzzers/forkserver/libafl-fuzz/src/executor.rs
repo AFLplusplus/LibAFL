@@ -259,8 +259,7 @@ pub enum SupportedExecutors<S, OT, FSV, NYX> {
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX, EM, Z> Executor<EM, I, S, Z>
-    for SupportedExecutors<S, OT, FSV, NYX>
+impl<S, OT, FSV, NYX, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<S, OT, FSV, NYX>
 where
     S: HasCorpus,
     NYX: Executor<EM, I, S, Z>,
@@ -335,8 +334,7 @@ pub enum SupportedExecutors<S, OT, FSV> {
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV, EM, Z> Executor<EM, I, S, Z>
-    for SupportedExecutors<S, OT, FSV>
+impl<S, OT, FSV, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<S, OT, FSV>
 where
     S: HasCorpus,
     FSV: Executor<EM, I, S, Z>,

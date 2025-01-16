@@ -2,7 +2,7 @@
 //!
 //! It _never_ keeps any of them in memory.
 //! This is a good solution for solutions that are never reused, or for *very* memory-constraint environments.
-//! For any other occasions, consider using [`crate::corpus::CachedOnDiskCorpus`]
+//! For any other occasions, consider using [`CachedOnDiskCorpus`]
 //! which stores a certain number of [`Testcase`]s in memory and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
@@ -163,12 +163,12 @@ where
     }
 
     #[inline]
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         self.inner.load_input_into(testcase)
     }
 
     #[inline]
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.store_input_from(testcase)
     }
 }

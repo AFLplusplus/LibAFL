@@ -210,7 +210,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
 }
 
 #[cfg(feature = "std")]
-impl<EMH, OT, S, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, OT, S, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
     OT: Serialize + MatchNameRef,

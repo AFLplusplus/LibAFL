@@ -120,12 +120,12 @@ impl<I> Corpus<I> for NopCorpus<I> {
     }
 
     #[inline]
-    fn load_input_into(&self, _testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     #[inline]
-    fn store_input_from(&self, _testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 }
