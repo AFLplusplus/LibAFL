@@ -128,7 +128,7 @@ mod observers {
 
     /// The [`CountersMultiMapObserver`] observes all the counters that may be set by
     /// `SanitizerCoverage` in [`super::COUNTERS_MAPS`]
-    #[derive(Serialize, Deserialize, Debug, Hash)]
+    #[derive(Serialize, Deserialize, Debug)]
     #[expect(clippy::unsafe_derive_deserialize)]
     pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool> {
         intervals: IntervalTree<usize, usize>,
