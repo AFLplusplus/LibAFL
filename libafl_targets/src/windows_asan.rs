@@ -1,7 +1,6 @@
 //! Setup asan death callbback
 
 use libafl::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
