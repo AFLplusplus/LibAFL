@@ -10,8 +10,7 @@ use core::{
 use std::{
     ffi::{c_void, CString},
     fmt::{Display, Formatter},
-    intrinsics::{copy_nonoverlapping, transmute},
-    mem::MaybeUninit,
+    mem::{MaybeUninit, copy_nonoverlapping, transmute},
     ops::Range,
     pin::Pin,
     sync::OnceLock,

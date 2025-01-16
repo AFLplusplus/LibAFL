@@ -7,7 +7,6 @@ use libafl::{
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackFactory, StateInitializer},
-    state::HasCorpus,
 };
 use libafl_bolts::{Error, Named};
 use serde::{Deserialize, Serialize};

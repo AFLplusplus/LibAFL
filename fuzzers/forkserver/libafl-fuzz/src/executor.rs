@@ -6,7 +6,6 @@ use std::{
 };
 
 use libafl::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     state::HasCorpus,
     Error,

@@ -1,6 +1,6 @@
 use libafl::{
     events::{Event, EventManagerHook},
-    state::{HasCorpus, Stoppable},
+    state::Stoppable,
     Error,
 };
 use libafl_bolts::ClientId;

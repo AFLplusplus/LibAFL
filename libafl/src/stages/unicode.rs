@@ -112,16 +112,6 @@ impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage<BytesInput, 
 where
     S: HasCorpus<BytesInput> + HasCurrentTestcase<BytesInput>,
 {
-    fn perform(
-        &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        state: &mut S,
-        _manager: &mut EM,
-    ) -> Result<(), Error> {
-        UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
-    }
-
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Stage does not run the target. No reset helper needed.
@@ -132,5 +122,15 @@ where
     fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Stage does not run the target. No reset helper needed.
         Ok(())
+    }
+
+    fn perform(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut S,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
     }
 }
