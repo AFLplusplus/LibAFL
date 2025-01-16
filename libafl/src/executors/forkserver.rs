@@ -44,7 +44,7 @@ use crate::observers::{
 };
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{BytesInput, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
     state::{HasCorpus, HasExecutions},
