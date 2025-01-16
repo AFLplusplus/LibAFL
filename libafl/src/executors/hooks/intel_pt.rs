@@ -1,11 +1,12 @@
+use alloc::rc::Rc;
 use core::fmt::Debug;
 use std::{
-    ptr::slice_from_raw_parts_mut,
     string::{String, ToString},
+    vec::Vec,
 };
 
 use libafl_intelpt::{error_from_pt_error, IntelPT};
-use libipt::{Asid, Image, SectionCache};
+use libipt::{Image, SectionCache};
 use num_traits::SaturatingAdd;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
@@ -31,7 +32,7 @@ pub struct IntelPTHook<T> {
     #[builder(default = IntelPT::builder().build().unwrap())]
     intel_pt: IntelPT,
     #[builder(setter(transform = |sections: &[Section]| sections_to_image(sections).unwrap()))]
-    image: (Image<'static>, SectionCache<'static>),
+    image: Image,
     map_ptr: *mut T,
     map_len: usize,
 }
@@ -52,7 +53,7 @@ where
         pt.disable_tracing().unwrap();
 
         let _ = pt
-            .decode_traces_into_map(&mut self.image.0, self.map_ptr, self.map_len)
+            .decode_traces_into_map(&mut self.image, self.map_ptr, self.map_len)
             .inspect_err(|e| log::warn!("Intel PT trace decoding failed: {e}"));
         #[cfg(feature = "intel_pt_export_raw")]
         {
@@ -65,32 +66,29 @@ where
 
 // It would be nice to have this as a `TryFrom<IntoIter<Section>>`, but Rust's orphan rule doesn't
 // like this (and `TryFromIter` is not a thing atm)
-fn sections_to_image(
-    sections: &[Section],
-) -> Result<(Image<'static>, SectionCache<'static>), Error> {
+fn sections_to_image(sections: &[Section]) -> Result<Image, Error> {
     let mut image_cache = SectionCache::new(Some("image_cache")).map_err(error_from_pt_error)?;
     let mut image = Image::new(Some("image")).map_err(error_from_pt_error)?;
 
+    let mut isids = Vec::with_capacity(sections.len());
     for s in sections {
         let isid = image_cache.add_file(&s.file_path, s.file_offset, s.size, s.virtual_address);
-        if let Err(e) = isid {
-            log::warn!(
+        match isid {
+            Err(e) => log::warn!(
                 "Error while caching {} {} - skipped",
                 s.file_path,
                 e.to_string()
-            );
-            continue;
-        }
-
-        if let Err(e) = image.add_cached(&mut image_cache, isid.unwrap(), Asid::default()) {
-            log::warn!(
-                "Error while adding cache to image {} {} - skipped",
-                s.file_path,
-                e.to_string()
-            );
-            continue;
+            ),
+            Ok(id) => isids.push(id),
         }
     }
 
-    Ok((image, image_cache))
+    let rc_cache = Rc::new(image_cache);
+    for isid in isids {
+        if let Err(e) = image.add_cached(rc_cache.clone(), isid, None) {
+            log::warn!("Error while adding cache to image {}", e.to_string());
+        }
+    }
+
+    Ok(image)
 }
