@@ -237,12 +237,12 @@ where
     #[cfg(all(unix, feature = "fork"))]
     pub fn launch_with_hooks<EMH, I, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
-        S: DeserializeOwned + HasCorpus + Serialize,
+        S: DeserializeOwned + HasCorpus<I> + Serialize,
         I: DeserializeOwned,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, S, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
     {
@@ -314,7 +314,7 @@ where
                                 ClientDescription::new(index, overcommit_id, bind_to);
 
                             // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                            let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
+                            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                                 .shmem_provider(self.shmem_provider.clone())
                                 .broker_port(self.broker_port)
                                 .kind(ManagerKind::Client {
@@ -341,7 +341,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            let builder = RestartingMgr::<EMH, MT, S, SP>::builder()
+            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -633,23 +633,23 @@ where
     /// Launch a standard Centralized-based fuzzer
     pub fn launch<I, S>(&mut self) -> Result<(), Error>
     where
-        S: DeserializeOwned + HasCorpus + Serialize,
+        S: DeserializeOwned + HasCorpus<I> + Serialize,
         I: DeserializeOwned + Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SP>, (), I, S, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<S, SP>, (), S, SP>,
+            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SP>, (), I, S, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
     {
         let restarting_mgr_builder =
             |centralized_launcher: &Self, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                let builder = RestartingMgr::<(), MT, S, SP>::builder()
+                let builder = RestartingMgr::<(), I, MT, S, SP>::builder()
                     .shmem_provider(centralized_launcher.shmem_provider.clone())
                     .broker_port(centralized_launcher.broker_port)
                     .kind(ManagerKind::Client { client_description })
@@ -681,17 +681,17 @@ where
         secondary_inner_mgr_builder: EMB,
     ) -> Result<(), Error>
     where
-        S: HasCorpus,
+        S: HasCorpus<I>,
         I: Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), S, SP>,
+            CentralizedEventManager<EM, (), I, S, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMB: FnOnce(&Self, ClientDescription) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), S, SP>, // No broker_hooks for centralized EM
+            CentralizedEventManager<EM, (), I, S, SP>, // No broker_hooks for centralized EM
             ClientDescription,
         ) -> Result<(), Error>,
     {

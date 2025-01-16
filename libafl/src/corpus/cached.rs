@@ -12,6 +12,7 @@ use crate::{
         HasTestcase, Testcase,
     },
     inputs::Input,
+    state::HasCorpus,
     Error,
 };
 
@@ -55,6 +56,23 @@ where
         Ok(())
     }
 }
+
+// Reflexivity
+impl<I> HasCorpus<I> for CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
+    type Corpus = Self;
+
+    fn corpus(&self) -> &Self::Corpus {
+        self
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        self
+    }
+}
+
 impl<I> Corpus<I> for CachedOnDiskCorpus<I>
 where
     I: Input,

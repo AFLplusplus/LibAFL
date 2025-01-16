@@ -1490,7 +1490,7 @@ pub struct SpliceMutator;
 
 impl<I, S> Mutator<I, S> for SpliceMutator
 where
-    S: HasCorpus + HasRand,
+    S: HasCorpus<I> + HasRand,
     I: HasMutatorBytes,
 {
     #[expect(clippy::cast_sign_loss)]

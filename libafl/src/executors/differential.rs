@@ -69,7 +69,7 @@ where
     <A as HasObservers>::Observers: ObserversTuple<I, S>,
     <B as HasObservers>::Observers: ObserversTuple<I, S>,
     DOT: DifferentialObserversTuple<A::Observers, B::Observers, I, S> + MatchName,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     fn run_target(
         &mut self,
@@ -239,7 +239,7 @@ where
     DOT: DifferentialObserversTuple<OTA, OTB, I, S> + MatchName,
     OTA: ObserversTuple<I, S>,
     OTB: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     type Observers = ProxyObserversTuple<OTA, OTB, DOT>;
 

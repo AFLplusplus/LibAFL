@@ -77,7 +77,7 @@ where
 impl<EM, H, HB, HT, I, OT, S, Z> Executor<EM, I, S, Z>
     for GenericInProcessExecutor<H, HB, HT, I, OT, S>
 where
-    S: HasCorpus + HasExecutions,
+    S: HasCorpus<I> + HasExecutions,
     OT: ObserversTuple<I, S>,
     HT: ExecutorHooksTuple<I, S>,
     HB: BorrowMut<H>,

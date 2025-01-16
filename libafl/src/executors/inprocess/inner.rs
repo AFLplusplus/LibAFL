@@ -69,7 +69,7 @@ impl<HT, I, OT, S> HasObservers for GenericInProcessExecutorInner<HT, I, OT, S> 
 impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
 where
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     /// This function marks the boundary between the fuzzer and the target
     ///
@@ -132,7 +132,7 @@ impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus + HasExecutions + HasSolutions,
+    S: HasCorpus<I> + HasExecutions + HasSolutions<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<E, EM, OF, Z>(

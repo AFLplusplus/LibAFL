@@ -236,13 +236,13 @@ where
     }
 }
 
-impl<CS, F, M, O> MinimizerScheduler<CS, F, M, O>
+impl<CS, F, I, M, O> MinimizerScheduler<CS, F, I, M, O>
 where
     M: for<'a> AsIter<'a, Item = usize> + SerdeAny + HasRefCnt,
 {
     /// Update the [`Corpus`] score using the [`MinimizerScheduler`]
     #[expect(clippy::cast_possible_wrap)]
-    pub fn update_score<I, S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
+    pub fn update_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
         F: TestcaseScore<I, S>,
         S: HasCorpus<I> + HasMetadata,
@@ -319,7 +319,7 @@ where
     }
 
     /// Cull the [`Corpus`] using the [`MinimizerScheduler`]
-    pub fn cull<I, S>(&self, state: &S) -> Result<(), Error>
+    pub fn cull<S>(&self, state: &S) -> Result<(), Error>
     where
         S: HasCorpus<I> + HasMetadata,
     {
@@ -349,7 +349,7 @@ where
         Ok(())
     }
 }
-impl<CS, F, M, O> HasQueueCycles for MinimizerScheduler<CS, F, M, O>
+impl<CS, F, I, M, O> HasQueueCycles for MinimizerScheduler<CS, F, I, M, O>
 where
     CS: HasQueueCycles,
 {
@@ -357,7 +357,7 @@ where
         self.base.queue_cycles()
     }
 }
-impl<CS, F, M, O> MinimizerScheduler<CS, F, M, O>
+impl<CS, F, I, M, O> MinimizerScheduler<CS, F, I, M, O>
 where
     O: CanTrack,
 {

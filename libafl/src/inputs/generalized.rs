@@ -107,7 +107,7 @@ impl GeneralizedInputMetadata {
 
 impl<S> MutatedTransform<BytesInput, S> for GeneralizedInputMetadata
 where
-    S: HasCorpus<BytesInput>,
+    S: HasCorpus<GeneralizedInputMetadata>,
 {
     type Post = Self;
 

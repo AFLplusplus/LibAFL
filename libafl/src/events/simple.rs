@@ -145,9 +145,8 @@ where
         + HasExecutions
         + HasLastReportTime
         + Stoppable
-        + HasCorpus
+        + HasCorpus<I>
         + MaybeHasClientPerfMonitor,
-    S::Corpus: Corpus<Input = I>,
 {
     fn maybe_report_progress(
         &mut self,
@@ -387,9 +386,8 @@ where
         + HasMetadata
         + HasLastReportTime
         + Stoppable
-        + HasCorpus
+        + HasCorpus<I>
         + MaybeHasClientPerfMonitor,
-    S::Corpus: Corpus<Input = I>,
 {
     fn maybe_report_progress(
         &mut self,
@@ -435,7 +433,7 @@ where
     /// but can still used shared maps to recover from crashes and timeouts.
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
-        S: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
+        S: DeserializeOwned + Serialize + HasCorpus<I> + HasSolutions<I>,
         MT: Debug,
     {
         // We start ourself as child process to actually fuzz

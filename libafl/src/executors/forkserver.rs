@@ -662,7 +662,7 @@ impl ForkserverExecutor<(), (), (), UnixShMemProvider, ()> {
 impl<I, OT, S, SP, TC> ForkserverExecutor<I, OT, S, SP, TC>
 where
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
+    S: HasCorpus<I>,
     SP: ShMemProvider,
     TC: TargetBytesConverter,
 {
@@ -842,13 +842,13 @@ where
     pub fn build<OT, I, S>(
         mut self,
         observers: OT,
-    ) -> Result<ForkserverExecutor<TC, OT, I, S, SP>, Error>
+    ) -> Result<ForkserverExecutor<I, OT, S, SP, TC>, Error>
     where
-        OT: ObserversTuple<I, S>,
-        S: HasCorpus,
         I: Input,
-        TC: TargetBytesConverter,
+        OT: ObserversTuple<I, S>,
+        S: HasCorpus<I>,
         SP: ShMemProvider,
+        TC: TargetBytesConverter,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
@@ -909,13 +909,13 @@ where
         mut self,
         mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<TC, (A, OT), I, S, SP>, Error>
+    ) -> Result<ForkserverExecutor<I, (A, OT), S, SP, TC>, Error>
     where
-        MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         A: Observer<I, S> + AsMut<MO>,
-        OT: ObserversTuple<I, S> + Prepend<MO>,
         I: Input + HasTargetBytes,
-        S: HasCorpus,
+        MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
+        OT: ObserversTuple<I, S> + Prepend<MO>,
+        S: HasCorpus<I>,
         SP: ShMemProvider,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
@@ -1582,11 +1582,11 @@ impl Default
     }
 }
 
-impl<EM, TC, OT, I, S, SP, Z> Executor<EM, I, S, Z> for ForkserverExecutor<TC, OT, I, S, SP>
+impl<EM, I, OT, S, SP, TC, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SP, TC>
 where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
-    S: HasCorpus + HasExecutions,
+    S: HasCorpus<I> + HasExecutions,
     TC: TargetBytesConverter<Input = I>,
 {
     #[inline]
@@ -1616,7 +1616,7 @@ where
     }
 }
 
-impl<TC, OT, I, S, SP> HasObservers for ForkserverExecutor<TC, OT, I, S, SP>
+impl<I, OT, S, SP, TC> HasObservers for ForkserverExecutor<I, OT, S, SP, TC>
 where
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I>,

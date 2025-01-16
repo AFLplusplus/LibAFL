@@ -30,7 +30,7 @@ pub struct VerifyTimeoutsStage<E, I, S> {
     phantom: PhantomData<(E, I, S)>,
 }
 
-impl<E, S> VerifyTimeoutsStage<E, S> {
+impl<E, I, S> VerifyTimeoutsStage<E, I, S> {
     /// Create a `VerifyTimeoutsStage`
     pub fn new(capture_timeouts: Rc<RefCell<bool>>, configured_timeout: Duration) -> Self {
         Self {

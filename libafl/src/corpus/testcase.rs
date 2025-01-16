@@ -81,7 +81,7 @@ impl<I> HasMetadata for Testcase<I> {
 /// Impl of a testcase
 impl<I> Testcase<I> {
     /// Returns this [`Testcase`] with a loaded `Input`]
-    pub fn load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
+    pub fn load_input<C: Corpus<I>>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
         Ok(self.input.as_ref().unwrap())
     }
@@ -352,7 +352,7 @@ where
     }
 
     /// Get the `len` or calculate it, if not yet calculated.
-    pub fn load_len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
+    pub fn load_len<C: Corpus<I>>(&mut self, corpus: &C) -> Result<usize, Error> {
         match &self.input {
             Some(i) => {
                 let l = i.len();

@@ -43,7 +43,7 @@ pub struct PushStageSharedState<EM, I, OT, S, Z> {
     pub fuzzer: Z,
     /// The event manager
     pub event_mgr: EM,
-    /// The [`crate::observers::ObserversTuple`]
+    /// The [`ObserversTuple`]
     pub observers: OT,
     phantom: PhantomData<I>,
 }
@@ -237,7 +237,7 @@ static mut PUSH_STAGE_ADAPTER_ID: usize = 0;
 /// The name for push stage adapter
 pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 
-impl<CS, EM, OT, PS, Z> Named for PushStageAdapter<CS, EM, OT, PS, Z> {
+impl<CS, EM, I, OT, PS, Z> Named for PushStageAdapter<CS, EM, I, OT, PS, Z> {
     #[must_use]
     fn name(&self) -> &Cow<'static, str> {
         &self.name
@@ -263,6 +263,17 @@ where
         + EvaluatorObservers<E, EM, I, OT>
         + HasScheduler<I, S>,
 {
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: Proper restart handling - call post_exec at the right time, etc...
+        RetryCountRestartHelper::no_retry(state, &self.name)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
+    }
+
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -305,16 +316,5 @@ where
 
         self.push_stage
             .deinit(fuzzer, state, event_mgr, &mut *executor.observers_mut())
-    }
-
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: Proper restart handling - call post_exec at the right time, etc...
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }

@@ -160,7 +160,7 @@ impl<E, EM, I, SOT, S, Z> Named for ShadowTracingStage<E, EM, I, SOT, S, Z> {
     }
 }
 
-impl<E, EM, I, SOT, S, Z> Stage<ShadowExecutor<E, S, SOT>, EM, S, Z>
+impl<E, EM, I, SOT, S, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
     for ShadowTracingStage<E, EM, I, SOT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers,
@@ -174,11 +174,19 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        RetryCountRestartHelper::no_retry(state, &self.name)
+    }
+
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
+    }
+
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        executor: &mut ShadowExecutor<E, S, SOT>,
+        executor: &mut ShadowExecutor<E, I, S, SOT>,
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
@@ -209,14 +217,6 @@ where
 
         Ok(())
     }
-
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
 }
 
 impl<E, EM, I, SOT, S, Z> ShadowTracingStage<E, EM, I, SOT, S, Z>
@@ -226,7 +226,7 @@ where
     SOT: ObserversTuple<I, S>,
 {
     /// Creates a new default stage
-    pub fn new(_executor: &mut ShadowExecutor<E, S, SOT>) -> Self {
+    pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
         let stage_id = unsafe {
             let ret = SHADOW_TRACING_STAGE_ID;

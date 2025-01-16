@@ -306,7 +306,7 @@ impl CommandExecutor<(), (), (), ()> {
     }
 }
 
-impl<I, OT, S, T, HT, C> Debug for CommandExecutor<I, I, S, T, HT, C>
+impl<I, OT, S, T, HT, C> Debug for CommandExecutor<I, OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
@@ -329,9 +329,9 @@ impl<I, OT, S, T, HT, C> CommandExecutor<I, OT, S, T, HT, C> {
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<I, OT, S, T> CommandExecutor<I, OT, I, S, T>
+impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
 where
-    S: HasExecutions + HasCorpus,
+    S: HasExecutions + HasCorpus<I>,
     T: CommandConfigurator<I> + Debug,
     OT: ObserversTuple<I, S>,
 {
@@ -387,7 +387,7 @@ where
 
 impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T>
 where
-    S: HasExecutions + HasCorpus,
+    S: HasExecutions + HasCorpus<I>,
     T: CommandConfigurator<I> + Debug,
     OT: MatchName + ObserversTuple<I, S>,
 {
@@ -405,7 +405,7 @@ where
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 impl<I, OT, S, T> HasTimeout for CommandExecutor<I, OT, S, T>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
     T: CommandConfigurator<I>,
 {
     #[inline]
@@ -424,7 +424,7 @@ impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S,
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: MatchName + ObserversTuple<I, S>,
-    S: HasCorpus + HasExecutions,
+    S: HasCorpus<I> + HasExecutions,
     T: CommandConfigurator<I, Pid> + Debug,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
@@ -681,7 +681,7 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
     where
-        S: HasCorpus,
+        S: HasCorpus<I>,
         I: HasTargetBytes,
         OT: MatchName + ObserversTuple<I, S>,
     {

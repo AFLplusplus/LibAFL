@@ -214,8 +214,8 @@ where
     I: DeserializeOwned + Input,
     S::Corpus: Serialize,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<LlmpEventManager<EMH, S, SP>, I, E::Observers, S>
-        + EvaluatorObservers<E, LlmpEventManager<EMH, S, SP>, I, S>,
+    Z: ExecutionProcessor<LlmpEventManager<EMH, I, S, SP>, I, E::Observers, S>
+        + EvaluatorObservers<E, LlmpEventManager<EMH, I, S, SP>, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         let res = self.llmp_mgr.process(fuzzer, state, executor)?;
@@ -314,7 +314,7 @@ pub enum ManagerKind {
 /// The restarting mgr is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[expect(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<MT, I, S>(
+pub fn setup_restarting_mgr_std<I, MT, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
@@ -346,7 +346,7 @@ where
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 /// This one, additionally uses the timeobserver for the adaptive serialization
 #[expect(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std_adaptive<MT, I, S>(
+pub fn setup_restarting_mgr_std_adaptive<I, MT, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
@@ -380,7 +380,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<EMH, MT, I, S, SP> {
+pub struct RestartingMgr<EMH, I, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
@@ -418,7 +418,7 @@ pub struct RestartingMgr<EMH, MT, I, S, SP> {
 }
 
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
-impl<EMH, MT, I, S, SP> RestartingMgr<EMH, MT, I, S, SP>
+impl<EMH, I, MT, S, SP> RestartingMgr<EMH, I, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     SP: ShMemProvider,

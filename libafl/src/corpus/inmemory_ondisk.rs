@@ -25,6 +25,7 @@ use super::{
 use crate::{
     corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
     inputs::Input,
+    state::HasCorpus,
     Error, HasMetadata,
 };
 
@@ -57,6 +58,21 @@ pub struct InMemoryOnDiskCorpus<I> {
     meta_format: Option<OnDiskMetadataFormat>,
     prefix: Option<String>,
     locking: bool,
+}
+
+impl<I> HasCorpus<I> for InMemoryOnDiskCorpus<I>
+where
+    I: Input,
+{
+    type Corpus = Self;
+
+    fn corpus(&self) -> &Self::Corpus {
+        self
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        self
+    }
 }
 
 impl<I> Corpus<I> for InMemoryOnDiskCorpus<I>

@@ -64,7 +64,7 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
-impl CentralizedEventManager<NopEventManager, (), NopState<NopInput>, NopShMemProvider> {
+impl CentralizedEventManager<NopEventManager, (), NopInput, NopState<NopInput>, NopShMemProvider> {
     /// Creates a builder for [`CentralizedEventManager`]
     #[must_use]
     pub fn builder() -> CentralizedEventManagerBuilder {
@@ -214,7 +214,7 @@ where
     EM: HasEventManagerId + EventFirer<I, S>,
     EMH: EventManagerHooksTuple<I, S>,
     SP: ShMemProvider,
-    S: HasCorpus + Stoppable,
+    S: HasCorpus<I> + Stoppable,
     I: Input,
 {
     fn should_send(&self) -> bool {
@@ -317,7 +317,7 @@ where
     E::Observers: DeserializeOwned,
     EM: EventProcessor<E, S, Z> + HasEventManagerId + EventFirer<I, S>,
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasCorpus + Stoppable,
+    S: HasCorpus<I> + Stoppable,
     I: Input,
     SP: ShMemProvider,
     Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
@@ -347,7 +347,7 @@ where
         + HasMetadata
         + HasLastReportTime
         + Stoppable
-        + HasCorpus
+        + HasCorpus<I>
         + MaybeHasClientPerfMonitor,
     I: Input,
     SP: ShMemProvider,
@@ -400,7 +400,7 @@ impl<EM, EMH, I, S, SP> CentralizedEventManager<EM, EMH, I, S, SP>
 where
     EM: HasEventManagerId + EventFirer<I, S>,
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasCorpus + Stoppable,
+    S: HasCorpus<I> + Stoppable,
     I: Input,
     SP: ShMemProvider,
 {

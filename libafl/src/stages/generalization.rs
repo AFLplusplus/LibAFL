@@ -54,7 +54,7 @@ pub struct GeneralizationStage<C, EM, I, O, OT, S, Z> {
     phantom: PhantomData<(EM, I, O, OT, S, Z)>,
 }
 
-impl<C, EM, O, OT, S, Z> Named for GeneralizationStage<C, EM, O, OT, S, Z> {
+impl<C, EM, I, O, OT, S, Z> Named for GeneralizationStage<C, EM, I, O, OT, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -74,6 +74,18 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
+    }
+
     #[inline]
     #[expect(clippy::too_many_lines)]
     fn perform(
@@ -322,18 +334,6 @@ where
         }
 
         Ok(())
-    }
-
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
     }
 }
 
