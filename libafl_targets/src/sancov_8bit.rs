@@ -1,5 +1,6 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
+use core::hash::Hash;
 
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut};
 
@@ -127,7 +128,7 @@ mod observers {
 
     /// The [`CountersMultiMapObserver`] observes all the counters that may be set by
     /// `SanitizerCoverage` in [`super::COUNTERS_MAPS`]
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, Hash)]
     #[expect(clippy::unsafe_derive_deserialize)]
     pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool> {
         intervals: IntervalTree<usize, usize>,
@@ -228,11 +229,6 @@ mod observers {
                 }
             }
             res
-        }
-
-        #[inline]
-        fn hash_simple(&self) -> u64 {
-            RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
         }
 
         fn reset_map(&mut self) -> Result<(), Error> {
