@@ -39,7 +39,7 @@ pub fn main() -> Result<(), Error> {
     #[allow(static_mut_refs)] // only a problem in nightly
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS.len()) };
 
-    let factory = MapEqualityFactory::new(&observer);
+    let factory = ObserverEqualityFactory::new(&observer);
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
