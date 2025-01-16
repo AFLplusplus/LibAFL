@@ -107,14 +107,14 @@ pub fn on_evaluation_metadata_default<CS, O, OT, S>(
 ) -> Result<(), Error>
 where
     CS: AflScheduler,
-    CS::MapObserverRef: AsRef<O>,
+    CS::ObserverRef: AsRef<O>,
     S: HasMetadata,
     O: Hash,
     OT: MatchName,
 {
     let observer = observers
-        .get(scheduler.map_observer_handle())
-        .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+        .get(scheduler.observer_handle())
+        .ok_or_else(|| Error::key_not_found("Observer not found".to_string()))?
         .as_ref();
 
     let mut hash = generic_hash_std(observer) as usize;
@@ -153,8 +153,8 @@ where
 
 /// Defines the common metadata operations for the AFL-style schedulers
 pub trait AflScheduler {
-    /// The type of [`MapObserver`] that this scheduler will use as reference
-    type MapObserverRef;
+    /// The type of [`crate::observers::Observer`] that this scheduler will use as reference
+    type ObserverRef;
 
     /// Return the last hash
     fn last_hash(&self) -> usize;
@@ -162,8 +162,8 @@ pub trait AflScheduler {
     /// Set the last hash
     fn set_last_hash(&mut self, value: usize);
 
-    /// Get the observer map observer name
-    fn map_observer_handle(&self) -> &Handle<Self::MapObserverRef>;
+    /// Get the observer handle
+    fn observer_handle(&self) -> &Handle<Self::ObserverRef>;
 }
 
 /// Trait for Schedulers which track queue cycles
