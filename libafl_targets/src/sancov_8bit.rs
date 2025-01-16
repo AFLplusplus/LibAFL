@@ -1,6 +1,5 @@
 //! [`LLVM` `8-bit-counters`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 use alloc::vec::Vec;
-use core::hash::Hash;
 
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut};
 
