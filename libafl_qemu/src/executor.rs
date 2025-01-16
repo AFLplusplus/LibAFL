@@ -21,7 +21,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "fork")]
@@ -95,7 +95,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions<I> + HasCorpus<I> + Unpin + HasCurrentTestcase<I>,
+    S: HasExecutions + HasSolutions<I> + Unpin + HasCurrentTestcase<I>,
     I: Input,
     Z: HasObjective<Objective = OF>,
 {
@@ -150,7 +150,7 @@ where
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     I: Input + Unpin,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+    S: Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
 {
     pub fn new<EM, OF, Z>(
         emulator: Emulator<C, CM, ED, ET, I, S, SM>,
@@ -248,7 +248,7 @@ where
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     I: Unpin,
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + Unpin + HasCorpus<I>,
+    S: HasExecutions + Unpin,
 {
     fn run_target(
         &mut self,
@@ -285,7 +285,6 @@ where
     ET: EmulatorModuleTuple<I, S>,
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I>,
 {
     type Observers = OT;
     #[inline]
@@ -336,7 +335,7 @@ where
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasSolutions<I> + HasCorpus<I>,
+    S: HasSolutions<I>,
     SP: ShMemProvider,
     Z: HasObjective,
     Z::Objective: Feedback<EM, I, OT, S>,
@@ -404,7 +403,7 @@ where
     OF: Feedback<EM, I, OT, S>,
     OT: ObserversTuple<I, S> + Debug,
     I: Input + Unpin,
-    S: HasExecutions + Unpin + HasCorpus<I>,
+    S: HasExecutions + Unpin,
     SP: ShMemProvider,
     Z: HasObjective<Objective = OF>,
 {

@@ -77,7 +77,7 @@ where
 /// Implementation for `DumpToDiskStage` with a default `generate_filename` function.
 impl<CB1, EM, I, S, Z> DumpToDiskStage<CB1, fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
 where
-    S: HasCorpus<I> + HasSolutions<I> + HasRand + HasMetadata,
+    S: HasSolutions<I> + HasRand + HasMetadata,
     I: Input,
 {
     /// Create a new [`DumpToDiskStage`] with a default `generate_filename` function.
@@ -115,7 +115,7 @@ where
 
 impl<CB1, CB2, EM, I, S, Z> DumpToDiskStage<CB1, CB2, EM, I, S, Z>
 where
-    S: HasCorpus<I> + HasMetadata + HasSolutions<I>,
+    S: HasMetadata + HasSolutions<I>,
 {
     /// Create a new [`DumpToDiskStage`] with a custom `generate_filename` function.
     pub fn new_with_custom_filenames<A, B>(
@@ -158,6 +158,7 @@ where
     #[inline]
     fn dump_state_to_disk<P: AsRef<Path>>(&mut self, state: &mut S) -> Result<(), Error>
     where
+        S: HasCorpus<I>,
         CB1: FnMut(&Testcase<I>, &S) -> Vec<u8>,
         CB2: FnMut(&Testcase<I>, &CorpusId) -> P,
     {

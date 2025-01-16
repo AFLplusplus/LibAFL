@@ -52,10 +52,7 @@ use crate::{
     monitors::Monitor,
     observers::ObserversTuple,
     stages::HasCurrentStageId,
-    state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
-        Stoppable,
-    },
+    state::{HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasMetadata,
 };
 
@@ -563,7 +560,7 @@ impl<EMH, I, S> Drop for TcpEventManager<EMH, I, S> {
 impl<EMH, I, S> TcpEventManager<EMH, I, S>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus<I> + Stoppable,
+    S: HasExecutions + HasMetadata + HasImported + Stoppable,
 {
     /// Write the client id for a client `EventManager` to env vars
     pub fn to_env(&self, env_name: &str) {
@@ -643,7 +640,6 @@ impl<EMH, I, S> EventFirer<I, S> for TcpEventManager<EMH, I, S>
 where
     EMH: EventManagerHooksTuple<I, S>,
     I: Serialize,
-    S: HasCorpus<I>,
 {
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
@@ -688,7 +684,7 @@ where
     E::Observers: Serialize + ObserversTuple<I, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus<I> + Stoppable,
+    S: HasExecutions + HasMetadata + HasImported + Stoppable,
     I: DeserializeOwned,
     Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
@@ -770,7 +766,7 @@ impl<EMH, I, S> ProgressReporter<S> for TcpEventManager<EMH, I, S>
 where
     EMH: EventManagerHooksTuple<I, S>,
     I: Serialize,
-    S: HasExecutions + HasMetadata + HasLastReportTime + HasCorpus<I> + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasMetadata + HasLastReportTime + MaybeHasClientPerfMonitor,
 {
     fn maybe_report_progress(
         &mut self,
@@ -809,7 +805,7 @@ where
 impl<EMH, I, S, SP> ProgressReporter<S> for TcpRestartingEventManager<EMH, I, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasMetadata + HasExecutions + HasLastReportTime + HasCorpus<I> + MaybeHasClientPerfMonitor,
+    S: HasMetadata + HasExecutions + HasLastReportTime + MaybeHasClientPerfMonitor,
     I: Serialize,
     SP: ShMemProvider,
 {
@@ -830,7 +826,6 @@ impl<EMH, I, S, SP> EventFirer<I, S> for TcpRestartingEventManager<EMH, I, S, SP
 where
     EMH: EventManagerHooksTuple<I, S>,
     I: Serialize,
-    S: HasCorpus<I>,
     SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
@@ -869,7 +864,7 @@ where
 impl<EMH, I, S, SP> EventRestarter<S> for TcpRestartingEventManager<EMH, I, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasCorpus<I> + HasExecutions + HasCurrentStageId + Serialize,
+    S: HasExecutions + HasCurrentStageId + Serialize,
     SP: ShMemProvider,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
@@ -896,7 +891,7 @@ where
     E::Observers: ObserversTuple<I, S> + Serialize,
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus<I> + Stoppable,
+    S: HasExecutions + HasMetadata + HasImported + Stoppable,
     SP: ShMemProvider,
     Z: ExecutionProcessor<TcpEventManager<EMH, I, S>, I, E::Observers, S>
         + EvaluatorObservers<E, TcpEventManager<EMH, I, S>, I, S>,
@@ -928,7 +923,6 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<EMH, I, S, SP> TcpRestartingEventManager<EMH, I, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasCorpus<I>,
     SP: ShMemProvider,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
@@ -996,7 +990,7 @@ pub fn setup_restarting_mgr_tcp<I, MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus<I> + DeserializeOwned + Stoppable,
+    S: HasExecutions + HasMetadata + HasImported + DeserializeOwned + Stoppable,
     I: Input,
 {
     TcpRestartingMgr::builder()
@@ -1062,7 +1056,7 @@ where
     I: Input,
     MT: Monitor + Clone,
     SP: ShMemProvider,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus<I> + DeserializeOwned + Stoppable,
+    S: HasExecutions + HasMetadata + HasImported + DeserializeOwned + Stoppable,
 {
     /// Launch the restarting manager
     pub fn launch(

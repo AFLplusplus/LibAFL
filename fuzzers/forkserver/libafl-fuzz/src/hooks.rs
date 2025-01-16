@@ -13,7 +13,7 @@ pub struct LibAflFuzzEventHook {
 
 impl<I, S> EventManagerHook<I, S> for LibAflFuzzEventHook
 where
-    S: HasCorpus<I> + Stoppable,
+    S: Stoppable,
 {
     fn pre_exec(
         &mut self,

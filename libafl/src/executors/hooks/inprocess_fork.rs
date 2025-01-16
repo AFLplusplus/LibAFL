@@ -21,7 +21,6 @@ use crate::{
         HasObservers,
     },
     observers::ObserversTuple,
-    state::HasCorpus,
     Error,
 };
 
@@ -35,10 +34,7 @@ pub struct InChildProcessHooks<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S>
-where
-    S: HasCorpus<I>,
-{
+impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S> {
     /// Init this hook
     fn init(&mut self, _state: &mut S) {}
 
@@ -61,7 +57,6 @@ impl<I, S> InChildProcessHooks<I, S> {
     where
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        S: HasCorpus<I>,
     {
         #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {

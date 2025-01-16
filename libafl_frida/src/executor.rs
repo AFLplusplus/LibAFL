@@ -60,7 +60,7 @@ impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
     for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
 where
     H: FnMut(&I) -> ExitKind,
-    S: HasCorpus<I> + HasExecutions,
+    S: HasExecutions,
     TC: TargetBytesConverter<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
@@ -128,7 +128,6 @@ impl<H, I, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H,
 impl<'a, 'b, 'c, H, I, OT, RT, S>
     FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, NopTargetBytesConverter<I>>
 where
-    S: HasCorpus<I>,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
@@ -225,9 +224,9 @@ impl<'a, 'b, 'c, H, I, OT, RT, S, TC> HasInProcessHooks<I, S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
 where
     H: FnMut(&I) -> ExitKind,
-    S: HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I> + HasExecutions,
+    S: HasSolutions<I> + HasCurrentTestcase<I> + HasExecutions,
     I: Input,
-    TC: TargetBytesConverter<Input = I>,
+    TC: TargetBytesConverter<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
 {

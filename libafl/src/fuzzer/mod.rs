@@ -267,7 +267,6 @@ pub struct StdFuzzer<CS, F, IF, OF> {
 
 impl<CS, F, I, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IF, OF>
 where
-    S: HasCorpus<I>,
     CS: Scheduler<I, S>,
 {
     type Scheduler = CS;

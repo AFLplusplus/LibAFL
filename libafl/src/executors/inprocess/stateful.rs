@@ -21,7 +21,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
 };
 
@@ -73,7 +73,7 @@ where
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasExecutions,
+    S: HasExecutions,
 {
     fn run_target(
         &mut self,
@@ -105,7 +105,6 @@ where
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I>,
 {
     type Observers = OT;
     #[inline]
@@ -123,7 +122,7 @@ impl<'a, H, I, OT, S, ES> StatefulInProcessExecutor<'a, H, I, OT, S, ES>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
     I: Clone + Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -244,7 +243,7 @@ where
     HT: ExecutorHooksTuple<I, S>,
     I: Input + Clone,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<EM, OF, Z>(

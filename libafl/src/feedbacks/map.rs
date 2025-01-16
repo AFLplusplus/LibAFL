@@ -27,7 +27,6 @@ use crate::{
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver},
-    state::HasCorpus,
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -401,7 +400,7 @@ where
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadata + HasCorpus<I>, // delete me
+    S: HasNamedMetadata,
 {
     #[rustversion::nightly]
     default fn is_interesting(
@@ -541,7 +540,7 @@ where
     EM: EventFirer<I, S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadata + HasCorpus<I>,
+    S: HasNamedMetadata,
 {
     fn is_interesting(
         &mut self,

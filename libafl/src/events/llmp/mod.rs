@@ -18,7 +18,7 @@ use crate::{
     events::{Event, EventFirer},
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
-    state::{HasCorpus, NopState},
+    state::NopState,
     Error,
 };
 
@@ -228,7 +228,6 @@ where
 
 impl<I, IC, ICB, S, SP> LlmpEventConverter<I, IC, ICB, S, SP>
 where
-    S: HasCorpus<I>,
     SP: ShMemProvider,
 {
     // TODO other new_* routines
@@ -348,7 +347,6 @@ where
 impl<I, IC, ICB, S, SP> EventFirer<I, S> for LlmpEventConverter<I, IC, ICB, S, SP>
 where
     IC: InputConverter<From = I>,
-    S: HasCorpus<I>,
     SP: ShMemProvider,
     IC::To: Serialize,
 {

@@ -55,7 +55,6 @@ impl<F, S> StateInitializer<S> for CustomFilepathToTestcaseFeedback<F> {}
 
 impl<F, EM, I, OT, S> Feedback<EM, I, OT, S> for CustomFilepathToTestcaseFeedback<F>
 where
-    S: HasCorpus<I>,
     F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
 {
     #[inline]

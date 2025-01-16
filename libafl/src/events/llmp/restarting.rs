@@ -46,10 +46,7 @@ use crate::{
     monitors::Monitor,
     observers::TimeObserver,
     stages::HasCurrentStageId,
-    state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
-        Stoppable,
-    },
+    state::{HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error,
 };
 
@@ -104,12 +101,7 @@ where
 
 impl<EMH, I, S, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
-    S: HasExecutions
-        + HasLastReportTime
-        + HasMetadata
-        + HasCorpus<I>
-        + Serialize
-        + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasLastReportTime + HasMetadata + Serialize + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
     I: Serialize,
 {
@@ -129,7 +121,7 @@ where
 impl<EMH, I, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<EMH, I, S, SP>
 where
     I: Serialize,
-    S: HasCorpus<I> + Serialize,
+    S: Serialize,
     SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
@@ -209,9 +201,8 @@ where
     EMH: EventManagerHooksTuple<I, S>,
     E: HasObservers,
     E::Observers: DeserializeOwned,
-    S: HasCorpus<I> + HasImported + Stoppable + Serialize,
+    S: HasImported + Stoppable + Serialize,
     I: DeserializeOwned + Input,
-    S::Corpus: Serialize,
     SP: ShMemProvider,
     Z: ExecutionProcessor<LlmpEventManager<EMH, I, S, SP>, I, E::Observers, S>
         + EvaluatorObservers<E, LlmpEventManager<EMH, I, S, SP>, I, S>,
@@ -326,7 +317,7 @@ pub fn setup_restarting_mgr_std<I, MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: HasCorpus<I> + Serialize + DeserializeOwned,
+    S: Serialize + DeserializeOwned,
     I: DeserializeOwned,
 {
     RestartingMgr::builder()
@@ -359,7 +350,7 @@ pub fn setup_restarting_mgr_std_adaptive<I, MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: HasCorpus<I> + Serialize + DeserializeOwned,
+    S: Serialize + DeserializeOwned,
     I: DeserializeOwned,
 {
     RestartingMgr::builder()
@@ -421,7 +412,7 @@ impl<EMH, I, MT, S, SP> RestartingMgr<EMH, I, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     SP: ShMemProvider,
-    S: HasCorpus<I> + Serialize + DeserializeOwned,
+    S: Serialize + DeserializeOwned,
     I: DeserializeOwned,
     MT: Monitor + Clone,
 {

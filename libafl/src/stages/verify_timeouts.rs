@@ -14,7 +14,6 @@ use crate::{
     inputs::BytesInput,
     observers::ObserversTuple,
     stages::Stage,
-    state::HasCorpus,
     Evaluator, HasMetadata,
 };
 
@@ -85,7 +84,7 @@ where
     E::Observers: ObserversTuple<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers + HasTimeout,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasMetadata,
     I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     fn perform(

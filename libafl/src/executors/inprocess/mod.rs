@@ -77,7 +77,7 @@ where
 impl<EM, H, HB, HT, I, OT, S, Z> Executor<EM, I, S, Z>
     for GenericInProcessExecutor<H, HB, HT, I, OT, S>
 where
-    S: HasCorpus<I> + HasExecutions,
+    S: HasExecutions,
     OT: ObserversTuple<I, S>,
     HT: ExecutorHooksTuple<I, S>,
     HB: BorrowMut<H>,
@@ -124,7 +124,7 @@ impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+    S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -226,7 +226,7 @@ where
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+    S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -440,7 +440,7 @@ where
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
     I: Input + Clone,
     Z: HasObjective<Objective = OF> + ExecutionProcessor<EM, I, E::Observers, S>,
 {

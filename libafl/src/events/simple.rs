@@ -29,7 +29,7 @@ use crate::{
     },
     monitors::Monitor,
     stages::HasCurrentStageId,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
+    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
@@ -140,12 +140,7 @@ impl<I, MT, S> ProgressReporter<S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
-    S: HasMetadata
-        + HasExecutions
-        + HasLastReportTime
-        + Stoppable
-        + HasCorpus<I>
-        + MaybeHasClientPerfMonitor,
+    S: HasMetadata + HasExecutions + HasLastReportTime + Stoppable + MaybeHasClientPerfMonitor,
 {
     fn maybe_report_progress(
         &mut self,
@@ -381,12 +376,7 @@ where
     I: Debug,
     MT: Monitor,
     SP: ShMemProvider,
-    S: HasExecutions
-        + HasMetadata
-        + HasLastReportTime
-        + Stoppable
-        + HasCorpus<I>
-        + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + MaybeHasClientPerfMonitor,
 {
     fn maybe_report_progress(
         &mut self,
@@ -432,7 +422,7 @@ where
     /// but can still used shared maps to recover from crashes and timeouts.
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
-        S: DeserializeOwned + Serialize + HasCorpus<I> + HasSolutions<I>,
+        S: DeserializeOwned + Serialize + HasSolutions<I>,
         MT: Debug,
     {
         // We start ourself as child process to actually fuzz

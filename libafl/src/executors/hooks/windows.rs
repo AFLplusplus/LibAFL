@@ -18,7 +18,7 @@ pub mod windows_asan_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     /// # Safety
@@ -30,7 +30,7 @@ pub mod windows_asan_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         let data = &raw mut GLOBAL_STATE;
@@ -135,7 +135,7 @@ pub mod windows_exception_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -186,7 +186,7 @@ pub mod windows_exception_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         let old_hook = panic::take_hook();
@@ -248,7 +248,7 @@ pub mod windows_exception_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         let data: &mut InProcessExecutorHandlerData =
@@ -317,7 +317,7 @@ pub mod windows_exception_handler {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         // Have we set a timer_before?

@@ -47,7 +47,7 @@ use crate::{
     inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     Error,
 };
 
@@ -661,7 +661,6 @@ impl ForkserverExecutor<(), (), (), UnixShMemProvider, ()> {
 impl<I, OT, S, SP, TC> ForkserverExecutor<I, OT, S, SP, TC>
 where
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I>,
     SP: ShMemProvider,
     TC: TargetBytesConverter<I>,
 {
@@ -912,7 +911,6 @@ where
         I: Input + HasTargetBytes,
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
         OT: ObserversTuple<I, S> + Prepend<MO>,
-        S: HasCorpus<I>,
         SP: ShMemProvider,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
@@ -1583,7 +1581,7 @@ impl<EM, I, OT, S, SP, TC, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT
 where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
-    S: HasCorpus<I> + HasExecutions,
+    S: HasExecutions,
     TC: TargetBytesConverter<I>,
 {
     #[inline]
@@ -1616,7 +1614,6 @@ where
 impl<I, OT, S, SP, TC> HasObservers for ForkserverExecutor<I, OT, S, SP, TC>
 where
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I>,
     SP: ShMemProvider,
 {
     type Observers = OT;

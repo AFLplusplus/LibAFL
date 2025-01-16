@@ -145,8 +145,8 @@ impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I, M, S
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I>
-        + HasRand
+    S: HasRand
+        + HasCorpus<I>
         + HasMetadata
         + HasExecutions
         + HasNamedMetadata
@@ -203,7 +203,7 @@ impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I> + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
+    S: HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
     I: Clone + MutatedTransform<I, S>,
 {
     /// Creates a new transforming mutational stage with the default max iterations
@@ -302,7 +302,7 @@ impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<E, EM, I, M,
 where
     M: MultiMutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I> + HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
+    S: HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
     I: Clone + MutatedTransform<I, S>,
 {
     #[inline]

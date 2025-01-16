@@ -22,7 +22,7 @@ use crate::{
         MutationalStage, RetryCountRestartHelper, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
+    state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -79,8 +79,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers,
     F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
-    S: HasCorpus<I>
-        + HasMetadata
+    S: HasMetadata
         + HasRand
         + HasExecutions
         + HasNamedMetadata
@@ -118,7 +117,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers,
     F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
+    S: HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
     I: MutatedTransform<I, S> + Clone,
     Z: Evaluator<E, EM, I, S>,
 {

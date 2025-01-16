@@ -20,7 +20,7 @@ pub mod unix_signal_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr = unsafe fn(
@@ -82,7 +82,7 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
@@ -131,7 +131,7 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasCorpus<I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
@@ -187,7 +187,7 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {

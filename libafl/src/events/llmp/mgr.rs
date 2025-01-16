@@ -46,8 +46,8 @@ use crate::{
     observers::TimeObserver,
     stages::HasCurrentStageId,
     state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
-        NopState, Stoppable,
+        HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor, NopState,
+        Stoppable,
     },
     Error, HasMetadata,
 };
@@ -346,7 +346,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        S: HasCorpus<I> + HasImported + Stoppable,
+        S: HasImported + Stoppable,
         EMH: EventManagerHooksTuple<I, S>,
         I: Input,
         E: HasObservers,
@@ -510,7 +510,7 @@ impl<E, EMH, I, S, SP, Z> EventProcessor<E, S, Z> for LlmpEventManager<EMH, I, S
 where
     E: HasObservers,
     E::Observers: DeserializeOwned,
-    S: HasCorpus<I> + HasImported + Stoppable,
+    S: HasImported + Stoppable,
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned + Input,
     SP: ShMemProvider,
@@ -562,7 +562,7 @@ where
 
 impl<EMH, I, S, SP> ProgressReporter<S> for LlmpEventManager<EMH, I, S, SP>
 where
-    S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus<I> + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasLastReportTime + HasMetadata + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
     I: Serialize,
 {

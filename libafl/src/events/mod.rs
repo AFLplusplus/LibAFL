@@ -48,7 +48,7 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
+    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
     Error, HasMetadata,
 };
 
@@ -491,7 +491,7 @@ where
 pub fn std_report_progress<EM, I, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
 where
     EM: EventFirer<I, S>,
-    S: HasExecutions + HasLastReportTime + HasCorpus<I> + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasLastReportTime + MaybeHasClientPerfMonitor,
 {
     let executions = *state.executions();
     let cur = current_time();

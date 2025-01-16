@@ -7,7 +7,6 @@ use libafl_bolts::tuples::RefIndexable;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
-    state::HasCorpus,
     Error,
 };
 
@@ -21,7 +20,6 @@ pub struct WithObservers<E, I, OT, S> {
 
 impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, I, OT, S>
 where
-    S: HasCorpus<I>,
     E: Executor<EM, I, S, Z>,
 {
     fn run_target(
@@ -37,7 +35,6 @@ where
 
 impl<E, I, OT, S> HasObservers for WithObservers<E, I, OT, S>
 where
-    S: HasCorpus<I>,
     OT: ObserversTuple<I, S>,
 {
     type Observers = OT;

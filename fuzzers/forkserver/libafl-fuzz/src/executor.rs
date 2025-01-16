@@ -261,7 +261,6 @@ pub enum SupportedExecutors<FSV, I, OT, NYX> {
 #[cfg(feature = "nyx")]
 impl<S, I, OT, FSV, NYX, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<FSV, I, OT, NYX>
 where
-    S: HasCorpus<I>,
     NYX: Executor<EM, I, S, Z>,
     FSV: Executor<EM, I, S, Z>,
 {

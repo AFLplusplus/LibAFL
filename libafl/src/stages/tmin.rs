@@ -70,9 +70,9 @@ where
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<EM, I, E::Observers, S>,
     S: HasMetadata
+        + HasCorpus<I>
         + HasExecutions
         + HasSolutions<I>
-        + HasCorpus<I>
         + HasMaxSize
         + HasNamedMetadata
         + HasCurrentCorpusId

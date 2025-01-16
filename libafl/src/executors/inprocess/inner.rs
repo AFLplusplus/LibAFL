@@ -28,7 +28,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
 };
 
@@ -68,7 +68,6 @@ impl<HT, I, OT, S> HasObservers for GenericInProcessExecutorInner<HT, I, OT, S> 
 impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
 where
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I>,
 {
     /// This function marks the boundary between the fuzzer and the target
     ///
@@ -131,7 +130,7 @@ impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasExecutions + HasSolutions<I>,
+    S: HasExecutions + HasSolutions<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<E, EM, OF, Z>(
@@ -147,7 +146,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase<I> + HasCorpus<I> + HasSolutions<I>,
+        S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: HasObjective<Objective = OF>,
     {
         Self::with_timeout_generic::<E, EM, OF, Z>(
@@ -176,7 +175,7 @@ where
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase<I> + HasCorpus<I> + HasSolutions<I>,
+        S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: HasObjective<Objective = OF>,
     {
         let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
@@ -207,7 +206,7 @@ where
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasCurrentTestcase<I> + HasCorpus<I> + HasSolutions<I>,
+        S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {

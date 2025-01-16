@@ -10,7 +10,7 @@ use num_traits::SaturatingAdd;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
-use crate::{executors::hooks::ExecutorHook, state::HasCorpus, Error};
+use crate::{executors::hooks::ExecutorHook, Error};
 
 /// Info of a binary's section that can be used during `Intel PT` traces decoding
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +38,7 @@ pub struct IntelPTHook<T> {
 
 impl<I, S, T> ExecutorHook<I, S> for IntelPTHook<T>
 where
-    S: Serialize + HasCorpus<I>,
+    S: Serialize,
     T: SaturatingAdd + From<u8> + Debug,
 {
     fn init(&mut self, _state: &mut S) {}

@@ -12,7 +12,6 @@ use super::HasTimeout;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
-    state::HasCorpus,
     Error,
 };
 
@@ -41,7 +40,6 @@ where
 impl<E, I, S, SOT> ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers,
-    S: HasCorpus<I>,
     SOT: ObserversTuple<I, S>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
@@ -69,7 +67,6 @@ where
 impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
 where
     E: Executor<EM, I, S, Z> + HasObservers,
-    S: HasCorpus<I>,
     SOT: ObserversTuple<I, S>,
 {
     fn run_target(
@@ -100,7 +97,6 @@ where
 impl<E, I, S, SOT> HasObservers for ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers,
-    S: HasCorpus<I>,
     SOT: ObserversTuple<I, S>,
 {
     type Observers = E::Observers;

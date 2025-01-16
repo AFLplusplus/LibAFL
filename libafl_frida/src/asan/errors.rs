@@ -17,7 +17,6 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
-    state::HasCorpus,
     Error, HasMetadata,
 };
 use libafl_bolts::{
@@ -650,7 +649,7 @@ impl<S> StateInitializer<S> for AsanErrorsFeedback<S> {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for AsanErrorsFeedback<S>
 where
-    S: HasCorpus<I> + Debug,
+    S: Debug,
     OT: MatchNameRef,
 {
     fn is_interesting(

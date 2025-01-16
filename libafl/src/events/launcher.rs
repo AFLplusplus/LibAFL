@@ -57,7 +57,6 @@ use crate::{
     },
     monitors::Monitor,
     observers::TimeObserver,
-    state::HasCorpus,
     Error,
 };
 
@@ -221,7 +220,7 @@ where
             ClientDescription,
         ) -> Result<(), Error>,
         I: DeserializeOwned,
-        S: DeserializeOwned + HasCorpus<I> + Serialize,
+        S: DeserializeOwned + Serialize,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
@@ -236,7 +235,7 @@ where
     #[cfg(all(unix, feature = "fork"))]
     pub fn launch_with_hooks<EMH, I, S>(&mut self, hooks: EMH) -> Result<(), Error>
     where
-        S: DeserializeOwned + HasCorpus<I> + Serialize,
+        S: DeserializeOwned + Serialize,
         I: DeserializeOwned,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         CF: FnOnce(
@@ -391,7 +390,7 @@ where
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         I: DeserializeOwned,
-        S: DeserializeOwned + HasCorpus<I> + Serialize,
+        S: DeserializeOwned + Serialize,
     {
         use libafl_bolts::core_affinity::get_core_ids;
 
@@ -632,7 +631,7 @@ where
     /// Launch a standard Centralized-based fuzzer
     pub fn launch<I, S>(&mut self) -> Result<(), Error>
     where
-        S: DeserializeOwned + HasCorpus<I> + Serialize,
+        S: DeserializeOwned + Serialize,
         I: DeserializeOwned + Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
@@ -680,7 +679,6 @@ where
         secondary_inner_mgr_builder: EMB,
     ) -> Result<(), Error>
     where
-        S: HasCorpus<I>,
         I: Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,

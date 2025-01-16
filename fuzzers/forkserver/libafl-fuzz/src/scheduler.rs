@@ -17,7 +17,7 @@ impl<I, Q, S, W> RemovableScheduler<I, S> for SupportedSchedulers<Q, W>
 where
     Q: Scheduler<I, S> + RemovableScheduler<I, S>,
     W: Scheduler<I, S> + RemovableScheduler<I, S>,
-    S: HasCorpus<I> + HasTestcase,
+    S: HasTestcase,
 {
     fn on_remove(
         &mut self,

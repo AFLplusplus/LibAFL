@@ -52,7 +52,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     std::borrow::ToOwned,
     Error,
 };
@@ -331,7 +331,7 @@ impl<I, OT, S, T, HT, C> CommandExecutor<I, OT, S, T, HT, C> {
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
 where
-    S: HasExecutions + HasCorpus<I>,
+    S: HasExecutions,
     T: CommandConfigurator<I> + Debug,
     OT: ObserversTuple<I, S>,
 {
@@ -387,7 +387,7 @@ where
 
 impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T>
 where
-    S: HasExecutions + HasCorpus<I>,
+    S: HasExecutions,
     T: CommandConfigurator<I> + Debug,
     OT: MatchName + ObserversTuple<I, S>,
 {
@@ -405,7 +405,6 @@ where
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 impl<I, OT, S, T> HasTimeout for CommandExecutor<I, OT, S, T>
 where
-    S: HasCorpus<I>,
     T: CommandConfigurator<I>,
 {
     #[inline]
@@ -424,7 +423,7 @@ impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S,
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: MatchName + ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasExecutions,
+    S: HasExecutions,
     T: CommandConfigurator<I, Pid> + Debug,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
@@ -497,7 +496,6 @@ where
 
 impl<I, OT, S, T, HT, C> HasObservers for CommandExecutor<I, OT, S, T, HT, C>
 where
-    S: HasCorpus<I>,
     OT: ObserversTuple<I, S>,
 {
     type Observers = OT;
@@ -681,7 +679,6 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
     where
-        S: HasCorpus<I>,
         I: HasTargetBytes,
         OT: MatchName + ObserversTuple<I, S>,
     {
@@ -743,7 +740,7 @@ impl CommandExecutorBuilder {
 /// # Example
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, corpus::Corpus, inputs::{BytesInput, HasTargetBytes, Input}, executors::{Executor, command::CommandConfigurator}, state::{HasCorpus, HasExecutions}};
+/// use libafl::{Error, corpus::Corpus, inputs::{BytesInput, HasTargetBytes, Input}, executors::{Executor, command::CommandConfigurator}, state::{HasExecutions}};
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
@@ -775,8 +772,7 @@ impl CommandExecutorBuilder {
 ///
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
-///     S: HasCorpus<BytesInput> + HasExecutions,
-///     S::Corpus: Corpus<BytesInput>
+///     S: HasExecutions,
 /// {
 ///     MyExecutor.into_executor(())
 /// }

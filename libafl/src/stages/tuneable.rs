@@ -17,7 +17,7 @@ use crate::{
         ExecutionCountRestartHelper, MutationalStage, Stage,
     },
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
+    state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, Evaluator, HasMetadata, HasNamedMetadata,
 };
 
@@ -163,12 +163,7 @@ impl<E, EM, I, M, S, Z> MutationalStage<S> for TuneableMutationalStage<E, EM, I,
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I>
-        + HasRand
-        + HasNamedMetadata
-        + HasMetadata
-        + HasExecutions
-        + HasCurrentTestcase<I>,
+    S: HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase<I>,
     I: MutatedTransform<I, S> + Clone,
 {
     type Mutator = M;
@@ -199,8 +194,7 @@ impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for TuneableMutationalStage<E, EM, I,
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I>
-        + HasRand
+    S: HasRand
         + HasNamedMetadata
         + HasMetadata
         + HasExecutions
@@ -237,8 +231,7 @@ impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I>
-        + HasRand
+    S: HasRand
         + HasNamedMetadata
         + HasExecutions
         + HasMetadata
@@ -467,7 +460,7 @@ impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I> + HasRand + HasNamedMetadata,
+    S: HasRand + HasNamedMetadata,
 {
     /// Creates a new transforming mutational stage
     #[must_use]

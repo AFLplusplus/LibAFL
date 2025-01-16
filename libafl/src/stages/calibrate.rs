@@ -386,7 +386,6 @@ where
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I>,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]

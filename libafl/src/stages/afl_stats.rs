@@ -446,7 +446,7 @@ impl<C, E, EM, I, O, S, Z> AflStatsStage<C, E, EM, I, O, S, Z>
 where
     E: HasObservers,
     EM: EventFirer<I, S>,
-    S: HasImported + HasCorpus<I> + HasMetadata + HasExecutions,
+    S: HasImported + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,
 {
@@ -666,7 +666,7 @@ where
     E: HasObservers,
     EM: EventFirer<I, S>,
     O: MapObserver,
-    S: HasImported + HasCorpus<I> + HasMetadata + HasExecutions,
+    S: HasImported + HasMetadata + HasExecutions,
 {
     fn new() -> Self {
         Self {

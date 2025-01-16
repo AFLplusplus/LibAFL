@@ -38,9 +38,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, NopInput},
     observers::TimeObserver,
-    state::{
-        HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, NopState, Stoppable,
-    },
+    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, NopState, Stoppable},
     Error,
 };
 
@@ -213,7 +211,7 @@ where
     EM: HasEventManagerId + EventFirer<I, S>,
     EMH: EventManagerHooksTuple<I, S>,
     SP: ShMemProvider,
-    S: HasCorpus<I> + Stoppable,
+    S: Stoppable,
     I: Input,
 {
     fn should_send(&self) -> bool {
@@ -316,7 +314,7 @@ where
     E::Observers: DeserializeOwned,
     EM: EventProcessor<E, S, Z> + HasEventManagerId + EventFirer<I, S>,
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasCorpus<I> + Stoppable,
+    S: Stoppable,
     I: Input,
     SP: ShMemProvider,
     Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
@@ -342,12 +340,7 @@ impl<EM, EMH, I, S, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH,
 where
     EM: EventFirer<I, S> + HasEventManagerId,
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions
-        + HasMetadata
-        + HasLastReportTime
-        + Stoppable
-        + HasCorpus<I>
-        + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + MaybeHasClientPerfMonitor,
     I: Input,
     SP: ShMemProvider,
 {
@@ -399,7 +392,7 @@ impl<EM, EMH, I, S, SP> CentralizedEventManager<EM, EMH, I, S, SP>
 where
     EM: HasEventManagerId + EventFirer<I, S>,
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasCorpus<I> + Stoppable,
+    S: Stoppable,
     I: Input,
     SP: ShMemProvider,
 {

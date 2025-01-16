@@ -8,7 +8,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
@@ -40,7 +40,7 @@ impl NyxExecutor<(), ()> {
 
 impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for NyxExecutor<S, OT>
 where
-    S: HasCorpus<I> + HasExecutions,
+    S: HasExecutions,
     I: HasTargetBytes,
     OT: ObserversTuple<I, S>,
 {
