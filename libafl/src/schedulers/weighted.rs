@@ -3,7 +3,7 @@
 //! The queue corpus scheduler with weighted queue item selection [from AFL++](https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32).
 //! This queue corpus scheduler needs calibration stage.
 
-use core::marker::PhantomData;
+use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::HashMap;
 use libafl_bolts::{
@@ -13,14 +13,12 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::powersched::PowerSchedule;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    observers::MapObserver,
     random_corpus_id,
     schedulers::{
         on_add_metadata_default, on_evaluation_metadata_default, on_next_metadata_default,
-        powersched::{BaseSchedule, SchedulerMetadata},
+        powersched::{BaseSchedule, PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
@@ -101,7 +99,7 @@ libafl_bolts::impl_serdeany!(WeightedScheduleMetadata);
 pub struct WeightedScheduler<C, F, O> {
     table_invalidated: bool,
     strat: Option<PowerSchedule>,
-    map_observer_handle: Handle<C>,
+    observer_handle: Handle<C>,
     last_hash: usize,
     queue_cycles: u64,
     phantom: PhantomData<(F, O)>,
@@ -115,16 +113,16 @@ where
 {
     /// Create a new [`WeightedScheduler`] without any power schedule
     #[must_use]
-    pub fn new<S>(state: &mut S, map_observer: &C) -> Self
+    pub fn new<S>(state: &mut S, observer: &C) -> Self
     where
         S: HasMetadata,
     {
-        Self::with_schedule(state, map_observer, None)
+        Self::with_schedule(state, observer, None)
     }
 
     /// Create a new [`WeightedScheduler`]
     #[must_use]
-    pub fn with_schedule<S>(state: &mut S, map_observer: &C, strat: Option<PowerSchedule>) -> Self
+    pub fn with_schedule<S>(state: &mut S, observer: &C, strat: Option<PowerSchedule>) -> Self
     where
         S: HasMetadata,
     {
@@ -133,7 +131,7 @@ where
 
         Self {
             strat,
-            map_observer_handle: map_observer.handle(),
+            observer_handle: observer.handle(),
             last_hash: 0,
             queue_cycles: 0,
             table_invalidated: true,
@@ -284,7 +282,7 @@ impl<C, F, I, O, S> RemovableScheduler<I, S> for WeightedScheduler<C, F, O> {
 }
 
 impl<C, F, O> AflScheduler for WeightedScheduler<C, F, O> {
-    type MapObserverRef = C;
+    type ObserverRef = C;
 
     fn last_hash(&self) -> usize {
         self.last_hash
@@ -294,8 +292,8 @@ impl<C, F, O> AflScheduler for WeightedScheduler<C, F, O> {
         self.last_hash = hash;
     }
 
-    fn map_observer_handle(&self) -> &Handle<C> {
-        &self.map_observer_handle
+    fn observer_handle(&self) -> &Handle<C> {
+        &self.observer_handle
     }
 }
 
@@ -309,7 +307,7 @@ impl<C, F, I, O, S> Scheduler<I, S> for WeightedScheduler<C, F, O>
 where
     C: AsRef<O> + Named,
     F: TestcaseScore<I, S>,
-    O: MapObserver,
+    O: Hash,
     S: HasCorpus<I> + HasMetadata + HasRand + HasTestcase<I>,
 {
     /// Called when a [`Testcase`] is added to the corpus

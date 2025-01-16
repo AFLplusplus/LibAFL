@@ -37,7 +37,7 @@ use serde::{Deserialize, Serialize};
 pub use sync::*;
 #[cfg(feature = "std")]
 pub use time_tracker::TimeTrackingStageWrapper;
-pub use tmin::{MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage};
+pub use tmin::{ObserverEqualityFactory, ObserverEqualityFeedback, StdTMinMutationalStage};
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
