@@ -17,7 +17,7 @@ use crate::{
     corpus::HasCurrentCorpusId,
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::{HasMutatorBytes, HasMutatorResizableBytes},
+    inputs::HasMutatorResizableBytes,
     mutators::mutations::buffer_copy,
     nonzero,
     observers::{MapObserver, ObserversTuple},
