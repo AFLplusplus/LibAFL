@@ -775,8 +775,8 @@ impl CommandExecutorBuilder {
 ///
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
-///     S: HasCorpus + HasExecutions,
-///     S::Corpus: Corpus<Input = BytesInput>
+///     S: HasCorpus<BytesInput> + HasExecutions,
+///     S::Corpus: Corpus<BytesInput>
 /// {
 ///     MyExecutor.into_executor(())
 /// }
