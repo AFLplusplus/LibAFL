@@ -8,7 +8,6 @@ use core::{
     slice::{Iter, IterMut},
 };
 
-use ahash::RandomState;
 use libafl_bolts::{
     ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named,
 };
@@ -16,7 +15,7 @@ use meminterval::IntervalTree;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, DifferentialObserver, Observer, SimpleHash},
+    observers::{map::MapObserver, DifferentialObserver, Observer},
     Error,
 };
 
@@ -81,16 +80,6 @@ impl<T, const DIFFERENTIAL: bool> AsRef<Self> for MultiMapObserver<'_, T, DIFFER
 impl<T, const DIFFERENTIAL: bool> AsMut<Self> for MultiMapObserver<'_, T, DIFFERENTIAL> {
     fn as_mut(&mut self) -> &mut Self {
         self
-    }
-}
-
-impl<T, const DIFFERENTIAL: bool> SimpleHash for MultiMapObserver<'_, T, DIFFERENTIAL>
-where
-    T: Hash,
-{
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 }
 

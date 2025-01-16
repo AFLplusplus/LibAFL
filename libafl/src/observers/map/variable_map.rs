@@ -7,7 +7,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
     AsSlice, AsSliceMut, HasLen, Named,
@@ -15,7 +14,7 @@ use libafl_bolts::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, Observer, SimpleHash, VarLenMapObserver},
+    observers::{map::MapObserver, Observer, VarLenMapObserver},
     Error,
 };
 
@@ -72,16 +71,6 @@ impl<T> AsRef<Self> for VariableMapObserver<'_, T> {
 impl<T> AsMut<Self> for VariableMapObserver<'_, T> {
     fn as_mut(&mut self) -> &mut Self {
         self
-    }
-}
-
-impl<T> SimpleHash for VariableMapObserver<'_, T>
-where
-    T: Hash,
-{
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 }
 

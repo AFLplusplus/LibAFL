@@ -1,7 +1,7 @@
 //! Schedule the access to the Corpus.
 
 use alloc::{borrow::ToOwned, string::ToString};
-use core::marker::PhantomData;
+use core::{hash::Hash, marker::PhantomData};
 
 pub mod testcase_score;
 pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
@@ -28,6 +28,7 @@ pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod tuneable;
 use libafl_bolts::{
+    generic_hash_std,
     rands::Rand,
     tuples::{Handle, MatchName, MatchNameRef},
 };
@@ -35,7 +36,6 @@ pub use tuneable::*;
 
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, SchedulerTestcaseMetadata, Testcase},
-    observers::SimpleHash,
     random_corpus_id,
     state::{HasCorpus, HasRand},
     Error, HasMetadata,
@@ -109,7 +109,7 @@ where
     CS: AflScheduler,
     CS::MapObserverRef: AsRef<O>,
     S: HasMetadata,
-    O: SimpleHash,
+    O: Hash,
     OT: MatchName,
 {
     let observer = observers
@@ -117,7 +117,7 @@ where
         .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
         .as_ref();
 
-    let mut hash = observer.hash_simple() as usize;
+    let mut hash = generic_hash_std(observer) as usize;
 
     let psmeta = state.metadata_mut::<SchedulerMetadata>()?;
 

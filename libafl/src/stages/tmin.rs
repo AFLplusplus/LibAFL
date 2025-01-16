@@ -8,6 +8,7 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
+    generic_hash_std,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
     HasLen, Named,
 };
@@ -25,7 +26,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple, SimpleHash},
+    observers::{MapObserver, ObserversTuple},
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
@@ -360,7 +361,7 @@ impl<C, M, S> StateInitializer<S> for MapEqualityFeedback<C, M, S> {}
 
 impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for MapEqualityFeedback<C, M, S>
 where
-    M: SimpleHash,
+    M: Hash,
     C: AsRef<M>,
     OT: MatchName,
 {
@@ -375,7 +376,7 @@ where
         let obs = observers
             .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
-        let res = obs.as_ref().hash_simple() == self.orig_hash;
+        let res = generic_hash_std(obs.as_ref()) == self.orig_hash;
         #[cfg(feature = "track_hit_feedbacks")]
         {
             self.last_result = Some(res);
@@ -419,7 +420,7 @@ impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
 
 impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqualityFactory<C, M, S>
 where
-    M: SimpleHash,
+    M: Hash,
     C: AsRef<M> + Handled,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus,
@@ -431,7 +432,7 @@ where
         MapEqualityFeedback {
             name: Cow::from("MapEq"),
             map_ref: obs.handle(),
-            orig_hash: obs.as_ref().hash_simple(),
+            orig_hash: generic_hash_std(obs.as_ref()),
             #[cfg(feature = "track_hit_feedbacks")]
             last_result: None,
             phantom: PhantomData,

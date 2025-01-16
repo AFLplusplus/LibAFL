@@ -8,12 +8,11 @@ use core::{
     ptr::NonNull,
 };
 
-use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedMutSizedSlice, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    observers::{map::MapObserver, ConstLenMapObserver, Observer, SimpleHash},
+    observers::{map::MapObserver, ConstLenMapObserver, Observer},
     Error,
 };
 
@@ -69,16 +68,6 @@ impl<T, const N: usize> AsRef<Self> for ConstMapObserver<'_, T, N> {
 impl<T, const N: usize> AsMut<Self> for ConstMapObserver<'_, T, N> {
     fn as_mut(&mut self) -> &mut Self {
         self
-    }
-}
-
-impl<T, const N: usize> SimpleHash for ConstMapObserver<'_, T, N>
-where
-    T: Hash,
-{
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 }
 

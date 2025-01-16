@@ -14,8 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     executors::ExitKind,
     observers::{
-        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, SimpleHash,
-        VarLenMapObserver,
+        map::MapObserver, ConstLenMapObserver, DifferentialObserver, Observer, VarLenMapObserver,
     },
     Error,
 };
@@ -182,16 +181,6 @@ impl<M> AsRef<Self> for HitcountsMapObserver<M> {
 impl<M> AsMut<Self> for HitcountsMapObserver<M> {
     fn as_mut(&mut self) -> &mut Self {
         self
-    }
-}
-
-impl<M> SimpleHash for HitcountsMapObserver<M>
-where
-    M: SimpleHash,
-{
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        self.base.hash_simple()
     }
 }
 
@@ -409,16 +398,6 @@ impl<M> AsRef<Self> for HitcountsIterableMapObserver<M> {
 impl<M> AsMut<Self> for HitcountsIterableMapObserver<M> {
     fn as_mut(&mut self) -> &mut Self {
         self
-    }
-}
-
-impl<M> SimpleHash for HitcountsIterableMapObserver<M>
-where
-    M: SimpleHash,
-{
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        self.base.hash_simple()
     }
 }
 

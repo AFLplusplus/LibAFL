@@ -7,7 +7,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -338,12 +337,6 @@ pub mod macros {
     }
 }
 
-/// Can calculate a simple hash function, usually used in conjunction with a [`MapObserver`]
-pub trait SimpleHash {
-    /// Compute the hash of the map without needing to provide a hasher
-    fn hash_simple(&self) -> u64;
-}
-
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 ///
 /// When referring to this type in a constraint (e.g. `O: MapObserver`), ensure that you only refer
@@ -492,16 +485,6 @@ impl<T, const DIFFERENTIAL: bool> AsRef<Self> for StdMapObserver<'_, T, DIFFEREN
 impl<T, const DIFFERENTIAL: bool> AsMut<Self> for StdMapObserver<'_, T, DIFFERENTIAL> {
     fn as_mut(&mut self) -> &mut Self {
         self
-    }
-}
-
-impl<T, const DIFFERENTIAL: bool> SimpleHash for StdMapObserver<'_, T, DIFFERENTIAL>
-where
-    T: Hash,
-{
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 }
 

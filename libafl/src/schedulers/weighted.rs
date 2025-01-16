@@ -3,7 +3,7 @@
 //! The queue corpus scheduler with weighted queue item selection [from AFL++](https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32).
 //! This queue corpus scheduler needs calibration stage.
 
-use core::marker::PhantomData;
+use core::{hash::Hash, marker::PhantomData};
 
 use hashbrown::HashMap;
 use libafl_bolts::{
@@ -13,14 +13,12 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::powersched::PowerSchedule;
 use crate::{
     corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    observers::SimpleHash,
     random_corpus_id,
     schedulers::{
         on_add_metadata_default, on_evaluation_metadata_default, on_next_metadata_default,
-        powersched::{BaseSchedule, SchedulerMetadata},
+        powersched::{BaseSchedule, PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         AflScheduler, HasQueueCycles, RemovableScheduler, Scheduler,
     },
@@ -309,7 +307,7 @@ impl<C, F, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for WeightedSchedule
 where
     C: AsRef<O> + Named,
     F: TestcaseScore<S>,
-    O: SimpleHash,
+    O: Hash,
     S: HasCorpus + HasMetadata + HasRand + HasTestcase,
 {
     /// Called when a [`Testcase`] is added to the corpus
