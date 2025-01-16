@@ -47,11 +47,13 @@ pub struct X<A>
 ```
 
 - Prefer generic to associated types in traits definition as much as possible. They are much easier to use around, and avoid tricky caveats / type repetition in the code. It is also much easier to have unconstrained struct definitions.
-Try to not write this:
+
+Try not to write this:
 ```rust
 pub trait X
 {
     type A;
+    
     fn a(&self) -> Self::A;
 }
 ```
@@ -63,12 +65,13 @@ pub trait X<A>
 }
 ```
 
-- Traits which have an associated type should refer to the associated type, not the concrete/generic. In other words, you should only have the associated type when you can define a getter to it. For example, in the following code, you can define a associate type.
+- Traits which have an associated type (if you have made sure you cannot use a generic instead) should refer to the associated type, not the concrete/generic. In other words, you should only have the associated type when you can define a getter to it. For example, in the following code, you can define a associate type.
 ```rust
 pub trait X 
 {
     type A; // <- You should(can) define it as long as you have a getter to it.
-    fn a(&self) -> Self::ASelf::;
+    
+    fn a(&self) -> Self::A;
 }
 ```
 
