@@ -230,7 +230,9 @@ where
                     is_tc = true;
                     true
                 }
-                Event::UpdateExecStats { .. } | Event::Objective { .. } | Event::Stop => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::UpdateExecStats { .. } => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::Objective { .. } => true,
+                Event::Stop => true,
                 _ => false,
             };
 
