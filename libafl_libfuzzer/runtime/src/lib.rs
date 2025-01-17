@@ -151,12 +151,13 @@ macro_rules! fuzz_with {
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
             feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
-            inputs::{BytesInput, HasTargetBytes},
+            inputs::{BytesInput, HasTargetBytes, GeneralizedInputMetadata},
             mutators::{
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
                 I2SRandReplace, StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator,
-                UnicodeCategoryTokenReplaceMutator, UnicodeSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
+                UnicodeCategoryTokenReplaceMutator, UnicodeSubcategoryTokenReplaceMutator, Tokens, tokens_mutations,
+                UnicodeInput,
             },
             observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack},
             schedulers::{
@@ -173,7 +174,6 @@ macro_rules! fuzz_with {
         use libafl_bolts::nonzero;
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
-        use core::num::NonZeroUsize;
         use crate::{
             CustomMutationStatus,
             corpus::{ArtifactCorpus, LibfuzzerCorpus},
@@ -414,7 +414,7 @@ macro_rules! fuzz_with {
                 ),
                 3,
             );
-            let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(grimoire_mutator), ()));
+            let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::<_, _, GeneralizedInputMetadata, BytesInput, _, _, _>::transforming(grimoire_mutator), ()));
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()));
