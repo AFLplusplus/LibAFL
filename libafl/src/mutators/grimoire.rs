@@ -4,8 +4,8 @@
 use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{max, min},
-    num::NonZero,
     marker::PhantomData,
+    num::NonZero,
 };
 
 use libafl_bolts::{
