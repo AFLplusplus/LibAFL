@@ -11,7 +11,7 @@ use std::{
 use frida_gum::{
     instruction_writer::InstructionWriter,
     stalker::{StalkerIterator, StalkerOutput, Transformer},
-    Backend, Gum, ModuleDetails, ModuleMap, Script,
+    Backend, Gum, Module, ModuleMap, Script,
 };
 use frida_gum_sys::gchar;
 use libafl::Error;
@@ -276,8 +276,8 @@ pub struct FridaInstrumentationHelperBuilder {
     stalker_enabled: bool,
     disable_excludes: bool,
     #[expect(clippy::type_complexity)]
-    instrument_module_predicate: Option<Box<dyn FnMut(&ModuleDetails) -> bool>>,
-    skip_module_predicate: Box<dyn FnMut(&ModuleDetails) -> bool>,
+    instrument_module_predicate: Option<Box<dyn FnMut(&Module) -> bool>>,
+    skip_module_predicate: Box<dyn FnMut(&Module) -> bool>,
     skip_ranges: Vec<SkipRange>,
 }
 
@@ -353,7 +353,7 @@ impl FridaInstrumentationHelperBuilder {
     ///     .instrument_module_if(|module| module.path().starts_with("/usr/lib"));
     /// ```
     #[must_use]
-    pub fn instrument_module_if<F: FnMut(&ModuleDetails) -> bool + 'static>(
+    pub fn instrument_module_if<F: FnMut(&Module) -> bool + 'static>(
         mut self,
         mut predicate: F,
     ) -> Self {
@@ -382,10 +382,7 @@ impl FridaInstrumentationHelperBuilder {
     ///     .skip_module_if(|module| module.name() == "libfoo.so");
     /// ```
     #[must_use]
-    pub fn skip_module_if<F: FnMut(&ModuleDetails) -> bool + 'static>(
-        mut self,
-        mut predicate: F,
-    ) -> Self {
+    pub fn skip_module_if<F: FnMut(&Module) -> bool + 'static>(mut self, mut predicate: F) -> Self {
         let new = move |module: &_| (self.skip_module_predicate)(module) || predicate(module);
         Self {
             skip_module_predicate: Box::new(new),
@@ -430,7 +427,7 @@ impl FridaInstrumentationHelperBuilder {
                 !skip_module_predicate(&module)
             }
         });
-        let module_map = Rc::new(ModuleMap::new_with_filter(gum, &mut module_filter));
+        let module_map = Rc::new(ModuleMap::new_with_filter(&mut module_filter));
 
         let ranges = RangeMap::new();
         // Wrap ranges and runtimes in reference-counted refcells in order to move
@@ -461,7 +458,7 @@ impl FridaInstrumentationHelperBuilder {
                         .borrow_mut()
                         .remove(range.start as u64..range.end as u64),
                     SkipRange::ModuleRelative { name, range } => {
-                        let module_details = ModuleDetails::with_name(name).unwrap();
+                        let module_details = Module::load(gum, &name);
                         let lib_start = module_details.range().base_address().0 as u64;
                         ranges.borrow_mut().remove(
                             (lib_start + range.start as u64)..(lib_start + range.end as u64),
@@ -550,7 +547,7 @@ pub unsafe extern "C" fn test_function(message: *const gchar) {
     }
 }
 
-fn pathlist_contains_module<I, P>(list: I, module: &ModuleDetails) -> bool
+fn pathlist_contains_module<I, P>(list: I, module: &Module) -> bool
 where
     I: IntoIterator<Item = P>,
     P: AsRef<Path>,
