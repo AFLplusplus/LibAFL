@@ -143,8 +143,9 @@ impl<E, EM, I1, I2, M, S, Z> Named for StdMutationalStage<E, EM, I1, I2, M, S, Z
 
 impl<E, EM, I1, I2, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
+    I1: Clone + MutatedTransform<I2, S>,
+    I2: Input,
     M: Mutator<I1, S>,
-    Z: Evaluator<E, EM, I2, S>,
     S: HasRand
         + HasCorpus<I2>
         + HasMetadata
@@ -152,8 +153,7 @@ where
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    I1: Clone + MutatedTransform<I2, S>,
-    I2: Input,
+    Z: Evaluator<E, EM, I2, S>,
 {
     #[inline]
     fn perform(
@@ -183,9 +183,9 @@ where
 impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
     I: MutatedTransform<I, S> + Input + Clone,
+    S: HasCorpus<I> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -202,11 +202,11 @@ where
 
 impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    M: Mutator<I1, S>,
-    Z: Evaluator<E, EM, I2, S>,
-    S: HasCorpus<I2> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
     I1: MutatedTransform<I2, S> + Clone,
     I2: Input,
+    M: Mutator<I1, S>,
+    S: HasCorpus<I2> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I2, S>,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -235,11 +235,11 @@ where
 
 impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    M: Mutator<I1, S>,
-    Z: Evaluator<E, EM, I2, S>,
-    S: HasRand + HasCurrentTestcase<I2> + MaybeHasClientPerfMonitor,
     I1: MutatedTransform<I2, S> + Clone,
     I2: Input,
+    M: Mutator<I1, S>,
+    S: HasRand + HasCurrentTestcase<I2> + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I2, S>,
 {
     /// Runs this (mutational) stage for the given testcase
     fn perform_mutational(
@@ -311,10 +311,10 @@ impl<E, EM, I, M, S, Z> Named for MultiMutationalStage<E, EM, I, M, S, Z> {
 
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<E, EM, I, M, S, Z>
 where
-    M: MultiMutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    S: HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
     I: Clone + MutatedTransform<I, S>,
+    M: MultiMutator<I, S>,
+    S: HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
+    Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
