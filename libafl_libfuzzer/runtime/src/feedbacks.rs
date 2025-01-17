@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use libafl::{
     alloc,
-    corpus::{Corpus, Testcase},
+    corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback, StateInitializer},
     inputs::{BytesInput, Input},
@@ -43,15 +43,15 @@ impl Named for LibfuzzerKeepFeedback {
 
 impl<S> StateInitializer<S> for LibfuzzerKeepFeedback {}
 
-impl<EM, OT, S> Feedback<EM, <S::Corpus as Corpus>::Input, OT, S> for LibfuzzerKeepFeedback
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for LibfuzzerKeepFeedback
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S::Corpus as Corpus>::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {

@@ -6,7 +6,6 @@ use std::{
 };
 
 use libafl::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     state::HasCorpus,
     Error,
@@ -253,25 +252,23 @@ fn check_file_found(file: &Path, perm: u32) -> bool {
 }
 
 #[cfg(feature = "nyx")]
-pub enum SupportedExecutors<S, OT, FSV, NYX> {
-    Forkserver(FSV, PhantomData<(S, OT, NYX)>),
+pub enum SupportedExecutors<FSV, I, OT, NYX> {
+    Forkserver(FSV, PhantomData<(FSV, I, OT)>),
     Nyx(NYX),
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for SupportedExecutors<S, OT, FSV, NYX>
+impl<S, I, OT, FSV, NYX, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<FSV, I, OT, NYX>
 where
-    S: HasCorpus,
-    NYX: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
-    FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+    NYX: Executor<EM, I, S, Z>,
+    FSV: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
@@ -282,7 +279,7 @@ where
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX> HasObservers for SupportedExecutors<S, OT, FSV, NYX>
+impl<FSV, I, OT, NYX> HasObservers for SupportedExecutors<FSV, I, OT, NYX>
 where
     NYX: HasObservers<Observers = OT>,
     FSV: HasObservers<Observers = OT>,
@@ -308,7 +305,7 @@ where
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX> HasTimeout for SupportedExecutors<S, OT, FSV, NYX>
+impl<FSV, I, OT, NYX> HasTimeout for SupportedExecutors<FSV, I, OT, NYX>
 where
     FSV: HasTimeout,
     NYX: HasTimeout,
@@ -330,23 +327,22 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-pub enum SupportedExecutors<S, OT, FSV> {
-    Forkserver(FSV, PhantomData<(S, OT)>),
+pub enum SupportedExecutors<FSV, I, OT, S> {
+    Forkserver(FSV, PhantomData<(I, OT, S)>),
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for SupportedExecutors<S, OT, FSV>
+impl<S, I, OT, FSV, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<FSV, I, OT, S>
 where
-    S: HasCorpus,
-    FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+    S: HasCorpus<I>,
+    FSV: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
@@ -355,7 +351,7 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV> HasObservers for SupportedExecutors<S, OT, FSV>
+impl<FSV, I, OT, S> HasObservers for SupportedExecutors<FSV, I, OT, S>
 where
     FSV: HasObservers<Observers = OT>,
 {
@@ -376,7 +372,7 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV> HasTimeout for SupportedExecutors<S, OT, FSV>
+impl<FSV, I, OT, S> HasTimeout for SupportedExecutors<FSV, I, OT, S>
 where
     FSV: HasTimeout,
 {

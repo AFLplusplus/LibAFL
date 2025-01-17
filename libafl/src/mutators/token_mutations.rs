@@ -31,7 +31,7 @@ use crate::{
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasMaxSize, HasRand},
     Error, HasMetadata,
 };
 
@@ -1305,7 +1305,7 @@ impl AFLppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
-    S: HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
+    S: HasMetadata + HasRand + HasMaxSize + HasCurrentCorpusId,
     I: HasMutatorResizableBytes + From<Vec<u8>>,
 {
     #[expect(clippy::needless_range_loop, clippy::too_many_lines)]

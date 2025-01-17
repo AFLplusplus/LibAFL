@@ -1,7 +1,7 @@
 //! In-memory corpus, keeps all test cases in memory at all times
 
 use alloc::vec::Vec;
-use core::cell::RefCell;
+use core::cell::{Ref, RefCell, RefMut};
 
 use serde::{Deserialize, Serialize};
 
@@ -314,9 +314,7 @@ pub struct InMemoryCorpus<I> {
     current: Option<CorpusId>,
 }
 
-impl<I> Corpus for InMemoryCorpus<I> {
-    type Input = I;
-
+impl<I> Corpus<I> for InMemoryCorpus<I> {
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -360,7 +358,7 @@ impl<I> Corpus for InMemoryCorpus<I> {
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
         let mut testcase = self.storage.enabled.remove(id);
         if testcase.is_none() {
             testcase = self.storage.disabled.remove(id);
@@ -380,7 +378,7 @@ impl<I> Corpus for InMemoryCorpus<I> {
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let mut testcase = self.storage.enabled.get(id);
         if testcase.is_none() {
             testcase = self.storage.disabled.get(id);
@@ -400,15 +398,15 @@ impl<I> Corpus for InMemoryCorpus<I> {
         &mut self.current
     }
 
+    #[inline]
+    fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        self.storage.enabled.next(id)
+    }
+
     /// Peek the next free corpus id
     #[inline]
     fn peek_free_id(&self) -> CorpusId {
         self.storage.peek_free_id()
-    }
-
-    #[inline]
-    fn next(&self, id: CorpusId) -> Option<CorpusId> {
-        self.storage.enabled.next(id)
     }
 
     #[inline]
@@ -443,29 +441,23 @@ impl<I> Corpus for InMemoryCorpus<I> {
     }
 
     #[inline]
-    fn load_input_into(&self, _: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, _: &mut Testcase<I>) -> Result<(), Error> {
         // Inputs never get evicted, nothing to load here.
         Ok(())
     }
 
     #[inline]
-    fn store_input_from(&self, _: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, _: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<I> HasTestcase for InMemoryCorpus<I> {
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+impl<I> HasTestcase<I> for InMemoryCorpus<I> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }

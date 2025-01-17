@@ -20,7 +20,7 @@ impl<I, S> RemovableScheduler<I, S> for QueueScheduler {}
 
 impl<I, S> Scheduler<I, S> for QueueScheduler
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id

@@ -3,10 +3,10 @@ use alloc::vec::Vec;
 use core::{
     ffi::c_void,
     marker::PhantomData,
+    mem::transmute,
     ptr::null,
     sync::atomic::{compiler_fence, Ordering},
 };
-use std::intrinsics::transmute;
 
 #[cfg(not(miri))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
@@ -21,7 +21,6 @@ use crate::{
         HasObservers,
     },
     observers::ObserversTuple,
-    state::HasCorpus,
     Error,
 };
 
@@ -35,10 +34,7 @@ pub struct InChildProcessHooks<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S>
-where
-    S: HasCorpus,
-{
+impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S> {
     /// Init this hook
     fn init(&mut self, _state: &mut S) {}
 
@@ -61,7 +57,6 @@ impl<I, S> InChildProcessHooks<I, S> {
     where
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        S: HasCorpus,
     {
         #[cfg_attr(miri, allow(unused_variables, unused_unsafe))]
         unsafe {
