@@ -1384,12 +1384,12 @@ impl<F, I, O> Named for MappedCrossoverInsertMutator<F, I, O> {
 
 /// Crossover replace mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
-pub struct MappedCrossoverReplaceMutator<F, O> {
+pub struct MappedCrossoverReplaceMutator<F, I, O> {
     input_mapper: F,
-    phantom: PhantomData<O>,
+    phantom: PhantomData<(I, O)>,
 }
 
-impl<F, O> MappedCrossoverReplaceMutator<F, O> {
+impl<F, I, O> MappedCrossoverReplaceMutator<F, I, O> {
     /// Creates a new [`MappedCrossoverReplaceMutator`]
     pub fn new(input_mapper: F) -> Self {
         Self {
@@ -1399,14 +1399,14 @@ impl<F, O> MappedCrossoverReplaceMutator<F, O> {
     }
 }
 
-impl<S, F, I, O> Mutator<I, S> for MappedCrossoverReplaceMutator<F, O>
+impl<S, F, I1, I2, O> Mutator<I2, S> for MappedCrossoverReplaceMutator<F, I1, O>
 where
-    F: Fn(&I) -> &O,
-    I: HasMutatorBytes,
+    F: Fn(&I1) -> &O,
+    I2: HasMutatorBytes,
     O: IntoOptionBytes,
-    S: HasCorpus<I> + HasMaxSize + HasRand,
+    S: HasCorpus<I1> + HasMaxSize + HasRand,
 {
-    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I2) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         if size == 0 {
             return Ok(MutationResult::Skipped);
@@ -1461,7 +1461,7 @@ where
     }
 }
 
-impl<F, O> Named for MappedCrossoverReplaceMutator<F, O> {
+impl<F, I, O> Named for MappedCrossoverReplaceMutator<F, I, O> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("MappedCrossoverReplaceMutator");
         &NAME
