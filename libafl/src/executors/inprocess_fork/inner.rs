@@ -32,7 +32,7 @@ use crate::{
 };
 
 /// Inner state of GenericInProcessExecutor-like structures.
-pub struct GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z> {
+pub struct GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SHM, SP, Z> {
     pub(super) hooks: (InChildProcessHooks<I, S>, HT),
     pub(super) shmem_provider: SP,
     pub(super) observers: OT,
@@ -40,10 +40,11 @@ pub struct GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z> {
     pub(super) itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
     pub(super) itimerval: Itimerval,
-    pub(super) phantom: PhantomData<(I, S, EM, Z)>,
+    pub(super) phantom: PhantomData<(EM, I, S, SHM, Z)>,
 }
 
-impl<HT, I, OT, S, SP, EM, Z> Debug for GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
+impl<EM, HT, I, OT, S, SHM, SP, Z> Debug
+    for GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SHM, SP, Z>
 where
     HT: Debug,
     OT: Debug,
@@ -104,11 +105,11 @@ fn parse_itimerval(timeout: Duration) -> Itimerval {
     }
 }
 
-impl<EM, HT, I, OT, S, SP, Z> GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
+impl<EM, HT, I, OT, S, SHM, SP, Z> GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SHM, SP, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
-    SP: ShMemProvider,
     OT: ObserversTuple<I, S>,
+    SP: ShMemProvider<SHM>,
 {
     pub(super) unsafe fn pre_run_target_child(
         &mut self,
@@ -195,7 +196,7 @@ where
     }
 }
 
-impl<HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
+impl<EM, HT, I, OT, S, SHM, SP, Z> GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SHM, SP, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -284,8 +285,8 @@ where
     }
 }
 
-impl<HT, I, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>
+impl<EM, HT, I, OT, S, SHM, SP, Z> HasObservers
+    for GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SHM, SP, Z>
 {
     type Observers = OT;
 

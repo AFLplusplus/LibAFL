@@ -113,13 +113,13 @@ impl<SP> Default for LlmpExampleHook<SP> {
 }
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-impl<SP> LlmpHook<SP> for LlmpExampleHook<SP>
+impl<SHM, SP> LlmpHook<SHM, SP> for LlmpExampleHook<SP>
 where
-    SP: ShMemProvider + 'static,
+    SP: ShMemProvider<SHM> + 'static,
 {
     fn on_new_message(
         &mut self,
-        _broker_inner: &mut LlmpBrokerInner<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         _msg_flags: &mut Flags,

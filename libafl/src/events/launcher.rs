@@ -14,6 +14,7 @@
 
 use core::{
     fmt::{self, Debug, Formatter},
+    marker::PhantomData,
     num::NonZeroUsize,
     time::Duration,
 };
@@ -21,7 +22,7 @@ use std::{net::SocketAddr, string::String};
 
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    shmem::ShMemProvider,
+    shmem::{ShMem, ShMemProvider},
     tuples::{tuple_list, Handle},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -129,7 +130,7 @@ impl ClientDescription {
 ///
 /// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
 #[derive(TypedBuilder)]
-pub struct Launcher<'a, CF, MT, SP> {
+pub struct Launcher<'a, CF, MT, SHM, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -183,9 +184,11 @@ pub struct Launcher<'a, CF, MT, SP> {
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
+    #[builder(default = PhantomData)]
+    phantom: PhantomData<SHM>,
 }
 
-impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
+impl<CF, MT, SHM, SP> Debug for Launcher<'_, CF, MT, SHM, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_struct = f.debug_struct("Launcher");
         dbg_struct
@@ -205,10 +208,9 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
     }
 }
 
-impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
+impl<CF, MT, SHM, SP> Launcher<'_, CF, MT, SHM, SP>
 where
     MT: Monitor + Clone,
-    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(any(windows, not(feature = "fork"), all(unix, feature = "fork")))]
@@ -216,20 +218,23 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<(), I, S, SP>,
+            LlmpRestartingEventManager<(), I, S, SHM, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         I: DeserializeOwned,
         S: DeserializeOwned + Serialize,
+        SHM: ShMem,
+        SP: ShMemProvider<SHM>,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
 }
 
-impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
+impl<CF, MT, SHM, SP> Launcher<'_, CF, MT, SHM, SP>
 where
     MT: Monitor + Clone,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "fork"))]
@@ -240,7 +245,7 @@ where
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, I, S, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SHM, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
     {
@@ -312,7 +317,7 @@ where
                                 ClientDescription::new(index, overcommit_id, bind_to);
 
                             // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+                            let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
                                 .shmem_provider(self.shmem_provider.clone())
                                 .broker_port(self.broker_port)
                                 .kind(ManagerKind::Client {
@@ -339,7 +344,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+            let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -385,7 +390,7 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, I, S, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SHM, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
@@ -401,7 +406,7 @@ where
                 let client_description = ClientDescription::from_safe_string(&core_conf);
                 // the actual client. do the fuzzing
 
-                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+                let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -502,7 +507,7 @@ where
         if self.spawn_broker {
             log::info!("I am broker!!.");
 
-            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
+            let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -541,7 +546,7 @@ where
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(all(unix, feature = "fork"))]
 #[derive(TypedBuilder)]
-pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
+pub struct CentralizedLauncher<'a, CF, MF, MT, SHM, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -601,10 +606,11 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
+    phantom: PhantomData<SHM>,
 }
 
 #[cfg(all(unix, feature = "fork"))]
-impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
+impl<CF, MF, MT, SHM, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SHM, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
             .field("configuration", &self.configuration)
@@ -620,13 +626,14 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
 }
 
 /// The standard inner manager of centralized
-pub type StdCentralizedInnerMgr<I, S, SP> = LlmpRestartingEventManager<(), I, S, SP>;
+pub type StdCentralizedInnerMgr<I, S, SHM, SP> = LlmpRestartingEventManager<(), I, S, SHM, SP>;
 
 #[cfg(all(unix, feature = "fork"))]
-impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
+impl<CF, MF, MT, SHM, SP> CentralizedLauncher<'_, CF, MF, MT, SHM, SP>
 where
     MT: Monitor + Clone + 'static,
-    SP: ShMemProvider + 'static,
+    SHM: ShMem + 'static,
+    SP: ShMemProvider<SHM> + 'static,
 {
     /// Launch a standard Centralized-based fuzzer
     pub fn launch<I, S>(&mut self) -> Result<(), Error>
@@ -635,19 +642,19 @@ where
         I: DeserializeOwned + Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SP>, (), I, S, SP>,
+            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SHM, SP>, (), I, S, SHM, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SP>, (), I, S, SP>,
+            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SHM, SP>, (), I, S, SHM, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
     {
         let restarting_mgr_builder =
             |centralized_launcher: &Self, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                let builder = RestartingMgr::<(), I, MT, S, SP>::builder()
+                let builder = RestartingMgr::<(), I, MT, S, SHM, SP>::builder()
                     .shmem_provider(centralized_launcher.shmem_provider.clone())
                     .broker_port(centralized_launcher.broker_port)
                     .kind(ManagerKind::Client { client_description })
@@ -665,10 +672,11 @@ where
 }
 
 #[cfg(all(unix, feature = "fork"))]
-impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
+impl<CF, MF, MT, SHM, SP> CentralizedLauncher<'_, CF, MF, MT, SHM, SP>
 where
     MT: Monitor + Clone + 'static,
-    SP: ShMemProvider + 'static,
+    SHM: ShMem + 'static,
+    SP: ShMemProvider<SHM> + 'static,
 {
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
@@ -682,13 +690,13 @@ where
         I: Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SP>,
+            CentralizedEventManager<EM, (), I, S, SHM, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMB: FnOnce(&Self, ClientDescription) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SP>, // No broker_hooks for centralized EM
+            CentralizedEventManager<EM, (), I, S, SHM, SP>, // No broker_hooks for centralized EM
             ClientDescription,
         ) -> Result<(), Error>,
     {
