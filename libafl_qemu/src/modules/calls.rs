@@ -341,7 +341,7 @@ where
                 for detail in insn_detail.groups() {
                     match u32::from(detail.0) {
                         capstone::InsnGroupType::CS_GRP_CALL => {
-                            let call_len = insn.bytes().len();
+                            let call_len = insn.mutator_bytes().len();
                             call_addrs.push((insn.address() as GuestAddr, call_len));
                         }
                         capstone::InsnGroupType::CS_GRP_RET => {
@@ -358,7 +358,7 @@ where
                     }
                 }
 
-                iaddr += insn.bytes().len() as GuestAddr;
+                iaddr += insn.mutator_bytes().len() as GuestAddr;
 
                 #[cfg(feature = "usermode")]
                 unsafe {

@@ -11,7 +11,7 @@ use std::{
 
 use libafl::{
     corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes},
+    inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
@@ -172,7 +172,7 @@ where
                     drop(result);
 
                     if succeeded {
-                        let target = intermediary.bytes();
+                        let target = intermediary.mutator_bytes();
                         if target.as_slice().len() > max_size {
                             self.result
                                 .replace(Err(Error::illegal_state("Mutation result was too long!")))
@@ -322,7 +322,7 @@ where
         input: &mut BytesInput,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
-        let len_orig = input.bytes().len();
+        let len_orig = input.mutator_bytes().len();
         let max_len = state.max_size();
         input.resize(max_len, 0);
 
@@ -335,7 +335,7 @@ where
         });
         let new_len = unsafe {
             libafl_targets_libfuzzer_custom_mutator(
-                input.bytes_mut().as_mut_ptr(),
+                input.mutator_bytes_mut().as_mut_ptr(),
                 len_orig,
                 max_len,
                 seed as u32,
@@ -410,7 +410,7 @@ where
 
         let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
-        let data2 = Vec::from(other.bytes());
+        let data2 = Vec::from(other.mutator_bytes());
         drop(other_testcase);
 
         let seed = state.rand_mut().next();
@@ -430,7 +430,7 @@ where
         });
         let new_len = unsafe {
             libafl_targets_libfuzzer_custom_crossover(
-                input.bytes_mut().as_mut_ptr(),
+                input.mutator_bytes_mut().as_mut_ptr(),
                 len_orig,
                 data2.as_ptr(),
                 data2.len(),

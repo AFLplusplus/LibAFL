@@ -158,17 +158,17 @@ pub trait HasTargetBytes {
 /// Contains mutable bytes
 pub trait HasMutatorBytes: HasLen {
     /// The bytes
-    fn bytes(&self) -> &[u8];
+    fn mutator_bytes(&self) -> &[u8];
 
     /// The bytes to mutate
-    fn bytes_mut(&mut self) -> &mut [u8];
+    fn mutator_bytes_mut(&mut self) -> &mut [u8];
 
     /// Creates a [`SubRangeSlice`] from this input, that can be used to slice a byte array.
     fn sub_bytes<R>(&self, range: R) -> SubRangeSlice<u8>
     where
         R: RangeBounds<usize>,
     {
-        SubRangeSlice::new(OwnedSlice::from(self.bytes()), range)
+        SubRangeSlice::new(OwnedSlice::from(self.mutator_bytes()), range)
     }
 
     /// Creates a [`SubRangeMutSlice`] from this input, that can be used to slice a byte array.
@@ -176,7 +176,7 @@ pub trait HasMutatorBytes: HasLen {
     where
         R: RangeBounds<usize>,
     {
-        SubRangeMutSlice::new(OwnedMutSlice::from(self.bytes_mut()), range)
+        SubRangeMutSlice::new(OwnedMutSlice::from(self.mutator_bytes_mut()), range)
     }
 
     /// Creates a [`BytesSubInput`] from this input, that can be used for local mutations.
@@ -189,11 +189,11 @@ pub trait HasMutatorBytes: HasLen {
 }
 
 impl HasMutatorBytes for Vec<u8> {
-    fn bytes(&self) -> &[u8] {
+    fn mutator_bytes(&self) -> &[u8] {
         self.as_ref()
     }
 
-    fn bytes_mut(&mut self) -> &mut [u8] {
+    fn mutator_bytes_mut(&mut self) -> &mut [u8] {
         self.as_mut()
     }
 }
@@ -203,63 +203,68 @@ impl HasMutatorBytes for Vec<u8> {
 pub type MutVecInput<'a> = &'a mut Vec<u8>;
 
 impl HasMutatorBytes for &'_ mut Vec<u8> {
-    fn bytes(&self) -> &[u8] {
+    fn mutator_bytes(&self) -> &[u8] {
         self
     }
 
-    fn bytes_mut(&mut self) -> &mut [u8] {
+    fn mutator_bytes_mut(&mut self) -> &mut [u8] {
         self
     }
 }
 
-/// Contains mutable and resizable bytes
-pub trait HasMutatorResizableBytes: HasMutatorBytes {
-    /// Resize the mutator bytes to a given new size.
+/// Contains resizable bytes
+pub trait ResizableMutator<T> {
+    /// Resize the mutator content to a given new size.
     /// Use `value` to fill new slots in case the buffer grows.
     /// See [`Vec::splice`].
-    fn resize(&mut self, new_len: usize, value: u8);
+    fn resize(&mut self, new_len: usize, value: T);
 
     /// Extends the given buffer with an iterator. See [`alloc::vec::Vec::extend`]
-    fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I);
+    fn extend<'a, I: IntoIterator<Item = &'a T>>(&mut self, iter: I)
+    where
+        T: 'a;
 
-    /// Splices the given target bytes according to [`Vec::splice`]'s rules
+    /// Splices the given target values according to [`Vec::splice`]'s rules
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
     where
         R: RangeBounds<usize>,
-        I: IntoIterator<Item = u8>;
+        I: IntoIterator<Item = T>;
 
-    /// Drains the given target bytes according to [`Vec::drain`]'s rules
-    fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
+    /// Drains the given target value according to [`Vec::drain`]'s rules
+    fn drain<R>(&mut self, range: R) -> Drain<'_, T>
     where
         R: RangeBounds<usize>;
 }
 
-impl HasMutatorResizableBytes for Vec<u8> {
-    fn resize(&mut self, new_len: usize, value: u8) {
-        <Vec<u8>>::resize(self, new_len, value);
+impl<T> ResizableMutator<T> for Vec<T>
+where
+    T: Copy + 'static,
+{
+    fn resize(&mut self, new_len: usize, value: T) {
+        <Vec<T>>::resize(self, new_len, value);
     }
 
-    fn extend<'a, I: IntoIterator<Item = &'a u8>>(&mut self, iter: I) {
-        <Vec<u8> as Extend<I::Item>>::extend(self, iter);
+    fn extend<'a, I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
+        <Vec<T> as Extend<I::Item>>::extend(self, iter);
     }
 
     fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
     where
         R: RangeBounds<usize>,
-        I: IntoIterator<Item = u8>,
+        I: IntoIterator<Item = T>,
     {
-        <Vec<u8>>::splice(self, range, replace_with)
+        <Vec<T>>::splice(self, range, replace_with)
     }
 
-    fn drain<R>(&mut self, range: R) -> Drain<'_, u8>
+    fn drain<R>(&mut self, range: R) -> Drain<'_, T>
     where
         R: RangeBounds<usize>,
     {
-        <Vec<u8>>::drain(self, range)
+        <Vec<T>>::drain(self, range)
     }
 }
 
-impl HasMutatorResizableBytes for &mut Vec<u8> {
+impl ResizableMutator<u8> for &mut Vec<u8> {
     fn resize(&mut self, new_len: usize, value: u8) {
         self.deref_mut().resize(new_len, value);
     }

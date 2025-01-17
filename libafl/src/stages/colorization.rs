@@ -18,7 +18,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::{HasMutatorBytes, HasMutatorResizableBytes},
+    inputs::{HasMutatorBytes, ResizableMutator},
     mutators::mutations::buffer_copy,
     nonzero,
     observers::ObserversTuple,
@@ -81,7 +81,7 @@ where
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     S: HasCorpus + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: HasMutatorResizableBytes + Clone,
+    <S::Corpus as Corpus>::Input: ResizableMutator<u8> + Clone + HasMutatorBytes,
     O: Hash,
     C: AsRef<O> + Named,
 {
@@ -158,7 +158,7 @@ where
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase,
-    <S::Corpus as Corpus>::Input: HasMutatorResizableBytes + Clone,
+    <S::Corpus as Corpus>::Input: ResizableMutator<u8> + HasMutatorBytes + Clone,
 {
     #[inline]
     fn colorize(
@@ -179,7 +179,7 @@ where
         // Idea: No need to do this every time
         let orig_hash =
             Self::get_raw_map_hash_run(fuzzer, executor, state, manager, &input, observer_handle)?;
-        let changed_bytes = changed.bytes_mut();
+        let changed_bytes = changed.mutator_bytes_mut();
         let input_len = changed_bytes.len();
 
         // Binary heap, pop is logN, insert is logN
@@ -208,8 +208,8 @@ where
                 let copy_len = r.len();
                 unsafe {
                     buffer_copy(
-                        input.bytes_mut(),
-                        changed.bytes(),
+                        input.mutator_bytes_mut(),
+                        changed.mutator_bytes(),
                         range_start,
                         range_start,
                         copy_len,
@@ -236,8 +236,8 @@ where
                     // Revert the changes
                     unsafe {
                         buffer_copy(
-                            input.bytes_mut(),
-                            backup.bytes(),
+                            input.mutator_bytes_mut(),
+                            backup.mutator_bytes(),
                             range_start,
                             range_start,
                             copy_len,
@@ -280,11 +280,11 @@ where
         }
 
         if let Some(meta) = state.metadata_map_mut().get_mut::<TaintMetadata>() {
-            meta.update(input.bytes().to_vec(), res);
+            meta.update(input.mutator_bytes().to_vec(), res);
 
             // println!("meta: {:#?}", meta);
         } else {
-            let meta = TaintMetadata::new(input.bytes().to_vec(), res);
+            let meta = TaintMetadata::new(input.mutator_bytes().to_vec(), res);
             state.add_metadata::<TaintMetadata>(meta);
         }
 

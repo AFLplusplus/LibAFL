@@ -2112,7 +2112,7 @@ impl AsanRuntime {
         u32,                     //load/store size
         Option<(ShiftStyle, u8)>, //(shift type, shift size)
     )> {
-        let instr = disas_count(&decoder, instr.bytes(), 1)[0];
+        let instr = disas_count(&decoder, instr.mutator_bytes(), 1)[0];
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.opcode {

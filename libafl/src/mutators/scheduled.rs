@@ -352,10 +352,10 @@ mod tests {
         let mut splice = SpliceMutator::new();
         splice.mutate(&mut state, &mut input).unwrap();
 
-        log::trace!("{:?}", input.bytes());
+        log::trace!("{:?}", input.mutator_bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        assert_eq!(input.bytes(), b"abf");
+        assert_eq!(input.mutator_bytes(), b"abf");
     }
 
     #[test]

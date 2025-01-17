@@ -208,14 +208,14 @@ pub(crate) fn frida_to_cs(
     decoder: InstDecoder,
     frida_insn: &frida_gum_sys::Insn,
 ) -> Result<Instruction, Error> {
-    match decoder.decode_slice(frida_insn.bytes()) {
+    match decoder.decode_slice(frida_insn.mutator_bytes()) {
         Ok(result) => Ok(result),
         Err(error) => {
             log::error!(
                 "{:?}: {:x}: {:?}",
                 error,
                 frida_insn.address(),
-                frida_insn.bytes()
+                frida_insn.mutator_bytes()
             );
             Err(Error::illegal_state(
                 "Instruction did not disassemble properly",

@@ -655,7 +655,7 @@ where
         let mut basic_block_size = 0;
         for instruction in basic_block {
             let instr = instruction.instr();
-            let instr_size = instr.bytes().len();
+            let instr_size = instr.mutator_bytes().len();
             let address = instr.address();
             // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
             //the ASAN check needs to be done before the hook_rt check due to x86 insns such as call [mem]
@@ -696,7 +696,7 @@ where
                         rt.emit_shadow_check(
                             address,
                             output,
-                            instr.bytes().len(),
+                            instr.mutator_bytes().len(),
                             details.0,
                             details.1,
                             details.2,

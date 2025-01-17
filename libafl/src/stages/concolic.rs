@@ -411,7 +411,7 @@ where
             for mutation in mutations {
                 let mut input_copy = state.current_input_cloned()?;
                 for (index, new_byte) in mutation {
-                    input_copy.bytes_mut()[index] = new_byte;
+                    input_copy.mutator_bytes_mut()[index] = new_byte;
                 }
                 fuzzer.evaluate_filtered(state, executor, manager, input_copy)?;
             }

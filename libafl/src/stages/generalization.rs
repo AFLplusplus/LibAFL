@@ -18,8 +18,7 @@ use crate::{
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{
-        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes,
-        HasMutatorResizableBytes,
+        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, ResizableMutator,
     },
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
@@ -107,7 +106,7 @@ where
             let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
             let input = entry.input_mut().as_mut().unwrap();
 
-            let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
+            let payload: Vec<_> = input.mutator_bytes().iter().map(|&x| Some(x)).collect();
 
             if payload.len() > MAX_GENERALIZED_LEN {
                 return Ok(());
