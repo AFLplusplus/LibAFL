@@ -6,6 +6,7 @@ use core::{
     cmp::{max, min},
     num::NonZero,
 };
+use std::marker::PhantomData;
 
 use libafl_bolts::{
     rands::{choose, fast_bound, Rand},
@@ -116,13 +117,14 @@ where
 
 /// Extend the generalized input with another random one from the corpus
 #[derive(Debug, Default)]
-pub struct GrimoireExtensionMutator {
+pub struct GrimoireExtensionMutator<I> {
     gap_indices: Vec<usize>,
+    phantom: PhantomData<I>,
 }
 
-impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireExtensionMutator
+impl<I, S> Mutator<GeneralizedInputMetadata, S> for GrimoireExtensionMutator<I>
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
+    S: HasMetadata + HasRand + HasCorpus<I>,
 {
     fn mutate(
         &mut self,
@@ -137,33 +139,35 @@ where
     }
 }
 
-impl Named for GrimoireExtensionMutator {
+impl<I> Named for GrimoireExtensionMutator<I> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireExtensionMutator");
         &NAME
     }
 }
 
-impl GrimoireExtensionMutator {
+impl<I> GrimoireExtensionMutator<I> {
     /// Creates a new [`GrimoireExtensionMutator`].
     #[must_use]
     pub fn new() -> Self {
         Self {
             gap_indices: vec![],
+            phantom: PhantomData,
         }
     }
 }
 
 /// Extend the generalized input with another random one from the corpus
 #[derive(Debug, Default)]
-pub struct GrimoireRecursiveReplacementMutator {
+pub struct GrimoireRecursiveReplacementMutator<I> {
     scratch: Vec<GeneralizedItem>,
     gap_indices: Vec<usize>,
+    phantom: PhantomData<I>,
 }
 
-impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireRecursiveReplacementMutator
+impl<I, S> Mutator<GeneralizedInputMetadata, S> for GrimoireRecursiveReplacementMutator<I>
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
+    S: HasMetadata + HasRand + HasCorpus<I>,
 {
     fn mutate(
         &mut self,
@@ -215,31 +219,34 @@ where
     }
 }
 
-impl Named for GrimoireRecursiveReplacementMutator {
+impl<I> Named for GrimoireRecursiveReplacementMutator<I> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireRecursiveReplacementMutator");
         &NAME
     }
 }
 
-impl GrimoireRecursiveReplacementMutator {
+impl<I> GrimoireRecursiveReplacementMutator<I> {
     /// Creates a new [`GrimoireRecursiveReplacementMutator`].
     #[must_use]
     pub fn new() -> Self {
         Self {
             scratch: vec![],
             gap_indices: vec![],
+            phantom: PhantomData,
         }
     }
 }
 
 /// Replace matching tokens with others from the tokens metadata
 #[derive(Debug, Default)]
-pub struct GrimoireStringReplacementMutator {}
+pub struct GrimoireStringReplacementMutator<I> {
+    phantom: PhantomData<I>,
+}
 
-impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireStringReplacementMutator
+impl<I, S> Mutator<GeneralizedInputMetadata, S> for GrimoireStringReplacementMutator<I>
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
+    S: HasMetadata + HasRand + HasCorpus<I>,
 {
     fn mutate(
         &mut self,
@@ -336,30 +343,33 @@ where
     }
 }
 
-impl Named for GrimoireStringReplacementMutator {
+impl<I> Named for GrimoireStringReplacementMutator<I> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireStringReplacementMutator");
         &NAME
     }
 }
 
-impl GrimoireStringReplacementMutator {
+impl<I> GrimoireStringReplacementMutator<I> {
     /// Creates a new [`GrimoireExtensionMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 
 /// Randomly delete a part of the generalized input
 #[derive(Debug, Default)]
-pub struct GrimoireRandomDeleteMutator {
+pub struct GrimoireRandomDeleteMutator<I> {
     gap_indices: Vec<usize>,
+    phantom: PhantomData<I>,
 }
 
-impl<S> Mutator<GeneralizedInputMetadata, S> for GrimoireRandomDeleteMutator
+impl<I, S> Mutator<GeneralizedInputMetadata, S> for GrimoireRandomDeleteMutator<I>
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInputMetadata>,
+    S: HasMetadata + HasRand + HasCorpus<I>,
 {
     fn mutate(
         &mut self,
@@ -400,19 +410,20 @@ where
     }
 }
 
-impl Named for GrimoireRandomDeleteMutator {
+impl<I> Named for GrimoireRandomDeleteMutator<I> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("GrimoireRandomDeleteMutator");
         &NAME
     }
 }
 
-impl GrimoireRandomDeleteMutator {
+impl<I> GrimoireRandomDeleteMutator<I> {
     /// Creates a new [`GrimoireExtensionMutator`].
     #[must_use]
     pub fn new() -> Self {
         Self {
             gap_indices: vec![],
+            phantom: PhantomData,
         }
     }
 }
