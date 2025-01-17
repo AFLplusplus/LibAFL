@@ -27,7 +27,7 @@ Before making your pull requests, try to see if your code follows these rules.
 - `PhantomData` should have the smallest set of types needed. Try not adding `PhantomData` to your struct unless it is really necessary. Also even when you really need `PhantomData`, try to keep the types `T` used in `PhantomData` as smallest as possible 
 - Wherever possible, trait implementations with lifetime specifiers should use '_ lifetime elision.
 - Complex constructors should be replaced with `typed_builder`, or write code in the builder pattern for yourself.
-- Remove generic restrictions at the definitions (e.g., we do not need to specify that types impl `Serialize`, `Deserialize`, or `Debug` anymore at the struct definitions). Therefore, try avoiding code like this unless the contraint is really necessary.
+- Remove generic restrictions at the definitions (e.g., we do not need to specify that types impl `Serialize`, `Deserialize`, or `Debug` anymore at the struct definitions). Therefore, try avoiding code like this unless the constraint is really necessary.
 ```rust
 pub struct X<A> 
     where
@@ -35,9 +35,8 @@ pub struct X<A>
 {
     fn ...
 }
-
 ```
-- Reduce generics to the least restrictive necessary. __Never overspecify the contraints__. There's no automated tool to check the useless constraints, so you have to verify this manually.
+- Reduce generics to the least restrictive necessary. __Never overspecify the constraints__. There's no automated tool to check the useless constraints, so you have to verify this manually.
 ```rust
 pub struct X<A> 
     where
@@ -45,17 +44,37 @@ pub struct X<A>
 {
     fn ...
 }
-
 ```
-- Traits which have an associated type should refer to the associated type, not the concrete/generic. In other words, you should only have the associated type when you can define a getter to it. For example, in the following code, you can define a associate type.
+
+- Prefer generic to associated types in traits definition as much as possible. They are much easier to use around, and avoid tricky caveats / type repetition in the code. It is also much easier to have unconstrained struct definitions.
+
+Try not to write this:
+```rust
+pub trait X
+{
+    type A;
+    
+    fn a(&self) -> Self::A;
+}
+```
+Try to write this instead:
+```rust
+pub trait X<A>
+{
+    fn a(&self) -> A;
+}
+```
+
+- Traits which have an associated type (if you have made sure you cannot use a generic instead) should refer to the associated type, not the concrete/generic. In other words, you should only have the associated type when you can define a getter to it. For example, in the following code, you can define a associate type.
 ```rust
 pub trait X 
 {
     type A; // <- You should(can) define it as long as you have a getter to it.
-    fn a(&self) -> A;
+    
+    fn a(&self) -> Self::A;
 }
-
 ```
+
 - __Ideally__ the types used in the the arguments of methods in traits should have the same as the types defined on the traits.
 ```rust
 pub trait X<A, B, C> // <- this trait have 3 generics, A, B, and C

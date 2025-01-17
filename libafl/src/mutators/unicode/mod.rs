@@ -10,8 +10,8 @@ use core::{
 use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::{BytesInput, HasMutatorBytes},
+    corpus::{CorpusId, HasTestcase, Testcase},
+    inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
     nonzero,
     stages::{
@@ -32,8 +32,7 @@ pub type UnicodeInput = (BytesInput, UnicodeIdentificationMetadata);
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput
 where
-    S: HasCorpus + HasTestcase,
-    S::Corpus: Corpus<Input = BytesInput>,
+    S: HasCorpus<BytesInput> + HasTestcase<BytesInput>,
 {
     type Post = UnicodeIdentificationMetadata;
 
@@ -50,7 +49,7 @@ where
 
 impl<S> MutatedTransformPost<S> for UnicodeIdentificationMetadata
 where
-    S: HasTestcase,
+    S: HasTestcase<BytesInput>,
 {
     fn post_exec(self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
         if let Some(corpus_id) = corpus_id {

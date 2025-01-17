@@ -15,24 +15,18 @@ use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
-use crate::{corpus::CorpusId, state::HasCorpus, Error, HasMetadata};
+use crate::{corpus::CorpusId, Error, HasMetadata};
 
 /// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
 /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-pub trait HasTestcase: HasCorpus {
+pub trait HasTestcase<I> {
     /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<Ref<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error>;
 
     /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
     /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<RefMut<Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error>;
 }
 
 /// An entry in the [`Testcase`] Corpus
@@ -87,7 +81,7 @@ impl<I> HasMetadata for Testcase<I> {
 /// Impl of a testcase
 impl<I> Testcase<I> {
     /// Returns this [`Testcase`] with a loaded `Input`]
-    pub fn load_input<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<&I, Error> {
+    pub fn load_input<C: Corpus<I>>(&mut self, corpus: &C) -> Result<&I, Error> {
         corpus.load_input_into(self)?;
         Ok(self.input.as_ref().unwrap())
     }
@@ -358,7 +352,7 @@ where
     }
 
     /// Get the `len` or calculate it, if not yet calculated.
-    pub fn load_len<C: Corpus<Input = I>>(&mut self, corpus: &C) -> Result<usize, Error> {
+    pub fn load_len<C: Corpus<I>>(&mut self, corpus: &C) -> Result<usize, Error> {
         match &self.input {
             Some(i) => {
                 let l = i.len();

@@ -4,10 +4,9 @@ use std::{
 };
 
 use libafl::{
-    corpus::{Corpus, Testcase},
+    corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackFactory, StateInitializer},
-    state::HasCorpus,
 };
 use libafl_bolts::{Error, Named};
 use serde::{Deserialize, Serialize};
@@ -53,18 +52,16 @@ impl<F> Named for CustomFilepathToTestcaseFeedback<F> {
 
 impl<F, S> StateInitializer<S> for CustomFilepathToTestcaseFeedback<F> {}
 
-impl<F, EM, OT, S> Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>
-    for CustomFilepathToTestcaseFeedback<F>
+impl<F, EM, I, OT, S> Feedback<EM, I, OT, S> for CustomFilepathToTestcaseFeedback<F>
 where
-    S: HasCorpus,
-    F: FnMut(&mut S, &mut Testcase<<S::Corpus as Corpus>::Input>, &Path) -> Result<(), Error>,
+    F: FnMut(&mut S, &mut Testcase<I>, &Path) -> Result<(), Error>,
 {
     #[inline]
     fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S::Corpus as Corpus>::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
@@ -76,7 +73,7 @@ where
         state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<<S::Corpus as Corpus>::Input>,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         (self.func)(state, testcase, &self.out_dir)?;
         Ok(())

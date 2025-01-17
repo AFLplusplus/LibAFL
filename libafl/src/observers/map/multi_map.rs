@@ -8,7 +8,6 @@ use core::{
     slice::{Iter, IterMut},
 };
 
-use ahash::RandomState;
 use libafl_bolts::{
     ownedref::OwnedMutSlice, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named,
 };
@@ -122,11 +121,6 @@ where
             }
         }
         res
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     fn reset_map(&mut self) -> Result<(), Error> {

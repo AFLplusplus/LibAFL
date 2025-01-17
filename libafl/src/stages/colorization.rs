@@ -4,9 +4,10 @@ use alloc::{
     collections::binary_heap::BinaryHeap,
     vec::Vec,
 };
-use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
+use core::{cmp::Ordering, fmt::Debug, hash::Hash, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
+    generic_hash_std,
     rands::Rand,
     tuples::{Handle, Handled},
     Named,
@@ -14,13 +15,13 @@ use libafl_bolts::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::HasCurrentCorpusId,
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::HasMutatorBytes,
+    inputs::HasMutatorResizableBytes,
     mutators::mutations::buffer_copy,
     nonzero,
-    observers::{MapObserver, ObserversTuple},
+    observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
@@ -62,26 +63,26 @@ impl Ord for Earlier {
 pub const COLORIZATION_STAGE_NAME: &str = "colorization";
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct ColorizationStage<C, E, EM, O, S, Z> {
+pub struct ColorizationStage<C, E, EM, I, O, S, Z> {
     map_observer_handle: Handle<C>,
     name: Cow<'static, str>,
-    phantom: PhantomData<(E, EM, O, E, S, Z)>,
+    phantom: PhantomData<(E, EM, I, O, E, S, Z)>,
 }
 
-impl<C, E, EM, O, S, Z> Named for ColorizationStage<C, E, EM, O, S, Z> {
+impl<C, E, EM, I, O, S, Z> Named for ColorizationStage<C, E, EM, I, O, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, E, EM, I, O, S, Z>
 where
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
-    S: HasCorpus + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
-    O: MapObserver,
+    EM: EventFirer<I, S>,
+    E: HasObservers + Executor<EM, I, S, Z>,
+    S: HasCorpus<I> + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
+    E::Observers: ObserversTuple<I, S>,
+    I: HasMutatorResizableBytes + Clone,
+    O: Hash,
     C: AsRef<O> + Named,
 {
     #[inline]
@@ -106,7 +107,7 @@ where
     }
 
     fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
+        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
     }
 }
 
@@ -149,15 +150,15 @@ impl TaintMetadata {
 
 libafl_bolts::impl_serdeany!(TaintMetadata);
 
-impl<C, E, EM, O, S, Z> ColorizationStage<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> ColorizationStage<C, E, EM, I, O, S, Z>
 where
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    O: MapObserver,
+    EM: EventFirer<I, S>,
+    O: Hash,
     C: AsRef<O> + Named,
-    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
+    E: HasObservers + Executor<EM, I, S, Z>,
+    E::Observers: ObserversTuple<I, S>,
+    S: HasCorpus<I> + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase<I>,
+    I: HasMutatorResizableBytes + Clone,
 {
     #[inline]
     fn colorize(
@@ -166,7 +167,7 @@ where
         state: &mut S,
         manager: &mut EM,
         observer_handle: &Handle<C>,
-    ) -> Result<<S::Corpus as Corpus>::Input, Error> {
+    ) -> Result<I, Error> {
         let mut input = state.current_input_cloned()?;
         // The backup of the input
         let backup = input.clone();
@@ -307,7 +308,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
         observer_handle: &Handle<C>,
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -317,7 +318,7 @@ where
         let observers = executor.observers();
         let observer = observers[observer_handle].as_ref();
 
-        let hash = observer.hash_simple() as usize;
+        let hash = generic_hash_std(observer) as usize;
 
         executor
             .observers_mut()

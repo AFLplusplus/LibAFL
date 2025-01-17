@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
 use libafl::{
-    corpus::{Corpus, Testcase},
+    corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata, StateInitializer},
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::HasCorpus,
     Error, HasMetadata,
 };
 use libafl_bolts::{Named, SerdeAny};
@@ -20,14 +19,11 @@ pub struct PacketLenMetadata {
 
 pub struct PacketLenTestcaseScore {}
 
-impl<S> TestcaseScore<S> for PacketLenTestcaseScore
+impl<I, S> TestcaseScore<I, S> for PacketLenTestcaseScore
 where
-    S: HasMetadata + HasCorpus,
+    S: HasMetadata,
 {
-    fn compute(
-        _state: &S,
-        entry: &mut Testcase<<S::Corpus as Corpus>::Input>,
-    ) -> Result<f64, Error> {
+    fn compute(_state: &S, entry: &mut Testcase<I>) -> Result<f64, Error> {
         Ok(entry
             .metadata_map()
             .get::<PacketLenMetadata>()
@@ -35,8 +31,8 @@ where
     }
 }
 
-pub type PacketLenMinimizerScheduler<CS, S> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata, S>;
+pub type PacketLenMinimizerScheduler<CS, I, S> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, I, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {

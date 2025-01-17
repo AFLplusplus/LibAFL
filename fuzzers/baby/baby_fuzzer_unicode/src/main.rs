@@ -13,7 +13,10 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::{StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator},
+    mutators::{
+        StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeInput,
+        UnicodeSubcategoryRandMutator,
+    },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::{mutational::StdMutationalStage, UnicodeIdentificationStage},
@@ -134,7 +137,7 @@ pub fn main() {
     ));
     let mut stages = tuple_list!(
         UnicodeIdentificationStage::new(),
-        StdMutationalStage::transforming(mutator)
+        StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(mutator)
     );
 
     fuzzer

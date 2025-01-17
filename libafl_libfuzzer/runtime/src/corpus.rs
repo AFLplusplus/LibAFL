@@ -88,7 +88,7 @@ where
         &'a self,
         id: CorpusId,
         corpus: &'a TestcaseStorageMap<I>,
-    ) -> Result<&RefCell<Testcase<I>>, Error> {
+    ) -> Result<&'a RefCell<Testcase<I>>, Error> {
         self.touch(id, corpus)?;
         corpus.map.get(&id).map(|item| &item.testcase).ok_or_else(|| Error::illegal_state("Nonexistent corpus entry {id} requested (present in loaded entries, but not the mapping?)"))
     }
@@ -140,12 +140,10 @@ where
     }
 }
 
-impl<I> Corpus for LibfuzzerCorpus<I>
+impl<I> Corpus<I> for LibfuzzerCorpus<I>
 where
     I: Input + Serialize + for<'de> Deserialize<'de>,
 {
-    type Input = I;
-
     #[inline]
     fn count(&self) -> usize {
         self.mapping.enabled.map.len()
@@ -158,30 +156,26 @@ where
     fn count_all(&self) -> usize {
         self.count_disabled().saturating_add(self.count_disabled())
     }
-    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self._add(RefCell::new(testcase), false)
     }
-    fn add_disabled(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self._add(RefCell::new(testcase), true)
     }
 
-    fn replace(
-        &mut self,
-        _id: CorpusId,
-        _testcase: Testcase<Self::Input>,
-    ) -> Result<Testcase<Self::Input>, Error> {
+    fn replace(&mut self, _id: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         unimplemented!("It is unsafe to use this corpus variant with replace!");
     }
 
-    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<I>, Error> {
         unimplemented!("It is unsafe to use this corpus variant with replace!");
     }
 
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self._get(id, &self.mapping.enabled)
     }
 
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         match self._get(id, &self.mapping.enabled) {
             Ok(input) => Ok(input),
             Err(Error::KeyNotFound(..)) => return self._get(id, &self.mapping.disabled),
@@ -225,7 +219,7 @@ where
         self.mapping.enabled.keys[nth]
     }
 
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         // we don't need to update the loaded testcases because it must have already been loaded
         if testcase.input().is_none() {
             let path = testcase.file_path().as_ref().ok_or_else(|| {
@@ -237,7 +231,7 @@ where
         Ok(())
     }
 
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         let input = testcase.input().as_ref().ok_or_else(|| {
             Error::empty("The testcase, when being saved, must have an input present!")
         })?;
@@ -277,12 +271,10 @@ where
     }
 }
 
-impl<I> Corpus for ArtifactCorpus<I>
+impl<I> Corpus<I> for ArtifactCorpus<I>
 where
     I: Input + Serialize + for<'de> Deserialize<'de>,
 {
-    type Input = I;
-
     fn count(&self) -> usize {
         self.count
     }
@@ -297,7 +289,7 @@ where
         self.count() + self.count_disabled()
     }
 
-    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let idx = self.count;
         self.count += 1;
 
@@ -320,23 +312,19 @@ where
         Ok(CorpusId::from(idx))
     }
 
-    fn add_disabled(&mut self, _testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
+    fn add_disabled(&mut self, _testcase: Testcase<I>) -> Result<CorpusId, Error> {
         unimplemented!("ArtifactCorpus disregards disabled inputs")
     }
 
-    fn replace(
-        &mut self,
-        _id: CorpusId,
-        _testcase: Testcase<Self::Input>,
-    ) -> Result<Testcase<Self::Input>, Error> {
+    fn replace(&mut self, _id: CorpusId, _testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
     }
 
-    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+    fn remove(&mut self, _id: CorpusId) -> Result<Testcase<I>, Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
     }
 
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let maybe_last = if self
             .count
             .checked_sub(1)
@@ -355,7 +343,7 @@ where
     }
 
     // This just calls Self::get as ArtifactCorpus disregards disabled entries
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self.get(id)
     }
 
@@ -388,11 +376,11 @@ where
         self.count.checked_sub(1).map(CorpusId::from)
     }
 
-    fn load_input_into(&self, _testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
     }
 
-    fn store_input_from(&self, _testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
         unimplemented!("Artifact prefix is thin and cannot get, replace, or remove.")
     }
 }

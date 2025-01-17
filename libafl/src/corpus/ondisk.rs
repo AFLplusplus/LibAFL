@@ -2,7 +2,7 @@
 //!
 //! It _never_ keeps any of them in memory.
 //! This is a good solution for solutions that are never reused, or for *very* memory-constraint environments.
-//! For any other occasions, consider using [`crate::corpus::CachedOnDiskCorpus`]
+//! For any other occasions, consider using [`CachedOnDiskCorpus`]
 //! which stores a certain number of [`Testcase`]s in memory and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
@@ -56,11 +56,10 @@ pub struct OnDiskCorpus<I> {
     inner: CachedOnDiskCorpus<I>,
 }
 
-impl<I> Corpus for OnDiskCorpus<I>
+impl<I> Corpus<I> for OnDiskCorpus<I>
 where
     I: Input,
 {
-    type Input = I;
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -94,12 +93,6 @@ where
     #[inline]
     fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         self.inner.replace(id, testcase)
-    }
-
-    /// Peek the next free corpus id
-    #[inline]
-    fn peek_free_id(&self) -> CorpusId {
-        self.inner.peek_free_id()
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
@@ -137,6 +130,12 @@ where
         self.inner.next(id)
     }
 
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        self.inner.peek_free_id()
+    }
+
     #[inline]
     fn prev(&self, id: CorpusId) -> Option<CorpusId> {
         self.inner.prev(id)
@@ -164,17 +163,17 @@ where
     }
 
     #[inline]
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         self.inner.load_input_into(testcase)
     }
 
     #[inline]
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.store_input_from(testcase)
     }
 }
 
-impl<I> HasTestcase for OnDiskCorpus<I>
+impl<I> HasTestcase<I> for OnDiskCorpus<I>
 where
     I: Input,
 {

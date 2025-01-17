@@ -52,7 +52,7 @@ fn destroy_output_fds(options: &LibfuzzerOptions) {
     }
 }
 
-fn do_fuzz<F, ST, E, S, EM>(
+fn do_fuzz<F, ST, E, I, S, EM>(
     options: &LibfuzzerOptions,
     fuzzer: &mut F,
     stages: &mut ST,
@@ -61,10 +61,10 @@ fn do_fuzz<F, ST, E, S, EM>(
     mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, S, ST>,
+    F: Fuzzer<E, EM, I, S, ST>,
     S: HasMetadata
         + HasExecutions
-        + HasSolutions
+        + HasSolutions<I>
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,

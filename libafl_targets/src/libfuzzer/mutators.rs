@@ -11,7 +11,7 @@ use std::{
 
 use libafl::{
     corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes},
+    inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
@@ -367,9 +367,8 @@ impl<S, SM> Named for LLVMCustomMutator<S, SM, true> {
 
 impl<S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<S, SM, true>
 where
-    S: HasRand + HasMaxSize + HasCorpus + 'static,
+    S: HasRand + HasMaxSize + HasCorpus<BytesInput> + 'static,
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S::Corpus: Corpus<Input = BytesInput>,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
     #[inline]
@@ -381,8 +380,7 @@ where
 impl<S, SM> ScheduledMutator<BytesInput, S> for LLVMCustomMutator<S, SM, true>
 where
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S: HasRand + HasMaxSize + HasCorpus + 'static,
-    S::Corpus: Corpus<Input = BytesInput>,
+    S: HasRand + HasMaxSize + HasCorpus<BytesInput> + 'static,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
     fn iterations(&self, state: &mut S, input: &BytesInput) -> u64 {
