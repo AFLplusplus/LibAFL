@@ -51,9 +51,8 @@ pub type HavocMutationsNoCrossoverType = tuple_list_type!(
 pub type HavocCrossoverType = tuple_list_type!(CrossoverInsertMutator, CrossoverReplaceMutator);
 
 /// Tuple type of the mutations that compose the Havoc mutator's crossover mutations for mapped input types
-pub type MappedHavocCrossoverType<F, O> = tuple_list_type!(
-    MappedCrossoverInsertMutator<F, O>,
-    MappedCrossoverReplaceMutator<F, O>,
+pub type MappedHavocCrossoverType<F, I, O> = tuple_list_type!(
+    MappedCrossoverInsertMutator<F, I, O>,
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator
@@ -61,15 +60,15 @@ pub type HavocMutationsType =
     merge_tuple_list_type!(HavocMutationsNoCrossoverType, HavocCrossoverType);
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types
-pub type MappedHavocMutationsType<F1, F2, O> = map_tuple_list_type!(
-    merge_tuple_list_type!(HavocMutationsNoCrossoverType, MappedHavocCrossoverType<F2,O>),
+pub type MappedHavocMutationsType<F1, F2, I, O> = map_tuple_list_type!(
+    merge_tuple_list_type!(HavocMutationsNoCrossoverType, MappedHavocCrossoverType<F2,I, O>),
     ToMappingMutator<F1>
 );
 
 /// Tuple type of the mutations that compose the Havoc mutator for mapped input types, for optional byte array input parts
-pub type OptionMappedHavocMutationsType<F1, F2, O> = map_tuple_list_type!(
+pub type OptionMappedHavocMutationsType<F1, F2, I, O> = map_tuple_list_type!(
     map_tuple_list_type!(
-        merge_tuple_list_type!(HavocMutationsNoCrossoverType, MappedHavocCrossoverType<F2,O>),
+        merge_tuple_list_type!(HavocMutationsNoCrossoverType, MappedHavocCrossoverType<F2,I, O>),
         ToOptionalMutator
     ),
     ToMappingMutator<F1>
@@ -117,29 +116,23 @@ pub fn havoc_crossover() -> HavocCrossoverType {
 }
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy with custom corpus extraction logic
-pub fn havoc_crossover_with_corpus_mapper<F, IO, O>(
+pub fn havoc_crossover_with_corpus_mapper<F, I, IO, O>(
     input_mapper: F,
-) -> MappedHavocCrossoverType<F, O>
+) -> MappedHavocCrossoverType<F, I, O>
 where
     F: Clone + Fn(&IO) -> &O,
 {
-    tuple_list!(
-        MappedCrossoverInsertMutator::new(input_mapper.clone()),
-        MappedCrossoverReplaceMutator::new(input_mapper.clone()),
-    )
+    tuple_list!(MappedCrossoverInsertMutator::new(input_mapper.clone()),)
 }
 
 /// Get the mutations that compose the Havoc mutator's crossover strategy with custom corpus extraction logic
-pub fn havoc_crossover_with_corpus_mapper_optional<F, O>(
+pub fn havoc_crossover_with_corpus_mapper_optional<F, I, O>(
     input_mapper: F,
-) -> MappedHavocCrossoverType<F, O>
+) -> MappedHavocCrossoverType<F, I, O>
 where
     F: Clone,
 {
-    tuple_list!(
-        MappedCrossoverInsertMutator::new(input_mapper.clone()),
-        MappedCrossoverReplaceMutator::new(input_mapper.clone()),
-    )
+    tuple_list!(MappedCrossoverInsertMutator::new(input_mapper.clone()),)
 }
 
 /// Get the mutations that compose the Havoc mutator
@@ -155,7 +148,7 @@ pub fn havoc_mutations() -> HavocMutationsType {
 pub fn mapped_havoc_mutations<F1, F2, IO1, IO2, II, O>(
     current_input_mapper: F1,
     input_from_corpus_mapper: F2,
-) -> MappedHavocMutationsType<F1, F2, O>
+) -> MappedHavocMutationsType<F1, F2, IO1, O>
 where
     F1: Clone + FnMut(&mut IO1) -> &mut II,
     F2: Clone + Fn(&IO2) -> &O,
@@ -172,7 +165,7 @@ where
 pub fn optional_mapped_havoc_mutations<F1, F2, IO1, IO2, II, O>(
     current_input_mapper: F1,
     input_from_corpus_mapper: F2,
-) -> OptionMappedHavocMutationsType<F1, F2, O>
+) -> OptionMappedHavocMutationsType<F1, F2, IO1, O>
 where
     F1: Clone + FnMut(&mut IO1) -> &mut II,
     F2: Clone + Fn(&IO2) -> &O,

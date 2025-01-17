@@ -1295,12 +1295,12 @@ impl IntoOptionBytes for Option<Vec<u8>> {
 
 /// Crossover insert mutation for inputs mapped to a bytes vector
 #[derive(Debug)]
-pub struct MappedCrossoverInsertMutator<F, O> {
+pub struct MappedCrossoverInsertMutator<F, I, O> {
     input_mapper: F,
-    phantom: PhantomData<O>,
+    phantom: PhantomData<(I, O)>,
 }
 
-impl<F, O> MappedCrossoverInsertMutator<F, O> {
+impl<F, I, O> MappedCrossoverInsertMutator<F, I, O> {
     /// Creates a new [`MappedCrossoverInsertMutator`]
     pub fn new(input_mapper: F) -> Self {
         Self {
@@ -1310,14 +1310,14 @@ impl<F, O> MappedCrossoverInsertMutator<F, O> {
     }
 }
 
-impl<S, F, I, O> Mutator<I, S> for MappedCrossoverInsertMutator<F, O>
+impl<S, F, I1, I2, O> Mutator<I2, S> for MappedCrossoverInsertMutator<F, I1, O>
 where
-    F: Fn(&I) -> &O,
-    I: HasMutatorResizableBytes,
+    F: Fn(&I1) -> &O,
+    I2: HasMutatorResizableBytes,
     O: IntoOptionBytes,
-    S: HasCorpus<I> + HasMaxSize + HasRand,
+    S: HasCorpus<I1> + HasMaxSize + HasRand,
 {
-    fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut I2) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
         let max_size = state.max_size();
         // TODO: fix bug if size is 0 (?)
@@ -1375,7 +1375,7 @@ where
     }
 }
 
-impl<F, O> Named for MappedCrossoverInsertMutator<F, O> {
+impl<F, I, O> Named for MappedCrossoverInsertMutator<F, I, O> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("MappedCrossoverInsertMutator");
         &NAME
