@@ -319,8 +319,8 @@ macro_rules! fuzz_with {
                     UnicodeSubcategoryTokenReplaceMutator,
                 )
             );
-            let unicode_power = StdMutationalStage::transforming(unicode_mutator);
-            let unicode_replace_power = StdMutationalStage::transforming(unicode_replace_mutator);
+            let unicode_power = StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(unicode_mutator);
+            let unicode_replace_power = StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(unicode_replace_mutator);
 
             let unicode_analysis = UnicodeIdentificationStage::new();
             let unicode_analysis = IfStage::new(|_, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(unicode_analysis, unicode_power, unicode_replace_power));
@@ -414,7 +414,7 @@ macro_rules! fuzz_with {
                 ),
                 3,
             );
-            let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::transforming(grimoire_mutator), ()));
+            let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(grimoire_mutator), ()));
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()));
