@@ -23,15 +23,15 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 use crate::executors::hooks::timer::TimerStruct;
 #[cfg(all(unix, feature = "std"))]
 use crate::executors::hooks::unix::unix_signal_handler;
-#[cfg(any(unix, windows))]
-use crate::{corpus::Corpus, inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
-    state::{HasCorpus, HasExecutions, HasSolutions},
+    state::{HasExecutions, HasSolutions},
     Error, HasObjective,
 };
+#[cfg(any(unix, windows))]
+use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
 
 /// The inmem executor's handlers.
 #[expect(missing_debug_implementations)]
@@ -185,10 +185,7 @@ impl<I, S> HasTimeout for InProcessHooks<I, S> {
     }
 }
 
-impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S>
-where
-    S: HasCorpus,
-{
+impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
     fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
@@ -223,10 +220,9 @@ impl<I, S> InProcessHooks<I, S> {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
-        S::Solutions: Corpus<Input = I>,
     {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
@@ -268,8 +264,7 @@ impl<I, S> InProcessHooks<I, S> {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         let ret;
@@ -330,7 +325,7 @@ impl<I, S> InProcessHooks<I, S> {
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus,
+        S: HasExecutions + HasSolutions<I>,
         Z: HasObjective<Objective = OF>,
     {
         #[cfg_attr(miri, allow(unused_variables))]

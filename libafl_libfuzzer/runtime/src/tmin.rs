@@ -26,7 +26,7 @@ use libafl_targets::LLVMCustomMutator;
 use crate::{options::LibfuzzerOptions, CustomMutationStatus};
 
 type TMinState =
-    StdState<BytesInput, InMemoryCorpus<BytesInput>, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
+    StdState<InMemoryCorpus<BytesInput>, BytesInput, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
 
 fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     options: &LibfuzzerOptions,

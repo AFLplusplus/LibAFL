@@ -34,7 +34,6 @@ use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(feature = "std")]
 use crate::events::{serialize_observers_adaptive, CanSerializeObserver};
 use crate::{
-    corpus::Corpus,
     events::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
         std_maybe_report_progress, std_on_restart, std_report_progress, AdaptiveSerializer, Event,
@@ -47,8 +46,8 @@ use crate::{
     observers::TimeObserver,
     stages::HasCurrentStageId,
     state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
-        NopState, Stoppable,
+        HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor, NopState,
+        Stoppable,
     },
     Error, HasMetadata,
 };
@@ -58,7 +57,7 @@ const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
 
 /// An `EventManager` that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, `llmp`.
-pub struct LlmpEventManager<EMH, S, SP>
+pub struct LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -80,11 +79,11 @@ where
     serializations_cnt: usize,
     should_serialize_cnt: usize,
     pub(crate) time_ref: Option<Handle<TimeObserver>>,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
     event_buffer: Vec<u8>,
 }
 
-impl LlmpEventManager<(), NopState<NopInput>, NopShMemProvider> {
+impl LlmpEventManager<(), NopState<NopInput>, NopInput, NopShMemProvider> {
     /// Creates a builder for [`LlmpEventManager`]
     #[must_use]
     pub fn builder() -> LlmpEventManagerBuilder<()> {
@@ -133,12 +132,12 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     }
 
     /// Create a manager from a raw LLMP client
-    pub fn build_from_client<S, SP>(
+    pub fn build_from_client<I, S, SP>(
         self,
         llmp: LlmpClient<SP>,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -163,13 +162,13 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     /// Create an LLMP event manager on a port.
     /// It expects a broker to exist on this port.
     #[cfg(feature = "std")]
-    pub fn build_on_port<S, SP>(
+    pub fn build_on_port<I, S, SP>(
         self,
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -180,13 +179,13 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     /// If a client respawns, it may reuse the existing connection, previously
     /// stored by [`LlmpClient::to_env()`].
     #[cfg(feature = "std")]
-    pub fn build_existing_client_from_env<S, SP>(
+    pub fn build_existing_client_from_env<I, S, SP>(
         self,
         shmem_provider: SP,
         env_name: &str,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -195,13 +194,13 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     }
 
     /// Create an existing client from description
-    pub fn build_existing_client_from_description<S, SP>(
+    pub fn build_existing_client_from_description<I, S, SP>(
         self,
         shmem_provider: SP,
         description: &LlmpClientDescription,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -211,7 +210,7 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
 }
 
 #[cfg(feature = "std")]
-impl<EMH, OT, S, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, OT, S, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
     OT: Serialize + MatchNameRef,
@@ -221,7 +220,7 @@ where
     }
 }
 
-impl<EMH, S, SP> AdaptiveSerializer for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> AdaptiveSerializer for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -256,7 +255,7 @@ where
     }
 }
 
-impl<EMH, S, SP> core::fmt::Debug for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> core::fmt::Debug for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -273,7 +272,7 @@ where
     }
 }
 
-impl<EMH, S, SP> Drop for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> Drop for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -283,7 +282,7 @@ where
     }
 }
 
-impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -333,7 +332,7 @@ where
     }
 }
 
-impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -344,16 +343,15 @@ where
         executor: &mut E,
         state: &mut S,
         client_id: ClientId,
-        event: Event<<S::Corpus as Corpus>::Input>,
+        event: Event<I>,
     ) -> Result<(), Error>
     where
-        S: HasCorpus + HasImported + Stoppable,
-        EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-        <S::Corpus as Corpus>::Input: Input,
+        S: HasImported + Stoppable,
+        EMH: EventManagerHooksTuple<I, S>,
+        I: Input,
         E: HasObservers,
         E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-            + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
+        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
         log::trace!("Got event in client: {} from {client_id:?}", event.name());
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
@@ -409,7 +407,7 @@ where
     }
 }
 
-impl<EMH, S, SP: ShMemProvider> LlmpEventManager<EMH, S, SP> {
+impl<EMH, I, S, SP: ShMemProvider> LlmpEventManager<EMH, I, S, SP> {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
     /// We are no longer allowed to send anything afterwards.
@@ -418,7 +416,7 @@ impl<EMH, S, SP: ShMemProvider> LlmpEventManager<EMH, S, SP> {
     }
 }
 
-impl<EMH, I, S, SP> EventFirer<I, S> for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> EventFirer<I, S> for LlmpEventManager<EMH, I, S, SP>
 where
     I: Serialize,
     SP: ShMemProvider,
@@ -482,7 +480,7 @@ where
     }
 }
 
-impl<EMH, S, SP> EventRestarter<S> for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> EventRestarter<S> for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
     S: HasCurrentStageId,
@@ -492,7 +490,7 @@ where
     }
 }
 
-impl<EMH, S, SP> ManagerExit for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> ManagerExit for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
@@ -508,16 +506,15 @@ where
     }
 }
 
-impl<E, EMH, S, SP, Z> EventProcessor<E, S, Z> for LlmpEventManager<EMH, S, SP>
+impl<E, EMH, I, S, SP, Z> EventProcessor<E, S, Z> for LlmpEventManager<EMH, I, S, SP>
 where
     E: HasObservers,
     E::Observers: DeserializeOwned,
-    S: HasCorpus + HasImported + Stoppable,
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: DeserializeOwned + Input,
+    S: HasImported + Stoppable,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: DeserializeOwned + Input,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
+    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -543,7 +540,7 @@ where
             } else {
                 msg
             };
-            let event: Event<<S::Corpus as Corpus>::Input> = postcard::from_bytes(event_bytes)?;
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
             log::debug!("Received event in normal llmp {}", event.name_detailed());
 
             // If the message comes from another machine, do not
@@ -563,11 +560,11 @@ where
     }
 }
 
-impl<EMH, S, SP> ProgressReporter<S> for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> ProgressReporter<S> for LlmpEventManager<EMH, I, S, SP>
 where
-    S: HasExecutions + HasLastReportTime + HasMetadata + HasCorpus + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasLastReportTime + HasMetadata + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
-    <S::Corpus as Corpus>::Input: Serialize,
+    I: Serialize,
 {
     fn maybe_report_progress(
         &mut self,
@@ -582,7 +579,7 @@ where
     }
 }
 
-impl<EMH, S, SP> HasEventManagerId for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SP> HasEventManagerId for LlmpEventManager<EMH, I, S, SP>
 where
     SP: ShMemProvider,
 {
