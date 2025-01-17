@@ -5,8 +5,8 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     cmp::{max, min},
     num::NonZero,
+    marker::PhantomData,
 };
-use std::marker::PhantomData;
 
 use libafl_bolts::{
     rands::{choose, fast_bound, Rand},
