@@ -1714,7 +1714,7 @@ pub mod win32_shmem {
         fn new() -> Result<Self, Error> {
             Ok(Self {})
         }
-        fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+        fn new_shmem(&mut self, map_size: usize) -> Result<Win32ShMem, Error> {
             Win32ShMem::new_shmem(map_size)
         }
 
@@ -1722,7 +1722,7 @@ pub mod win32_shmem {
             &mut self,
             id: ShMemId,
             size: usize,
-        ) -> Result<Self::ShMem, Error> {
+        ) -> Result<Win32ShMem, Error> {
             Win32ShMem::shmem_from_id_and_size(id, size)
         }
     }
