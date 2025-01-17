@@ -356,12 +356,9 @@ where
 }
 
 /// A converter that converts from `input` to target bytes
-pub trait TargetBytesConverter {
-    /// The input
-    type Input;
-
+pub trait TargetBytesConverter<I> {
     /// Create target bytes
-    fn to_target_bytes<'a>(&mut self, input: &'a Self::Input) -> OwnedSlice<'a, u8>;
+    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8>;
 }
 
 /// Simply gets the target bytes out from a [`HasTargetBytes`] type.
@@ -386,10 +383,11 @@ impl<I> Default for NopTargetBytesConverter<I> {
     }
 }
 
-impl<I: HasTargetBytes> TargetBytesConverter for NopTargetBytesConverter<I> {
-    type Input = I;
-
-    fn to_target_bytes<'a>(&mut self, input: &'a Self::Input) -> OwnedSlice<'a, u8> {
+impl<I> TargetBytesConverter<I> for NopTargetBytesConverter<I>
+where
+    I: HasTargetBytes,
+{
+    fn to_target_bytes<'a>(&mut self, input: &'a I) -> OwnedSlice<'a, u8> {
         input.target_bytes()
     }
 }

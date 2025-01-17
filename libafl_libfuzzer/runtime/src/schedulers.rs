@@ -20,7 +20,7 @@ pub struct MergeScheduler<I, S> {
 impl<I, S> RemovableScheduler<I, S> for MergeScheduler<I, S>
 where
     I: Input,
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     fn on_remove(
         &mut self,
@@ -35,7 +35,7 @@ where
 
 impl<I, S> Scheduler<I, S> for MergeScheduler<I, S>
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.all.insert(id);

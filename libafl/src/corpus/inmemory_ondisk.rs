@@ -5,7 +5,7 @@
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
 use alloc::string::String;
-use core::cell::RefCell;
+use core::cell::{Ref, RefCell, RefMut};
 use std::{
     fs,
     fs::{File, OpenOptions},
@@ -59,12 +59,10 @@ pub struct InMemoryOnDiskCorpus<I> {
     locking: bool,
 }
 
-impl<I> Corpus for InMemoryOnDiskCorpus<I>
+impl<I> Corpus<I> for InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
-    type Input = I;
-
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -182,7 +180,7 @@ where
         self.inner.nth_from_all(nth)
     }
 
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         if testcase.input_mut().is_none() {
             let Some(file_path) = testcase.file_path().as_ref() else {
                 return Err(Error::illegal_argument(
@@ -195,7 +193,7 @@ where
         Ok(())
     }
 
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         // Store the input to disk
         let Some(file_path) = testcase.file_path() else {
             return Err(Error::illegal_argument(
@@ -211,21 +209,15 @@ where
     }
 }
 
-impl<I> HasTestcase for InMemoryOnDiskCorpus<I>
+impl<I> HasTestcase<I> for InMemoryOnDiskCorpus<I>
 where
     I: Input,
 {
-    fn testcase(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::Ref<Testcase<<Self as Corpus>::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(
-        &self,
-        id: CorpusId,
-    ) -> Result<core::cell::RefMut<Testcase<<Self as Corpus>::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }
@@ -242,7 +234,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
     /// If you don't want metadata, use [`InMemoryOnDiskCorpus::no_meta`].
     /// To pick a different metadata format, use [`InMemoryOnDiskCorpus::with_meta_format`].
     ///
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    /// Will error, if [`fs::create_dir_all()`] failed for `dir_path`.
     pub fn new<P>(dir_path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -257,7 +249,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     /// Creates the [`InMemoryOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
     ///
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    /// Will error, if [`fs::create_dir_all()`] failed for `dir_path`.
     pub fn with_meta_format<P>(
         dir_path: P,
         meta_format: Option<OnDiskMetadataFormat>,
@@ -271,7 +263,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
     /// Creates the [`InMemoryOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk
     /// and the prefix for the filenames.
     ///
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    /// Will error, if [`fs::create_dir_all()`] failed for `dir_path`.
     pub fn with_meta_format_and_prefix<P>(
         dir_path: P,
         meta_format: Option<OnDiskMetadataFormat>,
@@ -286,7 +278,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     /// Creates an [`InMemoryOnDiskCorpus`] that will not store .metadata files
     ///
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    /// Will error, if [`fs::create_dir_all()`] failed for `dir_path`.
     pub fn no_meta<P>(dir_path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
