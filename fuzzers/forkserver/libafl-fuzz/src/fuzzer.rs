@@ -73,12 +73,13 @@ use crate::{
 };
 
 pub type LibaflFuzzState =
-    StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<CachedOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(not(feature = "fuzzbench"))]
 type LibaflFuzzManager = CentralizedEventManager<
-    LlmpRestartingEventManager<(), LibaflFuzzState, StdShMemProvider>,
+    LlmpRestartingEventManager<(), BytesInput, LibaflFuzzState, StdShMemProvider>,
     (),
+    BytesInput,
     LibaflFuzzState,
     StdShMemProvider,
 >;
@@ -521,7 +522,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         );
 
         // Run our fuzzer; WITH CmpLog
-        run_fuzzer_with_stages(
+        run_fuzzer_with_stages::<_, _, BytesInput, _, _, _>(
             opt,
             &mut fuzzer,
             &mut stages,
@@ -540,7 +541,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         );
 
         // Run our fuzzer; NO CmpLog
-        run_fuzzer_with_stages(
+        run_fuzzer_with_stages::<_, _, BytesInput, _, _, _>(
             opt,
             &mut fuzzer,
             &mut stages,
@@ -648,7 +649,7 @@ pub fn fuzzer_target_mode(opt: &Opt) -> Cow<'static, str> {
 #[derive(Debug, Serialize, Deserialize, SerdeAny)]
 pub struct IsInitialCorpusEntryMetadata {}
 
-pub fn run_fuzzer_with_stages<E, EM, S, ST, Z>(
+pub fn run_fuzzer_with_stages<E, EM, I, S, ST, Z>(
     opt: &Opt,
     fuzzer: &mut Z,
     stages: &mut ST,
@@ -657,7 +658,7 @@ pub fn run_fuzzer_with_stages<E, EM, S, ST, Z>(
     mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    Z: Fuzzer<E, EM, S, ST>,
+    Z: Fuzzer<E, EM, I, S, ST>,
     EM: ProgressReporter<S>,
     ST: StagesTuple<E, EM, S, Z>,
     S: HasLastReportTime + HasExecutions + HasMetadata,

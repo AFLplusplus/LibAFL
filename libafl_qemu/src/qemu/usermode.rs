@@ -1,5 +1,5 @@
 use std::{
-    intrinsics::copy_nonoverlapping, mem::MaybeUninit, slice::from_raw_parts_mut,
+    mem::MaybeUninit, ptr::copy_nonoverlapping, slice::from_raw_parts_mut,
     str::from_utf8_unchecked_mut,
 };
 

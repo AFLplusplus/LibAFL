@@ -19,7 +19,7 @@ use crate::{
         inprocess_fork::inner::GenericInProcessForkExecutorInner, Executor, ExitKind, HasObservers,
     },
     observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     Error,
 };
 
@@ -45,7 +45,6 @@ pub type InProcessForkExecutor<'a, H, I, OT, S, SP, EM, Z> =
 impl<'a, H, I, OT, S, SP, EM, Z> InProcessForkExecutor<'a, H, I, OT, S, SP, EM, Z>
 where
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
 {
     /// The constructor for `InProcessForkExecutor`
     pub fn new(
@@ -107,7 +106,7 @@ impl<EM, H, HT, I, OT, S, SP, Z> Executor<EM, I, S, Z>
     for GenericInProcessForkExecutor<'_, H, HT, I, OT, S, SP, EM, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
-    S: HasCorpus + HasExecutions,
+    S: HasExecutions,
     SP: ShMemProvider,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -146,7 +145,6 @@ impl<'a, H, HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutor<'a, H, HT, I, 
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus,
 {
     /// Creates a new [`GenericInProcessForkExecutor`] with custom hooks
     #[expect(clippy::too_many_arguments)]

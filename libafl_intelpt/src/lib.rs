@@ -46,8 +46,9 @@ use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
 pub use libipt::{asid::Asid, image::Image, image::SectionCache, status::Status};
 #[cfg(target_os = "linux")]
 use libipt::{
-    block::BlockDecoder, config::AddrConfig, config::AddrFilter, config::AddrFilterBuilder,
-    config::AddrRange, config::Cpu, config::PtEncoderDecoder, error::PtError, error::PtErrorCode,
+    block::BlockDecoder, enc_dec_builder::AddrFilterRange, enc_dec_builder::AddrFilterType,
+    enc_dec_builder::AddrFilters, enc_dec_builder::AddrFiltersBuilder, enc_dec_builder::Cpu,
+    enc_dec_builder::PtEncoderDecoder, error::PtError, error::PtErrorCode,
 };
 #[cfg(target_os = "linux")]
 use num_enum::TryFromPrimitive;
@@ -186,12 +187,11 @@ impl IntelPT {
         self.ip_filters.clone()
     }
 
-    fn ip_filters_to_addr_filter(&self) -> AddrFilter {
-        let mut builder = AddrFilterBuilder::new();
-        let mut iter = self
-            .ip_filters
-            .iter()
-            .map(|f| AddrRange::new(*f.start() as u64, *f.end() as u64, AddrConfig::FILTER));
+    fn ip_filters_to_addr_filter(&self) -> AddrFilters {
+        let mut builder = AddrFiltersBuilder::new();
+        let mut iter = self.ip_filters.iter().map(|f| {
+            AddrFilterRange::new(*f.start() as u64, *f.end() as u64, AddrFilterType::FILTER)
+        });
         if let Some(f) = iter.next() {
             builder.addr0(f);
             if let Some(f) = iter.next() {

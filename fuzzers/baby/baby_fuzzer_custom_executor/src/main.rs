@@ -47,17 +47,17 @@ impl<S> CustomExecutor<S> {
     }
 }
 
-impl<EM, S, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for CustomExecutor<S>
+impl<EM, I, S, Z> Executor<EM, I, S, Z> for CustomExecutor<S>
 where
-    S: HasCorpus + HasExecutions,
-    <S::Corpus as Corpus>::Input: HasTargetBytes,
+    S: HasCorpus<I> + HasExecutions,
+    I: HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, libafl::Error> {
         // We need to keep track of the exec count.
         *state.executions_mut() += 1;

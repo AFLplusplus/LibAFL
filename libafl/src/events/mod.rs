@@ -45,11 +45,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    corpus::Corpus,
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
+    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
     Error, HasMetadata,
 };
 
@@ -489,10 +488,10 @@ where
 
 /// Default implementation of [`ProgressReporter::report_progress`] for implementors with the
 /// given constraints
-pub fn std_report_progress<EM, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
+pub fn std_report_progress<EM, I, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
 where
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasLastReportTime + HasCorpus + MaybeHasClientPerfMonitor,
+    EM: EventFirer<I, S>,
+    S: HasExecutions + HasLastReportTime + MaybeHasClientPerfMonitor,
 {
     let executions = *state.executions();
     let cur = current_time();

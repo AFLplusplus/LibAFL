@@ -79,33 +79,33 @@ impl Default for UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, O, OT, S> {
+pub struct CalibrationStage<C, E, I, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    phantom: PhantomData<(E, O, OT, S)>,
+    phantom: PhantomData<(E, I, O, OT, S)>,
 }
 
-impl<C, E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, O, OT, S>
+impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, I, O, OT, S>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<I, S>,
     O: MapObserver,
     C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry:
         Serialize + Deserialize<'de> + 'static + Default + Debug + Bounded,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
+    OT: ObserversTuple<I, S>,
+    S: HasCorpus<I>
         + HasMetadata
         + HasNamedMetadata
         + HasExecutions
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasCurrentCorpusId,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Input,
+    Z: Evaluator<E, EM, I, S>,
+    I: Input,
 {
     #[inline]
     #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
@@ -380,13 +380,12 @@ where
     }
 }
 
-impl<C, E, O, OT, S> CalibrationStage<C, E, O, OT, S>
+impl<C, E, I, O, OT, S> CalibrationStage<C, E, I, O, OT, S>
 where
+    C: AsRef<O>,
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
-    C: AsRef<O>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus,
+    OT: ObserversTuple<I, S>,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
@@ -419,7 +418,7 @@ where
     }
 }
 
-impl<C, E, O, OT, S> Named for CalibrationStage<C, E, O, OT, S> {
+impl<C, E, I, O, OT, S> Named for CalibrationStage<C, E, I, O, OT, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

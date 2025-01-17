@@ -1,10 +1,9 @@
 use core::{marker::PhantomData, ptr, time::Duration};
 
 use libafl::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     Error,
 };
 use libafl_bolts::{
@@ -48,11 +47,10 @@ where
     }
 }
 
-impl<EM, S, SP, OT, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for TinyInstExecutor<S, SP, OT>
+impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for TinyInstExecutor<S, SP, OT>
 where
-    S: HasCorpus + HasExecutions,
-    <S::Corpus as Corpus>::Input: HasTargetBytes,
+    S: HasExecutions,
+    I: HasTargetBytes,
     SP: ShMemProvider,
 {
     #[inline]
@@ -61,7 +59,7 @@ where
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
         match &self.map {

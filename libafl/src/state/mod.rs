@@ -43,9 +43,9 @@ use crate::{
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus {
+pub trait HasCorpus<I> {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus;
+    type Corpus: Corpus<I>;
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
@@ -71,28 +71,12 @@ trait State:
 {
 }
 
-impl<I, C, R, SC> State for StdState<I, C, R, SC>
+impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
     C: Serialize + DeserializeOwned,
     R: Rand,
     SC: Serialize + DeserializeOwned,
 {
-}
-
-// Reflexivity
-impl<C> HasCorpus for C
-where
-    C: Corpus,
-{
-    type Corpus = Self;
-
-    fn corpus(&self) -> &Self::Corpus {
-        self
-    }
-
-    fn corpus_mut(&mut self) -> &mut Self::Corpus {
-        self
-    }
 }
 
 /// Interact with the maximum size
@@ -104,9 +88,9 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions {
+pub trait HasSolutions<I> {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus;
+    type Solutions: Corpus<I>;
 
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
@@ -220,7 +204,7 @@ impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
         SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
         R: serde::Serialize + for<'a> serde::Deserialize<'a>
     ")]
-pub struct StdState<I, C, R, SC> {
+pub struct StdState<C, I, R, SC> {
     /// RNG instance
     rand: R,
     /// How many times the executor ran the harness/target
@@ -266,7 +250,7 @@ pub struct StdState<I, C, R, SC> {
     phantom: PhantomData<I>,
 }
 
-impl<I, C, R, SC> HasRand for StdState<I, C, R, SC>
+impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
 where
     R: Rand,
 {
@@ -285,9 +269,9 @@ where
     }
 }
 
-impl<I, C, R, SC> HasCorpus for StdState<I, C, R, SC>
+impl<C, I, R, SC> HasCorpus<I> for StdState<C, I, R, SC>
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     type Corpus = C;
 
@@ -304,26 +288,26 @@ where
     }
 }
 
-impl<I, C, R, SC> HasTestcase for StdState<I, C, R, SC>
+impl<C, I, R, SC> HasTestcase<I> for StdState<C, I, R, SC>
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     /// To get the testcase
-    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<C::Input>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<'_, Testcase<I>>, Error> {
         Ok(self.corpus().get(id)?.borrow())
     }
 
     /// To get mutable testcase
-    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<C::Input>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<'_, Testcase<I>>, Error> {
         Ok(self.corpus().get(id)?.borrow_mut())
     }
 }
 
-impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
+impl<C, I, R, SC> HasSolutions<I> for StdState<C, I, R, SC>
 where
+    C: Corpus<I>,
     I: Input,
-    C: Corpus,
-    SC: Corpus<Input = C::Input>,
+    SC: Corpus<I>,
 {
     type Solutions = SC;
 
@@ -340,7 +324,7 @@ where
     }
 }
 
-impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata_map(&self) -> &SerdeAnyMap {
@@ -354,7 +338,7 @@ impl<I, C, R, SC> HasMetadata for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn named_metadata_map(&self) -> &NamedSerdeAnyMap {
@@ -368,7 +352,7 @@ impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC> {
     /// The executions counter
     #[inline]
     fn executions(&self) -> &u64 {
@@ -382,7 +366,7 @@ impl<I, C, R, SC> HasExecutions for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasImported for StdState<C, I, R, SC> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn imported(&self) -> &usize {
@@ -396,7 +380,7 @@ impl<I, C, R, SC> HasImported for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasLastFoundTime for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasLastFoundTime for StdState<C, I, R, SC> {
     /// Return the number of new paths that imported from other fuzzers
     #[inline]
     fn last_found_time(&self) -> &Duration {
@@ -410,7 +394,7 @@ impl<I, C, R, SC> HasLastFoundTime for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasLastReportTime for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasLastReportTime for StdState<C, I, R, SC> {
     /// The last time we reported progress,if available/used.
     /// This information is used by fuzzer `maybe_report_progress`.
     fn last_report_time(&self) -> &Option<Duration> {
@@ -424,7 +408,7 @@ impl<I, C, R, SC> HasLastReportTime for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasMaxSize for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC> {
     fn max_size(&self) -> usize {
         self.max_size
     }
@@ -434,7 +418,7 @@ impl<I, C, R, SC> HasMaxSize for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC> {
     /// The starting time
     #[inline]
     fn start_time(&self) -> &Duration {
@@ -448,7 +432,7 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasCurrentCorpusId for StdState<C, I, R, SC> {
     fn set_corpus_id(&mut self, id: CorpusId) -> Result<(), Error> {
         self.corpus_id = Some(id);
         Ok(())
@@ -465,20 +449,17 @@ impl<I, C, R, SC> HasCurrentCorpusId for StdState<I, C, R, SC> {
 }
 
 /// Has information about the current [`Testcase`] we are fuzzing
-pub trait HasCurrentTestcase: HasCorpus {
+pub trait HasCurrentTestcase<I>: HasCorpus<I> {
     /// Gets the current [`Testcase`] we are fuzzing
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase(&self)
-        -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error>;
     //fn current_testcase(&self) -> Result<&Testcase<I>, Error>;
 
     /// Gets the current [`Testcase`] we are fuzzing (mut)
     ///
     /// Will return [`Error::key_not_found`] if no `corpus_id` is currently set.
-    fn current_testcase_mut(
-        &self,
-    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error>;
+    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error>;
     //fn current_testcase_mut(&self) -> Result<&mut Testcase<I>, Error>;
 
     /// Gets a cloned representation of the current [`Testcase`].
@@ -488,17 +469,15 @@ pub trait HasCurrentTestcase: HasCorpus {
     /// # Note
     /// This allocates memory and copies the contents!
     /// For performance reasons, if you just need to access the testcase, use [`Self::current_testcase`] instead.
-    fn current_input_cloned(&self) -> Result<<Self::Corpus as Corpus>::Input, Error>;
+    fn current_input_cloned(&self) -> Result<I, Error>;
 }
 
-impl<T> HasCurrentTestcase for T
+impl<I, T> HasCurrentTestcase<I> for T
 where
-    T: HasCorpus + HasCurrentCorpusId,
-    <Self::Corpus as Corpus>::Input: Clone,
+    T: HasCorpus<I> + HasCurrentCorpusId,
+    I: Clone,
 {
-    fn current_testcase(
-        &self,
-    ) -> Result<Ref<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    fn current_testcase(&self) -> Result<Ref<'_, Testcase<I>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::key_not_found(
                 "We are not currently processing a testcase",
@@ -508,9 +487,7 @@ where
         Ok(self.corpus().get(corpus_id)?.borrow())
     }
 
-    fn current_testcase_mut(
-        &self,
-    ) -> Result<RefMut<'_, Testcase<<Self::Corpus as Corpus>::Input>>, Error> {
+    fn current_testcase_mut(&self) -> Result<RefMut<'_, Testcase<I>>, Error> {
         let Some(corpus_id) = self.current_corpus_id()? else {
             return Err(Error::illegal_state(
                 "We are not currently processing a testcase",
@@ -520,7 +497,7 @@ where
         Ok(self.corpus().get(corpus_id)?.borrow_mut())
     }
 
-    fn current_input_cloned(&self) -> Result<<Self::Corpus as Corpus>::Input, Error> {
+    fn current_input_cloned(&self) -> Result<I, Error> {
         let mut testcase = self.current_testcase_mut()?;
         Ok(testcase.borrow_mut().load_input(self.corpus())?.clone())
     }
@@ -538,7 +515,7 @@ pub trait Stoppable {
     fn discard_stop_request(&mut self);
 }
 
-impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
+impl<C, I, R, SC> Stoppable for StdState<C, I, R, SC> {
     fn request_stop(&mut self) {
         self.stop_requested = true;
     }
@@ -552,7 +529,7 @@ impl<I, C, R, SC> Stoppable for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasCurrentStageId for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasCurrentStageId for StdState<C, I, R, SC> {
     fn set_current_stage_id(&mut self, idx: StageId) -> Result<(), Error> {
         self.stage_stack.set_current_stage_id(idx)
     }
@@ -570,7 +547,7 @@ impl<I, C, R, SC> HasCurrentStageId for StdState<I, C, R, SC> {
     }
 }
 
-impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasNestedStageStatus for StdState<C, I, R, SC> {
     fn enter_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_stack.enter_inner_stage()
     }
@@ -581,12 +558,12 @@ impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
 }
 
 #[cfg(feature = "std")]
-impl<C, I, R, SC> StdState<I, C, R, SC>
+impl<C, I, R, SC> StdState<C, I, R, SC>
 where
+    C: Corpus<I>,
     I: Input,
     R: Rand,
-    C: Corpus,
-    SC: Corpus<Input = C::Input>,
+    SC: Corpus<I>,
 {
     /// Decide if the state must load the inputs
     pub fn must_load_initial_inputs(&self) -> bool {
@@ -1022,12 +999,12 @@ where
     }
 }
 
-impl<C, I, R, SC> StdState<I, C, R, SC>
+impl<C, I, R, SC> StdState<C, I, R, SC>
 where
+    C: Corpus<I>,
     I: Input,
-    C: Corpus<Input = I>,
     R: Rand,
-    SC: Corpus<Input = I>,
+    SC: Corpus<I>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,
@@ -1040,7 +1017,7 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        G: Generator<C::Input, Self>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         let mut added = 0;
@@ -1078,7 +1055,7 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        G: Generator<C::Input, Self>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
@@ -1095,7 +1072,7 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        G: Generator<C::Input, Self>,
+        G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
@@ -1146,16 +1123,16 @@ where
     }
 }
 
-impl StdState<NopInput, InMemoryCorpus<NopInput>, StdRand, InMemoryCorpus<NopInput>> {
+impl StdState<InMemoryCorpus<NopInput>, NopInput, StdRand, InMemoryCorpus<NopInput>> {
     /// Create an empty [`StdState`] that has very minimal uses.
     /// Potentially good for testing.
-    pub fn nop<I>() -> Result<StdState<I, InMemoryCorpus<I>, StdRand, InMemoryCorpus<I>>, Error>
-    where
-        I: Input,
-    {
+    pub fn nop() -> Result<
+        StdState<InMemoryCorpus<NopInput>, NopInput, StdRand, InMemoryCorpus<NopInput>>,
+        Error,
+    > {
         StdState::new(
             StdRand::with_seed(0),
-            InMemoryCorpus::<I>::new(),
+            InMemoryCorpus::<NopInput>::new(),
             InMemoryCorpus::new(),
             &mut (),
             &mut (),
@@ -1164,7 +1141,7 @@ impl StdState<NopInput, InMemoryCorpus<NopInput>, StdRand, InMemoryCorpus<NopInp
 }
 
 #[cfg(feature = "introspection")]
-impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
+impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         &self.introspection_monitor
     }
@@ -1210,7 +1187,7 @@ impl<I> HasMaxSize for NopState<I> {
     }
 }
 
-impl<I> HasCorpus for NopState<I> {
+impl<I> HasCorpus<I> for NopState<I> {
     type Corpus = InMemoryCorpus<I>;
 
     fn corpus(&self) -> &Self::Corpus {
@@ -1329,10 +1306,10 @@ impl<I> HasClientPerfMonitor for NopState<I> {
 
 #[cfg(test)]
 mod test {
-    use crate::{inputs::BytesInput, state::StdState};
+    use crate::state::StdState;
 
     #[test]
     fn test_std_state() {
-        StdState::nop::<BytesInput>().expect("couldn't instantiate the test state");
+        StdState::nop().expect("couldn't instantiate the test state");
     }
 }
