@@ -31,7 +31,7 @@ use crate::{
     },
     observers::cmp::{AFLppCmpValuesMetadata, CmpValues, CmpValuesMetadata},
     stages::TaintMetadata,
-    state::{HasMaxSize, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
     Error, HasMetadata,
 };
 
