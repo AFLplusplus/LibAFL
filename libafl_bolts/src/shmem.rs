@@ -65,10 +65,11 @@ pub type StdShMem = MmapShMem;
 
 /// The standard sharedmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
-pub type StdShMemProvider = RcShMemProvider<MmapShMem, ServedShMemProvider<MmapShMemProvider>>;
+pub type StdShMemProvider =
+    RcShMemProvider<MmapShMem, ServedShMemProvider<MmapShMem, MmapShMemProvider>>;
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 /// The standard sharedmem service
-pub type StdShMemService = ShMemService<MmapShmem, MmapShMemProvider>;
+pub type StdShMemService = ShMemService<MmapShMem, MmapShMemProvider>;
 
 /// The default [`ShMem`].
 #[cfg(all(
@@ -98,7 +99,8 @@ pub type StdServedShMemProvider =
     RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
 /// The standard served shmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
-pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
+pub type StdServedShMemProvider =
+    RcShMemProvider<MmapShMem, ServedShMemProvider<MmapShMem, MmapShMemProvider>>;
 /// The standard served shmem provider
 #[cfg(all(
     feature = "std",
