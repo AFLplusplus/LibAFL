@@ -81,7 +81,7 @@ where
     E: HasObservers + Executor<EM, I, S, Z>,
     S: HasCorpus<I> + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<I, S>,
-    I: ResizableMutator<u8> + Clone + HasMutatorBytes,
+    I: ResizableMutator<u8> + HasMutatorBytes + Clone,
     O: Hash,
     C: AsRef<O> + Named,
 {
