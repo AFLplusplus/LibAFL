@@ -180,13 +180,12 @@ where
     }
 }
 
-impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
+impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, I, M, S, Z>
 where
-    M: Mutator<I1, S>,
-    Z: Evaluator<E, EM, I2, S>,
-    S: HasCorpus<I2> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
-    I1: MutatedTransform<I2, S> + Clone,
-    I2: Input,
+    M: Mutator<I, S>,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
+    I: MutatedTransform<I, S> + Input + Clone,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -205,7 +204,7 @@ impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
     M: Mutator<I1, S>,
     Z: Evaluator<E, EM, I2, S>,
-    S: HasRand + HasCurrentTestcase<I2> + MaybeHasClientPerfMonitor,
+    S: HasCorpus<I2> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
     I1: MutatedTransform<I2, S> + Clone,
     I2: Input,
 {
@@ -232,7 +231,16 @@ where
             phantom: PhantomData,
         }
     }
+}
 
+impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
+where
+    M: Mutator<I1, S>,
+    Z: Evaluator<E, EM, I2, S>,
+    S: HasRand + HasCurrentTestcase<I2> + MaybeHasClientPerfMonitor,
+    I1: MutatedTransform<I2, S> + Clone,
+    I2: Input,
+{
     /// Runs this (mutational) stage for the given testcase
     fn perform_mutational(
         &mut self,
