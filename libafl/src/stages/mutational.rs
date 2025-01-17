@@ -96,17 +96,17 @@ pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<E, EM, I, M, S, Z> {
+pub struct StdMutationalStage<E, EM, I1, I2, M, S, Z> {
     /// The name
     name: Cow<'static, str>,
     /// The mutator(s) to use
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: NonZeroUsize,
-    phantom: PhantomData<(E, EM, I, S, Z)>,
+    phantom: PhantomData<(E, EM, I1, I2, S, Z)>,
 }
 
-impl<E, EM, I, M, S, Z> MutationalStage<S> for StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> MutationalStage<S> for StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
     S: HasRand,
 {
@@ -135,24 +135,25 @@ static mut MUTATIONAL_STAGE_ID: usize = 0;
 /// The name for mutational stage
 pub static MUTATIONAL_STAGE_NAME: &str = "mutational";
 
-impl<E, EM, I, M, S, Z> Named for StdMutationalStage<E, EM, I, M, S, Z> {
+impl<E, EM, I1, I2, M, S, Z> Named for StdMutationalStage<E, EM, I1, I2, M, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
+    M: Mutator<I1, S>,
+    Z: Evaluator<E, EM, I2, S>,
     S: HasRand
-        + HasCorpus<I>
+        + HasCorpus<I2>
         + HasMetadata
         + HasExecutions
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    I: Clone + MutatedTransform<I, S>,
+    I1: Clone + MutatedTransform<I2, S>,
+    I2: Input,
 {
     #[inline]
     fn perform(
@@ -179,12 +180,13 @@ where
     }
 }
 
-impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    S: HasCorpus<I> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
-    I: Input + Clone,
+    M: Mutator<I1, S>,
+    Z: Evaluator<E, EM, I2, S>,
+    S: HasCorpus<I2> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
+    I1: MutatedTransform<I2, S> + Clone,
+    I2: Input,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -199,12 +201,13 @@ where
     }
 }
 
-impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
-    S: HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
-    I: Clone + MutatedTransform<I, S>,
+    M: Mutator<I1, S>,
+    Z: Evaluator<E, EM, I2, S>,
+    S: HasRand + HasCurrentTestcase<I2> + MaybeHasClientPerfMonitor,
+    I1: MutatedTransform<I2, S> + Clone,
+    I2: Input,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -249,7 +252,7 @@ where
         let num = self.iterations(state)?;
         let mut testcase = state.current_testcase_mut()?;
 
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
+        let Ok(input) = I1::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
         drop(testcase);
