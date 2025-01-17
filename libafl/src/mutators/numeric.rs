@@ -1,7 +1,7 @@
 //! Mutators for integer-style inputs
 
 use alloc::borrow::Cow;
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use libafl_bolts::{
     rands::Rand,
