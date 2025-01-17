@@ -47,7 +47,41 @@ pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 
 pub mod utils;
 
-/// A module for `libafl_qemu`.
+/// [`EmulatorModule`] is a trait designed to define modules that interact with the QEMU emulator
+/// during fuzzing. [`EmulatorModule`] provides a set of interfaces (hooks) that can be invoked at various stages
+/// of the fuzzer's execution.
+///
+/// The typical sequence of these hooks execution during a fuzzing session is as follows:
+/// ```rust,ignore
+/// pre_qemu_init()
+/// // Qemu initialization (in the Emulator)
+/// post_qemu_init()
+/// // Harness initialization
+/// first_exec()
+///
+/// // The following loop is executed for every fuzzing iteration
+/// pre_exec()
+/// // Harness execution
+/// post_exec()
+/// ```
+///
+/// It is important to note that all registered [`EmulatorModule`] instances will have their interfaces (hooks)
+/// invoked. The order of invocation depends on the order in which the modules were registered.
+///
+/// Users typically add hooks, monitoring, or other instrumentation to the **fuzzing target** in [`EmulatorModule`]
+/// For example:
+/// ```rust,ignore
+/// fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
+/// where
+///     ET: EmulatorModuleTuple<I, S>,
+/// {
+///     // Add a hook before the execution of a syscall in the fuzzing target
+///     _emulator_modules.pre_syscalls(Hook::Function(your_syscall_hooks::<ET, I, S>))
+///     // ...
+/// }
+/// ```
+/// For more details on adding hooks to the **fuzzing target**, including function signatures,
+/// return values, please refer to the [`EmulatorModules`].
 // TODO remove 'static when specialization will be stable
 pub trait EmulatorModule<I, S>: 'static + Debug {
     type ModuleAddressFilter: AddressFilter;

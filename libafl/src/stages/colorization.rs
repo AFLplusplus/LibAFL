@@ -4,9 +4,10 @@ use alloc::{
     collections::binary_heap::BinaryHeap,
     vec::Vec,
 };
-use core::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Range};
+use core::{cmp::Ordering, fmt::Debug, hash::Hash, marker::PhantomData, ops::Range};
 
 use libafl_bolts::{
+    generic_hash_std,
     rands::Rand,
     tuples::{Handle, Handled},
     Named,
@@ -17,10 +18,10 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     events::EventFirer,
     executors::{Executor, HasObservers},
-    inputs::HasMutatorBytes,
+    inputs::{HasMutatorBytes, HasMutatorResizableBytes},
     mutators::mutations::buffer_copy,
     nonzero,
-    observers::{MapObserver, ObserversTuple},
+    observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand},
     Error, HasMetadata, HasNamedMetadata,
@@ -80,8 +81,8 @@ where
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     S: HasCorpus + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
-    O: MapObserver,
+    <S::Corpus as Corpus>::Input: HasMutatorResizableBytes + Clone,
+    O: Hash,
     C: AsRef<O> + Named,
 {
     #[inline]
@@ -152,12 +153,12 @@ libafl_bolts::impl_serdeany!(TaintMetadata);
 impl<C, E, EM, O, S, Z> ColorizationStage<C, E, EM, O, S, Z>
 where
     EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    O: MapObserver,
+    O: Hash,
     C: AsRef<O> + Named,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasCorpus + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase,
-    <S::Corpus as Corpus>::Input: HasMutatorBytes + Clone,
+    <S::Corpus as Corpus>::Input: HasMutatorResizableBytes + Clone,
 {
     #[inline]
     fn colorize(
@@ -317,7 +318,7 @@ where
         let observers = executor.observers();
         let observer = observers[observer_handle].as_ref();
 
-        let hash = observer.hash_simple() as usize;
+        let hash = generic_hash_std(observer) as usize;
 
         executor
             .observers_mut()
