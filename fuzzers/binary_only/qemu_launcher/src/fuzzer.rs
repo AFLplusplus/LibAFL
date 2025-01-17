@@ -129,7 +129,11 @@ impl Fuzzer {
         }
 
         #[cfg(feature = "simplemgr")]
-        return client.run(None, SimpleEventManager::new(monitor), ClientDescription::new(0, 0, CoreId(0)));
+        return client.run(
+            None,
+            SimpleEventManager::new(monitor),
+            ClientDescription::new(0, 0, CoreId(0)),
+        );
 
         // Build and run the Launcher / fuzzer.
         #[cfg(not(feature = "simplemgr"))]

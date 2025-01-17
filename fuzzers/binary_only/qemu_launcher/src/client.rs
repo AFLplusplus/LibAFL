@@ -10,7 +10,8 @@ use libafl::{
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 use libafl_qemu::modules::{
-    asan::AsanModule, asan_guest::AsanGuestModule, cmplog::CmpLogModule, DrCovModule, InjectionModule,
+    asan::AsanModule, asan_guest::AsanGuestModule, cmplog::CmpLogModule, DrCovModule,
+    InjectionModule,
 };
 
 use crate::{
@@ -92,7 +93,7 @@ impl Client<'_> {
             });
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
-        
+
         let extra_tokens = if cfg!(feature = "injections") {
             injection_module
                 .as_ref()
