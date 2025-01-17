@@ -19,8 +19,7 @@ pub use usermode::*;
 
 #[cfg(feature = "systemmode")]
 pub mod systemmode;
-#[cfg(feature = "systemmode")]
-#[expect(unused_imports)]
+#[cfg(all(feature = "systemmode", feature = "intel_pt"))]
 pub use systemmode::*;
 
 pub mod edges;
