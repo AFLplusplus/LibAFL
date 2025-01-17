@@ -41,9 +41,14 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{NopInput, UsesInput},
     observers::{ObserversTuple, TimeObserver},
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, NopState, State, UsesState},
+    state::{
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasSolutions, NopState, State,
+        UsesState,
+    },
     Error, HasMetadata,
 };
+#[cfg(feature = "share_objectives")]
+use crate::{corpus::Testcase, state::HasCurrentTestcase};
 
 /// Default initial capacity of the event buffer - 4KB
 const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
@@ -396,8 +401,9 @@ where
 impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
+    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus + HasSolutions,
     S::Corpus: Corpus<Input = S::Input>,
+    S::Solutions: Corpus<Input = S::Input>,
     SP: ShMemProvider,
 {
     // Handle arriving events in the client
@@ -620,8 +626,9 @@ where
 impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<EMH, S, SP>
 where
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
+    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus + HasSolutions,
     S::Corpus: Corpus<Input = S::Input>,
+    S::Solutions: Corpus<Input = S::Input>,
     SP: ShMemProvider,
     E: HasObservers + Executor<Self, Z, State = S>,
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
@@ -685,8 +692,15 @@ where
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported + HasCorpus,
+    S: State
+        + HasExecutions
+        + HasMetadata
+        + HasLastReportTime
+        + HasImported
+        + HasCorpus
+        + HasSolutions,
     S::Corpus: Corpus<Input = S::Input>,
+    S::Solutions: Corpus<Input = S::Input>,
     SP: ShMemProvider,
     Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
         + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>

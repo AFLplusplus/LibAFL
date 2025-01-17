@@ -44,7 +44,9 @@ use crate::{
     inputs::UsesInput,
     monitors::Monitor,
     observers::{ObserversTuple, TimeObserver},
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, State, UsesState},
+    state::{
+        HasCorpus, HasExecutions, HasImported, HasLastReportTime, HasSolutions, State, UsesState,
+    },
     Error, HasMetadata,
 };
 
@@ -195,8 +197,9 @@ where
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
+    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus + HasSolutions,
     S::Corpus: Corpus<Input = S::Input>,
+    S::Solutions: Corpus<Input = S::Input>,
     SP: ShMemProvider,
     Z: ExecutionProcessor<
             LlmpEventManager<EMH, S, SP>,
@@ -223,8 +226,15 @@ where
     E::Observers: ObserversTuple<S::Input, S> + Serialize,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported + HasCorpus,
+    S: State
+        + HasExecutions
+        + HasMetadata
+        + HasLastReportTime
+        + HasImported
+        + HasCorpus
+        + HasSolutions,
     S::Corpus: Corpus<Input = S::Input>,
+    S::Solutions: Corpus<Input = S::Input>,
     SP: ShMemProvider,
     Z: ExecutionProcessor<
             LlmpEventManager<EMH, S, SP>,
