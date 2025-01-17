@@ -8,6 +8,7 @@ use core::{borrow::BorrowMut, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use ahash::RandomState;
 use libafl_bolts::{
+    generic_hash_std,
     tuples::{Handle, Handled, MatchName, MatchNameRef},
     HasLen, Named,
 };
@@ -22,10 +23,10 @@ use crate::{
     events::EventFirer,
     executors::{ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverHandle, StateInitializer},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
-    observers::{MapObserver, ObserversTuple},
+    observers::ObserversTuple,
     schedulers::RemovableScheduler,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
@@ -34,7 +35,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
-        MaybeHasClientPerfMonitor, State, UsesState,
+        MaybeHasClientPerfMonitor,
     },
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
     HasScheduler,
@@ -63,9 +64,9 @@ where
         + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
         + HasFeedback,
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + UsesState<State = S>,
+    E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasMetadata
@@ -75,8 +76,7 @@ where
         + HasMaxSize
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Hash + HasLen,
@@ -134,9 +134,9 @@ where
         + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
         + HasFeedback,
     Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + UsesState<State = S>,
+    E: HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     FF: FeedbackFactory<F, E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasMetadata
@@ -147,8 +147,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Hash + HasLen + Input,
@@ -331,12 +330,12 @@ impl<E, EM, F, FF, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
     }
 }
 
-/// A feedback which checks if the hash of the currently observed map is equal to the original hash
+/// A feedback which checks if the hash of the current observed value is equal to the original hash
 /// provided
 #[derive(Clone, Debug)]
-pub struct MapEqualityFeedback<C, M, S> {
+pub struct ObserverEqualityFeedback<C, M, S> {
     name: Cow<'static, str>,
-    map_ref: Handle<C>,
+    observer_handle: Handle<C>,
     orig_hash: u64,
     #[cfg(feature = "track_hit_feedbacks")]
     // The previous run's result of `Self::is_interesting`
@@ -344,27 +343,26 @@ pub struct MapEqualityFeedback<C, M, S> {
     phantom: PhantomData<(M, S)>,
 }
 
-impl<C, M, S> Named for MapEqualityFeedback<C, M, S> {
+impl<C, M, S> Named for ObserverEqualityFeedback<C, M, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<C, M, S> HasObserverHandle for MapEqualityFeedback<C, M, S> {
+impl<C, M, S> HasObserverHandle for ObserverEqualityFeedback<C, M, S> {
     type Observer = C;
 
     fn observer_handle(&self) -> &Handle<Self::Observer> {
-        &self.map_ref
+        &self.observer_handle
     }
 }
 
-impl<C, M, S> StateInitializer<S> for MapEqualityFeedback<C, M, S> {}
+impl<C, M, S> StateInitializer<S> for ObserverEqualityFeedback<C, M, S> {}
 
-impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for MapEqualityFeedback<C, M, S>
+impl<C, EM, I, M, OT, S> Feedback<EM, I, OT, S> for ObserverEqualityFeedback<C, M, S>
 where
-    M: MapObserver,
+    M: Hash,
     C: AsRef<M>,
-    S: State,
     OT: MatchName,
 {
     fn is_interesting(
@@ -378,7 +376,7 @@ where
         let obs = observers
             .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
-        let res = obs.as_ref().hash_simple() == self.orig_hash;
+        let res = generic_hash_std(obs.as_ref()) == self.orig_hash;
         #[cfg(feature = "track_hit_feedbacks")]
         {
             self.last_result = Some(res);
@@ -391,50 +389,51 @@ where
     }
 }
 
-/// A feedback factory for ensuring that the maps for minimized inputs are the same
+/// A feedback factory for ensuring that the values of the observers for minimized inputs are the same
 #[derive(Debug, Clone)]
-pub struct MapEqualityFactory<C, M, S> {
-    map_ref: Handle<C>,
+pub struct ObserverEqualityFactory<C, M, S> {
+    observer_handle: Handle<C>,
     phantom: PhantomData<(C, M, S)>,
 }
 
-impl<C, M, S> MapEqualityFactory<C, M, S>
+impl<C, M, S> ObserverEqualityFactory<C, M, S>
 where
-    M: MapObserver,
+    M: Hash,
     C: AsRef<M> + Handled,
 {
-    /// Creates a new map equality feedback for the given observer
+    /// Creates a new observer equality feedback for the given observer
     pub fn new(obs: &C) -> Self {
         Self {
-            map_ref: obs.handle(),
+            observer_handle: obs.handle(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<C, M, S> HasObserverHandle for MapEqualityFactory<C, M, S> {
+impl<C, M, S> HasObserverHandle for ObserverEqualityFactory<C, M, S> {
     type Observer = C;
 
     fn observer_handle(&self) -> &Handle<C> {
-        &self.map_ref
+        &self.observer_handle
     }
 }
 
-impl<C, M, OT, S> FeedbackFactory<MapEqualityFeedback<C, M, S>, OT> for MapEqualityFactory<C, M, S>
+impl<C, M, OT, S> FeedbackFactory<ObserverEqualityFeedback<C, M, S>, OT>
+    for ObserverEqualityFactory<C, M, S>
 where
-    M: MapObserver,
+    M: Hash,
     C: AsRef<M> + Handled,
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasCorpus,
 {
-    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<C, M, S> {
+    fn create_feedback(&self, observers: &OT) -> ObserverEqualityFeedback<C, M, S> {
         let obs = observers
             .get(self.observer_handle())
             .expect("Should have been provided valid observer name.");
-        MapEqualityFeedback {
-            name: Cow::from("MapEq"),
-            map_ref: obs.handle(),
-            orig_hash: obs.as_ref().hash_simple(),
+        ObserverEqualityFeedback {
+            name: Cow::from("ObserverEq"),
+            observer_handle: obs.handle(),
+            orig_hash: generic_hash_std(obs.as_ref()),
             #[cfg(feature = "track_hit_feedbacks")]
             last_result: None,
             phantom: PhantomData,

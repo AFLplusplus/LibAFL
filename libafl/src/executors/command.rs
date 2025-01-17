@@ -46,12 +46,14 @@ use nix::{
 use typed_builder::TypedBuilder;
 
 use super::HasTimeout;
+#[cfg(target_os = "linux")]
+use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     corpus::Corpus,
-    executors::{hooks::ExecutorHooksTuple, Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input, UsesInput},
+    executors::{Executor, ExitKind, HasObservers},
+    inputs::HasTargetBytes,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::{HasCorpus, HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions},
     std::borrow::ToOwned,
     Error,
 };
@@ -321,11 +323,7 @@ where
     }
 }
 
-impl<OT, S, T, HT, C> CommandExecutor<OT, S, T, HT, C>
-where
-    T: Debug,
-    OT: Debug,
-{
+impl<OT, S, T, HT, C> CommandExecutor<OT, S, T, HT, C> {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.configurer
@@ -333,13 +331,17 @@ where
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<I, OT, S, T> CommandExecutor<OT, S, T>
+impl<OT, S, T> CommandExecutor<OT, S, T>
 where
-    S: State + HasExecutions + UsesInput<Input = I>,
-    T: CommandConfigurator<I> + Debug,
-    OT: Debug + ObserversTuple<I, S>,
+    S: HasExecutions + HasCorpus,
+    T: CommandConfigurator<<S::Corpus as Corpus>::Input> + Debug,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
-    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
+    fn execute_input_with_command(
+        &mut self,
+        state: &mut S,
+        input: &<S::Corpus as Corpus>::Input,
+    ) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
@@ -389,19 +391,18 @@ where
     }
 }
 
-impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<OT, S, T>
+impl<EM, OT, S, T, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for CommandExecutor<OT, S, T>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions + UsesInput,
-    T: CommandConfigurator<S::Input> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
+    S: HasExecutions + HasCorpus,
+    T: CommandConfigurator<<S::Corpus as Corpus>::Input> + Debug,
+    OT: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         self.execute_input_with_command(state, input)
     }
@@ -425,13 +426,13 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<EM, OT, S, T, Z, HT> Executor<EM, Z> for CommandExecutor<OT, S, T, HT, Pid>
+impl<EM, OT, S, T, Z, HT> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+    for CommandExecutor<OT, S, T, HT, Pid>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions + UsesInput,
-    T: CommandConfigurator<S::Input, Pid> + Debug,
-    OT: Debug + MatchName + ObserversTuple<S::Input, S>,
-    HT: ExecutorHooksTuple<S>,
+    S: HasCorpus + HasExecutions,
+    T: CommandConfigurator<<S::Corpus as Corpus>::Input, Pid> + Debug,
+    OT: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -441,9 +442,9 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -471,7 +472,7 @@ where
 
         self.observers.pre_exec_child_all(state, input)?;
         if *state.executions() == 1 {
-            self.hooks.init_all::<Self>(state);
+            self.hooks.init_all(state);
         }
         self.hooks.pre_exec_all(state, input);
 
@@ -501,18 +502,10 @@ where
     }
 }
 
-impl<OT, S, T, HT, C> UsesState for CommandExecutor<OT, S, T, HT, C>
-where
-    S: State,
-{
-    type State = S;
-}
-
 impl<OT, S, T, HT, C> HasObservers for CommandExecutor<OT, S, T, HT, C>
 where
-    S: State,
-    T: Debug,
-    OT: ObserversTuple<S::Input, S>,
+    S: HasCorpus,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
     type Observers = OT;
 
@@ -695,9 +688,9 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
     where
-        OT: MatchName + ObserversTuple<S::Input, S>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
+        S: HasCorpus,
+        <S::Corpus as Corpus>::Input: HasTargetBytes,
+        OT: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
@@ -744,12 +737,9 @@ impl CommandExecutorBuilder {
             timeout: self.timeout,
             command,
         };
-        Ok(
-            <StdCommandConfigurator as CommandConfigurator<S::Input>>::into_executor::<OT, S>(
-                configurator,
-                observers,
-            ),
-        )
+        Ok(<StdCommandConfigurator as CommandConfigurator<
+            <S::Corpus as Corpus>::Input,
+        >>::into_executor::<OT, S>(configurator, observers))
     }
 }
 
@@ -757,7 +747,7 @@ impl CommandExecutorBuilder {
 /// # Example
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{UsesState, HasExecutions}};
+/// use libafl::{Error, corpus::Corpus, inputs::{BytesInput, HasTargetBytes, Input}, executors::{Executor, command::CommandConfigurator}, state::{HasCorpus, HasExecutions}};
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
@@ -787,10 +777,10 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
+/// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
-///     EM: UsesState,
-///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
+///     S: HasCorpus + HasExecutions,
+///     S::Corpus: Corpus<Input = BytesInput>
 /// {
 ///     MyExecutor.into_executor(())
 /// }
@@ -826,10 +816,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C>
-    where
-        OT: MatchName,
-    {
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C> {
         CommandExecutor {
             configurer: self,
             observers,
@@ -844,12 +831,7 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
         self,
         observers: OT,
         hooks: HT,
-    ) -> CommandExecutor<OT, S, Self, HT, C>
-    where
-        OT: MatchName,
-        HT: ExecutorHooksTuple<S>,
-        S: UsesInput<Input = I>,
-    {
+    ) -> CommandExecutor<OT, S, Self, HT, C> {
         CommandExecutor {
             configurer: self,
             observers,
@@ -885,7 +867,7 @@ mod tests {
             Executor,
         },
         fuzzer::NopFuzzer,
-        inputs::BytesInput,
+        inputs::{BytesInput, NopInput},
         monitors::SimpleMonitor,
         state::NopState,
     };
@@ -893,9 +875,10 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_builder() {
-        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
-            log::info!("{status}");
-        }));
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
+            SimpleEventManager::new(SimpleMonitor::new(|status| {
+                log::info!("{status}");
+            }));
 
         let mut executor = CommandExecutor::builder();
         executor

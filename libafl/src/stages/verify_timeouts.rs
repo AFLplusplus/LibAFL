@@ -12,10 +12,10 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers, HasTimeout},
-    inputs::{BytesInput, UsesInput},
+    inputs::BytesInput,
     observers::ObserversTuple,
     stages::Stage,
-    state::{HasCorpus, UsesState},
+    state::HasCorpus,
     Evaluator, HasMetadata,
 };
 
@@ -84,10 +84,9 @@ impl<I> TimeoutsToVerify<I> {
 impl<E, EM, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, S>
 where
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
-    EM: UsesState<State = S>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers + HasTimeout,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasMetadata + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S: HasCorpus + HasMetadata,
     <S::Corpus as Corpus>::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     fn perform(

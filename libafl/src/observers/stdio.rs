@@ -28,12 +28,12 @@ use crate::{observers::Observer, Error};
 ///     events::{EventFirer, NopEventManager},
 ///     executors::{CommandExecutor, ExitKind},
 ///     feedbacks::{Feedback, StateInitializer},
-///     inputs::{BytesInput, UsesInput},
+///     inputs::BytesInput,
 ///     mutators::{MutationResult, NopMutator},
 ///     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
 ///     schedulers::QueueScheduler,
 ///     stages::StdMutationalStage,
-///     state::{HasCorpus, State, StdState},
+///     state::{HasCorpus, StdState},
 ///     Error, Fuzzer, StdFuzzer,
 /// };
 ///
@@ -58,7 +58,6 @@ use crate::{observers::Observer, Error};
 ///
 /// impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ExportStdXObserver
 /// where
-///     S: State,
 ///     OT: MatchNameRef
 /// {
 ///     fn is_interesting(

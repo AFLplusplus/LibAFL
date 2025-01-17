@@ -4,10 +4,10 @@ use core::marker::PhantomData;
 use libafl::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
-    inputs::{BytesInput, UsesInput},
+    inputs::BytesInput,
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, UsesState},
+    state::{HasCorpus, HasCurrentTestcase},
     Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
@@ -36,15 +36,9 @@ impl<EM, TE, S, Z> Named for AFLppCmplogTracingStage<'_, EM, TE, S, Z> {
 
 impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for AFLppCmplogTracingStage<'_, EM, TE, S, Z>
 where
-    EM: UsesState<State = S>,
-    TE: HasObservers + Executor<EM, Z, State = S>,
+    TE: HasObservers + Executor<EM, BytesInput, S, Z>,
     TE::Observers: MatchNameRef + ObserversTuple<BytesInput, S>,
-    S: HasCorpus
-        + HasCurrentTestcase
-        + UsesInput<Input = BytesInput>
-        + HasMetadata
-        + HasNamedMetadata
-        + HasCurrentCorpusId,
+    S: HasCorpus + HasCurrentTestcase + HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
     S::Corpus: Corpus<Input = BytesInput>,
 {
     #[inline]

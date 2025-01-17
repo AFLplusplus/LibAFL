@@ -702,7 +702,6 @@ where
                             Ok(()) => (),
                             Err(e) => {
                                 log::info!("Ignoring failed read from client {e:?} {poll_fd:?}");
-                                continue;
                             }
                         };
                     } else {

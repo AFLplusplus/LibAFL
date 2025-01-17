@@ -51,7 +51,7 @@ mod generators {
     use std::{cmp::max, ptr};
 
     use hashbrown::hash_map::Entry;
-    use libafl::{inputs::UsesInput, HasMetadata};
+    use libafl::HasMetadata;
     use libafl_bolts::hash_64_fast;
     use libafl_qemu_sys::GuestAddr;
 
@@ -79,18 +79,28 @@ mod generators {
     }
 
     #[allow(unused_variables)]
-    pub fn gen_unique_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+    pub fn gen_unique_edge_ids<
+        AF,
+        ET,
+        PF,
+        I,
+        S,
+        V,
+        const IS_CONST_MAP: bool,
+        const MAP_SIZE: usize,
+    >(
         qemu: Qemu,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         state: Option<&mut S>,
         src: GuestAddr,
         dest: GuestAddr,
     ) -> Option<u64>
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
         if let Some(module) =
@@ -157,18 +167,28 @@ mod generators {
 
     #[allow(unused_variables)]
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
-    pub fn gen_hashed_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+    pub fn gen_hashed_edge_ids<
+        AF,
+        ET,
+        PF,
+        I,
+        S,
+        V,
+        const IS_CONST_MAP: bool,
+        const MAP_SIZE: usize,
+    >(
         qemu: Qemu,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: Option<&mut S>,
         src: GuestAddr,
         dest: GuestAddr,
     ) -> Option<u64>
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
         if let Some(module) =
@@ -211,17 +231,27 @@ mod generators {
     #[expect(clippy::unnecessary_cast)]
     #[allow(unused_variables)]
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
-    pub fn gen_hashed_block_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+    pub fn gen_hashed_block_ids<
+        AF,
+        ET,
+        PF,
+        I,
+        S,
+        V,
+        const IS_CONST_MAP: bool,
+        const MAP_SIZE: usize,
+    >(
         qemu: Qemu,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
         // first check if we should filter

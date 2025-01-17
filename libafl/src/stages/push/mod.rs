@@ -26,7 +26,6 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
-    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::{RetryCountRestartHelper, Stage},
@@ -38,11 +37,11 @@ use crate::{
 /// Should be stored inside a `[Rc<RefCell<_>>`]
 #[derive(Clone, Debug)]
 pub struct PushStageSharedState<EM, I, OT, S, Z> {
-    /// The [`crate::state::State`]
+    /// The state
     pub state: S,
     /// The [`crate::fuzzer::Fuzzer`] instance
     pub fuzzer: Z,
-    /// The [`crate::events::EventManager`]
+    /// The event manager
     pub event_mgr: EM,
     /// The [`crate::observers::ObserversTuple`]
     pub observers: OT,
@@ -254,10 +253,12 @@ where
         + HasLastReportTime
         + HasCurrentCorpusId
         + HasNamedMetadata
-        + HasMetadata
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
-    EM: EventFirer<State = S> + EventRestarter + HasEventManagerId + ProgressReporter<State = S>,
+        + HasMetadata,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>
+        + EventRestarter<S>
+        + HasEventManagerId
+        + ProgressReporter<S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     PS: PushStage<EM, <S::Corpus as Corpus>::Input, OT, S, Z>,
     Z: ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>

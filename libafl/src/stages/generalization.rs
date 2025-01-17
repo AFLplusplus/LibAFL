@@ -17,13 +17,16 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, UsesInput},
+    inputs::{
+        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes,
+        HasMutatorResizableBytes,
+    },
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
+    state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -64,17 +67,15 @@ impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<C, EM, O, E::
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    E: Executor<EM, Z, State = S> + HasObservers,
+    E: Executor<EM, BytesInput, S, Z> + HasObservers,
     E::Observers: ObserversTuple<BytesInput, S>,
     S: HasExecutions
         + HasMetadata
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = BytesInput>,
+        + MaybeHasClientPerfMonitor,
     S::Corpus: Corpus<Input = BytesInput>,
-    EM: UsesState<State = S>,
 {
     #[inline]
     #[expect(clippy::too_many_lines)]
@@ -343,13 +344,9 @@ impl<C, EM, O, OT, S, Z> GeneralizationStage<C, EM, O, OT, S, Z>
 where
     O: MapObserver,
     C: CanTrack + AsRef<O> + Named,
-    S: HasExecutions
-        + HasMetadata
-        + HasCorpus
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = BytesInput>,
+    S: HasExecutions + HasMetadata + HasCorpus + MaybeHasClientPerfMonitor,
+    S::Corpus: Corpus<Input = BytesInput>,
     OT: ObserversTuple<BytesInput, S>,
-    EM: UsesState<State = S>,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
@@ -375,7 +372,7 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
         E::Observers: ObserversTuple<BytesInput, S>,
     {
         start_timer!(state);
@@ -417,7 +414,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -455,7 +452,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
+        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers<Observers = OT>,
     {
         let mut index = 0;
         while index < payload.len() {

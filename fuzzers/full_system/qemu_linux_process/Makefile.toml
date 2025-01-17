@@ -11,8 +11,11 @@ end
 
 if eq ${harness_api} "nyx"
     set_env FEATURE nyx
-else
+elseif eq ${harness_api} "lqemu"
     set_env FEATURE ""
+else
+    echo "Unknown harness API: ${harness_api}"
+    exit 1
 end
 
 ''', '''
@@ -132,6 +135,24 @@ args = [
   "${FEATURE}",
 ]
 
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+# TODO: Run real test, not only building.
+
+# LibAFL QEMU API
+HARNESS_API=lqemu cargo make build
+
+# Nyx API
+HARNESS_API=nyx cargo make build
+'''
+
+[tasks.test]
+description = "Run a test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
 [tasks.run]
 dependencies = ["build"]
 script_runner = "@shell"
@@ -145,18 +166,18 @@ else
   LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu
 fi
 
-cp ${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd ${LINUX_BUILDER_OUT}/OVMF_CODE.fd.clone
-cp ${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd ${LINUX_BUILDER_OUT}/OVMF_VARS.fd.clone
-cp ${LINUX_BUILDER_OUT}/linux.qcow2 ${LINUX_BUILDER_OUT}/linux.qcow2.clone
+qemu-img create -f qcow2 -o backing_file=${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd -F raw ${LINUX_BUILDER_OUT}/OVMF_CODE.4m.qcow2
+qemu-img create -f qcow2 -o backing_file=${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd -F raw ${LINUX_BUILDER_OUT}/OVMF_VARS.4m.qcow2
+qemu-img create -f qcow2 -o backing_file=${LINUX_BUILDER_OUT}/linux.qcow2 -F qcow2 ${LINUX_BUILDER_OUT}/linux.tmp.qcow2
 
 ${TARGET_DIR}/${PROFILE_DIR}/qemu_linux_process \
   -accel tcg \
   -m 4G \
-  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd" `# OVMF code pflash` \
-  -drive if=pflash,format=raw,file="${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd" `# OVMF vars pflash` \
-  -device virtio-scsi-pci,id=scsi0 `# SCSI bus` \
-  -device scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1 \
-  -blockdev driver=file,filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage `# Backend file of "disk"` \
+  -drive if=pflash,format=qcow2,file="${LINUX_BUILDER_OUT}/OVMF_CODE.4m.qcow2" `# OVMF code pflash` \
+  -drive if=pflash,format=qcow2,file="${LINUX_BUILDER_OUT}/OVMF_VARS.4m.qcow2" `# OVMF vars pflash` \
+  -device ahci,id=ahci,bus=pci.0,addr=4 \
+  -device ide-hd,bus=ahci.0,drive=disk,bootindex=1 \
+  -blockdev driver=file,filename="${LINUX_BUILDER_OUT}/linux.tmp.qcow2",node-name=storage `# Backend file of "disk"` \
   -blockdev driver=qcow2,file=storage,node-name=disk `# QCOW2 "disk"` \
   -L "${LIBAFL_QEMU_BIOS_DIR}" \
   -nographic \

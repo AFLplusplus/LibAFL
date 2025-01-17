@@ -5,10 +5,11 @@ use std::{
 };
 
 use libafl::{
+    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
-    state::{HasExecutions, State, UsesState},
+    state::{HasCorpus, HasExecutions},
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
@@ -38,26 +39,18 @@ impl NyxExecutor<(), ()> {
     }
 }
 
-impl<S, OT> UsesState for NyxExecutor<S, OT>
+impl<EM, S, Z, OT> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for NyxExecutor<S, OT>
 where
-    S: State,
-{
-    type State = S;
-}
-
-impl<EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<S, OT>
-where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    S::Input: HasTargetBytes,
-    OT: ObserversTuple<S::Input, S>,
+    S: HasCorpus + HasExecutions,
+    <S::Corpus as Corpus>::Input: HasTargetBytes,
+    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -205,11 +198,7 @@ impl NyxExecutorBuilder {
     }
 }
 
-impl<S, OT> HasObservers for NyxExecutor<S, OT>
-where
-    S: State,
-    OT: ObserversTuple<S::Input, S>,
-{
+impl<S, OT> HasObservers for NyxExecutor<S, OT> {
     type Observers = OT;
 
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {

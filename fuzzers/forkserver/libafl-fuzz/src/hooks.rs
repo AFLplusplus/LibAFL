@@ -1,6 +1,7 @@
 use libafl::{
+    corpus::Corpus,
     events::{Event, EventManagerHook},
-    state::{State, Stoppable},
+    state::{HasCorpus, Stoppable},
     Error,
 };
 use libafl_bolts::ClientId;
@@ -10,15 +11,15 @@ pub struct LibAflFuzzEventHook {
     exit_on_solution: bool,
 }
 
-impl<S> EventManagerHook<S> for LibAflFuzzEventHook
+impl<S> EventManagerHook<<S::Corpus as Corpus>::Input, S> for LibAflFuzzEventHook
 where
-    S: State + Stoppable,
+    S: HasCorpus + Stoppable,
 {
     fn pre_exec(
         &mut self,
         state: &mut S,
         _client_id: ClientId,
-        event: &Event<S::Input>,
+        event: &Event<<S::Corpus as Corpus>::Input>,
     ) -> Result<bool, Error> {
         if self.exit_on_solution && matches!(event, Event::Objective { .. }) {
             // TODO: dump state

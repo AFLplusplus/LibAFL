@@ -14,7 +14,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
@@ -23,9 +23,7 @@ use crate::{
         MutationalStage, RetryCountRestartHelper, Stage,
     },
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor, UsesState,
-    },
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -79,8 +77,7 @@ where
 
 impl<E, F, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
-    EM: UsesState<State = S>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     F: TestcaseScore<S>,
     M: Mutator<I, S>,
     S: HasCorpus
@@ -90,8 +87,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + MaybeHasClientPerfMonitor,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
     <S::Corpus as Corpus>::Input: Input,
@@ -121,17 +117,11 @@ where
 
 impl<E, F, EM, I, M, S, Z> PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
-    EM: UsesState<State = S>,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     F: TestcaseScore<S>,
     I: Input,
     M: Mutator<I, S>,
-    S: HasCorpus
-        + HasMetadata
-        + HasRand
-        + HasCurrentTestcase
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    S: HasCorpus + HasMetadata + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
     <S::Corpus as Corpus>::Input: Input,

@@ -13,12 +13,12 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers, ShadowExecutor},
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasNamedMetadata,
 };
 
@@ -32,15 +32,13 @@ pub struct TracingStage<EM, TE, S, Z> {
 
 impl<EM, TE, S, Z> TracingStage<EM, TE, S, Z>
 where
-    TE: Executor<EM, Z, State = S> + HasObservers,
+    TE: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentTestcase
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>, //delete me
+        + MaybeHasClientPerfMonitor,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
@@ -76,15 +74,13 @@ where
 
 impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for TracingStage<EM, TE, S, Z>
 where
-    TE: Executor<EM, Z, State = S> + HasObservers,
+    TE: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>,
+        + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Input,
 {
     #[inline]
@@ -164,10 +160,10 @@ impl<E, EM, SOT, S, Z> Named for ShadowTracingStage<E, EM, SOT, S, Z> {
     }
 }
 
-impl<E, EM, SOT, S, Z> Stage<ShadowExecutor<E, SOT>, EM, S, Z>
+impl<E, EM, SOT, S, Z> Stage<ShadowExecutor<E, S, SOT>, EM, S, Z>
     for ShadowTracingStage<E, EM, SOT, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions
@@ -176,15 +172,13 @@ where
         + Debug
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>,
+        + MaybeHasClientPerfMonitor,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        executor: &mut ShadowExecutor<E, SOT>,
+        executor: &mut ShadowExecutor<E, S, SOT>,
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
@@ -227,13 +221,12 @@ where
 
 impl<E, EM, SOT, S, Z> ShadowTracingStage<E, EM, SOT, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
-    S: HasExecutions + HasCorpus + UsesInput,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
+    S: HasExecutions + HasCorpus,
     SOT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    EM: UsesState<State = S>,
 {
     /// Creates a new default stage
-    pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {
+    pub fn new(_executor: &mut ShadowExecutor<E, S, SOT>) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
         let stage_id = unsafe {
             let ret = SHADOW_TRACING_STAGE_ID;

@@ -28,50 +28,19 @@ pub use stack::StageStack;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "scalability_introspection")]
-use crate::monitors::ScalabilityMonitor;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::StateInitializer,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::{Input, NopInput, UsesInput},
+    inputs::{Input, NopInput},
     stages::{HasCurrentStageId, HasNestedStageStatus, StageId},
     Error, HasMetadata, HasNamedMetadata,
 };
 
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
-
-/// The [`State`] of the fuzzer.
-/// Contains all important information about the current run.
-/// Will be used to restart the fuzzing process at any time.
-pub trait State:
-    UsesInput
-    + Serialize
-    + DeserializeOwned
-    + MaybeHasClientPerfMonitor
-    + MaybeHasScalabilityMonitor
-    + HasCurrentCorpusId
-    + HasCurrentStageId
-    + Stoppable
-{
-}
-
-/// Structs which implement this trait are aware of the state. This is used for type enforcement.
-pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
-    /// The state known by this type.
-    type State: State;
-}
-
-// blanket impl which automatically defines UsesInput for anything that implements UsesState
-impl<KS> UsesInput for KS
-where
-    KS: UsesState,
-{
-    type Input = <KS::State as UsesInput>::Input;
-}
 
 /// Trait for elements offering a corpus
 pub trait HasCorpus {
@@ -82,6 +51,32 @@ pub trait HasCorpus {
     fn corpus(&self) -> &Self::Corpus;
     /// The testcase corpus (mutable)
     fn corpus_mut(&mut self) -> &mut Self::Corpus;
+}
+
+/// The trait that implements the very standard capability of a state.
+/// This state contains important information about the current run
+/// and can be used to restart the fuzzing process at any time.
+///
+/// This [`State`] is here for documentation purpose.
+/// You should *NOT* implement this trait for any of your struct,
+/// but when you implement your customized state, you can look at this trait to see what would be needed.
+#[allow(dead_code)]
+trait State:
+    Serialize
+    + DeserializeOwned
+    + MaybeHasClientPerfMonitor
+    + HasCurrentCorpusId
+    + HasCurrentStageId
+    + Stoppable
+{
+}
+
+impl<I, C, R, SC> State for StdState<I, C, R, SC>
+where
+    C: Serialize + DeserializeOwned,
+    R: Rand,
+    SC: Serialize + DeserializeOwned,
+{
 }
 
 // Reflexivity
@@ -152,29 +147,6 @@ impl<T> MaybeHasClientPerfMonitor for T {}
 
 #[cfg(feature = "introspection")]
 impl<T> MaybeHasClientPerfMonitor for T where T: HasClientPerfMonitor {}
-
-/// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(feature = "scalability_introspection")]
-pub trait MaybeHasScalabilityMonitor: HasScalabilityMonitor {}
-/// Intermediate trait for `HasScalabilityMonitor`
-#[cfg(not(feature = "scalability_introspection"))]
-pub trait MaybeHasScalabilityMonitor {}
-
-#[cfg(not(feature = "scalability_introspection"))]
-impl<T> MaybeHasScalabilityMonitor for T {}
-
-#[cfg(feature = "scalability_introspection")]
-impl<T> MaybeHasScalabilityMonitor for T where T: HasScalabilityMonitor {}
-
-/// Trait for offering a [`ScalabilityMonitor`]
-#[cfg(feature = "scalability_introspection")]
-pub trait HasScalabilityMonitor {
-    /// Ref to [`ScalabilityMonitor`]
-    fn scalability_monitor(&self) -> &ScalabilityMonitor;
-
-    /// Mutable ref to [`ScalabilityMonitor`]
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor;
-}
 
 /// Trait for the execution counter
 pub trait HasExecutions {
@@ -270,8 +242,6 @@ pub struct StdState<I, C, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
-    #[cfg(feature = "scalability_introspection")]
-    scalability_monitor: ScalabilityMonitor,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -294,22 +264,6 @@ pub struct StdState<I, C, R, SC> {
     stop_requested: bool,
     stage_stack: StageStack,
     phantom: PhantomData<I>,
-}
-
-impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
-where
-    I: Input,
-{
-    type Input = I;
-}
-
-impl<I, C, R, SC> State for StdState<I, C, R, SC>
-where
-    C: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
-    R: Rand,
-    SC: Corpus<Input = Self::Input> + Serialize + DeserializeOwned,
-    Self: UsesInput,
-{
 }
 
 impl<I, C, R, SC> HasRand for StdState<I, C, R, SC>
@@ -368,7 +322,8 @@ where
 impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
 where
     I: Input,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    C: Corpus,
+    SC: Corpus<Input = C::Input>,
 {
     type Solutions = SC;
 
@@ -629,9 +584,9 @@ impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    C: Corpus,
+    SC: Corpus<Input = C::Input>,
 {
     /// Decide if the state must load the inputs
     pub fn must_load_initial_inputs(&self) -> bool {
@@ -723,8 +678,7 @@ where
         load_config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         if let Some(remaining) = self.remaining_initial_files.as_ref() {
@@ -748,8 +702,7 @@ where
         config: &mut LoadConfig<I, Self, Z>,
     ) -> Result<ExecuteInputResult, Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         log::info!("Loading file {path:?} ...");
@@ -783,8 +736,7 @@ where
         mut config: LoadConfig<I, Self, Z>,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         loop {
@@ -848,8 +800,7 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
@@ -876,8 +827,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -903,8 +853,7 @@ where
         file_list: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
@@ -929,8 +878,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -956,8 +904,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
@@ -998,8 +945,7 @@ where
         cores: &Cores,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
+        EM: EventFirer<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         if self.multicore_inputs_processed.unwrap_or(false) {
@@ -1079,9 +1025,9 @@ where
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = <Self as UsesInput>::Input>,
+    C: Corpus<Input = I>,
     R: Rand,
-    SC: Corpus<Input = <Self as UsesInput>::Input>,
+    SC: Corpus<Input = I>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,
@@ -1093,9 +1039,8 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
-        G: Generator<<Self as UsesInput>::Input, Self>,
+        EM: EventFirer<I, Self>,
+        G: Generator<C::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         let mut added = 0;
@@ -1132,9 +1077,8 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
-        G: Generator<<Self as UsesInput>::Input, Self>,
+        EM: EventFirer<I, Self>,
+        G: Generator<C::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
@@ -1150,9 +1094,8 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: UsesState<State = Self>,
-        EM: EventFirer<State = Self>,
-        G: Generator<<Self as UsesInput>::Input, Self>,
+        EM: EventFirer<I, Self>,
+        G: Generator<C::Input, Self>,
         Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
@@ -1185,8 +1128,6 @@ where
             stop_requested: false,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
-            #[cfg(feature = "scalability_introspection")]
-            scalability_monitor: ScalabilityMonitor::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
@@ -1233,17 +1174,6 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     }
 }
 
-#[cfg(feature = "scalability_introspection")]
-impl<I, C, R, SC> HasScalabilityMonitor for StdState<I, C, R, SC> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        &self.scalability_monitor
-    }
-
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
-        &mut self.scalability_monitor
-    }
-}
-
 /// A very simple state without any bells or whistles, for testing.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
@@ -1280,11 +1210,16 @@ impl<I> HasMaxSize for NopState<I> {
     }
 }
 
-impl<I> UsesInput for NopState<I>
-where
-    I: Input,
-{
-    type Input = I;
+impl<I> HasCorpus for NopState<I> {
+    type Corpus = InMemoryCorpus<I>;
+
+    fn corpus(&self) -> &Self::Corpus {
+        unimplemented!("Unimplemented for NopState!");
+    }
+
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
+        unimplemented!("Unimplemented for No[State!");
+    }
 }
 
 impl<I> HasExecutions for NopState<I> {
@@ -1353,8 +1288,6 @@ impl<I> HasRand for NopState<I> {
     }
 }
 
-impl<I> State for NopState<I> where I: Input {}
-
 impl<I> HasCurrentCorpusId for NopState<I> {
     fn set_corpus_id(&mut self, _id: CorpusId) -> Result<(), Error> {
         Ok(())
@@ -1390,17 +1323,6 @@ impl<I> HasClientPerfMonitor for NopState<I> {
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!();
-    }
-}
-
-#[cfg(feature = "scalability_introspection")]
-impl<I> HasScalabilityMonitor for NopState<I> {
-    fn scalability_monitor(&self) -> &ScalabilityMonitor {
-        unimplemented!();
-    }
-
-    fn scalability_monitor_mut(&mut self) -> &mut ScalabilityMonitor {
         unimplemented!();
     }
 }

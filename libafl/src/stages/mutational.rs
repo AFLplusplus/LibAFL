@@ -14,7 +14,7 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     nonzero,
@@ -156,11 +156,9 @@ where
         + HasExecutions
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput,
+        + MaybeHasClientPerfMonitor,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
-    S::Corpus: Corpus<Input = S::Input>,
 {
     #[inline]
     fn perform(
@@ -191,9 +189,8 @@ impl<E, EM, M, S, Z> StdMutationalStage<E, EM, <S::Corpus as Corpus>::Input, M, 
 where
     M: Mutator<<S::Corpus as Corpus>::Input, S>,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasCurrentCorpusId + UsesInput + MaybeHasClientPerfMonitor,
+    S: HasCorpus + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
     <S::Corpus as Corpus>::Input: Input + Clone,
-    S::Corpus: Corpus<Input = S::Input>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -212,10 +209,9 @@ impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor + UsesInput,
+    S: HasCorpus + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
-    S::Corpus: Corpus<Input = S::Input>,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -313,10 +309,9 @@ impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<E, EM, I, M,
 where
     M: MultiMutator<I, S>,
     Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId + UsesInput,
+    S: HasCorpus + HasRand + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId,
     I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
     <S::Corpus as Corpus>::Input: Input,
-    S::Corpus: Corpus<Input = S::Input>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

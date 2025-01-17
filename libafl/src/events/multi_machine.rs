@@ -51,10 +51,7 @@ const DUMMY_BYTE: u8 = 0x14;
 /// An owned TCP message for multi machine
 #[derive(Clone, Debug)]
 // #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum MultiMachineMsg<'a, I>
-where
-    I: Input,
-{
+pub enum MultiMachineMsg<'a, I> {
     /// A raw llmp message (not deserialized)
     LlmpMsg(OwnedRef<'a, [u8]>),
 
@@ -66,10 +63,7 @@ where
 unsafe impl<I: Input> Send for MultiMachineMsg<'_, I> {}
 unsafe impl<I: Input> Sync for MultiMachineMsg<'_, I> {}
 
-impl<'a, I> MultiMachineMsg<'a, I>
-where
-    I: Input,
-{
+impl<'a, I> MultiMachineMsg<'a, I> {
     /// Create a new [`MultiMachineMsg`] as event.
     ///
     /// # Safety
@@ -165,10 +159,7 @@ pub struct NodeDescriptor<A> {
 /// passed to the `on_new_message` method (or rather, the memory it points to),
 /// lives sufficiently long for an async background task to process it.
 #[derive(Debug)]
-pub struct TcpMultiMachineHooks<A, I>
-where
-    I: Input,
-{
+pub struct TcpMultiMachineHooks<A, I> {
     /// The sender hooks
     pub sender: TcpMultiMachineLlmpSenderHook<A, I>,
     /// The hooks

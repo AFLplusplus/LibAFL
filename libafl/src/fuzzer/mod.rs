@@ -14,10 +14,12 @@ use serde::Serialize;
 use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
-    events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
+    events::{
+        CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
@@ -25,7 +27,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
-        HasSolutions, MaybeHasClientPerfMonitor, State, UsesState,
+        HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -307,13 +309,8 @@ impl<CS, EM, F, IF, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Inp
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    EM: EventFirer<State = S>,
-    S: HasCorpus
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + HasCurrentTestcase
-        + HasSolutions
-        + HasLastFoundTime,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<OT>,
+    S: HasCorpus + MaybeHasClientPerfMonitor + HasCurrentTestcase + HasSolutions + HasLastFoundTime,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
@@ -397,7 +394,7 @@ where
                     if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
-                        manager.serialize_observers::<OT>(observers)?
+                        manager.serialize_observers(observers)?
                     }
                 } else {
                     None
@@ -516,16 +513,15 @@ impl<CS, E, EM, F, IF, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::I
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + Executor<EM, Self, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
     E::Observers: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasCorpus
         + HasSolutions
         + MaybeHasClientPerfMonitor
         + HasCurrentTestcase
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasExecutions
         + HasLastFoundTime,
     <S::Corpus as Corpus>::Input: Input,
@@ -594,9 +590,9 @@ impl<CS, E, EM, F, IF, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + Executor<EM, Self, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
     E::Observers: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<E::Observers>,
     F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
     S: HasCorpus
@@ -604,8 +600,7 @@ where
         + MaybeHasClientPerfMonitor
         + HasCurrentTestcase
         + HasLastFoundTime
-        + HasExecutions
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasExecutions,
     <S::Corpus as Corpus>::Input: Input,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     IF: InputFilter<<S::Corpus as Corpus>::Input>,
@@ -731,7 +726,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            manager.serialize_observers::<E::Observers>(&*observers)?
+            manager.serialize_observers(&*observers)?
         };
         manager.fire(
             state,
@@ -753,9 +748,8 @@ where
 
 impl<CS, E, EM, F, IF, OF, S, ST> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, IF, OF>
 where
-    CS: Scheduler<S::Input, S>,
-    E: UsesState<State = S>,
-    EM: ProgressReporter + EventProcessor<E, Self, State = S>,
+    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
     S: HasExecutions
         + HasMetadata
         + HasCorpus
@@ -763,7 +757,8 @@ where
         + HasTestcase
         + HasCurrentCorpusId
         + HasCurrentStageId
-        + State,
+        + Stoppable
+        + MaybeHasClientPerfMonitor,
     ST: StagesTuple<E, EM, S, Self>,
 {
     fn fuzz_one(
@@ -929,13 +924,9 @@ impl<CS, E, EM, F, IF, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input,
     for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: Executor<EM, Self, State = S> + HasObservers,
+    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
     E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    EM: UsesState<State = S>,
-    S: UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + HasExecutions
-        + HasCorpus
-        + MaybeHasClientPerfMonitor,
+    S: HasExecutions + HasCorpus + MaybeHasClientPerfMonitor,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -983,16 +974,15 @@ impl Default for NopFuzzer {
 
 impl<E, EM, S, ST> Fuzzer<E, EM, S, ST> for NopFuzzer
 where
-    E: UsesState,
-    EM: ProgressReporter<State = S> + EventProcessor<E, Self>,
+    EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
     ST: StagesTuple<E, EM, S, Self>,
-    S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId + UsesInput,
+    S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId,
 {
     fn fuzz_one(
         &mut self,
         _stages: &mut ST,
         _executor: &mut E,
-        _state: &mut EM::State,
+        _state: &mut S,
         _manager: &mut EM,
     ) -> Result<CorpusId, Error> {
         unimplemented!("NopFuzzer cannot fuzz");

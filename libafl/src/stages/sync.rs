@@ -15,11 +15,11 @@ use crate::{
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, InputConverter, UsesInput},
+    inputs::{Input, InputConverter},
     stages::{RetryCountRestartHelper, Stage},
     state::{
-        HasCorpus, HasExecutions, HasRand, HasSolutions, MaybeHasClientPerfMonitor, State,
-        Stoppable,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
+        MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -77,7 +77,6 @@ where
         + HasRand
         + HasMetadata
         + HasNamedMetadata
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
@@ -224,31 +223,26 @@ impl SyncFromBrokerMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromBrokerStage<DI, IC, ICB, S, SP>
+pub struct SyncFromBrokerStage<IC, ICB, S, SP>
 where
-    SP: ShMemProvider + 'static,
-    S: UsesInput,
-    IC: InputConverter<From = S::Input, To = DI>,
-    ICB: InputConverter<From = DI, To = S::Input>,
-    DI: Input,
+    SP: ShMemProvider,
 {
-    client: LlmpEventConverter<DI, IC, ICB, S, SP>,
+    client: LlmpEventConverter<IC, ICB, S, SP>,
 }
 
-// Do not include trait bound HasSolutions to S if share_objectives is disabled
-impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
+impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<IC, ICB, S, SP>
 where
-    EM: EventFirer<State = S>,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions
         + HasCorpus
         + HasRand
         + HasMetadata
+        + HasSolutions
+        + HasCurrentTestcase
         + Stoppable
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + State
-        + HasSolutions,
+        + MaybeHasClientPerfMonitor,
     SP: ShMemProvider,
-    E: HasObservers + Executor<EM, Z, State = S>,
+    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
     for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
         + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
@@ -256,7 +250,7 @@ where
     ICB: InputConverter<From = DI, To = <S::Corpus as Corpus>::Input>,
     DI: Input,
     <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Clone,
-    S::Solutions: Corpus<Input = S::Input>,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
 {
     #[inline]
     fn perform(
@@ -329,17 +323,13 @@ where
     }
 }
 
-impl<DI, IC, ICB, S, SP> SyncFromBrokerStage<DI, IC, ICB, S, SP>
+impl<IC, ICB, S, SP> SyncFromBrokerStage<IC, ICB, S, SP>
 where
-    SP: ShMemProvider + 'static,
-    S: UsesInput,
-    IC: InputConverter<From = S::Input, To = DI>,
-    ICB: InputConverter<From = DI, To = S::Input>,
-    DI: Input,
+    SP: ShMemProvider,
 {
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
-    pub fn new(client: LlmpEventConverter<DI, IC, ICB, S, SP>) -> Self {
+    pub fn new(client: LlmpEventConverter<IC, ICB, S, SP>) -> Self {
         Self { client }
     }
 }

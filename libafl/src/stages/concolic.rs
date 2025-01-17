@@ -17,10 +17,9 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
-    inputs::UsesInput,
     observers::{concolic::ConcolicObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage, TracingStage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor, UsesState},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 #[cfg(feature = "concolic_mutation")]
@@ -50,16 +49,14 @@ impl<EM, TE, S, Z> Named for ConcolicTracingStage<'_, EM, TE, S, Z> {
 
 impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<'_, EM, TE, S, Z>
 where
-    TE: Executor<EM, Z, State = S> + HasObservers,
+    TE: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
     TE::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     S: HasExecutions
         + HasCorpus
         + HasNamedMetadata
         + HasCurrentTestcase
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    EM: UsesState<State = S>,
+        + MaybeHasClientPerfMonitor,
 {
     #[inline]
     fn perform(
@@ -387,8 +384,7 @@ where
         + HasNamedMetadata
         + HasCurrentTestcase
         + MaybeHasClientPerfMonitor
-        + HasCurrentCorpusId
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        + HasCurrentCorpusId,
 {
     #[inline]
     fn perform(

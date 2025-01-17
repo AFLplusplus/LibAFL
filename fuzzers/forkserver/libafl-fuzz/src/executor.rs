@@ -6,9 +6,9 @@ use std::{
 };
 
 use libafl::{
+    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
-    observers::ObserversTuple,
-    state::{State, UsesState},
+    state::HasCorpus,
     Error,
 };
 use libafl_bolts::tuples::RefIndexable;
@@ -259,28 +259,19 @@ pub enum SupportedExecutors<S, OT, FSV, NYX> {
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX> UsesState for SupportedExecutors<S, OT, FSV, NYX>
+impl<S, OT, FSV, NYX, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+    for SupportedExecutors<S, OT, FSV, NYX>
 where
-    S: State,
-{
-    type State = S;
-}
-
-#[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV, NYX>
-where
-    S: State,
-    Z: UsesState<State = S>,
-    EM: UsesState<State = S>,
-    FSV: Executor<EM, Z, State = S>,
-    NYX: Executor<EM, Z, State = S>,
+    S: HasCorpus,
+    NYX: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
+    FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
@@ -293,10 +284,8 @@ where
 #[cfg(feature = "nyx")]
 impl<S, OT, FSV, NYX> HasObservers for SupportedExecutors<S, OT, FSV, NYX>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-    FSV: HasObservers<Observers = OT>,
     NYX: HasObservers<Observers = OT>,
+    FSV: HasObservers<Observers = OT>,
 {
     type Observers = OT;
     #[inline]
@@ -341,31 +330,23 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV> UsesState for SupportedExecutors<S, OT, FSV>
-where
-    S: State,
-{
-    type State = S;
-}
-
-#[cfg(not(feature = "nyx"))]
 pub enum SupportedExecutors<S, OT, FSV> {
     Forkserver(FSV, PhantomData<(S, OT)>),
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV>
+impl<S, OT, FSV, EM, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
+    for SupportedExecutors<S, OT, FSV>
 where
-    S: State,
-    EM: UsesState<State = S>,
-    FSV: Executor<EM, Z, State = S>,
+    S: HasCorpus,
+    FSV: Executor<EM, <S::Corpus as Corpus>::Input, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
@@ -376,8 +357,6 @@ where
 #[cfg(not(feature = "nyx"))]
 impl<S, OT, FSV> HasObservers for SupportedExecutors<S, OT, FSV>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
     FSV: HasObservers<Observers = OT>,
 {
     type Observers = OT;

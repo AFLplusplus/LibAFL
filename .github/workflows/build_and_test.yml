@@ -290,7 +290,7 @@ jobs:
           - ./fuzzers/structure_aware/forkserver_simple_nautilus
 
           # In-process
-          - ./fuzzers/fuzz_anything/cargo_fuzz
+          # - ./fuzzers/fuzz_anything/cargo_fuzz # Revive after they fix rustc
           # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
@@ -360,8 +360,8 @@ jobs:
 
           # Full-system
           - ./fuzzers/full_system/qemu_baremetal
-          # - ./fuzzers/full_system/qemu_linux_kernel
-          #- ./fuzzers/full_system/qemu_linux_process
+          - ./fuzzers/full_system/qemu_linux_kernel
+          - ./fuzzers/full_system/qemu_linux_process
 
     runs-on: [ self-hosted, qemu ]
     container: registry.gitlab.com/qemu-project/qemu/qemu/ubuntu2204:latest
