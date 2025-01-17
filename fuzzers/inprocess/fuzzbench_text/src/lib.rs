@@ -23,7 +23,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, GeneralizedInputMetadata, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         grimoire::{

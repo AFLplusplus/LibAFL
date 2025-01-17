@@ -8,7 +8,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, GeneralizedInputMetadata, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator,
