@@ -8,7 +8,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess_fork::InProcessForkExecutor, ExitKind},
     feedbacks::{CrashFeedback, TimeoutFeedback},
-    inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
+    inputs::{BytesInput, HasFixedMutatorBytes, HasTargetBytes},
     mutators::{havoc_mutations_no_crossover, Mutator, StdScheduledMutator},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,

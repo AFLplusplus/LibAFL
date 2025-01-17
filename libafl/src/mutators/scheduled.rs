@@ -316,7 +316,7 @@ mod tests {
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
-        inputs::{BytesInput, HasMutatorBytes},
+        inputs::{BytesInput, HasFixedMutatorBytes},
         mutators::{
             havoc_mutations::havoc_mutations, mutations::SpliceMutator,
             scheduled::StdScheduledMutator, Mutator,

@@ -156,7 +156,7 @@ pub trait HasTargetBytes {
 }
 
 /// Contains mutable bytes
-pub trait HasMutatorBytes: HasLen {
+pub trait HasFixedMutatorBytes: HasLen {
     /// The bytes
     fn bytes(&self) -> &[u8];
 
@@ -188,7 +188,7 @@ pub trait HasMutatorBytes: HasLen {
     }
 }
 
-impl HasMutatorBytes for Vec<u8> {
+impl HasFixedMutatorBytes for Vec<u8> {
     fn bytes(&self) -> &[u8] {
         self.as_ref()
     }
@@ -202,7 +202,7 @@ impl HasMutatorBytes for Vec<u8> {
 #[deprecated(since = "0.15.0", note = "Use &mut Vec<u8> directly")]
 pub type MutVecInput<'a> = &'a mut Vec<u8>;
 
-impl HasMutatorBytes for &'_ mut Vec<u8> {
+impl HasFixedMutatorBytes for &'_ mut Vec<u8> {
     fn bytes(&self) -> &[u8] {
         self
     }
@@ -213,7 +213,7 @@ impl HasMutatorBytes for &'_ mut Vec<u8> {
 }
 
 /// Contains mutable and resizable bytes
-pub trait HasMutatorResizableBytes: HasMutatorBytes {
+pub trait HasMutatorBytes: HasFixedMutatorBytes {
     /// Resize the mutator bytes to a given new size.
     /// Use `value` to fill new slots in case the buffer grows.
     /// See [`Vec::splice`].
@@ -234,7 +234,7 @@ pub trait HasMutatorResizableBytes: HasMutatorBytes {
         R: RangeBounds<usize>;
 }
 
-impl HasMutatorResizableBytes for Vec<u8> {
+impl HasMutatorBytes for Vec<u8> {
     fn resize(&mut self, new_len: usize, value: u8) {
         <Vec<u8>>::resize(self, new_len, value);
     }
@@ -259,7 +259,7 @@ impl HasMutatorResizableBytes for Vec<u8> {
     }
 }
 
-impl HasMutatorResizableBytes for &mut Vec<u8> {
+impl HasMutatorBytes for &mut Vec<u8> {
     fn resize(&mut self, new_len: usize, value: u8) {
         self.deref_mut().resize(new_len, value);
     }

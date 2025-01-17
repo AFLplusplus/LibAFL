@@ -11,7 +11,7 @@ use core::cell::RefCell;
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 
 use super::ValueInput;
-use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes, HasTargetBytes};
+use crate::inputs::{HasFixedMutatorBytes, HasMutatorBytes, HasTargetBytes};
 
 /// A bytes input is the basic input
 pub type BytesInput = ValueInput<Vec<u8>>;
@@ -23,7 +23,7 @@ impl From<BytesInput> for Rc<RefCell<BytesInput>> {
     }
 }
 
-impl HasMutatorBytes for BytesInput {
+impl HasFixedMutatorBytes for BytesInput {
     fn bytes(&self) -> &[u8] {
         self.as_ref()
     }
@@ -33,7 +33,7 @@ impl HasMutatorBytes for BytesInput {
     }
 }
 
-impl HasMutatorResizableBytes for BytesInput {
+impl HasMutatorBytes for BytesInput {
     fn resize(&mut self, new_len: usize, value: u8) {
         self.as_mut().resize(new_len, value);
     }

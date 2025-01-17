@@ -24,7 +24,7 @@ use crate::{
 };
 #[cfg(feature = "concolic_mutation")]
 use crate::{
-    inputs::HasMutatorBytes,
+    inputs::HasFixedMutatorBytes,
     mark_feature_time,
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
     start_timer, Evaluator,
@@ -377,7 +377,7 @@ impl<I, Z> Named for SimpleConcolicMutationalStage<I, Z> {
 impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<I, Z>
 where
     Z: Evaluator<E, EM, I, S>,
-    I: HasMutatorBytes + Clone,
+    I: HasFixedMutatorBytes + Clone,
     S: HasExecutions
         + HasCorpus<I>
         + HasMetadata

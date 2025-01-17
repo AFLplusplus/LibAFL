@@ -18,8 +18,8 @@ use crate::{
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{
-        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes,
-        HasMutatorResizableBytes,
+        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasFixedMutatorBytes,
+        HasMutatorBytes,
     },
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},

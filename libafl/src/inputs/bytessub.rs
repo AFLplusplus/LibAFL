@@ -11,16 +11,16 @@ use libafl_bolts::{
     HasLen,
 };
 
-use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
+use crate::inputs::{HasFixedMutatorBytes, HasMutatorBytes};
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
-/// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
+/// inputs implementing the [`HasFixedMutatorBytes`] for a sub-range of this input.
 ///
 /// For example, we can do the following:
 /// ```rust
 /// # extern crate alloc;
 /// # extern crate libafl;
-/// # use libafl::inputs::{BytesInput, HasMutatorBytes};
+/// # use libafl::inputs::{BytesInput, HasFixedMutatorBytes};
 /// # use alloc::vec::Vec;
 /// #
 /// # #[cfg(not(feature = "std"))]
@@ -37,7 +37,7 @@ use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
 /// assert_eq!(bytes_input.bytes()[1], 42);
 /// ```
 ///
-/// If inputs implement the [`HasMutatorResizableBytes`] trait, growing or shrinking the sub input
+/// If inputs implement the [`HasMutatorBytes`] trait, growing or shrinking the sub input
 /// will grow or shrink the parent input,
 /// and keep elements around the current range untouched / move them accordingly.
 ///
@@ -45,7 +45,7 @@ use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
 /// ```rust
 /// # extern crate alloc;
 /// # extern crate libafl;
-/// # use libafl::inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes};
+/// # use libafl::inputs::{BytesInput, HasFixedMutatorBytes, HasMutatorBytes};
 /// # use alloc::vec::Vec;
 /// #
 /// # #[cfg(not(feature = "std"))]
@@ -77,7 +77,7 @@ pub struct BytesSubInput<'a, I: ?Sized> {
 
 impl<'a, I> BytesSubInput<'a, I>
 where
-    I: HasMutatorBytes + ?Sized,
+    I: HasFixedMutatorBytes + ?Sized,
 {
     /// Creates a new [`BytesSubInput`] that's a view on an input with mutator bytes.
     /// The sub input can then be used to mutate parts of the original input.
@@ -97,9 +97,9 @@ where
     }
 }
 
-impl<I> HasMutatorBytes for BytesSubInput<'_, I>
+impl<I> HasFixedMutatorBytes for BytesSubInput<'_, I>
 where
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     #[inline]
     fn bytes(&self) -> &[u8] {
@@ -112,9 +112,9 @@ where
     }
 }
 
-impl<I> HasMutatorResizableBytes for BytesSubInput<'_, I>
+impl<I> HasMutatorBytes for BytesSubInput<'_, I>
 where
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     fn resize(&mut self, new_len: usize, value: u8) {
         let start_index = self.range.start;
@@ -200,7 +200,7 @@ where
 
 impl<I> HasLen for BytesSubInput<'_, I>
 where
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -214,7 +214,7 @@ mod tests {
     use libafl_bolts::HasLen;
 
     use crate::{
-        inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes, NopInput},
+        inputs::{BytesInput, HasFixedMutatorBytes, HasMutatorBytes, NopInput},
         mutators::{havoc_mutations_no_crossover, MutatorsTuple},
         state::NopState,
     };

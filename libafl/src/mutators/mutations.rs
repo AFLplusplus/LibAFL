@@ -16,7 +16,7 @@ use libafl_bolts::{rands::Rand, Named};
 
 use crate::{
     corpus::Corpus,
-    inputs::{HasMutatorBytes, HasMutatorResizableBytes},
+    inputs::{HasFixedMutatorBytes, HasMutatorBytes},
     mutators::{MutationResult, Mutator},
     nonzero, random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
@@ -129,7 +129,7 @@ pub struct BitFlipMutator;
 impl<I, S> Mutator<I, S> for BitFlipMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -165,7 +165,7 @@ pub struct ByteFlipMutator;
 impl<I, S> Mutator<I, S> for ByteFlipMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -199,7 +199,7 @@ pub struct ByteIncMutator;
 impl<I, S> Mutator<I, S> for ByteIncMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -234,7 +234,7 @@ pub struct ByteDecMutator;
 impl<I, S> Mutator<I, S> for ByteDecMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -269,7 +269,7 @@ pub struct ByteNegMutator;
 impl<I, S> Mutator<I, S> for ByteNegMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -304,7 +304,7 @@ pub struct ByteRandMutator;
 impl<I, S> Mutator<I, S> for ByteRandMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -464,7 +464,7 @@ pub struct BytesDeleteMutator;
 impl<I, S> Mutator<I, S> for BytesDeleteMutator
 where
     S: HasRand,
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -506,7 +506,7 @@ pub struct BytesExpandMutator;
 impl<I, S> Mutator<I, S> for BytesExpandMutator
 where
     S: HasRand + HasMaxSize,
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -557,7 +557,7 @@ pub struct BytesInsertMutator;
 impl<I, S> Mutator<I, S> for BytesInsertMutator
 where
     S: HasRand + HasMaxSize,
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -620,7 +620,7 @@ pub struct BytesRandInsertMutator;
 impl<I, S> Mutator<I, S> for BytesRandInsertMutator
 where
     S: HasRand + HasMaxSize,
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -678,7 +678,7 @@ pub struct BytesSetMutator;
 impl<I, S> Mutator<I, S> for BytesSetMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -721,7 +721,7 @@ pub struct BytesRandSetMutator;
 impl<I, S> Mutator<I, S> for BytesRandSetMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -764,7 +764,7 @@ pub struct BytesCopyMutator;
 impl<I, S> Mutator<I, S> for BytesCopyMutator
 where
     S: HasRand,
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -815,7 +815,7 @@ pub struct BytesInsertCopyMutator {
 impl<I, S> Mutator<I, S> for BytesInsertCopyMutator
 where
     S: HasRand + HasMaxSize,
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -886,7 +886,7 @@ pub struct BytesSwapMutator {
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
     S: HasRand,
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -1104,7 +1104,7 @@ impl CrossoverInsertMutator {
         other: &[u8],
     ) -> MutationResult
     where
-        I: HasMutatorResizableBytes,
+        I: HasMutatorBytes,
     {
         input.resize(size + range.len(), 0);
         unsafe {
@@ -1125,7 +1125,7 @@ impl CrossoverInsertMutator {
 
 impl<I, S> Mutator<I, S> for CrossoverInsertMutator
 where
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
     S: HasCorpus<I> + HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -1205,7 +1205,7 @@ impl CrossoverReplaceMutator {
         other: &[u8],
     ) -> MutationResult
     where
-        I: HasMutatorBytes,
+        I: HasFixedMutatorBytes,
     {
         unsafe {
             buffer_copy(input.bytes_mut(), other, range.start, target, range.len());
@@ -1216,7 +1216,7 @@ impl CrossoverReplaceMutator {
 
 impl<I, S> Mutator<I, S> for CrossoverReplaceMutator
 where
-    I: HasMutatorBytes,
+    I: HasFixedMutatorBytes,
     S: HasCorpus<I> + HasRand,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -1313,7 +1313,7 @@ impl<F, I, O> MappedCrossoverInsertMutator<F, I, O> {
 impl<S, F, I1, I2, O> Mutator<I2, S> for MappedCrossoverInsertMutator<F, I1, O>
 where
     F: Fn(&I1) -> &O,
-    I2: HasMutatorResizableBytes,
+    I2: HasMutatorBytes,
     O: IntoOptionBytes,
     S: HasCorpus<I1> + HasMaxSize + HasRand,
 {
@@ -1402,7 +1402,7 @@ impl<F, I, O> MappedCrossoverReplaceMutator<F, I, O> {
 impl<S, F, I1, I2, O> Mutator<I2, S> for MappedCrossoverReplaceMutator<F, I1, O>
 where
     F: Fn(&I1) -> &O,
-    I2: HasMutatorBytes,
+    I2: HasFixedMutatorBytes,
     O: IntoOptionBytes,
     S: HasCorpus<I1> + HasMaxSize + HasRand,
 {
@@ -1491,7 +1491,7 @@ pub struct SpliceMutator;
 impl<I, S> Mutator<I, S> for SpliceMutator
 where
     S: HasCorpus<I> + HasRand,
-    I: HasMutatorResizableBytes,
+    I: HasMutatorBytes,
 {
     #[expect(clippy::cast_sign_loss)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
