@@ -5,8 +5,7 @@ use std::{
     vec::Vec,
 };
 
-use libafl_intelpt::{error_from_pt_error, IntelPT};
-use libipt::{Image, SectionCache};
+use libafl_intelpt::{error_from_pt_error, Image, IntelPT, SectionCache};
 use num_traits::SaturatingAdd;
 use serde::Serialize;
 use typed_builder::TypedBuilder;

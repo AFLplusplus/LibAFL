@@ -43,12 +43,12 @@ use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
 use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
 #[cfg(target_os = "linux")]
-use libipt::{
-    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, Cpu,
-    PtEncoderDecoder, PtError, PtErrorCode, Status,
-};
+pub use libipt::{asid::Asid, image::Image, image::SectionCache, status::Status};
 #[cfg(target_os = "linux")]
-pub use libipt::{Asid, Image, SectionCache};
+use libipt::{
+    block::BlockDecoder, config::AddrConfig, config::AddrFilter, config::AddrFilterBuilder,
+    config::AddrRange, config::Cpu, config::PtEncoderDecoder, error::PtError, error::PtErrorCode,
+};
 #[cfg(target_os = "linux")]
 use num_enum::TryFromPrimitive;
 #[cfg(target_os = "linux")]
@@ -204,7 +204,7 @@ impl IntelPT {
                 }
             }
         }
-        builder.finish()
+        builder.build()
     }
 
     /// Start tracing
