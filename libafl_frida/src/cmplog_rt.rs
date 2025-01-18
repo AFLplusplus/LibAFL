@@ -650,7 +650,7 @@ impl CmpLogRuntime {
         Option<SpecialCmpLogCase>,
         Option<SpecialCmpLogCase>,
     )> {
-        let bytes = instr._bytes();
+        let bytes = instr.bytes();
         let mut decoder =
             iced_x86::Decoder::with_ip(64, bytes, instr.address(), DecoderOptions::NONE);
         if !decoder.can_decode() {
@@ -758,7 +758,7 @@ impl CmpLogRuntime {
         Option<(ShiftStyle, u8)>, //possible shifts: everything except MSL
         Option<SpecialCmpLogCase>,
     )> {
-        let mut instr = disas_count(&decoder, instr._bytes(), 1)[0];
+        let mut instr = disas_count(&decoder, instr.bytes(), 1)[0];
         let operands_len = instr
             .operands
             .iter()

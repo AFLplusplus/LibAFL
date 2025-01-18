@@ -10,7 +10,7 @@ use libafl_bolts::{rands::Rand, Error};
 use crate::{
     corpus::{Corpus, CorpusId},
     impl_default_multipart,
-    inputs::{multi::MultipartInput, Input, ResizableMutator},
+    inputs::{multi::MultipartInput, Input, ResizableMutator, HasMutatorBytes},
     mutators::{
         mutations::{
             rand_range, BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator,
