@@ -312,13 +312,17 @@ where
             None => 0.0,
         };
 
-        let avg_top_size =
-            match state.metadata::<TopRatedsMetadata>() {
-                Ok(m) => m.map().len() as f64,
-                Err(_) => return Err(Error::key_not_found(
-                    "TopRatedsMetadata not found! You have to use Minimizer scheduler with this.",
-                )),
-            };
+        let avg_top_size = match state.metadata::<TopRatedsMetadata>() {
+            Ok(m) => {
+                m.map().len() as f64
+            },
+            Err(e) => {
+                return Err(Error::key_not_found(format!(
+                    "{:?} You have to use Minimizer scheduler with this.",
+                    e
+                )))
+            }
+        };
 
         weight *= 1.0 + (tc_ref / avg_top_size);
 
