@@ -276,6 +276,7 @@ jobs:
           - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
 
           # Full-system
+          - ./fuzzers/full_system/nyx_launcher
           - ./fuzzers/full_system/nyx_libxml2_standalone
           - ./fuzzers/full_system/nyx_libxml2_parallel
 
