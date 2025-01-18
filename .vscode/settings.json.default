@@ -8,5 +8,6 @@
         "cargo",
         "check",
         "--message-format=json",
-    ]
+    ],
+    "rust-analyzer.cargo.allTargets": false,
 }
