@@ -152,7 +152,7 @@ use crate::{observers::Observer, Error};
 ///         .get(corpus_id)
 ///         .unwrap()
 ///         .replace(Testcase::new(BytesInput::from(
-///             encoded_input_text.mutator_bytes().skip(1).collect::<Vec<u8>>(), // skip one char to make it invalid code
+///             encoded_input_text.bytes().skip(1).collect::<Vec<u8>>(), // skip one char to make it invalid code
 ///         )));
 ///
 ///     fuzzer

@@ -655,7 +655,7 @@ where
         let mut basic_block_size = 0;
         for instruction in basic_block {
             let instr = instruction.instr();
-            let instr_size = instr.mutator_bytes().len();
+            let instr_size = instr.bytes().len();
             let address = instr.address();
             // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
             //the ASAN check needs to be done before the hook_rt check due to x86 insns such as call [mem]
@@ -767,9 +767,12 @@ where
                 .match_first_type_mut::<DrCovRuntime>()
             {
                 log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
+
+                // We can maybe remove the `basic_block_size as u64`` cast in the future
+                #[allow(trivial_numeric_casts)]
                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                     basic_block_start,
-                    basic_block_start + basic_block_size as u64,
+                    basic_block_start + (basic_block_size as u64),
                 ));
             }
         }

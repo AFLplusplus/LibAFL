@@ -385,7 +385,7 @@ impl CmpLogRoutinesModule {
                     }
                 }
 
-                iaddr += insn.mutator_bytes().len() as GuestAddr;
+                iaddr += insn.bytes().len() as GuestAddr;
 
                 #[cfg(feature = "usermode")]
                 unsafe {
