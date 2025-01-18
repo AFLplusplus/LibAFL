@@ -38,7 +38,11 @@ impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for AFLppCmplogTracingStage<'_, EM, TE,
 where
     TE: HasObservers + Executor<EM, BytesInput, S, Z>,
     TE::Observers: MatchNameRef + ObserversTuple<BytesInput, S>,
-    S: HasCorpus<BytesInput> + HasCurrentTestcase<BytesInput> + HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+    S: HasCorpus<BytesInput>
+        + HasCurrentTestcase<BytesInput>
+        + HasMetadata
+        + HasNamedMetadata
+        + HasCurrentCorpusId,
 {
     #[inline]
     fn perform(

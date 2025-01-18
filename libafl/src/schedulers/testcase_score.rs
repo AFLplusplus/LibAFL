@@ -313,13 +313,10 @@ where
         };
 
         let avg_top_size = match state.metadata::<TopRatedsMetadata>() {
-            Ok(m) => {
-                m.map().len() as f64
-            },
+            Ok(m) => m.map().len() as f64,
             Err(e) => {
                 return Err(Error::key_not_found(format!(
-                    "{:?} You have to use Minimizer scheduler with this.",
-                    e
+                    "{e:?} You have to use Minimizer scheduler with this.",
                 )))
             }
         };
