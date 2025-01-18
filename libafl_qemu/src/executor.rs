@@ -21,7 +21,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions, HasMetadata},
     Error, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "fork")]
@@ -40,7 +40,7 @@ use libc::siginfo_t;
 use crate::EmulatorModules;
 #[cfg(feature = "usermode")]
 use crate::Qemu;
-use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
+use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver, edges::Predicates};
 
 type EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> =
     StatefulInProcessExecutor<'a, H, I, OT, S, Emulator<C, CM, ED, ET, I, S, SM>>;
@@ -248,7 +248,7 @@ where
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     I: Unpin,
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + Unpin,
+    S: HasExecutions + Unpin + HasMetadata,
 {
     fn run_target(
         &mut self,
@@ -265,6 +265,13 @@ where
         self.inner
             .exposed_executor_state_mut()
             .pre_exec(state, input);
+        
+        match state.metadata_mut::<Predicates>() {
+            Ok(m) => {
+                m.clear()
+            },
+            _ => (),
+        }
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
 

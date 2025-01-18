@@ -32,6 +32,7 @@ pub(super) static mut LIBAFL_QEMU_EDGES_MAP_MASK_MAX: usize = 0;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
     pub map: HashMap<(GuestAddr, GuestAddr), u64>,
+    pub revmap: HashMap<u64, (GuestAddr, GuestAddr)>,
     pub current_id: u64,
 }
 
@@ -42,7 +43,57 @@ impl QemuEdgesMapMetadata {
     pub fn new() -> Self {
         Self {
             map: HashMap::new(),
+            revmap: HashMap::new(),
             current_id: 0,
+        }
+    }
+}
+
+mod rca {
+    use libafl::HasMetadata;
+
+    use super::{
+        super::EdgeCoverageVariant, QemuEdgesMapMetadata, 
+    };
+    use crate::{
+        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter, edges::Predicates},
+        EmulatorModules, Qemu,
+    };
+
+    pub fn exec_edges<AF, ET, I, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        state: Option<&mut S>,
+        id: u64,
+    ) 
+    where
+        AF: AddressFilter,
+        PF: PageFilter,
+        ET: EmulatorModuleTuple<I, S>,
+        I: Unpin,
+        S: HasMetadata + Unpin,
+        V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
+    {
+        let use_rca = if let Some(module) =
+            emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
+        {
+            module.use_rca()
+        } else {
+            false
+        };
+
+        if use_rca {
+            let state =
+                state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
+            let meta = state.metadata::<QemuEdgesMapMetadata>();
+            let (src, dest) = match meta {
+                Ok(m) => match m.revmap.get(&id) {
+                    Some((src, dest)) => (*src, *dest),
+                    _ => return,
+                },
+                _ => return,
+            };
+            let predicates = state.metadata_or_insert_with(Predicates::new);
+            predicates.add_edges(src, dest);
         }
     }
 }
@@ -136,7 +187,7 @@ mod generators {
         let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
         let meta = state.metadata_or_insert_with(QemuEdgesMapMetadata::new);
 
-        match meta.map.entry((src, dest)) {
+        let id = match meta.map.entry((src, dest)) {
             Entry::Occupied(e) => {
                 let id = *e.get();
                 unsafe {
@@ -146,7 +197,7 @@ mod generators {
                         *LIBAFL_QEMU_EDGES_MAP_SIZE_PTR = max(*LIBAFL_QEMU_EDGES_MAP_SIZE_PTR, nxt);
                     }
                 }
-                Some(id)
+                id
             }
             Entry::Vacant(e) => {
                 let id = meta.current_id;
@@ -160,9 +211,12 @@ mod generators {
                 }
                 // GuestAddress is u32 for 32 bit guests
                 #[expect(clippy::unnecessary_cast)]
-                Some(id as u64)
+                id
             }
-        }
+        };
+
+        meta.revmap.insert(id, (src, dest));
+        Some(id)
     }
 
     #[allow(unused_variables)]

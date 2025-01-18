@@ -23,6 +23,9 @@ pub use full::{
     EdgeCoverageFullVariant, StdEdgeCoverageFullModule, StdEdgeCoverageFullModuleBuilder,
 };
 
+pub mod predicates;
+pub use predicates::*;
+
 pub mod classic;
 pub use classic::{
     EdgeCoverageClassicVariant, StdEdgeCoverageClassicModule, StdEdgeCoverageClassicModuleBuilder,
@@ -108,6 +111,7 @@ pub struct EdgeCoverageModuleBuilder<
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
+    use_rca: bool,
 }
 
 #[derive(Debug)]
@@ -119,6 +123,7 @@ pub struct EdgeCoverageModule<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZ
     page_filter: PF,
     use_hitcounts: bool,
     use_jit: bool,
+    use_rca: bool,
 }
 
 impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
@@ -138,6 +143,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             self.variant,
             self.use_hitcounts,
             self.use_jit,
+            self.use_rca,
         ))
     }
 }
@@ -151,6 +157,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
         page_filter: PF,
         use_hitcounts: bool,
         use_jit: bool,
+        use_rca: bool,
     ) -> Self {
         Self {
             variant,
@@ -158,6 +165,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             page_filter,
             use_hitcounts,
             use_jit,
+            use_rca,
         }
     }
 
@@ -186,6 +194,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             self.page_filter,
             self.use_hitcounts,
             self.use_jit,
+            self.use_rca,
         )
     }
 
@@ -203,6 +212,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             self.page_filter,
             self.use_hitcounts,
             self.use_jit,
+            self.use_rca,
         )
     }
 
@@ -216,6 +226,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             self.page_filter,
             self.use_hitcounts,
             self.use_jit,
+            self.use_rca,
         )
     }
 
@@ -229,6 +240,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             self.page_filter,
             self.use_hitcounts,
             self.use_jit,
+            self.use_rca,
         )
     }
 
@@ -242,6 +254,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             page_filter,
             self.use_hitcounts,
             self.use_jit,
+            self.use_rca,
         )
     }
 
@@ -256,6 +269,7 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             self.page_filter,
             use_hitcounts,
             self.use_jit,
+            self.use_rca,
         )
     }
 
@@ -270,8 +284,25 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             self.page_filter,
             self.use_hitcounts,
             use_jit,
+            self.use_rca,
         )
     }
+
+    #[must_use]
+    pub fn rca(
+        self,
+        use_rca: bool,
+    ) -> EdgeCoverageModuleBuilder<AF, PF, V, IS_INITIALIZED, IS_CONST_MAP, MAP_SIZE> {
+        EdgeCoverageModuleBuilder::new(
+            self.variant,
+            self.address_filter,
+            self.page_filter,
+            self.use_hitcounts,
+            self.use_jit,
+            use_rca,
+        )
+    }
+
 }
 
 impl<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
@@ -284,6 +315,7 @@ impl<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
         variant: V,
         use_hitcounts: bool,
         use_jit: bool,
+        use_rca: bool,
     ) -> Self {
         Self {
             variant,
@@ -291,7 +323,13 @@ impl<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
             page_filter,
             use_hitcounts,
             use_jit,
+            use_rca,
         }
+    }
+
+    #[must_use]
+    pub fn use_rca(&self) -> bool {
+        self.use_rca
     }
 }
 
