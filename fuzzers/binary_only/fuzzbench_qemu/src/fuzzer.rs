@@ -50,6 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
+    modules::edges::PredicateFeedback,
     modules::edges::StdEdgeCoverageModule,
     Emulator,
     GuestReg,
@@ -188,6 +189,7 @@ fn fuzz(
     let modules = tuple_list!(
         StdEdgeCoverageModule::builder()
             .map_observer(edges_observer.as_mut())
+            .rca(true)
             .build()
             .unwrap(),
         CmpLogModule::default(),
@@ -295,11 +297,11 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        TimeFeedback::new(&time_observer)
+        PredicateFeedback::new(),
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = CrashFeedback::new();
+    let mut objective = feedback_or!(CrashFeedback::new(), PredicateFeedback::new());
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -414,13 +416,6 @@ fn fuzz(
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
-    // Remove target output (logs still survive)
-    #[cfg(unix)]
-    {
-        let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
-    }
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()

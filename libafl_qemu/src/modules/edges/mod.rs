@@ -302,7 +302,6 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
             use_rca,
         )
     }
-
 }
 
 impl<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>

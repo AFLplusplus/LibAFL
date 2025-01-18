@@ -4,6 +4,7 @@ use std::ptr;
 pub use generators::{gen_hashed_block_ids, gen_hashed_edge_ids, gen_unique_edge_ids};
 use hashbrown::HashMap;
 use libafl_qemu_sys::GuestAddr;
+pub use rca::exec_edges;
 use serde::{Deserialize, Serialize};
 /// Tracers, responsible for propagating an ID in a map.
 pub use tracers::{
@@ -52,20 +53,20 @@ impl QemuEdgesMapMetadata {
 mod rca {
     use libafl::HasMetadata;
 
-    use super::{
-        super::EdgeCoverageVariant, QemuEdgesMapMetadata, 
-    };
+    use super::{super::EdgeCoverageVariant, QemuEdgesMapMetadata};
     use crate::{
-        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter, edges::Predicates},
-        EmulatorModules, Qemu,
+        modules::{
+            edges::Predicates, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter,
+        },
+        qemu, EmulatorModules,
     };
 
-    pub fn exec_edges<AF, ET, I, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+    pub fn exec_edges<AF, ET, PF, I, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
+        _qemu: qemu::Qemu,
         emulator_modules: &mut EmulatorModules<ET, I, S>,
         state: Option<&mut S>,
         id: u64,
-    ) 
-    where
+    ) where
         AF: AddressFilter,
         PF: PageFilter,
         ET: EmulatorModuleTuple<I, S>,

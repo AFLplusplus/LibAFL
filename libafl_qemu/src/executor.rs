@@ -10,6 +10,7 @@ use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use libafl::{
+    common::HasMetadata,
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::inprocess::InProcessExecutorHandlerData,
@@ -21,7 +22,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCurrentTestcase, HasExecutions, HasSolutions, HasMetadata},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "fork")]
@@ -40,7 +41,11 @@ use libc::siginfo_t;
 use crate::EmulatorModules;
 #[cfg(feature = "usermode")]
 use crate::Qemu;
-use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver, edges::Predicates};
+use crate::{
+    command::CommandManager,
+    modules::{edges::Predicates, EmulatorModuleTuple},
+    Emulator, EmulatorDriver,
+};
 
 type EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> =
     StatefulInProcessExecutor<'a, H, I, OT, S, Emulator<C, CM, ED, ET, I, S, SM>>;
@@ -150,7 +155,7 @@ where
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     I: Input + Unpin,
     OT: ObserversTuple<I, S>,
-    S: Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+    S: Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasMetadata,
 {
     pub fn new<EM, OF, Z>(
         emulator: Emulator<C, CM, ED, ET, I, S, SM>,
@@ -265,11 +270,9 @@ where
         self.inner
             .exposed_executor_state_mut()
             .pre_exec(state, input);
-        
+
         match state.metadata_mut::<Predicates>() {
-            Ok(m) => {
-                m.clear()
-            },
+            Ok(m) => m.clear(),
             _ => (),
         }
 

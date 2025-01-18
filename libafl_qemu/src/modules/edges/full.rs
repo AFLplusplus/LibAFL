@@ -1,7 +1,7 @@
 use libafl::HasMetadata;
 
 use super::{
-    helpers::{gen_unique_edge_ids, trace_edge_hitcount, trace_edge_single},
+    helpers::{exec_edges, gen_unique_edge_ids, trace_edge_hitcount, trace_edge_single},
     EdgeCoverageVariant,
 };
 use crate::{
@@ -40,7 +40,7 @@ impl<AF, PF, const IS_CONST_MAP: bool, const MAP_SIZE: usize>
     {
         let hook_id = emulator_modules.edges(
             Hook::Function(gen_unique_edge_ids::<AF, ET, PF, I, S, Self, IS_CONST_MAP, MAP_SIZE>),
-            Hook::Empty,
+            Hook::Function(exec_edges::<AF, ET, PF, I, S, Self, IS_CONST_MAP, MAP_SIZE>),
         );
         unsafe {
             libafl_qemu_sys::libafl_qemu_edge_hook_set_jit(

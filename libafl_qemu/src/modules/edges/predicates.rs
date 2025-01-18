@@ -1,5 +1,6 @@
-use std::borrow::Cow;
 use core::fmt;
+use std::borrow::Cow;
+
 use hashbrown::{HashMap, HashSet};
 use libafl::{
     corpus::Testcase,
@@ -31,7 +32,34 @@ impl PredicatesMap {
             map: HashMap::new(),
         }
     }
+    pub fn sort_and_show(&self) {
+        let mut entries: Vec<_> = self.map.iter().collect();
+
+        // Sort entries based on the ratio (first usize) / (second usize)
+        entries.sort_by(|a, b| {
+            let ratio_a = a.1 .0 as f64 / a.1 .1 as f64;
+            let ratio_b = b.1 .0 as f64 / b.1 .1 as f64;
+            ratio_b.partial_cmp(&ratio_a).unwrap()
+        });
+
+        // Take the top 10 entries (or fewer if there are less than 10)
+        let top_30 = entries.iter().take(30);
+
+        println!("Top 10 entries with highest ratio:");
+        for (i, (key, (first, second))) in top_30.enumerate() {
+            let ratio = *first as f64 / *second as f64;
+            println!(
+                "{}. {}: ({}, {}) - Ratio: {:.2}",
+                i + 1,
+                key,
+                first,
+                second,
+                ratio
+            );
+        }
+    }
 }
+
 impl_serdeany!(PredicatesMap);
 impl_serdeany!(Predicates);
 impl Predicates {
@@ -49,34 +77,8 @@ impl Predicates {
     pub fn predicates(&self) -> &HashSet<Predicate> {
         &self.predicates
     }
-
-    pub fn sort_and_show(&self) {
-        let mut entries: Vec<_> = self.map.iter().collect();
-
-        // Sort entries based on the ratio (first usize) / (second usize)
-        entries.sort_by(|a, b| {
-            let ratio_a = a.1 .0 as f64 / a.1 .1 as f64;
-            let ratio_b = b.1 .0 as f64 / b.1 .1 as f64;
-            ratio_b.partial_cmp(&ratio_a).unwrap()
-        });
-
-        // Take the top 10 entries (or fewer if there are less than 10)
-        let top_10 = entries.iter().take(10);
-
-        println!("Top 10 entries with highest ratio:");
-        for (i, (key, (first, second))) in top_10.enumerate() {
-            let ratio = *first as f64 / *second as f64;
-            println!(
-                "{}. {}: ({}, {}) - Ratio: {:.2}",
-                i + 1,
-                key,
-                first,
-                second,
-                ratio
-            );
-        }
-    }
 }
+
 pub struct PredicateFeedback {
     was_crash: bool,
 }
@@ -108,7 +110,7 @@ where
         match exit_kind {
             ExitKind::Ok => {
                 self.was_crash = false;
-                Ok(true)
+                Ok(false)
             }
             ExitKind::Crash => {
                 self.was_crash = true;
@@ -150,7 +152,7 @@ where
                     .or_insert((0, 1));
             }
         }
-        println!("{:#?}", map);
+        map.sort_and_show();
         Ok(())
     }
 }
