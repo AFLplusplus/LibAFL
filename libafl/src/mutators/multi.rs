@@ -119,7 +119,7 @@ impl_default_multipart!(
 impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator
 where
     S: HasCorpus<MultipartInput<I>> + HasMaxSize + HasRand,
-    I: Input + ResizableMutator<u8>,
+    I: Input + ResizableMutator<u8> + HasMutatorBytes,
 {
     fn mutate(
         &mut self,
@@ -254,7 +254,7 @@ where
 impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator
 where
     S: HasCorpus<MultipartInput<I>> + HasMaxSize + HasRand,
-    I: Input + ResizableMutator<u8>,
+    I: Input + ResizableMutator<u8> + HasMutatorBytes,
 {
     fn mutate(
         &mut self,

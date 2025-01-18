@@ -696,7 +696,7 @@ where
                         rt.emit_shadow_check(
                             address,
                             output,
-                            instr.mutator_bytes().len(),
+                            instr._bytes().len(),
                             details.0,
                             details.1,
                             details.2,
