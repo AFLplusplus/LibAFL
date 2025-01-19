@@ -22,7 +22,10 @@ use crate::{
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasRand, MaybeHasClientPerfMonitor, Stoppable},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
+        MaybeHasClientPerfMonitor, Stoppable,
+    },
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -235,9 +238,15 @@ where
     I: Input + Clone,
     IC: InputConverter<From = I, To = DI>,
     ICB: InputConverter<From = DI, To = I>,
-    S: HasExecutions + HasCorpus<I> + HasRand + HasMetadata + Stoppable + MaybeHasClientPerfMonitor,
+    S: HasExecutions
+        + HasRand
+        + HasMetadata
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + Stoppable
+        + MaybeHasClientPerfMonitor,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider,
     Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
     #[inline]

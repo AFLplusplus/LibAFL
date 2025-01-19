@@ -29,6 +29,8 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 
+#[cfg(feature = "share_objectives")]
+use crate::corpus::{Corpus, Testcase};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 #[cfg(feature = "std")]
@@ -46,8 +48,8 @@ use crate::{
     observers::TimeObserver,
     stages::HasCurrentStageId,
     state::{
-        HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor, NopState,
-        Stoppable,
+        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        MaybeHasClientPerfMonitor, NopState, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -357,7 +359,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        S: HasImported + Stoppable,
+        S: HasImported + HasSolutions<I> + HasCurrentTestcase<I> + Stoppable,
         EMH: EventManagerHooksTuple<I, S>,
         I: Input,
         E: HasObservers,
@@ -401,6 +403,20 @@ where
                 } else {
                     log::debug!("Testcase {evt_name} was discarded");
                 }
+            }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { input, .. } => {
+                log::debug!("Received new Objective");
+                let mut testcase = Testcase::from(input);
+                testcase.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
+
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
             }
             Event::Stop => {
                 state.request_stop();
@@ -531,7 +547,7 @@ where
     E::Observers: DeserializeOwned,
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned + Input,
-    S: HasImported + Stoppable,
+    S: HasImported + HasSolutions<I> + HasCurrentTestcase<I> + Stoppable,
     SHM: ShMem,
     SP: ShMemProvider<SHM>,
     Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
