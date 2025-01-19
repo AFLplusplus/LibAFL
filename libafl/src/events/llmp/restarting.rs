@@ -46,7 +46,10 @@ use crate::{
     monitors::Monitor,
     observers::TimeObserver,
     stages::HasCurrentStageId,
-    state::{HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
+    state::{
+        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        MaybeHasClientPerfMonitor, Stoppable,
+    },
     Error,
 };
 
@@ -201,7 +204,7 @@ where
     EMH: EventManagerHooksTuple<I, S>,
     E: HasObservers,
     E::Observers: DeserializeOwned,
-    S: HasImported + Stoppable + Serialize,
+    S: HasImported + HasCurrentTestcase<I> + HasSolutions<I> + Stoppable + Serialize,
     I: DeserializeOwned + Input,
     SP: ShMemProvider,
     Z: ExecutionProcessor<LlmpEventManager<EMH, I, S, SP>, I, E::Observers, S>
