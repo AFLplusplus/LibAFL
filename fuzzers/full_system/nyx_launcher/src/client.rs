@@ -15,7 +15,7 @@ use crate::{
 
 #[allow(clippy::module_name_repetitions)]
 pub type ClientState =
-    StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 pub struct Client<'a> {
     options: &'a FuzzerOptions,
