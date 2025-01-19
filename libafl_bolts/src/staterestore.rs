@@ -65,17 +65,15 @@ impl StateShMemContent {
 /// it will instead write to disk, and store the file name into the map.
 /// Writing to [`StateRestorer`] multiple times is not allowed.
 #[derive(Debug, Clone)]
-pub struct StateRestorer<SP>
-where
-    SP: ShMemProvider,
-{
-    shmem: SP::ShMem,
+pub struct StateRestorer<SHM, SP> {
+    shmem: SHM,
     phantom: PhantomData<*const SP>,
 }
 
-impl<SP> StateRestorer<SP>
+impl<SHM, SP> StateRestorer<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
 {
     /// Get the map size backing this [`StateRestorer`].
     pub fn mapsize(&self) -> usize {
@@ -96,7 +94,7 @@ where
     }
 
     /// Create a new [`StateRestorer`].
-    pub fn new(shmem: SP::ShMem) -> Self {
+    pub fn new(shmem: SHM) -> Self {
         let mut ret = Self {
             shmem,
             phantom: PhantomData,
@@ -296,7 +294,7 @@ mod tests {
         };
 
         use crate::{
-            shmem::{ShMemProvider, StdShMemProvider},
+            shmem::{ShMemProvider, StdShMem, StdShMemProvider},
             staterestore::StateRestorer,
         };
 
@@ -304,7 +302,7 @@ mod tests {
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
         let shmem = shmem_provider.new_shmem(TESTMAP_SIZE).unwrap();
-        let mut state_restorer = StateRestorer::<StdShMemProvider>::new(shmem);
+        let mut state_restorer = StateRestorer::<StdShMem, StdShMemProvider>::new(shmem);
 
         let state = "hello world".to_string();
 

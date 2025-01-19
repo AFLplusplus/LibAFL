@@ -6,7 +6,7 @@ use core::{
 
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
-    shmem::ShMemProvider,
+    shmem::{ShMem, ShMemProvider},
     tuples::{tuple_list, RefIndexable},
 };
 use libc::siginfo_t;
@@ -39,10 +39,10 @@ pub mod stateful;
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub type InProcessForkExecutor<'a, H, I, OT, S, SP, EM, Z> =
-    GenericInProcessForkExecutor<'a, H, (), I, OT, S, SP, EM, Z>;
+pub type InProcessForkExecutor<'a, EM, H, I, OT, S, SHM, SP, Z> =
+    GenericInProcessForkExecutor<'a, EM, H, (), I, OT, S, SHM, SP, Z>;
 
-impl<'a, H, I, OT, S, SP, EM, Z> InProcessForkExecutor<'a, H, I, OT, S, SP, EM, Z>
+impl<'a, H, I, OT, S, SHM, SP, EM, Z> InProcessForkExecutor<'a, EM, H, I, OT, S, SHM, SP, Z>
 where
     OT: ObserversTuple<I, S>,
 {
@@ -73,13 +73,13 @@ where
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub struct GenericInProcessForkExecutor<'a, H, HT, I, OT, S, SP, EM, Z> {
+pub struct GenericInProcessForkExecutor<'a, EM, H, HT, I, OT, S, SHM, SP, Z> {
     harness_fn: &'a mut H,
-    inner: GenericInProcessForkExecutorInner<HT, I, OT, S, SP, EM, Z>,
+    inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SHM, SP, Z>,
 }
 
-impl<H, HT, I, OT, S, SP, EM, Z> Debug
-    for GenericInProcessForkExecutor<'_, H, HT, I, OT, S, SP, EM, Z>
+impl<H, HT, I, OT, S, SHM, SP, EM, Z> Debug
+    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SHM, SP, Z>
 where
     HT: Debug,
     OT: Debug,
@@ -102,12 +102,13 @@ where
     }
 }
 
-impl<EM, H, HT, I, OT, S, SP, Z> Executor<EM, I, S, Z>
-    for GenericInProcessForkExecutor<'_, H, HT, I, OT, S, SP, EM, Z>
+impl<EM, H, HT, I, OT, S, SHM, SP, Z> Executor<EM, I, S, Z>
+    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SHM, SP, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     S: HasExecutions,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
 {
@@ -141,7 +142,8 @@ where
     }
 }
 
-impl<'a, H, HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutor<'a, H, HT, I, OT, S, SP, EM, Z>
+impl<'a, H, HT, I, OT, S, SHM, SP, EM, Z>
+    GenericInProcessForkExecutor<'a, EM, H, HT, I, OT, S, SHM, SP, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -186,8 +188,8 @@ where {
     }
 }
 
-impl<H, HT, I, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutor<'_, H, HT, I, OT, S, SP, EM, Z>
+impl<H, HT, I, OT, S, SHM, SP, EM, Z> HasObservers
+    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SHM, SP, Z>
 {
     type Observers = OT;
     #[inline]

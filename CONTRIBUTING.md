@@ -84,6 +84,22 @@ pub trait X<A, B, C> // <- this trait have 3 generics, A, B, and C
     fn do_other_stuff(&self, a: A, b: B); // <- this is not ideal because it does not have C.
 }
 ```
+- Generic naming should be consistent. Do NOT use multiple name for the same generic, it just makes things more confusing. Do
+```rust
+pub struct X<A> {
+    phantom: PhanomData<A>,
+}
+
+impl<A> X<A> {}
+```
+But not,
+```rust
+pub struct X<A> {
+    phantom: PhanomData<A>,
+}
+
+impl<B> X<B> {} // <- Do NOT do that, use A instead of B
+```
 - Always alphabetically order the type generics. Therefore,
 ```rust
 pub struct X<E, EM, OT, S, Z> {}; // <- Generics are alphabetically ordered

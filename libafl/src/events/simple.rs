@@ -11,9 +11,9 @@ use libafl_bolts::os::startable_self;
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use libafl_bolts::os::{fork, ForkResult};
-use libafl_bolts::ClientId;
 #[cfg(feature = "std")]
 use libafl_bolts::{os::CTRL_C_EXIT, shmem::ShMemProvider, staterestore::StateRestorer};
+use libafl_bolts::{shmem::ShMem, ClientId};
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -280,23 +280,19 @@ where
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[derive(Debug)]
-pub struct SimpleRestartingEventManager<I, MT, S, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     /// The actual simple event mgr
     inner: SimpleEventManager<I, MT, S>,
     /// [`StateRestorer`] for restarts
-    staterestorer: StateRestorer<SP>,
+    staterestorer: StateRestorer<SHM, SP>,
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SHM, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
     S: Stoppable,
-    SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
         true
@@ -308,9 +304,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventRestarter<S> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SHM, SP> EventRestarter<S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
     S: HasCurrentStageId + Serialize,
     MT: Monitor,
 {
@@ -329,9 +326,9 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, OT, S, SP> CanSerializeObserver<OT> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, OT, S, SHM, SP> CanSerializeObserver<OT>
+    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
-    SP: ShMemProvider,
     OT: Serialize,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
@@ -340,9 +337,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> ManagerExit for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SHM, SP> ManagerExit for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
@@ -354,12 +352,14 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, MT, S, SP, Z> EventProcessor<E, S, Z> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<E, I, MT, S, SHM, SP, Z> EventProcessor<E, S, Z>
+    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
-    SP: ShMemProvider,
     S: Stoppable,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.inner.process(fuzzer, state, executor)
@@ -371,11 +371,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> ProgressReporter<S> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SHM, SP> ProgressReporter<S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
-    SP: ShMemProvider,
     S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + MaybeHasClientPerfMonitor,
 {
     fn maybe_report_progress(
@@ -392,25 +391,23 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> HasEventManagerId for SimpleRestartingEventManager<I, MT, S, SP>
-where
-    SP: ShMemProvider,
-{
+impl<I, MT, S, SHM, SP> HasEventManagerId for SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
     }
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SHM, SP> SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
     S: Stoppable,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
 {
     /// Creates a new [`SimpleEventManager`].
-    fn launched(monitor: MT, staterestorer: StateRestorer<SP>) -> Self {
+    fn launched(monitor: MT, staterestorer: StateRestorer<SHM, SP>) -> Self {
         Self {
             staterestorer,
             inner: SimpleEventManager::new(monitor),
@@ -429,10 +426,10 @@ where
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
             #[cfg(unix)]
-            let staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SHM, SP> =
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
             #[cfg(not(unix))]
-            let staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SHM, SP> =
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };

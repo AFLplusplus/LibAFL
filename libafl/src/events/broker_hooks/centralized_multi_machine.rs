@@ -11,7 +11,6 @@ use libafl_bolts::llmp::LLMP_FLAG_COMPRESSED;
 use libafl_bolts::{
     llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag, LLMP_FLAG_FROM_MM},
     ownedref::OwnedRef,
-    shmem::ShMemProvider,
     ClientId, Error,
 };
 use serde::Serialize;
@@ -149,16 +148,15 @@ where
     }
 }
 
-impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpSenderHook<A, I>
+impl<A, I, SHM, SP> LlmpHook<SHM, SP> for TcpMultiMachineLlmpSenderHook<A, I>
 where
     I: Input,
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
-    SP: ShMemProvider,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.
     fn on_new_message(
         &mut self,
-        _broker_inner: &mut LlmpBrokerInner<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SHM, SP>,
         _client_id: ClientId,
         _msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
@@ -211,16 +209,15 @@ where
     }
 }
 
-impl<A, I, SP> LlmpHook<SP> for TcpMultiMachineLlmpReceiverHook<A, I>
+impl<A, I, SHM, SP> LlmpHook<SHM, SP> for TcpMultiMachineLlmpReceiverHook<A, I>
 where
     I: Input,
     A: Clone + Display + ToSocketAddrs + Send + Sync + 'static,
-    SP: ShMemProvider,
 {
     /// check for received messages, and forward them alongside the incoming message to inner.
     fn on_new_message(
         &mut self,
-        _broker_inner: &mut LlmpBrokerInner<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SHM, SP>,
         _client_id: ClientId,
         _msg_tag: &mut Tag,
         _msg_flags: &mut Flags,

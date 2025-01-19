@@ -28,6 +28,7 @@ use libafl::{
 use libafl_bolts::shmem::ShMemProvider;
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
+    shmem::ShMem,
     tuples::RefIndexable,
 };
 #[cfg(feature = "systemmode")]
@@ -43,7 +44,7 @@ use crate::Qemu;
 use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
 
 type EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> =
-    StatefulInProcessExecutor<'a, H, I, OT, S, Emulator<C, CM, ED, ET, I, S, SM>>;
+    StatefulInProcessExecutor<'a, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S>;
 
 pub struct QemuExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> {
     inner: EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM>,
@@ -207,7 +208,7 @@ where
         }
 
         inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
-            StatefulInProcessExecutor<'a, H, I, OT, S, Emulator<C, CM, ED, ET, I, S, SM>>,
+            StatefulInProcessExecutor<'a, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S>,
             EM,
             ET,
             I,
@@ -298,27 +299,41 @@ where
     }
 }
 
-pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> =
-    StatefulInProcessForkExecutor<'a, H, I, OT, S, SP, Emulator<C, CM, ED, ET, I, S, SM>, EM, Z>;
+pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z> =
+    StatefulInProcessForkExecutor<
+        'a,
+        EM,
+        Emulator<C, CM, ED, ET, I, S, SM>,
+        H,
+        I,
+        OT,
+        S,
+        SHM,
+        SP,
+        Z,
+    >;
 
 #[cfg(feature = "fork")]
-pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
-    inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>,
+#[expect(clippy::type_complexity)]
+pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z> {
+    inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z>,
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> Debug
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z> Debug
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z>
 where
     C: Debug,
     CM: Debug,
     ED: Debug,
+    EM: Debug,
     ET: EmulatorModuleTuple<I, S> + Debug,
     OT: ObserversTuple<I, S> + Debug,
     I: Debug,
     S: Debug,
     SM: Debug,
-    SP: ShMemProvider,
+    SHM: Debug,
+    SP: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuForkExecutor")
@@ -329,14 +344,15 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
-    QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z>
+    QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z>
 where
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasSolutions<I>,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
     Z: HasObjective,
     Z::Objective: Feedback<EM, I, OT, S>,
 {
@@ -370,14 +386,14 @@ where
     #[allow(clippy::type_complexity)]
     pub fn inner(
         &self,
-    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
+    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z> {
         &self.inner
     }
 
     #[allow(clippy::type_complexity)]
     pub fn inner_mut(
         &mut self,
-    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
+    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z> {
         &mut self.inner
     }
 
@@ -391,8 +407,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP, Z> Executor<EM, I, S, Z>
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SHM, SM, SP, Z> Executor<EM, I, S, Z>
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z>
 where
     C: Clone,
     CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
@@ -404,7 +420,8 @@ where
     OT: ObserversTuple<I, S> + Debug,
     I: Input + Unpin,
     S: HasExecutions + Unpin,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<SHM>,
     Z: HasObjective<Objective = OF>,
 {
     fn run_target(
@@ -432,12 +449,11 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> HasObservers
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z> HasObservers
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SHM, SM, SP, Z>
 where
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    SP: ShMemProvider,
 {
     type Observers = OT;
     #[inline]

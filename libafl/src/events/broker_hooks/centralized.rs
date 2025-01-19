@@ -5,7 +5,6 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
     llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
-    shmem::ShMemProvider,
     ClientId, Error,
 };
 use serde::de::DeserializeOwned;
@@ -21,14 +20,13 @@ pub struct CentralizedLlmpHook<I> {
     phantom: PhantomData<I>,
 }
 
-impl<I, SP> LlmpHook<SP> for CentralizedLlmpHook<I>
+impl<I, SHM, SP> LlmpHook<SHM, SP> for CentralizedLlmpHook<I>
 where
     I: DeserializeOwned,
-    SP: ShMemProvider,
 {
     fn on_new_message(
         &mut self,
-        _broker_inner: &mut LlmpBrokerInner<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         _msg_flags: &mut Flags,

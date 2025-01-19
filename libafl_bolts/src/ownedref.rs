@@ -190,7 +190,7 @@ where
     /// # Safety
     /// The shared memory needs to start with a valid object of type `T`.
     /// Any use of this [`OwnedRef`] will dereference a pointer to the shared memory accordingly.
-    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+    pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
         Self::from_ptr(shmem.as_mut_ptr_of().unwrap())
     }
 
@@ -325,7 +325,7 @@ where
     /// # Safety
     /// The shared memory needs to start with a valid object of type `T`.
     /// Any use of this [`OwnedRefMut`] will dereference a pointer to the shared memory accordingly.
-    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+    pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
         Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
     }
 
