@@ -1,7 +1,7 @@
 use core::fmt;
 use std::borrow::Cow;
 
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use libafl::{
     corpus::Testcase,
     executors::ExitKind,
@@ -17,10 +17,17 @@ use crate::GuestAddr;
 pub enum Predicate {
     Edges(GuestAddr, GuestAddr),
     Max(GuestAddr, u64),
+    Min(GuestAddr, u64),
 }
+
+/// List of predicates gathered over during one run
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Predicates {
-    predicates: HashSet<Predicate>,
+    predicates: Vec<Predicate>,
+    // Temporal storage to memoize the max value observed in 1 run
+    maxmap: HashMap<GuestAddr, u64>,
+    // Temporal storage to memoize the min value observed in 1 run
+    minmap: HashMap<GuestAddr, u64>,
 }
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PredicatesMap {
@@ -68,20 +75,47 @@ impl Predicates {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            predicates: HashSet::new(),
+            predicates: Vec::new(),
+            maxmap: HashMap::new(),
+            minmap: HashMap::new(),
         }
     }
 
     pub fn add_edges(&mut self, src: GuestAddr, dest: GuestAddr) {
-        self.predicates.insert(Predicate::Edges(src, dest));
+        self.predicates.push(Predicate::Edges(src, dest));
     }
 
+    /// Reset it (should do it every run)
     pub fn clear(&mut self) {
         self.predicates.clear();
+        self.maxmap.clear();
+        self.minmap.clear();
+    }
+
+    pub fn update_max_min(&mut self, addr: GuestAddr, value: u64) {
+        // Update maxmap
+        self.maxmap
+            .entry(addr)
+            .and_modify(|max_value| {
+                if value > *max_value {
+                    *max_value = value;
+                }
+            })
+            .or_insert(value);
+
+        // Update minmap
+        self.minmap
+            .entry(addr)
+            .and_modify(|min_value| {
+                if value < *min_value {
+                    *min_value = value;
+                }
+            })
+            .or_insert(value);
     }
 
     #[must_use]
-    pub fn predicates(&self) -> &HashSet<Predicate> {
+    pub fn predicates(&self) -> &Vec<Predicate> {
         &self.predicates
     }
 }
@@ -166,6 +200,7 @@ impl fmt::Display for Predicate {
         match self {
             Predicate::Edges(addr1, addr2) => write!(f, "Edges({addr1:#x}, {addr2:#x})"),
             Predicate::Max(addr, value) => write!(f, "Max({addr:#x}, {value:#x})"),
+            Predicate::Min(addr, value) => write!(f, "Min({addr:#x}, {value:#x})"),
         }
     }
 }

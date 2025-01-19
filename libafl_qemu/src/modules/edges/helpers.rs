@@ -83,8 +83,7 @@ mod rca {
         };
 
         if use_rca {
-            let state =
-                state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
+            let state = state.expect("state missing for exec_edges");
             let meta = state.metadata::<QemuEdgesMapMetadata>();
             let (src, dest) = match meta {
                 Ok(m) => match m.revmap.get(&id) {

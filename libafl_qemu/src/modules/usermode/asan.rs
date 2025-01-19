@@ -3,7 +3,7 @@
 use std::{borrow::Cow, env, fs, path::PathBuf, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
-use libafl::{executors::ExitKind, observers::ObserversTuple};
+use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
@@ -659,6 +659,7 @@ pub enum QemuAsanOptions {
 pub type AsanChildModule = AsanModule;
 
 #[derive(Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct AsanModule {
     env: Vec<(String, String)>,
     enabled: bool,
@@ -666,6 +667,7 @@ pub struct AsanModule {
     empty: bool,
     rt: Pin<Box<AsanGiovese>>,
     filter: StdAddressFilter,
+    use_rca: bool,
 }
 
 impl AsanModule {
@@ -697,6 +699,7 @@ impl AsanModule {
             empty: true,
             rt,
             filter,
+            use_rca: false,
         }
     }
 
@@ -725,6 +728,7 @@ impl AsanModule {
             empty: true,
             rt,
             filter,
+            use_rca: false,
         }
     }
 
@@ -808,12 +812,17 @@ impl AsanModule {
     pub fn reset(&mut self, qemu: Qemu) -> AsanRollback {
         self.rt.rollback(qemu, self.detect_leaks)
     }
+
+    #[must_use]
+    pub fn use_rca(&self) -> bool {
+        self.use_rca
+    }
 }
 
 impl<I, S> EmulatorModule<I, S> for AsanModule
 where
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
@@ -973,7 +982,7 @@ pub fn oncrash_asan<ET, I, S>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     let pc: GuestAddr = qemu.read_reg(Regs::Pc).unwrap();
@@ -991,7 +1000,7 @@ pub fn gen_readwrite_asan<ET, I, S>(
 where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     if h.must_instrument(pc) {
@@ -1004,15 +1013,37 @@ where
 pub fn trace_read_asan<ET, I, S, const N: usize>(
     qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
-    _state: Option<&mut S>,
+    state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
+
+    if h.use_rca() {
+        match N {
+            1 => {
+                let val = unsafe { qemu.read_mem_val::<u8>(addr) };
+                let state = state.expect("state missing for trace_read_asan");
+            }
+            2 => {
+                let val = unsafe { qemu.read_mem_val::<u16>(addr) };
+            }
+            4 => {
+                let val = unsafe { qemu.read_mem_val::<u32>(addr) };
+            }
+            8 => {
+                let val = unsafe { qemu.read_mem_val::<u64>(addr) };
+            }
+            _ => {
+                unreachable!("Impossible. else you coded it wrong.")
+            }
+        };
+    }
+
     h.read::<N>(qemu, id as GuestAddr, addr);
 }
 
@@ -1026,7 +1057,7 @@ pub fn trace_read_n_asan<ET, I, S>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
@@ -1041,7 +1072,7 @@ pub fn trace_write_asan<ET, I, S, const N: usize>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.write::<N>(qemu, id as GuestAddr, addr);
@@ -1057,7 +1088,7 @@ pub fn trace_write_n_asan<ET, I, S>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.read_n(qemu, id as GuestAddr, addr, size);
@@ -1074,7 +1105,7 @@ pub fn gen_write_asan_snapshot<ET, I, S>(
 where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     if h.must_instrument(pc) {
@@ -1093,7 +1124,7 @@ pub fn trace_write_asan_snapshot<ET, I, S, const N: usize>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     if id != 0 {
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
@@ -1113,7 +1144,7 @@ pub fn trace_write_n_asan_snapshot<ET, I, S>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     if id != 0 {
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();
@@ -1141,7 +1172,7 @@ pub fn qasan_fake_syscall<ET, I, S>(
 where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     if sys_num == QASAN_FAKESYS_NR {
         let h = emulator_modules.get_mut::<AsanModule>().unwrap();

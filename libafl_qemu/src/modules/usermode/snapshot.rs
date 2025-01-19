@@ -2,6 +2,7 @@
 use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
+use libafl::HasMetadata;
 use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
@@ -696,7 +697,7 @@ impl Default for SnapshotModule {
 impl<I, S> EmulatorModule<I, S> for SnapshotModule
 where
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     type ModuleAddressFilter = NopAddressFilter;
 
@@ -756,7 +757,7 @@ pub fn trace_write_snapshot<ET, I, S, const SIZE: usize>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, SIZE);
@@ -772,7 +773,7 @@ pub fn trace_write_n_snapshot<ET, I, S>(
 ) where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, size);
@@ -796,7 +797,7 @@ pub fn filter_mmap_snapshot<ET, I, S>(
 where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     if i64::from(sys_num) == SYS_munmap {
         let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
@@ -826,7 +827,7 @@ pub fn trace_mmap_snapshot<ET, I, S>(
 where
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
-    S: Unpin,
+    S: Unpin + HasMetadata,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {
