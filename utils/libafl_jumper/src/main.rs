@@ -55,7 +55,7 @@ pub unsafe extern "C" fn libafl_jmp(target: *mut c_void) -> ! {
         options(noreturn)
     );
 
-    #[cfg(target_arch = "hexagon")]
+    #[cfg(any(target_arch = "powerpc", target_arch = "powerpc64"))]
     asm!(
         "b {target}",       // Branch instruction (PowerPC)
         target = in(reg) target,
