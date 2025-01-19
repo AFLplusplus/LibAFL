@@ -21,7 +21,7 @@
 - Restrictions from certain schedulers and stages that required their inner observer to implement `MapObserver` have been lifted in favor of requiring `Hash`
   - Related: removed `hash_simple` from `MapObserver`
 
-# 0.14.0 -> 0.14.1
+# 0.14.0 -> 0.15.0
 - Removed `with_observers` from `Executor` trait.
 - `MmapShMemProvider::new_shmem_persistent` has been removed in favour of `MmapShMem::persist`. You probably want to do something like this: `let shmem = MmapShMemProvider::new()?.new_shmem(size)?.persist()?;`
 
