@@ -13,7 +13,7 @@ use rangemap::RangeMap;
 
 use crate::{
     modules::{
-        calls::FullBacktraceCollector, snapshot::SnapshotModule, EmulatorModule,
+        calls::FullBacktraceCollector, edges::Predicates, snapshot::SnapshotModule, EmulatorModule,
         EmulatorModuleTuple,
     },
     qemu::MemAccessInfo,
@@ -1024,19 +1024,35 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
 
     if h.use_rca() {
+        let state = state.expect("state missing for rca");
+        let predicates = state
+            .metadata_mut::<Predicates>()
+            .expect("Predicates missing for rca");
         match N {
             1 => {
-                let val = unsafe { qemu.read_mem_val::<u8>(addr) };
-                let state = state.expect("state missing for trace_read_asan");
+                let value = unsafe { qemu.read_mem_val::<u8>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(addr, u64::from(value));
+                }
             }
             2 => {
-                let val = unsafe { qemu.read_mem_val::<u16>(addr) };
+                let value: Result<u16, crate::QemuRWError> =
+                    unsafe { qemu.read_mem_val::<u16>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(addr, u64::from(value));
+                }
             }
             4 => {
-                let val = unsafe { qemu.read_mem_val::<u32>(addr) };
+                let value = unsafe { qemu.read_mem_val::<u32>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(addr, u64::from(value));
+                }
             }
             8 => {
-                let val = unsafe { qemu.read_mem_val::<u64>(addr) };
+                let value = unsafe { qemu.read_mem_val::<u64>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(addr, value);
+                }
             }
             _ => {
                 unreachable!("Impossible. else you coded it wrong.")
