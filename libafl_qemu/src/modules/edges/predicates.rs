@@ -18,20 +18,22 @@ pub enum Predicate {
     Edges(GuestAddr, GuestAddr),
     Max(GuestAddr, u64),
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Predicates {
     predicates: HashSet<Predicate>,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PredicatesMap {
     map: HashMap<Predicate, (usize, usize)>,
 }
 impl PredicatesMap {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             map: HashMap::new(),
         }
     }
+    #[allow(clippy::cast_precision_loss)]
     pub fn sort_and_show(&self) {
         let mut entries: Vec<_> = self.map.iter().collect();
 
@@ -63,31 +65,40 @@ impl PredicatesMap {
 impl_serdeany!(PredicatesMap);
 impl_serdeany!(Predicates);
 impl Predicates {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             predicates: HashSet::new(),
         }
     }
+
     pub fn add_edges(&mut self, src: GuestAddr, dest: GuestAddr) {
         self.predicates.insert(Predicate::Edges(src, dest));
     }
+
     pub fn clear(&mut self) {
         self.predicates.clear();
     }
+
+    #[must_use]
     pub fn predicates(&self) -> &HashSet<Predicate> {
         &self.predicates
     }
 }
 
+#[derive(Default)]
 pub struct PredicateFeedback {
     was_crash: bool,
 }
+
 impl Named for PredicateFeedback {
     fn name(&self) -> &Cow<'static, str> {
         &Cow::Borrowed("predicates")
     }
 }
+
 impl PredicateFeedback {
+    #[must_use]
     pub fn new() -> Self {
         Self { was_crash: false }
     }
@@ -107,19 +118,12 @@ where
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, libafl::Error> {
-        match exit_kind {
-            ExitKind::Ok => {
-                self.was_crash = false;
-                Ok(false)
-            }
-            ExitKind::Crash => {
-                self.was_crash = true;
-                Ok(true)
-            }
-            _ => {
-                self.was_crash = false;
-                Ok(false)
-            }
+        if exit_kind == &ExitKind::Crash {
+            self.was_crash = true;
+            Ok(true)
+        } else {
+            self.was_crash = false;
+            Ok(false)
         }
     }
     fn append_metadata(
@@ -132,7 +136,7 @@ where
         let mut predicates = vec![];
         if let Ok(meta) = state.metadata::<Predicates>() {
             for predicate in &meta.predicates {
-                predicates.push(predicate.clone());
+                predicates.push(*predicate);
             }
         }
         let map = state.metadata_or_insert_with(PredicatesMap::new);
@@ -142,7 +146,7 @@ where
                     .entry(predicate)
                     .and_modify(|e| {
                         e.0 += 1;
-                        e.1 += 1
+                        e.1 += 1;
                     })
                     .or_insert((1, 1));
             } else {
@@ -160,8 +164,8 @@ where
 impl fmt::Display for Predicate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Predicate::Edges(addr1, addr2) => write!(f, "Edges({:#x}, {:#x})", addr1, addr2),
-            Predicate::Max(addr, value) => write!(f, "Max({:#x}, {:#x})", addr, value),
+            Predicate::Edges(addr1, addr2) => write!(f, "Edges({addr1:#x}, {addr2:#x})"),
+            Predicate::Max(addr, value) => write!(f, "Max({addr:#x}, {value:#x})"),
         }
     }
 }

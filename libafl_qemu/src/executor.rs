@@ -271,9 +271,8 @@ where
             .exposed_executor_state_mut()
             .pre_exec(state, input);
 
-        match state.metadata_mut::<Predicates>() {
-            Ok(m) => m.clear(),
-            _ => (),
+        if let Ok(m) = state.metadata_mut::<Predicates>() {
+            m.clear();
         }
 
         let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
