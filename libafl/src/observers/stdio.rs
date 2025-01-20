@@ -226,11 +226,11 @@ pub type StdOutObserver = StreamObserver<StdOut>;
 pub type StdErrObserver = StreamObserver<StdErr>;
 
 // Extension traits for specific stream types
-pub(crate) trait HasStdOut {
+pub trait HasStdOut {
     fn observe_stdout(&mut self, stdout: &[u8]);
 }
 
-pub(crate) trait HasStdErr {
+pub trait HasStdErr {
     fn observe_stderr(&mut self, stderr: &[u8]);
 }
 
