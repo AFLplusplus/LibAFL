@@ -28,7 +28,6 @@ use libafl::{
 use libafl_bolts::shmem::ShMemProvider;
 use libafl_bolts::{
     os::unix_signals::{ucontext_t, Signal},
-    shmem::ShMem,
     tuples::RefIndexable,
 };
 #[cfg(feature = "systemmode")]

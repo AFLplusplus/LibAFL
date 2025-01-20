@@ -7,7 +7,7 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{ClientDescription, EventRestarter, NopEventManager},
+    events::{ClientDescription, EventRestarter},
     executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -30,7 +30,7 @@ use libafl::{
     Error, HasMetadata, NopFuzzer,
 };
 #[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::StdShMemProvider;
+use libafl_bolts::shmem::{StdShMem, StdShMemProvider};
 use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
@@ -55,10 +55,10 @@ pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(feature = "simplemgr")]
-pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;
+pub type ClientMgr<M> = SimpleEventManager<BytesInput, M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
 pub type ClientMgr<M> = MonitorTypedEventManager<
-    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMemProvider>,
+    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
     M,
 >;
 

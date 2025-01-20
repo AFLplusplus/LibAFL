@@ -42,7 +42,7 @@ use libafl::{
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
 #[cfg(not(feature = "fuzzbench"))]
-use libafl_bolts::shmem::StdShMemProvider;
+use libafl_bolts::shmem::{StdShMem, StdShMemProvider};
 use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos, current_time,
@@ -77,10 +77,11 @@ pub type LibaflFuzzState =
 
 #[cfg(not(feature = "fuzzbench"))]
 type LibaflFuzzManager = CentralizedEventManager<
-    LlmpRestartingEventManager<(), BytesInput, LibaflFuzzState, StdShMemProvider>,
+    LlmpRestartingEventManager<(), BytesInput, LibaflFuzzState, StdShMem, StdShMemProvider>,
     (),
     BytesInput,
     LibaflFuzzState,
+    StdShMem,
     StdShMemProvider,
 >;
 #[cfg(feature = "fuzzbench")]
