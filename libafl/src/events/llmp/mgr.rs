@@ -217,8 +217,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
 #[cfg(feature = "std")]
 impl<EMH, I, S, OT, SHM, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
+    OT: MatchNameRef + Serialize,
     SHM: ShMem,
-    OT: Serialize + MatchNameRef,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
         serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)

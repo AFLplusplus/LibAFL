@@ -149,8 +149,8 @@ where
 impl<EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT>
     for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
+    OT: MatchNameRef + Serialize,
     SHM: ShMem,
-    OT: Serialize + MatchNameRef,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
         serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)

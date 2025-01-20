@@ -283,7 +283,7 @@ impl<EM, EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT>
     for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
     EM: AdaptiveSerializer,
-    OT: Serialize + MatchNameRef,
+    OT: MatchNameRef + Serialize,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
         serialize_observers_adaptive::<EM, OT>(
