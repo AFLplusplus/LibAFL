@@ -10,6 +10,7 @@ use libafl_bolts::tuples::{Handle, Handled, MatchFirstType, MatchNameRef};
 use libafl_qemu_sys::GuestAddr;
 use thread_local::ThreadLocal;
 
+use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
 use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
@@ -415,10 +416,6 @@ where
     S: Unpin,
     T: CallTraceCollectorTuple + Debug,
 {
-    type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
-
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
@@ -459,7 +456,15 @@ where
             .unwrap()
             .post_exec_all(qemu, input, observers, exit_kind);
     }
+}
 
+impl<T> HasAddressFilter for CallTracerModule<T>
+where
+    T: CallTraceCollectorTuple,
+{
+    type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(feature = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.filter
     }

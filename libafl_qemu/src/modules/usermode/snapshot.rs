@@ -24,7 +24,7 @@ use crate::{
     emu::EmulatorModules,
     modules::{
         asan::AsanModule,
-        utils::filters::{NopAddressFilter, NOP_ADDRESS_FILTER},
+        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
         EmulatorModule, EmulatorModuleTuple, Range,
     },
     qemu::{Hook, SyscallHookResult},
@@ -698,8 +698,6 @@ where
     I: Unpin,
     S: Unpin,
 {
-    type ModuleAddressFilter = NopAddressFilter;
-
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
@@ -737,7 +735,10 @@ where
             self.reset(qemu);
         }
     }
+}
 
+impl HasAddressFilter for SnapshotModule {
+    type ModuleAddressFilter = NopAddressFilter;
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &NopAddressFilter
     }

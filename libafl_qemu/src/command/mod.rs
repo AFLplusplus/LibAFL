@@ -23,7 +23,7 @@ use crate::{
         VersionCommandParser,
     },
     get_exit_arch_regs,
-    modules::EmulatorModuleTuple,
+    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
     sync_exit::ExitArgs,
     Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
     IsSnapshotManager, Qemu, QemuMemoryChunk, QemuRWError, Regs, StdEmulatorDriver, CPU,
@@ -98,7 +98,7 @@ macro_rules! define_std_command_manager {
 
             impl<C, ET, I, S, SM> CommandManager<C, StdEmulatorDriver, ET, I, S, SM> for $name<S>
             where
-                ET: EmulatorModuleTuple<I, S>,
+                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -127,7 +127,7 @@ macro_rules! define_std_command_manager {
 
             impl<C, ET, I, S, SM> IsCommand<C, $name<S>, StdEmulatorDriver, ET, I, S, SM> for [<$name Commands>]
             where
-                ET: EmulatorModuleTuple<I, S>,
+                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -385,7 +385,7 @@ pub struct StartCommand {
 impl<C, ET, I, S, SM> IsCommand<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartCommand
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -546,7 +546,7 @@ pub struct PageAllowCommand {
 #[cfg(feature = "systemmode")]
 impl<C, CM, ED, ET, I, S, SM> IsCommand<C, CM, ED, ET, I, S, SM> for PageAllowCommand
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: Unpin,
     S: Unpin,
 {
@@ -574,7 +574,7 @@ pub struct AddressAllowCommand {
 }
 impl<C, CM, ED, ET, I, S, SM> IsCommand<C, CM, ED, ET, I, S, SM> for AddressAllowCommand
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: Unpin,
     S: Unpin,
 {
