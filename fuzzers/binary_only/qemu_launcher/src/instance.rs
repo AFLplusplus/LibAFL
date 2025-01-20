@@ -55,7 +55,7 @@ pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(feature = "simplemgr")]
-pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;
+pub type ClientMgr<M> = SimpleEventManager<BytesInput, M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
 pub type ClientMgr<M> = MonitorTypedEventManager<
     LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMemProvider>,
@@ -242,12 +242,7 @@ impl<M: Monitor> Instance<'_, M> {
             )?;
 
             executor
-                .run_target(
-                    &mut NopFuzzer::new(),
-                    &mut state,
-                    &mut NopEventManager::new(),
-                    &input,
-                )
+                .run_target(&mut fuzzer, &mut state, &mut self.mgr, &input)
                 .expect("Error running target");
             // We're done :)
             process::exit(0);
