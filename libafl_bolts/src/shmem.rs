@@ -48,15 +48,12 @@ pub type StdShMem = unix_shmem::ashmem::AshmemShMem;
 
 /// The standard sharedmem provider
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMemProvider = RcShMemProvider<
-    unix_shmem::ashmem::AshmemShMem,
-    ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>,
->;
+pub type StdShMemProvider =
+    RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
 
 /// The standard sharedmem service
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMemService =
-    ShMemService<unix_shmem::ashmem::AshmemShMem, unix_shmem::ashmem::AshmemShMemProvider>;
+pub type StdShMemService = ShMemService<unix_shmem::ashmem::AshmemShMemProvider>;
 
 /// The standard sharedmem
 #[cfg(all(feature = "std", target_vendor = "apple"))]
