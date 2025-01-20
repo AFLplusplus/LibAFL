@@ -29,7 +29,7 @@ use crate::{
     events::{
         std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
         Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
-        ManagerExit,
+        SendExiting,
     },
     monitors::Monitor,
     stages::HasCurrentStageId,
@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<I, MT, S> ManagerExit for SimpleEventManager<I, MT, S> {
+impl<I, MT, S> SendExiting for SimpleEventManager<I, MT, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
@@ -343,7 +343,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SHM, SP> ManagerExit for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+impl<I, MT, S, SHM, SP> SendExiting for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,

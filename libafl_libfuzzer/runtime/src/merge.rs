@@ -9,7 +9,7 @@ use std::{
 
 use libafl::{
     corpus::Corpus,
-    events::{ManagerExit, SimpleRestartingEventManager},
+    events::{SendExiting, SimpleRestartingEventManager},
     executors::{ExitKind, InProcessExecutor},
     feedback_and_fast, feedback_or_fast,
     feedbacks::{CrashFeedback, MinMapFeedback, TimeoutFeedback},

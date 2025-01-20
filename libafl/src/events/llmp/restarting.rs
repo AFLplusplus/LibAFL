@@ -37,8 +37,8 @@ use crate::{
         launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
         std_report_progress, AdaptiveSerializer, AwaitRestartSafe, CanSerializeObserver, Event,
         EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ManagerExit,
-        ProgressReporter, StdLlmpEventHook,
+        EventRestarter, HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ProgressReporter,
+        SendExiting, StdLlmpEventHook,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -47,7 +47,7 @@ use crate::{
     observers::TimeObserver,
     stages::HasCurrentStageId,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
     Error,
@@ -105,13 +105,7 @@ where
 impl<EMH, I, S, SHM, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     I: Serialize,
-    S: HasExecutions
-        + HasLastReportTime
-        + HasMetadata
-        + Serialize
-        + MaybeHasClientPerfMonitor
-        + HasCorpus<I>,
-    S::Corpus: Serialize,
+    S: HasExecutions + HasLastReportTime + HasMetadata + Serialize + MaybeHasClientPerfMonitor,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
@@ -190,7 +184,7 @@ where
     }
 }
 
-impl<EMH, I, S, SHM, SP> ManagerExit for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> SendExiting for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,

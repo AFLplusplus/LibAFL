@@ -40,7 +40,7 @@ use crate::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
         std_maybe_report_progress, std_on_restart, std_report_progress, AdaptiveSerializer,
         AwaitRestartSafe, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
+        EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter, SendExiting,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -260,9 +260,10 @@ where
     }
 }
 
-impl<EMH, I, S, SHM: Debug, SP: Debug> Debug for LlmpEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> Debug for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
+    SP: Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventManager");
@@ -518,7 +519,7 @@ where
     }
 }
 
-impl<EMH, I, S, SHM, SP> ManagerExit for LlmpEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> SendExiting for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,

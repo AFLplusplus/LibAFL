@@ -581,7 +581,7 @@ pub trait CanSerializeObserver<OT> {
 }
 
 /// Send that we're about to exit
-pub trait ManagerExit {
+pub trait SendExiting {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error>;
@@ -642,7 +642,7 @@ where
     }
 }
 
-impl ManagerExit for NopEventManager {
+impl SendExiting for NopEventManager {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error> {
@@ -766,9 +766,9 @@ where
     }
 }
 
-impl<EM, M> ManagerExit for MonitorTypedEventManager<EM, M>
+impl<EM, M> SendExiting for MonitorTypedEventManager<EM, M>
 where
-    EM: ManagerExit,
+    EM: SendExiting,
 {
     #[inline]
     fn send_exiting(&mut self) -> Result<(), Error> {

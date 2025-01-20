@@ -33,7 +33,7 @@ use crate::{
         serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
         AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer,
         EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
-        LogSeverity, ManagerExit, ProgressReporter,
+        LogSeverity, ProgressReporter, SendExiting,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -295,9 +295,9 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> ManagerExit for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, EMH, I, S, SHM, SP> SendExiting for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    EM: ManagerExit,
+    EM: SendExiting,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
