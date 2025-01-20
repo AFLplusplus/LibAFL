@@ -35,6 +35,7 @@ script_runner = "@shell"
 script = '''
 cc -c "${PROJECT_DIR}/libfuzzer_main.c"
 cc \
+	-O0 \
     ./fuzz.c \
     ./libfuzzer_main.o \
     -o ${FUZZER_NAME} \

@@ -42,7 +42,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge},
+    tuples::{tuple_list, Merge, MatchFirstType},
     AsSlice,
 };
 use libafl_qemu::{
@@ -51,7 +51,9 @@ use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
     modules::edges::PredicateFeedback,
-    modules::edges::StdEdgeCoverageModule,
+    modules::edges::{StdEdgeCoverageModule, EdgeCoverageFullVariant},
+    modules::utils::filters::{StdAddressFilter, NopPageFilter},
+    modules::{EmulatorModule, EdgeCoverageModule},
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
@@ -206,6 +208,15 @@ fn fuzz(
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
+
+    let text_addr = elf.get_section(".text", qemu.load_addr()).unwrap(); // 100% there is
+    let cov_filter = StdAddressFilter::allow_list(vec![text_addr]);
+
+    // update address filter after qemu has been initialized
+    <EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0> as EmulatorModule<BytesInput, _>>::update_address_filter(emulator.modules_mut()
+            .modules_mut()
+            .match_first_type_mut::<EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0>>()
+            .expect("Could not find back the edge module"), qemu, cov_filter);
 
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
