@@ -172,8 +172,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider<ShMem = SHM>,
         SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Self::build_from_client(self, llmp, configuration, time_ref)
@@ -190,8 +190,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider<ShMem = SHM>,
         SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Self::build_from_client(self, llmp, configuration, time_ref)
@@ -433,8 +433,8 @@ where
 
 impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider<ShMem = SHM>,
     SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
