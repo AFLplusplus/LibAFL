@@ -51,7 +51,10 @@ use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
+    observers::{
+        stdio::{HasStdErr, HasStdOut},
+        ObserversTuple, StdErrObserver, StdOutObserver,
+    },
     state::HasExecutions,
     std::borrow::ToOwned,
     Error,
