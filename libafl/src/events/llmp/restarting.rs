@@ -385,7 +385,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<EMH, I, MT, S, SHM, SP> {
+pub struct RestartingMgr<EMH, I, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
@@ -419,28 +419,33 @@ pub struct RestartingMgr<EMH, I, MT, S, SHM, SP> {
     #[builder(default = None)]
     time_ref: Option<Handle<TimeObserver>>,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(EMH, I, S, SHM)>,
+    phantom_data: PhantomData<(EMH, I, S)>,
 }
 
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
-impl<EMH, I, MT, S, SHM, SP> RestartingMgr<EMH, I, MT, S, SHM, SP>
+impl<EMH, I, MT, S, SP> RestartingMgr<EMH, I, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     I: DeserializeOwned,
     MT: Monitor + Clone,
     S: Serialize + DeserializeOwned,
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
     pub fn launch(
         &mut self,
-    ) -> Result<(Option<S>, LlmpRestartingEventManager<EMH, I, S, SHM, SP>), Error> {
+    ) -> Result<
+        (
+            Option<S>,
+            LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
+        ),
+        Error,
+    > {
         // We start ourselves as child process to actually fuzz
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: LlmpBroker<_, SHM, SP>, remote_broker_addr| {
+            let broker_things = |mut broker: LlmpBroker<_, SP::ShMem, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.inner_mut().connect_b2b(remote_broker_addr)?;
@@ -480,7 +485,7 @@ where
                             return Err(Error::shutting_down());
                         }
                         LlmpConnection::IsClient { client } => {
-                            let mgr: LlmpEventManager<EMH, I, S, SHM, SP> =
+                            let mgr: LlmpEventManager<EMH, I, S, SP::ShMem, SP> =
                                 LlmpEventManager::builder()
                                     .hooks(self.hooks)
                                     .build_from_client(
@@ -530,7 +535,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let staterestorer: StateRestorer<SHM, SP> =
+            let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]

@@ -14,7 +14,6 @@
 
 use core::{
     fmt::{self, Debug, Formatter},
-    marker::PhantomData,
     num::NonZeroUsize,
     time::Duration,
 };
@@ -22,7 +21,7 @@ use std::{net::SocketAddr, string::String};
 
 use libafl_bolts::{
     core_affinity::{CoreId, Cores},
-    shmem::{ShMem, ShMemProvider},
+    shmem::ShMemProvider,
     tuples::{tuple_list, Handle},
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -130,7 +129,7 @@ impl ClientDescription {
 ///
 /// Will hide child output, unless the settings indicate otherwise, or the `LIBAFL_DEBUG_OUTPUT` env variable is set.
 #[derive(TypedBuilder)]
-pub struct Launcher<'a, CF, MT, SHM, SP> {
+pub struct Launcher<'a, CF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -184,11 +183,9 @@ pub struct Launcher<'a, CF, MT, SHM, SP> {
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
-    #[builder(default = PhantomData)]
-    phantom: PhantomData<SHM>,
 }
 
-impl<CF, MT, SHM, SP> Debug for Launcher<'_, CF, MT, SHM, SP> {
+impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_struct = f.debug_struct("Launcher");
         dbg_struct
@@ -208,7 +205,7 @@ impl<CF, MT, SHM, SP> Debug for Launcher<'_, CF, MT, SHM, SP> {
     }
 }
 
-impl<CF, MT, SHM, SP> Launcher<'_, CF, MT, SHM, SP>
+impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
 {
@@ -218,23 +215,21 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<(), I, S, SHM, SP>,
+            LlmpRestartingEventManager<(), I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         I: DeserializeOwned,
         S: DeserializeOwned + Serialize,
-        SHM: ShMem,
-        SP: ShMemProvider<ShMem = SHM>,
+        SP: ShMemProvider,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
 }
 
-impl<CF, MT, SHM, SP> Launcher<'_, CF, MT, SHM, SP>
+impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "fork"))]
@@ -245,7 +240,7 @@ where
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, I, S, SHM, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
     {
@@ -317,7 +312,7 @@ where
                                 ClientDescription::new(index, overcommit_id, bind_to);
 
                             // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                            let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
+                            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                                 .shmem_provider(self.shmem_provider.clone())
                                 .broker_port(self.broker_port)
                                 .kind(ManagerKind::Client {
@@ -344,7 +339,7 @@ where
             log::info!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
+            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -666,7 +661,7 @@ where
         let restarting_mgr_builder =
             |centralized_launcher: &Self, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                let builder = RestartingMgr::<(), I, MT, S, SP::ShMem, SP>::builder()
+                let builder = RestartingMgr::<(), I, MT, S, SP>::builder()
                     .shmem_provider(centralized_launcher.shmem_provider.clone())
                     .broker_port(centralized_launcher.broker_port)
                     .kind(ManagerKind::Client { client_description })
