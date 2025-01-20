@@ -870,7 +870,7 @@ where
 impl<EMH, I, S, SHM, SP> ManagerExit for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
@@ -892,7 +892,7 @@ where
     EMH: EventManagerHooksTuple<I, S>,
     S: HasExecutions + HasCurrentStageId + Serialize,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -926,7 +926,7 @@ where
         + HasCurrentTestcase<I>
         + Stoppable,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: ExecutionProcessor<TcpEventManager<EMH, I, S>, I, E::Observers, S>
         + EvaluatorObservers<E, TcpEventManager<EMH, I, S>, I, S>,
 {
@@ -1094,8 +1094,7 @@ where
         + DeserializeOwned
         + Stoppable,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
-
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Launch the restarting manager
     pub fn launch(

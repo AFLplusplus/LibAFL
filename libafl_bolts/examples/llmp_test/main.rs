@@ -115,7 +115,7 @@ impl<SP> Default for LlmpExampleHook<SP> {
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
 impl<SHM, SP> LlmpHook<SHM, SP> for LlmpExampleHook<SP>
 where
-    SP: ShMemProvider<SHM> + 'static,
+    SP: ShMemProvider<ShMem = SHM> + 'static,
 {
     fn on_new_message(
         &mut self,

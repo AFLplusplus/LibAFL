@@ -352,7 +352,7 @@ where
     OT: ObserversTuple<I, S>,
     S: HasSolutions<I>,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: HasObjective,
     Z::Objective: Feedback<EM, I, OT, S>,
 {
@@ -421,7 +421,7 @@ where
     I: Input + Unpin,
     S: HasExecutions + Unpin,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: HasObjective<Objective = OF>,
 {
     fn run_target(

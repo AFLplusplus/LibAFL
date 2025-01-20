@@ -148,7 +148,7 @@ impl<'a> TinyInstExecutorBuilder<'a, NopShMem, NopShMemProvider> {
 impl<SHM, SP> TinyInstExecutorBuilder<'_, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Argument for tinyinst instrumentation
     #[must_use]
