@@ -50,10 +50,10 @@ use libafl_qemu::{
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::{PredicateFeedback, Predicates},
     modules::edges::{EdgeCoverageFullVariant, StdEdgeCoverageModule},
+    modules::edges::{PredicateFeedback, Predicates},
     modules::utils::filters::{NopPageFilter, StdAddressFilter},
-    modules::{utils::filters::HasAddressFilter, EdgeCoverageModule, EmulatorModule, AsanModule},
+    modules::{utils::filters::HasAddressFilter, AsanModule, EdgeCoverageModule, EmulatorModule},
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
@@ -189,8 +189,8 @@ fn fuzz(
     };
 
     let env = std::env::vars()
-    .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
-    .collect::<Vec<(String, String)>>();
+        .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
+        .collect::<Vec<(String, String)>>();
 
     let mut asan = AsanModule::default(&env);
     asan.use_rca = true;

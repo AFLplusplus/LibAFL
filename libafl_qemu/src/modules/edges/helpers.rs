@@ -92,7 +92,9 @@ mod rca {
                 },
                 _ => return,
             };
-            let predicates = state.metadata_mut::<Predicates>().expect("Predicates not found!");
+            let predicates = state
+                .metadata_mut::<Predicates>()
+                .expect("Predicates not found!");
             predicates.add_edges(src, dest);
         }
     }

@@ -8,13 +8,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   v = v + 120;
   // printf("%d\n", v);
   array[v] = 0x0;
-  if(v % 2 == 0 ){
-  	array[0] = 1;
+  if (v % 2 == 0) {
+    array[0] = 1;
+  } else {
+    array[0] = 2;
   }
-  else{
-  	array[0] = 2;
-  }
-	
+
   return 0;
 }
 

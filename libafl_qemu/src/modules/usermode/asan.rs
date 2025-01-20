@@ -13,8 +13,8 @@ use rangemap::RangeMap;
 
 use crate::{
     modules::{
-        calls::FullBacktraceCollector, snapshot::SnapshotModule, utils::filters::HasAddressFilter,
-        EmulatorModule, EmulatorModuleTuple, edges::Predicates,
+        calls::FullBacktraceCollector, edges::Predicates, snapshot::SnapshotModule,
+        utils::filters::HasAddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::MemAccessInfo,
     sys::TCGTemp,
