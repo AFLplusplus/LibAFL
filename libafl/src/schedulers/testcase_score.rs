@@ -312,7 +312,15 @@ where
             None => 0.0,
         };
 
-        let avg_top_size = state.metadata::<TopRatedsMetadata>()?.map().len() as f64;
+        let avg_top_size = match state.metadata::<TopRatedsMetadata>() {
+            Ok(m) => m.map().len() as f64,
+            Err(e) => {
+                return Err(Error::key_not_found(format!(
+                    "{e:?} You have to use Minimizer scheduler with this.",
+                )))
+            }
+        };
+
         weight *= 1.0 + (tc_ref / avg_top_size);
 
         if favored {

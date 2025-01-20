@@ -110,7 +110,10 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     }
 
     let mut testcase = state.testcase_mut(id)?;
-    let input = testcase.load_input(state.corpus())?.bytes().to_vec();
+    let input = testcase
+        .load_input(state.corpus())?
+        .mutator_bytes()
+        .to_vec();
     drop(testcase);
     if input.len() >= size {
         eprintln!(

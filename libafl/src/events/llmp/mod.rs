@@ -14,11 +14,13 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 
+#[cfg(feature = "share_objectives")]
+use crate::corpus::{Corpus, Testcase};
 use crate::{
     events::{Event, EventFirer},
     fuzzer::EvaluatorObservers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
-    state::NopState,
+    state::{HasCurrentTestcase, HasSolutions, NopState},
     Error,
 };
 
@@ -265,6 +267,7 @@ where
     ) -> Result<(), Error>
     where
         ICB: InputConverter<To = I, From = DI>,
+        S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
@@ -290,6 +293,28 @@ where
                 }
                 Ok(())
             }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { input, .. } => {
+                log::debug!("Received new Objective");
+
+                let Some(converter) = self.converter_back.as_mut() else {
+                    return Ok(());
+                };
+
+                let converted_input = converter.convert(input)?;
+                let mut testcase = Testcase::from(converted_input);
+                testcase.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
+
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
+
+                Ok(())
+            }
             Event::Stop => Ok(()),
             _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
@@ -309,6 +334,7 @@ where
     where
         ICB: InputConverter<To = I, From = DI>,
         DI: DeserializeOwned + Input,
+        S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: EvaluatorObservers<E, EM, I, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
