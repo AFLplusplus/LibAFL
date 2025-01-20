@@ -1,19 +1,20 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <stdio.h>
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-
-  if (Data[0] == 'a') {
-	if (Data[1] == 'b') {
-	  if (Data[2] == 'c') {
-		if (Data[3] == 'd'){
-		  abort();		
-	    }
-	  }
-	}
+  char array[40] = {};
+  char v = *(uint8_t *)Data;
+  v = v + 120;
+  // printf("%d\n", v);
+  array[v] = 0x0;
+  if(v % 2 == 0 ){
+  	array[0] = 1;
   }
-
+  else{
+  	array[0] = 2;
+  }
+	
   return 0;
 }
 

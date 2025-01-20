@@ -42,7 +42,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, Merge, MatchFirstType},
+    tuples::{tuple_list, MatchFirstType, Merge},
     AsSlice,
 };
 use libafl_qemu::{
@@ -50,10 +50,10 @@ use libafl_qemu::{
     filter_qemu_args,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::PredicateFeedback,
-    modules::edges::{StdEdgeCoverageModule, EdgeCoverageFullVariant},
-    modules::utils::filters::{StdAddressFilter, NopPageFilter},
-    modules::{EmulatorModule, EdgeCoverageModule},
+    modules::edges::{PredicateFeedback, Predicates},
+    modules::edges::{EdgeCoverageFullVariant, StdEdgeCoverageModule},
+    modules::utils::filters::{NopPageFilter, StdAddressFilter},
+    modules::{utils::filters::HasAddressFilter, EdgeCoverageModule, EmulatorModule, AsanModule},
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,
@@ -188,6 +188,13 @@ fn fuzz(
         .track_indices()
     };
 
+    let env = std::env::vars()
+    .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
+    .collect::<Vec<(String, String)>>();
+
+    let mut asan = AsanModule::default(&env);
+    asan.use_rca = true;
+
     let modules = tuple_list!(
         StdEdgeCoverageModule::builder()
             .map_observer(edges_observer.as_mut())
@@ -195,11 +202,11 @@ fn fuzz(
             .build()
             .unwrap(),
         CmpLogModule::default(),
-        // QemuAsanHelper::default(asan),
+        asan,
         //QemuSnapshotHelper::new()
     );
 
-    let emulator = Emulator::empty()
+    let mut emulator = Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
         .build()?;
@@ -213,10 +220,10 @@ fn fuzz(
     let cov_filter = StdAddressFilter::allow_list(vec![text_addr]);
 
     // update address filter after qemu has been initialized
-    <EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0> as EmulatorModule<BytesInput, _>>::update_address_filter(emulator.modules_mut()
+    emulator.modules_mut()
             .modules_mut()
             .match_first_type_mut::<EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0>>()
-            .expect("Could not find back the edge module"), qemu, cov_filter);
+            .expect("Could not find back the edge module").update_address_filter(qemu, cov_filter);
 
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
@@ -332,7 +339,7 @@ fn fuzz(
         )
         .unwrap()
     });
-
+    state.add_metadata(Predicates::new());
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
