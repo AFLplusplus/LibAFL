@@ -32,8 +32,8 @@ pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
-pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-use crate::{os::unix_shmem_server::ServedShMem, Error};
+pub use crate::os::unix_shmem_server::{ServedShMem, ServedShMemProvider, ShMemService};
+use crate::Error;
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
