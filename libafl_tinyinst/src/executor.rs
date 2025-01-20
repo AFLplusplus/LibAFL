@@ -29,7 +29,7 @@ pub struct TinyInstExecutor<S, SHM, OT> {
 impl TinyInstExecutor<(), NopShMem, ()> {
     /// Create a builder for [`TinyInstExecutor`]
     #[must_use]
-    pub fn builder<'a>() -> TinyInstExecutorBuilder<'a, NopShMem, NopShMemProvider> {
+    pub fn builder<'a>() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         TinyInstExecutorBuilder::new()
     }
 }
@@ -96,59 +96,52 @@ where
 
 /// Builder for `TinyInstExecutor`
 #[derive(Debug)]
-pub struct TinyInstExecutorBuilder<'a, SHM, SP> {
+pub struct TinyInstExecutorBuilder<'a, SP> {
     tinyinst_args: Vec<String>,
     program_args: Vec<String>,
     timeout: Duration,
     coverage_ptr: *mut Vec<u64>,
     shmem_provider: Option<&'a mut SP>,
-    phantom: PhantomData<SHM>,
 }
 
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
-impl Default for TinyInstExecutorBuilder<'_, NopShMem, NopShMemProvider> {
+impl Default for TinyInstExecutorBuilder<'_, NopShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> TinyInstExecutorBuilder<'a, NopShMem, NopShMemProvider> {
+impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
     /// Constructor
     #[must_use]
-    pub fn new() -> TinyInstExecutorBuilder<'a, NopShMem, NopShMemProvider> {
+    pub fn new() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         Self {
             tinyinst_args: vec![],
             program_args: vec![],
             timeout: Duration::new(3, 0),
             shmem_provider: None,
             coverage_ptr: ptr::null_mut(),
-            phantom: PhantomData,
         }
     }
 
     /// Use this to enable shmem testcase passing.
     #[must_use]
-    pub fn shmem_provider<SHM, SP>(
-        self,
-        shmem_provider: &'a mut SP,
-    ) -> TinyInstExecutorBuilder<'a, SHM, SP> {
+    pub fn shmem_provider<SP>(self, shmem_provider: &'a mut SP) -> TinyInstExecutorBuilder<'a, SP> {
         TinyInstExecutorBuilder {
             tinyinst_args: self.tinyinst_args,
             program_args: self.program_args,
             timeout: self.timeout,
             shmem_provider: Some(shmem_provider),
             coverage_ptr: ptr::null_mut(),
-            phantom: PhantomData,
         }
     }
 }
 
-impl<SHM, SP> TinyInstExecutorBuilder<'_, SHM, SP>
+impl<SP> TinyInstExecutorBuilder<'_, SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    SP: ShMemProvider,
 {
     /// Argument for tinyinst instrumentation
     #[must_use]
@@ -245,7 +238,10 @@ where
     }
 
     /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-    pub fn build<OT, S>(&mut self, observers: OT) -> Result<TinyInstExecutor<S, SHM, OT>, Error> {
+    pub fn build<OT, S>(
+        &mut self,
+        observers: OT,
+    ) -> Result<TinyInstExecutor<S, SP::ShMem, OT>, Error> {
         if self.coverage_ptr.is_null() {
             return Err(Error::illegal_argument("Coverage pointer may not be null."));
         }

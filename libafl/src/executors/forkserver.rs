@@ -648,12 +648,9 @@ where
 impl ForkserverExecutor<(), (), (), UnixShMem, ()> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
-    pub fn builder() -> ForkserverExecutorBuilder<
-        'static,
-        NopTargetBytesConverter<BytesInput>,
-        UnixShMem,
-        UnixShMemProvider,
-    > {
+    pub fn builder(
+    ) -> ForkserverExecutorBuilder<'static, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
+    {
         ForkserverExecutorBuilder::new()
     }
 }
@@ -804,7 +801,7 @@ where
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
 #[expect(clippy::struct_excessive_bools)]
-pub struct ForkserverExecutorBuilder<'a, TC, SHM, SP> {
+pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
@@ -825,10 +822,9 @@ pub struct ForkserverExecutorBuilder<'a, TC, SHM, SP> {
     asan_obs: Option<Handle<AsanBacktraceObserver>>,
     crash_exitcode: Option<i8>,
     target_bytes_converter: TC,
-    phantom: PhantomData<SHM>,
 }
 
-impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SHM, SP>
+impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
@@ -1465,9 +1461,7 @@ where
     }
 }
 
-impl<'a>
-    ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMem, UnixShMemProvider>
-{
+impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
@@ -1475,12 +1469,8 @@ impl<'a>
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
-    pub fn new() -> ForkserverExecutorBuilder<
-        'a,
-        NopTargetBytesConverter<BytesInput>,
-        UnixShMem,
-        UnixShMemProvider,
-    > {
+    pub fn new(
+    ) -> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             program: None,
             arguments: vec![],
@@ -1502,17 +1492,16 @@ impl<'a>
             asan_obs: None,
             crash_exitcode: None,
             target_bytes_converter: NopTargetBytesConverter::new(),
-            phantom: PhantomData,
         }
     }
 }
 
-impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMem, UnixShMemProvider> {
+impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
     /// Shmem provider for forkserver's shared memory testcase feature.
-    pub fn shmem_provider<SHM, SP>(
+    pub fn shmem_provider<SP>(
         self,
         shmem_provider: &'a mut SP,
-    ) -> ForkserverExecutorBuilder<'a, TC, SHM, SP> {
+    ) -> ForkserverExecutorBuilder<'a, TC, SP> {
         ForkserverExecutorBuilder {
             // Set the new provider
             shmem_provider: Some(shmem_provider),
@@ -1536,17 +1525,16 @@ impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMem, UnixShMemProvider> {
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
             target_bytes_converter: self.target_bytes_converter,
-            phantom: PhantomData,
         }
     }
 }
 
-impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SHM, SP> {
+impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn target_bytes_converter<I, TC2: TargetBytesConverter<I>>(
         self,
         target_bytes_converter: TC2,
-    ) -> ForkserverExecutorBuilder<'a, TC2, SHM, SP> {
+    ) -> ForkserverExecutorBuilder<'a, TC2, SP> {
         ForkserverExecutorBuilder {
             // Set the new provider
             shmem_provider: self.shmem_provider,
@@ -1570,18 +1558,12 @@ impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SHM, SP> {
             asan_obs: self.asan_obs,
             crash_exitcode: self.crash_exitcode,
             target_bytes_converter,
-            phantom: PhantomData,
         }
     }
 }
 
 impl Default
-    for ForkserverExecutorBuilder<
-        '_,
-        NopTargetBytesConverter<BytesInput>,
-        UnixShMem,
-        UnixShMemProvider,
-    >
+    for ForkserverExecutorBuilder<'_, NopTargetBytesConverter<BytesInput>, UnixShMemProvider>
 {
     fn default() -> Self {
         Self::new()
@@ -1609,13 +1591,13 @@ where
 
 impl<I, OT, S, SHM, TC> HasTimeout for ForkserverExecutor<I, OT, S, SHM, TC> {
     #[inline]
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.timeout = TimeSpec::from_duration(timeout);
+    fn timeout(&self) -> Duration {
+        self.timeout.into()
     }
 
     #[inline]
-    fn timeout(&self) -> Duration {
-        self.timeout.into()
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = TimeSpec::from_duration(timeout);
     }
 }
 

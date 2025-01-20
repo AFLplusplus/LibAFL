@@ -101,13 +101,17 @@ impl CentralizedEventManagerBuilder {
     }
 
     /// Creates a new [`CentralizedEventManager`].
-    pub fn build_from_client<EM, EMH, I, S, SHM, SP>(
+    #[expect(clippy::type_complexity)]
+    pub fn build_from_client<EM, EMH, I, S, SP>(
         self,
         inner: EM,
         hooks: EMH,
-        client: LlmpClient<SHM, SP>,
+        client: LlmpClient<SP::ShMem, SP>,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error> {
+    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SP::ShMem, SP>, Error>
+    where
+        SP: ShMemProvider,
+    {
         Ok(CentralizedEventManager {
             inner,
             hooks,

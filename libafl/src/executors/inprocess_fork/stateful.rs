@@ -8,7 +8,7 @@ use core::{
 };
 
 use libafl_bolts::{
-    shmem::{ShMem, ShMemProvider},
+    shmem::ShMemProvider,
     tuples::{tuple_list, RefIndexable},
 };
 use nix::unistd::{fork, ForkResult};
@@ -24,15 +24,13 @@ use crate::{
 };
 
 /// The `StatefulInProcessForkExecutor` with no user hooks
-pub type StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SHM, SP, Z> =
-    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, (), I, OT, S, SHM, SP, Z>;
+pub type StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z> =
+    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, (), I, OT, S, SP, Z>;
 
-impl<'a, H, I, OT, S, SHM, SP, ES, EM, Z>
-    StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SHM, SP, Z>
+impl<'a, H, I, OT, S, SP, ES, EM, Z> StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z>
 where
     OT: ObserversTuple<I, S>,
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    SP: ShMemProvider,
 {
     #[expect(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
@@ -61,17 +59,17 @@ where
 }
 
 /// [`StatefulGenericInProcessForkExecutor`] is an executor that forks the current process before each execution. Harness can access some internal state.
-pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SHM, SP, Z> {
+pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z> {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: &'a mut H,
     /// The state used as argument of the harness
     pub exposed_executor_state: ES,
     /// Inner state of the executor
-    pub inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SHM, SP, Z>,
+    pub inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
 }
 
-impl<H, HT, I, OT, S, SHM, SP, ES, EM, Z> Debug
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SHM, SP, Z>
+impl<H, HT, I, OT, S, SP, ES, EM, Z> Debug
+    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
 where
     HT: Debug,
     OT: Debug,
@@ -94,14 +92,13 @@ where
     }
 }
 
-impl<EM, H, HT, I, OT, SHM, S, SP, Z, ES> Executor<EM, I, S, Z>
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SHM, SP, Z>
+impl<EM, H, HT, I, OT, S, SP, Z, ES> Executor<EM, I, S, Z>
+    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
 where
     H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     HT: ExecutorHooksTuple<I, S>,
     S: HasExecutions,
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    SP: ShMemProvider,
     OT: ObserversTuple<I, S>,
 {
     #[inline]
@@ -134,8 +131,8 @@ where
     }
 }
 
-impl<'a, H, HT, I, OT, S, SHM, SP, ES, EM, Z>
-    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SHM, SP, Z>
+impl<'a, H, HT, I, OT, S, SP, ES, EM, Z>
+    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -181,8 +178,8 @@ where
     }
 }
 
-impl<H, HT, I, OT, S, SHM, SP, ES, EM, Z> HasObservers
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SHM, SP, Z>
+impl<H, HT, I, OT, S, SP, ES, EM, Z> HasObservers
+    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
 {
     type Observers = OT;
 

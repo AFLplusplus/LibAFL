@@ -546,7 +546,7 @@ where
 /// This is for centralized, the 4th argument of the closure should mean if this is the main node.
 #[cfg(all(unix, feature = "fork"))]
 #[derive(TypedBuilder)]
-pub struct CentralizedLauncher<'a, CF, MF, MT, SHM, SP> {
+pub struct CentralizedLauncher<'a, CF, MF, MT, SP> {
     /// The `ShmemProvider` to use
     shmem_provider: SP,
     /// The monitor instance to use
@@ -606,11 +606,10 @@ pub struct CentralizedLauncher<'a, CF, MF, MT, SHM, SP> {
     /// Tell the manager to serialize or not the state on restart
     #[builder(default = LlmpShouldSaveState::OnRestart)]
     serialize_state: LlmpShouldSaveState,
-    phantom: PhantomData<SHM>,
 }
 
 #[cfg(all(unix, feature = "fork"))]
-impl<CF, MF, MT, SHM, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SHM, SP> {
+impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
             .field("configuration", &self.configuration)
@@ -629,11 +628,10 @@ impl<CF, MF, MT, SHM, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SHM, SP>
 pub type StdCentralizedInnerMgr<I, S, SHM, SP> = LlmpRestartingEventManager<(), I, S, SHM, SP>;
 
 #[cfg(all(unix, feature = "fork"))]
-impl<CF, MF, MT, SHM, SP> CentralizedLauncher<'_, CF, MF, MT, SHM, SP>
+impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
-    SHM: ShMem + 'static,
-    SP: ShMemProvider<ShMem = SHM> + 'static,
+    SP: ShMemProvider + 'static,
 {
     /// Launch a standard Centralized-based fuzzer
     pub fn launch<I, S>(&mut self) -> Result<(), Error>
@@ -642,19 +640,33 @@ where
         I: DeserializeOwned + Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SHM, SP>, (), I, S, SHM, SP>,
+            CentralizedEventManager<
+                StdCentralizedInnerMgr<I, S, SP::ShMem, SP>,
+                (),
+                I,
+                S,
+                SP::ShMem,
+                SP,
+            >,
             ClientDescription,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SHM, SP>, (), I, S, SHM, SP>,
+            CentralizedEventManager<
+                StdCentralizedInnerMgr<I, S, SP::ShMem, SP>,
+                (),
+                I,
+                S,
+                SP::ShMem,
+                SP,
+            >,
             ClientDescription,
         ) -> Result<(), Error>,
     {
         let restarting_mgr_builder =
             |centralized_launcher: &Self, client_description: ClientDescription| {
                 // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                let builder = RestartingMgr::<(), I, MT, S, SHM, SP>::builder()
+                let builder = RestartingMgr::<(), I, MT, S, SP::ShMem, SP>::builder()
                     .shmem_provider(centralized_launcher.shmem_provider.clone())
                     .broker_port(centralized_launcher.broker_port)
                     .kind(ManagerKind::Client { client_description })
@@ -672,11 +684,10 @@ where
 }
 
 #[cfg(all(unix, feature = "fork"))]
-impl<CF, MF, MT, SHM, SP> CentralizedLauncher<'_, CF, MF, MT, SHM, SP>
+impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
 where
     MT: Monitor + Clone + 'static,
-    SHM: ShMem + 'static,
-    SP: ShMemProvider<ShMem = SHM> + 'static,
+    SP: ShMemProvider + 'static,
 {
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.
@@ -690,13 +701,13 @@ where
         I: Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SHM, SP>,
+            CentralizedEventManager<EM, (), I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMB: FnOnce(&Self, ClientDescription) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SHM, SP>, // No broker_hooks for centralized EM
+            CentralizedEventManager<EM, (), I, S, SP::ShMem, SP>, // No broker_hooks for centralized EM
             ClientDescription,
         ) -> Result<(), Error>,
     {
