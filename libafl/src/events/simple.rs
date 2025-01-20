@@ -354,6 +354,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 impl<I, MT, S, SHM, SP> AwaitRestartSafe for SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     /// Block until we are safe to exit, usually called inside `on_restart`.
     #[inline]
