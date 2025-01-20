@@ -1044,7 +1044,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[derive(TypedBuilder, Debug)]
-pub struct TcpRestartingMgr<EMH, I, MT, S, SHM, SP> {
+pub struct TcpRestartingMgr<EMH, I, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
@@ -1076,11 +1076,11 @@ pub struct TcpRestartingMgr<EMH, I, MT, S, SHM, SP> {
     /// The hooks for `handle_in_client`
     hooks: EMH,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(I, S, SHM)>,
+    phantom_data: PhantomData<(I, S)>,
 }
 
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
-impl<EMH, I, MT, S, SHM, SP> TcpRestartingMgr<EMH, I, MT, S, SHM, SP>
+impl<EMH, I, MT, S, SP> TcpRestartingMgr<EMH, I, MT, S, SP>
 where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     I: Input,
@@ -1092,13 +1092,18 @@ where
         + HasCurrentTestcase<I>
         + DeserializeOwned
         + Stoppable,
-    SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    SP: ShMemProvider,
 {
     /// Launch the restarting manager
     pub fn launch(
         &mut self,
-    ) -> Result<(Option<S>, TcpRestartingEventManager<EMH, I, S, SHM, SP>), Error> {
+    ) -> Result<
+        (
+            Option<S>,
+            TcpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
+        ),
+        Error,
+    > {
         // We start ourself as child process to actually fuzz
         let (staterestorer, _new_shmem_provider, core_id) = if env::var(_ENV_FUZZER_SENDER).is_err()
         {
@@ -1176,7 +1181,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let staterestorer: StateRestorer<SHM, SP> =
+            let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]
