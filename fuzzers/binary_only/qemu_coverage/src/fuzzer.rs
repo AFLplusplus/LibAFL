@@ -9,7 +9,7 @@ use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus},
     events::{
-        launcher::Launcher, ClientDescription, EventConfig, LlmpRestartingEventManager, ManagerExit,
+        launcher::Launcher, ClientDescription, EventConfig, LlmpRestartingEventManager, SendExiting,
     },
     executors::ExitKind,
     fuzzer::StdFuzzer,
