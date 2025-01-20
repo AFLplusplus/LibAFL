@@ -96,7 +96,7 @@ unsafe fn fuzz(
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<_>,
-                          mgr: LlmpRestartingEventManager<_, _, _, _>,
+                          mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
@@ -104,7 +104,7 @@ unsafe fn fuzz(
 
         if options.asan && options.asan_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 
@@ -231,7 +231,7 @@ unsafe fn fuzz(
             })(state, mgr, client_description)
         } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 
@@ -367,7 +367,7 @@ unsafe fn fuzz(
             })(state, mgr, client_description)
         } else {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 

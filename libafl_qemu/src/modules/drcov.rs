@@ -7,6 +7,7 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use serde::{Deserialize, Serialize};
 
+use super::utils::filters::HasAddressFilter;
 #[cfg(feature = "systemmode")]
 use crate::modules::utils::filters::{NopPageFilter, NOP_PAGE_FILTER};
 use crate::{
@@ -264,10 +265,6 @@ where
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    type ModuleAddressFilter = F;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
-
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
@@ -349,6 +346,15 @@ where
     unsafe fn on_timeout(&mut self) {
         self.write();
     }
+}
+
+impl<F> HasAddressFilter for DrCovModule<F>
+where
+    F: AddressFilter,
+{
+    type ModuleAddressFilter = F;
+    #[cfg(feature = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.filter

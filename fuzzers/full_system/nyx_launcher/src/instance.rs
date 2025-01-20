@@ -30,7 +30,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    shmem::StdShMemProvider,
+    shmem::{StdShMem, StdShMemProvider},
     tuples::{tuple_list, Merge},
 };
 use libafl_nyx::{
@@ -44,7 +44,7 @@ pub type ClientState =
     StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 pub type ClientMgr<M> = MonitorTypedEventManager<
-    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMemProvider>,
+    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
     M,
 >;
 

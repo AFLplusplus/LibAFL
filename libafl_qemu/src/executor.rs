@@ -48,7 +48,7 @@ use crate::{
 };
 
 type EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> =
-    StatefulInProcessExecutor<'a, H, I, OT, S, Emulator<C, CM, ED, ET, I, S, SM>>;
+    StatefulInProcessExecutor<'a, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S>;
 
 pub struct QemuExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> {
     inner: EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM>,
@@ -212,7 +212,7 @@ where
         }
 
         inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
-            StatefulInProcessExecutor<'a, H, I, OT, S, Emulator<C, CM, ED, ET, I, S, SM>>,
+            StatefulInProcessExecutor<'a, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S>,
             EM,
             ET,
             I,
@@ -308,9 +308,10 @@ where
 }
 
 pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> =
-    StatefulInProcessForkExecutor<'a, H, I, OT, S, SP, Emulator<C, CM, ED, ET, I, S, SM>, EM, Z>;
+    StatefulInProcessForkExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, SP, Z>;
 
 #[cfg(feature = "fork")]
+#[expect(clippy::type_complexity)]
 pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
     inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>,
 }
@@ -322,12 +323,13 @@ where
     C: Debug,
     CM: Debug,
     ED: Debug,
+    EM: Debug,
     ET: EmulatorModuleTuple<I, S> + Debug,
     OT: ObserversTuple<I, S> + Debug,
     I: Debug,
     S: Debug,
     SM: Debug,
-    SP: ShMemProvider,
+    SP: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuForkExecutor")
@@ -446,7 +448,6 @@ impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> HasObservers
 where
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    SP: ShMemProvider,
 {
     type Observers = OT;
     #[inline]

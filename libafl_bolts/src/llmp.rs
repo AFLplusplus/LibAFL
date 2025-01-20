@@ -707,25 +707,23 @@ impl LlmpMsg {
 
 /// An Llmp instance
 #[derive(Debug)]
-pub enum LlmpConnection<HT, SP>
-where
-    SP: ShMemProvider,
-{
+pub enum LlmpConnection<HT, SHM, SP> {
     /// A broker and a thread using this tcp background thread
     IsBroker {
         /// The [`LlmpBroker`] of this [`LlmpConnection`].
-        broker: LlmpBroker<HT, SP>,
+        broker: LlmpBroker<HT, SHM, SP>,
     },
     /// A client, connected to the port
     IsClient {
         /// The [`LlmpClient`] of this [`LlmpConnection`].
-        client: LlmpClient<SP>,
+        client: LlmpClient<SHM, SP>,
     },
 }
 
-impl<SP> LlmpConnection<(), SP>
+impl<SHM, SP> LlmpConnection<(), SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
@@ -776,10 +774,11 @@ where
     }
 }
 
-impl<MT, SP> LlmpConnection<MT, SP>
+impl<MT, SHM, SP> LlmpConnection<MT, SHM, SP>
 where
-    MT: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    MT: LlmpHookTuple<SHM, SP>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Describe this in a reproducible fashion, if it's a client
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
@@ -793,7 +792,7 @@ where
     pub fn existing_client_from_description(
         shmem_provider: SP,
         description: &LlmpClientDescription,
-    ) -> Result<LlmpConnection<MT, SP>, Error> {
+    ) -> Result<LlmpConnection<MT, SHM, SP>, Error> {
         Ok(LlmpConnection::IsClient {
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
         })
@@ -891,23 +890,20 @@ struct LlmpClientExitInfo {
 
 /// Sending end on a (unidirectional) sharedmap channel
 #[derive(Debug)]
-pub struct LlmpSender<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpSender<SHM, SP> {
     /// ID of this sender.
     id: ClientId,
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
     last_msg_sent: *const LlmpMsg,
     /// A vec of page wrappers, each containing an initialized [`ShMem`]
-    out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
+    out_shmems: Vec<LlmpSharedMap<SHM>>,
     /// A vec of pages that we previously used, but that have served its purpose
     /// (no potential receivers are left).
     /// Instead of freeing them, we keep them around to potentially reuse them later,
     /// if they are still large enough.
     /// This way, the OS doesn't have to spend time zeroing pages, and getting rid of our old pages
-    unused_shmem_cache: Vec<LlmpSharedMap<SP::ShMem>>,
+    unused_shmem_cache: Vec<LlmpSharedMap<SHM>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
     /// By keeping the message history around,
@@ -920,9 +916,10 @@ where
 }
 
 /// An actor on the sending part of the shared map
-impl<SP> LlmpSender<SP>
+impl<SHM, SP> LlmpSender<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create a new [`LlmpSender`] using a given [`ShMemProvider`], and `id`.
     /// If `keep_pages_forever` is `true`, `ShMem` will never be freed.
@@ -1068,7 +1065,7 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_shmem(
         shmem_provider: SP,
-        current_out_shmem: SP::ShMem,
+        current_out_shmem: SHM,
         last_msg_sent_offset: Option<u64>,
     ) -> Result<Self, Error> {
         let mut out_shmem = LlmpSharedMap::existing(current_out_shmem);
@@ -1307,7 +1304,7 @@ where
         &mut self,
         sender_id: ClientId,
         next_min_shmem_size: usize,
-    ) -> Result<LlmpSharedMap<<SP>::ShMem>, Error> {
+    ) -> Result<LlmpSharedMap<SHM>, Error> {
         // Find a shared map that has been released to reuse, from which all receivers left / finished reading.
         let cached_shmem = self
             .unused_shmem_cache
@@ -1586,10 +1583,7 @@ where
 
 /// Receiving end on a (unidirectional) sharedmap channel
 #[derive(Debug)]
-pub struct LlmpReceiver<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpReceiver<SHM, SP> {
     /// Client Id of this receiver
     id: ClientId,
     /// Pointer to the last message received
@@ -1600,15 +1594,16 @@ where
     /// The shmem provider
     shmem_provider: SP,
     /// current page. After EOP, this gets replaced with the new one
-    current_recv_shmem: LlmpSharedMap<SP::ShMem>,
+    current_recv_shmem: LlmpSharedMap<SHM>,
     /// Caches the highest msg id we've seen so far
     highest_msg_id: MessageId,
 }
 
 /// Receiving end of an llmp channel
-impl<SP> LlmpReceiver<SP>
+impl<SHM, SP> LlmpReceiver<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reattach to a vacant `recv_shmem`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
@@ -1634,7 +1629,7 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_shmem(
         shmem_provider: SP,
-        current_sender_shmem: SP::ShMem,
+        current_sender_shmem: SHM,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
         let mut current_recv_shmem = LlmpSharedMap::existing(current_sender_shmem);
@@ -1897,10 +1892,7 @@ where
 
 /// A page wrapper
 #[derive(Clone, Debug)]
-pub struct LlmpSharedMap<SHM>
-where
-    SHM: ShMem,
-{
+pub struct LlmpSharedMap<SHM> {
     /// Shmem containg the actual (unsafe) page,
     /// shared between one `LlmpSender` and one `LlmpReceiver`
     shmem: SHM,
@@ -2050,18 +2042,15 @@ where
 
 /// The inner state of [`LlmpBroker`]
 #[derive(Debug)]
-pub struct LlmpBrokerInner<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpBrokerInner<SHM, SP> {
     /// Broadcast map from broker to all clients
-    llmp_out: LlmpSender<SP>,
+    llmp_out: LlmpSender<SHM, SP>,
     /// Users of Llmp can add message handlers in the broker.
     /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     /// The backing values of `llmp_clients` [`ClientId`]s will always be sorted (but not gapless)
     /// Make sure to always increase `num_clients_seen` when pushing a new [`LlmpReceiver`] to  `llmp_clients`!
-    llmp_clients: Vec<LlmpReceiver<SP>>,
+    llmp_clients: Vec<LlmpReceiver<SHM, SP>>,
     /// The own listeners we spawned via `launch_listener` or `crate_attach_to_tcp`.
     /// Listeners will be ignored for `exit_cleanly_after` and they are never considered to have timed out.
     listeners: Vec<ClientId>,
@@ -2078,12 +2067,9 @@ where
 
 /// The broker (node 0)
 #[derive(Debug)]
-pub struct LlmpBroker<HT, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpBroker<HT, SHM, SP> {
     /// The broker
-    inner: LlmpBrokerInner<SP>,
+    inner: LlmpBrokerInner<SHM, SP>,
     /// Llmp hooks
     hooks: HT,
 }
@@ -2118,10 +2104,11 @@ pub trait Broker {
     fn nb_listeners(&self) -> usize;
 }
 
-impl<HT, SP> Broker for LlmpBroker<HT, SP>
+impl<HT, SHM, SP> Broker for LlmpBroker<HT, SHM, SP>
 where
-    HT: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    HT: LlmpHookTuple<SHM, SP>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn is_shutting_down(&self) -> bool {
         self.inner.is_shutting_down()
@@ -2215,15 +2202,12 @@ impl CtrlHandler for LlmpShutdownSignalHandler {
 }
 
 /// Llmp hooks
-pub trait LlmpHook<SP>
-where
-    SP: ShMemProvider,
-{
+pub trait LlmpHook<SHM, SP> {
     /// Hook called whenever a new message is received. It receives an llmp message as input, does
     /// something with it (read, transform, forward, etc...) and decides to discard it or not.
     fn on_new_message(
         &mut self,
-        broker_inner: &mut LlmpBrokerInner<SP>,
+        broker_inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -2238,14 +2222,11 @@ where
 }
 
 /// A tuple of Llmp hooks. They are evaluated sequentially, and returns if one decides to filter out the evaluated message.
-pub trait LlmpHookTuple<SP>
-where
-    SP: ShMemProvider,
-{
+pub trait LlmpHookTuple<SHM, SP> {
     /// Call all hook callbacks on new message.
     fn on_new_message_all(
         &mut self,
-        inner: &mut LlmpBrokerInner<SP>,
+        inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -2257,13 +2238,10 @@ where
     fn on_timeout_all(&mut self) -> Result<(), Error>;
 }
 
-impl<SP> LlmpHookTuple<SP> for ()
-where
-    SP: ShMemProvider,
-{
+impl<SHM, SP> LlmpHookTuple<SHM, SP> for () {
     fn on_new_message_all(
         &mut self,
-        _inner: &mut LlmpBrokerInner<SP>,
+        _inner: &mut LlmpBrokerInner<SHM, SP>,
         _client_id: ClientId,
         _msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
@@ -2278,15 +2256,14 @@ where
     }
 }
 
-impl<Head, Tail, SP> LlmpHookTuple<SP> for (Head, Tail)
+impl<Head, Tail, SHM, SP> LlmpHookTuple<SHM, SP> for (Head, Tail)
 where
-    Head: LlmpHook<SP>,
-    Tail: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    Head: LlmpHook<SHM, SP>,
+    Tail: LlmpHookTuple<SHM, SP>,
 {
     fn on_new_message_all(
         &mut self,
-        inner: &mut LlmpBrokerInner<SP>,
+        inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -2315,15 +2292,12 @@ where
     }
 }
 
-impl<SP> LlmpBroker<(), SP>
-where
-    SP: ShMemProvider,
-{
+impl<SHM, SP> LlmpBroker<(), SHM, SP> {
     /// Add hooks to a hookless [`LlmpBroker`].
     /// We do not support replacing hooks for now.
-    pub fn add_hooks<HT>(self, hooks: HT) -> LlmpBroker<HT, SP>
+    pub fn add_hooks<HT>(self, hooks: HT) -> LlmpBroker<HT, SHM, SP>
     where
-        HT: LlmpHookTuple<SP>,
+        HT: LlmpHookTuple<SHM, SP>,
     {
         LlmpBroker {
             inner: self.inner,
@@ -2446,10 +2420,11 @@ impl Brokers {
     }
 }
 
-impl<HT, SP> LlmpBroker<HT, SP>
+impl<HT, SHM, SP> LlmpBroker<HT, SHM, SP>
 where
-    HT: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    HT: LlmpHookTuple<SHM, SP>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create and initialize a new [`LlmpBroker`], associated with some hooks.
     pub fn new(shmem_provider: SP, hooks: HT) -> Result<Self, Error> {
@@ -2496,12 +2471,12 @@ where
     }
 
     /// Get the inner state of the broker
-    pub fn inner(&self) -> &LlmpBrokerInner<SP> {
+    pub fn inner(&self) -> &LlmpBrokerInner<SHM, SP> {
         &self.inner
     }
 
     /// Get the inner mutable state of the broker
-    pub fn inner_mut(&mut self) -> &mut LlmpBrokerInner<SP> {
+    pub fn inner_mut(&mut self) -> &mut LlmpBrokerInner<SHM, SP> {
         &mut self.inner
     }
 
@@ -2829,9 +2804,10 @@ where
 
 /// The broker forwards all messages to its own bus-like broadcast map.
 /// It may intercept messages passing through.
-impl<SP> LlmpBrokerInner<SP>
+impl<SHM, SP> LlmpBrokerInner<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create and initialize a new [`LlmpBrokerInner`], associated with some hooks.
     pub fn new(shmem_provider: SP) -> Result<Self, Error> {
@@ -2917,7 +2893,7 @@ where
     /// Will increase `num_clients_seen`.
     /// The backing values of `llmp_clients` [`ClientId`]s will always be sorted (but not gapless)
     /// returns the [`ClientId`] of the new client.
-    pub fn add_client(&mut self, mut client_receiver: LlmpReceiver<SP>) -> ClientId {
+    pub fn add_client(&mut self, mut client_receiver: LlmpReceiver<SHM, SP>) -> ClientId {
         let id = self.peek_next_client_id();
         client_receiver.id = id;
         self.llmp_clients.push(client_receiver);
@@ -2932,7 +2908,7 @@ where
 
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in [`broker.client_shmem`]
-    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) -> ClientId {
+    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SHM>) -> ClientId {
         // Tell the client it may unmap its initial allocated shmem page now.
         // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
         client_page.mark_safe_to_unmap();
@@ -3090,7 +3066,7 @@ where
     /// Upon receiving this message, the broker should map the announced page and start tracking it for new messages.
     #[cfg(feature = "std")]
     fn announce_new_client(
-        sender: &mut LlmpSender<SP>,
+        sender: &mut LlmpSender<SHM, SP>,
         shmem_description: &ShMemDescription,
     ) -> Result<(), Error> {
         unsafe {
@@ -3108,7 +3084,7 @@ where
 
     /// Tell the broker to disconnect this client from it.
     #[cfg(feature = "std")]
-    fn announce_client_exit(sender: &mut LlmpSender<SP>, client_id: u32) -> Result<(), Error> {
+    fn announce_client_exit(sender: &mut LlmpSender<SHM, SP>, client_id: u32) -> Result<(), Error> {
         // # Safety
         // No user-provided potentially unsafe parameters.
         unsafe {
@@ -3280,7 +3256,7 @@ where
         mut stream: TcpStream,
         request: &TcpRequest,
         current_client_id: &mut ClientId,
-        sender: &mut LlmpSender<SP>,
+        sender: &mut LlmpSender<SHM, SP>,
         broker_shmem_description: &ShMemDescription,
     ) {
         match request {
@@ -3451,21 +3427,19 @@ pub struct LlmpClientDescription {
 
 /// Client side of LLMP
 #[derive(Debug)]
-pub struct LlmpClient<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpClient<SHM, SP> {
     /// Outgoing channel to the broker
-    sender: LlmpSender<SP>,
+    sender: LlmpSender<SHM, SP>,
     /// Incoming (broker) broadcast map
-    receiver: LlmpReceiver<SP>,
+    receiver: LlmpReceiver<SHM, SP>,
 }
 
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
 /// and get incoming messages from the shared broker bus
-impl<SP> LlmpClient<SP>
+impl<SHM, SP> LlmpClient<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reattach to a vacant client map.
     /// It is essential, that the broker (or someone else) kept a pointer to the `out_shmem`
@@ -3473,9 +3447,9 @@ where
     #[allow(clippy::needless_pass_by_value)] // no longer necessary on nightly
     pub fn on_existing_shmem(
         shmem_provider: SP,
-        _current_out_shmem: SP::ShMem,
+        _current_out_shmem: SHM,
         _last_msg_sent_offset: Option<u64>,
-        current_broker_shmem: SP::ShMem,
+        current_broker_shmem: SHM,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -3542,25 +3516,25 @@ where
 
     /// Outgoing channel to the broker
     #[must_use]
-    pub fn sender(&self) -> &LlmpSender<SP> {
+    pub fn sender(&self) -> &LlmpSender<SHM, SP> {
         &self.sender
     }
 
     /// Outgoing channel to the broker (mut)
     #[must_use]
-    pub fn sender_mut(&mut self) -> &mut LlmpSender<SP> {
+    pub fn sender_mut(&mut self) -> &mut LlmpSender<SHM, SP> {
         &mut self.sender
     }
 
     /// Incoming (broker) broadcast map
     #[must_use]
-    pub fn receiver(&self) -> &LlmpReceiver<SP> {
+    pub fn receiver(&self) -> &LlmpReceiver<SHM, SP> {
         &self.receiver
     }
 
     /// Incoming (broker) broadcast map (mut)
     #[must_use]
-    pub fn receiver_mut(&mut self) -> &mut LlmpReceiver<SP> {
+    pub fn receiver_mut(&mut self) -> &mut LlmpReceiver<SHM, SP> {
         &mut self.receiver
     }
 
@@ -3588,7 +3562,7 @@ where
     /// Creates a new [`LlmpClient`]
     pub fn new(
         mut shmem_provider: SP,
-        initial_broker_shmem: LlmpSharedMap<SP::ShMem>,
+        initial_broker_shmem: LlmpSharedMap<SHM>,
         sender_id: ClientId,
     ) -> Result<Self, Error> {
         Ok(Self {

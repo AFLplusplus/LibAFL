@@ -7,7 +7,7 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{ClientDescription, EventRestarter, NopEventManager},
+    events::{ClientDescription, EventRestarter},
     executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -27,10 +27,10 @@ use libafl::{
         ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState},
-    Error, HasMetadata, NopFuzzer,
+    Error, HasMetadata,
 };
 #[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::StdShMemProvider;
+use libafl_bolts::shmem::{StdShMem, StdShMemProvider};
 use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
@@ -41,8 +41,8 @@ use libafl_qemu::{
     modules::{
         cmplog::CmpLogObserver,
         edges::EdgeCoverageFullVariant,
-        utils::filters::{NopPageFilter, StdAddressFilter},
-        EdgeCoverageModule, EmulatorModule, EmulatorModuleTuple, StdEdgeCoverageModule,
+        utils::filters::{HasAddressFilter, NopPageFilter, StdAddressFilter},
+        EdgeCoverageModule, EmulatorModuleTuple, StdEdgeCoverageModule,
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
@@ -58,7 +58,7 @@ pub type ClientState =
 pub type ClientMgr<M> = SimpleEventManager<BytesInput, M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
 pub type ClientMgr<M> = MonitorTypedEventManager<
-    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMemProvider>,
+    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
     M,
 >;
 
@@ -140,10 +140,10 @@ impl<M: Monitor> Instance<'_, M> {
         let qemu = emulator.qemu();
 
         // update address filter after qemu has been initialized
-        <EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0> as EmulatorModule<BytesInput, ClientState>>::update_address_filter(emulator.modules_mut()
+        emulator.modules_mut()
             .modules_mut()
             .match_first_type_mut::<EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0>>()
-            .expect("Could not find back the edge module"), qemu, self.coverage_filter(qemu)?);
+            .expect("Could not find back the edge module").update_address_filter(qemu, self.coverage_filter(qemu)?);
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

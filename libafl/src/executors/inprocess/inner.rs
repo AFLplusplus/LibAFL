@@ -74,6 +74,7 @@ where
     /// # Safety
     /// This function sets a bunch of raw pointers in global variables, reused in other parts of
     /// the code.
+    // TODO: Remove EM and Z from function bound and add it to struct instead to avoid possible type confusion
     #[inline]
     pub unsafe fn enter_target<EM, Z>(
         &mut self,

@@ -119,7 +119,7 @@ impl ForkserverBytesCoverageSugar<'_> {
         let time_ref = time_observer.handle();
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                               _core_id| {
             let time_observer = time_observer.clone();
 

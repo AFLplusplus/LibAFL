@@ -13,8 +13,8 @@ use rangemap::RangeMap;
 
 use crate::{
     modules::{
-        calls::FullBacktraceCollector, edges::Predicates, snapshot::SnapshotModule, EmulatorModule,
-        EmulatorModuleTuple,
+        calls::FullBacktraceCollector, snapshot::SnapshotModule, utils::filters::HasAddressFilter,
+        EmulatorModule, EmulatorModuleTuple, edges::Predicates,
     },
     qemu::MemAccessInfo,
     sys::TCGTemp,
@@ -667,7 +667,7 @@ pub struct AsanModule {
     empty: bool,
     rt: Pin<Box<AsanGiovese>>,
     filter: StdAddressFilter,
-    use_rca: bool,
+    pub use_rca: bool,
 }
 
 impl AsanModule {
@@ -824,7 +824,6 @@ where
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
     fn pre_qemu_init<ET>(
@@ -965,7 +964,10 @@ where
             *exit_kind = ExitKind::Crash;
         }
     }
+}
 
+impl HasAddressFilter for AsanModule {
+    type ModuleAddressFilter = StdAddressFilter;
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.filter
     }
@@ -1058,6 +1060,7 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
                 unreachable!("Impossible. else you coded it wrong.")
             }
         };
+        println!("AA");
     }
 
     h.read::<N>(qemu, id as GuestAddr, addr);

@@ -208,7 +208,6 @@ impl<CF, MT, SP> Debug for Launcher<'_, CF, MT, SP> {
 impl<CF, MT, SP> Launcher<'_, CF, MT, SP>
 where
     MT: Monitor + Clone,
-    SP: ShMemProvider,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(any(windows, not(feature = "fork"), all(unix, feature = "fork")))]
@@ -216,11 +215,12 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<(), I, S, SP>,
+            LlmpRestartingEventManager<(), I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         I: DeserializeOwned,
         S: DeserializeOwned + Serialize,
+        SP: ShMemProvider,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
@@ -240,7 +240,7 @@ where
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, I, S, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
     {
@@ -385,7 +385,7 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, I, S, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
@@ -620,7 +620,7 @@ impl<CF, MF, MT, SP> Debug for CentralizedLauncher<'_, CF, MF, MT, SP> {
 }
 
 /// The standard inner manager of centralized
-pub type StdCentralizedInnerMgr<I, S, SP> = LlmpRestartingEventManager<(), I, S, SP>;
+pub type StdCentralizedInnerMgr<I, S, SHM, SP> = LlmpRestartingEventManager<(), I, S, SHM, SP>;
 
 #[cfg(all(unix, feature = "fork"))]
 impl<CF, MF, MT, SP> CentralizedLauncher<'_, CF, MF, MT, SP>
@@ -635,12 +635,26 @@ where
         I: DeserializeOwned + Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SP>, (), I, S, SP>,
+            CentralizedEventManager<
+                StdCentralizedInnerMgr<I, S, SP::ShMem, SP>,
+                (),
+                I,
+                S,
+                SP::ShMem,
+                SP,
+            >,
             ClientDescription,
         ) -> Result<(), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<StdCentralizedInnerMgr<I, S, SP>, (), I, S, SP>,
+            CentralizedEventManager<
+                StdCentralizedInnerMgr<I, S, SP::ShMem, SP>,
+                (),
+                I,
+                S,
+                SP::ShMem,
+                SP,
+            >,
             ClientDescription,
         ) -> Result<(), Error>,
     {
@@ -682,13 +696,13 @@ where
         I: Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SP>,
+            CentralizedEventManager<EM, (), I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMB: FnOnce(&Self, ClientDescription) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SP>, // No broker_hooks for centralized EM
+            CentralizedEventManager<EM, (), I, S, SP::ShMem, SP>, // No broker_hooks for centralized EM
             ClientDescription,
         ) -> Result<(), Error>,
     {

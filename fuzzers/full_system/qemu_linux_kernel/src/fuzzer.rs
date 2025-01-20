@@ -40,8 +40,8 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
-        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
-        EmulatorModuleTuple,
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
+        utils::filters::HasAddressFilterTuples, CmpLogModule, EmulatorModuleTuple,
     },
     FastSnapshotManager, NopSnapshotManager, QemuInitError,
 };
@@ -78,7 +78,7 @@ fn get_emulator<C, ET, I, S>(
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: HasExecutions + Unpin,
 {
