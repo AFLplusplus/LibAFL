@@ -38,7 +38,7 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use super::{std_maybe_report_progress, std_report_progress, SendExiting};
+use super::{std_maybe_report_progress, std_report_progress, AwaitRestartSafe, SendExiting};
 #[cfg(feature = "share_objectives")]
 use crate::corpus::{Corpus, Testcase};
 #[cfg(all(unix, not(miri)))]
@@ -776,7 +776,7 @@ where
     }
 }
 
-impl<EMH, I, S> SendExiting for TcpEventManager<EMH, I, S> {
+impl<EMH, I, S> AwaitRestartSafe for TcpEventManager<EMH, I, S> {
     /// The TCP client needs to wait until a broker has mapped all pages before shutting down.
     /// Otherwise, the OS may already have removed the shared maps.
     fn await_restart_safe(&mut self) {

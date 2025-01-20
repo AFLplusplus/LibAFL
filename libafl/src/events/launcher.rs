@@ -385,7 +385,7 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, I, SP::ShMem, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
