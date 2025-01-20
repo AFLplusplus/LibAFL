@@ -179,8 +179,11 @@ pub struct StreamObserver<T> {
 }
 
 /// Marker traits to distinguish between stdout and stderr
-pub struct StdOut;
-pub struct StdErr;
+#[derive(Debug)]
+struct StdOut;
+/// Marker traits to distinguish between stdout and stderr
+#[derive(Debug)]
+struct StdErr;
 
 impl<T> StreamObserver<T> {
     /// Create a new StreamObserver with the given name.
@@ -217,8 +220,9 @@ impl<I, S, T> Observer<I, S> for StreamObserver<T> {
     }
 }
 
-// Type aliases for convenience
+/// An observer that captures stdout of a target.
 pub type StdOutObserver = StreamObserver<StdOut>;
+/// An observer that captures stderr of a target.
 pub type StdErrObserver = StreamObserver<StdErr>;
 
 // Extension traits for specific stream types
