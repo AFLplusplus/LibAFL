@@ -44,7 +44,10 @@ pub type StdShMem = Win32ShMem;
 
 /// The standard sharedmem
 #[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMem = unix_shmem::ashmem::AshmemShMem;
+pub type StdShMem = RcShMem<
+    ServedShMem<unix_shmem::ashmem::AshmemShMem>,
+    ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>,
+>;
 
 /// The standard sharedmem provider
 #[cfg(all(target_os = "android", feature = "std"))]
@@ -1225,7 +1228,7 @@ pub mod unix_shmem {
                     //return Err(Error::unknown("Failed to set the ashmem mapping's name".to_string()));
                     //};
 
-                    #[expect(trivial_numeric_casts)]
+                    #[allow(trivial_numeric_casts)]
                     if ioctl(fd, ASHMEM_SET_SIZE as _, map_size) != 0 {
                         close(fd);
                         return Err(Error::unknown(
@@ -1260,7 +1263,8 @@ pub mod unix_shmem {
             pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
-                    #[expect(trivial_numeric_casts, clippy::cast_sign_loss)]
+                    #[allow(trivial_numeric_casts)]
+                    #[expect(clippy::cast_sign_loss)]
                     if ioctl(fd, ASHMEM_GET_SIZE as _) as u32 as usize != map_size {
                         return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
@@ -1313,12 +1317,12 @@ pub mod unix_shmem {
 
         /// [`Drop`] implementation for [`AshmemShMem`], which cleans up the mapping.
         impl Drop for AshmemShMem {
-            #[expect(trivial_numeric_casts)]
+            #[allow(trivial_numeric_casts)]
             fn drop(&mut self) {
                 unsafe {
                     let fd: i32 = self.id.to_string().parse().unwrap();
 
-                    #[expect(trivial_numeric_casts)]
+                    #[allow(trivial_numeric_casts)]
                     #[expect(clippy::cast_sign_loss)]
                     let length = ioctl(fd, ASHMEM_GET_SIZE as _) as u32;
 
