@@ -225,22 +225,25 @@ pub type StdOutObserver = StreamObserver<StdOutMarker>;
 /// An observer that captures stderr of a target.
 pub type StdErrObserver = StreamObserver<StdErrMarker>;
 
-// Extension traits for specific stream types
+/// Extension traits for stdout stream
 pub trait HasStdOut {
+    /// React to stdout
     fn observe_stdout(&mut self, stdout: &[u8]);
 }
 
+/// Extension traits for stderr stream
 pub trait HasStdErr {
+    /// React to stderr
     fn observe_stderr(&mut self, stderr: &[u8]);
 }
 
-impl HasStdOut for StreamObserver<StdOut> {
+impl HasStdOut for StreamObserver<StdOutMarker> {
     fn observe_stdout(&mut self, stdout: &[u8]) {
         self.observe(stdout);
     }
 }
 
-impl HasStdErr for StreamObserver<StdErr> {
+impl HasStdErr for StreamObserver<StdErrMarker> {
     fn observe_stderr(&mut self, stderr: &[u8]) {
         self.observe(stderr);
     }
