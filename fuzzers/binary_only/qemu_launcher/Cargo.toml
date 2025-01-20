@@ -42,6 +42,7 @@ vergen-git2 = "1.0.1"
 
 [dependencies]
 clap = { version = "4.5.18", features = ["derive", "string"] }
+env_logger = { version = "0.11.5" }
 libafl = { path = "../../../libafl", features = ["tui_monitor"] }
 libafl_bolts = { path = "../../../libafl_bolts", features = [
   "errors_backtrace",
