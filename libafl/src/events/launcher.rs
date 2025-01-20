@@ -385,7 +385,7 @@ where
     where
         CF: FnOnce(
             Option<S>,
-            LlmpRestartingEventManager<EMH, I, S, SHM, SP>,
+            LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMH: EventManagerHooksTuple<I, S> + Clone + Copy,
@@ -401,7 +401,7 @@ where
                 let client_description = ClientDescription::from_safe_string(&core_conf);
                 // the actual client. do the fuzzing
 
-                let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
+                let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -502,7 +502,7 @@ where
         if self.spawn_broker {
             log::info!("I am broker!!.");
 
-            let builder = RestartingMgr::<EMH, I, MT, S, SHM, SP>::builder()
+            let builder = RestartingMgr::<EMH, I, MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
