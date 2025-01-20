@@ -564,11 +564,9 @@ pub trait EventRestarter<S> {
 
 /// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
 /// constraints
-pub fn std_on_restart<S>(
-    restarter: &mut (impl EventRestarter<S> + ManagerExit),
-    state: &mut S,
-) -> Result<(), Error>
+pub fn std_on_restart<EM, S>(restarter: &mut EM, state: &mut S) -> Result<(), Error>
 where
+    EM: EventRestarter<S> + AwaitRestartSafe,
     S: HasCurrentStageId,
 {
     state.on_restart()?;
@@ -582,11 +580,15 @@ pub trait CanSerializeObserver<OT> {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>;
 }
 
-/// Routines called before exiting
+/// Send that we're about to exit
 pub trait ManagerExit {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error>;
+}
+
+/// Wait until it's safe to restart
+pub trait AwaitRestartSafe {
     /// Block until we are safe to exit, usually called inside `on_restart`.
     fn await_restart_safe(&mut self);
 }
@@ -646,6 +648,9 @@ impl ManagerExit for NopEventManager {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
+}
+
+impl AwaitRestartSafe for NopEventManager {
     /// Block until we are safe to exit, usually called inside `on_restart`.
     fn await_restart_safe(&mut self) {}
 }
@@ -769,7 +774,12 @@ where
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.inner.send_exiting()
     }
+}
 
+impl<EM, M> AwaitRestartSafe for MonitorTypedEventManager<EM, M>
+where
+    EM: AwaitRestartSafe,
+{
     #[inline]
     fn await_restart_safe(&mut self) {
         self.inner.await_restart_safe();

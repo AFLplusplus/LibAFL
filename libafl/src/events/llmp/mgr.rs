@@ -18,7 +18,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     current_time,
     llmp::{LlmpClient, LlmpClientDescription, LLMP_FLAG_FROM_MM},
-    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
+    shmem::{NopShMem, ShMem, ShMemProvider},
     tuples::Handle,
     ClientId,
 };
@@ -38,18 +38,18 @@ use crate::events::{serialize_observers_adaptive, CanSerializeObserver};
 use crate::{
     events::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        std_maybe_report_progress, std_on_restart, std_report_progress, AdaptiveSerializer, Event,
-        EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
+        std_maybe_report_progress, std_on_restart, std_report_progress, AdaptiveSerializer,
+        AwaitRestartSafe, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, ManagerExit, ProgressReporter,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, NopInput},
+    inputs::Input,
     observers::TimeObserver,
     stages::HasCurrentStageId,
     state::{
         HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        MaybeHasClientPerfMonitor, NopState, Stoppable,
+        MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -62,7 +62,6 @@ const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
 pub struct LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     /// We only send 1 testcase for every `throttle` second
     pub(crate) throttle: Option<Duration>,
@@ -82,11 +81,11 @@ where
     serializations_cnt: usize,
     should_serialize_cnt: usize,
     pub(crate) time_ref: Option<Handle<TimeObserver>>,
-    phantom: PhantomData<(I, S)>,
     event_buffer: Vec<u8>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl LlmpEventManager<(), NopState<NopInput>, NopInput, NopShMem, NopShMemProvider> {
+impl LlmpEventManager<(), (), (), NopShMem, ()> {
     /// Creates a builder for [`LlmpEventManager`]
     #[must_use]
     pub fn builder() -> LlmpEventManagerBuilder<()> {
@@ -143,7 +142,6 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
-        SP: ShMemProvider<ShMem = SHM>,
     {
         Ok(LlmpEventManager {
             throttle: self.throttle,
@@ -158,8 +156,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             serializations_cnt: 0,
             should_serialize_cnt: 0,
             time_ref,
-            phantom: PhantomData,
             event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
+            phantom: PhantomData,
         })
     }
 
@@ -174,8 +172,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
+        SHM: ShMem,
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Self::build_from_client(self, llmp, configuration, time_ref)
@@ -192,8 +190,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
         time_ref: Option<Handle<TimeObserver>>,
     ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
+        SHM: ShMem,
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Self::build_from_client(self, llmp, configuration, time_ref)
@@ -217,11 +215,10 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
 }
 
 #[cfg(feature = "std")]
-impl<EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, OT, SHM, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    OT: Serialize + MatchNameRef,
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    OT: Serialize + MatchNameRef,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
         serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)
@@ -231,7 +228,6 @@ where
 impl<EMH, I, S, SHM, SP> AdaptiveSerializer for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     fn serialization_time(&self) -> Duration {
         self.serialization_time
@@ -264,10 +260,9 @@ where
     }
 }
 
-impl<EMH, I, S, SHM, SP> Debug for LlmpEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM: Debug, SP: Debug> Debug for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventManager");
@@ -277,7 +272,6 @@ where
         let debug = debug.field("compressor", &self.compressor);
         debug
             .field("configuration", &self.configuration)
-            .field("phantom", &self.phantom)
             .finish_non_exhaustive()
     }
 }
@@ -285,7 +279,6 @@ where
 impl<EMH, I, S, SHM, SP> Drop for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -296,7 +289,6 @@ where
 impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Calling this function will tell the llmp broker that this client is exiting
     /// This should be called from the restarter not from the actual fuzzer client
@@ -330,7 +322,12 @@ where
         log::debug!("Asking he broker to be disconnected");
         Ok(())
     }
+}
 
+impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
     /// Describe the client event manager's LLMP parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         self.llmp.describe()
@@ -347,7 +344,6 @@ where
 impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     // Handle arriving events in the client
     fn handle_in_client<E, Z>(
@@ -436,8 +432,8 @@ where
 
 impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
+    SHM: ShMem,
 {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
@@ -516,7 +512,6 @@ impl<EMH, I, S, SHM, SP> EventRestarter<S> for LlmpEventManager<EMH, I, S, SHM, 
 where
     S: HasCurrentStageId,
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         std_on_restart(self, state)
@@ -526,13 +521,17 @@ where
 impl<EMH, I, S, SHM, SP> ManagerExit for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.llmp.sender_mut().send_exiting()
     }
+}
 
+impl<EMH, I, S, SHM, SP> AwaitRestartSafe for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
     /// The LLMP client needs to wait until a broker has mapped all pages before shutting down.
     /// Otherwise, the OS may already have removed the shared maps.
     fn await_restart_safe(&mut self) {
@@ -621,7 +620,6 @@ where
 impl<EMH, I, S, SHM, SP> HasEventManagerId for LlmpEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {

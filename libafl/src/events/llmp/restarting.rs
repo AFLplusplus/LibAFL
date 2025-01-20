@@ -35,10 +35,10 @@ use crate::{
     common::HasMetadata,
     events::{
         launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
-        std_report_progress, AdaptiveSerializer, CanSerializeObserver, Event, EventConfig,
-        EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter,
-        HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ManagerExit, ProgressReporter,
-        StdLlmpEventHook,
+        std_report_progress, AdaptiveSerializer, AwaitRestartSafe, CanSerializeObserver, Event,
+        EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId, LlmpEventManager, LlmpShouldSaveState, ManagerExit,
+        ProgressReporter, StdLlmpEventHook,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -47,7 +47,7 @@ use crate::{
     observers::TimeObserver,
     stages::HasCurrentStageId,
     state::{
-        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
     Error,
@@ -58,7 +58,6 @@ use crate::{
 pub struct LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     /// The embedded LLMP event manager
     llmp_mgr: LlmpEventManager<EMH, I, S, SHM, SP>,
@@ -71,7 +70,6 @@ where
 impl<EMH, I, S, SHM, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
 {
     fn serialization_time(&self) -> Duration {
         self.llmp_mgr.serialization_time()
@@ -107,7 +105,13 @@ where
 impl<EMH, I, S, SHM, SP> ProgressReporter<S> for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     I: Serialize,
-    S: HasExecutions + HasLastReportTime + HasMetadata + Serialize + MaybeHasClientPerfMonitor,
+    S: HasExecutions
+        + HasLastReportTime
+        + HasMetadata
+        + Serialize
+        + MaybeHasClientPerfMonitor
+        + HasCorpus<I>,
+    S::Corpus: Serialize,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
@@ -151,9 +155,8 @@ where
 impl<EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT>
     for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    OT: Serialize + MatchNameRef,
     SHM: ShMem,
-    SP: ShMemProvider<ShMem = SHM>,
+    OT: Serialize + MatchNameRef,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
         serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)
@@ -198,7 +201,12 @@ where
         // This way, the broker can clean up the pages, and eventually exit.
         self.llmp_mgr.send_exiting()
     }
+}
 
+impl<EMH, I, S, SHM, SP> AwaitRestartSafe for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     #[inline]
@@ -331,9 +339,9 @@ pub fn setup_restarting_mgr_std<I, MT, S>(
     Error,
 >
 where
+    I: DeserializeOwned,
     MT: Monitor + Clone,
     S: Serialize + DeserializeOwned,
-    I: DeserializeOwned,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)

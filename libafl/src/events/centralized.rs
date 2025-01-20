@@ -18,27 +18,28 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{LlmpClient, LlmpClientDescription, Tag},
-    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
+    shmem::{ShMem, ShMemProvider},
     tuples::{Handle, MatchNameRef},
     ClientId,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{CanSerializeObserver, ManagerExit, NopEventManager};
+use super::AwaitRestartSafe;
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     common::HasMetadata,
     events::{
         serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
-        AdaptiveSerializer, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
+        AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        LogSeverity, ManagerExit, ProgressReporter,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, NopInput},
+    inputs::Input,
     observers::TimeObserver,
-    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, NopState, Stoppable},
+    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error,
 };
 
@@ -58,16 +59,7 @@ pub struct CentralizedEventManager<EM, EMH, I, S, SHM, SP> {
     phantom: PhantomData<(I, S)>,
 }
 
-impl
-    CentralizedEventManager<
-        NopEventManager,
-        (),
-        NopInput,
-        NopState<NopInput>,
-        NopShMem,
-        NopShMemProvider,
-    >
-{
+impl CentralizedEventManager<(), (), (), (), (), ()> {
     /// Creates a builder for [`CentralizedEventManager`]
     #[must_use]
     pub fn builder() -> CentralizedEventManagerBuilder {
@@ -313,7 +305,13 @@ where
         self.client.sender_mut().send_exiting()?;
         self.inner.send_exiting()
     }
+}
 
+impl<EM, EMH, I, S, SHM, SP> AwaitRestartSafe for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+    EM: AwaitRestartSafe,
+{
     #[inline]
     fn await_restart_safe(&mut self) {
         self.client.await_safe_to_unmap_blocking();

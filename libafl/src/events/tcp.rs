@@ -783,7 +783,9 @@ impl<EMH, I, S> ManagerExit for TcpEventManager<EMH, I, S> {
         // wait until we can drop the message safely.
         //self.tcp.await_safe_to_unmap_blocking();
     }
+}
 
+impl<EMH, I, S> ManagerExit for TcpEventManager<EMH, I, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         //TODO: Should not be needed since TCP does that for us
         //self.tcp.sender.send_exiting()
@@ -877,7 +879,12 @@ where
         // This way, the broker can clean up the pages, and eventually exit.
         self.tcp_mgr.send_exiting()
     }
+}
 
+impl<EMH, I, S, SHM, SP> AwaitRestartSafe for TcpRestartingEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
     /// The tcp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     #[inline]
