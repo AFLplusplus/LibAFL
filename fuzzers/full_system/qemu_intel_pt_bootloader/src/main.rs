@@ -119,7 +119,7 @@ fn main() {
     qemu.save_snapshot("bootloader_start", true);
 
     let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
-                       _: &mut StdState<BytesInput, _, _, _>,
+                       _: &mut StdState<_, _, _, _>,
                        input: &BytesInput| unsafe {
         let mut fixed_len_input = input.target_bytes().as_slice().to_vec();
         fixed_len_input.resize(3, 0);

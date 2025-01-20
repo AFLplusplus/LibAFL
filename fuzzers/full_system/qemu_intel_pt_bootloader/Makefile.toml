@@ -1,5 +1,6 @@
 [env]
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+USER = { script = ["logname"] }
 
 [env.development]
 PROFILE_DIR = "debug"
@@ -16,11 +17,18 @@ mkdir -p ${TARGET_DIR}
 
 [tasks.ram_disk]
 condition = { files_not_exist = ["/mnt/libafl_qemu_tmpfs"] }
-script = "sudo mkdir -p /mnt/libafl_qemu_tmpfs && sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs"
+script = """
+sudo mkdir -p /mnt/libafl_qemu_tmpfs &&
+sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs &&
+sudo chown "${USER}:${USER}" "/mnt/libafl_qemu_tmpfs"
+"""
 
 [tasks.remove_ram_disk]
 condition = { files_exist = ["/mnt/libafl_qemu_tmpfs"] }
-script = "sudo umount /mnt/libafl_qemu_tmpfs && sudo rm -r /mnt/libafl_qemu_tmpfs"
+script = """
+sudo umount /mnt/libafl_qemu_tmpfs;
+sudo rm -r /mnt/libafl_qemu_tmpfs
+"""
 
 [tasks.build_target]
 dependencies = ["target_dir"]
