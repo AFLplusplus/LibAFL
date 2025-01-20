@@ -186,7 +186,7 @@ pub struct StdOutMarker;
 pub struct StdErrMarker;
 
 impl<T> StreamObserver<T> {
-    /// Create a new StreamObserver with the given name.
+    /// Create a new `StreamObserver` with the given name.
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
