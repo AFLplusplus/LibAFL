@@ -277,6 +277,7 @@ jobs:
           - ./fuzzers/full_system/qemu_intel_pt_bootloader
 
           # Full-system
+          - ./fuzzers/full_system/nyx_launcher
           - ./fuzzers/full_system/nyx_libxml2_standalone
           - ./fuzzers/full_system/nyx_libxml2_parallel
 

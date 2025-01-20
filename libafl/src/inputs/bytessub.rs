@@ -11,7 +11,7 @@ use libafl_bolts::{
     HasLen,
 };
 
-use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
+use crate::inputs::{HasMutatorBytes, ResizableMutator};
 
 /// The [`BytesSubInput`] makes it possible to use [`crate::mutators::Mutator`]`s` that work on
 /// inputs implementing the [`HasMutatorBytes`] for a sub-range of this input.
@@ -31,13 +31,13 @@ use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
 /// let mut sub_input = bytes_input.sub_input(1..);
 ///
 /// // Run any mutations on the sub input.
-/// sub_input.bytes_mut()[0] = 42;
+/// sub_input.mutator_bytes_mut()[0] = 42;
 ///
 /// // The mutations are applied to the underlying input.
-/// assert_eq!(bytes_input.bytes()[1], 42);
+/// assert_eq!(bytes_input.mutator_bytes()[1], 42);
 /// ```
 ///
-/// If inputs implement the [`HasMutatorResizableBytes`] trait, growing or shrinking the sub input
+/// If inputs implement the [`ResizableMutator`] trait, growing or shrinking the sub input
 /// will grow or shrink the parent input,
 /// and keep elements around the current range untouched / move them accordingly.
 ///
@@ -45,7 +45,7 @@ use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
 /// ```rust
 /// # extern crate alloc;
 /// # extern crate libafl;
-/// # use libafl::inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes};
+/// # use libafl::inputs::{BytesInput, HasMutatorBytes, ResizableMutator};
 /// # use alloc::vec::Vec;
 /// #
 /// # #[cfg(not(feature = "std"))]
@@ -57,13 +57,13 @@ use crate::inputs::{HasMutatorBytes, HasMutatorResizableBytes};
 /// // Note that the range ends on an exclusive value this time.
 /// let mut sub_input = bytes_input.sub_input(1..=3);
 ///
-/// assert_eq!(sub_input.bytes(), &[2, 3, 4]);
+/// assert_eq!(sub_input.mutator_bytes(), &[2, 3, 4]);
 ///
 /// // We extend it with a few values.
 /// sub_input.extend(&[42, 42, 42]);
 ///
 /// // The values outside of the range are moved back and forwards, accordingly.
-/// assert_eq!(bytes_input.bytes(), [1, 2, 3, 4, 42, 42, 42, 5]);
+/// assert_eq!(bytes_input.mutator_bytes(), [1, 2, 3, 4, 42, 42, 42, 5]);
 /// ```
 ///
 /// The input supports all methods in the [`HasMutatorBytes`] trait if the parent input also implements this trait.
@@ -102,19 +102,19 @@ where
     I: HasMutatorBytes,
 {
     #[inline]
-    fn bytes(&self) -> &[u8] {
-        &self.parent_input.bytes()[self.range.clone()]
+    fn mutator_bytes(&self) -> &[u8] {
+        &self.parent_input.mutator_bytes()[self.range.clone()]
     }
 
     #[inline]
-    fn bytes_mut(&mut self) -> &mut [u8] {
-        &mut self.parent_input.bytes_mut()[self.range.clone()]
+    fn mutator_bytes_mut(&mut self) -> &mut [u8] {
+        &mut self.parent_input.mutator_bytes_mut()[self.range.clone()]
     }
 }
 
-impl<I> HasMutatorResizableBytes for BytesSubInput<'_, I>
+impl<I> ResizableMutator<u8> for BytesSubInput<'_, I>
 where
-    I: HasMutatorResizableBytes,
+    I: ResizableMutator<u8> + HasMutatorBytes + HasLen,
 {
     fn resize(&mut self, new_len: usize, value: u8) {
         let start_index = self.range.start;
@@ -134,7 +134,7 @@ where
 
                 if old_parent_len > end_index {
                     // the parent has a reminder, move it back.
-                    let parent_bytes = self.parent_input.bytes_mut();
+                    let parent_bytes = self.parent_input.mutator_bytes_mut();
 
                     // move right
                     let (_, rest) = parent_bytes.split_at_mut(start_index + old_len);
@@ -151,7 +151,7 @@ where
                 // We shrink. Remove the values, then remove the underlying buffer.
                 let diff = old_len - new_len;
 
-                let parent_bytes = self.parent_input.bytes_mut();
+                let parent_bytes = self.parent_input.mutator_bytes_mut();
 
                 // move left
                 let (_, rest) = parent_bytes.split_at_mut(start_index + new_len);
@@ -171,7 +171,7 @@ where
 
         let new_values: Vec<u8> = iter.into_iter().copied().collect();
         self.resize(old_len + new_values.len(), 0);
-        self.bytes_mut()[old_len..].copy_from_slice(&new_values);
+        self.mutator_bytes_mut()[old_len..].copy_from_slice(&new_values);
     }
 
     /// Creates a splicing iterator that replaces the specified range in the vector
@@ -214,7 +214,7 @@ mod tests {
     use libafl_bolts::HasLen;
 
     use crate::{
-        inputs::{BytesInput, HasMutatorBytes, HasMutatorResizableBytes, NopInput},
+        inputs::{BytesInput, HasMutatorBytes, NopInput, ResizableMutator},
         mutators::{havoc_mutations_no_crossover, MutatorsTuple},
         state::NopState,
     };
@@ -245,19 +245,19 @@ mod tests {
 
         let mut sub_input = bytes_input.sub_input(0..1);
         assert_eq!(sub_input.len(), 1);
-        sub_input.bytes_mut()[0] = 2;
-        assert_eq!(bytes_input.bytes()[0], 2);
+        sub_input.mutator_bytes_mut()[0] = 2;
+        assert_eq!(bytes_input.mutator_bytes()[0], 2);
 
         let mut sub_input = bytes_input.sub_input(1..=2);
         assert_eq!(sub_input.len(), 2);
-        sub_input.bytes_mut()[0] = 3;
-        assert_eq!(bytes_input.bytes()[1], 3);
+        sub_input.mutator_bytes_mut()[0] = 3;
+        assert_eq!(bytes_input.mutator_bytes()[1], 3);
 
         let mut sub_input = bytes_input.sub_input(..);
         assert_eq!(sub_input.len(), len_orig);
-        sub_input.bytes_mut()[0] = 1;
-        sub_input.bytes_mut()[1] = 2;
-        assert_eq!(bytes_input.bytes()[0], 1);
+        sub_input.mutator_bytes_mut()[0] = 1;
+        sub_input.mutator_bytes_mut()[1] = 2;
+        assert_eq!(bytes_input.mutator_bytes()[0], 1);
     }
 
     #[test]
@@ -268,10 +268,10 @@ mod tests {
         let mut sub_input = bytes_input.sub_input(2..);
         assert_eq!(sub_input.len(), len_orig - 2);
         sub_input.resize(len_orig, 0);
-        assert_eq!(sub_input.bytes()[sub_input.len() - 1], 0);
+        assert_eq!(sub_input.mutator_bytes()[sub_input.len() - 1], 0);
         assert_eq!(sub_input.len(), len_orig);
         assert_eq!(bytes_input.len(), len_orig + 2);
-        assert_eq!(bytes_input.bytes()[bytes_input.len() - 1], 0);
+        assert_eq!(bytes_input.mutator_bytes()[bytes_input.len() - 1], 0);
 
         let (mut bytes_input, len_orig) = init_bytes_input();
 
@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(sub_input.len(), 2);
         sub_input.resize(3, 0);
         assert_eq!(sub_input.len(), 3);
-        assert_eq!(sub_input.bytes()[sub_input.len() - 1], 0);
+        assert_eq!(sub_input.mutator_bytes()[sub_input.len() - 1], 0);
         assert_eq!(bytes_input.len(), len_orig + 1);
 
         let mut sub_input = bytes_input.sub_input(..3);
@@ -300,7 +300,7 @@ mod tests {
         sub_input.resize(10, 0);
         assert_eq!(sub_input.len(), 10);
         assert_eq!(bytes_input.len(), 10);
-        assert_eq!(bytes_input.bytes()[2], 0);
+        assert_eq!(bytes_input.mutator_bytes()[2], 0);
 
         let mut sub_input = bytes_input.sub_input(..);
         sub_input.resize(1, 0);

@@ -5,20 +5,21 @@ use std::{
 };
 
 use clap::Parser;
-#[cfg(feature = "simplemgr")]
-use libafl::events::SimpleEventManager;
-#[cfg(not(feature = "simplemgr"))]
-use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
-    events::{ClientDescription, LlmpEventManager, LlmpRestartingEventManager},
+    events::{
+        ClientDescription, EventConfig, Launcher, LlmpEventManager, LlmpRestartingEventManager,
+        MonitorTypedEventManager,
+    },
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-use libafl_bolts::{core_affinity::CoreId, current_time, llmp::LlmpBroker, tuples::tuple_list};
-#[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::{
+    core_affinity::CoreId,
+    current_time,
+    llmp::LlmpBroker,
     shmem::{ShMemProvider, StdShMemProvider},
     staterestore::StateRestorer,
+    tuples::tuple_list,
 };
 #[cfg(unix)]
 use {
@@ -34,7 +35,6 @@ pub struct Fuzzer {
 
 impl Fuzzer {
     pub fn new() -> Fuzzer {
-        env_logger::init();
         let options = FuzzerOptions::parse();
         options.validate();
         Fuzzer { options }
@@ -43,8 +43,8 @@ impl Fuzzer {
     pub fn fuzz(&self) -> Result<(), Error> {
         if self.options.tui {
             let monitor = TuiMonitor::builder()
-                .title("QEMU Launcher")
-                .version("0.13.1")
+                .title("Nyx Launcher")
+                .version("0.14.1")
                 .enhanced_graphics(true)
                 .build();
             self.launch(monitor)
@@ -60,7 +60,7 @@ impl Fuzzer {
 
             #[cfg(unix)]
             let stdout_cpy = RefCell::new(unsafe {
-                let new_fd = dup(io::stdout().as_raw_fd())?;
+                let new_fd = dup(io::stdout().as_raw_fd()).unwrap();
                 File::from_raw_fd(new_fd)
             });
 
@@ -84,11 +84,9 @@ impl Fuzzer {
         M: Monitor + Clone,
     {
         // The shared memory allocator
-        #[cfg(not(feature = "simplemgr"))]
         let mut shmem_provider = StdShMemProvider::new()?;
 
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
-        #[cfg(not(feature = "simplemgr"))]
         let stdout = if self.options.verbose {
             None
         } else {
@@ -97,7 +95,6 @@ impl Fuzzer {
 
         let client = Client::new(&self.options);
 
-        #[cfg(not(feature = "simplemgr"))]
         if self.options.rerun_input.is_some() {
             // If we want to rerun a single input but we use a restarting mgr, we'll have to create a fake restarting mgr that doesn't actually restart.
             // It's not pretty but better than recompiling with simplemgr.
@@ -130,14 +127,9 @@ impl Fuzzer {
         }
 
         #[cfg(feature = "simplemgr")]
-        return client.run(
-            None,
-            SimpleEventManager::new(monitor),
-            ClientDescription::new(0, 0, CoreId(0)),
-        );
+        return client.run(None, SimpleEventManager::new(monitor), CoreId(0));
 
-        // Build and run the Launcher / fuzzer.
-        #[cfg(not(feature = "simplemgr"))]
+        // Build and run a Launcher
         match Launcher::builder()
             .shmem_provider(shmem_provider)
             .broker_port(self.options.port)

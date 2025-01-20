@@ -39,6 +39,8 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use super::{std_maybe_report_progress, std_report_progress, ManagerExit};
+#[cfg(feature = "share_objectives")]
+use crate::corpus::{Corpus, Testcase};
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -52,7 +54,10 @@ use crate::{
     monitors::Monitor,
     observers::ObserversTuple,
     stages::HasCurrentStageId,
-    state::{HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
+    state::{
+        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        MaybeHasClientPerfMonitor, Stoppable,
+    },
     Error, HasMetadata,
 };
 
@@ -560,7 +565,12 @@ impl<EMH, I, S> Drop for TcpEventManager<EMH, I, S> {
 impl<EMH, I, S> TcpEventManager<EMH, I, S>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions + HasMetadata + HasImported + Stoppable,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + Stoppable,
 {
     /// Write the client id for a client `EventManager` to env vars
     pub fn to_env(&self, env_name: &str) {
@@ -609,6 +619,20 @@ where
                     *state.imported_mut() += 1;
                     log::info!("Added received Testcase as item #{item}");
                 }
+            }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { input, .. } => {
+                log::debug!("Received new Objective");
+                let mut testcase = Testcase::from(input);
+                testcase.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
+
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
             }
             Event::Stop => {
                 state.request_stop();
@@ -684,7 +708,12 @@ where
     E::Observers: Serialize + ObserversTuple<I, S>,
     for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions + HasMetadata + HasImported + Stoppable,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + Stoppable,
     I: DeserializeOwned,
     Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
@@ -891,7 +920,12 @@ where
     E::Observers: ObserversTuple<I, S> + Serialize,
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned,
-    S: HasExecutions + HasMetadata + HasImported + Stoppable,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + Stoppable,
     SP: ShMemProvider,
     Z: ExecutionProcessor<TcpEventManager<EMH, I, S>, I, E::Observers, S>
         + EvaluatorObservers<E, TcpEventManager<EMH, I, S>, I, S>,
@@ -990,7 +1024,13 @@ pub fn setup_restarting_mgr_tcp<I, MT, S>(
 >
 where
     MT: Monitor + Clone,
-    S: HasExecutions + HasMetadata + HasImported + DeserializeOwned + Stoppable,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + DeserializeOwned
+        + Stoppable,
     I: Input,
 {
     TcpRestartingMgr::builder()
@@ -1056,7 +1096,13 @@ where
     I: Input,
     MT: Monitor + Clone,
     SP: ShMemProvider,
-    S: HasExecutions + HasMetadata + HasImported + DeserializeOwned + Stoppable,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + DeserializeOwned
+        + Stoppable,
 {
     /// Launch the restarting manager
     pub fn launch(
