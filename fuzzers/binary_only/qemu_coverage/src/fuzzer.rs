@@ -101,6 +101,7 @@ pub struct FuzzerOptions {
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 pub fn fuzz() {
+    env_logger::init();
     let mut options = FuzzerOptions::parse();
 
     let corpus_files = options
@@ -115,10 +116,10 @@ pub fn fuzz() {
     let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
 
     let program = env::args().next().unwrap();
-    log::debug!("Program: {program:}");
+    log::info!("Program: {program:}");
 
     options.args.insert(0, program);
-    log::debug!("ARGS: {:#?}", options.args);
+    log::info!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
 
@@ -146,12 +147,12 @@ pub fn fuzz() {
         let test_one_input_ptr = elf
             .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
             .expect("Symbol LLVMFuzzerTestOneInput not found");
-        log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+        log::info!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
         qemu.entry_break(test_one_input_ptr);
 
         for m in qemu.mappings() {
-            log::debug!(
+            log::info!(
                 "Mapping: 0x{:016x}-0x{:016x}, {}",
                 m.start(),
                 m.end(),
@@ -160,17 +161,17 @@ pub fn fuzz() {
         }
 
         let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
-        log::debug!("Break at {pc:#x}");
+        log::info!("Break at {pc:#x}");
 
         let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
-        log::debug!("Return address = {ret_addr:#x}");
+        log::info!("Return address = {ret_addr:#x}");
 
         qemu.set_breakpoint(ret_addr);
 
         let input_addr = qemu
             .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
             .unwrap();
-        log::debug!("Placing input at {input_addr:#x}");
+        log::info!("Placing input at {input_addr:#x}");
 
         let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
@@ -267,10 +268,10 @@ pub fn fuzz() {
                     println!("Failed to load initial corpus at {:?}", &options.input_dir);
                     process::exit(0);
                 });
-            log::debug!("We imported {} inputs from disk.", state.corpus().count());
+            log::info!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        log::debug!("Processed {} inputs from disk.", files.len());
+        log::info!("Processed {} inputs from disk.", files.len());
 
         mgr.send_exiting()?;
         Err(Error::ShuttingDown)?

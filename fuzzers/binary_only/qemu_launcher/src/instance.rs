@@ -242,12 +242,7 @@ impl<M: Monitor> Instance<'_, M> {
             )?;
 
             executor
-                .run_target(
-                    &mut NopFuzzer::new(),
-                    &mut state,
-                    &mut NopEventManager::new(),
-                    &input,
-                )
+                .run_target(&mut fuzzer, &mut state, &mut self.mgr, &input)
                 .expect("Error running target");
             // We're done :)
             process::exit(0);
