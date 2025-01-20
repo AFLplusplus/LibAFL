@@ -58,7 +58,7 @@ use crate::{
 pub struct LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// The embedded LLMP event manager
     llmp_mgr: LlmpEventManager<EMH, I, S, SHM, SP>,
@@ -71,7 +71,7 @@ where
 impl<EMH, I, S, SHM, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn serialization_time(&self) -> Duration {
         self.llmp_mgr.serialization_time()
@@ -109,7 +109,7 @@ where
     I: Serialize,
     S: HasExecutions + HasLastReportTime + HasMetadata + Serialize + MaybeHasClientPerfMonitor,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn maybe_report_progress(
         &mut self,
@@ -129,7 +129,7 @@ where
     I: Serialize,
     S: Serialize,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
@@ -153,7 +153,7 @@ impl<EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT>
 where
     OT: Serialize + MatchNameRef,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
         serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)
@@ -164,7 +164,7 @@ impl<EMH, I, S, SHM, SP> EventRestarter<S> for LlmpRestartingEventManager<EMH, I
 where
     S: Serialize + HasCurrentStageId,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -190,7 +190,7 @@ where
 impl<EMH, I, S, SHM, SP> ManagerExit for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
@@ -216,7 +216,7 @@ where
     I: DeserializeOwned + Input,
     S: HasImported + HasCurrentTestcase<I> + HasSolutions<I> + Stoppable + Serialize,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: ExecutionProcessor<LlmpEventManager<EMH, I, S, SHM, SP>, I, E::Observers, S>
         + EvaluatorObservers<E, LlmpEventManager<EMH, I, S, SHM, SP>, I, S>,
 {
@@ -234,7 +234,7 @@ where
 impl<EMH, I, S, SHM, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.llmp_mgr.mgr_id()
@@ -251,7 +251,7 @@ impl<EMH, I, S, SHM, SP> LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     S: Serialize,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
     pub fn new(
@@ -430,7 +430,7 @@ where
     MT: Monitor + Clone,
     S: Serialize + DeserializeOwned,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Launch the broker and the clients and fuzz
     pub fn launch(

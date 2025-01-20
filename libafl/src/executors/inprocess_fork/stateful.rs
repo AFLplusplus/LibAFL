@@ -32,7 +32,7 @@ impl<'a, H, I, OT, S, SHM, SP, ES, EM, Z>
 where
     OT: ObserversTuple<I, S>,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[expect(clippy::too_many_arguments)]
     /// The constructor for `InProcessForkExecutor`
@@ -101,7 +101,7 @@ where
     HT: ExecutorHooksTuple<I, S>,
     S: HasExecutions,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
     OT: ObserversTuple<I, S>,
 {
     #[inline]

@@ -109,7 +109,7 @@ impl<EM, HT, I, OT, S, SHM, SP, Z> GenericInProcessForkExecutorInner<EM, HT, I, 
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     pub(super) unsafe fn pre_run_target_child(
         &mut self,

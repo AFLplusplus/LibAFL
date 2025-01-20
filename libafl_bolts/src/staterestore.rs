@@ -73,7 +73,7 @@ pub struct StateRestorer<SHM, SP> {
 impl<SHM, SP> StateRestorer<SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Get the map size backing this [`StateRestorer`].
     pub fn mapsize(&self) -> usize {
@@ -266,7 +266,7 @@ where
             File::open(tmpfile)?.read_to_end(&mut file_content)?;
             if file_content.is_empty() {
                 return Err(Error::illegal_state(format!(
-                    "Colud not restore state from file {}",
+                    "Could not restore state from file {}",
                     &filename
                 )));
             }

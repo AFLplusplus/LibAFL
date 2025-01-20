@@ -831,7 +831,7 @@ pub struct ForkserverExecutorBuilder<'a, TC, SHM, SP> {
 impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Builds `ForkserverExecutor`.
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.

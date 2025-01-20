@@ -134,7 +134,7 @@ impl CentralizedEventManagerBuilder {
     ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
-        SP: ShMemProvider<SHM>,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Self::build_from_client(self, inner, hooks, client, time_obs)
@@ -152,7 +152,7 @@ impl CentralizedEventManagerBuilder {
     ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
-        SP: ShMemProvider<SHM>,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Self::build_from_client(self, inner, hooks, client, time_obs)
@@ -169,7 +169,7 @@ impl CentralizedEventManagerBuilder {
     ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
-        SP: ShMemProvider<SHM>,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::existing_client_from_description(shmem_provider, description)?;
         Self::build_from_client(self, inner, hooks, client, time_obs)
@@ -218,7 +218,7 @@ where
     S: Stoppable,
     I: Input,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn should_send(&self) -> bool {
         self.inner.should_send()
@@ -273,7 +273,7 @@ impl<EM, EMH, I, S, SHM, SP> EventRestarter<S> for CentralizedEventManager<EM, E
 where
     EM: EventRestarter<S>,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[inline]
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -303,7 +303,7 @@ impl<EM, EMH, I, S, SHM, SP> ManagerExit for CentralizedEventManager<EM, EMH, I,
 where
     EM: ManagerExit,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.client.sender_mut().send_exiting()?;
@@ -327,7 +327,7 @@ where
     I: Input,
     S: Stoppable,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
@@ -354,7 +354,7 @@ where
     I: Input,
     S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + MaybeHasClientPerfMonitor,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn maybe_report_progress(
         &mut self,
@@ -381,7 +381,7 @@ where
 impl<EM, EMH, I, S, SHM, SP> CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Describe the client event manager's LLMP parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
@@ -407,7 +407,7 @@ where
     I: Input,
     S: Stoppable,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[cfg(feature = "llmp_compression")]
     fn forward_to_main(&mut self, event: &Event<I>) -> Result<(), Error> {

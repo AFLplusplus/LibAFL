@@ -224,7 +224,7 @@ where
         I: DeserializeOwned,
         S: DeserializeOwned + Serialize,
         SHM: ShMem,
-        SP: ShMemProvider<SHM>,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         Self::launch_with_hooks(self, tuple_list!())
     }
@@ -234,7 +234,7 @@ impl<CF, MT, SHM, SP> Launcher<'_, CF, MT, SHM, SP>
 where
     MT: Monitor + Clone,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Launch the broker and the clients and fuzz with a user-supplied hook
     #[cfg(all(unix, feature = "fork"))]
@@ -633,7 +633,7 @@ impl<CF, MF, MT, SHM, SP> CentralizedLauncher<'_, CF, MF, MT, SHM, SP>
 where
     MT: Monitor + Clone + 'static,
     SHM: ShMem + 'static,
-    SP: ShMemProvider<SHM> + 'static,
+    SP: ShMemProvider<ShMem = SHM> + 'static,
 {
     /// Launch a standard Centralized-based fuzzer
     pub fn launch<I, S>(&mut self) -> Result<(), Error>
@@ -676,7 +676,7 @@ impl<CF, MF, MT, SHM, SP> CentralizedLauncher<'_, CF, MF, MT, SHM, SP>
 where
     MT: Monitor + Clone + 'static,
     SHM: ShMem + 'static,
-    SP: ShMemProvider<SHM> + 'static,
+    SP: ShMemProvider<ShMem = SHM> + 'static,
 {
     /// Launch a Centralized-based fuzzer.
     /// - `main_inner_mgr_builder` will be called to build the inner manager of the main node.

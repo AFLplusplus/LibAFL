@@ -246,7 +246,7 @@ where
         + Stoppable
         + MaybeHasClientPerfMonitor,
     SHM: ShMem,
-    SP: ShMemProvider,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
     #[inline]

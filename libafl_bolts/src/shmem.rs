@@ -7,7 +7,6 @@ use alloc::{rc::Rc, string::ToString, vec::Vec};
 use core::{cell::RefCell, fmt, fmt::Display, mem::ManuallyDrop};
 use core::{
     fmt::Debug,
-    marker::PhantomData,
     mem::size_of,
     ops::{Deref, DerefMut},
 };
@@ -66,7 +65,7 @@ pub type StdShMem = MmapShMem;
 /// The standard sharedmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMemProvider =
-    RcShMemProvider<MmapShMem, ServedShMemProvider<MmapShMem, MmapShMemProvider>>;
+    RcShMemProvider<MmapShMemProvider, ServedShMemProvider<MmapShMem, MmapShMemProvider>>;
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 /// The standard sharedmem service
 pub type StdShMemService = ShMemService<MmapShMem, MmapShMemProvider>;
@@ -99,16 +98,14 @@ pub type StdServedShMemProvider =
     RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
 /// The standard served shmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
-pub type StdServedShMemProvider =
-    RcShMemProvider<MmapShMem, ServedShMemProvider<MmapShMem, MmapShMemProvider>>;
+pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 /// The standard served shmem provider
 #[cfg(all(
     feature = "std",
     unix,
     not(any(target_os = "android", target_vendor = "apple", target_os = "haiku"))
 ))]
-pub type StdServedShMemProvider =
-    RcShMemProvider<MmapShMem, ServedShMemProvider<MmapShMem, MmapShMemProvider>>;
+pub type StdServedShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 
 /// Description of a shared map.
 /// May be used to restore the map by id.
@@ -274,21 +271,21 @@ pub trait ShMem: Sized + Debug + Clone + DerefMut<Target = [u8]> {
 ///
 /// They are the backbone of [`crate::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
-pub trait ShMemProvider<SHM>: Clone + Default + Debug {
+pub trait ShMemProvider: Clone + Default + Debug {
+    /// The actual shared map handed out by this [`ShMemProvider`].
+    type ShMem: ShMem;
+
     /// Create a new instance of the provider
     fn new() -> Result<Self, Error>;
 
     /// Create a new shared memory mapping
-    fn new_shmem(&mut self, map_size: usize) -> Result<SHM, Error>;
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error>;
 
     /// Get a mapping given its id and size
-    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<SHM, Error>;
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error>;
 
     /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
-    fn new_on_shmem<T: Sized + 'static>(&mut self, value: T) -> Result<SHM, Error>
-    where
-        SHM: ShMem,
-    {
+    fn new_on_shmem<T: Sized + 'static>(&mut self, value: T) -> Result<Self::ShMem, Error> {
         self.uninit_on_shmem::<T>().map(|mut shmem| {
             // # Safety
             // The map has been created at this point in time, and is large enough.
@@ -299,26 +296,26 @@ pub trait ShMemProvider<SHM>: Clone + Default + Debug {
     }
 
     /// Create a new shared memory mapping to hold an object of the given type, and initializes it with the given value.
-    fn uninit_on_shmem<T: Sized + 'static>(&mut self) -> Result<SHM, Error> {
+    fn uninit_on_shmem<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
         self.new_shmem(size_of::<T>())
     }
 
     /// Get a mapping given a description
-    fn shmem_from_description(&mut self, description: ShMemDescription) -> Result<SHM, Error> {
+    fn shmem_from_description(
+        &mut self,
+        description: ShMemDescription,
+    ) -> Result<Self::ShMem, Error> {
         self.shmem_from_id_and_size(description.id, description.size)
     }
 
     /// Create a new sharedmap reference from an existing `id` and `len`
-    fn clone_ref(&mut self, mapping: &SHM) -> Result<SHM, Error>
-    where
-        SHM: ShMem,
-    {
+    fn clone_ref(&mut self, mapping: &Self::ShMem) -> Result<Self::ShMem, Error> {
         self.shmem_from_id_and_size(mapping.id(), mapping.len())
     }
 
     /// Reads an existing map config from env vars, then maps it
     #[cfg(feature = "std")]
-    fn existing_from_env(&mut self, env_name: &str) -> Result<SHM, Error> {
+    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::ShMem, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{env_name}_SIZE"))?)?;
         self.shmem_from_description(ShMemDescription::from_string_and_size(
@@ -344,7 +341,7 @@ pub trait ShMemProvider<SHM>: Clone + Default + Debug {
     }
 
     /// Release the resources associated with the given [`ShMem`]
-    fn release_shmem(&mut self, _shmem: &mut SHM) {
+    fn release_shmem(&mut self, _shmem: &mut Self::ShMem) {
         // do nothing
     }
 }
@@ -362,16 +359,22 @@ pub trait ShMemProvider<SHM>: Clone + Default + Debug {
 pub struct NopShMemProvider;
 
 #[cfg(feature = "alloc")]
-impl ShMemProvider<NopShMem> for NopShMemProvider {
+impl ShMemProvider for NopShMemProvider {
+    type ShMem = NopShMem;
+
     fn new() -> Result<Self, Error> {
         Ok(Self)
     }
 
-    fn new_shmem(&mut self, map_size: usize) -> Result<NopShMem, Error> {
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         self.shmem_from_id_and_size(ShMemId::default(), map_size)
     }
 
-    fn shmem_from_id_and_size(&mut self, id: ShMemId, map_size: usize) -> Result<NopShMem, Error> {
+    fn shmem_from_id_and_size(
+        &mut self,
+        id: ShMemId,
+        map_size: usize,
+    ) -> Result<Self::ShMem, Error> {
         Ok(NopShMem {
             id,
             buf: vec![0; map_size],
@@ -417,17 +420,17 @@ impl Deref for NopShMem {
 #[derive(Debug, Clone, Default)]
 pub struct RcShMem<SHM, SP>
 where
-    SP: ShMemProvider<SHM>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     internal: ManuallyDrop<SHM>,
     provider: Rc<RefCell<SP>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<SHM, SP> ShMem for RcShMem<SHM, SP>
+impl<SP> ShMem for RcShMem<SP::ShMem, SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider,
 {
     fn id(&self) -> ShMemId {
         self.internal.id()
@@ -437,8 +440,8 @@ where
 #[cfg(feature = "alloc")]
 impl<SHM, SP> Deref for RcShMem<SHM, SP>
 where
-    SHM: Deref<Target = [u8]>,
-    SP: ShMemProvider<SHM>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     type Target = [u8];
 
@@ -450,8 +453,8 @@ where
 #[cfg(feature = "alloc")]
 impl<SHM, SP> DerefMut for RcShMem<SHM, SP>
 where
-    SHM: DerefMut<Target = [u8]>,
-    SP: ShMemProvider<SHM>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn deref_mut(&mut self) -> &mut [u8] {
         &mut self.internal
@@ -461,7 +464,8 @@ where
 #[cfg(feature = "alloc")]
 impl<SHM, SP> Drop for RcShMem<SHM, SP>
 where
-    SP: ShMemProvider<SHM>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn drop(&mut self) {
         self.provider.borrow_mut().release_shmem(&mut self.internal);
@@ -473,7 +477,7 @@ where
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-pub struct RcShMemProvider<SHM, SP> {
+pub struct RcShMemProvider<SP> {
     /// The wrapped [`ShMemProvider`].
     internal: Rc<RefCell<SP>>,
     /// A pipe the child uses to communicate progress to the parent after fork.
@@ -484,37 +488,32 @@ pub struct RcShMemProvider<SHM, SP> {
     /// A pipe the parent uses to communicate progress to the child after fork.
     /// This prevents a potential race condition when using the [`ShMemService`].
     parent_child_pipe: Option<Pipe>,
-    phantom: PhantomData<SHM>,
 }
 
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-impl<SHM, SP> ShMemProvider<RcShMem<SHM, SP>> for RcShMemProvider<SHM, SP>
+impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider + Debug,
 {
+    type ShMem = RcShMem<SP::ShMem, SP>;
+
     fn new() -> Result<Self, Error> {
         Ok(Self {
             internal: Rc::new(RefCell::new(SP::new()?)),
             child_parent_pipe: None,
             parent_child_pipe: None,
-            phantom: PhantomData,
         })
     }
 
-    fn new_shmem(&mut self, map_size: usize) -> Result<RcShMem<SHM, SP>, Error> {
-        Ok(RcShMem {
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
             internal: ManuallyDrop::new(self.internal.borrow_mut().new_shmem(map_size)?),
             provider: self.internal.clone(),
         })
     }
 
-    fn shmem_from_id_and_size(
-        &mut self,
-        id: ShMemId,
-        size: usize,
-    ) -> Result<RcShMem<SHM, SP>, Error> {
-        Ok(RcShMem {
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
             internal: ManuallyDrop::new(
                 self.internal
                     .borrow_mut()
@@ -524,12 +523,12 @@ where
         })
     }
 
-    fn release_shmem(&mut self, map: &mut RcShMem<SHM, SP>) {
+    fn release_shmem(&mut self, map: &mut Self::ShMem) {
         self.internal.borrow_mut().release_shmem(&mut map.internal);
     }
 
-    fn clone_ref(&mut self, mapping: &RcShMem<SHM, SP>) -> Result<RcShMem<SHM, SP>, Error> {
-        Ok(RcShMem {
+    fn clone_ref(&mut self, mapping: &Self::ShMem) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
             internal: ManuallyDrop::new(self.internal.borrow_mut().clone_ref(&mapping.internal)?),
             provider: self.internal.clone(),
         })
@@ -566,7 +565,7 @@ where
 }
 
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-impl<SHM, SP> RcShMemProvider<SHM, SP> {
+impl<SP> RcShMemProvider<SP> {
     /// "set" the "latch"
     /// (we abuse `pipes` as `semaphores`, as they don't need an additional shared mem region.)
     fn pipe_set(pipe: &mut Option<Pipe>) -> Result<(), Error> {
@@ -625,10 +624,9 @@ impl<SHM, SP> RcShMemProvider<SHM, SP> {
 }
 
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-impl<SHM, SP> Default for RcShMemProvider<SHM, SP>
+impl<SP> Default for RcShMemProvider<SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider,
 {
     fn default() -> Self {
         Self::new().unwrap()
@@ -636,7 +634,7 @@ where
 }
 
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-impl<SHM, SP> RcShMemProvider<SHM, ServedShMemProvider<SHM, SP>> {
+impl<SP> RcShMemProvider<ServedShMemProvider<SP>> {
     /// Forward to `ServedShMemProvider::on_restart`
     pub fn on_restart(&mut self) {
         self.internal.borrow_mut().on_restart();
@@ -991,12 +989,14 @@ pub mod unix_shmem {
 
         /// Implement [`ShMemProvider`] for [`MmapShMemProvider`].
         #[cfg(unix)]
-        impl ShMemProvider<MmapShMem> for MmapShMemProvider {
+        impl ShMemProvider for MmapShMemProvider {
+            type ShMem = MmapShMem;
+
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
 
-            fn new_shmem(&mut self, map_size: usize) -> Result<MmapShMem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mut rand = StdRand::with_seed(crate::rands::random_seed());
                 let id = rand.next() as u32;
                 let mut full_file_name = format!("libafl_{}_{}", process::id(), id);
@@ -1009,11 +1009,11 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<MmapShMem, Error> {
+            ) -> Result<Self::ShMem, Error> {
                 MmapShMem::shmem_from_id_and_size(id, size)
             }
 
-            fn release_shmem(&mut self, shmem: &mut MmapShMem) {
+            fn release_shmem(&mut self, shmem: &mut Self::ShMem) {
                 let fd = CStr::from_bytes_until_nul(shmem.id().as_array())
                     .unwrap()
                     .to_str()
@@ -1034,16 +1034,15 @@ pub mod unix_shmem {
 
         impl CommonUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
-            #[expect(unused_qualifications)]
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
-                const SHM_R: libc::c_int = 0o400;
+                const SHM_R: c_int = 0o400;
                 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
-                const SHM_R: libc::c_int = libc::SHM_R;
+                const SHM_R: c_int = libc::SHM_R;
                 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
-                const SHM_W: libc::c_int = 0o200;
+                const SHM_W: c_int = 0o200;
                 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
-                const SHM_W: libc::c_int = libc::SHM_W;
+                const SHM_W: c_int = libc::SHM_W;
 
                 unsafe {
                     let os_id = shmget(
@@ -1137,11 +1136,13 @@ pub mod unix_shmem {
 
         /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
         #[cfg(unix)]
-        impl ShMemProvider<CommonUnixShMem> for CommonUnixShMemProvider {
+        impl ShMemProvider for CommonUnixShMemProvider {
+            type ShMem = CommonUnixShMem;
+
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
-            fn new_shmem(&mut self, map_size: usize) -> Result<CommonUnixShMem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 CommonUnixShMem::new(map_size)
             }
 
@@ -1149,7 +1150,7 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<CommonUnixShMem, Error> {
+            ) -> Result<Self::ShMem, Error> {
                 CommonUnixShMem::shmem_from_id_and_size(id, size)
             }
         }
@@ -1349,12 +1350,14 @@ pub mod unix_shmem {
         }
 
         /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
-        impl ShMemProvider<AshmemShMem> for AshmemShMemProvider {
+        impl ShMemProvider for AshmemShMemProvider {
+            type ShMem = AshmemShMem;
+
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
 
-            fn new_shmem(&mut self, map_size: usize) -> Result<AshmemShMem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mapping = AshmemShMem::new(map_size)?;
                 Ok(mapping)
             }
@@ -1363,7 +1366,7 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<AshmemShMem, Error> {
+            ) -> Result<Self::ShMem, Error> {
                 AshmemShMem::shmem_from_id_and_size(id, size)
             }
         }
@@ -1528,12 +1531,14 @@ pub mod unix_shmem {
 
         /// Implement [`ShMemProvider`] for [`MemfdShMemProvider`]
         #[cfg(unix)]
-        impl ShMemProvider<MemfdShMem> for MemfdShMemProvider {
+        impl ShMemProvider for MemfdShMemProvider {
+            type ShMem = MemfdShMem;
+
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
 
-            fn new_shmem(&mut self, map_size: usize) -> Result<MemfdShMem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mapping = MemfdShMem::new(map_size)?;
                 Ok(mapping)
             }
@@ -1542,7 +1547,7 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<MemfdShMem, Error> {
+            ) -> Result<Self::ShMem, Error> {
                 MemfdShMem::shmem_from_id_and_size(id, size)
             }
         }
@@ -1710,11 +1715,13 @@ pub mod win32_shmem {
     }
 
     /// Implement [`ShMemProvider`] for [`Win32ShMemProvider`]
-    impl ShMemProvider<Win32ShMem> for Win32ShMemProvider {
+    impl ShMemProvider for Win32ShMemProvider {
+        type ShMem = Win32ShMem;
+
         fn new() -> Result<Self, Error> {
             Ok(Self {})
         }
-        fn new_shmem(&mut self, map_size: usize) -> Result<Win32ShMem, Error> {
+        fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
             Win32ShMem::new_shmem(map_size)
         }
 
@@ -1722,7 +1729,7 @@ pub mod win32_shmem {
             &mut self,
             id: ShMemId,
             size: usize,
-        ) -> Result<Win32ShMem, Error> {
+        ) -> Result<Self::ShMem, Error> {
             Win32ShMem::shmem_from_id_and_size(id, size)
         }
     }
@@ -1785,10 +1792,6 @@ where
         }
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
     fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
         match self.empty_slice_mut().write_vectored(bufs) {
             Ok(w) => {
@@ -1797,6 +1800,10 @@ where
             }
             Err(e) => Err(e),
         }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 
     fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {

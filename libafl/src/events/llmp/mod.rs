@@ -163,7 +163,7 @@ impl LlmpEventConverterBuilder {
     ) -> Result<LlmpEventConverter<I, IC, ICB, S, SHM, SP>, Error>
     where
         SHM: ShMem,
-        SP: ShMemProvider<SHM>,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Ok(LlmpEventConverter {
@@ -189,7 +189,7 @@ impl LlmpEventConverterBuilder {
     ) -> Result<LlmpEventConverter<I, IC, ICB, S, SHM, SP>, Error>
     where
         SHM: ShMem,
-        SP: ShMemProvider<SHM>,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Ok(LlmpEventConverter {
@@ -229,7 +229,7 @@ where
 impl<I, IC, ICB, S, SHM, SP> LlmpEventConverter<I, IC, ICB, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     // TODO other new_* routines
 
@@ -374,7 +374,7 @@ where
     IC: InputConverter<From = I>,
     IC::To: Serialize,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {

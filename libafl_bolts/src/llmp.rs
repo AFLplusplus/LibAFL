@@ -723,7 +723,7 @@ pub enum LlmpConnection<HT, SHM, SP> {
 impl<SHM, SP> LlmpConnection<(), SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
@@ -778,7 +778,7 @@ impl<MT, SHM, SP> LlmpConnection<MT, SHM, SP>
 where
     MT: LlmpHookTuple<SHM, SP>,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Describe this in a reproducible fashion, if it's a client
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
@@ -919,7 +919,7 @@ pub struct LlmpSender<SHM, SP> {
 impl<SHM, SP> LlmpSender<SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create a new [`LlmpSender`] using a given [`ShMemProvider`], and `id`.
     /// If `keep_pages_forever` is `true`, `ShMem` will never be freed.
@@ -1603,7 +1603,7 @@ pub struct LlmpReceiver<SHM, SP> {
 impl<SHM, SP> LlmpReceiver<SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reattach to a vacant `recv_shmem`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
@@ -2108,7 +2108,7 @@ impl<HT, SHM, SP> Broker for LlmpBroker<HT, SHM, SP>
 where
     HT: LlmpHookTuple<SHM, SP>,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn is_shutting_down(&self) -> bool {
         self.inner.is_shutting_down()
@@ -2424,7 +2424,7 @@ impl<HT, SHM, SP> LlmpBroker<HT, SHM, SP>
 where
     HT: LlmpHookTuple<SHM, SP>,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create and initialize a new [`LlmpBroker`], associated with some hooks.
     pub fn new(shmem_provider: SP, hooks: HT) -> Result<Self, Error> {
@@ -2807,7 +2807,7 @@ where
 impl<SHM, SP> LlmpBrokerInner<SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create and initialize a new [`LlmpBrokerInner`], associated with some hooks.
     pub fn new(shmem_provider: SP) -> Result<Self, Error> {
@@ -3439,7 +3439,7 @@ pub struct LlmpClient<SHM, SP> {
 impl<SHM, SP> LlmpClient<SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reattach to a vacant client map.
     /// It is essential, that the broker (or someone else) kept a pointer to the `out_shmem`

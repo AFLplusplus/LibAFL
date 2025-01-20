@@ -307,7 +307,7 @@ where
 impl<I, MT, S, SHM, SP> EventRestarter<S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
     S: HasCurrentStageId + Serialize,
     MT: Monitor,
 {
@@ -340,7 +340,7 @@ where
 impl<I, MT, S, SHM, SP> ManagerExit for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
@@ -359,7 +359,7 @@ where
     MT: Monitor,
     S: Stoppable,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.inner.process(fuzzer, state, executor)
@@ -404,7 +404,7 @@ where
     MT: Monitor,
     S: Stoppable,
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Creates a new [`SimpleEventManager`].
     fn launched(monitor: MT, staterestorer: StateRestorer<SHM, SP>) -> Self {

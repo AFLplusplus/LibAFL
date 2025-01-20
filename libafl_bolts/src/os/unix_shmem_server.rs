@@ -61,13 +61,13 @@ const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
 
 ///     s out served shared maps, as used on Android.
 #[derive(Debug)]
-pub struct ServedShMemProvider<SHM, SP> {
+pub struct ServedShMemProvider<SP> {
     stream: UnixStream,
     inner: SP,
     id: i32,
     /// A referencde to the [`ShMemService`] backing this provider.
     /// It will be started only once for all processes and providers.
-    service: ShMemService<SHM, SP>,
+    service: ShMemService<SP>,
     about_to_restart: bool,
 }
 
@@ -109,7 +109,7 @@ where
     }
 }
 
-impl<SHM, SP> ServedShMemProvider<SHM, SP> {
+impl<SP> ServedShMemProvider<SP> {
     /// Send a request to the server, and wait for a response
     #[expect(clippy::similar_names)] // id and fd
     fn send_receive(&mut self, request: ServedShMemRequest) -> Result<(i32, i32), Error> {
@@ -144,20 +144,18 @@ impl<SHM, SP> ServedShMemProvider<SHM, SP> {
     }
 }
 
-impl<SHM, SP> Default for ServedShMemProvider<SHM, SP>
+impl<SP> Default for ServedShMemProvider<SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider,
 {
     fn default() -> Self {
         Self::new().unwrap()
     }
 }
 
-impl<SHM, SP> Clone for ServedShMemProvider<SHM, SP>
+impl<SP> Clone for ServedShMemProvider<SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider,
 {
     fn clone(&self) -> Self {
         let mut cloned = Self::new().unwrap();
@@ -166,16 +164,17 @@ where
     }
 }
 
-impl<SHM, SP> ShMemProvider<ServedShMem<SHM>> for ServedShMemProvider<SHM, SP>
+impl<SP> ShMemProvider for ServedShMemProvider<SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider,
 {
+    type ShMem = ServedShMem<SP::ShMem>;
+
     /// Connect to the server and return a new [`ServedShMemProvider`]
     /// Will try to spawn a [`ShMemService`]. This will only work for the first try.
     fn new() -> Result<Self, Error> {
         // Needed for `MacOS` and Android to get sharedmaps working.
-        let service = ShMemService::<SHM, SP>::start();
+        let service = ShMemService::<SP>::start();
 
         let mut res = Self {
             stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?).map_err(|err| Error::illegal_state(if cfg!(target_vendor = "apple") {
@@ -193,7 +192,7 @@ where
         Ok(res)
     }
 
-    fn new_shmem(&mut self, map_size: usize) -> Result<ServedShMem<SHM>, Error> {
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
         Ok(ServedShMem {
@@ -207,11 +206,7 @@ where
         })
     }
 
-    fn shmem_from_id_and_size(
-        &mut self,
-        id: ShMemId,
-        size: usize,
-    ) -> Result<ServedShMem<SHM>, Error> {
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
         let parts = id.as_str().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.first().unwrap();
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
@@ -249,7 +244,7 @@ where
         Ok(())
     }
 
-    fn release_shmem(&mut self, map: &mut ServedShMem<SHM>) {
+    fn release_shmem(&mut self, map: &mut Self::ShMem) {
         if self.about_to_restart {
             return;
         }
@@ -292,10 +287,7 @@ struct SharedShMemClient<SHM> {
     maps: HashMap<i32, Vec<Rc<RefCell<SHM>>>>,
 }
 
-impl<SHM> SharedShMemClient<SHM>
-where
-    SHM: ShMem,
-{
+impl<SHM> SharedShMemClient<SHM> {
     fn new(stream: UnixStream) -> Self {
         Self {
             stream,
@@ -323,20 +315,20 @@ enum ShMemServiceStatus {
 /// The [`ShMemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
 /// It is mainly used and needed on Android.
 #[derive(Debug, Clone)]
-pub enum ShMemService<SHM, SP> {
+pub enum ShMemService<SP> {
     /// A started service
     Started {
         /// The background thread
         bg_thread: Arc<Mutex<ShMemServiceThread>>,
-        /// The pantom data
-        phantom: PhantomData<(SHM, SP)>,
+        /// The phantom data
+        phantom: PhantomData<SP>,
     },
     /// A failed service
     Failed {
         /// The error message
         err_msg: String,
-        /// The pantom data
-        phantom: PhantomData<(SHM, SP)>,
+        /// The phantom data
+        phantom: PhantomData<SP>,
     },
 }
 
@@ -381,10 +373,9 @@ impl Drop for ShMemServiceThread {
     }
 }
 
-impl<SHM, SP> ShMemService<SHM, SP>
+impl<SP> ShMemService<SP>
 where
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider,
 {
     /// Create a new [`ShMemService`], then listen and service incoming connections in a new thread.
     /// Returns [`ShMemService::Failed`] on error.
@@ -401,7 +392,7 @@ where
         let syncpair = Arc::new((Mutex::new(ShMemServiceStatus::Starting), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle = thread::spawn(move || {
-            let mut worker = match ServedShMemServiceWorker::<SHM, SP>::new() {
+            let mut worker = match ServedShMemServiceWorker::<SP::ShMem, SP>::new() {
                 Ok(worker) => worker,
                 Err(e) => {
                     // Make sure the parent processes can continue
@@ -472,7 +463,7 @@ struct ServedShMemServiceWorker<SHM, SP> {
 impl<SHM, SP> ServedShMemServiceWorker<SHM, SP>
 where
     SHM: ShMem,
-    SP: ShMemProvider<SHM>,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create a new [`ShMemService`]
     fn new() -> Result<Self, Error> {

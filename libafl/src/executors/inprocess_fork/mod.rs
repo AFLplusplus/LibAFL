@@ -106,11 +106,11 @@ impl<EM, H, HT, I, OT, S, SHM, SP, Z> Executor<EM, I, S, Z>
     for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SHM, SP, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
-    S: HasExecutions,
-    SHM: ShMem,
-    SP: ShMemProvider<SHM>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
+    S: HasExecutions,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[inline]
     fn run_target(
