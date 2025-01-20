@@ -7,7 +7,7 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{ClientDescription, EventRestarter, NopEventManager},
+    events::{ClientDescription, EventRestarter},
     executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -27,7 +27,7 @@ use libafl::{
         ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
     state::{HasCorpus, StdState},
-    Error, HasMetadata, NopFuzzer,
+    Error, HasMetadata,
 };
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::shmem::StdShMemProvider;
@@ -41,8 +41,8 @@ use libafl_qemu::{
     modules::{
         cmplog::CmpLogObserver,
         edges::EdgeCoverageFullVariant,
-        utils::filters::{NopPageFilter, StdAddressFilter},
-        EdgeCoverageModule, EmulatorModule, EmulatorModuleTuple, StdEdgeCoverageModule,
+        utils::filters::{HasAddressFilter, NopPageFilter, StdAddressFilter},
+        EdgeCoverageModule, EmulatorModuleTuple, StdEdgeCoverageModule,
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
