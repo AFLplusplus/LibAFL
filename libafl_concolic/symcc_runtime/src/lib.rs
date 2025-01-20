@@ -46,6 +46,7 @@ pub mod cpp_runtime {
 #[doc(hidden)]
 pub use ctor::ctor;
 use libafl::observers::concolic;
+pub use libafl_bolts::shmem::StdShMem;
 #[doc(hidden)]
 pub use libc::atexit;
 #[doc(hidden)]

@@ -75,7 +75,7 @@ pub trait X
 }
 ```
 
-- __Ideally__ the types used in the the arguments of methods in traits should have the same as the types defined on the traits.
+- __Ideally__ the types used in the arguments of methods in traits should have the same as the types defined on the traits.
 ```rust
 pub trait X<A, B, C> // <- this trait have 3 generics, A, B, and C
 {
@@ -84,6 +84,22 @@ pub trait X<A, B, C> // <- this trait have 3 generics, A, B, and C
     fn do_other_stuff(&self, a: A, b: B); // <- this is not ideal because it does not have C.
 }
 ```
+- Generic naming should be consistent. Do NOT use multiple name for the same generic, it just makes things more confusing. Do:
+```rust
+pub struct X<A> {
+    phantom: PhanomData<A>,
+}
+
+impl<A> X<A> {}
+```
+But not:
+```rust
+pub struct X<A> {
+    phantom: PhanomData<A>,
+}
+
+impl<B> X<B> {} // <- Do NOT do that, use A instead of B
+```
 - Always alphabetically order the type generics. Therefore,
 ```rust
 pub struct X<E, EM, OT, S, Z> {}; // <- Generics are alphabetically ordered
@@ -91,4 +107,31 @@ pub struct X<E, EM, OT, S, Z> {}; // <- Generics are alphabetically ordered
 But not,
 ```rust
 pub struct X<S, OT, Z, EM, E> {}; // <- Generics are not ordered
+```
+- Similarly, generic bounds in `where` clauses should be alphabetically sorted. Prefer:
+```rust
+pub trait FooA {}
+pub trait FooB {}
+
+pub struct X<A, B>;
+
+impl<A, B> X<A, B>
+where
+    A: FooA,
+    B: FooB,
+{}
+```
+Over:
+```rust
+pub trait FooA {}
+pub trait FooB {}
+
+pub struct X<A, B>;
+
+impl<A, B> X<A, B>
+where
+    B: FooB, // <-|
+             //   | Generic bounds are not alphabetically ordered.
+    A: FooA, // <-|
+{}
 ```

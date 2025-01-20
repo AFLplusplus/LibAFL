@@ -68,6 +68,12 @@ where
         Ok(false)
     }
 
+    #[cfg(feature = "track_hit_feedbacks")]
+    #[inline]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
+    }
+
     fn append_metadata(
         &mut self,
         state: &mut S,
@@ -77,11 +83,5 @@ where
     ) -> Result<(), Error> {
         (self.func)(state, testcase, &self.out_dir)?;
         Ok(())
-    }
-
-    #[cfg(feature = "track_hit_feedbacks")]
-    #[inline]
-    fn last_result(&self) -> Result<bool, Error> {
-        Ok(false)
     }
 }

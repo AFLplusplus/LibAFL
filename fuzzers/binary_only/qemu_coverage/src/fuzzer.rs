@@ -124,7 +124,7 @@ pub fn fuzz() {
     env::remove_var("LD_LIBRARY_PATH");
 
     let mut run_client = |state: Option<_>,
-                          mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         let mut cov_path = options.coverage_path.clone();
 

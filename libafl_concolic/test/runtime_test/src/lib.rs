@@ -7,8 +7,10 @@ use symcc_runtime::{
     export_runtime,
     filter::NoFloat,
     tracing::{self, StdShMemMessageFileWriter},
-    Runtime,
+    Runtime, StdShMem,
 };
+
+// use libafl_bolts::StdShmem;
 
 export_runtime!(
     NoFloat => NoFloat;
@@ -17,5 +19,5 @@ export_runtime!(
             .expect("unable to construct tracing runtime writer. (missing env?)"),
         false
     )
-    => tracing::TracingRuntime
+    => tracing::TracingRuntime<StdShMem>
 );

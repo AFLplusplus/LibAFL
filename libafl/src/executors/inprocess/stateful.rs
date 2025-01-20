@@ -27,8 +27,8 @@ use crate::{
 
 /// The process executor simply calls a target function, as mutable reference to a closure
 /// The internal state of the executor is made available to the harness.
-pub type StatefulInProcessExecutor<'a, H, I, OT, S, ES> =
-    StatefulGenericInProcessExecutor<H, &'a mut H, (), I, OT, S, ES>;
+pub type StatefulInProcessExecutor<'a, ES, H, I, OT, S> =
+    StatefulGenericInProcessExecutor<ES, H, &'a mut H, (), I, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 /// The internal state of the executor is made available to the harness.
@@ -44,7 +44,7 @@ pub type OwnedInProcessExecutor<I, OT, S, ES> = StatefulGenericInProcessExecutor
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 /// The harness can access the internal state of the executor.
-pub struct StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES> {
+pub struct StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S> {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
     /// The state used as argument of the harness
@@ -54,7 +54,7 @@ pub struct StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES> {
     phantom: PhantomData<(ES, *const H)>,
 }
 
-impl<H, HB, HT, I, OT, S, ES> Debug for StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES>
+impl<H, HB, HT, I, OT, S, ES> Debug for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 where
     OT: Debug,
 {
@@ -67,7 +67,7 @@ where
 }
 
 impl<EM, H, HB, HT, I, OT, S, Z, ES> Executor<EM, I, S, Z>
-    for StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES>
+    for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     HB: BorrowMut<H>,
@@ -99,7 +99,7 @@ where
 }
 
 impl<H, HB, HT, I, OT, S, ES> HasObservers
-    for StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES>
+    for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     HB: BorrowMut<H>,
@@ -118,7 +118,7 @@ where
     }
 }
 
-impl<'a, H, I, OT, S, ES> StatefulInProcessExecutor<'a, H, I, OT, S, ES>
+impl<'a, H, I, OT, S, ES> StatefulInProcessExecutor<'a, ES, H, I, OT, S>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
@@ -224,7 +224,7 @@ where
     }
 }
 
-impl<H, HB, HT, I, OT, S, ES> StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES> {
+impl<H, HB, HT, I, OT, S, ES> StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S> {
     /// The executor state given to the harness
     pub fn exposed_executor_state(&self) -> &ES {
         &self.exposed_executor_state
@@ -236,7 +236,7 @@ impl<H, HB, HT, I, OT, S, ES> StatefulGenericInProcessExecutor<H, HB, HT, I, OT,
     }
 }
 
-impl<H, HB, HT, I, OT, S, ES> StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES>
+impl<H, HB, HT, I, OT, S, ES> StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     HB: BorrowMut<H>,
@@ -364,7 +364,7 @@ where
 }
 
 impl<H, HB, HT, I, OT, S, ES> HasInProcessHooks<I, S>
-    for StatefulGenericInProcessExecutor<H, HB, HT, I, OT, S, ES>
+    for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 {
     /// the timeout handler
     #[inline]

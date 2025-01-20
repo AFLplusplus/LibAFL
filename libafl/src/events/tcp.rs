@@ -25,7 +25,7 @@ use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{
     core_affinity::CoreId,
     os::CTRL_C_EXIT,
-    shmem::{ShMemProvider, StdShMemProvider},
+    shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
     tuples::tuple_list,
     ClientId,
@@ -819,24 +819,20 @@ impl<EMH, I, S> HasEventManagerId for TcpEventManager<EMH, I, S> {
 
 /// A manager that can restart on the fly, storing states in-between (in `on_restart`)
 #[derive(Debug)]
-pub struct TcpRestartingEventManager<EMH, I, S, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct TcpRestartingEventManager<EMH, I, S, SHM, SP> {
     /// The embedded TCP event manager
     tcp_mgr: TcpEventManager<EMH, I, S>,
     /// The staterestorer to serialize the state for the next runner
-    staterestorer: StateRestorer<SP>,
+    staterestorer: StateRestorer<SHM, SP>,
     /// Decide if the state restorer must save the serialized state
     save_state: bool,
 }
 
-impl<EMH, I, S, SP> ProgressReporter<S> for TcpRestartingEventManager<EMH, I, S, SP>
+impl<EMH, I, S, SHM, SP> ProgressReporter<S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
     S: HasMetadata + HasExecutions + HasLastReportTime + MaybeHasClientPerfMonitor,
     I: Serialize,
-    SP: ShMemProvider,
 {
     fn maybe_report_progress(
         &mut self,
@@ -851,11 +847,10 @@ where
     }
 }
 
-impl<EMH, I, S, SP> EventFirer<I, S> for TcpRestartingEventManager<EMH, I, S, SP>
+impl<EMH, I, S, SHM, SP> EventFirer<I, S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
     I: Serialize,
-    SP: ShMemProvider,
 {
     fn should_send(&self) -> bool {
         self.tcp_mgr.should_send()
@@ -871,30 +866,32 @@ where
     }
 }
 
-impl<EMH, I, S, SP> ManagerExit for TcpRestartingEventManager<EMH, I, S, SP>
+impl<EMH, I, S, SHM, SP> ManagerExit for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
-    /// The tcp client needs to wait until a broker mapped all pages, before shutting down.
-    /// Otherwise, the OS may already have removed the shared maps,
-    #[inline]
-    fn await_restart_safe(&mut self) {
-        self.tcp_mgr.await_restart_safe();
-    }
-
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
         // Also inform the broker that we are about to exit.
         // This way, the broker can clean up the pages, and eventually exit.
         self.tcp_mgr.send_exiting()
     }
+
+    /// The tcp client needs to wait until a broker mapped all pages, before shutting down.
+    /// Otherwise, the OS may already have removed the shared maps,
+    #[inline]
+    fn await_restart_safe(&mut self) {
+        self.tcp_mgr.await_restart_safe();
+    }
 }
 
-impl<EMH, I, S, SP> EventRestarter<S> for TcpRestartingEventManager<EMH, I, S, SP>
+impl<EMH, I, S, SHM, SP> EventRestarter<S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
     S: HasExecutions + HasCurrentStageId + Serialize,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -913,7 +910,8 @@ where
     }
 }
 
-impl<E, EMH, I, S, SP, Z> EventProcessor<E, S, Z> for TcpRestartingEventManager<EMH, I, S, SP>
+impl<E, EMH, I, S, SHM, SP, Z> EventProcessor<E, S, Z>
+    for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     E: HasObservers + Executor<TcpEventManager<EMH, I, S>, I, S, Z>,
     for<'a> E::Observers: Deserialize<'a>,
@@ -926,7 +924,8 @@ where
         + HasSolutions<I>
         + HasCurrentTestcase<I>
         + Stoppable,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: ExecutionProcessor<TcpEventManager<EMH, I, S>, I, E::Observers, S>
         + EvaluatorObservers<E, TcpEventManager<EMH, I, S>, I, S>,
 {
@@ -939,10 +938,7 @@ where
     }
 }
 
-impl<EMH, I, S, SP> HasEventManagerId for TcpRestartingEventManager<EMH, I, S, SP>
-where
-    SP: ShMemProvider,
-{
+impl<EMH, I, S, SHM, SP> HasEventManagerId for TcpRestartingEventManager<EMH, I, S, SHM, SP> {
     fn mgr_id(&self) -> EventManagerId {
         self.tcp_mgr.mgr_id()
     }
@@ -954,13 +950,12 @@ const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The tcp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
-impl<EMH, I, S, SP> TcpRestartingEventManager<EMH, I, S, SP>
+impl<EMH, I, S, SHM, SP> TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    SP: ShMemProvider,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
-    pub fn new(tcp_mgr: TcpEventManager<EMH, I, S>, staterestorer: StateRestorer<SP>) -> Self {
+    pub fn new(tcp_mgr: TcpEventManager<EMH, I, S>, staterestorer: StateRestorer<SHM, SP>) -> Self {
         Self {
             tcp_mgr,
             staterestorer,
@@ -971,7 +966,7 @@ where
     /// Create a new runner specifying if it must save the serialized state on restart.
     pub fn with_save_state(
         tcp_mgr: TcpEventManager<EMH, I, S>,
-        staterestorer: StateRestorer<SP>,
+        staterestorer: StateRestorer<SHM, SP>,
         save_state: bool,
     ) -> Self {
         Self {
@@ -982,12 +977,12 @@ where
     }
 
     /// Get the staterestorer
-    pub fn staterestorer(&self) -> &StateRestorer<SP> {
+    pub fn staterestorer(&self) -> &StateRestorer<SHM, SP> {
         &self.staterestorer
     }
 
     /// Get the staterestorer (mutable)
-    pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SP> {
+    pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SHM, SP> {
         &mut self.staterestorer
     }
 }
@@ -1018,7 +1013,7 @@ pub fn setup_restarting_mgr_tcp<I, MT, S>(
 ) -> Result<
     (
         Option<S>,
-        TcpRestartingEventManager<(), I, S, StdShMemProvider>,
+        TcpRestartingEventManager<(), I, S, StdShMem, StdShMemProvider>,
     ),
     Error,
 >
@@ -1049,12 +1044,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[derive(TypedBuilder, Debug)]
-pub struct TcpRestartingMgr<EMH, I, MT, S, SP>
-where
-    MT: Monitor,
-    S: DeserializeOwned,
-    SP: ShMemProvider + 'static,
-{
+pub struct TcpRestartingMgr<EMH, I, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
@@ -1095,7 +1085,6 @@ where
     EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
     I: Input,
     MT: Monitor + Clone,
-    SP: ShMemProvider,
     S: HasExecutions
         + HasMetadata
         + HasImported
@@ -1103,11 +1092,18 @@ where
         + HasCurrentTestcase<I>
         + DeserializeOwned
         + Stoppable,
+    SP: ShMemProvider,
 {
     /// Launch the restarting manager
     pub fn launch(
         &mut self,
-    ) -> Result<(Option<S>, TcpRestartingEventManager<EMH, I, S, SP>), Error> {
+    ) -> Result<
+        (
+            Option<S>,
+            TcpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
+        ),
+        Error,
+    > {
         // We start ourself as child process to actually fuzz
         let (staterestorer, _new_shmem_provider, core_id) = if env::var(_ENV_FUZZER_SENDER).is_err()
         {
@@ -1185,11 +1181,11 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]
-            let staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;

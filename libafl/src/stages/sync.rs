@@ -7,7 +7,12 @@ use alloc::{
 use core::{marker::PhantomData, time::Duration};
 use std::path::{Path, PathBuf};
 
-use libafl_bolts::{current_time, fs::find_new_files_rec, shmem::ShMemProvider, Named};
+use libafl_bolts::{
+    current_time,
+    fs::find_new_files_rec,
+    shmem::{ShMem, ShMemProvider},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -219,14 +224,12 @@ impl SyncFromBrokerMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromBrokerStage<I, IC, ICB, S, SP>
-where
-    SP: ShMemProvider,
-{
-    client: LlmpEventConverter<I, IC, ICB, S, SP>,
+pub struct SyncFromBrokerStage<I, IC, ICB, S, SHM, SP> {
+    client: LlmpEventConverter<I, IC, ICB, S, SHM, SP>,
 }
 
-impl<E, EM, I, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<I, IC, ICB, S, SP>
+impl<E, EM, I, IC, ICB, DI, S, SHM, SP, Z> Stage<E, EM, S, Z>
+    for SyncFromBrokerStage<I, IC, ICB, S, SHM, SP>
 where
     DI: Input,
     EM: EventFirer<I, S>,
@@ -242,7 +245,8 @@ where
         + HasCurrentTestcase<I>
         + Stoppable
         + MaybeHasClientPerfMonitor,
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
     Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
     #[inline]
@@ -316,13 +320,10 @@ where
     }
 }
 
-impl<I, IC, ICB, S, SP> SyncFromBrokerStage<I, IC, ICB, S, SP>
-where
-    SP: ShMemProvider,
-{
+impl<I, IC, ICB, S, SHM, SP> SyncFromBrokerStage<I, IC, ICB, S, SHM, SP> {
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
-    pub fn new(client: LlmpEventConverter<I, IC, ICB, S, SP>) -> Self {
+    pub fn new(client: LlmpEventConverter<I, IC, ICB, S, SHM, SP>) -> Self {
         Self { client }
     }
 }
