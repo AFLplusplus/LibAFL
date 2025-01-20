@@ -1,4 +1,4 @@
-use core::{marker::PhantomData, ptr, time::Duration};
+use core::{ptr, time::Duration};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -15,20 +15,16 @@ use libafl_bolts::{
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
 /// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-pub struct TinyInstExecutor<S, SP, OT>
-where
-    SP: ShMemProvider,
-{
+pub struct TinyInstExecutor<SHM, OT> {
     tinyinst: TinyInst,
     coverage_ptr: *mut Vec<u64>,
     timeout: Duration,
     observers: OT,
-    phantom: PhantomData<S>,
     cur_input: InputFile,
-    map: Option<<SP as ShMemProvider>::ShMem>,
+    map: Option<SHM>,
 }
 
-impl TinyInstExecutor<(), NopShMemProvider, ()> {
+impl TinyInstExecutor<NopShMemProvider, ()> {
     /// Create a builder for [`TinyInstExecutor`]
     #[must_use]
     pub fn builder<'a>() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
@@ -36,10 +32,7 @@ impl TinyInstExecutor<(), NopShMemProvider, ()> {
     }
 }
 
-impl<S, SP, OT> std::fmt::Debug for TinyInstExecutor<S, SP, OT>
-where
-    SP: ShMemProvider,
-{
+impl<SHM, OT> std::fmt::Debug for TinyInstExecutor<SHM, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TinyInstExecutor")
             .field("timeout", &self.timeout)
@@ -47,11 +40,11 @@ where
     }
 }
 
-impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for TinyInstExecutor<S, SP, OT>
+impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for TinyInstExecutor<SHM, OT>
 where
     S: HasExecutions,
+    SHM: for<'a> AsSliceMut<'a, Entry = u8>,
     I: HasTargetBytes,
-    SP: ShMemProvider,
 {
     #[inline]
     fn run_target(
@@ -246,7 +239,10 @@ where
     }
 
     /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-    pub fn build<OT, S>(&mut self, observers: OT) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
+    pub fn build<OT, S>(
+        &mut self,
+        observers: OT,
+    ) -> Result<TinyInstExecutor<SP::ShMem, OT>, Error> {
         if self.coverage_ptr.is_null() {
             return Err(Error::illegal_argument("Coverage pointer may not be null."));
         }
@@ -306,17 +302,13 @@ where
             coverage_ptr: self.coverage_ptr,
             timeout: self.timeout,
             observers,
-            phantom: PhantomData,
             cur_input,
             map,
         })
     }
 }
 
-impl<S, SP, OT> HasObservers for TinyInstExecutor<S, SP, OT>
-where
-    SP: ShMemProvider,
-{
+impl<SHM, OT> HasObservers for TinyInstExecutor<SHM, OT> {
     type Observers = OT;
 
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
