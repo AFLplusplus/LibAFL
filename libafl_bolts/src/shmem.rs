@@ -34,6 +34,7 @@ use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
 pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
 use crate::Error;
+use crate::os::unix_shmem_server::ServedShMem;
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -60,15 +61,14 @@ pub type StdShMemService =
 
 /// The standard sharedmem
 #[cfg(all(feature = "std", target_vendor = "apple"))]
-pub type StdShMem = MmapShMem;
+pub type StdShMem = RcShMem<ServedShMem<MmapShMem>, ServedShMemProvider<MmapShMemProvider>>;
 
 /// The standard sharedmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
-pub type StdShMemProvider =
-    RcShMemProvider<MmapShMemProvider, ServedShMemProvider<MmapShMem, MmapShMemProvider>>;
+pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 /// The standard sharedmem service
-pub type StdShMemService = ShMemService<MmapShMem, MmapShMemProvider>;
+pub type StdShMemService = ShMemService<MmapShMemProvider>;
 
 /// The default [`ShMem`].
 #[cfg(all(
