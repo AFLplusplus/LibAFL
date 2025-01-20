@@ -9,10 +9,9 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
-#[cfg(feature = "injections")]
-use libafl_qemu::modules::injections::InjectionModule;
 use libafl_qemu::modules::{
     asan::AsanModule, asan_guest::AsanGuestModule, cmplog::CmpLogModule, DrCovModule,
+    InjectionModule,
 };
 
 use crate::{
@@ -75,7 +74,7 @@ impl Client<'_> {
         }
 
         #[cfg(not(feature = "injections"))]
-        let injection_module = None;
+        let injection_module = Option::<InjectionModule>::None;
 
         #[cfg(feature = "injections")]
         let injection_module = self
@@ -95,10 +94,14 @@ impl Client<'_> {
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let extra_tokens = injection_module
-            .as_ref()
-            .map(|h| h.tokens.clone())
-            .unwrap_or_default();
+        let extra_tokens = if cfg!(feature = "injections") {
+            injection_module
+                .as_ref()
+                .map(|h| h.tokens.clone())
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
         let instance_builder = Instance::builder()
             .options(self.options)
