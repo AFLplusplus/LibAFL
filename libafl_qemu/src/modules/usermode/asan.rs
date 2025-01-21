@@ -1060,7 +1060,6 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
                 unreachable!("Impossible. else you coded it wrong.")
             }
         };
-        println!("AA");
     }
 
     h.read::<N>(qemu, id as GuestAddr, addr);
