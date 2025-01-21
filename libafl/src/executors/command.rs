@@ -51,10 +51,7 @@ use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    observers::{
-        stdio::{HasStdErr, HasStdOut},
-        ObserversTuple, StdErrObserver, StdOutObserver,
-    },
+    observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
     std::borrow::ToOwned,
     Error,
@@ -371,7 +368,7 @@ where
              })?.read_to_end(&mut stdout)?;
             let mut observers = self.observers_mut();
             let obs = observers.index_mut(h);
-            obs.observe_stdout(&stdout);
+            obs.observe(&stdout);
         }
         if let Some(h) = &mut self.configurer.stderr_observer() {
             let mut stderr = Vec::new();
@@ -382,7 +379,7 @@ where
              })?.read_to_end(&mut stderr)?;
             let mut observers = self.observers_mut();
             let obs = observers.index_mut(h);
-            obs.observe_stderr(&stderr);
+            obs.observe(&stderr);
         }
         Ok(exit_kind)
     }
