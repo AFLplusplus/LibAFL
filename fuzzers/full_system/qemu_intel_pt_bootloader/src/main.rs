@@ -27,7 +27,7 @@ use libafl::{
 use libafl_bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice};
 use libafl_qemu::{
     config,
-    config::{Accelerator, QemuConfig},
+    config::{Accelerator, DriveCache, QemuConfig},
     executor::QemuExecutor,
     modules::intel_pt::{IntelPTModule, Section},
     Emulator, EmulatorBuilder, GuestAddr, QemuExitReason, QemuShutdownCause,
@@ -67,6 +67,7 @@ fn main() {
         .drives([config::Drive::builder()
             .format(config::DiskImageFileFormat::Qcow2)
             .file("/mnt/libafl_qemu_tmpfs/boot.qcow2")
+            .cache(DriveCache::None)
             .build()])
         .accelerator(Accelerator::Kvm)
         //.snapshot(true) todo: doesnt work

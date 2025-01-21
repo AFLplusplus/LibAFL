@@ -37,6 +37,16 @@ pub enum DiskImageFileFormat {
     Raw,
 }
 
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "cache=", serialize_all = "lowercase")]
+pub enum DriveCache {
+    WriteBack,
+    None,
+    WriteThrough,
+    DirectSync,
+    Unsafe,
+}
+
 #[derive(Debug, Clone, Default, TypedBuilder)]
 pub struct Drive {
     #[builder(default, setter(strip_option, into))]
@@ -45,6 +55,8 @@ pub struct Drive {
     format: Option<DiskImageFileFormat>,
     #[builder(default, setter(strip_option))]
     interface: Option<DriveInterface>,
+    #[builder(default, setter(strip_option))]
+    cache: Option<DriveCache>,
 }
 
 impl Display for Drive {
@@ -69,6 +81,9 @@ impl Display for Drive {
         }
         if let Some(interface) = &self.interface {
             write!(f, "{}{interface}", separator())?;
+        }
+        if let Some(cache) = &self.cache {
+            write!(f, "{}{cache}", separator())?;
         }
 
         Ok(())

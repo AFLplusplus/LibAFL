@@ -16,11 +16,10 @@ mkdir -p ${TARGET_DIR}
 '''
 
 [tasks.ram_disk]
-condition = { files_not_exist = ["/mnt/libafl_qemu_tmpfs"] }
 script = """
-sudo mkdir -p /mnt/libafl_qemu_tmpfs &&
-sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs &&
-sudo chown "${USER}:${USER}" "/mnt/libafl_qemu_tmpfs"
+sudo mkdir -p /mnt/libafl_qemu_tmpfs || echo "/mnt/libafl_qemu_tmpfs creation failed";
+sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs || echo "tmpfs mount failed";
+sudo chown "${USER}:${USER}" "/mnt/libafl_qemu_tmpfs";
 """
 
 [tasks.remove_ram_disk]
