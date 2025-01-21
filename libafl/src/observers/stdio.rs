@@ -71,8 +71,8 @@ use crate::{observers::Observer, Error};
 ///     ) -> Result<bool, Error>
 ///     {
 ///         unsafe {
-///             STDOUT = observers.get(&self.stdout_observer).unwrap().data.clone();
-///             STDERR = observers.get(&self.stderr_observer).unwrap().data.clone();
+///             STDOUT = observers.get(&self.stdout_observer).unwrap().output.clone();
+///             STDERR = observers.get(&self.stderr_observer).unwrap().output.clone();
 ///         }
 ///         Ok(true)
 ///     }
@@ -169,58 +169,59 @@ use crate::{observers::Observer, Error};
 /// ```
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct StreamObserver<T> {
+pub struct OutputObserver<T> {
     /// The name of the observer.
     pub name: Cow<'static, str>,
     /// The captured stdout/stderr data during last execution.
-    pub data: Option<Vec<u8>>,
+    pub output: Option<Vec<u8>>,
     /// Phantom data to hold the stream type
     phantom: PhantomData<T>,
 }
 
-/// Marker traits to distinguish between stdout and stderr
+/// Marker traits to mark stdout for the `OutputObserver`
 #[derive(Debug, Clone)]
 pub struct StdOutMarker;
-/// Marker traits to distinguish between stdout and stderr
+
+/// Marker traits to mark stderr for the `OutputObserver`
 #[derive(Debug, Clone)]
 pub struct StdErrMarker;
 
-impl<T> StreamObserver<T> {
-    /// Create a new `StreamObserver` with the given name.
+impl<T> OutputObserver<T> {
+    /// Create a new `OutputObserver` with the given name.
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
             name: Cow::from(name),
-            data: None,
+            output: None,
             phantom: PhantomData,
         }
     }
 
     /// React to new stream data
     pub fn observe(&mut self, data: &[u8]) {
-        self.data = Some(data.into());
+        self.output = Some(data.into());
     }
 }
 
-impl<T> Named for StreamObserver<T> {
+impl<T> Named for OutputObserver<T> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<I, S, T> Observer<I, S> for StreamObserver<T> {
+impl<I, S, T> Observer<I, S> for OutputObserver<T> {
     fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.data = None;
+        self.output = None;
         Ok(())
     }
 
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.data = None;
+        self.output = None;
         Ok(())
     }
 }
 
 /// An observer that captures stdout of a target.
-pub type StdOutObserver = StreamObserver<StdOutMarker>;
+pub type StdOutObserver = OutputObserver<StdOutMarker>;
 /// An observer that captures stderr of a target.
-pub type StdErrObserver = StreamObserver<StdErrMarker>;
+pub type StdErrObserver = OutputObserver<StdErrMarker>;
