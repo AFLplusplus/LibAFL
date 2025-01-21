@@ -662,10 +662,10 @@ pub mod unix_shmem {
     pub type UnixShMem = ashmem::AshmemShMem;
     /// Shared memory Provider for Unix
     #[cfg(not(target_os = "android"))]
-    pub type UnixShMemProvider = default::CommonUnixShMemProvider;
+    pub type UnixShMemProvider = memfd::MemfdShMemProvider;
     /// Shared memory for Unix
     #[cfg(not(target_os = "android"))]
-    pub type UnixShMem = default::CommonUnixShMem;
+    pub type UnixShMem = memfd::MemfdShMem;
 
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
