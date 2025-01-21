@@ -265,8 +265,18 @@ where
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
+        ET: EmulatorModuleTuple<I, S>,
+    {}
+
+    #[cfg(feature = "usermode")]
+    fn first_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _state: &mut S,
+    ) where
         ET: EmulatorModuleTuple<I, S>,
     {
         emulator_modules.blocks(
@@ -274,17 +284,7 @@ where
             Hook::Function(gen_block_lengths::<ET, F, I, S>),
             Hook::Function(exec_trace_block::<ET, F, I, S>),
         );
-    }
 
-    #[cfg(feature = "usermode")]
-    fn first_exec<ET>(
-        &mut self,
-        qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, I, S>,
-        _state: &mut S,
-    ) where
-        ET: EmulatorModuleTuple<I, S>,
-    {
         if self.module_mapping.is_none() {
             log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
 
@@ -392,7 +392,7 @@ where
         return None;
     }
 
-    let state = state.expect("The gen_unique_block_ids hook works only for in-process fuzzing");
+    let state = state.expect("The gen_unique_block_ids hook works only for in-process fuzzing. Is the Executor initialized?");
     if state
         .metadata_map_mut()
         .get_mut::<DrCovMetadata>()

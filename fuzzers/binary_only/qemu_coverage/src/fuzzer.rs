@@ -4,7 +4,6 @@
 use core::mem::size_of;
 use core::time::Duration;
 use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
-
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus},
@@ -29,9 +28,9 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::{drcov::DrCovModule, utils::filters::StdAddressFilter},
+    modules::{drcov::DrCovModule},
     ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor,
-    QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    QemuExitReason, QemuRWError, QemuShutdownCause, Regs, Qemu,
 };
 
 #[derive(Default)]
@@ -127,9 +126,14 @@ pub fn fuzz() {
                           mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         let mut cov_path = options.coverage_path.clone();
+        let core_id = client_description.core_id();
+
+        let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
+        let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
+        let core = core_id.0;
+        cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
         let emulator_modules = tuple_list!(DrCovModule::builder()
-            .filter(StdAddressFilter::default())
             .filename(cov_path.clone())
             .full_trace(false)
             .build());
@@ -175,7 +179,7 @@ pub fn fuzz() {
 
         let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-        let reset = |buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
+        let reset = |qemu: Qemu, buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
             unsafe {
                 let _ = qemu.write_mem(input_addr, buf);
                 qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
@@ -197,7 +201,9 @@ pub fn fuzz() {
         };
 
         let mut harness =
-            |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            |emulator: &mut Emulator<_, _, _, _, _, _, _>, state: &mut _, input: &BytesInput| {
+                let qemu = emulator.qemu();
+
                 let target = input.target_bytes();
                 let mut buf = target.as_slice();
                 let mut len = buf.len();
@@ -206,7 +212,13 @@ pub fn fuzz() {
                     len = MAX_INPUT_SIZE;
                 }
                 let len = len as GuestReg;
-                reset(buf, len).unwrap();
+                reset(qemu, buf, len).unwrap();
+
+                unsafe {
+                    let ret = emulator.run(state, input);
+                    log::warn!("ret = {ret:?}");
+                }
+
                 ExitKind::Ok
             };
 
@@ -215,6 +227,7 @@ pub fn fuzz() {
             .cores
             .position(core_id)
             .expect("Failed to get core index");
+
         let files = corpus_files
             .iter()
             .skip(files_per_core * core_idx)
@@ -244,11 +257,6 @@ pub fn fuzz() {
 
         let scheduler = QueueScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-        let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
-        let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
-        let core = core_id.0;
-        cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
         let mut executor = QemuExecutor::new(
             emulator,
