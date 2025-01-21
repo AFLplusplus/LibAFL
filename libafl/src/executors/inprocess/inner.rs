@@ -5,6 +5,7 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
     time::Duration,
 };
+use std::marker::PhantomData;
 
 use libafl_bolts::tuples::{tuple_list, Merge, RefIndexable};
 #[cfg(windows)]
@@ -22,7 +23,7 @@ use crate::{
             ExecutorHooksTuple,
         },
         inprocess::HasInProcessHooks,
-        Executor, HasObservers,
+        EntersTarget, Executor, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -65,36 +66,62 @@ impl<HT, I, OT, S> HasObservers for GenericInProcessExecutorInner<HT, I, OT, S> 
     }
 }
 
-impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
-where
-    OT: ObserversTuple<I, S>,
+/// A simple guard, to be used with [`GenericInProcessExecutorInner`].
+#[derive(Debug)]
+pub struct InProcessGuard<'a> {
+    phantom: PhantomData<&'a ()>,
+}
+
+impl Drop for InProcessGuard<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            let data = &raw mut GLOBAL_STATE;
+
+            write_volatile(&raw mut (*data).current_input_ptr, null());
+            compiler_fence(Ordering::SeqCst);
+        }
+    }
+}
+
+impl<E, EM, HT, I, OT, S, Z> EntersTarget<E, EM, I, S, Z>
+    for GenericInProcessExecutorInner<HT, I, OT, S>
 {
+    type Guard<'a>
+        = InProcessGuard<'a>
+    where
+        E: 'a,
+        EM: 'a,
+        I: 'a,
+        S: 'a,
+        Z: 'a;
+
     /// This function marks the boundary between the fuzzer and the target
     ///
     /// # Safety
     /// This function sets a bunch of raw pointers in global variables, reused in other parts of
     /// the code.
-    // TODO: Remove EM and Z from function bound and add it to struct instead to avoid possible type confusion
     #[inline]
-    pub unsafe fn enter_target<EM, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-        executor_ptr: *const c_void,
-    ) {
+    fn enter_target<'a>(
+        executor: &'a mut E,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Guard<'a> {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
             write_volatile(
                 &raw mut (*data).current_input_ptr,
                 ptr::from_ref(input) as *const c_void,
             );
-            write_volatile(&raw mut (*data).executor_ptr, executor_ptr);
+            write_volatile(
+                &raw mut (*data).executor_ptr,
+                ptr::from_mut(executor) as *mut c_void,
+            );
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
             write_volatile(
-                &raw mut ((*data).state_ptr),
+                &raw mut (*data).state_ptr,
                 ptr::from_mut(state) as *mut c_void,
             );
             write_volatile(
@@ -107,22 +134,8 @@ where
             );
             compiler_fence(Ordering::SeqCst);
         }
-    }
-
-    /// This function marks the boundary between the fuzzer and the target
-    #[inline]
-    pub fn leave_target<EM, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
-        unsafe {
-            let data = &raw mut GLOBAL_STATE;
-
-            write_volatile(&raw mut (*data).current_input_ptr, null());
-            compiler_fence(Ordering::SeqCst);
+        InProcessGuard {
+            phantom: PhantomData,
         }
     }
 }

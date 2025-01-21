@@ -62,7 +62,7 @@ pub(crate) struct Itimerval {
 extern "C" {
     pub(crate) fn setitimer(
         which: libc::c_int,
-        new_value: *mut Itimerval,
+        new_value: *const Itimerval,
         old_value: *mut Itimerval,
     ) -> libc::c_int;
 }

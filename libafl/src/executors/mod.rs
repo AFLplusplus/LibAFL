@@ -67,6 +67,30 @@ pub enum ExitKind {
     // Custom(Box<dyn SerdeAny>),
 }
 
+/// Trait which enters and exits the target. When entering the target, the corresponding fuzzer,
+/// state, event manager, and input are held in a guard until it is dropped, at which point these
+/// references may once again be used.
+pub trait EntersTarget<E, EM, I, S, Z> {
+    /// Holds the references to the fuzzer components until it is dropped.
+    type Guard<'a>
+    where
+        E: 'a,
+        EM: 'a,
+        I: 'a,
+        S: 'a,
+        Z: 'a;
+
+    /// Enter the target. Until the guard is dropped, these references may not otherwise be used.
+    #[must_use]
+    fn enter_target<'a>(
+        executor: &'a mut E,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        event_mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Guard<'a>;
+}
+
 /// How one of the diffing executions finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(

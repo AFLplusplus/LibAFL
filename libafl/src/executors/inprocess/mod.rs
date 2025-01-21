@@ -5,10 +5,8 @@
 use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
-    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr,
     time::Duration,
 };
 
@@ -24,7 +22,7 @@ use crate::{
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::inner::GenericInProcessExecutorInner,
-        Executor, ExitKind, HasObservers,
+        EntersTarget, Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -57,7 +55,7 @@ pub type OwnedInProcessExecutor<I, OT, S> = GenericInProcessExecutor<
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 pub struct GenericInProcessExecutor<H, HB, HT, I, OT, S> {
-    harness_fn: HB,
+    harness_fn: Option<HB>,
     inner: GenericInProcessExecutorInner<HT, I, OT, S>,
     phantom: PhantomData<(*const H, HB)>,
 }
@@ -91,17 +89,21 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        unsafe {
-            let executor_ptr = ptr::from_ref(self) as *const c_void;
-            self.inner
-                .enter_target(fuzzer, state, mgr, input, executor_ptr);
-        }
         self.inner.hooks.pre_exec_all(state, input);
+        let Some(mut harness_fn) = self.harness_fn.take() else {
+            return Err(Error::illegal_state("We attempted to call the target without a harness function. This indicates that we somehow called the harness again from within the panic handler."));
+        };
 
-        let ret = self.harness_fn.borrow_mut()(input);
+        let guard = GenericInProcessExecutorInner::<HT, I, OT, S>::enter_target(
+            self, fuzzer, state, mgr, input,
+        );
 
+        let ret = harness_fn.borrow_mut()(input);
+
+        drop(guard);
+
+        self.harness_fn = Some(harness_fn);
         self.inner.hooks.post_exec_all(state, input);
-        self.inner.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }
 }
@@ -176,7 +178,7 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
+            harness_fn: Some(harness_fn),
             inner,
             phantom: PhantomData,
         })
@@ -213,7 +215,7 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
+            harness_fn: Some(harness_fn),
             inner,
             phantom: PhantomData,
         })
@@ -276,7 +278,7 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
+            harness_fn: Some(harness_fn),
             inner,
             phantom: PhantomData,
         })
@@ -309,7 +311,7 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
+            harness_fn: Some(harness_fn),
             inner,
             phantom: PhantomData,
         })
@@ -317,14 +319,14 @@ where
 
     /// Retrieve the harness function.
     #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn.borrow()
+    pub fn harness(&self) -> Option<&H> {
+        self.harness_fn.as_ref().map(|h| h.borrow())
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn.borrow_mut()
+    pub fn harness_mut(&mut self) -> Option<&mut H> {
+        self.harness_fn.as_mut().map(|h| h.borrow_mut())
     }
 
     /// The inprocess handlers

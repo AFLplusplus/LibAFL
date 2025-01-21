@@ -1,10 +1,8 @@
 use alloc::boxed::Box;
 use core::{
     borrow::BorrowMut,
-    ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr,
     time::Duration,
 };
 
@@ -15,7 +13,7 @@ use crate::{
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
         inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
-        Executor, ExitKind, HasObservers,
+        EntersTarget, Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -46,12 +44,12 @@ pub type OwnedInProcessExecutor<I, OT, S, ES> = StatefulGenericInProcessExecutor
 /// The harness can access the internal state of the executor.
 pub struct StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S> {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: HB,
+    harness_fn: Option<HB>,
     /// The state used as argument of the harness
-    pub exposed_executor_state: ES,
+    exposed_executor_state: Option<ES>,
     /// Inner state of the executor
-    pub inner: GenericInProcessExecutorInner<HT, I, OT, S>,
-    phantom: PhantomData<(ES, *const H)>,
+    inner: GenericInProcessExecutorInner<HT, I, OT, S>,
+    phantom: PhantomData<*const H>,
 }
 
 impl<H, HB, HT, I, OT, S, ES> Debug for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
@@ -69,7 +67,7 @@ where
 impl<EM, H, HB, HT, I, OT, S, Z, ES> Executor<EM, I, S, Z>
     for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 where
-    H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
+    H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -83,17 +81,24 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
-        unsafe {
-            let executor_ptr = ptr::from_ref(self) as *const c_void;
-            self.inner
-                .enter_target(fuzzer, state, mgr, input, executor_ptr);
-        }
+
         self.inner.hooks.pre_exec_all(state, input);
+        let Some(mut harness_fn) = self.harness_fn.take() else {
+            return Err(Error::illegal_state("We attempted to call the target without a harness function. This indicates that we somehow called the harness again from within the panic handler."));
+        };
+        let Some(mut exposed_executor_state) = self.exposed_executor_state.take() else {
+            return Err(Error::illegal_state("We attempted to call the target without a harness function. This indicates that we somehow called the harness again from within the panic handler."));
+        };
+        let guard = GenericInProcessExecutorInner::<HT, I, OT, S>::enter_target(
+            self, fuzzer, state, mgr, input,
+        );
 
-        let ret = self.harness_fn.borrow_mut()(&mut self.exposed_executor_state, state, input);
+        let ret = harness_fn.borrow_mut()(&mut exposed_executor_state, input);
+        drop(guard);
 
+        self.harness_fn = Some(harness_fn);
+        self.exposed_executor_state = Some(exposed_executor_state);
         self.inner.hooks.post_exec_all(state, input);
-        self.inner.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }
 }
@@ -101,7 +106,7 @@ where
 impl<H, HB, HT, I, OT, S, ES> HasObservers
     for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 where
-    H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
+    H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -120,7 +125,7 @@ where
 
 impl<'a, H, I, OT, S, ES> StatefulInProcessExecutor<'a, ES, H, I, OT, S>
 where
-    H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
+    H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
     S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
     I: Clone + Input,
@@ -177,8 +182,8 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
-            exposed_executor_state,
+            harness_fn: Some(harness_fn),
+            exposed_executor_state: Some(exposed_executor_state),
             inner,
             phantom: PhantomData,
         })
@@ -216,8 +221,8 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
-            exposed_executor_state,
+            harness_fn: Some(harness_fn),
+            exposed_executor_state: Some(exposed_executor_state),
             inner,
             phantom: PhantomData,
         })
@@ -226,19 +231,19 @@ where
 
 impl<H, HB, HT, I, OT, S, ES> StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S> {
     /// The executor state given to the harness
-    pub fn exposed_executor_state(&self) -> &ES {
-        &self.exposed_executor_state
+    pub fn exposed_executor_state(&self) -> Option<&ES> {
+        self.exposed_executor_state.as_ref()
     }
 
     /// The mutable executor state given to the harness
-    pub fn exposed_executor_state_mut(&mut self) -> &mut ES {
-        &mut self.exposed_executor_state
+    pub fn exposed_executor_state_mut(&mut self) -> Option<&mut ES> {
+        self.exposed_executor_state.as_mut()
     }
 }
 
 impl<H, HB, HT, I, OT, S, ES> StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
 where
-    H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
+    H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     I: Input + Clone,
@@ -295,8 +300,8 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
-            exposed_executor_state,
+            harness_fn: Some(harness_fn),
+            exposed_executor_state: Some(exposed_executor_state),
             inner,
             phantom: PhantomData,
         })
@@ -331,8 +336,8 @@ where
         )?;
 
         Ok(Self {
-            harness_fn,
-            exposed_executor_state,
+            harness_fn: Some(harness_fn),
+            exposed_executor_state: Some(exposed_executor_state),
             inner,
             phantom: PhantomData,
         })
@@ -340,14 +345,14 @@ where
 
     /// Retrieve the harness function.
     #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn.borrow()
+    pub fn harness(&self) -> Option<&H> {
+        self.harness_fn.as_ref().map(|h| h.borrow())
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn.borrow_mut()
+    pub fn harness_mut(&mut self) -> Option<&mut H> {
+        self.harness_fn.as_mut().map(|h| h.borrow_mut())
     }
 
     /// The inprocess handlers

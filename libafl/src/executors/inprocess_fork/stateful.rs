@@ -61,9 +61,9 @@ where
 /// [`StatefulGenericInProcessForkExecutor`] is an executor that forks the current process before each execution. Harness can access some internal state.
 pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z> {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a mut H,
+    harness_fn: Option<&'a mut H>,
     /// The state used as argument of the harness
-    pub exposed_executor_state: ES,
+    pub exposed_executor_state: Option<ES>,
     /// Inner state of the executor
     pub inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
 }
@@ -116,9 +116,22 @@ where
             match fork() {
                 Ok(ForkResult::Child) => {
                     // Child
-                    self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
-                    (self.harness_fn)(&mut self.exposed_executor_state, input);
-                    self.inner.post_run_target_child(fuzzer, state, mgr, input);
+                    let Some(harness_fn) = self.harness_fn.take() else {
+                        return Err(Error::illegal_state("We attempted to call the target without a harness function. This indicates that we somehow called the harness again from within the panic handler."));
+                    };
+                    let Some(mut exposed_executor_state) = self.exposed_executor_state.take()
+                    else {
+                        return Err(Error::illegal_state("We attempted to call the target without a harness function. This indicates that we somehow called the harness again from within the panic handler."));
+                    };
+
+                    let guard = self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
+                    harness_fn(&mut exposed_executor_state, input);
+                    drop(guard);
+
+                    self.inner.post_run_target_child(state, input);
+
+                    self.harness_fn = Some(harness_fn);
+                    self.exposed_executor_state = Some(exposed_executor_state);
                     Ok(ExitKind::Ok)
                 }
                 Ok(ForkResult::Parent { child }) => {
@@ -151,8 +164,8 @@ where
         shmem_provider: SP,
     ) -> Result<Self, Error> {
         Ok(Self {
-            harness_fn,
-            exposed_executor_state,
+            harness_fn: Some(harness_fn),
+            exposed_executor_state: Some(exposed_executor_state),
             inner: GenericInProcessForkExecutorInner::with_hooks(
                 userhooks,
                 observers,
@@ -167,14 +180,14 @@ where
 
     /// Retrieve the harness function.
     #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn
+    pub fn harness(&self) -> Option<&H> {
+        self.harness_fn.as_deref()
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
+    pub fn harness_mut(&mut self) -> Option<&mut H> {
+        self.harness_fn.as_deref_mut()
     }
 }
 

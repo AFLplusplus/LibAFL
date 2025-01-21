@@ -74,7 +74,7 @@ where
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
 pub struct GenericInProcessForkExecutor<'a, EM, H, HT, I, OT, S, SP, Z> {
-    harness_fn: &'a mut H,
+    harness_fn: Option<&'a mut H>,
     inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
 }
 
@@ -126,9 +126,17 @@ where
             match fork() {
                 Ok(ForkResult::Child) => {
                     // Child
-                    self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
-                    (self.harness_fn)(input);
-                    self.inner.post_run_target_child(fuzzer, state, mgr, input);
+                    let Some(harness_fn) = self.harness_fn.take() else {
+                        return Err(Error::illegal_state("We attempted to call the target without a harness function. This indicates that we somehow called the harness again from within the panic handler."));
+                    };
+
+                    let guard = self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
+                    harness_fn(input);
+                    drop(guard);
+
+                    self.inner.post_run_target_child(state, input);
+
+                    self.harness_fn = Some(harness_fn);
                     Ok(ExitKind::Ok)
                 }
                 Ok(ForkResult::Parent { child }) => {
@@ -160,7 +168,7 @@ where
     ) -> Result<Self, Error>
 where {
         Ok(Self {
-            harness_fn,
+            harness_fn: Some(harness_fn),
             inner: GenericInProcessForkExecutorInner::with_hooks(
                 userhooks,
                 observers,
@@ -175,14 +183,14 @@ where {
 
     /// Retrieve the harness function.
     #[inline]
-    pub fn harness(&self) -> &H {
-        self.harness_fn
+    pub fn harness(&self) -> Option<&H> {
+        self.harness_fn.as_deref()
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
-    pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
+    pub fn harness_mut(&mut self) -> Option<&mut H> {
+        self.harness_fn.as_deref_mut()
     }
 }
 

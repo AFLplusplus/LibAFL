@@ -25,7 +25,7 @@ use crate::{
             inprocess_fork::{InChildProcessHooks, FORK_EXECUTOR_GLOBAL_DATA},
             ExecutorHooksTuple,
         },
-        ExitKind, HasObservers,
+        EntersTarget, ExitKind, HasObservers,
     },
     observers::ObserversTuple,
     Error,
@@ -110,21 +110,23 @@ where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
-    pub(super) unsafe fn pre_run_target_child(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<(), Error> {
+    pub(super) unsafe fn pre_run_target_child<'a>(
+        &'a mut self,
+        fuzzer: &'a mut Z,
+        state: &'a mut S,
+        mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Result<InProcessForkGuard<'a>, Error> {
         self.shmem_provider.post_fork(true)?;
 
-        self.enter_target(fuzzer, state, mgr, input);
         self.hooks.pre_exec_all(state, input);
+
+        let itimerspec = self.itimerspec;
 
         self.observers
             .pre_exec_child_all(state, input)
             .expect("Failed to run post_exec on observers");
+        let guard = Self::enter_target(self, fuzzer, state, mgr, input);
 
         #[cfg(target_os = "linux")]
         {
@@ -134,30 +136,23 @@ where
             libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
 
             // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-            let _: i32 = libc::timer_settime(timerid, 0, &raw mut self.itimerspec, null_mut());
+            let _: i32 = libc::timer_settime(timerid, 0, &itimerspec, null_mut());
         }
         #[cfg(not(target_os = "linux"))]
         {
-            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+            setitimer(ITIMER_REAL, &itimerval, null_mut());
         }
         // log::trace!("{v:#?} {}", nix::errno::errno());
 
-        Ok(())
+        Ok(guard)
     }
 
-    pub(super) unsafe fn post_run_target_child(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) {
+    pub(super) unsafe fn post_run_target_child(&mut self, state: &mut S, input: &I) {
         self.observers
             .post_exec_child_all(state, input, &ExitKind::Ok)
             .expect("Failed to run post_exec on observers");
 
         self.hooks.post_exec_all(state, input);
-        self.leave_target(fuzzer, state, mgr, input);
 
         libc::_exit(0);
     }
@@ -195,44 +190,58 @@ where
     }
 }
 
-impl<EM, HT, I, OT, S, SP, Z> GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>
-where
-    HT: ExecutorHooksTuple<I, S>,
-    OT: ObserversTuple<I, S>,
+/// A simple guard, to be used with [`GenericInProcessForkExecutorInner`].
+#[derive(Debug)]
+pub struct InProcessForkGuard<'a> {
+    phantom: PhantomData<&'a ()>,
+}
+
+impl<E, EM, HT, I, OT, S, SP, Z> EntersTarget<E, EM, I, S, Z>
+    for GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>
 {
-    #[inline]
-    /// This function marks the boundary between the fuzzer and the target.
-    pub fn enter_target(&mut self, _fuzzer: &mut Z, state: &mut S, _event_mgr: &mut EM, input: &I) {
+    type Guard<'a>
+        = InProcessForkGuard<'a>
+    where
+        E: 'a,
+        EM: 'a,
+        I: 'a,
+        S: 'a,
+        Z: 'a;
+
+    fn enter_target<'a>(
+        executor: &'a mut E,
+        _fuzzer: &'a mut Z,
+        state: &'a mut S,
+        _event_mgr: &'a mut EM,
+        input: &'a I,
+    ) -> Self::Guard<'a> {
         unsafe {
             let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
                 &raw mut (*data).executor_ptr,
-                ptr::from_ref(self) as *const c_void,
+                ptr::from_ref(executor) as *const c_void,
             );
             write_volatile(
                 &raw mut (*data).current_input_ptr,
                 ptr::from_ref(input) as *const c_void,
             );
             write_volatile(
-                &raw mut ((*data).state_ptr),
+                &raw mut (*data).state_ptr,
                 ptr::from_mut(state) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);
         }
+        InProcessForkGuard {
+            phantom: Default::default(),
+        }
     }
+}
 
-    #[inline]
-    /// This function marks the boundary between the fuzzer and the target.
-    pub fn leave_target(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _input: &I,
-    ) {
-        // do nothing
-    }
-
+impl<EM, HT, I, OT, S, SP, Z> GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>
+where
+    HT: ExecutorHooksTuple<I, S>,
+    OT: ObserversTuple<I, S>,
+{
     /// Creates a new [`GenericInProcessForkExecutorInner`] with custom hooks
     #[cfg(target_os = "linux")]
     pub fn with_hooks(
