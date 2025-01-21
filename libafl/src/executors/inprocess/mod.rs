@@ -158,7 +158,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout<EM, OF, Z>(
+    pub fn batched_timeout<OF>(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -171,7 +171,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
+        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
             tuple_list!(),
             observers,
             fuzzer,
@@ -261,7 +261,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout_generic<EM, OF, Z>(
+    pub fn batched_timeout_generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
@@ -276,7 +276,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
+        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
         )?;
 
