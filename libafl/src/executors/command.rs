@@ -49,7 +49,7 @@ use super::HasTimeout;
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{hooks::InitableExecutorHooksTuple, Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
     state::HasExecutions,
@@ -425,6 +425,7 @@ where
     OT: MatchName + ObserversTuple<I, S>,
     S: HasExecutions,
     T: CommandConfigurator<I, Pid> + Debug,
+    HT: InitableExecutorHooksTuple<S>,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`

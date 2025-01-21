@@ -70,6 +70,7 @@ extern "C" {
 /// The strcut about all the internals of the timer.
 /// This struct absorb all platform specific differences about timer.
 #[expect(missing_debug_implementations)]
+#[derive(Debug)]
 pub struct TimerStruct {
     // timeout time (windows)
     #[cfg(windows)]

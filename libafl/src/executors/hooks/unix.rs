@@ -3,7 +3,7 @@
 pub mod unix_signal_handler {
     use alloc::{boxed::Box, string::String, vec::Vec};
     use core::mem::transmute;
-    use std::{io::Write, panic};
+    use std::{io::Write, mem::MaybeUninit, panic};
 
     use libafl_bolts::os::unix_signals::{ucontext_t, Signal, SignalHandler};
     use libc::siginfo_t;
@@ -13,7 +13,7 @@ pub mod unix_signal_handler {
         executors::{
             common_signals,
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
-            inprocess::{run_observers_and_save_state, HasInProcessHooks},
+            inprocess::run_observers_and_save_state,
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -76,40 +76,18 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
-    where
-        E: Executor<EM, I, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
-        I: Input + Clone,
-    {
+    pub fn setup_panic_hook() {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
             old_hook(panic_info);
             let data = &raw mut GLOBAL_STATE;
             let in_handler = (*data).set_in_handler(true);
-            if (*data).is_valid() {
-                // We are fuzzing!
-                let executor = (*data).executor_mut::<E>();
-                let state = (*data).state_mut::<S>();
-                let input = (*data).take_current_input::<I>();
-                let fuzzer = (*data).fuzzer_mut::<Z>();
-                let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
-                    executor,
-                    state,
-                    input,
-                    fuzzer,
-                    event_mgr,
-                    ExitKind::Crash,
-                );
+            let func: HandlerFuncPtr = transmute((*data).crash_handler);
 
-                libc::_exit(128 + 6); // SIGABRT exit code
-            }
+            let mut empty_siginfo = MaybeUninit::<siginfo_t>::uninit().assume_init();
+            (func)(Signal::SigAbort, &mut empty_siginfo, None, data);
+
             (*data).set_in_handler(in_handler);
         }));
     }
@@ -121,18 +99,18 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, I, S, Z>(
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
+        E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective,
+        Z::Objective: Feedback<EM, I, E::Observers, S>,
         I: Input + Clone,
     {
         // this stuff is for batch timeout
@@ -158,7 +136,7 @@ pub mod unix_signal_handler {
 
         log::error!("Timeout in fuzz run.");
 
-        run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+        run_observers_and_save_state::<E, EM, I, S, Z>(
             executor,
             state,
             input,
@@ -177,7 +155,7 @@ pub mod unix_signal_handler {
     /// # Safety
     /// Well, signal handling is not safe
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, S, Z>(
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
@@ -186,9 +164,9 @@ pub mod unix_signal_handler {
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
+        Z: HasObjective,
+        Z::Objective: Feedback<EM, I, E::Observers, S>,
         I: Input + Clone,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
@@ -229,7 +207,7 @@ pub mod unix_signal_handler {
                 }
             }
 
-            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+            run_observers_and_save_state::<E, EM, I, S, Z>(
                 executor,
                 state,
                 input,

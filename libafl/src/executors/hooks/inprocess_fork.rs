@@ -35,9 +35,6 @@ pub struct InChildProcessHooks<I, S> {
 }
 
 impl<I, S> ExecutorHook<I, S> for InChildProcessHooks<I, S> {
-    /// Init this hook
-    fn init(&mut self, _state: &mut S) {}
-
     /// Call before running a target.
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
         unsafe {

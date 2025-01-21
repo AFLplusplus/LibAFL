@@ -21,27 +21,11 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
-#[cfg(all(unix, feature = "std"))]
-use crate::executors::hooks::unix::unix_signal_handler;
-use crate::{
-    events::{EventFirer, EventRestarter},
-    executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
-    feedbacks::Feedback,
-    state::{HasExecutions, HasSolutions},
-    Error, HasObjective,
-};
-#[cfg(any(unix, windows))]
-use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
+use crate::Error;
 
 /// The inmem executor's handlers.
 #[expect(missing_debug_implementations)]
 pub struct InProcessHooks<I, S> {
-    /// On crash C function pointer
-    #[cfg(feature = "std")]
-    pub crash_handler: *const c_void,
-    /// On timeout C function pointer
-    #[cfg(feature = "std")]
-    pub timeout_handler: *const c_void,
     /// `TImer` struct
     #[cfg(feature = "std")]
     pub timer: TimerStruct,
@@ -185,53 +169,17 @@ impl<I, S> HasTimeout for InProcessHooks<I, S> {
     }
 }
 
-impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
-    fn init(&mut self, _state: &mut S) {}
-    /// Call before running a target.
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) {
-        #[cfg(feature = "std")]
-        unsafe {
-            let data = &raw mut GLOBAL_STATE;
-            (*data).crash_handler = self.crash_handler;
-            (*data).timeout_handler = self.timeout_handler;
-        }
-
-        #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
-        self.timer_mut().set_timer();
-    }
-
-    /// Call after running a target.
-    fn post_exec(&mut self, _state: &mut S, _input: &I) {
-        // timeout stuff
-        // # Safety
-        // We're calling this only once per execution, in a single thread.
-        #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
-        self.timer_mut().unset_timer();
-    }
-}
-
 impl<I, S> InProcessHooks<I, S> {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)] // for `exec_tmout` without `std`
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
-    where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
-        E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
-        I: Input + Clone,
-    {
+    pub fn new(exec_tmout: Duration) -> Result<Self, Error> {
         // # Safety
         // We get a pointer to `GLOBAL_STATE` that will be initialized at this point in time.
         // This unsafe is needed in stable but not in nightly. Remove in the future(?)
         #[expect(unused_unsafe)]
         #[cfg(all(not(miri), unix, feature = "std"))]
         let data = unsafe { &raw mut GLOBAL_STATE };
-        #[cfg(feature = "std")]
-        unix_signal_handler::setup_panic_hook::<E, EM, I, OF, S, Z>();
         // # Safety
         // Setting up the signal handlers with a pointer to the `GLOBAL_STATE` which should not be NULL at this point.
         // We are the sole users of `GLOBAL_STATE` right now, and only dereference it in case of Segfault/Panic.
@@ -242,12 +190,6 @@ impl<I, S> InProcessHooks<I, S> {
         }
         compiler_fence(Ordering::SeqCst);
         Ok(Self {
-            #[cfg(feature = "std")]
-            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z>
-                as *const c_void,
-            #[cfg(feature = "std")]
-            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z>
-                as *const _,
             #[cfg(feature = "std")]
             timer: TimerStruct::new(exec_tmout),
             phantom: PhantomData,
@@ -341,10 +283,6 @@ impl<I, S> InProcessHooks<I, S> {
     pub fn nop() -> Self {
         Self {
             #[cfg(feature = "std")]
-            crash_handler: ptr::null(),
-            #[cfg(feature = "std")]
-            timeout_handler: ptr::null(),
-            #[cfg(feature = "std")]
             timer: TimerStruct::new(Duration::from_millis(5000)),
             phantom: PhantomData,
         }
@@ -371,6 +309,8 @@ pub struct InProcessExecutorHandlerData {
     /// The timeout handler
     #[cfg(feature = "std")]
     pub(crate) timeout_handler: *const c_void,
+
+    pub(crate) timer: Option<TimerStruct>,
 
     #[cfg(all(windows, feature = "std"))]
     pub(crate) ptp_timer: Option<PTP_TIMER>,
@@ -448,6 +388,8 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     current_input_ptr: ptr::null(),
 
     in_handler: false,
+
+    timer: None,
 
     // The crash handler fn
     #[cfg(feature = "std")]

@@ -12,7 +12,7 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{
         hooks::{inprocess::InProcessHooks, ExecutorHooksTuple},
-        inprocess::{GenericInProcessExecutorInner, HasInProcessHooks},
+        inprocess::GenericInProcessExecutorInner,
         EntersTarget, Executor, ExitKind, HasObservers,
     },
     feedbacks::Feedback,
@@ -48,8 +48,8 @@ pub struct StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S> {
     /// The state used as argument of the harness
     exposed_executor_state: Option<ES>,
     /// Inner state of the executor
-    inner: GenericInProcessExecutorInner<HT, I, OT, S>,
-    phantom: PhantomData<*const H>,
+    inner: GenericInProcessExecutorInner<HT, OT>,
+    phantom: PhantomData<(*const H, I, S)>,
 }
 
 impl<H, HB, HT, I, OT, S, ES> Debug for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
@@ -89,9 +89,8 @@ where
         let Some(mut exposed_executor_state) = self.exposed_executor_state.take() else {
             return Err(Error::illegal_state("We attempted to call the target without a harness function. This indicates that we somehow called the harness again from within the panic handler."));
         };
-        let guard = GenericInProcessExecutorInner::<HT, I, OT, S>::enter_target(
-            self, fuzzer, state, mgr, input,
-        );
+        let guard =
+            GenericInProcessExecutorInner::<HT, OT>::enter_target(self, fuzzer, state, mgr, input);
 
         let ret = harness_fn.borrow_mut()(&mut exposed_executor_state, input);
         drop(guard);
@@ -365,21 +364,5 @@ where
     #[inline]
     pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<I, S>, HT) {
         self.inner.hooks_mut()
-    }
-}
-
-impl<H, HB, HT, I, OT, S, ES> HasInProcessHooks<I, S>
-    for StatefulGenericInProcessExecutor<ES, H, HB, HT, I, OT, S>
-{
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks(&self) -> &InProcessHooks<I, S> {
-        self.inner.inprocess_hooks()
-    }
-
-    /// the timeout handler
-    #[inline]
-    fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<I, S> {
-        self.inner.inprocess_hooks_mut()
     }
 }
