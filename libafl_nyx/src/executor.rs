@@ -120,7 +120,7 @@ where
                 .read_to_end(&mut stdout)
                 .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
 
-            ob.observe_stdout(&stdout);
+            ob.observe(&stdout);
         }
 
         unsafe {

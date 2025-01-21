@@ -8,6 +8,7 @@
 )]
 
 use alloc::borrow::Cow;
+use core::marker::PhantomData;
 use std::vec::Vec;
 
 use libafl_bolts::Named;
@@ -70,8 +71,8 @@ use crate::{observers::Observer, Error};
 ///     ) -> Result<bool, Error>
 ///     {
 ///         unsafe {
-///             STDOUT = observers.get(&self.stdout_observer).unwrap().stdout.clone();
-///             STDERR = observers.get(&self.stderr_observer).unwrap().stderr.clone();
+///             STDOUT = observers.get(&self.stdout_observer).unwrap().data.clone();
+///             STDERR = observers.get(&self.stderr_observer).unwrap().data.clone();
 ///         }
 ///         Ok(true)
 ///     }
@@ -168,91 +169,58 @@ use crate::{observers::Observer, Error};
 /// ```
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct StdOutObserver {
+pub struct StreamObserver<T> {
     /// The name of the observer.
     pub name: Cow<'static, str>,
-    /// The stdout of the target during its last execution.
-    pub stdout: Option<Vec<u8>>,
+    /// The captured stdout/stderr data during last execution.
+    pub data: Option<Vec<u8>>,
+    /// Phantom data to hold the stream type
+    phantom: PhantomData<T>,
+}
+
+/// Marker traits to distinguish between stdout and stderr
+#[derive(Debug, Clone)]
+pub struct StdOutMarker;
+/// Marker traits to distinguish between stdout and stderr
+#[derive(Debug, Clone)]
+pub struct StdErrMarker;
+
+impl<T> StreamObserver<T> {
+    /// Create a new `StreamObserver` with the given name.
+    #[must_use]
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: Cow::from(name),
+            data: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// React to new stream data
+    pub fn observe(&mut self, data: &[u8]) {
+        self.data = Some(data.into());
+    }
+}
+
+impl<T> Named for StreamObserver<T> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+}
+
+impl<I, S, T> Observer<I, S> for StreamObserver<T> {
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        self.data = None;
+        Ok(())
+    }
+
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        self.data = None;
+        Ok(())
+    }
 }
 
 /// An observer that captures stdout of a target.
-impl StdOutObserver {
-    /// Create a new [`StdOutObserver`] with the given name.
-    #[must_use]
-    pub fn new(name: &'static str) -> Self {
-        Self {
-            name: Cow::from(name),
-            stdout: None,
-        }
-    }
-
-    /// React to new `stdout`
-    pub fn observe_stdout(&mut self, stdout: &[u8]) {
-        self.stdout = Some(stdout.into());
-    }
-}
-
-impl Named for StdOutObserver {
-    fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-}
-
-impl<I, S> Observer<I, S> for StdOutObserver {
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.stdout = None;
-        Ok(())
-    }
-
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.stdout = None;
-        Ok(())
-    }
-}
-
+pub type StdOutObserver = StreamObserver<StdOutMarker>;
 /// An observer that captures stderr of a target.
-/// Only works for supported executors.
-///
-/// Check docs for [`StdOutObserver`] for example.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct StdErrObserver {
-    /// The name of the observer.
-    pub name: Cow<'static, str>,
-    /// The stderr of the target during its last execution.
-    pub stderr: Option<Vec<u8>>,
-}
-
-/// An observer that captures stderr of a target.
-impl StdErrObserver {
-    /// Create a new [`StdErrObserver`] with the given name.
-    #[must_use]
-    pub fn new(name: &'static str) -> Self {
-        Self {
-            name: Cow::from(name),
-            stderr: None,
-        }
-    }
-
-    /// React to new `stderr`
-    pub fn observe_stderr(&mut self, stderr: &[u8]) {
-        self.stderr = Some(stderr.into());
-    }
-}
-
-impl Named for StdErrObserver {
-    fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-}
-
-impl<I, S> Observer<I, S> for StdErrObserver {
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.stderr = None;
-        Ok(())
-    }
-
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.stderr = None;
-        Ok(())
-    }
-}
+pub type StdErrObserver = StreamObserver<StdErrMarker>;
