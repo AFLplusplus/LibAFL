@@ -71,8 +71,8 @@ use crate::{observers::Observer, Error};
 ///     ) -> Result<bool, Error>
 ///     {
 ///         unsafe {
-///             STDOUT = observers.get(&self.stdout_observer).unwrap().data.clone();
-///             STDERR = observers.get(&self.stderr_observer).unwrap().data.clone();
+///             STDOUT = observers.get(&self.stdout_observer).unwrap().output.clone();
+///             STDERR = observers.get(&self.stderr_observer).unwrap().output.clone();
 ///         }
 ///         Ok(true)
 ///     }
