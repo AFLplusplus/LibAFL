@@ -22,14 +22,14 @@ use libafl_bolts::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::{std_on_restart, ProgressReporter};
+use super::{std_on_restart, AwaitRestartSafe, ProgressReporter};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
         Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
-        ManagerExit,
+        SendExiting,
     },
     monitors::Monitor,
     stages::HasCurrentStageId,
@@ -90,11 +90,13 @@ where
     }
 }
 
-impl<I, MT, S> ManagerExit for SimpleEventManager<I, MT, S> {
+impl<I, MT, S> SendExiting for SimpleEventManager<I, MT, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
+}
 
+impl<I, MT, S> AwaitRestartSafe for SimpleEventManager<I, MT, S> {
     fn await_restart_safe(&mut self) {}
 }
 
@@ -341,7 +343,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SHM, SP> ManagerExit for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+impl<I, MT, S, SHM, SP> SendExiting for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
@@ -350,6 +352,10 @@ where
         self.staterestorer.send_exiting();
         Ok(())
     }
+}
+
+#[cfg(feature = "std")]
+impl<I, MT, S, SHM, SP> AwaitRestartSafe for SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     /// Block until we are safe to exit, usually called inside `on_restart`.
     #[inline]
     fn await_restart_safe(&mut self) {}

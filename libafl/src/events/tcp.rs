@@ -38,7 +38,7 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use super::{std_maybe_report_progress, std_report_progress, ManagerExit};
+use super::{std_maybe_report_progress, std_report_progress, AwaitRestartSafe, SendExiting};
 #[cfg(feature = "share_objectives")]
 use crate::corpus::{Corpus, Testcase};
 #[cfg(all(unix, not(miri)))]
@@ -776,14 +776,16 @@ where
     }
 }
 
-impl<EMH, I, S> ManagerExit for TcpEventManager<EMH, I, S> {
+impl<EMH, I, S> AwaitRestartSafe for TcpEventManager<EMH, I, S> {
     /// The TCP client needs to wait until a broker has mapped all pages before shutting down.
     /// Otherwise, the OS may already have removed the shared maps.
     fn await_restart_safe(&mut self) {
         // wait until we can drop the message safely.
         //self.tcp.await_safe_to_unmap_blocking();
     }
+}
 
+impl<EMH, I, S> SendExiting for TcpEventManager<EMH, I, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         //TODO: Should not be needed since TCP does that for us
         //self.tcp.sender.send_exiting()
@@ -866,7 +868,7 @@ where
     }
 }
 
-impl<EMH, I, S, SHM, SP> ManagerExit for TcpRestartingEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> SendExiting for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
@@ -877,7 +879,12 @@ where
         // This way, the broker can clean up the pages, and eventually exit.
         self.tcp_mgr.send_exiting()
     }
+}
 
+impl<EMH, I, S, SHM, SP> AwaitRestartSafe for TcpRestartingEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
     /// The tcp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     #[inline]
