@@ -268,7 +268,8 @@ where
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
-    {}
+    {
+    }
 
     #[cfg(feature = "usermode")]
     fn first_exec<ET>(

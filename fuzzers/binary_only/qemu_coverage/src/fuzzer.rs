@@ -4,6 +4,7 @@
 use core::mem::size_of;
 use core::time::Duration;
 use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process};
+
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus},
@@ -27,10 +28,8 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    elf::EasyElf,
-    modules::{drcov::DrCovModule},
-    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor,
-    QemuExitReason, QemuRWError, QemuShutdownCause, Regs, Qemu,
+    elf::EasyElf, modules::drcov::DrCovModule, ArchExtras, CallingConvention, Emulator, GuestAddr,
+    GuestReg, MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
