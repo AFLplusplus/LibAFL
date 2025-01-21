@@ -32,7 +32,7 @@ use crate::{
         CommandError, CommandManager, IsCommand, NativeCommandParser,
     },
     get_exit_arch_regs,
-    modules::EmulatorModuleTuple,
+    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
     sync_exit::ExitArgs,
     Emulator, EmulatorDriverError, EmulatorDriverResult, GuestReg, InputLocation,
     IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
@@ -98,7 +98,7 @@ macro_rules! define_nyx_command_manager {
 
             impl<C, ET, I, S, SM> CommandManager<C, NyxEmulatorDriver, ET, I, S, SM> for $name<S>
             where
-                ET: EmulatorModuleTuple<I, S>,
+                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -133,7 +133,7 @@ macro_rules! define_nyx_command_manager {
 
             impl<C, ET, I, S, SM> IsCommand<C, $name<S>, NyxEmulatorDriver, ET, I, S, SM> for [<$name Commands>]
             where
-                ET: EmulatorModuleTuple<I, S>,
+                ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
                 I: HasTargetBytes + Unpin,
                 S: Unpin,
                 SM: IsSnapshotManager,
@@ -295,7 +295,7 @@ pub struct NextPayloadCommand;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommand
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -359,7 +359,7 @@ pub struct SubmitCR3Command;
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3Command
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -407,7 +407,7 @@ impl RangeSubmitCommand {
 impl<C, ET, I, S, SM> IsCommand<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommand
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
