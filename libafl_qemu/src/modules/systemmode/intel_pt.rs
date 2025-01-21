@@ -11,9 +11,7 @@ use num_traits::SaturatingAdd;
 use typed_builder::TypedBuilder;
 
 use crate::{
-    modules::{
-        utils::filters::NopPageFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind,
-    },
+    modules::{AddressFilter, EmulatorModule, EmulatorModuleTuple, ExitKind},
     EmulatorModules, NewThreadHook, Qemu, QemuParams,
 };
 
@@ -41,8 +39,8 @@ where
     S: Unpin + HasMetadata,
     T: SaturatingAdd + From<u8> + Debug + 'static,
 {
-    type ModuleAddressFilter = Self;
-    type ModulePageFilter = NopPageFilter;
+    // type ModuleAddressFilter = Self;
+    // type ModulePageFilter = NopPageFilter;
 
     fn pre_qemu_init<ET>(
         &mut self,
@@ -104,21 +102,21 @@ where
         }
     }
 
-    fn address_filter(&self) -> &Self::ModuleAddressFilter {
-        self
-    }
-
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
-        self
-    }
-
-    fn page_filter(&self) -> &Self::ModulePageFilter {
-        unimplemented!()
-    }
-
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
-        unimplemented!()
-    }
+    // fn address_filter(&self) -> &Self::ModuleAddressFilter {
+    //     self
+    // }
+    //
+    // fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter {
+    //     self
+    // }
+    //
+    // fn page_filter(&self) -> &Self::ModulePageFilter {
+    //     unimplemented!()
+    // }
+    //
+    // fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter {
+    //     unimplemented!()
+    // }
 }
 
 impl<T> AddressFilter for IntelPTModule<T>
