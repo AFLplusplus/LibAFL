@@ -12,6 +12,7 @@ use core::{
     time::Duration,
 };
 
+use inner::EnterLeaveTarget;
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
 #[cfg(any(unix, feature = "std"))]

@@ -65,18 +65,36 @@ impl<HT, I, OT, S> HasObservers for GenericInProcessExecutorInner<HT, I, OT, S> 
     }
 }
 
-impl<HT, I, OT, S> GenericInProcessExecutorInner<HT, I, OT, S>
-where
-    OT: ObserversTuple<I, S>,
+/// Implements methods to enter the target and to leave the target, with the same generic bound.
+pub trait EnterLeaveTarget<EM, I, S, Z> {
+    /// This function marks the boundary between the fuzzer and the target
+    ///
+    /// # Safety
+    /// This function sets a bunch of raw pointers in global variables, reused in other parts of
+    /// the code.
+    unsafe fn enter_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+        executor_ptr: *const c_void,
+    );
+
+    /// This function marks the boundary between the fuzzer and the target
+    fn leave_target(&mut self, _fuzzer: &mut Z, _state: &mut S, _mgr: &mut EM, _input: &I);
+}
+
+impl<EM, HT, I, OT, S, Z> EnterLeaveTarget<EM, I, S, Z>
+    for GenericInProcessExecutorInner<HT, I, OT, S>
 {
     /// This function marks the boundary between the fuzzer and the target
     ///
     /// # Safety
     /// This function sets a bunch of raw pointers in global variables, reused in other parts of
     /// the code.
-    // TODO: Remove EM and Z from function bound and add it to struct instead to avoid possible type confusion
     #[inline]
-    pub unsafe fn enter_target<EM, Z>(
+    unsafe fn enter_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -111,13 +129,7 @@ where
 
     /// This function marks the boundary between the fuzzer and the target
     #[inline]
-    pub fn leave_target<EM, Z>(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        _input: &I,
-    ) {
+    fn leave_target(&mut self, _fuzzer: &mut Z, _state: &mut S, _mgr: &mut EM, _input: &I) {
         unsafe {
             let data = &raw mut GLOBAL_STATE;
 
