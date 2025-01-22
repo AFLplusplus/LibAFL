@@ -356,8 +356,6 @@ impl DrCovReader {
                 return Err(err("path"));
             };
 
-            log::error!("{path:?}");
-
             modules.push(DrCovModuleEntry {
                 id,
                 base,
