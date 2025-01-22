@@ -264,7 +264,7 @@ fn parse_path(s: &str) -> Option<PathBuf> {
         return None
     }
 
-    Some(PathBuf::from(s.trim()))
+    Some(PathBuf::from(chars.as_str()))
 }
 
 impl DrCovReader {
@@ -355,6 +355,8 @@ impl DrCovReader {
             let Some(path) = split.next().map(parse_path).flatten() else {
                 return Err(err("path"));
             };
+
+            log::error!("{path:?}");
 
             modules.push(DrCovModuleEntry {
                 id,
