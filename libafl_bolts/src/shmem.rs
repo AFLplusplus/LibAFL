@@ -660,15 +660,15 @@ pub mod unix_shmem {
     /// Shared memory for Android
     #[cfg(target_os = "android")]
     pub type UnixShMem = ashmem::AshmemShMem;
-    /// Shared memory Provider for Unix
+    /// Shared memory Provider for Linux & FreeBSD
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub type UnixShMemProvider = memfd::MemfdShMemProvider;
-    /// Shared memory for Unix
+    /// Shared memory Provider for Linux & FreeBSD
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub type UnixShMem = memfd::MemfdShMem;
-
+    /// Shared memory Provider for unix other than Linux, FreeBDS, and Android
     #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "android")))]
-    pub type UnixShMemProvider = default::CommonUnixShMemProvider;
+    /// Shared memory Provider for unix other than Linux, FreeBDS, and Android
     #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "android")))]
     pub type UnixShMem = default::CommonUnixShMem;
 
