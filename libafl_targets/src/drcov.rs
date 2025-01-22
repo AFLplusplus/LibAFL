@@ -352,7 +352,7 @@ impl DrCovReader {
                 return Err(err("timestamp"));
             };
 
-            let Some(path) = split.next().map(parse_path).flatten() else {
+            let Some(path) = split.next().and_then(parse_path) else {
                 return Err(err("path"));
             };
 
