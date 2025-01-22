@@ -43,7 +43,9 @@ use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
 use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
 #[cfg(target_os = "linux")]
-pub use libipt::{asid::Asid, image::Image, image::SectionCache, status::Status};
+pub use libipt::{
+    asid::Asid, image::Image, image::SectionCache, image::SectionInfo, status::Status,
+};
 #[cfg(target_os = "linux")]
 use libipt::{
     block::BlockDecoder, enc_dec_builder::AddrFilterRange, enc_dec_builder::AddrFilterType,

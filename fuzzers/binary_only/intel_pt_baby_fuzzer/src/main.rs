@@ -8,7 +8,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        hooks::intel_pt::{IntelPTHook, Section},
+        hooks::intel_pt::{IntelPTHook, SectionInfo},
         inprocess::GenericInProcessExecutor,
         ExitKind,
     },
@@ -100,10 +100,10 @@ pub fn main() {
     let sections = process_maps
         .iter()
         .filter_map(|pm| {
-            if pm.is_exec() && pm.filename().is_some() {
-                Some(Section {
-                    file_path: pm.filename().unwrap().to_string_lossy().to_string(),
-                    file_offset: pm.offset as u64,
+            if pm.is_exec() && pm.filename().is_some() && pm.inode != 0 {
+                Some(SectionInfo {
+                    filename: pm.filename().unwrap().to_string_lossy().to_string(),
+                    offset: pm.offset as u64,
                     size: pm.size() as u64,
                     virtual_address: pm.start() as u64,
                 })

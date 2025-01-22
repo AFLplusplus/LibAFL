@@ -4,8 +4,7 @@
 
 use std::{arch::asm, process};
 
-use libafl_intelpt::{availability, IntelPT};
-use libipt::image::Image;
+use libafl_intelpt::{availability, Image, IntelPT};
 use nix::{
     sys::{
         signal::{kill, raise, Signal},

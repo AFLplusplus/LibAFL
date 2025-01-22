@@ -1,11 +1,11 @@
 use std::{
     fmt::Debug,
     ops::{Range, RangeInclusive},
-    rc::Rc,
 };
 
-use libafl::{observers::ObserversTuple, Error, HasMetadata};
-use libafl_intelpt::{error_from_pt_error, Image, IntelPT, IntelPTBuilder, SectionCache};
+use libafl::{observers::ObserversTuple, HasMetadata};
+pub use libafl_intelpt::SectionInfo;
+use libafl_intelpt::{Image, IntelPT, IntelPTBuilder};
 use libafl_qemu_sys::{CPUArchStatePtr, GuestAddr};
 use num_traits::SaturatingAdd;
 use typed_builder::TypedBuilder;
@@ -21,7 +21,11 @@ pub struct IntelPTModule<T = u8> {
     pt: Option<IntelPT>,
     #[builder(default = IntelPTModule::default_pt_builder())]
     intel_pt_builder: IntelPTBuilder,
-    #[builder(setter(transform = |sections: &[Section]| sections_to_image(sections).unwrap()))]
+    #[builder(setter(transform = |sections: &[SectionInfo]| {
+        let mut i = Image::new(None).unwrap();
+        i.add_files_cached(sections, None).unwrap();
+        i
+    }))]
     image: Image,
     map_ptr: *mut T,
     map_len: usize,
@@ -175,46 +179,4 @@ where
 
     // What does this bool mean? ignore for the moment
     true
-}
-
-// It would be nice to have this as a `TryFrom<IntoIter<Section>>`, but Rust's orphan rule doesn't
-// like this (and `TryFromIter` is not a thing atm)
-fn sections_to_image(sections: &[Section]) -> Result<Image, Error> {
-    let mut image_cache = SectionCache::new(Some("image_cache")).map_err(error_from_pt_error)?;
-    let mut image = Image::new(Some("image")).map_err(error_from_pt_error)?;
-
-    let mut isids = Vec::with_capacity(sections.len());
-    for s in sections {
-        let isid = image_cache.add_file(&s.file_path, s.file_offset, s.size, s.virtual_address);
-        match isid {
-            Err(e) => log::warn!(
-                "Error while caching {} {} - skipped",
-                s.file_path,
-                e.to_string()
-            ),
-            Ok(id) => isids.push(id),
-        }
-    }
-
-    let rc_cache = Rc::new(image_cache);
-    for isid in isids {
-        if let Err(e) = image.add_cached(rc_cache.clone(), isid, None) {
-            log::warn!("Error while adding cache to image {}", e.to_string());
-        }
-    }
-
-    Ok(image)
-}
-
-/// Info of a binary's section that can be used during `Intel PT` traces decoding
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Section {
-    /// Path of the binary
-    pub file_path: String,
-    /// Offset of the section in the file
-    pub file_offset: u64,
-    /// Size of the section
-    pub size: u64,
-    /// Start virtual address of the section once loaded in memory
-    pub virtual_address: u64,
 }

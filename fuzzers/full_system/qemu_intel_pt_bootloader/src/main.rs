@@ -29,7 +29,7 @@ use libafl_qemu::{
     config,
     config::{Accelerator, DriveCache, QemuConfig},
     executor::QemuExecutor,
-    modules::intel_pt::{IntelPTModule, Section},
+    modules::intel_pt::{IntelPTModule, SectionInfo},
     Emulator, EmulatorBuilder, GuestAddr, QemuExitReason, QemuShutdownCause,
 };
 
@@ -76,13 +76,13 @@ fn main() {
         .start_cpu(false)
         .build();
 
-    let file_path = Path::new(&target_dir)
+    let filename = Path::new(&target_dir)
         .join("boot.bin")
         .to_string_lossy()
         .to_string();
-    let image = [Section {
-        file_path,
-        file_offset: 0,
+    let image = [SectionInfo {
+        filename,
+        offset: 0,
         size: (BOOTLOADER_CODE.end() - BOOTLOADER_CODE.start()) as u64 + 1,
         virtual_address: *BOOTLOADER_CODE.start() as u64,
     }];
