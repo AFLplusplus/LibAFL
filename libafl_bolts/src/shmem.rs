@@ -668,6 +668,7 @@ pub mod unix_shmem {
     pub type UnixShMem = memfd::MemfdShMem;
     /// Shared memory Provider for unix other than Linux, FreeBDS, and Android
     #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "android")))]
+    pub type UnixShMemProvider = default::CommonUnixShMemProvider;
     /// Shared memory Provider for unix other than Linux, FreeBDS, and Android
     #[cfg(not(any(target_os = "linux", target_os = "freebsd", target_os = "android")))]
     pub type UnixShMem = default::CommonUnixShMem;
