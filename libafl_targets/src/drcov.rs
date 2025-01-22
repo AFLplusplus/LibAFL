@@ -251,6 +251,22 @@ fn parse_hex_to_u64(str: &str) -> Result<u64, ParseIntError> {
     u64::from_str_radix(&str[2..], 16)
 }
 
+fn parse_path(s: &str) -> Option<PathBuf> {
+    let mut chars = s.trim().chars();
+
+    // first char must be a quote
+    if chars.next()? != '\"' {
+        return None
+    }
+
+    // last char must be a quote as well
+    if chars.next_back()? != '\"' {
+        return None
+    }
+
+    Some(PathBuf::from(s.trim()))
+}
+
 impl DrCovReader {
     /// Parse a `drcov` file to memory.
     pub fn read<P: AsRef<Path> + ?Sized>(file: &P) -> Result<Self, Error> {
@@ -336,7 +352,7 @@ impl DrCovReader {
                 return Err(err("timestamp"));
             };
 
-            let Some(path) = split.next().map(|s| PathBuf::from(s.trim())) else {
+            let Some(path) = split.next().map(parse_path).flatten() else {
                 return Err(err("path"));
             };
 
