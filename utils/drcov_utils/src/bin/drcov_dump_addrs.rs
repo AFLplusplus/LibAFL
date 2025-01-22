@@ -51,6 +51,9 @@ fn main() {
             continue;
         };
 
+        let mut blocks = drcov.basic_block_addresses_u64();
+        blocks.sort();
+
         if let Some(out_dir) = &opts.out_dir {
             // Write files to a directory
             let out_file = out_dir.join(
@@ -65,9 +68,12 @@ fn main() {
                 continue;
             };
 
-            println!("Dumping addresses from drcov file {input:?} to {out_file:?}");
+            println!(
+                "Dumping {} addresses from drcov file {input:?} to {out_file:?}",
+                blocks.len()
+            );
 
-            for line in drcov.basic_block_addresses_u64() {
+            for line in blocks {
                 file.write_all(format!("{line:#x}\n").as_bytes())
                     .expect("Could not write to file");
             }
@@ -86,11 +92,10 @@ fn main() {
             }
             println!();
 
-            let blocks = drcov.basic_block_addresses_u64();
             print!("# {} Blocks covered in {input:?}", blocks.len());
             if opts.verbose {
                 println!(":");
-                for line in drcov.basic_block_addresses_u64() {
+                for line in blocks {
                     println!("{line:#x}");
                 }
                 println!();
