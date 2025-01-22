@@ -23,6 +23,12 @@ pub struct Opt {
         help = "Output folder to write address files to. If none is set, this will output all addresses to stdout."
     )]
     pub out_dir: Option<PathBuf>,
+    #[arg(
+        short,
+        long,
+        help = "Print all the addresses when printing to stdout. Does not have any impact when writing addresses to a file."
+    )]
+    pub verbose: bool,
 }
 
 fn main() {
@@ -67,13 +73,30 @@ fn main() {
             }
         } else {
             // dump to stdout
-            println!("# Blocks covered in {input:?}:");
-
-            for line in drcov.basic_block_addresses_u64() {
-                println!("{line:#x}");
+            let modules = &drcov.module_entries;
+            println!("# {} Modules:", modules.len());
+            for module in &drcov.module_entries {
+                println!(
+                    "\t{} - [{:#020x}-{:#020x}] {}",
+                    module.id,
+                    module.base,
+                    module.end,
+                    module.path.display()
+                );
             }
-
             println!();
+
+            let blocks = drcov.basic_block_addresses_u64();
+            print!("# {} Blocks covered in {input:?}", blocks.len());
+            if opts.verbose {
+                println!(":");
+                for line in drcov.basic_block_addresses_u64() {
+                    println!("{line:#x}");
+                }
+                println!();
+            } else {
+                println!(".");
+            }
         }
     }
 }
