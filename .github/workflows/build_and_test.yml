@@ -345,7 +345,7 @@ jobs:
               - 'libafl_bolts/**'
               - 'libafl_targets/**'
               - 'libafl_qemu/**'
-              - 'fuzzers/*qemu*/**'
+              - 'fuzzers/**/*qemu*/**'
 
   fuzzers-qemu:
     needs:
