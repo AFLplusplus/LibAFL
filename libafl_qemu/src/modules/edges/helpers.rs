@@ -133,7 +133,7 @@ mod generators {
 
         let mask: usize = get_mask::<IS_CONST_MAP, MAP_SIZE>();
 
-        let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
+        let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing. Is the Executor initialized?");
         let meta = state.metadata_or_insert_with(QemuEdgesMapMetadata::new);
 
         match meta.map.entry((src, dest)) {

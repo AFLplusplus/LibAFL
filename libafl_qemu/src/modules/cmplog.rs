@@ -207,7 +207,7 @@ where
             return None;
         }
     }
-    let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing");
+    let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing. Is the Executor initialized?");
     if state.metadata_map().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
     }
