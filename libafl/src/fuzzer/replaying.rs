@@ -54,11 +54,9 @@ pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
     input_filter: IF,
 }
 
-impl<CS, F, O, IF, OF, S> HasScheduler<<S::Corpus as Corpus>::Input, S>
-    for ReplayingFuzzer<CS, F, O, IF, OF>
+impl<CS, F, O, I, IF, OF, S> HasScheduler<I, S> for ReplayingFuzzer<CS, F, O, IF, OF>
 where
-    S: HasCorpus,
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    CS: Scheduler<I, S>,
 {
     type Scheduler = CS;
 
@@ -95,23 +93,26 @@ impl<CS, F, O, IF, OF> HasObjective for ReplayingFuzzer<CS, F, O, IF, OF> {
     }
 }
 
-impl<CS, EM, F, O, IF, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
+impl<CS, EM, F, O, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S>
     for ReplayingFuzzer<CS, F, O, IF, OF>
 where
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<OT>,
-    S: HasCorpus + MaybeHasClientPerfMonitor + HasCurrentTestcase + HasSolutions + HasLastFoundTime,
-    F: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
-    OF: Feedback<EM, <S::Corpus as Corpus>::Input, OT, S>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    <S::Corpus as Corpus>::Input: Input,
-    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    CS: Scheduler<I, S>,
+    EM: EventFirer<I, S> + CanSerializeObserver<OT>,
+    F: Feedback<EM, I, OT, S>,
+    I: Input,
+    OF: Feedback<EM, I, OT, S>,
+    OT: ObserversTuple<I, S> + Serialize,
+    S: HasCorpus<I>
+        + MaybeHasClientPerfMonitor
+        + HasCurrentTestcase<I>
+        + HasSolutions<I>
+        + HasLastFoundTime,
 {
     fn check_results(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<ExecuteInputResult, Error> {
@@ -151,7 +152,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: <S::Corpus as Corpus>::Input,
+        input: I,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -171,7 +172,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: <S::Corpus as Corpus>::Input,
+        input: I,
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -201,7 +202,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: <S::Corpus as Corpus>::Input,
+        input: I,
         exec_res: &ExecuteInputResult,
         observers_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
@@ -247,7 +248,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
         exec_res: &ExecuteInputResult,
         observers: &OT,
     ) -> Result<Option<CorpusId>, Error> {
@@ -296,23 +297,22 @@ where
     }
 }
 
-impl<CS, E, EM, F, O, IF, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+impl<CS, E, EM, F, O, I, IF, OF, S> EvaluatorObservers<E, EM, I, S>
     for ReplayingFuzzer<CS, F, O, IF, OF>
 where
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
-    E::Observers: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<E::Observers>,
-    F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    S: HasCorpus
-        + HasSolutions
+    CS: Scheduler<I, S>,
+    E: HasObservers + Executor<EM, I, S, Self>,
+    E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
+    EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
+    F: Feedback<EM, I, E::Observers, S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    S: HasCorpus<I>
+        + HasSolutions<I>
         + MaybeHasClientPerfMonitor
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasExecutions
         + HasLastFoundTime,
-    <S::Corpus as Corpus>::Input: Input,
-    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    I: Input,
     O: Hash,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
@@ -322,7 +322,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: <S::Corpus as Corpus>::Input,
+        input: I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -334,24 +334,22 @@ where
     }
 }
 
-impl<CS, E, EM, F, O, IF, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
-    for ReplayingFuzzer<CS, F, O, IF, OF>
+impl<CS, E, EM, F, O, I, IF, OF, S> Evaluator<E, EM, I, S> for ReplayingFuzzer<CS, F, O, IF, OF>
 where
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
-    E::Observers: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<E::Observers>,
-    F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    S: HasCorpus
-        + HasSolutions
+    CS: Scheduler<I, S>,
+    E: HasObservers + Executor<EM, I, S, Self>,
+    E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
+    EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
+    F: Feedback<EM, I, E::Observers, S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    S: HasCorpus<I>
+        + HasSolutions<I>
         + MaybeHasClientPerfMonitor
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasLastFoundTime
         + HasExecutions,
-    <S::Corpus as Corpus>::Input: Input,
-    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
-    IF: InputFilter<<S::Corpus as Corpus>::Input>,
+    I: Input,
+    IF: InputFilter<I>,
     O: Hash,
 {
     fn evaluate_filtered(
@@ -359,7 +357,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: <S::Corpus as Corpus>::Input,
+        input: I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         if self.input_filter.should_execute(&input) {
             self.evaluate_input(state, executor, manager, input)
@@ -375,17 +373,13 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: <S::Corpus as Corpus>::Input,
+        input: I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
 
-    fn add_disabled_input(
-        &mut self,
-        state: &mut S,
-        input: <S::Corpus as Corpus>::Input,
-    ) -> Result<CorpusId, Error> {
+    fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
         let mut testcase = Testcase::from(input.clone());
         testcase.set_disabled(true);
         // Add the disabled input to the main corpus
@@ -399,7 +393,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: <S::Corpus as Corpus>::Input,
+        input: I,
     ) -> Result<CorpusId, Error> {
         *state.last_found_time_mut() = current_time();
 
@@ -492,15 +486,16 @@ where
     }
 }
 
-impl<CS, E, EM, F, O, IF, OF, S, ST> Fuzzer<E, EM, S, ST> for ReplayingFuzzer<CS, F, O, IF, OF>
+impl<CS, E, EM, F, O, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST>
+    for ReplayingFuzzer<CS, F, O, IF, OF>
 where
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
+    CS: Scheduler<I, S>,
     EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
     S: HasExecutions
         + HasMetadata
-        + HasCorpus
+        + HasCorpus<I>
         + HasLastReportTime
-        + HasTestcase
+        + HasTestcase<I>
         + HasCurrentCorpusId
         + HasCurrentStageId
         + Stoppable
@@ -692,15 +687,14 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
     }
 }
 
-impl<CS, E, EM, F, O, IF, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
-    for ReplayingFuzzer<CS, F, O, IF, OF>
+impl<CS, E, EM, F, O, I, IF, OF, S> ExecutesInput<E, EM, I, S> for ReplayingFuzzer<CS, F, O, IF, OF>
 where
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + MatchNameRef,
-    S: HasExecutions + HasCorpus + MaybeHasClientPerfMonitor,
+    CS: Scheduler<I, S>,
+    E: Executor<EM, I, S, Self> + HasObservers,
+    E::Observers: ObserversTuple<I, S>,
+    S: HasExecutions + HasCorpus<I> + MaybeHasClientPerfMonitor,
     O: Hash,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<I, S>,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -708,7 +702,7 @@ where
         state: &mut S,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         let mut results = HashMap::new();
         let (exit_kind, total_replayed) = loop {
