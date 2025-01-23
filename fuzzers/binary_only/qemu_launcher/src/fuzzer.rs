@@ -10,15 +10,13 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
-    events::{ClientDescription, LlmpEventManagerBuilder},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-use libafl_bolts::{core_affinity::CoreId, current_time, llmp::LlmpBroker, tuples::tuple_list};
+use libafl_bolts::{current_time};
 #[cfg(not(feature = "simplemgr"))]
 use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
-    staterestore::StateRestorer,
 };
 #[cfg(unix)]
 use {
@@ -85,7 +83,7 @@ impl Fuzzer {
     {
         // The shared memory allocator
         #[cfg(not(feature = "simplemgr"))]
-        let mut shmem_provider = StdShMemProvider::new()?;
+        let shmem_provider = StdShMemProvider::new()?;
         /* If we are running in verbose, don't provide a replacement stdout, otherwise, use /dev/null */
         #[cfg(not(feature = "simplemgr"))]
         let stdout = if self.options.verbose {
