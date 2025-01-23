@@ -749,9 +749,9 @@ where
 
             if consistent_enough && latest_execution_is_dominant {
                 break (exit_kind, total_replayed);
-            } else if total_replayed >= self.max_trys * self.min_count_diff {
+            } else if total_replayed >= self.max_trys {
                 log::warn!(
-                    "Replaying {} times did not lead to dominant result, using the latest observer value and most common exit_kind",
+                    "Replaying {} times did not lead to dominant result, using the latest observer value and most common exit_kind. Details: {results:?}",
                     total_replayed
                 );
                 break (*max_exit_kind, total_replayed);
