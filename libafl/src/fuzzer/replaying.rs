@@ -741,9 +741,9 @@ where
 
             let observer = observers.get(&self.handle).expect("observer not found");
             let hash = generic_hash_std(observer);
-            *results.entry((hash, exit_kind)).or_insert(0_usize) += 1;
+            *results.entry((hash, exit_kind)).or_insert(0_u32) += 1;
 
-            let total_replayed = results.values().sum::<usize>();
+            let total_replayed = results.values().sum::<u32>() as usize;
 
             let ((max_hash, max_exit_kind), max_count) =
                 results.iter().max_by(|(_, a), (_, b)| a.cmp(b)).unwrap();
@@ -752,11 +752,9 @@ where
                 .values()
                 .filter(|e| **e != *max_count)
                 .all(|&count| {
-                    let min_value_count = count + self.min_count_diff;
-                    let min_value_factor =
-                        f64::from(u32::try_from(*max_count).unwrap()) * self.min_factor_diff;
-                    min_value_count <= *max_count
-                        && min_value_factor <= f64::from(u32::try_from(*max_count).unwrap())
+                    let min_value_count = count + self.min_count_diff as u32;
+                    let min_value_factor = f64::from(count) * self.min_factor_diff;
+                    min_value_count <= *max_count && min_value_factor <= f64::from(*max_count)
                 });
 
             let latest_execution_is_dominant = hash == *max_hash && exit_kind == *max_exit_kind;
