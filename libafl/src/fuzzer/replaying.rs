@@ -1,17 +1,17 @@
-//! The `Fuzzer` is the main struct for a fuzz campaign.
+//! Fuzzer instance that increases stability by executing the same input multiple times.
 
-pub mod replaying;
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
-use alloc::{string::ToString, vec::Vec};
-#[cfg(feature = "std")]
-use core::hash::Hash;
-use core::{fmt::Debug, time::Duration};
-
-#[cfg(feature = "std")]
-use fastbloom::BloomFilter;
-use libafl_bolts::{current_time, tuples::MatchName};
+use hashbrown::HashMap;
+use libafl_bolts::{
+    current_time, generic_hash_std,
+    tuples::{Handle, MatchName, MatchNameRef},
+};
 use serde::Serialize;
 
+#[cfg(feature = "std")]
+use crate::fuzzer::BloomInputFilter;
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
@@ -21,8 +21,14 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
+    fuzzer::{
+        Evaluator, EvaluatorObservers, ExecuteInputResult, ExecutesInput, ExecutionProcessor,
+        Fuzzer, HasFeedback, HasObjective, HasScheduler, InputFilter, NopInputFilter,
+        STATS_TIMEOUT_DEFAULT,
+    },
     inputs::Input,
     mark_feature_time,
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::{HasCurrentStageId, StagesTuple},
@@ -34,240 +40,24 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// Send a monitor update all 15 (or more) seconds
-pub(crate) const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
+/// The maximum factor of times an input will be replayed, multiplied by `count`.
+pub const MAX_REPLAY_FACTOR: usize = 5;
 
-/// Holds a scheduler
-pub trait HasScheduler<I, S> {
-    /// The [`Scheduler`] for this fuzzer
-    type Scheduler: Scheduler<I, S>;
-
-    /// The scheduler
-    fn scheduler(&self) -> &Self::Scheduler;
-
-    /// The scheduler (mutable)
-    fn scheduler_mut(&mut self) -> &mut Self::Scheduler;
-}
-
-/// Holds an feedback
-pub trait HasFeedback {
-    /// The feedback type
-    type Feedback;
-
-    /// The feedback
-    fn feedback(&self) -> &Self::Feedback;
-
-    /// The feedback (mutable)
-    fn feedback_mut(&mut self) -> &mut Self::Feedback;
-}
-
-/// Holds an objective feedback
-pub trait HasObjective {
-    /// The type of the [`Feedback`] used to find objectives for this fuzzer
-    type Objective;
-
-    /// The objective feedback
-    fn objective(&self) -> &Self::Objective;
-
-    /// The objective feedback (mutable)
-    fn objective_mut(&mut self) -> &mut Self::Objective;
-}
-
-/// Evaluates if an input is interesting using the feedback
-pub trait ExecutionProcessor<EM, I, OT, S> {
-    /// Check the outcome of the execution, find if it is worth for corpus or objectives
-    fn check_results(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: &I,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<ExecuteInputResult, Error>;
-
-    /// Process `ExecuteInputResult`. Add to corpus, solution or ignore
-    fn process_execution(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: &I,
-        exec_res: &ExecuteInputResult,
-        observers: &OT,
-    ) -> Result<Option<CorpusId>, Error>;
-
-    /// serialize and send event via manager
-    fn serialize_and_dispatch(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: I,
-        exec_res: &ExecuteInputResult,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error>;
-
-    /// send event via manager
-    fn dispatch_event(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: I,
-        exec_res: &ExecuteInputResult,
-        obs_buf: Option<Vec<u8>>,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error>;
-
-    /// Evaluate if a set of observation channels has an interesting state
-    fn evaluate_execution(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: I,
-        observers: &OT,
-        exit_kind: &ExitKind,
-        send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
-}
-
-/// Evaluates an input modifying the state of the fuzzer
-pub trait EvaluatorObservers<E, EM, I, S> {
-    /// Runs the input and triggers observers and feedback,
-    /// returns if is interesting an (option) the index of the new
-    /// [`crate::corpus::Testcase`] in the [`crate::corpus::Corpus`]
-    fn evaluate_input_with_observers(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
-        send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
-}
-
-/// Evaluate an input modifying the state of the fuzzer
-pub trait Evaluator<E, EM, I, S> {
-    /// Runs the input if it was (likely) not previously run and triggers observers and feedback and adds the input to the previously executed list
-    /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
-    fn evaluate_filtered(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
-
-    /// Runs the input and triggers observers and feedback,
-    /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
-    fn evaluate_input(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_events(state, executor, manager, input, true)
-    }
-
-    /// Runs the input and triggers observers and feedback,
-    /// returns if is interesting an (option) the index of the new testcase in the corpus
-    /// This version has a boolean to decide if send events to the manager.
-    fn evaluate_input_events(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
-        send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
-
-    /// Runs the input and triggers observers and feedback.
-    /// Adds an input, to the corpus even if it's not considered `interesting` by the `feedback`.
-    /// Returns the `index` of the new testcase in the corpus.
-    /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
-    fn add_input(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
-    ) -> Result<CorpusId, Error>;
-
-    /// Adds the input to the corpus as disabled a input.
-    /// Used during initial corpus loading.
-    /// Disabled testcases are only used for splicing
-    /// Returns the `index` of the new testcase in the corpus.
-    /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
-    fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error>;
-}
-
-/// The main fuzzer trait.
-pub trait Fuzzer<E, EM, S, ST> {
-    /// Fuzz for a single iteration.
-    /// Returns the index of the last fuzzed corpus item.
-    /// (Note: An iteration represents a complete run of every stage.
-    /// Therefore it does not mean that the harness is executed for once,
-    /// because each stage could run the harness for multiple times)
-    ///
-    /// If you use this fn in a restarting scenario to only run for `n` iterations,
-    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
-    /// This way, the state will be available in the next, respawned, iteration.
-    fn fuzz_one(
-        &mut self,
-        stages: &mut ST,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
-    ) -> Result<CorpusId, Error>;
-
-    /// Fuzz forever (or until stopped)
-    fn fuzz_loop(
-        &mut self,
-        stages: &mut ST,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
-    ) -> Result<(), Error>;
-
-    /// Fuzz for n iterations.
-    /// Returns the index of the last fuzzed corpus item.
-    /// (Note: An iteration represents a complete run of every stage.
-    /// therefore the number n is not always equal to the number of the actual harness executions,
-    /// because each stage could run the harness for multiple times)
-    ///
-    /// If you use this fn in a restarting scenario to only run for `n` iterations,
-    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
-    /// This way, the state will be available in the next, respawned, iteration.
-    fn fuzz_loop_for(
-        &mut self,
-        stages: &mut ST,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
-        iters: u64,
-    ) -> Result<CorpusId, Error>;
-}
-
-/// The corpus this input should be added to
-#[derive(Debug, PartialEq, Eq)]
-pub enum ExecuteInputResult {
-    /// No special input
-    None,
-    /// This input should be stored in the corpus
-    Corpus,
-    /// This input leads to a solution
-    Solution,
-}
-
-/// Your default fuzzer instance, for everyday use.
+/// A fuzzer instance for unstable targets that increases stability by executing the same input multiple times.
+///
+/// The input will be executed at most `count` * [`MAX_REPLAY_FACTOR`] times.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, IF, OF> {
+pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
+    count: usize,
+    handles: Handle<O>,
     scheduler: CS,
     feedback: F,
     objective: OF,
     input_filter: IF,
 }
 
-impl<CS, F, IF, OF, S> HasScheduler<<S::Corpus as Corpus>::Input, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, F, O, IF, OF, S> HasScheduler<<S::Corpus as Corpus>::Input, S>
+    for ReplayingFuzzer<CS, F, O, IF, OF>
 where
     S: HasCorpus,
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
@@ -283,7 +73,7 @@ where
     }
 }
 
-impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, O, IF, OF> HasFeedback for ReplayingFuzzer<CS, F, O, IF, OF> {
     type Feedback = F;
 
     fn feedback(&self) -> &Self::Feedback {
@@ -295,7 +85,7 @@ impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, O, IF, OF> HasObjective for ReplayingFuzzer<CS, F, O, IF, OF> {
     type Objective = OF;
 
     fn objective(&self) -> &OF {
@@ -307,8 +97,8 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, EM, F, IF, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, EM, F, O, IF, OF, OT, S> ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, OT, S>
+    for ReplayingFuzzer<CS, F, O, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     EM: EventFirer<<S::Corpus as Corpus>::Input, S> + CanSerializeObserver<OT>,
@@ -392,7 +182,7 @@ where
         let observers_buf = match exec_res {
             ExecuteInputResult::Corpus => {
                 if manager.should_send() {
-                    // TODO set None for fast targets
+                    // TODO, set None for fast targets
                     if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
@@ -508,8 +298,8 @@ where
     }
 }
 
-impl<CS, E, EM, F, IF, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, O, IF, OF, S> EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
+    for ReplayingFuzzer<CS, F, O, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
@@ -525,6 +315,7 @@ where
         + HasLastFoundTime,
     <S::Corpus as Corpus>::Input: Input,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    O: Hash,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -545,48 +336,8 @@ where
     }
 }
 
-trait InputFilter<I> {
-    fn should_execute(&mut self, input: &I) -> bool;
-}
-
-/// A pseudo-filter that will execute each input.
-#[derive(Debug)]
-pub struct NopInputFilter;
-impl<I> InputFilter<I> for NopInputFilter {
-    #[inline]
-    #[must_use]
-    fn should_execute(&mut self, _input: &I) -> bool {
-        true
-    }
-}
-
-/// A filter that probabilistically prevents duplicate execution of the same input based on a bloom filter.
-#[cfg(feature = "std")]
-#[derive(Debug)]
-pub struct BloomInputFilter {
-    bloom: BloomFilter,
-}
-
-#[cfg(feature = "std")]
-impl BloomInputFilter {
-    #[must_use]
-    fn new(items_count: usize, fp_p: f64) -> Self {
-        let bloom = BloomFilter::with_false_pos(fp_p).expected_items(items_count);
-        Self { bloom }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<I: Hash> InputFilter<I> for BloomInputFilter {
-    #[inline]
-    #[must_use]
-    fn should_execute(&mut self, input: &I) -> bool {
-        !self.bloom.insert(input)
-    }
-}
-
-impl<CS, E, EM, F, IF, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, O, IF, OF, S> Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>
+    for ReplayingFuzzer<CS, F, O, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: HasObservers + Executor<EM, <S::Corpus as Corpus>::Input, S, Self>,
@@ -603,6 +354,7 @@ where
     <S::Corpus as Corpus>::Input: Input,
     S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     IF: InputFilter<<S::Corpus as Corpus>::Input>,
+    O: Hash,
 {
     fn evaluate_filtered(
         &mut self,
@@ -742,7 +494,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, IF, OF, S, ST> Fuzzer<E, EM, S, ST> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, O, IF, OF, S, ST> Fuzzer<E, EM, S, ST> for ReplayingFuzzer<CS, F, O, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
@@ -866,10 +618,19 @@ where
     }
 }
 
-impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
     /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
-    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF) -> Self {
+    pub fn with_input_filter(
+        count: usize,
+        handles: Handle<O>,
+        scheduler: CS,
+        feedback: F,
+        objective: OF,
+        input_filter: IF,
+    ) -> Self {
         Self {
+            count,
+            handles,
             scheduler,
             feedback,
             objective,
@@ -878,21 +639,36 @@ impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
+impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
     /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
-    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
-        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter)
+    pub fn new(
+        count: usize,
+        handles: Handle<O>,
+        scheduler: CS,
+        feedback: F,
+        objective: OF,
+    ) -> Self {
+        Self::with_input_filter(
+            count,
+            handles,
+            scheduler,
+            feedback,
+            objective,
+            NopInputFilter,
+        )
     }
 }
 
-#[cfg(feature = "std")]
-impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
+#[cfg(feature = "std")] // hashing requires std
+impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
     /// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
     ///
     /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
     ///
     /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
     pub fn with_bloom_input_filter(
+        count: usize,
+        handles: Handle<O>,
         scheduler: CS,
         feedback: F,
         objective: OF,
@@ -900,29 +676,19 @@ impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
         fp_p: f64,
     ) -> Self {
         let input_filter = BloomInputFilter::new(items_count, fp_p);
-        Self::with_input_filter(scheduler, feedback, objective, input_filter)
+        Self::with_input_filter(count, handles, scheduler, feedback, objective, input_filter)
     }
 }
 
-/// Structs with this trait will execute an input
-pub trait ExecutesInput<E, EM, I, S> {
-    /// Runs the input and triggers observers and feedback
-    fn execute_input(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-        event_mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error>;
-}
-
-impl<CS, E, EM, F, IF, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
-    for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, O, IF, OF, S> ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+    for ReplayingFuzzer<CS, F, O, IF, OF>
 where
     CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
     E: Executor<EM, <S::Corpus as Corpus>::Input, S, Self> + HasObservers,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + MatchNameRef,
     S: HasExecutions + HasCorpus + MaybeHasClientPerfMonitor,
+    O: Hash,
+    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -932,136 +698,142 @@ where
         event_mgr: &mut EM,
         input: &<S::Corpus as Corpus>::Input,
     ) -> Result<ExitKind, Error> {
-        start_timer!(state);
-        executor.observers_mut().pre_exec_all(state, input)?;
-        mark_feature_time!(state, PerfFeature::PreExecObservers);
+        let mut results = HashMap::new();
+        let (exit_kind, total_replayed) = loop {
+            start_timer!(state);
+            executor.observers_mut().pre_exec_all(state, input)?;
+            mark_feature_time!(state, PerfFeature::PreExecObservers);
 
-        start_timer!(state);
-        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
-        mark_feature_time!(state, PerfFeature::TargetExecution);
+            start_timer!(state);
+            let exit_kind = executor.run_target(self, state, event_mgr, input)?;
+            mark_feature_time!(state, PerfFeature::TargetExecution);
 
-        start_timer!(state);
-        executor
-            .observers_mut()
-            .post_exec_all(state, input, &exit_kind)?;
-        mark_feature_time!(state, PerfFeature::PostExecObservers);
+            start_timer!(state);
+            executor
+                .observers_mut()
+                .post_exec_all(state, input, &exit_kind)?;
+
+            let observers = executor.observers();
+
+            mark_feature_time!(state, PerfFeature::PostExecObservers);
+
+            let observer = observers.get(&self.handles).expect("observer not found");
+            let hash = generic_hash_std(observer);
+            *results.entry((hash, exit_kind)).or_insert(0_usize) += 1;
+
+            let total_replayed = results.values().sum::<usize>();
+
+            let ((max_hash, max_exit_kind), max_count) =
+                results.iter().max_by(|(_, a), (_, b)| a.cmp(b)).unwrap();
+
+            if *max_count < self.count {
+                continue;
+            }
+
+            let consistent_enough = results
+                .values()
+                .filter(|e| **e != *max_count)
+                .all(|&count| count <= max_count - self.count);
+
+            let latest_execution_is_dominant = hash == *max_hash && exit_kind == *max_exit_kind;
+
+            if consistent_enough && latest_execution_is_dominant {
+                break (exit_kind, total_replayed);
+            } else if total_replayed >= MAX_REPLAY_FACTOR * self.count {
+                log::warn!(
+                    "Replaying {} times did not lead to dominant result, using the latest observer value and most common exit_kind",
+                    total_replayed
+                );
+                break (*max_exit_kind, total_replayed);
+            }
+        };
+
+        event_mgr.fire(
+            state,
+            Event::UpdateUserStats {
+                name: Cow::Borrowed("consistency_replay_count"),
+                value: UserStats::new(
+                    UserStatsValue::Number(total_replayed as u64),
+                    AggregatorOps::Avg,
+                ),
+                phantom: PhantomData,
+            },
+        )?;
 
         Ok(exit_kind)
     }
 }
 
-/// A [`NopFuzzer`] that does nothing
-#[derive(Clone, Debug)]
-pub struct NopFuzzer {}
-
-impl NopFuzzer {
-    /// Creates a new [`NopFuzzer`]
-    #[must_use]
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Default for NopFuzzer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<E, EM, S, ST> Fuzzer<E, EM, S, ST> for NopFuzzer
-where
-    EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
-    ST: StagesTuple<E, EM, S, Self>,
-    S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId,
-{
-    fn fuzz_one(
-        &mut self,
-        _stages: &mut ST,
-        _executor: &mut E,
-        _state: &mut S,
-        _manager: &mut EM,
-    ) -> Result<CorpusId, Error> {
-        unimplemented!("NopFuzzer cannot fuzz");
-    }
-
-    fn fuzz_loop(
-        &mut self,
-        _stages: &mut ST,
-        _executor: &mut E,
-        _state: &mut S,
-        _manager: &mut EM,
-    ) -> Result<(), Error> {
-        unimplemented!("NopFuzzer cannot fuzz");
-    }
-
-    fn fuzz_loop_for(
-        &mut self,
-        _stages: &mut ST,
-        _executor: &mut E,
-        _state: &mut S,
-        _manager: &mut EM,
-        _iters: u64,
-    ) -> Result<CorpusId, Error> {
-        unimplemented!("NopFuzzer cannot fuzz");
-    }
-}
-
-#[cfg(all(test, feature = "std"))]
+#[cfg(test)]
 mod tests {
+    use alloc::rc::Rc;
     use core::cell::RefCell;
 
-    use libafl_bolts::rands::StdRand;
+    use libafl_bolts::{
+        rands::StdRand,
+        tuples::{tuple_list, Handled},
+    };
 
-    use super::{Evaluator, StdFuzzer};
     use crate::{
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
-        inputs::BytesInput,
+        fuzzer::ExecutesInput,
+        inputs::ValueInput,
+        observers::StdMapObserver,
+        replaying::ReplayingFuzzer,
         schedulers::StdScheduler,
         state::StdState,
     };
 
     #[test]
-    fn filtered_execution() {
-        let execution_count = RefCell::new(0);
-        let scheduler = StdScheduler::new();
-        let mut fuzzer = StdFuzzer::with_bloom_input_filter(scheduler, (), (), 100, 1e-4);
+    fn test_replaying() {
+        let map = Rc::new(RefCell::new(vec![0_usize]));
+        let return_value = Rc::new(RefCell::new(vec![0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+        let mut map_borrow = map.borrow_mut();
+        let observer = unsafe {
+            StdMapObserver::from_mut_ptr("observer", map_borrow.as_mut_ptr(), map_borrow.len())
+        };
+        drop(map_borrow);
+        let mut fuzzer = ReplayingFuzzer::new(
+            2,
+            observer.handle(),
+            StdScheduler::new(),
+            tuple_list!(),
+            tuple_list!(),
+        );
+
         let mut state = StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),
             InMemoryCorpus::new(),
-            &mut (),
-            &mut (),
+            &mut tuple_list!(),
+            &mut tuple_list!(),
         )
         .unwrap();
-        let mut manager = NopEventManager::new();
-        let mut harness = |_input: &BytesInput| {
+        let mut event_mgr = NopEventManager::new();
+        let execution_count = Rc::new(RefCell::new(0));
+        let mut harness = |_i: &ValueInput<usize>| {
+            let map_value = return_value.borrow_mut().remove(0);
+            map.borrow_mut()[0] = map_value;
             *execution_count.borrow_mut() += 1;
+
             ExitKind::Ok
         };
-        let mut executor =
-            InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut manager)
-                .unwrap();
-        let input = BytesInput::new(vec![1, 2, 3]);
-        assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
-            .is_ok());
-        assert_eq!(1, *execution_count.borrow()); // evaluate_input does not add it to the filter
+        let mut executor = InProcessExecutor::new(
+            &mut harness,
+            tuple_list!(observer),
+            &mut fuzzer,
+            &mut state,
+            &mut event_mgr,
+        )
+        .unwrap();
 
-        assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
-            .is_ok());
-        assert_eq!(2, *execution_count.borrow()); // at to the filter
+        let input: ValueInput<usize> = 42_usize.into();
+        fuzzer
+            .execute_input(&mut state, &mut executor, &mut event_mgr, &input)
+            .unwrap();
 
-        assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
-            .is_ok());
-        assert_eq!(2, *execution_count.borrow()); // the harness is not called
-
-        assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
-            .is_ok());
-        assert_eq!(3, *execution_count.borrow()); // evaluate_input ignores filters
+        assert_eq!(*execution_count.borrow(), 4);
     }
 }
