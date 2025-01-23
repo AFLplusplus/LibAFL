@@ -43,14 +43,15 @@ use crate::{
 /// A fuzzer instance for unstable targets that increases stability by executing the same input multiple times.
 ///
 /// The input will be executed as often as necessary until the most frequent result appears
+/// - at least `min_count_diff` times
 /// - at least `min_count_diff` times more often than any other result
 /// - at least `min_factor_diff` times more often than any other result
 /// - at most `max_trys` times
 #[derive(Debug)]
 pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
-    min_count_diff: usize,
+    min_count_diff: u32,
     min_factor_diff: f64,
-    max_trys: usize,
+    max_trys: u32,
     handle: Handle<O>,
     scheduler: CS,
     feedback: F,
@@ -623,9 +624,9 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
     /// Create a new [`ReplayingFuzzer`] with standard behavior and the provided duplicate input execution filter.
     #[expect(clippy::too_many_arguments)]
     pub fn with_input_filter(
-        min_count_diff: usize,
+        min_count_diff: u32,
         min_factor_diff: f64,
-        max_trys: usize,
+        max_trys: u32,
         handle: Handle<O>,
         scheduler: CS,
         feedback: F,
@@ -648,9 +649,9 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
 impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
     /// Create a new [`ReplayingFuzzer`] with standard behavior and no duplicate input execution filtering.
     pub fn new(
-        min_count_diff: usize,
+        min_count_diff: u32,
         min_factor_diff: f64,
-        max_trys: usize,
+        max_trys: u32,
         handle: Handle<O>,
         scheduler: CS,
         feedback: F,
@@ -678,9 +679,9 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
     /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
     #[expect(clippy::too_many_arguments)]
     pub fn with_bloom_input_filter(
-        min_count_diff: usize,
+        min_count_diff: u32,
         min_factor_diff: f64,
-        max_trys: usize,
+        max_trys: u32,
         handle: Handle<O>,
         scheduler: CS,
         feedback: F,
@@ -743,16 +744,20 @@ where
             let hash = generic_hash_std(observer);
             *results.entry((hash, exit_kind)).or_insert(0_u32) += 1;
 
-            let total_replayed = results.values().sum::<u32>() as usize;
+            let total_replayed = results.values().sum::<u32>();
 
             let ((max_hash, max_exit_kind), max_count) =
                 results.iter().max_by(|(_, a), (_, b)| a.cmp(b)).unwrap();
+
+            if *max_count < self.min_count_diff {
+                continue; // require at least min_count_diff replays
+            }
 
             let consistent_enough = results
                 .values()
                 .filter(|e| **e != *max_count)
                 .all(|&count| {
-                    let min_value_count = count + self.min_count_diff as u32;
+                    let min_value_count = count + self.min_count_diff;
                     let min_value_factor = f64::from(count) * self.min_factor_diff;
                     min_value_count <= *max_count && min_value_factor <= f64::from(*max_count)
                 });
@@ -776,7 +781,7 @@ where
             Event::UpdateUserStats {
                 name: Cow::Borrowed("consistency-caused-replay-per-input"),
                 value: UserStats::new(
-                    UserStatsValue::Float(u32::try_from(total_replayed).unwrap().into()),
+                    UserStatsValue::Float(total_replayed.into()),
                     AggregatorOps::Avg,
                 ),
                 phantom: PhantomData,
