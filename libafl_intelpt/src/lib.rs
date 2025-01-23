@@ -29,7 +29,7 @@ use std::{
         raw::c_void,
     },
     path::Path,
-    ptr, slice,
+    ptr,
     sync::LazyLock,
 };
 
@@ -39,9 +39,9 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
-use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
-use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
+use libafl_bolts::hash_64_fast;
+use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
 pub use libipt::{
     asid::Asid, image::Image, image::SectionCache, image::SectionInfo, status::Status,
@@ -336,27 +336,29 @@ impl IntelPT {
         // https://manpages.debian.org/bookworm/manpages-dev/perf_event_open.2.en.html#data_head
         smp_rmb();
 
-        // todo: Just use a pointer
-        let mut data = unsafe {
+        let (data_ptr, _owned_data) = unsafe {
             if head_wrap >= tail_wrap {
                 let ptr = self.perf_aux_buffer.add(tail_wrap as usize).cast::<u8>();
-                OwnedRefMut::Ref(slice::from_raw_parts_mut(ptr, len))
+                (ptr, None)
             } else {
                 // Head pointer wrapped, the trace is split
-                OwnedRefMut::Owned(self.join_split_trace(head_wrap, tail_wrap))
+                let mut owned_data = self.join_split_trace(head_wrap, tail_wrap);
+                (owned_data.as_mut_ptr(), Some(owned_data))
             }
         };
         #[cfg(feature = "export_raw")]
         {
-            self.last_decode_trace = data.as_ref().to_vec();
+            self.last_decode_trace = Vec::with_capacity(len);
+            unsafe {
+                ptr::copy_nonoverlapping(data_ptr, self.last_decode_trace.as_mut_ptr(), len);
+                self.last_decode_trace.set_len(len);
+            }
         }
 
-        let mut builder = unsafe {
-            BlockDecoder::builder().buffer_from_raw(data.as_mut().as_mut_ptr(), data.as_ref().len())
-        }
-        .filter(self.ip_filters_to_addr_filter())
-        .set_end_on_call(true)
-        .set_end_on_jump(true);
+        let mut builder = unsafe { BlockDecoder::builder().buffer_from_raw(data_ptr, len) }
+            .filter(self.ip_filters_to_addr_filter())
+            .set_end_on_call(true)
+            .set_end_on_jump(true);
         if let Some(cpu) = &*CURRENT_CPU {
             builder = builder.cpu(*cpu);
         }
