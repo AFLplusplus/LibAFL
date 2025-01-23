@@ -24,13 +24,13 @@ use crate::{
     Qemu,
 };
 
-/// Trace of IDs met at runtime
+/// Trace of `block_id`s met at runtime
 static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
 
-///Map of pc -> ID
+///Map of `pc` -> `block_id`
 static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
 
-/// Map of pc -> block_len
+/// Map of `pc` -> `block_len`
 static DRCOV_LENGTHS: Mutex<Option<HashMap<GuestAddr, GuestUsize>>> = Mutex::new(None);
 
 #[cfg_attr(
@@ -282,7 +282,7 @@ where
 
             // Now, we can reorder the data by building a RangeMap and consume the old map.
             for (path, (range, id)) in module_path_map {
-                module_range_map.insert(range, (id, path))
+                module_range_map.insert(range, (id, path));
             }
 
             self.module_mapping = Some(module_range_map);
@@ -344,7 +344,6 @@ impl DrCovModule<NopAddressFilter> {
 
 impl<F> DrCovModule<F> {
     #[must_use]
-    #[expect(clippy::let_underscore_untyped)]
     pub fn new(
         filter: F,
         filename: PathBuf,

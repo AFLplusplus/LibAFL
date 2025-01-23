@@ -2,7 +2,6 @@ use core::{fmt::Debug, ops::Range};
 
 use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
-use libafl_qemu_sys::GuestAddr;
 #[cfg(feature = "systemmode")]
 use libafl_qemu_sys::GuestPhysAddr;
 
@@ -20,7 +19,6 @@ pub use usermode::*;
 #[cfg(feature = "systemmode")]
 pub mod systemmode;
 #[cfg(feature = "systemmode")]
-#[expect(unused_imports)]
 pub use systemmode::*;
 
 pub mod edges;

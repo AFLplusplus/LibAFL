@@ -46,7 +46,6 @@
 #[macro_use]
 extern crate std;
 
-#[allow(unused_imports)] // for no-std
 #[macro_use]
 extern crate alloc;
 

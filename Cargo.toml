@@ -126,12 +126,15 @@ z3 = "0.12.1"
 
 
 [workspace.lints.rust]
+# Deny
+warnings = { level = "deny", priority = -2 }
+
 # Forbid
 unexpected_cfgs = "forbid"
 
 # Allow
 incomplete_features = "allow"
-ambiguous_glob_reexports = "allow"
+# ambiguous_glob_reexports = "allow"
 
 
 [workspace.lints.clippy]
@@ -142,9 +145,10 @@ cargo_common_metadata = "deny"
 
 # Warn
 cargo = { level = "warn", priority = -1 }
-negative_feature_names = "warn"
 
 # Allow
+negative_feature_names = "allow"    # TODO: turn into 'warn' when working
+multiple_crate_versions = "allow"   # TODO: turn into `warn` when working
 unreadable_literal = "allow"
 type_repetition_in_bounds = "allow"
 missing_errors_doc = "allow"

@@ -56,7 +56,7 @@ fn main() {
         let mut blocks = drcov.basic_block_addresses_u64();
 
         if opts.sort {
-            blocks.sort();
+            blocks.sort_unstable();
         }
 
         if let Some(out_dir) = &opts.out_dir {

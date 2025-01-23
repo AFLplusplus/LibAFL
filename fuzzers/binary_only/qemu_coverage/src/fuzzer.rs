@@ -135,9 +135,7 @@ pub fn fuzz() {
         cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
         let emulator_modules = tuple_list!(
-            DrCovModule::builder()
-                .filename(cov_path.clone())
-                .build(),
+            DrCovModule::builder().filename(cov_path.clone()).build(),
             SnapshotModule::new()
         );
 
