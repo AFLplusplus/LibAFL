@@ -28,8 +28,10 @@ use libafl_bolts::{
     AsSlice,
 };
 use libafl_qemu::{
-    elf::EasyElf, modules::drcov::DrCovModule, ArchExtras, CallingConvention, Emulator, GuestAddr,
-    GuestReg, MmapPerms, Qemu, QemuExecutor, QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    elf::EasyElf,
+    modules::{drcov::DrCovModule, SnapshotModule},
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
+    QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -132,10 +134,13 @@ pub fn fuzz() {
         let core = core_id.0;
         cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
-        let emulator_modules = tuple_list!(DrCovModule::builder()
-            .filename(cov_path.clone())
-            .full_trace(false)
-            .build());
+        let emulator_modules = tuple_list!(
+            DrCovModule::builder()
+                .filename(cov_path.clone())
+                .full_trace(false)
+                .build(),
+            SnapshotModule::new()
+        );
 
         let emulator = Emulator::empty()
             .qemu_parameters(options.args.clone())
@@ -200,7 +205,7 @@ pub fn fuzz() {
         };
 
         let mut harness =
-            |emulator: &mut Emulator<_, _, _, _, _, _, _>, state: &mut _, input: &BytesInput| {
+            |emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
                 let qemu = emulator.qemu();
 
                 let target = input.target_bytes();
