@@ -14,35 +14,44 @@ use serde::{Deserialize, Serialize};
 use crate::GuestAddr;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum Predicate {
-    Edges(GuestAddr, GuestAddr),
-    Max(GuestAddr, u64),
-    Min(GuestAddr, u64),
-}
+pub struct Edges(GuestAddr, GuestAddr);
 
 /// List of predicates gathered over during one run
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Predicates {
-    predicates: Vec<Predicate>,
+    edges: Vec<Edges>,
     // Temporal storage to memoize the max value observed in 1 run
     maxmap: HashMap<GuestAddr, u64>,
     // Temporal storage to memoize the min value observed in 1 run
     minmap: HashMap<GuestAddr, u64>,
 }
+
+/// List of predicates gathered over all runs.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PredicatesMap {
-    map: HashMap<Predicate, (usize, usize)>,
+    edges: HashMap<Edges, (usize, usize)>,
+    max: HashMap<GuestAddr, Vec<(usize, bool)>>,
+    min: HashMap<GuestAddr, Vec<(usize, bool)>>,
 }
+
 impl PredicatesMap {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            edges: HashMap::default(),
+            max: HashMap::default(),
+            min: HashMap::default(),
         }
     }
+
+    pub fn generate_predicates() {
+        todo!("Actually generate predicates from the info")
+    }
+
     #[allow(clippy::cast_precision_loss)]
+    #[deprecated]
     pub fn sort_and_show(&self) {
-        let mut entries: Vec<_> = self.map.iter().collect();
+        let mut entries: Vec<_> = self.edges.iter().collect();
 
         // Sort entries based on the ratio (first usize) / (second usize)
         entries.sort_by(|a, b| {
@@ -67,6 +76,40 @@ impl PredicatesMap {
             );
         }
     }
+
+    /// Take one item from max or min map and find it's divider and its misclassification rate.
+    fn select(a: &Vec<usize>, b: &Vec<usize>) {
+        let mut merged: Vec<(usize, i32)> = Vec::new();
+        for item in a.iter() {
+            merged.push((*item, 1)); // crashing guys
+        }
+        for item in b.iter() {
+            merged.push((*item, 0)); // non crashing guys
+        }
+
+        merged.sort(); // nlogn no better way than this shit
+
+        let n = a.len(); // total crash
+        let m = b.len(); // total safe
+        let mut x = 0; // current crash;
+        let mut y = 0; // current safe
+
+        // Now we gonna compute x + m - y
+        let mut missclassification = n + m;
+        let mut idx_found = 0;
+        for (idx, item) in merged.iter().enumerate() {
+            if x + m - y < missclassification {
+                missclassification = x + m - y;
+                idx_found = idx;
+            }
+            if item.1 == 1 {
+                x += 1;
+            } else {
+                y += 1;
+            }
+        }
+        println!("Best selector is {} {}", idx_found, missclassification);
+    }
 }
 
 impl_serdeany!(PredicatesMap);
@@ -75,19 +118,19 @@ impl Predicates {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            predicates: Vec::new(),
+            edges: Vec::new(),
             maxmap: HashMap::new(),
             minmap: HashMap::new(),
         }
     }
 
     pub fn add_edges(&mut self, src: GuestAddr, dest: GuestAddr) {
-        self.predicates.push(Predicate::Edges(src, dest));
+        self.edges.push(Edges(src, dest));
     }
 
     /// Reset it (should do it every run)
     pub fn clear(&mut self) {
-        self.predicates.clear();
+        self.edges.clear();
         self.maxmap.clear();
         self.minmap.clear();
     }
@@ -115,8 +158,18 @@ impl Predicates {
     }
 
     #[must_use]
-    pub fn predicates(&self) -> &Vec<Predicate> {
-        &self.predicates
+    pub fn edges(&self) -> &Vec<Edges> {
+        &self.edges
+    }
+
+    #[must_use]
+    pub fn maxmap(&self) -> &HashMap<GuestAddr, u64> {
+        &self.maxmap
+    }
+
+    #[must_use]
+    pub fn minmap(&self) -> &HashMap<GuestAddr, u64> {
+        &self.minmap
     }
 }
 
@@ -167,13 +220,11 @@ where
         _observers: &OT,
         _testcase: &mut Testcase<I>,
     ) -> Result<(), libafl::Error> {
+        // do stuf for map
+        /*
         let mut predicates = vec![];
-        if let Ok(meta) = state.metadata::<Predicates>() {
-            for predicate in &meta.predicates {
-                predicates.push(*predicate);
-            }
-        }
-        let map = state.metadata_or_insert_with(PredicatesMap::new);
+        let mut maxs = vec![];
+        let mut mins = vec![];
         for predicate in predicates {
             if self.was_crash {
                 map.map
@@ -190,17 +241,14 @@ where
                     .or_insert((0, 1));
             }
         }
-        map.sort_and_show();
+        */
+        let map = state.metadata_or_insert_with(PredicatesMap::new);
         Ok(())
     }
 }
 
-impl fmt::Display for Predicate {
+impl fmt::Display for Edges {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Predicate::Edges(addr1, addr2) => write!(f, "Edges({addr1:#x}, {addr2:#x})"),
-            Predicate::Max(addr, value) => write!(f, "Max({addr:#x}, {value:#x})"),
-            Predicate::Min(addr, value) => write!(f, "Min({addr:#x}, {value:#x})"),
-        }
+        write!(f, "Edges({:#x}, {:#x})", self.0, self.1)
     }
 }
