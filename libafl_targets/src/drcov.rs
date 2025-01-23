@@ -254,13 +254,15 @@ fn parse_hex_to_u64(str: &str) -> Result<u64, ParseIntError> {
 fn parse_path(s: &str) -> Option<PathBuf> {
     let mut chars = s.trim().chars();
 
-    // first char must be a quote
+    // If first character is a quote, let's remove them
     if chars.next()? != '\"' {
-        return None
-    }
 
-    // last char must be a quote as well
-    if chars.next_back()? != '\"' {
+        // If first char is a quote, last char must be a quote as well
+        if chars.next_back()? != '\"' {
+            log::error!("First character was a quote, but last character was not. Is path well-formed?");
+            return None
+        }
+
         return None
     }
 
