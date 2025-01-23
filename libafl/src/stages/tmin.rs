@@ -43,7 +43,7 @@ use crate::{
 
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
+pub struct StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> {
     /// The name
     name: Cow<'static, str>,
     /// The mutator(s) this stage uses
@@ -54,39 +54,40 @@ pub struct StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
     runs: usize,
     /// The progress helper for this stage, keeping track of resumes after timeouts/crashes
     restart_helper: ExecutionCountRestartHelper,
-    phantom: PhantomData<(E, EM, F, S, Z)>,
+    phantom: PhantomData<(E, EM, F, I, S, Z)>,
 }
 
-impl<E, EM, F, FF, M, S, Z> Stage<E, EM, S, Z> for StdTMinMutationalStage<E, EM, F, FF, M, S, Z>
+impl<E, EM, F, FF, I, M, S, Z> Stage<E, EM, S, Z>
+    for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
 where
-    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
-        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+    Z: HasScheduler<I, S>
+        + ExecutionProcessor<EM, I, E::Observers, S>
+        + ExecutesInput<E, EM, I, S>
         + HasFeedback,
-    Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+    Z::Scheduler: RemovableScheduler<I, S>,
     E: HasObservers,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    E::Observers: ObserversTuple<I, S> + Serialize,
+    EM: EventFirer<I, S>,
     FF: FeedbackFactory<F, E::Observers>,
-    F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    F: Feedback<EM, I, E::Observers, S>,
     S: HasMetadata
+        + HasCorpus<I>
         + HasExecutions
-        + HasSolutions
-        + HasCorpus
+        + HasSolutions<I>
         + HasMaxSize
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    M: Mutator<<S::Corpus as Corpus>::Input, S>,
-    <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Hash + HasLen,
+    Z::Feedback: Feedback<EM, I, E::Observers, S>,
+    M: Mutator<I, S>,
+    I: Input + Hash + HasLen,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.restart_helper.should_restart(state, &self.name)
     }
 
     fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        self.restart_helper.clear_progress(state, &self.name)
+        self.restart_helper.clear_progress::<S>(state, &self.name)
     }
 
     fn perform(
@@ -105,8 +106,8 @@ where
     }
 }
 
-impl<E, EM, F, FF, M, S, Z> FeedbackFactory<F, E::Observers>
-    for StdTMinMutationalStage<E, EM, F, FF, M, S, Z>
+impl<E, EM, F, FF, I, M, S, Z> FeedbackFactory<F, E::Observers>
+    for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
 where
     E: HasObservers,
     FF: FeedbackFactory<F, E::Observers>,
@@ -116,7 +117,7 @@ where
     }
 }
 
-impl<E, EM, F, FF, M, S, Z> Named for StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
+impl<E, EM, F, FF, I, M, S, Z> Named for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
@@ -127,30 +128,30 @@ static mut TMIN_STAGE_ID: usize = 0;
 /// The name for tmin stage
 pub static TMIN_STAGE_NAME: &str = "tmin";
 
-impl<E, EM, F, FF, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, M, S, Z>
+impl<E, EM, F, FF, I, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
 where
-    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>
-        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + ExecutesInput<E, EM, <S::Corpus as Corpus>::Input, S>
+    Z: HasScheduler<I, S>
+        + ExecutionProcessor<EM, I, E::Observers, S>
+        + ExecutesInput<E, EM, I, S>
         + HasFeedback,
-    Z::Scheduler: RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
+    Z::Scheduler: RemovableScheduler<I, S>,
     E: HasObservers,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
+    E::Observers: ObserversTuple<I, S> + Serialize,
+    EM: EventFirer<I, S>,
     FF: FeedbackFactory<F, E::Observers>,
-    F: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
+    F: Feedback<EM, I, E::Observers, S>,
     S: HasMetadata
         + HasExecutions
-        + HasSolutions
-        + HasCorpus
+        + HasSolutions<I>
+        + HasCorpus<I>
         + HasMaxSize
         + HasNamedMetadata
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    Z::Feedback: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    M: Mutator<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Hash + HasLen + Input,
+    Z::Feedback: Feedback<EM, I, E::Observers, S>,
+    M: Mutator<I, S>,
+    I: Hash + HasLen + Input,
 {
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
@@ -189,10 +190,7 @@ where
         }
 
         start_timer!(state);
-        let transformed = <S::Corpus as Corpus>::Input::try_transform_from(
-            state.current_testcase_mut()?.borrow_mut(),
-            state,
-        )?;
+        let transformed = I::try_transform_from(state.current_testcase_mut()?.borrow_mut(), state)?;
         let mut base = state.current_input_cloned()?;
         // potential post operation if base is replaced by a shorter input
         let mut base_post = None;
@@ -310,7 +308,7 @@ where
     }
 }
 
-impl<E, EM, F, FF, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, M, S, Z> {
+impl<E, EM, F, FF, I, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
         // unsafe but impossible that you create two threads both instantiating this instance
@@ -391,12 +389,12 @@ where
 
 /// A feedback factory for ensuring that the values of the observers for minimized inputs are the same
 #[derive(Debug, Clone)]
-pub struct ObserverEqualityFactory<C, M, S> {
+pub struct ObserverEqualityFactory<C, I, M, S> {
     observer_handle: Handle<C>,
-    phantom: PhantomData<(C, M, S)>,
+    phantom: PhantomData<(C, I, M, S)>,
 }
 
-impl<C, M, S> ObserverEqualityFactory<C, M, S>
+impl<C, I, M, S> ObserverEqualityFactory<C, I, M, S>
 where
     M: Hash,
     C: AsRef<M> + Handled,
@@ -410,7 +408,7 @@ where
     }
 }
 
-impl<C, M, S> HasObserverHandle for ObserverEqualityFactory<C, M, S> {
+impl<C, I, M, S> HasObserverHandle for ObserverEqualityFactory<C, I, M, S> {
     type Observer = C;
 
     fn observer_handle(&self) -> &Handle<C> {
@@ -418,13 +416,13 @@ impl<C, M, S> HasObserverHandle for ObserverEqualityFactory<C, M, S> {
     }
 }
 
-impl<C, M, OT, S> FeedbackFactory<ObserverEqualityFeedback<C, M, S>, OT>
-    for ObserverEqualityFactory<C, M, S>
+impl<C, I, M, OT, S> FeedbackFactory<ObserverEqualityFeedback<C, M, S>, OT>
+    for ObserverEqualityFactory<C, I, M, S>
 where
     M: Hash,
     C: AsRef<M> + Handled,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus,
+    OT: ObserversTuple<I, S>,
+    S: HasCorpus<I>,
 {
     fn create_feedback(&self, observers: &OT) -> ObserverEqualityFeedback<C, M, S> {
         let obs = observers

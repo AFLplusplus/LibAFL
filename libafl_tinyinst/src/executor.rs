@@ -1,35 +1,32 @@
 use core::{marker::PhantomData, ptr, time::Duration};
+use std::fmt::{Debug, Formatter};
 
 use libafl::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     Error,
 };
 use libafl_bolts::{
     fs::{InputFile, INPUTFILE_STD},
-    shmem::{NopShMemProvider, ShMem, ShMemProvider},
+    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
     tuples::RefIndexable,
     AsSlice, AsSliceMut,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
 /// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-pub struct TinyInstExecutor<S, SP, OT>
-where
-    SP: ShMemProvider,
-{
+pub struct TinyInstExecutor<S, SHM, OT> {
     tinyinst: TinyInst,
     coverage_ptr: *mut Vec<u64>,
     timeout: Duration,
     observers: OT,
     phantom: PhantomData<S>,
     cur_input: InputFile,
-    map: Option<<SP as ShMemProvider>::ShMem>,
+    map: Option<SHM>,
 }
 
-impl TinyInstExecutor<(), NopShMemProvider, ()> {
+impl TinyInstExecutor<(), NopShMem, ()> {
     /// Create a builder for [`TinyInstExecutor`]
     #[must_use]
     pub fn builder<'a>() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
@@ -37,23 +34,19 @@ impl TinyInstExecutor<(), NopShMemProvider, ()> {
     }
 }
 
-impl<S, SP, OT> std::fmt::Debug for TinyInstExecutor<S, SP, OT>
-where
-    SP: ShMemProvider,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<S, SHM, OT> Debug for TinyInstExecutor<S, SHM, OT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("TinyInstExecutor")
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()
     }
 }
 
-impl<EM, S, SP, OT, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for TinyInstExecutor<S, SP, OT>
+impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for TinyInstExecutor<S, SHM, OT>
 where
-    S: HasCorpus + HasExecutions,
-    <S::Corpus as Corpus>::Input: HasTargetBytes,
-    SP: ShMemProvider,
+    S: HasExecutions,
+    I: HasTargetBytes,
+    SHM: ShMem,
 {
     #[inline]
     fn run_target(
@@ -61,7 +54,7 @@ where
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
         match &self.map {
@@ -135,10 +128,7 @@ impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
 
     /// Use this to enable shmem testcase passing.
     #[must_use]
-    pub fn shmem_provider<SP: ShMemProvider>(
-        self,
-        shmem_provider: &'a mut SP,
-    ) -> TinyInstExecutorBuilder<'a, SP> {
+    pub fn shmem_provider<SP>(self, shmem_provider: &'a mut SP) -> TinyInstExecutorBuilder<'a, SP> {
         TinyInstExecutorBuilder {
             tinyinst_args: self.tinyinst_args,
             program_args: self.program_args,
@@ -248,7 +238,10 @@ where
     }
 
     /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
-    pub fn build<OT, S>(&mut self, observers: OT) -> Result<TinyInstExecutor<S, SP, OT>, Error> {
+    pub fn build<OT, S>(
+        &mut self,
+        observers: OT,
+    ) -> Result<TinyInstExecutor<S, SP::ShMem, OT>, Error> {
         if self.coverage_ptr.is_null() {
             return Err(Error::illegal_argument("Coverage pointer may not be null."));
         }
@@ -315,10 +308,7 @@ where
     }
 }
 
-impl<S, SP, OT> HasObservers for TinyInstExecutor<S, SP, OT>
-where
-    SP: ShMemProvider,
-{
+impl<S, SHM, OT> HasObservers for TinyInstExecutor<S, SHM, OT> {
     type Observers = OT;
 
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {

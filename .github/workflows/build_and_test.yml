@@ -276,6 +276,7 @@ jobs:
           - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
 
           # Full-system
+          - ./fuzzers/full_system/nyx_launcher
           - ./fuzzers/full_system/nyx_libxml2_standalone
           - ./fuzzers/full_system/nyx_libxml2_parallel
 
@@ -290,7 +291,7 @@ jobs:
           - ./fuzzers/structure_aware/forkserver_simple_nautilus
 
           # In-process
-          # - ./fuzzers/fuzz_anything/cargo_fuzz # Revive after they fix rustc
+          - ./fuzzers/fuzz_anything/cargo_fuzz
           # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
@@ -343,7 +344,7 @@ jobs:
               - 'libafl_bolts/**'
               - 'libafl_targets/**'
               - 'libafl_qemu/**'
-              - 'fuzzers/*qemu*/**'
+              - 'fuzzers/**/*qemu*/**'
 
   fuzzers-qemu:
     needs:

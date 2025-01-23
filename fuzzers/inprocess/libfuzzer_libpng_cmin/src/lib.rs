@@ -219,7 +219,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let orig_size = state.corpus().count();
     let msg = "Started distillation...".to_string();
-    <LlmpRestartingEventManager<_, _, _> as EventFirer<BytesInput, _>>::log(
+    <LlmpRestartingEventManager<_, _, _, _, _> as EventFirer<BytesInput, _>>::log(
         &mut restarting_mgr,
         &mut state,
         LogSeverity::Info,
@@ -227,7 +227,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     )?;
     minimizer.minimize(&mut fuzzer, &mut executor, &mut restarting_mgr, &mut state)?;
     let msg = format!("Distilled out {} cases", orig_size - state.corpus().count());
-    <LlmpRestartingEventManager<_, _, _> as EventFirer<BytesInput, _>>::log(
+    <LlmpRestartingEventManager<_, _, _, _, _> as EventFirer<BytesInput, _>>::log(
         &mut restarting_mgr,
         &mut state,
         LogSeverity::Info,

@@ -5,7 +5,6 @@ use std::{
     ops::Deref,
 };
 
-use ahash::AHasher;
 use libafl::{
     corpus::Corpus,
     executors::ExitKind,
@@ -129,12 +128,6 @@ where
         self.inner.count_bytes()
     }
 
-    fn hash_simple(&self) -> u64 {
-        let mut hasher = AHasher::default();
-        self.hash(&mut hasher);
-        hasher.finish()
-    }
-
     fn initial(&self) -> Self::Entry {
         *self.value_observer.default_value()
     }
@@ -158,27 +151,18 @@ where
     }
 }
 
-impl<M, O, S> Observer<<S::Corpus as Corpus>::Input, S> for MappedEdgeMapObserver<M, O>
+impl<I, M, O, S> Observer<I, S> for MappedEdgeMapObserver<M, O>
 where
-    S: HasCorpus,
-    M: Observer<<S::Corpus as Corpus>::Input, S> + Debug,
-    O: Observer<<S::Corpus as Corpus>::Input, S> + Debug,
+    M: Observer<I, S> + Debug,
+    O: Observer<I, S> + Debug,
+    S: HasCorpus<I>,
 {
-    fn pre_exec(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.inner.pre_exec(state, input)?;
         self.value_observer.pre_exec(state, input)
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         self.inner.post_exec(state, input, exit_kind)?;
         self.value_observer.post_exec(state, input, exit_kind)
     }
@@ -259,16 +243,12 @@ impl Named for SizeValueObserver {
     }
 }
 
-impl<S> Observer<<S::Corpus as Corpus>::Input, S> for SizeValueObserver
+impl<I, S> Observer<I, S> for SizeValueObserver
 where
-    S: HasCorpus,
-    <S::Corpus as Corpus>::Input: HasLen,
+    I: HasLen,
+    S: HasCorpus<I>,
 {
-    fn pre_exec(
-        &mut self,
-        _state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, input: &I) -> Result<(), Error> {
         self.size = input.len();
         Ok(())
     }
@@ -307,24 +287,15 @@ impl Named for TimeValueObserver {
     }
 }
 
-impl<S> Observer<<S::Corpus as Corpus>::Input, S> for TimeValueObserver
+impl<I, S> Observer<I, S> for TimeValueObserver
 where
-    S: HasCorpus,
+    S: HasCorpus<I>,
 {
-    fn pre_exec(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.time_obs.pre_exec(state, input)
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         self.time_obs.post_exec(state, input, exit_kind)?;
         self.time = self
             .time_obs
@@ -373,26 +344,17 @@ impl Named for SizeTimeValueObserver {
     }
 }
 
-impl<S> Observer<<S::Corpus as Corpus>::Input, S> for SizeTimeValueObserver
+impl<I, S> Observer<I, S> for SizeTimeValueObserver
 where
-    S: HasCorpus,
-    <S::Corpus as Corpus>::Input: HasLen,
+    S: HasCorpus<I>,
+    I: HasLen,
 {
-    fn pre_exec(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-    ) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.size_obs.pre_exec(state, input)?;
         self.time_obs.pre_exec(state, input)
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         self.time_obs.post_exec(state, input, exit_kind)?;
         self.size_obs.post_exec(state, input, exit_kind)?;
         self.value = self

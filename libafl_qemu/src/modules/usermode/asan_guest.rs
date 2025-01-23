@@ -14,7 +14,8 @@ use crate::sys::libafl_tcg_gen_asan;
 use crate::{
     emu::EmulatorModules,
     modules::{
-        utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
+        AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{Hook, MemAccessInfo, Qemu},
     sys::TCGTemp,
@@ -190,8 +191,6 @@ where
     I: Unpin,
     S: Unpin,
 {
-    type ModuleAddressFilter = F;
-
     fn pre_qemu_init<ET>(
         &mut self,
         _emulator_modules: &mut EmulatorModules<ET, I, S>,
@@ -334,6 +333,13 @@ where
             Hook::Function(guest_trace_error_n_asan::<ET, I, S>),
         );
     }
+}
+
+impl<F> HasAddressFilter for AsanGuestModule<F>
+where
+    F: AddressFilter,
+{
+    type ModuleAddressFilter = F;
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.filter

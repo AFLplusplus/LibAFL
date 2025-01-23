@@ -52,7 +52,7 @@ fn destroy_output_fds(options: &LibfuzzerOptions) {
     }
 }
 
-fn do_fuzz<F, ST, E, S, EM>(
+fn do_fuzz<F, ST, E, I, S, EM>(
     options: &LibfuzzerOptions,
     fuzzer: &mut F,
     stages: &mut ST,
@@ -61,10 +61,10 @@ fn do_fuzz<F, ST, E, S, EM>(
     mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, S, ST>,
+    F: Fuzzer<E, EM, I, S, ST>,
     S: HasMetadata
         + HasExecutions
-        + HasSolutions
+        + HasSolutions<I>
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,
@@ -111,7 +111,7 @@ where
     fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
         let (state, mgr): (
             Option<StdState<_, _, _, _>>,
-            SimpleRestartingEventManager<_, _, StdState<_, _, _, _>, _>,
+            SimpleRestartingEventManager<_, _, StdState<_, _, _, _>, _, _>,
         ) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider) {
             // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
             Ok(res) => res,

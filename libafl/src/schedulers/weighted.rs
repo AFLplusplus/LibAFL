@@ -155,10 +155,10 @@ where
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
     #[expect(clippy::cast_precision_loss)]
-    pub fn create_alias_table<S>(&self, state: &mut S) -> Result<(), Error>
+    pub fn create_alias_table<I, S>(&self, state: &mut S) -> Result<(), Error>
     where
-        F: TestcaseScore<S>,
-        S: HasCorpus + HasMetadata,
+        F: TestcaseScore<I, S>,
+        S: HasCorpus<I> + HasMetadata,
     {
         let n = state.corpus().count();
 
@@ -303,12 +303,12 @@ impl<C, F, O> HasQueueCycles for WeightedScheduler<C, F, O> {
     }
 }
 
-impl<C, F, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for WeightedScheduler<C, F, O>
+impl<C, F, I, O, S> Scheduler<I, S> for WeightedScheduler<C, F, O>
 where
     C: AsRef<O> + Named,
-    F: TestcaseScore<S>,
+    F: TestcaseScore<I, S>,
     O: Hash,
-    S: HasCorpus + HasMetadata + HasRand + HasTestcase,
+    S: HasCorpus<I> + HasMetadata + HasRand + HasTestcase<I>,
 {
     /// Called when a [`Testcase`] is added to the corpus
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -317,12 +317,7 @@ where
         Ok(())
     }
 
-    fn on_evaluation<OT>(
-        &mut self,
-        state: &mut S,
-        _input: &<S::Corpus as Corpus>::Input,
-        observers: &OT,
-    ) -> Result<(), Error>
+    fn on_evaluation<OT>(&mut self, state: &mut S, _input: &I, observers: &OT) -> Result<(), Error>
     where
         OT: MatchName,
     {

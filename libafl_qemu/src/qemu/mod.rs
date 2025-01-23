@@ -10,10 +10,10 @@ use core::{
 use std::{
     ffi::{c_void, CString},
     fmt::{Display, Formatter},
-    intrinsics::{copy_nonoverlapping, transmute},
-    mem::MaybeUninit,
+    mem::{transmute, MaybeUninit},
     ops::Range,
     pin::Pin,
+    ptr::copy_nonoverlapping,
     sync::OnceLock,
 };
 

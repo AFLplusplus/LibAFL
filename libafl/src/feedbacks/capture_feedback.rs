@@ -38,7 +38,7 @@ impl<S> StateInitializer<S> for CaptureTimeoutFeedback {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for CaptureTimeoutFeedback
 where
-    S: HasCorpus + HasMetadata,
+    S: HasCorpus<I> + HasMetadata,
     I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     #[inline]

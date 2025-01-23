@@ -25,7 +25,7 @@ use libafl_bolts::os::{fork, ForkResult};
 use libafl_bolts::{
     core_affinity::CoreId,
     os::CTRL_C_EXIT,
-    shmem::{ShMemProvider, StdShMemProvider},
+    shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
     tuples::tuple_list,
     ClientId,
@@ -38,11 +38,12 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use super::{std_maybe_report_progress, std_report_progress, ManagerExit};
+use super::{std_maybe_report_progress, std_report_progress, AwaitRestartSafe, SendExiting};
+#[cfg(feature = "share_objectives")]
+use crate::corpus::{Corpus, Testcase};
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
-    corpus::Corpus,
     events::{
         std_on_restart, BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple,
         EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
@@ -54,8 +55,8 @@ use crate::{
     observers::ObserversTuple,
     stages::HasCurrentStageId,
     state::{
-        HasCorpus, HasExecutions, HasImported, HasLastReportTime, MaybeHasClientPerfMonitor,
-        Stoppable,
+        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -409,7 +410,7 @@ where
 }
 
 /// An `EventManager` that forwards all events to other attached via tcp.
-pub struct TcpEventManager<EMH, S> {
+pub struct TcpEventManager<EMH, I, S> {
     /// We send message every `throttle` second
     throttle: Option<Duration>,
     /// When we sent the last message
@@ -425,32 +426,32 @@ pub struct TcpEventManager<EMH, S> {
     /// A node will not re-use the observer values sent over TCP
     /// from nodes with other configurations.
     configuration: EventConfig,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> TcpEventManager<(), S> {
+impl<I, S> TcpEventManager<(), I, S> {
     /// Create a builder for [`TcpEventManager`]
     #[must_use]
-    pub fn builder() -> TcpEventManagerBuilder<(), S> {
+    pub fn builder() -> TcpEventManagerBuilder<(), I, S> {
         TcpEventManagerBuilder::new()
     }
 }
 
 /// Builder for `TcpEventManager`
 #[derive(Debug, Copy, Clone)]
-pub struct TcpEventManagerBuilder<EMH, S> {
+pub struct TcpEventManagerBuilder<EMH, I, S> {
     throttle: Option<Duration>,
     hooks: EMH,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<S> Default for TcpEventManagerBuilder<(), S> {
+impl<I, S> Default for TcpEventManagerBuilder<(), I, S> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S> TcpEventManagerBuilder<(), S> {
+impl<I, S> TcpEventManagerBuilder<(), I, S> {
     /// Set the constructor
     #[must_use]
     pub fn new() -> Self {
@@ -463,7 +464,7 @@ impl<S> TcpEventManagerBuilder<(), S> {
 
     /// Set the hooks
     #[must_use]
-    pub fn hooks<EMH>(self, hooks: EMH) -> TcpEventManagerBuilder<EMH, S> {
+    pub fn hooks<EMH>(self, hooks: EMH) -> TcpEventManagerBuilder<EMH, I, S> {
         TcpEventManagerBuilder {
             throttle: self.throttle,
             hooks,
@@ -472,7 +473,7 @@ impl<S> TcpEventManagerBuilder<(), S> {
     }
 }
 
-impl<EMH, S> TcpEventManagerBuilder<EMH, S> {
+impl<EMH, I, S> TcpEventManagerBuilder<EMH, I, S> {
     /// Set the throttle
     #[must_use]
     pub fn throttle(mut self, throttle: Duration) -> Self {
@@ -486,7 +487,7 @@ impl<EMH, S> TcpEventManagerBuilder<EMH, S> {
         addr: &A,
         client_id: ClientId,
         configuration: EventConfig,
-    ) -> Result<TcpEventManager<EMH, S>, Error> {
+    ) -> Result<TcpEventManager<EMH, I, S>, Error> {
         let mut tcp = TcpStream::connect(addr)?;
 
         let mut our_client_id_buf = client_id.0.to_le_bytes();
@@ -521,7 +522,7 @@ impl<EMH, S> TcpEventManagerBuilder<EMH, S> {
         port: u16,
         client_id: ClientId,
         configuration: EventConfig,
-    ) -> Result<TcpEventManager<EMH, S>, Error> {
+    ) -> Result<TcpEventManager<EMH, I, S>, Error> {
         Self::build_from_client(self, &("127.0.0.1", port), client_id, configuration)
     }
 
@@ -534,13 +535,13 @@ impl<EMH, S> TcpEventManagerBuilder<EMH, S> {
         addr: &A,
         env_name: &str,
         configuration: EventConfig,
-    ) -> Result<TcpEventManager<EMH, S>, Error> {
+    ) -> Result<TcpEventManager<EMH, I, S>, Error> {
         let this_id = ClientId(str::parse::<u32>(&env::var(env_name)?)?);
         Self::build_from_client(self, addr, this_id, configuration)
     }
 }
 
-impl<EMH, S> core::fmt::Debug for TcpEventManager<EMH, S> {
+impl<EMH, I, S> core::fmt::Debug for TcpEventManager<EMH, I, S> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("TcpEventManager");
         let debug = debug_struct.field("tcp", &self.tcp);
@@ -554,17 +555,22 @@ impl<EMH, S> core::fmt::Debug for TcpEventManager<EMH, S> {
     }
 }
 
-impl<EMH, S> Drop for TcpEventManager<EMH, S> {
+impl<EMH, I, S> Drop for TcpEventManager<EMH, I, S> {
     /// TCP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
         self.await_restart_safe();
     }
 }
 
-impl<EMH, S> TcpEventManager<EMH, S>
+impl<EMH, I, S> TcpEventManager<EMH, I, S>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus + Stoppable,
+    EMH: EventManagerHooksTuple<I, S>,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + Stoppable,
 {
     /// Write the client id for a client `EventManager` to env vars
     pub fn to_env(&self, env_name: &str) {
@@ -578,14 +584,13 @@ where
         executor: &mut E,
         state: &mut S,
         client_id: ClientId,
-        event: Event<<S::Corpus as Corpus>::Input>,
+        event: Event<I>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-        E::Observers: Serialize + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        E: Executor<Self, I, S, Z> + HasObservers,
+        E::Observers: Serialize + ObserversTuple<I, S>,
         for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-            + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
+        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
@@ -615,6 +620,20 @@ where
                     log::info!("Added received Testcase as item #{item}");
                 }
             }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { input, .. } => {
+                log::debug!("Received new Objective");
+                let mut testcase = Testcase::from(input);
+                testcase.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
+                }
+
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
+            }
             Event::Stop => {
                 state.request_stop();
             }
@@ -630,7 +649,7 @@ where
     }
 }
 
-impl<EMH, S> TcpEventManager<EMH, S> {
+impl<EMH, I, S> TcpEventManager<EMH, I, S> {
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
     /// We are no longer allowed to send anything afterwards.
@@ -641,11 +660,10 @@ impl<EMH, S> TcpEventManager<EMH, S> {
     }
 }
 
-impl<EMH, S> EventFirer<<S::Corpus as Corpus>::Input, S> for TcpEventManager<EMH, S>
+impl<EMH, I, S> EventFirer<I, S> for TcpEventManager<EMH, I, S>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus,
-    <S::Corpus as Corpus>::Input: Serialize,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: Serialize,
 {
     fn should_send(&self) -> bool {
         if let Some(throttle) = self.throttle {
@@ -655,11 +673,7 @@ where
         }
     }
 
-    fn fire(
-        &mut self,
-        _state: &mut S,
-        event: Event<<S::Corpus as Corpus>::Input>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
 
         #[cfg(feature = "tcp_compression")]
@@ -679,7 +693,7 @@ where
     }
 }
 
-impl<EMH, S> EventRestarter<S> for TcpEventManager<EMH, S>
+impl<EMH, I, S> EventRestarter<S> for TcpEventManager<EMH, I, S>
 where
     S: HasCurrentStageId,
 {
@@ -688,16 +702,20 @@ where
     }
 }
 
-impl<E, EMH, S, Z> EventProcessor<E, S, Z> for TcpEventManager<EMH, S>
+impl<E, EMH, I, S, Z> EventProcessor<E, S, Z> for TcpEventManager<EMH, I, S>
 where
-    E: HasObservers + Executor<Self, <S::Corpus as Corpus>::Input, S, Z>,
-    E::Observers: Serialize + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    E: HasObservers + Executor<Self, I, S, Z>,
+    E::Observers: Serialize + ObserversTuple<I, S>,
     for<'a> E::Observers: Deserialize<'a>,
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus + Stoppable,
-    <S::Corpus as Corpus>::Input: DeserializeOwned,
-    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
+    EMH: EventManagerHooksTuple<I, S>,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + Stoppable,
+    I: DeserializeOwned,
+    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -758,14 +776,16 @@ where
     }
 }
 
-impl<EMH, S> ManagerExit for TcpEventManager<EMH, S> {
+impl<EMH, I, S> AwaitRestartSafe for TcpEventManager<EMH, I, S> {
     /// The TCP client needs to wait until a broker has mapped all pages before shutting down.
     /// Otherwise, the OS may already have removed the shared maps.
     fn await_restart_safe(&mut self) {
         // wait until we can drop the message safely.
         //self.tcp.await_safe_to_unmap_blocking();
     }
+}
 
+impl<EMH, I, S> SendExiting for TcpEventManager<EMH, I, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         //TODO: Should not be needed since TCP does that for us
         //self.tcp.sender.send_exiting()
@@ -773,11 +793,11 @@ impl<EMH, S> ManagerExit for TcpEventManager<EMH, S> {
     }
 }
 
-impl<EMH, S> ProgressReporter<S> for TcpEventManager<EMH, S>
+impl<EMH, I, S> ProgressReporter<S> for TcpEventManager<EMH, I, S>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Serialize,
-    S: HasExecutions + HasMetadata + HasLastReportTime + HasCorpus + MaybeHasClientPerfMonitor,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: Serialize,
+    S: HasExecutions + HasMetadata + HasLastReportTime + MaybeHasClientPerfMonitor,
 {
     fn maybe_report_progress(
         &mut self,
@@ -792,7 +812,7 @@ where
     }
 }
 
-impl<EMH, S> HasEventManagerId for TcpEventManager<EMH, S> {
+impl<EMH, I, S> HasEventManagerId for TcpEventManager<EMH, I, S> {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId(self.client_id.0 as usize)
@@ -801,24 +821,20 @@ impl<EMH, S> HasEventManagerId for TcpEventManager<EMH, S> {
 
 /// A manager that can restart on the fly, storing states in-between (in `on_restart`)
 #[derive(Debug)]
-pub struct TcpRestartingEventManager<EMH, S, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct TcpRestartingEventManager<EMH, I, S, SHM, SP> {
     /// The embedded TCP event manager
-    tcp_mgr: TcpEventManager<EMH, S>,
+    tcp_mgr: TcpEventManager<EMH, I, S>,
     /// The staterestorer to serialize the state for the next runner
-    staterestorer: StateRestorer<SP>,
+    staterestorer: StateRestorer<SHM, SP>,
     /// Decide if the state restorer must save the serialized state
     save_state: bool,
 }
 
-impl<EMH, S, SP> ProgressReporter<S> for TcpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> ProgressReporter<S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasMetadata + HasExecutions + HasLastReportTime + HasCorpus + MaybeHasClientPerfMonitor,
-    <S::Corpus as Corpus>::Input: Serialize,
-    SP: ShMemProvider,
+    EMH: EventManagerHooksTuple<I, S>,
+    S: HasMetadata + HasExecutions + HasLastReportTime + MaybeHasClientPerfMonitor,
+    I: Serialize,
 {
     fn maybe_report_progress(
         &mut self,
@@ -833,23 +849,16 @@ where
     }
 }
 
-impl<EMH, S, SP> EventFirer<<S::Corpus as Corpus>::Input, S>
-    for TcpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> EventFirer<I, S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus,
-    <S::Corpus as Corpus>::Input: Serialize,
-    SP: ShMemProvider,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: Serialize,
 {
     fn should_send(&self) -> bool {
         self.tcp_mgr.should_send()
     }
 
-    fn fire(
-        &mut self,
-        state: &mut S,
-        event: Event<<S::Corpus as Corpus>::Input>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.tcp_mgr.fire(state, event)
     }
@@ -859,17 +868,11 @@ where
     }
 }
 
-impl<EMH, S, SP> ManagerExit for TcpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> SendExiting for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
-    /// The tcp client needs to wait until a broker mapped all pages, before shutting down.
-    /// Otherwise, the OS may already have removed the shared maps,
-    #[inline]
-    fn await_restart_safe(&mut self) {
-        self.tcp_mgr.await_restart_safe();
-    }
-
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.staterestorer.send_exiting();
         // Also inform the broker that we are about to exit.
@@ -878,11 +881,24 @@ where
     }
 }
 
-impl<EMH, S, SP> EventRestarter<S> for TcpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> AwaitRestartSafe for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasExecutions + HasCurrentStageId + Serialize,
-    SP: ShMemProvider,
+    SHM: ShMem,
+{
+    /// The tcp client needs to wait until a broker mapped all pages, before shutting down.
+    /// Otherwise, the OS may already have removed the shared maps,
+    #[inline]
+    fn await_restart_safe(&mut self) {
+        self.tcp_mgr.await_restart_safe();
+    }
+}
+
+impl<EMH, I, S, SHM, SP> EventRestarter<S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
+where
+    EMH: EventManagerHooksTuple<I, S>,
+    S: HasExecutions + HasCurrentStageId + Serialize,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -901,17 +917,24 @@ where
     }
 }
 
-impl<E, EMH, S, SP, Z> EventProcessor<E, S, Z> for TcpRestartingEventManager<EMH, S, SP>
+impl<E, EMH, I, S, SHM, SP, Z> EventProcessor<E, S, Z>
+    for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    E: HasObservers + Executor<TcpEventManager<EMH, S>, <S::Corpus as Corpus>::Input, S, Z>,
+    E: HasObservers + Executor<TcpEventManager<EMH, I, S>, I, S, Z>,
     for<'a> E::Observers: Deserialize<'a>,
-    E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S> + Serialize,
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus + Stoppable,
-    <S::Corpus as Corpus>::Input: DeserializeOwned,
-    SP: ShMemProvider,
-    Z: ExecutionProcessor<TcpEventManager<EMH, S>, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + EvaluatorObservers<E, TcpEventManager<EMH, S>, <S::Corpus as Corpus>::Input, S>,
+    E::Observers: ObserversTuple<I, S> + Serialize,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: DeserializeOwned,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + Stoppable,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+    Z: ExecutionProcessor<TcpEventManager<EMH, I, S>, I, E::Observers, S>
+        + EvaluatorObservers<E, TcpEventManager<EMH, I, S>, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.tcp_mgr.process(fuzzer, state, executor)
@@ -922,10 +945,7 @@ where
     }
 }
 
-impl<EMH, S, SP> HasEventManagerId for TcpRestartingEventManager<EMH, S, SP>
-where
-    SP: ShMemProvider,
-{
+impl<EMH, I, S, SHM, SP> HasEventManagerId for TcpRestartingEventManager<EMH, I, S, SHM, SP> {
     fn mgr_id(&self) -> EventManagerId {
         self.tcp_mgr.mgr_id()
     }
@@ -937,15 +957,12 @@ const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The tcp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
-impl<EMH, S, SP> TcpRestartingEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus,
-    SP: ShMemProvider,
-    //CE: CustomEvent<I>,
+    EMH: EventManagerHooksTuple<I, S>,
 {
     /// Create a new runner, the executed child doing the actual fuzzing.
-    pub fn new(tcp_mgr: TcpEventManager<EMH, S>, staterestorer: StateRestorer<SP>) -> Self {
+    pub fn new(tcp_mgr: TcpEventManager<EMH, I, S>, staterestorer: StateRestorer<SHM, SP>) -> Self {
         Self {
             tcp_mgr,
             staterestorer,
@@ -955,8 +972,8 @@ where
 
     /// Create a new runner specifying if it must save the serialized state on restart.
     pub fn with_save_state(
-        tcp_mgr: TcpEventManager<EMH, S>,
-        staterestorer: StateRestorer<SP>,
+        tcp_mgr: TcpEventManager<EMH, I, S>,
+        staterestorer: StateRestorer<SHM, SP>,
         save_state: bool,
     ) -> Self {
         Self {
@@ -967,12 +984,12 @@ where
     }
 
     /// Get the staterestorer
-    pub fn staterestorer(&self) -> &StateRestorer<SP> {
+    pub fn staterestorer(&self) -> &StateRestorer<SHM, SP> {
         &self.staterestorer
     }
 
     /// Get the staterestorer (mutable)
-    pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SP> {
+    pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SHM, SP> {
         &mut self.staterestorer
     }
 }
@@ -996,21 +1013,27 @@ pub enum TcpManagerKind {
 /// The [`TcpRestartingEventManager`] is a combination of restarter and runner, that can be used on systems with and without `fork` support.
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[expect(clippy::type_complexity)]
-pub fn setup_restarting_mgr_tcp<MT, S>(
+pub fn setup_restarting_mgr_tcp<I, MT, S>(
     monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
 ) -> Result<
     (
         Option<S>,
-        TcpRestartingEventManager<(), S, StdShMemProvider>,
+        TcpRestartingEventManager<(), I, S, StdShMem, StdShMemProvider>,
     ),
     Error,
 >
 where
     MT: Monitor + Clone,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus + DeserializeOwned + Stoppable,
-    <S::Corpus as Corpus>::Input: Input,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + DeserializeOwned
+        + Stoppable,
+    I: Input,
 {
     TcpRestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -1028,12 +1051,7 @@ where
 /// `restarter` and `runner`, that can be used on systems both with and without `fork` support. The
 /// `restarter` will start a new process each time the child crashes or times out.
 #[derive(TypedBuilder, Debug)]
-pub struct TcpRestartingMgr<EMH, MT, S, SP>
-where
-    S: DeserializeOwned,
-    SP: ShMemProvider + 'static,
-    MT: Monitor,
-{
+pub struct TcpRestartingMgr<EMH, I, MT, S, SP> {
     /// The shared memory provider to use for the broker or client spawned by the restarting
     /// manager.
     shmem_provider: SP,
@@ -1065,25 +1083,38 @@ where
     /// The hooks for `handle_in_client`
     hooks: EMH,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<S>,
+    phantom_data: PhantomData<(I, S)>,
 }
 
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
-impl<EMH, MT, S, SP> TcpRestartingMgr<EMH, MT, S, SP>
+impl<EMH, I, MT, S, SP> TcpRestartingMgr<EMH, I, MT, S, SP>
 where
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S> + Copy + Clone,
-    SP: ShMemProvider,
-    S: HasExecutions + HasMetadata + HasImported + HasCorpus + DeserializeOwned + Stoppable,
-    <S::Corpus as Corpus>::Input: Input,
+    EMH: EventManagerHooksTuple<I, S> + Copy + Clone,
+    I: Input,
     MT: Monitor + Clone,
+    S: HasExecutions
+        + HasMetadata
+        + HasImported
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + DeserializeOwned
+        + Stoppable,
+    SP: ShMemProvider,
 {
     /// Launch the restarting manager
-    pub fn launch(&mut self) -> Result<(Option<S>, TcpRestartingEventManager<EMH, S, SP>), Error> {
+    pub fn launch(
+        &mut self,
+    ) -> Result<
+        (
+            Option<S>,
+            TcpRestartingEventManager<EMH, I, S, SP::ShMem, SP>,
+        ),
+        Error,
+    > {
         // We start ourself as child process to actually fuzz
         let (staterestorer, _new_shmem_provider, core_id) = if env::var(_ENV_FUZZER_SENDER).is_err()
         {
-            let broker_things = |mut broker: TcpEventBroker<<S::Corpus as Corpus>::Input, MT>,
-                                 _remote_broker_addr| {
+            let broker_things = |mut broker: TcpEventBroker<I, MT>, _remote_broker_addr| {
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
                     broker.set_exit_cleanly_after(exit_cleanly_after);
                 }
@@ -1097,11 +1128,10 @@ where
                     let connection = create_nonblocking_listener(("127.0.0.1", self.broker_port));
                     match connection {
                         Ok(listener) => {
-                            let event_broker =
-                                TcpEventBroker::<<S::Corpus as Corpus>::Input, MT>::with_listener(
-                                    listener,
-                                    self.monitor.take().unwrap(),
-                                );
+                            let event_broker = TcpEventBroker::<I, MT>::with_listener(
+                                listener,
+                                self.monitor.take().unwrap(),
+                            );
 
                             // Yep, broker. Just loop here.
                             log::info!(
@@ -1129,7 +1159,7 @@ where
                     }
                 }
                 TcpManagerKind::Broker => {
-                    let event_broker = TcpEventBroker::<<S::Corpus as Corpus>::Input, MT>::new(
+                    let event_broker = TcpEventBroker::<I, MT>::new(
                         format!("127.0.0.1:{}", self.broker_port),
                         self.monitor.take().unwrap(),
                     )?;
@@ -1158,11 +1188,11 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             #[cfg(unix)]
-            let staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
             #[cfg(not(unix))]
-            let staterestorer: StateRestorer<SP> =
+            let staterestorer: StateRestorer<SP::ShMem, SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;

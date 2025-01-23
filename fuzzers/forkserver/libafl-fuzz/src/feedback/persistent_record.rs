@@ -52,8 +52,7 @@ impl<I, S> StateInitializer<S> for PersitentRecordFeedback<I> {}
 
 impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PersitentRecordFeedback<I>
 where
-    S: HasCorpus,
-    S::Corpus: Corpus<Input = I>,
+    S: HasCorpus<I>,
     I: Input,
 {
     #[inline]

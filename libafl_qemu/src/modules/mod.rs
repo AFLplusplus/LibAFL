@@ -48,14 +48,43 @@ pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 
 pub mod utils;
 
-/// A module for `libafl_qemu`.
+/// [`EmulatorModule`] is a trait designed to define modules that interact with the QEMU emulator
+/// during fuzzing. [`EmulatorModule`] provides a set of interfaces (hooks) that can be invoked at various stages
+/// of the fuzzer's execution.
+///
+/// The typical sequence of these hooks execution during a fuzzing session is as follows:
+/// ```rust,ignore
+/// pre_qemu_init()
+/// // Qemu initialization (in the Emulator)
+/// post_qemu_init()
+/// // Harness initialization
+/// first_exec()
+///
+/// // The following loop is executed for every fuzzing iteration
+/// pre_exec()
+/// // Harness execution
+/// post_exec()
+/// ```
+///
+/// It is important to note that all registered [`EmulatorModule`] instances will have their interfaces (hooks)
+/// invoked. The order of invocation depends on the order in which the modules were registered.
+///
+/// Users typically add hooks, monitoring, or other instrumentation to the **fuzzing target** in [`EmulatorModule`]
+/// For example:
+/// ```rust,ignore
+/// fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
+/// where
+///     ET: EmulatorModuleTuple<I, S>,
+/// {
+///     // Add a hook before the execution of a syscall in the fuzzing target
+///     _emulator_modules.pre_syscalls(Hook::Function(your_syscall_hooks::<ET, I, S>))
+///     // ...
+/// }
+/// ```
+/// For more details on adding hooks to the **fuzzing target**, including function signatures,
+/// return values, please refer to the [`EmulatorModules`].
 // TODO remove 'static when specialization will be stable
 pub trait EmulatorModule<I, S>: 'static + Debug {
-    type ModuleAddressFilter: AddressFilter;
-
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter: PageFilter;
-
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
     /// Hook run **before** QEMU is initialized.
@@ -133,25 +162,6 @@ pub trait EmulatorModule<I, S>: 'static + Debug {
     ///
     /// This is getting executed in a signal handler.
     unsafe fn on_timeout(&mut self) {}
-
-    fn address_filter(&self) -> &Self::ModuleAddressFilter;
-    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
-    fn update_address_filter(&mut self, qemu: Qemu, filter: Self::ModuleAddressFilter) {
-        *self.address_filter_mut() = filter;
-        // Necessary because some hooks filter during TB generation.
-        qemu.flush_jit();
-    }
-
-    #[cfg(feature = "systemmode")]
-    fn page_filter(&self) -> &Self::ModulePageFilter;
-    #[cfg(feature = "systemmode")]
-    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter;
-    #[cfg(feature = "systemmode")]
-    fn update_page_filter(&mut self, qemu: Qemu, filter: Self::ModulePageFilter) {
-        *self.page_filter_mut() = filter;
-        // Necessary because some hooks filter during TB generation.
-        qemu.flush_jit();
-    }
 }
 
 pub trait EmulatorModuleTuple<I, S>:
@@ -211,11 +221,6 @@ pub trait EmulatorModuleTuple<I, S>:
     ///
     /// This is getting executed in a signal handler.
     unsafe fn on_timeout_all(&mut self);
-
-    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
-
-    #[cfg(feature = "systemmode")]
-    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr);
 }
 
 impl<I, S> EmulatorModuleTuple<I, S> for ()
@@ -280,11 +285,6 @@ where
     unsafe fn on_crash_all(&mut self) {}
 
     unsafe fn on_timeout_all(&mut self) {}
-
-    fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
-
-    #[cfg(feature = "systemmode")]
-    fn allow_page_id_all(&mut self, _page_id: GuestPhysAddr) {}
 }
 
 impl<Head, Tail, I, S> EmulatorModuleTuple<I, S> for (Head, Tail)
@@ -368,16 +368,5 @@ where
     unsafe fn on_timeout_all(&mut self) {
         self.0.on_timeout();
         self.1.on_timeout_all();
-    }
-
-    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
-        self.0.address_filter_mut().register(address_range.clone());
-        self.1.allow_address_range_all(address_range);
-    }
-
-    #[cfg(feature = "systemmode")]
-    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
-        self.0.page_filter_mut().register(page_id);
-        self.1.allow_page_id_all(page_id);
     }
 }

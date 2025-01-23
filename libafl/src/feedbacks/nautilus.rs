@@ -67,8 +67,7 @@ impl<'a> NautilusFeedback<'a> {
         testcase: &mut Testcase<NautilusInput>,
     ) -> Result<(), Error>
     where
-        S: HasCorpus + HasMetadata,
-        S::Corpus: Corpus<Input = NautilusInput>,
+        S: HasCorpus<NautilusInput> + HasMetadata,
     {
         state.corpus().load_input_into(testcase)?;
         let input = testcase.input().as_ref().unwrap().clone();
@@ -93,8 +92,7 @@ impl<S> StateInitializer<S> for NautilusFeedback<'_> {}
 
 impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'_>
 where
-    S: HasMetadata + HasCorpus,
-    S::Corpus: Corpus<Input = NautilusInput>,
+    S: HasMetadata + HasCorpus<NautilusInput>,
 {
     fn is_interesting(
         &mut self,

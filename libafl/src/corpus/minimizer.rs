@@ -29,16 +29,16 @@ use crate::{
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<C, E, O, S, T, TS> {
+pub struct MapCorpusMinimizer<C, E, I, O, S, T, TS> {
     observer_handle: Handle<C>,
-    phantom: PhantomData<(E, O, S, T, TS)>,
+    phantom: PhantomData<(E, I, O, S, T, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<C, E, O, S, T> =
-    MapCorpusMinimizer<C, E, O, S, T, LenTimeMulTestcaseScore>;
+pub type StdCorpusMinimizer<C, E, I, O, S, T> =
+    MapCorpusMinimizer<C, E, I, O, S, T, LenTimeMulTestcaseScore>;
 
-impl<C, E, O, S, T, TS> MapCorpusMinimizer<C, E, O, S, T, TS>
+impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
 where
     C: Named,
 {
@@ -52,14 +52,14 @@ where
     }
 }
 
-impl<C, E, O, S, T, TS> MapCorpusMinimizer<C, E, O, S, T, TS>
+impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,
-    S: HasMetadata + HasCorpus + HasExecutions,
-    <S::Corpus as Corpus>::Input: Input,
+    I: Input,
+    S: HasMetadata + HasCorpus<I> + HasExecutions,
     T: Copy + Hash + Eq,
-    TS: TestcaseScore<S>,
+    TS: TestcaseScore<I, S>,
 {
     /// Do the minimization
     #[expect(clippy::too_many_lines)]
@@ -71,12 +71,11 @@ where
         state: &mut S,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        CS: Scheduler<<S::Corpus as Corpus>::Input, S>
-            + RemovableScheduler<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-        Z: HasScheduler<<S::Corpus as Corpus>::Input, S, Scheduler = CS>,
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        CS: Scheduler<I, S> + RemovableScheduler<I, S>,
+        EM: EventFirer<I, S>,
+        Z: HasScheduler<I, S, Scheduler = CS>,
     {
         // don't delete this else it won't work after restart
         let current = *state.corpus().current();

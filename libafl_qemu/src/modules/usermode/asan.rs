@@ -13,8 +13,8 @@ use rangemap::RangeMap;
 
 use crate::{
     modules::{
-        calls::FullBacktraceCollector, snapshot::SnapshotModule, EmulatorModule,
-        EmulatorModuleTuple,
+        calls::FullBacktraceCollector, snapshot::SnapshotModule, utils::filters::HasAddressFilter,
+        EmulatorModule, EmulatorModuleTuple,
     },
     qemu::MemAccessInfo,
     sys::TCGTemp,
@@ -815,7 +815,6 @@ where
     I: Unpin,
     S: Unpin,
 {
-    type ModuleAddressFilter = StdAddressFilter;
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
     fn pre_qemu_init<ET>(
@@ -956,7 +955,10 @@ where
             *exit_kind = ExitKind::Crash;
         }
     }
+}
 
+impl HasAddressFilter for AsanModule {
+    type ModuleAddressFilter = StdAddressFilter;
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.filter
     }

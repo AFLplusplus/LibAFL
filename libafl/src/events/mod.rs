@@ -45,11 +45,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    corpus::Corpus,
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
-    state::{HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
+    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
     Error, HasMetadata,
 };
 
@@ -302,6 +301,9 @@ pub enum Event<I> {
     },
     /// A new objective was found
     Objective {
+        /// Input of newly found Objective
+        #[cfg(feature = "share_objectives")]
+        input: I,
         /// Objective corpus size
         objective_size: usize,
         /// The time when this event was created
@@ -489,10 +491,10 @@ where
 
 /// Default implementation of [`ProgressReporter::report_progress`] for implementors with the
 /// given constraints
-pub fn std_report_progress<EM, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
+pub fn std_report_progress<EM, I, S>(reporter: &mut EM, state: &mut S) -> Result<(), Error>
 where
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S>,
-    S: HasExecutions + HasLastReportTime + HasCorpus + MaybeHasClientPerfMonitor,
+    EM: EventFirer<I, S>,
+    S: HasExecutions + HasLastReportTime + MaybeHasClientPerfMonitor,
 {
     let executions = *state.executions();
     let cur = current_time();
@@ -562,11 +564,9 @@ pub trait EventRestarter<S> {
 
 /// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
 /// constraints
-pub fn std_on_restart<S>(
-    restarter: &mut (impl EventRestarter<S> + ManagerExit),
-    state: &mut S,
-) -> Result<(), Error>
+pub fn std_on_restart<EM, S>(restarter: &mut EM, state: &mut S) -> Result<(), Error>
 where
+    EM: EventRestarter<S> + AwaitRestartSafe,
     S: HasCurrentStageId,
 {
     state.on_restart()?;
@@ -580,11 +580,15 @@ pub trait CanSerializeObserver<OT> {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>;
 }
 
-/// Routines called before exiting
-pub trait ManagerExit {
+/// Send that we're about to exit
+pub trait SendExiting {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error>;
+}
+
+/// Wait until it's safe to restart
+pub trait AwaitRestartSafe {
     /// Block until we are safe to exit, usually called inside `on_restart`.
     fn await_restart_safe(&mut self);
 }
@@ -638,12 +642,15 @@ where
     }
 }
 
-impl ManagerExit for NopEventManager {
+impl SendExiting for NopEventManager {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
+}
+
+impl AwaitRestartSafe for NopEventManager {
     /// Block until we are safe to exit, usually called inside `on_restart`.
     fn await_restart_safe(&mut self) {}
 }
@@ -759,15 +766,20 @@ where
     }
 }
 
-impl<EM, M> ManagerExit for MonitorTypedEventManager<EM, M>
+impl<EM, M> SendExiting for MonitorTypedEventManager<EM, M>
 where
-    EM: ManagerExit,
+    EM: SendExiting,
 {
     #[inline]
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.inner.send_exiting()
     }
+}
 
+impl<EM, M> AwaitRestartSafe for MonitorTypedEventManager<EM, M>
+where
+    EM: AwaitRestartSafe,
+{
     #[inline]
     fn await_restart_safe(&mut self) {
         self.inner.await_restart_safe();

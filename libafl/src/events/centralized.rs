@@ -18,30 +18,28 @@ use libafl_bolts::{
 };
 use libafl_bolts::{
     llmp::{LlmpClient, LlmpClientDescription, Tag},
-    shmem::{NopShMemProvider, ShMemProvider},
+    shmem::{ShMem, ShMemProvider},
     tuples::{Handle, MatchNameRef},
     ClientId,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
-use super::{CanSerializeObserver, ManagerExit, NopEventManager};
+use super::AwaitRestartSafe;
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     common::HasMetadata,
-    corpus::Corpus,
     events::{
         serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
-        AdaptiveSerializer, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
+        AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer,
+        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        LogSeverity, ProgressReporter, SendExiting,
     },
     executors::HasObservers,
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, NopInput},
+    inputs::Input,
     observers::TimeObserver,
-    state::{
-        HasCorpus, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, NopState, Stoppable,
-    },
+    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error,
 };
 
@@ -49,22 +47,19 @@ pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]
-pub struct CentralizedEventManager<EM, EMH, S, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct CentralizedEventManager<EM, EMH, I, S, SHM, SP> {
     inner: EM,
     /// The centralized LLMP client for inter process communication
-    client: LlmpClient<SP>,
+    client: LlmpClient<SHM, SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     time_ref: Option<Handle<TimeObserver>>,
     hooks: EMH,
     is_main: bool,
-    phantom: PhantomData<S>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl CentralizedEventManager<NopEventManager, (), NopState<NopInput>, NopShMemProvider> {
+impl CentralizedEventManager<(), (), (), (), (), ()> {
     /// Creates a builder for [`CentralizedEventManager`]
     #[must_use]
     pub fn builder() -> CentralizedEventManagerBuilder {
@@ -98,13 +93,14 @@ impl CentralizedEventManagerBuilder {
     }
 
     /// Creates a new [`CentralizedEventManager`].
-    pub fn build_from_client<EM, EMH, S, SP>(
+    #[expect(clippy::type_complexity)]
+    pub fn build_from_client<EM, EMH, I, S, SP>(
         self,
         inner: EM,
         hooks: EMH,
-        client: LlmpClient<SP>,
+        client: LlmpClient<SP::ShMem, SP>,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SP::ShMem, SP>, Error>
     where
         SP: ShMemProvider,
     {
@@ -124,16 +120,17 @@ impl CentralizedEventManagerBuilder {
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    pub fn build_on_port<EM, EMH, S, SP>(
+    pub fn build_on_port<EM, EMH, I, S, SHM, SP>(
         self,
         inner: EM,
         hooks: EMH,
         shmem_provider: SP,
         port: u16,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider,
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
         Self::build_from_client(self, inner, hooks, client, time_obs)
@@ -141,42 +138,43 @@ impl CentralizedEventManagerBuilder {
 
     /// If a client respawns, it may reuse the existing connection, previously
     /// stored by [`LlmpClient::to_env()`].
-    pub fn build_existing_client_from_env<EM, EMH, S, SP>(
+    pub fn build_existing_client_from_env<EM, EMH, I, S, SHM, SP>(
         self,
         inner: EM,
         hooks: EMH,
         shmem_provider: SP,
         env_name: &str,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider,
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
         Self::build_from_client(self, inner, hooks, client, time_obs)
     }
 
     /// Create an existing client from description
-    pub fn existing_client_from_description<EM, EMH, S, SP>(
+    pub fn existing_client_from_description<EM, EMH, I, S, SHM, SP>(
         self,
         inner: EM,
         hooks: EMH,
         shmem_provider: SP,
         description: &LlmpClientDescription,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, S, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider,
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::existing_client_from_description(shmem_provider, description)?;
         Self::build_from_client(self, inner, hooks, client, time_obs)
     }
 }
 
-impl<EM, EMH, S, SP> AdaptiveSerializer for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> AdaptiveSerializer for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
     EM: AdaptiveSerializer,
-    SP: ShMemProvider,
 {
     fn serialization_time(&self) -> Duration {
         self.inner.serialization_time()
@@ -209,36 +207,33 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> EventFirer<<S::Corpus as Corpus>::Input, S>
-    for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> EventFirer<I, S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
-    EMH: EventManagerHooksTuple<<<S as HasCorpus>::Corpus as Corpus>::Input, S>,
-    SP: ShMemProvider,
-    S: HasCorpus + Stoppable,
-    <<S as HasCorpus>::Corpus as Corpus>::Input: Input,
+    EM: HasEventManagerId + EventFirer<I, S>,
+    EMH: EventManagerHooksTuple<I, S>,
+    S: Stoppable,
+    I: Input,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn should_send(&self) -> bool {
         self.inner.should_send()
     }
 
     #[expect(clippy::match_same_arms)]
-    fn fire(
-        &mut self,
-        state: &mut S,
-        mut event: Event<<S::Corpus as Corpus>::Input>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, state: &mut S, mut event: Event<I>) -> Result<(), Error> {
         if !self.is_main {
             // secondary node
             let mut is_tc = false;
-            // Forward to main only if new tc or heartbeat
+            // Forward to main only if new tc, heartbeat, or optionally, a new objective
             let should_be_forwarded = match &mut event {
                 Event::NewTestcase { forward_id, .. } => {
                     *forward_id = Some(ClientId(self.inner.mgr_id().0 as u32));
                     is_tc = true;
                     true
                 }
-                Event::UpdateExecStats { .. } => true, // send it but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::UpdateExecStats { .. } => true, // send UpdateExecStats but this guy won't be handled. the only purpose is to keep this client alive else the broker thinks it is dead and will dc it
+                Event::Objective { .. } => true,
                 Event::Stop => true,
                 _ => false,
             };
@@ -270,10 +265,11 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> EventRestarter<S> for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> EventRestarter<S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider,
     EM: EventRestarter<S>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[inline]
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -283,11 +279,11 @@ where
     }
 }
 
-impl<EM, EMH, OT, S, SP> CanSerializeObserver<OT> for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT>
+    for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
     EM: AdaptiveSerializer,
-    SP: ShMemProvider,
-    OT: Serialize + MatchNameRef,
+    OT: MatchNameRef + Serialize,
 {
     fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
         serialize_observers_adaptive::<EM, OT>(
@@ -299,16 +295,23 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> ManagerExit for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> SendExiting for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    EM: ManagerExit,
-    SP: ShMemProvider,
+    EM: SendExiting,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.client.sender_mut().send_exiting()?;
         self.inner.send_exiting()
     }
+}
 
+impl<EM, EMH, I, S, SHM, SP> AwaitRestartSafe for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+    EM: AwaitRestartSafe,
+{
     #[inline]
     fn await_restart_safe(&mut self) {
         self.client.await_safe_to_unmap_blocking();
@@ -316,17 +319,18 @@ where
     }
 }
 
-impl<E, EM, EMH, S, SP, Z> EventProcessor<E, S, Z> for CentralizedEventManager<EM, EMH, S, SP>
+impl<E, EM, EMH, I, S, SHM, SP, Z> EventProcessor<E, S, Z>
+    for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
     E: HasObservers,
     E::Observers: DeserializeOwned,
-    EM: EventProcessor<E, S, Z> + HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + Stoppable,
-    <S::Corpus as Corpus>::Input: Input,
-    SP: ShMemProvider,
-    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
+    EM: EventProcessor<E, S, Z> + HasEventManagerId + EventFirer<I, S>,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: Input,
+    S: Stoppable,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         if self.is_main {
@@ -345,18 +349,14 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    EM: EventFirer<<S::Corpus as Corpus>::Input, S> + HasEventManagerId,
-    EMH: EventManagerHooksTuple<<<S as HasCorpus>::Corpus as Corpus>::Input, S>,
-    S: HasExecutions
-        + HasMetadata
-        + HasLastReportTime
-        + Stoppable
-        + HasCorpus
-        + MaybeHasClientPerfMonitor,
-    <S::Corpus as Corpus>::Input: Input,
-    SP: ShMemProvider,
+    EM: EventFirer<I, S> + HasEventManagerId,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: Input,
+    S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + MaybeHasClientPerfMonitor,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn maybe_report_progress(
         &mut self,
@@ -371,19 +371,19 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> HasEventManagerId for CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> HasEventManagerId for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
     EM: HasEventManagerId,
-    SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
     }
 }
 
-impl<EM, EMH, S, SP> CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Describe the client event manager's LLMP parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
@@ -402,19 +402,17 @@ where
     }
 }
 
-impl<EM, EMH, S, SP> CentralizedEventManager<EM, EMH, S, SP>
+impl<EM, EMH, I, S, SHM, SP> CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    EM: HasEventManagerId + EventFirer<<S::Corpus as Corpus>::Input, S>,
-    EMH: EventManagerHooksTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + Stoppable,
-    <S::Corpus as Corpus>::Input: Input,
-    SP: ShMemProvider,
+    EM: HasEventManagerId + EventFirer<I, S>,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: Input,
+    S: Stoppable,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[cfg(feature = "llmp_compression")]
-    fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
-    where
-        I: Input,
-    {
+    fn forward_to_main(&mut self, event: &Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
         let flags = LLMP_FLAG_INITIALIZED;
 
@@ -434,10 +432,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn forward_to_main<I>(&mut self, event: &Event<I>) -> Result<(), Error>
-    where
-        I: Input,
-    {
+    fn forward_to_main(&mut self, event: &Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
         self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
         Ok(())
@@ -452,8 +447,7 @@ where
     where
         E: HasObservers,
         E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-            + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
+        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
@@ -478,7 +472,7 @@ where
             } else {
                 msg
             };
-            let event: Event<<S::Corpus as Corpus>::Input> = postcard::from_bytes(event_bytes)?;
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
             log::debug!("Processor received message {}", event.name_detailed());
             self.handle_in_main(fuzzer, executor, state, client_id, event)?;
             count += 1;
@@ -493,13 +487,12 @@ where
         executor: &mut E,
         state: &mut S,
         client_id: ClientId,
-        event: Event<<S::Corpus as Corpus>::Input>,
+        event: Event<I>,
     ) -> Result<(), Error>
     where
         E: HasObservers,
         E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-            + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>,
+        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
         log::debug!("handle_in_main!");
 
@@ -594,14 +587,3 @@ where
         Ok(())
     }
 }
-
-/*
-impl<EM, SP> Drop for CentralizedEventManager<EM, SP>
-where
-    EM: UsesState,    SP: ShMemProvider + 'static,
-{
-    /// LLMP clients will have to wait until their pages are mapped by somebody.
-    fn drop(&mut self) {
-        self.await_restart_safe();
-    }
-}*/
