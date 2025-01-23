@@ -148,101 +148,6 @@ where
         Ok(res)
     }
 
-    fn evaluate_execution(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: I,
-        observers: &OT,
-        exit_kind: &ExitKind,
-        send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
-        let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
-        if send_events {
-            self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
-        }
-        if exec_res != ExecuteInputResult::None {
-            *state.last_found_time_mut() = current_time();
-        }
-        Ok((exec_res, corpus_id))
-    }
-
-    fn serialize_and_dispatch(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: I,
-        exec_res: &ExecuteInputResult,
-        observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        // Now send off the event
-        let observers_buf = match exec_res {
-            ExecuteInputResult::Corpus => {
-                if manager.should_send() {
-                    // TODO, set None for fast targets
-                    if manager.configuration() == EventConfig::AlwaysUnique {
-                        None
-                    } else {
-                        manager.serialize_observers(observers)?
-                    }
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        };
-
-        self.dispatch_event(state, manager, input, exec_res, observers_buf, exit_kind)?;
-        Ok(())
-    }
-
-    fn dispatch_event(
-        &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: I,
-        exec_res: &ExecuteInputResult,
-        observers_buf: Option<Vec<u8>>,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        // Now send off the event
-        match exec_res {
-            ExecuteInputResult::Corpus => {
-                if manager.should_send() {
-                    manager.fire(
-                        state,
-                        Event::NewTestcase {
-                            input,
-                            observers_buf,
-                            exit_kind: *exit_kind,
-                            corpus_size: state.corpus().count(),
-                            client_config: manager.configuration(),
-                            time: current_time(),
-                            forward_id: None,
-                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
-                            node_id: None,
-                        },
-                    )?;
-                }
-            }
-            ExecuteInputResult::Solution => {
-                if manager.should_send() {
-                    manager.fire(
-                        state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                            time: current_time(),
-                        },
-                    )?;
-                }
-            }
-            ExecuteInputResult::None => (),
-        }
-        Ok(())
-    }
-
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution(
         &mut self,
@@ -294,6 +199,103 @@ where
                 Ok(None)
             }
         }
+    }
+
+    fn serialize_and_dispatch(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: I,
+        exec_res: &ExecuteInputResult,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        // Now send off the event
+        let observers_buf = match exec_res {
+            ExecuteInputResult::Corpus => {
+                if manager.should_send() {
+                    // TODO set None for fast targets
+                    if manager.configuration() == EventConfig::AlwaysUnique {
+                        None
+                    } else {
+                        manager.serialize_observers(observers)?
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        self.dispatch_event(state, manager, input, exec_res, observers_buf, exit_kind)?;
+        Ok(())
+    }
+
+    fn dispatch_event(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: I,
+        exec_res: &ExecuteInputResult,
+        observers_buf: Option<Vec<u8>>,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        // Now send off the event
+        match exec_res {
+            ExecuteInputResult::Corpus => {
+                if manager.should_send() {
+                    manager.fire(
+                        state,
+                        Event::NewTestcase {
+                            input,
+                            observers_buf,
+                            exit_kind: *exit_kind,
+                            corpus_size: state.corpus().count(),
+                            client_config: manager.configuration(),
+                            time: current_time(),
+                            forward_id: None,
+                            #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
+                            node_id: None,
+                        },
+                    )?;
+                }
+            }
+            ExecuteInputResult::Solution => {
+                if manager.should_send() {
+                    manager.fire(
+                        state,
+                        Event::Objective {
+                            #[cfg(feature = "share_objectives")]
+                            input,
+                            objective_size: state.solutions().count(),
+                            time: current_time(),
+                        },
+                    )?;
+                }
+            }
+            ExecuteInputResult::None => (),
+        }
+        Ok(())
+    }
+
+    fn evaluate_execution(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
+        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
+        let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
+        if send_events {
+            self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
+        }
+        if exec_res != ExecuteInputResult::None {
+            *state.last_found_time_mut() = current_time();
+        }
+        Ok((exec_res, corpus_id))
     }
 }
 
@@ -379,14 +381,6 @@ where
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
 
-    fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
-        let mut testcase = Testcase::from(input.clone());
-        testcase.set_disabled(true);
-        // Add the disabled input to the main corpus
-        let id = state.corpus_mut().add_disabled(testcase)?;
-        Ok(id)
-    }
-
     /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
@@ -428,6 +422,8 @@ where
             manager.fire(
                 state,
                 Event::Objective {
+                    #[cfg(feature = "share_objectives")]
+                    input,
                     objective_size: state.solutions().count(),
                     time: current_time(),
                 },
@@ -482,6 +478,14 @@ where
                 node_id: None,
             },
         )?;
+        Ok(id)
+    }
+
+    fn add_disabled_input(&mut self, state: &mut S, input: I) -> Result<CorpusId, Error> {
+        let mut testcase = Testcase::from(input.clone());
+        testcase.set_disabled(true);
+        // Add the disabled input to the main corpus
+        let id = state.corpus_mut().add_disabled(testcase)?;
         Ok(id)
     }
 }
@@ -602,7 +606,7 @@ where
 
         manager.report_progress(state)?;
 
-        // If we would assume the fuzzer loop will always exit after this, we could do this here:
+        // If we assumed the fuzzer loop will always exit after this, we could do this here:
         // manager.on_restart(state)?;
         // But as the state may grow to a few megabytes,
         // for now we won't, and the user has to do it (unless we find a way to do this on `Drop`).
