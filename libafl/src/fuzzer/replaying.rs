@@ -612,7 +612,7 @@ where
 }
 
 impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
+    /// Create a new [`ReplayingFuzzer`] with standard behavior and the provided duplicate input execution filter.
     pub fn with_input_filter(
         min_count_diff: usize,
         max_trys: usize,
