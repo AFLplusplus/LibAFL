@@ -50,7 +50,7 @@ pub use libipt::{
 use libipt::{
     block::BlockDecoder, enc_dec_builder::AddrFilterRange, enc_dec_builder::AddrFilterType,
     enc_dec_builder::AddrFilters, enc_dec_builder::AddrFiltersBuilder, enc_dec_builder::Cpu,
-    enc_dec_builder::PtEncoderDecoder, error::PtError, error::PtErrorCode,
+    enc_dec_builder::EncoderDecoderBuilder, error::PtError, error::PtErrorCode,
 };
 #[cfg(target_os = "linux")]
 use num_enum::TryFromPrimitive;
@@ -90,14 +90,6 @@ static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
 });
 
 #[cfg(target_os = "linux")]
-static CURRENT_CPU: LazyLock<Option<Cpu>> = LazyLock::new(|| {
-    let cpuid = CpuId::new();
-    cpuid
-        .get_feature_info()
-        .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
-});
-
-#[cfg(target_os = "linux")]
 static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     let path = format!("{PT_EVENT_PATH}/type");
     let s = fs::read_to_string(&path)
@@ -134,6 +126,8 @@ pub struct IntelPT {
     aux_tail: *mut u64,
     previous_decode_head: u64,
     ip_filters: Vec<RangeInclusive<usize>>,
+    // The lifetime of BlockDecoder<'a> is irrelevant during the building phase.
+    decoder_builder: EncoderDecoderBuilder<BlockDecoder<'static>>,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -354,14 +348,8 @@ impl IntelPT {
                 self.last_decode_trace.set_len(len);
             }
         }
-
-        let mut builder = unsafe { BlockDecoder::builder().buffer_from_raw(data_ptr, len) }
-            .filter(self.ip_filters_to_addr_filter())
-            .set_end_on_call(true)
-            .set_end_on_jump(true);
-        if let Some(cpu) = &*CURRENT_CPU {
-            builder = builder.cpu(*cpu);
-        }
+        let builder = unsafe { self.decoder_builder.clone().buffer_from_raw(data_ptr, len) }
+            .filter(self.ip_filters_to_addr_filter());
 
         let mut decoder = builder.build().map_err(error_from_pt_error)?;
         decoder.set_image(image).map_err(error_from_pt_error)?;
@@ -633,6 +621,13 @@ impl IntelPTBuilder {
         let aux_head = unsafe { &raw mut (*buff_metadata).aux_head };
         let aux_tail = unsafe { &raw mut (*buff_metadata).aux_tail };
 
+        let mut decoder_builder = EncoderDecoderBuilder::new()
+            .set_end_on_call(true)
+            .set_end_on_jump(true);
+        if let Some(cpu) = current_cpu() {
+            decoder_builder = decoder_builder.cpu(cpu);
+        }
+
         let mut intel_pt = IntelPT {
             fd,
             perf_buffer,
@@ -643,6 +638,7 @@ impl IntelPTBuilder {
             aux_tail,
             previous_decode_head: 0,
             ip_filters: Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize),
+            decoder_builder,
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
@@ -1037,6 +1033,15 @@ fn smp_rmb() {
 #[inline]
 const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
+}
+
+#[cfg(target_os = "linux")]
+#[inline]
+fn current_cpu() -> Option<Cpu> {
+    let cpuid = CpuId::new();
+    cpuid
+        .get_feature_info()
+        .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
 }
 
 #[cfg(test)]
