@@ -62,6 +62,18 @@ where
     pub fn shadow_observers_mut(&mut self) -> RefIndexable<&mut SOT, SOT> {
         RefIndexable::from(&mut self.shadow_observers)
     }
+
+    /// Inner executor
+    #[inline]
+    pub fn executor(&self) -> &E {
+        &self.executor
+    }
+
+    /// Inner executor
+    #[inline]
+    pub fn executor_mut(&mut self) -> &mut E {
+        &mut self.executor
+    }
 }
 
 impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
