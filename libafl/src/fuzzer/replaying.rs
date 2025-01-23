@@ -40,16 +40,14 @@ use crate::{
     Error, HasMetadata,
 };
 
-/// The maximum factor of times an input will be replayed, multiplied by `count`.
-pub const MAX_REPLAY_FACTOR: usize = 5;
-
 /// A fuzzer instance for unstable targets that increases stability by executing the same input multiple times.
 ///
-/// The input will be executed at most `count` * [`MAX_REPLAY_FACTOR`] times.
+/// The input will be executed as often as necessary until the most frequent result appears at least `min_count_diff` times more often than any other result and at most `max_trys` times.
 #[derive(Debug)]
 pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
-    count: usize,
-    handles: Handle<O>,
+    min_count_diff: usize,
+    max_trys: usize,
+    handle: Handle<O>,
     scheduler: CS,
     feedback: F,
     objective: OF,
@@ -621,16 +619,18 @@ where
 impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
     /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
     pub fn with_input_filter(
-        count: usize,
-        handles: Handle<O>,
+        min_count_diff: usize,
+        max_trys: usize,
+        handle: Handle<O>,
         scheduler: CS,
         feedback: F,
         objective: OF,
         input_filter: IF,
     ) -> Self {
         Self {
-            count,
-            handles,
+            min_count_diff,
+            max_trys,
+            handle,
             scheduler,
             feedback,
             objective,
@@ -640,17 +640,19 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
 }
 
 impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
+    /// Create a new [`ReplayingFuzzer`] with standard behavior and no duplicate input execution filtering.
     pub fn new(
-        count: usize,
-        handles: Handle<O>,
+        min_count_diff: usize,
+        max_trys: usize,
+        handle: Handle<O>,
         scheduler: CS,
         feedback: F,
         objective: OF,
     ) -> Self {
         Self::with_input_filter(
-            count,
-            handles,
+            min_count_diff,
+            max_trys,
+            handle,
             scheduler,
             feedback,
             objective,
@@ -661,14 +663,16 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
 
 #[cfg(feature = "std")] // hashing requires std
 impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
-    /// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
+    /// Create a new [`ReplayingFuzzer`], which, with a certain certainty, executes each input only once.
     ///
     /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
     ///
     /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
+    #[expect(clippy::too_many_arguments)]
     pub fn with_bloom_input_filter(
-        count: usize,
-        handles: Handle<O>,
+        min_count_diff: usize,
+        max_trys: usize,
+        handle: Handle<O>,
         scheduler: CS,
         feedback: F,
         objective: OF,
@@ -676,7 +680,15 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
         fp_p: f64,
     ) -> Self {
         let input_filter = BloomInputFilter::new(items_count, fp_p);
-        Self::with_input_filter(count, handles, scheduler, feedback, objective, input_filter)
+        Self::with_input_filter(
+            min_count_diff,
+            max_trys,
+            handle,
+            scheduler,
+            feedback,
+            objective,
+            input_filter,
+        )
     }
 }
 
@@ -717,7 +729,7 @@ where
 
             mark_feature_time!(state, PerfFeature::PostExecObservers);
 
-            let observer = observers.get(&self.handles).expect("observer not found");
+            let observer = observers.get(&self.handle).expect("observer not found");
             let hash = generic_hash_std(observer);
             *results.entry((hash, exit_kind)).or_insert(0_usize) += 1;
 
@@ -726,20 +738,20 @@ where
             let ((max_hash, max_exit_kind), max_count) =
                 results.iter().max_by(|(_, a), (_, b)| a.cmp(b)).unwrap();
 
-            if *max_count < self.count {
+            if *max_count < self.min_count_diff {
                 continue;
             }
 
             let consistent_enough = results
                 .values()
                 .filter(|e| **e != *max_count)
-                .all(|&count| count <= max_count - self.count);
+                .all(|&count| count <= max_count - self.min_count_diff);
 
             let latest_execution_is_dominant = hash == *max_hash && exit_kind == *max_exit_kind;
 
             if consistent_enough && latest_execution_is_dominant {
                 break (exit_kind, total_replayed);
-            } else if total_replayed >= MAX_REPLAY_FACTOR * self.count {
+            } else if total_replayed >= self.max_trys * self.min_count_diff {
                 log::warn!(
                     "Replaying {} times did not lead to dominant result, using the latest observer value and most common exit_kind",
                     total_replayed
@@ -753,7 +765,7 @@ where
             Event::UpdateUserStats {
                 name: Cow::Borrowed("consistency_replay_count"),
                 value: UserStats::new(
-                    UserStatsValue::Number(total_replayed as u64),
+                    UserStatsValue::Float(u32::try_from(total_replayed).unwrap().into()),
                     AggregatorOps::Avg,
                 ),
                 phantom: PhantomData,
@@ -797,6 +809,7 @@ mod tests {
         drop(map_borrow);
         let mut fuzzer = ReplayingFuzzer::new(
             2,
+            10,
             observer.handle(),
             StdScheduler::new(),
             tuple_list!(),
