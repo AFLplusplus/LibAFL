@@ -42,10 +42,14 @@ use crate::{
 
 /// A fuzzer instance for unstable targets that increases stability by executing the same input multiple times.
 ///
-/// The input will be executed as often as necessary until the most frequent result appears at least `min_count_diff` times more often than any other result and at most `max_trys` times.
+/// The input will be executed as often as necessary until the most frequent result appears
+/// - at least `min_count_diff` times more often than any other result
+/// - at least `min_factor_diff` times more often than any other result
+/// - at most `max_trys` times
 #[derive(Debug)]
 pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
     min_count_diff: usize,
+    min_factor_diff: f64,
     max_trys: usize,
     handle: Handle<O>,
     scheduler: CS,
@@ -617,8 +621,10 @@ where
 
 impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
     /// Create a new [`ReplayingFuzzer`] with standard behavior and the provided duplicate input execution filter.
+    #[expect(clippy::too_many_arguments)]
     pub fn with_input_filter(
         min_count_diff: usize,
+        min_factor_diff: f64,
         max_trys: usize,
         handle: Handle<O>,
         scheduler: CS,
@@ -628,6 +634,7 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
     ) -> Self {
         Self {
             min_count_diff,
+            min_factor_diff,
             max_trys,
             handle,
             scheduler,
@@ -642,6 +649,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
     /// Create a new [`ReplayingFuzzer`] with standard behavior and no duplicate input execution filtering.
     pub fn new(
         min_count_diff: usize,
+        min_factor_diff: f64,
         max_trys: usize,
         handle: Handle<O>,
         scheduler: CS,
@@ -650,6 +658,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
     ) -> Self {
         Self::with_input_filter(
             min_count_diff,
+            min_factor_diff,
             max_trys,
             handle,
             scheduler,
@@ -670,6 +679,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
     #[expect(clippy::too_many_arguments)]
     pub fn with_bloom_input_filter(
         min_count_diff: usize,
+        min_factor_diff: f64,
         max_trys: usize,
         handle: Handle<O>,
         scheduler: CS,
@@ -681,6 +691,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
         let input_filter = BloomInputFilter::new(items_count, fp_p);
         Self::with_input_filter(
             min_count_diff,
+            min_factor_diff,
             max_trys,
             handle,
             scheduler,
@@ -709,6 +720,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let mut results = HashMap::new();
+        let mut inconsistent = 0;
         let (exit_kind, total_replayed) = loop {
             start_timer!(state);
             executor.observers_mut().pre_exec_all(state, input)?;
@@ -736,14 +748,16 @@ where
             let ((max_hash, max_exit_kind), max_count) =
                 results.iter().max_by(|(_, a), (_, b)| a.cmp(b)).unwrap();
 
-            if *max_count < self.min_count_diff {
-                continue;
-            }
-
             let consistent_enough = results
                 .values()
                 .filter(|e| **e != *max_count)
-                .all(|&count| count <= max_count - self.min_count_diff);
+                .all(|&count| {
+                    let min_value_count = count + self.min_count_diff;
+                    let min_value_factor =
+                        f64::from(u32::try_from(*max_count).unwrap()) * self.min_factor_diff;
+                    min_value_count <= *max_count
+                        && min_value_factor <= f64::from(u32::try_from(*max_count).unwrap())
+                });
 
             let latest_execution_is_dominant = hash == *max_hash && exit_kind == *max_exit_kind;
 
@@ -754,6 +768,7 @@ where
                     "Replaying {} times did not lead to dominant result, using the latest observer value and most common exit_kind. Details: {results:?}",
                     total_replayed
                 );
+                inconsistent = 1;
                 break (*max_exit_kind, total_replayed);
             }
         };
@@ -761,9 +776,20 @@ where
         event_mgr.fire(
             state,
             Event::UpdateUserStats {
-                name: Cow::Borrowed("consistency_replay_count"),
+                name: Cow::Borrowed("consistency-caused-replay-per-input"),
                 value: UserStats::new(
                     UserStatsValue::Float(u32::try_from(total_replayed).unwrap().into()),
+                    AggregatorOps::Avg,
+                ),
+                phantom: PhantomData,
+            },
+        )?;
+        event_mgr.fire(
+            state,
+            Event::UpdateUserStats {
+                name: Cow::Borrowed("uncaptured-inconsistent-rate"),
+                value: UserStats::new(
+                    UserStatsValue::Float(u32::try_from(inconsistent).unwrap().into()),
                     AggregatorOps::Avg,
                 ),
                 phantom: PhantomData,
@@ -807,6 +833,7 @@ mod tests {
         drop(map_borrow);
         let mut fuzzer = ReplayingFuzzer::new(
             2,
+            1.0,
             10,
             observer.handle(),
             StdScheduler::new(),
