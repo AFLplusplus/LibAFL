@@ -47,6 +47,8 @@ use crate::{
 /// - at least `min_count_diff` times more often than any other result
 /// - at least `min_factor_diff` times more often than any other result
 /// - at most `max_trys` times
+///
+/// If `max_trys` is hit, the last observer values are left in place and the most frequent [`ExitKind`] is returned.
 #[derive(Debug)]
 pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
     min_count_diff: u32,
