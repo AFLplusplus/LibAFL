@@ -49,11 +49,13 @@ use crate::{
 /// - at most `max_trys` times
 ///
 /// If `max_trys` is hit, the last observer values are left in place and the most frequent [`ExitKind`] is returned.
+/// If `ignore_inconsistent_inputs` is set, [`ExitKind::Inconsistent`] is reported and the input is added to neighter the corpus nor the solutions.
 #[derive(Debug)]
 pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
     min_count_diff: u32,
     min_factor_diff: f64,
     max_trys: u32,
+    ignore_inconsistent_inputs: bool,
     handle: Handle<O>,
     scheduler: CS,
     feedback: F,
@@ -124,6 +126,10 @@ where
         exit_kind: &ExitKind,
     ) -> Result<ExecuteInputResult, Error> {
         let mut res = ExecuteInputResult::None;
+
+        if *exit_kind == ExitKind::Inconsistent {
+            return Ok(ExecuteInputResult::None);
+        }
 
         #[cfg(not(feature = "introspection"))]
         let is_solution = self
@@ -629,6 +635,7 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
         min_count_diff: u32,
         min_factor_diff: f64,
         max_trys: u32,
+        ignore_inconsistent_inputs: bool,
         handle: Handle<O>,
         scheduler: CS,
         feedback: F,
@@ -639,6 +646,7 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
             min_count_diff,
             min_factor_diff,
             max_trys,
+            ignore_inconsistent_inputs,
             handle,
             scheduler,
             feedback,
@@ -650,10 +658,12 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
 
 impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
     /// Create a new [`ReplayingFuzzer`] with standard behavior and no duplicate input execution filtering.
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         min_count_diff: u32,
         min_factor_diff: f64,
         max_trys: u32,
+        ignore_inconsistent_inputs: bool,
         handle: Handle<O>,
         scheduler: CS,
         feedback: F,
@@ -663,6 +673,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
             min_count_diff,
             min_factor_diff,
             max_trys,
+            ignore_inconsistent_inputs,
             handle,
             scheduler,
             feedback,
@@ -684,6 +695,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
         min_count_diff: u32,
         min_factor_diff: f64,
         max_trys: u32,
+        ignore_inconsistent_inputs: bool,
         handle: Handle<O>,
         scheduler: CS,
         feedback: F,
@@ -696,6 +708,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
             min_count_diff,
             min_factor_diff,
             max_trys,
+            ignore_inconsistent_inputs,
             handle,
             scheduler,
             feedback,
@@ -774,7 +787,12 @@ where
                     total_replayed
                 );
                 inconsistent = 1;
-                break (*max_exit_kind, total_replayed);
+                let returned_exit_kind = if self.ignore_inconsistent_inputs {
+                    ExitKind::Inconsistent
+                } else {
+                    *max_exit_kind
+                };
+                break (returned_exit_kind, total_replayed);
             }
         };
 
@@ -816,7 +834,7 @@ mod tests {
     };
 
     use crate::{
-        corpus::InMemoryCorpus,
+        corpus::{Corpus as _, InMemoryCorpus},
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         fuzzer::ExecutesInput,
@@ -824,7 +842,7 @@ mod tests {
         observers::StdMapObserver,
         replaying::ReplayingFuzzer,
         schedulers::StdScheduler,
-        state::StdState,
+        state::{HasCorpus, HasSolutions, StdState},
     };
 
     #[test]
@@ -840,6 +858,7 @@ mod tests {
             2,
             1.0,
             10,
+            true,
             observer.handle(),
             StdScheduler::new(),
             tuple_list!(),
@@ -878,5 +897,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(*execution_count.borrow(), 4);
+        assert!(state.corpus().is_empty());
+        assert!(state.solutions().is_empty());
     }
 }

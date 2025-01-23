@@ -330,6 +330,10 @@ where
     ) -> Result<ExecuteInputResult, Error> {
         let mut res = ExecuteInputResult::None;
 
+        if *exit_kind == ExitKind::Inconsistent {
+            return Ok(ExecuteInputResult::None);
+        }
+
         #[cfg(not(feature = "introspection"))]
         let is_solution = self
             .objective_mut()
