@@ -29,6 +29,8 @@ pub struct Opt {
         help = "Print all the addresses when printing to stdout. Does not have any impact when writing addresses to a file."
     )]
     pub verbose: bool,
+    #[arg(short, long, help = "Sort the addresses from smallest to biggest.")]
+    pub sort: bool,
 }
 
 fn main() {
@@ -52,7 +54,10 @@ fn main() {
         };
 
         let mut blocks = drcov.basic_block_addresses_u64();
-        blocks.sort();
+
+        if opts.sort {
+            blocks.sort();
+        }
 
         if let Some(out_dir) = &opts.out_dir {
             // Write files to a directory
