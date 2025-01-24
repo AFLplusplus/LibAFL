@@ -11,10 +11,9 @@ use libafl_bolts::Named;
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
@@ -23,9 +22,7 @@ use crate::{
         MutationalStage, RetryCountRestartHelper, Stage,
     },
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor, UsesState,
-    },
+    state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -50,8 +47,8 @@ impl<E, F, EM, I, M, S, Z> Named for PowerMutationalStage<E, F, EM, I, M, S, Z> 
 
 impl<E, F, EM, I, M, S, Z> MutationalStage<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    S: HasCurrentTestcase,
-    F: TestcaseScore<S>,
+    S: HasCurrentTestcase<I>,
+    F: TestcaseScore<I, S>,
 {
     type Mutator = M;
     /// The mutator, added to this stage
@@ -79,22 +76,18 @@ where
 
 impl<E, F, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    EM: UsesState<State = S>,
-    F: TestcaseScore<S>,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
-    S: HasCorpus
-        + HasMetadata
+    S: HasMetadata
         + HasRand
         + HasExecutions
         + HasNamedMetadata
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
-    <S::Corpus as Corpus>::Input: Input,
+        + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I, S>,
+    I: MutatedTransform<I, S> + Clone,
 {
     #[inline]
     #[expect(clippy::let_and_return)]
@@ -121,20 +114,12 @@ where
 
 impl<E, F, EM, I, M, S, Z> PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-    EM: UsesState<State = S>,
-    F: TestcaseScore<S>,
-    I: Input,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
-    S: HasCorpus
-        + HasMetadata
-        + HasRand
-        + HasCurrentTestcase
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Input,
+    S: HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
+    I: MutatedTransform<I, S> + Clone,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {

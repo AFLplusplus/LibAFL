@@ -15,8 +15,7 @@ pub struct NopCorpus<I> {
     phantom: PhantomData<I>,
 }
 
-impl<I> Corpus for NopCorpus<I> {
-    type Input = I;
+impl<I> Corpus<I> for NopCorpus<I> {
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -76,12 +75,6 @@ impl<I> Corpus for NopCorpus<I> {
         &self.empty
     }
 
-    /// Peek the next free corpus id
-    #[inline]
-    fn peek_free_id(&self) -> CorpusId {
-        CorpusId::from(0_usize)
-    }
-
     /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
@@ -91,6 +84,12 @@ impl<I> Corpus for NopCorpus<I> {
     #[inline]
     fn next(&self, _id: CorpusId) -> Option<CorpusId> {
         None
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        CorpusId::from(0_usize)
     }
 
     #[inline]
@@ -121,12 +120,12 @@ impl<I> Corpus for NopCorpus<I> {
     }
 
     #[inline]
-    fn load_input_into(&self, _testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, _testcase: &mut Testcase<I>) -> Result<(), Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 
     #[inline]
-    fn store_input_from(&self, _testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, _testcase: &Testcase<I>) -> Result<(), Error> {
         Err(Error::unsupported("Unsupported by NopCorpus"))
     }
 }

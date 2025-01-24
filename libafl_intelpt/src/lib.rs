@@ -39,9 +39,9 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
+use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
-use libafl_bolts::ownedref::OwnedRefMut;
-use libafl_bolts::{hash_64_fast, Error};
+use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
 use libipt::PtError;
 #[cfg(target_os = "linux")]
 use libipt::{

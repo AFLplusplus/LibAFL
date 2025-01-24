@@ -39,6 +39,7 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
+  "tui_monitor",
 ]
 document-features = ["dep:document-features"]
 
@@ -70,9 +71,6 @@ value_bloom_feedback = ["fastbloom", "fastbloom/serde"]
 
 ## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = []
-
-## Collects stats about scalability
-scalability_introspection = []
 
 ## Expose `libafl::prelude` for access without additional using directives
 prelude = ["libafl_bolts/prelude"]
@@ -147,6 +145,9 @@ unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc", "bitvec"]
 ## Enable multi-part input formats and mutators
 multipart_inputs = ["arrayvec", "rand_trait"]
 
+## Share objectives across nodes
+share_objectives = []
+
 #! ## LibAFL-Bolts Features
 
 ## Provide the `#[derive(SerdeAny)]` macro.
@@ -200,6 +201,11 @@ nautilus = [
   "regex-syntax",
   "regex",
 ]
+
+[[example]]
+name = "tui_mock"
+path = "./examples/tui_mock/main.rs"
+required-features = ["std", "tui_monitor"]
 
 [build-dependencies]
 rustversion = "1.0.17"

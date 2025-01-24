@@ -5,15 +5,15 @@
 
 use core::{
     cmp::{Ordering, PartialOrd},
-    fmt, ptr,
+    fmt, ptr, slice,
 };
 use std::{
     ffi::{c_void, CString},
     fmt::{Display, Formatter},
-    intrinsics::{copy_nonoverlapping, transmute},
-    mem::MaybeUninit,
+    mem::{transmute, MaybeUninit},
     ops::Range,
     pin::Pin,
+    ptr::copy_nonoverlapping,
     sync::OnceLock,
 };
 
@@ -51,6 +51,7 @@ pub use systemmode::*;
 
 mod hooks;
 pub use hooks::*;
+use libafl_bolts::{vec_init, AsSliceMut};
 
 static mut QEMU_IS_INITIALIZED: bool = false;
 
@@ -372,6 +373,18 @@ impl CPU {
             ))
         } else {
             Ok(())
+        }
+    }
+
+    pub fn read_mem_vec(&self, addr: GuestAddr, len: usize) -> Result<Vec<u8>, QemuRWError> {
+        // # Safety
+        // This is safe because we read exactly `len` bytes from QEMU.
+        unsafe {
+            vec_init(len, |buf| {
+                self.read_mem(addr, buf.as_slice_mut())?;
+
+                Ok::<(), QemuRWError>(())
+            })
         }
     }
 
@@ -724,11 +737,45 @@ impl Qemu {
             .read_mem(addr, buf)
     }
 
+    /// Read a value from a guest address, taking into account the potential indirections with the current CPU.
+    pub fn read_mem_vec(&self, addr: GuestAddr, len: usize) -> Result<Vec<u8>, QemuRWError> {
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .read_mem_vec(addr, len)
+    }
+
     /// Write a value to a guest address, taking into account the potential indirections with the current CPU.
     pub fn write_mem(&self, addr: GuestAddr, buf: &[u8]) -> Result<(), QemuRWError> {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
             .write_mem(addr, buf)
+    }
+
+    /// Read a value from memory to a guest addr, taking into account the potential indirections with the current CPU.
+    ///
+    /// # Safety
+    ///
+    /// The read object should have the same layout as the type of val.
+    /// No checked is performed to check whether the returned object makes sense or not.
+    // TODO: Use sized array when const generics are stabilized.
+    pub unsafe fn read_mem_val<T>(&self, addr: GuestAddr) -> Result<T, QemuRWError> {
+        // let mut val_buf: [u8; size_of::<T>()] = [0; size_of::<T>()];
+
+        let val_buf: Vec<u8> = vec_init(size_of::<T>(), |buf| self.read_mem(addr, buf))?;
+
+        Ok(ptr::read(val_buf.as_ptr() as *const T))
+    }
+
+    /// Write a value to memory at a guest addr, taking into account the potential indirections with the current CPU.
+    ///
+    /// # Safety
+    ///
+    /// val will be used as parameter of [`slice::from_raw_parts`], and thus must enforce the same requirements.
+    pub unsafe fn write_mem_val<T>(&self, addr: GuestAddr, val: &T) -> Result<(), QemuRWError> {
+        let val_buf: &[u8] = slice::from_raw_parts(ptr::from_ref(val) as *const u8, size_of::<T>());
+        self.write_mem(addr, val_buf)?;
+
+        Ok(())
     }
 
     /// Read a value from a guest address.
@@ -1005,6 +1052,18 @@ impl QemuMemoryChunk {
         };
 
         Ok(output_sliced.len().try_into().unwrap())
+    }
+
+    pub fn read_vec(&self, qemu: Qemu) -> Result<Vec<u8>, QemuRWError> {
+        // # Safety
+        // This is safe because we read exactly `self.size` bytes from QEMU.
+        unsafe {
+            vec_init(self.size as usize, |buf| {
+                self.read(qemu, buf.as_slice_mut())?;
+
+                Ok::<(), QemuRWError>(())
+            })
+        }
     }
 
     /// Returns the number of bytes effectively written.

@@ -4,15 +4,15 @@ use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
 #[cfg(not(feature = "nyx"))]
-use libafl::state::{HasExecutions, State};
+use libafl::state::HasExecutions;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
     executors::ShadowExecutor,
-    feedback_or, feedback_or_fast,
+    feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, UsesInput},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{havoc_mutations, I2SRandReplaceBinonly, StdScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
@@ -32,59 +32,79 @@ use libafl_bolts::{
 #[cfg(feature = "nyx")]
 use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
 #[cfg(not(feature = "nyx"))]
-use libafl_qemu::{command::StdCommandManager, StdEmulatorDriver};
+use libafl_qemu::{
+    command::StdCommandManager, modules::utils::filters::LINUX_PROCESS_ADDRESS_RANGE,
+    StdEmulatorDriver,
+};
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
-        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
-        EmulatorModuleTuple,
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
+        utils::filters::HasAddressFilterTuples, CmpLogModule, EmulatorModuleTuple,
     },
-    FastSnapshotManager, QemuInitError,
+    FastSnapshotManager, NopSnapshotManager, QemuInitError, QemuSnapshotManager,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
 
 #[cfg(feature = "nyx")]
-fn get_emulator<ET, S>(
+fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
     modules: ET,
 ) -> Result<
-    Emulator<NyxCommandManager<S>, NyxEmulatorDriver, ET, S, FastSnapshotManager>,
+    Emulator<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, NopSnapshotManager>,
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<S>,
-    S: UsesInput + Unpin,
-    <S as UsesInput>::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S>,
+    S: Unpin,
+    I: HasTargetBytes + Unpin,
 {
     Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
-        .driver(
-            NyxEmulatorDriver::builder()
-                .allow_page_on_start(true)
-                .process_only(true)
-                .build(),
-        )
+        .driver(NyxEmulatorDriver::builder().build())
         .command_manager(NyxCommandManager::default())
-        .snapshot_manager(FastSnapshotManager::default())
+        .snapshot_manager(NopSnapshotManager::default())
         .build()
 }
 
 #[cfg(not(feature = "nyx"))]
-fn get_emulator<ET, S>(
+fn get_emulator<C, ET, I, S>(
     args: Vec<String>,
-    modules: ET,
+    mut modules: ET,
 ) -> Result<
-    Emulator<StdCommandManager<S>, StdEmulatorDriver, ET, S, FastSnapshotManager>,
+    Emulator<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, FastSnapshotManager>,
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<S>,
-    S: State + HasExecutions + Unpin,
-    <S as UsesInput>::Input: HasTargetBytes,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    I: HasTargetBytes + Unpin,
+    S: HasExecutions + Unpin,
 {
-    Emulator::builder().qemu_cli(args).modules(modules).build()
+    // Allow linux process address space addresses as feedback
+    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
+
+    Emulator::builder()
+        .qemu_parameters(args)
+        .modules(modules)
+        .build()
+}
+
+fn display_args() {
+    let args: Vec<String> = env::args().collect();
+
+    let mut arg_str = String::new();
+    for arg in args {
+        arg_str.push_str(&arg);
+        arg_str.push_str(" \\\n\t");
+    }
+    arg_str.pop();
+    arg_str.pop();
+    arg_str.pop();
+
+    log::info!("QEMU args:");
+    log::info!("\n{arg_str}");
 }
 
 pub fn fuzz() {
@@ -94,14 +114,16 @@ pub fn fuzz() {
         str::parse::<usize>(&s).expect("FUZZ_SIZE was not a number");
     };
     // Hardcoded parameters
-    let timeout = Duration::from_secs(99999999);
+    let timeout = Duration::from_secs(50);
     let broker_port = 1338;
     let cores = Cores::from_cmdline("1").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
 
+    display_args();
+
     let mut run_client = |state: Option<_>, mut mgr, _client_description| {
-        // Initialize QEMU
+        // Fetch QEMU args from program's arguments
         let args: Vec<String> = env::args().collect();
 
         // Create an observation channel using the coverage map
@@ -125,10 +147,16 @@ pub fn fuzz() {
         let emu = get_emulator(args, modules)?;
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness =
-            |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
-                emulator.run(state, input).unwrap().try_into().unwrap()
-            };
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
+                           state: &mut _,
+                           input: &BytesInput| unsafe {
+            match emulator.run(state, input) {
+                Ok(res) => res.try_into().unwrap(),
+                Err(e) => match e {
+                    _ => panic!("{e:?}"),
+                },
+            }
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -145,8 +173,13 @@ pub fn fuzz() {
             TimeFeedback::new(&time_observer)
         );
 
+        let map_feedback = MaxMapFeedback::new(&edges_observer);
+
         // A feedback to choose if an input is a solution or not
-        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_and_fast!(
+            feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+            map_feedback,
+        );
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {

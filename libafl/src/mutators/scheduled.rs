@@ -215,7 +215,7 @@ impl<SM> Named for LoggerScheduledMutator<SM> {
 
 impl<I, S, SM> Mutator<I, S> for LoggerScheduledMutator<SM>
 where
-    S: HasRand + HasCorpus,
+    S: HasRand + HasCorpus<I>,
     SM: ScheduledMutator<I, S>,
     SM::Mutations: MutatorsTuple<I, S> + NamedTuple,
 {
@@ -258,7 +258,7 @@ where
 
 impl<I, S, SM> ScheduledMutator<I, S> for LoggerScheduledMutator<SM>
 where
-    S: HasRand + HasCorpus,
+    S: HasRand + HasCorpus<I>,
     SM: ScheduledMutator<I, S>,
     SM::Mutations: MutatorsTuple<I, S> + NamedTuple,
 {
@@ -352,10 +352,10 @@ mod tests {
         let mut splice = SpliceMutator::new();
         splice.mutate(&mut state, &mut input).unwrap();
 
-        log::trace!("{:?}", input.bytes());
+        log::trace!("{:?}", input.mutator_bytes());
 
         // The pre-seeded rand should have spliced at position 2.
-        assert_eq!(input.bytes(), b"abf");
+        assert_eq!(input.mutator_bytes(), b"abf");
     }
 
     #[test]

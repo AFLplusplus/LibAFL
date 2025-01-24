@@ -137,10 +137,8 @@ impl<'a> NautilusTargetBytesConverter<'a> {
     }
 }
 
-impl TargetBytesConverter for NautilusTargetBytesConverter<'_> {
-    type Input = NautilusInput;
-
-    fn to_target_bytes<'a>(&mut self, input: &'a Self::Input) -> OwnedSlice<'a, u8> {
+impl TargetBytesConverter<NautilusInput> for NautilusTargetBytesConverter<'_> {
+    fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
         let mut bytes = Vec::new();
         input.unparse(self.ctx, &mut bytes);
         OwnedSlice::from(bytes)

@@ -43,14 +43,14 @@ impl Harness {
     /// Initialize the emulator, run to the entrypoint (or jump there) and return the [`Harness`] struct
     pub fn init(qemu: Qemu) -> Result<Harness, Error> {
         let start_pc = Self::start_pc(qemu)?;
-        log::debug!("start_pc @ {start_pc:#x}");
+        log::info!("start_pc @ {start_pc:#x}");
 
         qemu.entry_break(start_pc);
 
         let ret_addr: GuestAddr = qemu
             .read_return_address()
             .map_err(|e| Error::unknown(format!("Failed to read return address: {e:?}")))?;
-        log::debug!("ret_addr = {ret_addr:#x}");
+        log::info!("ret_addr = {ret_addr:#x}");
         qemu.set_breakpoint(ret_addr);
 
         let input_addr = qemu

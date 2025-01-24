@@ -8,7 +8,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, GeneralizedInputMetadata, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator,
@@ -157,7 +157,9 @@ pub fn main() {
     let mut stages = tuple_list!(
         generalization,
         StdMutationalStage::new(mutator),
-        StdMutationalStage::transforming(grimoire_mutator)
+        StdMutationalStage::<_, _, GeneralizedInputMetadata, BytesInput, _, _, _>::transforming(
+            grimoire_mutator
+        )
     );
 
     for input in initial_inputs {

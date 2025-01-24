@@ -1,5 +1,11 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
+use core::{cell::RefCell, fmt, marker::PhantomData};
+
+use serde::{Deserialize, Serialize};
+
+use crate::Error;
+
 pub mod testcase;
 pub use testcase::{HasTestcase, SchedulerTestcaseMetadata, Testcase};
 
@@ -23,15 +29,11 @@ pub use cached::CachedOnDiskCorpus;
 
 #[cfg(all(feature = "cmin", unix))]
 pub mod minimizer;
-use core::{cell::RefCell, fmt};
 
 pub mod nop;
 #[cfg(all(feature = "cmin", unix))]
 pub use minimizer::*;
 pub use nop::NopCorpus;
-use serde::{Deserialize, Serialize};
-
-use crate::Error;
 
 /// An abstraction for the index that identify a testcase in the corpus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -101,10 +103,7 @@ macro_rules! random_corpus_id_with_disabled {
 }
 
 /// Corpus with all current [`Testcase`]s, or solutions
-pub trait Corpus: Sized {
-    /// The type of input contained in this corpus
-    type Input;
-
+pub trait Corpus<I>: Sized {
     /// Returns the number of all enabled entries
     fn count(&self) -> usize;
 
@@ -120,26 +119,22 @@ pub trait Corpus: Sized {
     }
 
     /// Add an enabled testcase to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error>;
 
     /// Add a disabled testcase to the corpus and return its index
-    fn add_disabled(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error>;
 
     /// Replaces the [`Testcase`] at the given idx, returning the existing.
-    fn replace(
-        &mut self,
-        id: CorpusId,
-        testcase: Testcase<Self::Input>,
-    ) -> Result<Testcase<Self::Input>, Error>;
+    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error>;
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error>;
 
     /// Get by id; considers only enabled testcases
-    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error>;
 
     /// Get by id; considers both enabled and disabled testcases
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusId>;
@@ -163,11 +158,12 @@ pub trait Corpus: Sized {
     fn last(&self) -> Option<CorpusId>;
 
     /// An iterator over very active corpus id
-    fn ids(&self) -> CorpusIdIterator<'_, Self> {
+    fn ids(&self) -> CorpusIdIterator<'_, Self, I> {
         CorpusIdIterator {
             corpus: self,
             cur: self.first(),
             cur_back: self.last(),
+            phantom: PhantomData,
         }
     }
 
@@ -184,15 +180,15 @@ pub trait Corpus: Sized {
     /// Method to load the input for this [`Testcase`] from persistent storage,
     /// if necessary, and if was not already loaded (`== Some(input)`).
     /// After this call, `testcase.input()` must always return `Some(input)`.
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error>;
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error>;
 
     /// Method to store the input of this `Testcase` to persistent storage, if necessary.
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error>;
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error>;
 
     /// Loads the `Input` for a given [`CorpusId`] from the [`Corpus`], and returns the clone.
-    fn cloned_input_for_id(&self, id: CorpusId) -> Result<Self::Input, Error>
+    fn cloned_input_for_id(&self, id: CorpusId) -> Result<I, Error>
     where
-        Self::Input: Clone,
+        I: Clone,
     {
         let mut testcase = self.get(id)?.borrow_mut();
         Ok(testcase.load_input(self)?.clone())
@@ -213,18 +209,16 @@ pub trait HasCurrentCorpusId {
 
 /// [`Iterator`] over the ids of a [`Corpus`]
 #[derive(Debug)]
-pub struct CorpusIdIterator<'a, C>
-where
-    C: Corpus,
-{
+pub struct CorpusIdIterator<'a, C, I> {
     corpus: &'a C,
     cur: Option<CorpusId>,
     cur_back: Option<CorpusId>,
+    phantom: PhantomData<I>,
 }
 
-impl<C> Iterator for CorpusIdIterator<'_, C>
+impl<C, I> Iterator for CorpusIdIterator<'_, C, I>
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     type Item = CorpusId;
 
@@ -238,9 +232,9 @@ where
     }
 }
 
-impl<C> DoubleEndedIterator for CorpusIdIterator<'_, C>
+impl<C, I> DoubleEndedIterator for CorpusIdIterator<'_, C, I>
 where
-    C: Corpus,
+    C: Corpus<I>,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
         if let Some(cur_back) = self.cur_back {

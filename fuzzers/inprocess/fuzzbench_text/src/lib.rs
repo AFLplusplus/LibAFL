@@ -23,7 +23,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, GeneralizedInputMetadata, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
         grimoire::{
@@ -604,7 +604,10 @@ fn fuzz_text(
         3,
     );
 
-    let grimoire = StdMutationalStage::transforming(grimoire_mutator);
+    let grimoire =
+        StdMutationalStage::<_, _, GeneralizedInputMetadata, BytesInput, _, _, _>::transforming(
+            grimoire_mutator,
+        );
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(

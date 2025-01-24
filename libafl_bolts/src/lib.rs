@@ -678,6 +678,8 @@ impl From<pyo3::PyErr> for Error {
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod prelude {
+    #![allow(ambiguous_glob_reexports)]
+
     pub use super::{bolts_prelude::*, *};
 }
 
@@ -1308,6 +1310,27 @@ pub mod pybind {
         crate::rands::pybind::register(m)?;
         Ok(())
     }
+}
+
+/// Create a [`Vec`] of the given type with `nb_elts` elements, initialized in place.
+/// The closure must initialize [`Vec`] (of size `nb_elts` * `sizeo_of::<T>()`).
+///
+/// # Safety
+///
+/// The input closure should fully initialize the new [`Vec`], not leaving any uninitialized bytes.
+// TODO: Use MaybeUninit API at some point.
+#[cfg(feature = "alloc")]
+#[expect(clippy::uninit_vec)]
+pub unsafe fn vec_init<E, F, T>(nb_elts: usize, init_fn: F) -> Result<Vec<T>, E>
+where
+    F: FnOnce(&mut Vec<T>) -> Result<(), E>,
+{
+    let mut new_vec: Vec<T> = Vec::with_capacity(nb_elts);
+    new_vec.set_len(nb_elts);
+
+    init_fn(&mut new_vec)?;
+
+    Ok(new_vec)
 }
 
 #[cfg(test)]

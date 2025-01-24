@@ -49,11 +49,10 @@ use super::HasTimeout;
 #[cfg(target_os = "linux")]
 use crate::executors::hooks::ExecutorHooksTuple;
 use crate::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::{ObserversTuple, StdErrObserver, StdOutObserver},
-    state::{HasCorpus, HasExecutions},
+    state::HasExecutions,
     std::borrow::ToOwned,
     Error,
 };
@@ -280,17 +279,16 @@ where
 ///
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<OT, S, T, HT = (), C = Child> {
+pub struct CommandExecutor<I, OT, S, T, HT = (), C = Child> {
     /// The wrapped command configurer
     configurer: T,
     /// The observers used by this executor
     observers: OT,
     hooks: HT,
-    phantom: PhantomData<S>,
-    phantom_child: PhantomData<C>,
+    phantom: PhantomData<(C, I, S)>,
 }
 
-impl CommandExecutor<(), (), ()> {
+impl CommandExecutor<(), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -308,7 +306,7 @@ impl CommandExecutor<(), (), ()> {
     }
 }
 
-impl<OT, S, T, HT, C> Debug for CommandExecutor<OT, S, T, HT, C>
+impl<I, OT, S, T, HT, C> Debug for CommandExecutor<I, OT, S, T, HT, C>
 where
     T: Debug,
     OT: Debug,
@@ -323,7 +321,7 @@ where
     }
 }
 
-impl<OT, S, T, HT, C> CommandExecutor<OT, S, T, HT, C> {
+impl<I, OT, S, T, HT, C> CommandExecutor<I, OT, S, T, HT, C> {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.configurer
@@ -331,17 +329,13 @@ impl<OT, S, T, HT, C> CommandExecutor<OT, S, T, HT, C> {
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<OT, S, T> CommandExecutor<OT, S, T>
+impl<I, OT, S, T> CommandExecutor<I, OT, S, T>
 where
-    S: HasExecutions + HasCorpus,
-    T: CommandConfigurator<<S::Corpus as Corpus>::Input> + Debug,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasExecutions,
+    T: CommandConfigurator<I> + Debug,
+    OT: ObserversTuple<I, S>,
 {
-    fn execute_input_with_command(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-    ) -> Result<ExitKind, Error> {
+    fn execute_input_with_command(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error> {
         use wait_timeout::ChildExt;
 
         *state.executions_mut() += 1;
@@ -374,7 +368,7 @@ where
              })?.read_to_end(&mut stdout)?;
             let mut observers = self.observers_mut();
             let obs = observers.index_mut(h);
-            obs.observe_stdout(&stdout);
+            obs.observe(&stdout);
         }
         if let Some(h) = &mut self.configurer.stderr_observer() {
             let mut stderr = Vec::new();
@@ -385,34 +379,33 @@ where
              })?.read_to_end(&mut stderr)?;
             let mut observers = self.observers_mut();
             let obs = observers.index_mut(h);
-            obs.observe_stderr(&stderr);
+            obs.observe(&stderr);
         }
         Ok(exit_kind)
     }
 }
 
-impl<EM, OT, S, T, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for CommandExecutor<OT, S, T>
+impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T>
 where
-    S: HasExecutions + HasCorpus,
-    T: CommandConfigurator<<S::Corpus as Corpus>::Input> + Debug,
-    OT: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasExecutions,
+    T: CommandConfigurator<I> + Debug,
+    OT: MatchName + ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         self.execute_input_with_command(state, input)
     }
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
-impl<OT, S, T> HasTimeout for CommandExecutor<OT, S, T>
+impl<I, OT, S, T> HasTimeout for CommandExecutor<I, OT, S, T>
 where
-    S: HasCorpus,
-    T: CommandConfigurator<<S::Corpus as Corpus>::Input>,
+    T: CommandConfigurator<I>,
 {
     #[inline]
     fn timeout(&self) -> Duration {
@@ -426,13 +419,12 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<EM, OT, S, T, Z, HT> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
-    for CommandExecutor<OT, S, T, HT, Pid>
+impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T, HT, Pid>
 where
-    S: HasCorpus + HasExecutions,
-    T: CommandConfigurator<<S::Corpus as Corpus>::Input, Pid> + Debug,
-    OT: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    HT: ExecutorHooksTuple<<S::Corpus as Corpus>::Input, S>,
+    HT: ExecutorHooksTuple<I, S>,
+    OT: MatchName + ObserversTuple<I, S>,
+    S: HasExecutions,
+    T: CommandConfigurator<I, Pid> + Debug,
 {
     /// Linux specific low level implementation, to directly handle `fork`, `exec` and use linux
     /// `ptrace`
@@ -444,7 +436,7 @@ where
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -502,10 +494,9 @@ where
     }
 }
 
-impl<OT, S, T, HT, C> HasObservers for CommandExecutor<OT, S, T, HT, C>
+impl<I, OT, S, T, HT, C> HasObservers for CommandExecutor<I, OT, S, T, HT, C>
 where
-    S: HasCorpus,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    OT: ObserversTuple<I, S>,
 {
     type Observers = OT;
 
@@ -683,14 +674,13 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `CommandExecutor`
-    pub fn build<OT, S>(
+    pub fn build<I, OT, S>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<OT, S, StdCommandConfigurator>, Error>
+    ) -> Result<CommandExecutor<I, OT, S, StdCommandConfigurator>, Error>
     where
-        S: HasCorpus,
-        <S::Corpus as Corpus>::Input: HasTargetBytes,
-        OT: MatchName + ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+        I: HasTargetBytes,
+        OT: MatchName + ObserversTuple<I, S>,
     {
         let Some(program) = &self.program else {
             return Err(Error::illegal_argument(
@@ -737,9 +727,12 @@ impl CommandExecutorBuilder {
             timeout: self.timeout,
             command,
         };
-        Ok(<StdCommandConfigurator as CommandConfigurator<
-            <S::Corpus as Corpus>::Input,
-        >>::into_executor::<OT, S>(configurator, observers))
+        Ok(
+            <StdCommandConfigurator as CommandConfigurator<I>>::into_executor::<OT, S>(
+                configurator,
+                observers,
+            ),
+        )
     }
 }
 
@@ -747,7 +740,7 @@ impl CommandExecutorBuilder {
 /// # Example
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}, time::Duration};
-/// use libafl::{Error, corpus::Corpus, inputs::{BytesInput, HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::{HasCorpus, UsesState, HasExecutions}};
+/// use libafl::{Error, corpus::Corpus, inputs::{BytesInput, HasTargetBytes, Input}, executors::{Executor, command::CommandConfigurator}, state::{HasExecutions}};
 /// use libafl_bolts::AsSlice;
 /// #[derive(Debug)]
 /// struct MyExecutor;
@@ -779,10 +772,7 @@ impl CommandExecutorBuilder {
 ///
 /// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
 /// where
-///     EM: UsesState,
-///     EM::State: UsesInput<Input = BytesInput> + HasExecutions,
-///     S: HasCorpus + HasExecutions,
-///     S::Corpus: Corpus<Input = BytesInput>,
+///     S: HasExecutions,
 /// {
 ///     MyExecutor.into_executor(())
 /// }
@@ -818,13 +808,12 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
     }
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<OT, S, Self, (), C> {
+    fn into_executor<OT, S>(self, observers: OT) -> CommandExecutor<I, OT, S, Self, (), C> {
         CommandExecutor {
             configurer: self,
             observers,
             hooks: (),
             phantom: PhantomData,
-            phantom_child: PhantomData,
         }
     }
 
@@ -833,13 +822,12 @@ pub trait CommandConfigurator<I, C = Child>: Sized {
         self,
         observers: OT,
         hooks: HT,
-    ) -> CommandExecutor<OT, S, Self, HT, C> {
+    ) -> CommandExecutor<I, OT, S, Self, HT, C> {
         CommandExecutor {
             configurer: self,
             observers,
             hooks,
             phantom: PhantomData,
-            phantom_child: PhantomData,
         }
     }
 }
@@ -877,7 +865,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_builder() {
-        let mut mgr: SimpleEventManager<_, NopState<NopInput>> =
+        let mut mgr: SimpleEventManager<NopInput, _, NopState<NopInput>> =
             SimpleEventManager::new(SimpleMonitor::new(|status| {
                 log::info!("{status}");
             }));
@@ -892,7 +880,7 @@ mod tests {
         executor
             .run_target(
                 &mut NopFuzzer::new(),
-                &mut NopState::new(),
+                &mut NopState::<NopInput>::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )
