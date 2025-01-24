@@ -678,7 +678,7 @@ impl From<pyo3::PyErr> for Error {
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod prelude {
-    #![expect(ambiguous_glob_reexports)]
+    #![allow(ambiguous_glob_reexports)]
 
     pub use super::{bolts_prelude::*, *};
 }
