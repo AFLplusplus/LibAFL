@@ -454,6 +454,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
                     FileExt::unlock(&lockfile)?;
                     drop(fs::remove_file(lockfile_path));
                 } else {
+                    lockfile.seek(SeekFrom::Start(0))?;
                     lockfile.write_all(&(ctr.parse::<u32>()? - 1).to_le_bytes())?;
                     return Ok(());
                 }
