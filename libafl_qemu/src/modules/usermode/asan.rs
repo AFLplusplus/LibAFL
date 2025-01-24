@@ -1030,30 +1030,31 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
         let predicates = state
             .metadata_mut::<Tracer>()
             .expect("Predicates missing for rca");
+        let rip = qemu.read_reg(Regs::Rip).unwrap(); // why getting rip would fail :P
         match N {
             1 => {
                 let value = unsafe { qemu.read_mem_val::<u8>(addr) };
                 if let Ok(value) = value {
-                    predicates.update_max_min(addr, u64::from(value));
+                    predicates.update_max_min(rip, u64::from(value));
                 }
             }
             2 => {
                 let value: Result<u16, crate::QemuRWError> =
                     unsafe { qemu.read_mem_val::<u16>(addr) };
                 if let Ok(value) = value {
-                    predicates.update_max_min(addr, u64::from(value));
+                    predicates.update_max_min(rip, u64::from(value));
                 }
             }
             4 => {
                 let value = unsafe { qemu.read_mem_val::<u32>(addr) };
                 if let Ok(value) = value {
-                    predicates.update_max_min(addr, u64::from(value));
+                    predicates.update_max_min(rip, u64::from(value));
                 }
             }
             8 => {
                 let value = unsafe { qemu.read_mem_val::<u64>(addr) };
                 if let Ok(value) = value {
-                    predicates.update_max_min(addr, value);
+                    predicates.update_max_min(rip, value);
                 }
             }
             _ => {
@@ -1084,7 +1085,7 @@ pub fn trace_read_n_asan<ET, I, S>(
 pub fn trace_write_asan<ET, I, S, const N: usize>(
     qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
-    _state: Option<&mut S>,
+    state: Option<&mut S>,
     id: u64,
     addr: GuestAddr,
 ) where
@@ -1092,6 +1093,46 @@ pub fn trace_write_asan<ET, I, S, const N: usize>(
     I: Unpin,
     S: Unpin + HasMetadata,
 {
+    let h: &mut AsanModule = emulator_modules.get_mut::<AsanModule>().unwrap();
+    // todo review this shit
+    if h.use_rca() {
+        let state = state.expect("state missing for rca");
+        let predicates = state
+            .metadata_mut::<Tracer>()
+            .expect("Predicates missing for rca");
+        let rip = qemu.read_reg(Regs::Rip).unwrap(); // why getting rip would fail :P
+        match N {
+            1 => {
+                let value = unsafe { qemu.read_mem_val::<u8>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(rip, u64::from(value));
+                }
+            }
+            2 => {
+                let value: Result<u16, crate::QemuRWError> =
+                    unsafe { qemu.read_mem_val::<u16>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(rip, u64::from(value));
+                }
+            }
+            4 => {
+                let value = unsafe { qemu.read_mem_val::<u32>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(rip, u64::from(value));
+                }
+            }
+            8 => {
+                let value = unsafe { qemu.read_mem_val::<u64>(addr) };
+                if let Ok(value) = value {
+                    predicates.update_max_min(rip, value);
+                }
+            }
+            _ => {
+                unreachable!("Impossible. else you coded it wrong.")
+            }
+        };
+    }
+
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.write::<N>(qemu, id as GuestAddr, addr);
 }

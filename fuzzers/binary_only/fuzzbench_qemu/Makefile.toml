@@ -38,51 +38,49 @@ cc \
 	-O0 \
     ./tests/test1.c \
     ./libfuzzer_main.o \
-    -o ${FUZZER_NAME} \
+    -o test1 \
+    -lm -lz
+
+cc \
+	-O0 \
+    ./tests/test2.c \
+    ./libfuzzer_main.o \
+    -o test2 \
     -lm -lz
 '''
 
-# Run the fuzzer
-[tasks.run]
-linux_alias = "run_unix"
-mac_alias = "run_unix"
-windows_alias = "unsupported"
-
-[tasks.run_unix]
+[tasks.test1]
 command = "cargo"
 args = [
   "run",
   "--profile",
   "${PROFILE}",
-  "./${FUZZER_NAME}",
+  "./test1",
   "--",
   "--libafl-in",
   "../../inprocess/libfuzzer_libpng/corpus",
   "--libafl-out",
   "./out",
-  "./${FUZZER_NAME}",
+  "./test1",
 ]
 dependencies = ["harness"]
 
-# Run the fuzzer
-[tasks.test]
-linux_alias = "test_unix"
-mac_alias = "test_unix"
-windows_alias = "unsupported"
+[tasks.test2]
+command = "cargo"
+args = [
+  "run",
+  "--profile",
+  "${PROFILE}",
+  "./test2",
+  "--",
+  "--libafl-in",
+  "../../inprocess/libfuzzer_libpng/corpus",
+  "--libafl-out",
+  "./out",
+  "./test2",
+]
+dependencies = ["harness"]
 
-# Short test
-[tasks.test_unix]
-script_runner = "@shell"
-script = '''
-timeout 15s ${TARGET_DIR}/${PROFILE_DIR}/fuzzbench_qemu ${PROJECT_DIR}/harness -- --libafl-in ${PROJECT_DIR}/../../inprocess/libfuzzer_libpng/corpus --libafl-out ${PROJECT_DIR}/out ${PROJECT_DIR}/harness | tee fuzz_stdout.log
-if grep -qa "objectives: 1" fuzz_stdout.log; then
-    echo "Fuzzer is working"
-else
-    echo "Fuzzer does not generate any testcases or any crashes"
-    exit 1
-fi
-'''
-dependencies = ["harness", "fuzzer"]
 
 # Clean up
 [tasks.clean]

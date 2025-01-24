@@ -27,7 +27,7 @@ pub struct Tracer {
     minmap: HashMap<GuestAddr, u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum PredicateType {
     // Has Edge
     HasEdge(Edges),
@@ -35,6 +35,21 @@ pub enum PredicateType {
     MaxGt(GuestAddr, u64),
     // Min is lt than
     MinLt(GuestAddr, u64),
+}
+
+
+impl fmt::Debug for PredicateType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PredicateType::HasEdge(edges) => write!(f, "PredicateType::HasEdge({:x} -> {:x})", edges.0, edges.1),
+            PredicateType::MaxGt(addr, value) => {
+                write!(f, "PredicateType::MaxGt(addr: {:x}, value: {})", addr, value)
+            }
+            PredicateType::MinLt(addr, value) => {
+                write!(f, "PredicateType::MinLt(addr: {:x}, value: {})", addr, value)
+            }
+        }
+    }
 }
 
 /// Take one item from max map and find it's divider and its misclassification rate.
@@ -292,6 +307,7 @@ where
         _observers: &OT,
         _testcase: &mut Testcase<I>,
     ) -> Result<(), libafl::Error> {
+
         let tracer = state.metadata::<Tracer>().unwrap();
         // because of double borrow shit!
         let mut edges = vec![];
@@ -323,6 +339,8 @@ where
             map.add_mins(addr, mi, self.was_crash);
         }
         map.synthesize();
+        println!("{:#?}", map.max);
+        println!("{:#?}", map.min);
         map.show();
         Ok(())
     }
