@@ -311,7 +311,7 @@ impl PageFilter for NopPageFilter {
 }
 
 #[cfg(feature = "usermode")]
-#[cfg_attr(feature = "hexagon", expect(dead_code))]
+#[cfg_attr(cpu_target = "hexagon", expect(dead_code))]
 pub(crate) static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
     UnsafeCell::new(NopAddressFilter);
 #[cfg(feature = "systemmode")]
