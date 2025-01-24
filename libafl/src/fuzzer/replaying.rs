@@ -740,8 +740,8 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let mut results = HashMap::new();
-        let mut inconsistent = 0;
-        let (exit_kind, total_replayed, max_count) = loop {
+        let mut probably_consistent = true;
+        let (exit_kind, total_replayed) = loop {
             start_timer!(state);
             executor.observers_mut().pre_exec_all(state, input)?;
             mark_feature_time!(state, PerfFeature::PreExecObservers);
@@ -781,7 +781,7 @@ where
             let latest_execution_is_dominant = hash == *max_hash && exit_kind == *max_exit_kind;
 
             if consistent_enough && latest_execution_is_dominant {
-                break (exit_kind, total_replayed, max_count);
+                break (exit_kind, total_replayed);
             } else if u64::from(total_replayed) >= self.max_trys {
                 log::warn!(
                     "Input still not consistent after {} tries, using the latest observer value and most common exit_kind. Results: {}",
@@ -789,46 +789,47 @@ where
                     results.iter().map(|((hash, exit_kind), count)| format!("{count} times with hash {hash} and ExitKind::{exit_kind:?}")).fold(String::new(), |acc,e| format!("{acc}, {e}"))
                 );
 
-                inconsistent = 1;
+                probably_consistent = false;
                 let returned_exit_kind = if self.ignore_inconsistent_inputs {
                     ExitKind::Inconsistent
                 } else {
                     *max_exit_kind
                 };
-                break (returned_exit_kind, total_replayed, max_count);
+                break (returned_exit_kind, total_replayed);
             }
         };
+
+        let execution_count = UserStats::new(
+            UserStatsValue::Ratio(total_replayed.into(), 1),
+            AggregatorOps::Avg,
+        );
 
         event_mgr.fire(
             state,
             Event::UpdateUserStats {
                 name: Cow::Borrowed("consistency-caused-replay-per-input"),
-                value: UserStats::new(
-                    UserStatsValue::Ratio(total_replayed.into(), 1),
-                    AggregatorOps::Avg,
-                ),
+                value: execution_count.clone(),
                 phantom: PhantomData,
             },
         )?;
 
-        event_mgr.fire(
-            state,
-            Event::UpdateUserStats {
-                name: Cow::Borrowed("consistency-caused-replay-per-input-success"),
-                value: UserStats::new(
-                    UserStatsValue::Ratio(max_count.into(), 1),
-                    AggregatorOps::Avg,
-                ),
-                phantom: PhantomData,
-            },
-        )?;
+        if probably_consistent {
+            event_mgr.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::Borrowed("consistency-caused-replay-per-input-success"),
+                    value: execution_count,
+                    phantom: PhantomData,
+                },
+            )?;
+        }
 
         event_mgr.fire(
             state,
             Event::UpdateUserStats {
                 name: Cow::Borrowed("uncaptured-inconsistent-rate"),
                 value: UserStats::new(
-                    UserStatsValue::Float(u32::try_from(inconsistent).unwrap().into()),
+                    UserStatsValue::Ratio(u64::from(probably_consistent), 1),
                     AggregatorOps::Avg,
                 ),
                 phantom: PhantomData,
