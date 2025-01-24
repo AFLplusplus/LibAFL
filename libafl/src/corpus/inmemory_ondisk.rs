@@ -10,7 +10,7 @@ use std::{
     fs,
     fs::{File, OpenOptions},
     io,
-    io::{Read, Write, Seek, SeekFrom},
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 
