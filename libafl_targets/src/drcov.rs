@@ -252,21 +252,16 @@ fn parse_hex_to_u64(str: &str) -> Result<u64, ParseIntError> {
 }
 
 fn parse_path(s: &str) -> Option<PathBuf> {
-    let mut chars = s.trim().chars();
+    let s = s.trim();
 
-    // If first character is a quote, let's remove them
-    if chars.next()? != '\"' {
+    // If first and last character is a quote, let's remove them
+    let s = if s.starts_with('\"') && s.ends_with('\"'){
+        &s[1..s.len() - 1]
+    } else {
+        s
+    };
 
-        // If first char is a quote, last char must be a quote as well
-        if chars.next_back()? != '\"' {
-            log::error!("First character was a quote, but last character was not. Is path well-formed?");
-            return None
-        }
-
-        return None
-    }
-
-    Some(PathBuf::from(chars.as_str()))
+    Some(PathBuf::from(s))
 }
 
 impl DrCovReader {
