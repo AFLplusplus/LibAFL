@@ -54,7 +54,7 @@ use crate::{
 pub struct ReplayingFuzzer<CS, F, O, IF, OF> {
     min_count_diff: u32,
     min_factor_diff: f64,
-    max_trys: u32,
+    max_trys: u64,
     ignore_inconsistent_inputs: bool,
     handle: Handle<O>,
     scheduler: CS,
@@ -634,7 +634,7 @@ impl<CS, F, O, IF, OF> ReplayingFuzzer<CS, F, O, IF, OF> {
     pub fn with_input_filter(
         min_count_diff: u32,
         min_factor_diff: f64,
-        max_trys: u32,
+        max_trys: u64,
         ignore_inconsistent_inputs: bool,
         handle: Handle<O>,
         scheduler: CS,
@@ -662,7 +662,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, NopInputFilter, OF> {
     pub fn new(
         min_count_diff: u32,
         min_factor_diff: f64,
-        max_trys: u32,
+        max_trys: u64,
         ignore_inconsistent_inputs: bool,
         handle: Handle<O>,
         scheduler: CS,
@@ -694,7 +694,7 @@ impl<CS, F, O, OF> ReplayingFuzzer<CS, F, O, BloomInputFilter, OF> {
     pub fn with_bloom_input_filter(
         min_count_diff: u32,
         min_factor_diff: f64,
-        max_trys: u32,
+        max_trys: u64,
         ignore_inconsistent_inputs: bool,
         handle: Handle<O>,
         scheduler: CS,
@@ -737,7 +737,7 @@ where
     ) -> Result<ExitKind, Error> {
         let mut results = HashMap::new();
         let mut inconsistent = 0;
-        let (exit_kind, total_replayed) = loop {
+        let (exit_kind, total_replayed, max_count) = loop {
             start_timer!(state);
             executor.observers_mut().pre_exec_all(state, input)?;
             mark_feature_time!(state, PerfFeature::PreExecObservers);
@@ -757,31 +757,28 @@ where
 
             let observer = observers.get(&self.handle).expect("observer not found");
             let hash = generic_hash_std(observer);
-            *results.entry((hash, exit_kind)).or_insert(0_u32) += 1;
+            *results.entry((hash, exit_kind)).or_insert(0) += 1;
 
             let total_replayed = results.values().sum::<u32>();
 
-            let ((max_hash, max_exit_kind), max_count) =
+            let ((max_hash, max_exit_kind), &max_count) =
                 results.iter().max_by(|(_, a), (_, b)| a.cmp(b)).unwrap();
 
-            if *max_count < self.min_count_diff {
+            if max_count < self.min_count_diff {
                 continue; // require at least min_count_diff replays
             }
 
-            let consistent_enough = results
-                .values()
-                .filter(|e| **e != *max_count)
-                .all(|&count| {
-                    let min_value_count = count + self.min_count_diff;
-                    let min_value_factor = f64::from(count) * self.min_factor_diff;
-                    min_value_count <= *max_count && min_value_factor <= f64::from(*max_count)
-                });
+            let consistent_enough = results.values().filter(|e| **e != max_count).all(|&count| {
+                let min_value_count = count + self.min_count_diff;
+                let min_value_factor = f64::from(count) * self.min_factor_diff;
+                min_value_count <= max_count && min_value_factor <= f64::from(max_count)
+            });
 
             let latest_execution_is_dominant = hash == *max_hash && exit_kind == *max_exit_kind;
 
             if consistent_enough && latest_execution_is_dominant {
-                break (exit_kind, total_replayed);
-            } else if total_replayed >= self.max_trys {
+                break (exit_kind, total_replayed, max_count);
+            } else if u64::from(total_replayed) >= self.max_trys {
                 log::warn!(
                     "Replaying {} times did not lead to dominant result, using the latest observer value and most common exit_kind. Details: {results:?}",
                     total_replayed
@@ -792,7 +789,7 @@ where
                 } else {
                     *max_exit_kind
                 };
-                break (returned_exit_kind, total_replayed);
+                break (returned_exit_kind, total_replayed, max_count);
             }
         };
 
@@ -801,12 +798,25 @@ where
             Event::UpdateUserStats {
                 name: Cow::Borrowed("consistency-caused-replay-per-input"),
                 value: UserStats::new(
-                    UserStatsValue::Float(total_replayed.into()),
+                    UserStatsValue::Ratio(total_replayed.into(), 1),
                     AggregatorOps::Avg,
                 ),
                 phantom: PhantomData,
             },
         )?;
+
+        event_mgr.fire(
+            state,
+            Event::UpdateUserStats {
+                name: Cow::Borrowed("consistency-caused-replay-per-input-success"),
+                value: UserStats::new(
+                    UserStatsValue::Ratio(max_count.into(), 1),
+                    AggregatorOps::Avg,
+                ),
+                phantom: PhantomData,
+            },
+        )?;
+
         event_mgr.fire(
             state,
             Event::UpdateUserStats {
