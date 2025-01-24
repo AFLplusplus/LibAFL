@@ -1,6 +1,10 @@
 //! Fuzzer instance that increases stability by executing the same input multiple times.
 
-use alloc::{borrow::Cow, string::ToString, vec::Vec};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use hashbrown::HashMap;
@@ -780,9 +784,11 @@ where
                 break (exit_kind, total_replayed, max_count);
             } else if u64::from(total_replayed) >= self.max_trys {
                 log::warn!(
-                    "Replaying {} times did not lead to dominant result, using the latest observer value and most common exit_kind. Details: {results:?}",
-                    total_replayed
+                    "Input still not consistent after {} tries, using the latest observer value and most common exit_kind. Results: {}",
+                    total_replayed,
+                    results.iter().map(|((hash, exit_kind), count)| format!("{count} times with hash {hash} and ExitKind::{exit_kind:?}")).fold(String::new(), |acc,e| format!("{acc}, {e}"))
                 );
+
                 inconsistent = 1;
                 let returned_exit_kind = if self.ignore_inconsistent_inputs {
                     ExitKind::Inconsistent
