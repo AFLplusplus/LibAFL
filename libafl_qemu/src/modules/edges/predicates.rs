@@ -9,6 +9,7 @@ use libafl::{
     HasMetadata,
 };
 use libafl_bolts::{impl_serdeany, Named};
+use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
 use crate::GuestAddr;
@@ -69,7 +70,7 @@ pub fn select_max(merged: &mut [(u64, bool)]) -> (u64, f64) {
     }
     // println!("Best selector is {} {}", idx_found, missclassification);
     let divider = merged[idx_found].0;
-    let rate = missclassification as f64 / n as f64;
+    let rate = missclassification as f64 / (n + m) as f64;
     (divider, rate)
 }
 
@@ -106,7 +107,7 @@ pub fn select_min(merged: &mut [(u64, bool)]) -> (u64, f64) {
     }
     // println!("Best selector is {} {}", idx_found, missclassification);
     let divider = merged[idx_found].0;
-    let rate = missclassification as f64 / n as f64;
+    let rate = missclassification as f64 / (n + m) as f64;
     (divider, rate)
 }
 
@@ -159,7 +160,7 @@ impl PredicatesMap {
     }
 
     pub fn add_mins(&mut self, addr: GuestAddr, mi: u64, was_crash: bool) {
-        self.max.entry(addr).or_default().push((mi, was_crash));
+        self.min.entry(addr).or_default().push((mi, was_crash));
     }
 
     #[allow(clippy::cast_precision_loss)]
@@ -169,18 +170,17 @@ impl PredicatesMap {
             let pred = PredicateType::HasEdge(*edge);
             synthesized.push((pred, *crash as f64 / *all as f64));
         }
-
         for (addr, max) in &mut self.max {
             let (divider, rate) = select_max(max);
             let pred = PredicateType::MaxGt(*addr, divider);
             synthesized.push((pred, rate));
         }
-
         for (addr, min) in &mut self.min {
             let (divider, rate) = select_min(min);
             let pred = PredicateType::MinLt(*addr, divider);
             synthesized.push((pred, rate));
         }
+        self.synthesized = synthesized;
     }
 }
 
@@ -301,10 +301,14 @@ where
             edges.push(*e);
         }
         for (addr, ma) in tracer.maxmap() {
-            maxes.push((*addr, *ma));
+            if !is_stack_ptr(*ma) {
+                maxes.push((*addr, *ma));
+            }
         }
         for (addr, mi) in tracer.minmap() {
-            mins.push((*addr, *mi));
+            if !is_stack_ptr(*mi) {
+                mins.push((*addr, *mi));
+            }
         }
 
         let map = state.metadata_or_insert_with(PredicatesMap::new);
@@ -318,7 +322,8 @@ where
         for (addr, mi) in mins {
             map.add_mins(addr, mi, self.was_crash);
         }
-
+        map.synthesize();
+        map.show();
         Ok(())
     }
 }
@@ -327,4 +332,11 @@ impl fmt::Display for Edges {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Edges({:#x}, {:#x})", self.0, self.1)
     }
+}
+
+pub fn is_stack_ptr(ptr: u64) -> bool {
+    let image_info = unsafe { libafl_get_image_info() };
+    let stack_end = unsafe { (*image_info).start_stack };
+    let stack_start = unsafe { (*image_info).stack_limit };
+    return ptr >= stack_start && stack_end >= ptr;
 }

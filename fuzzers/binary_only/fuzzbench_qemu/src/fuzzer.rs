@@ -51,7 +51,7 @@ use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
     modules::edges::{EdgeCoverageFullVariant, StdEdgeCoverageModule},
-    modules::edges::{PredicateFeedback, Predicates},
+    modules::edges::{PredicateFeedback, Tracer},
     modules::utils::filters::{NopPageFilter, StdAddressFilter},
     modules::{utils::filters::HasAddressFilter, AsanModule, EdgeCoverageModule, EmulatorModule},
     Emulator,
@@ -339,7 +339,7 @@ fn fuzz(
         )
         .unwrap()
     });
-    state.add_metadata(Predicates::new());
+    state.add_metadata(Tracer::new());
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
