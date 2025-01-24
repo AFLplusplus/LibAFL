@@ -43,7 +43,7 @@ use crate::EmulatorModules;
 use crate::Qemu;
 use crate::{
     command::CommandManager,
-    modules::{edges::Predicates, EmulatorModuleTuple},
+    modules::{edges::Tracer, EmulatorModuleTuple},
     Emulator, EmulatorDriver,
 };
 
@@ -271,7 +271,7 @@ where
             .exposed_executor_state_mut()
             .pre_exec(state, input);
 
-        if let Ok(m) = state.metadata_mut::<Predicates>() {
+        if let Ok(m) = state.metadata_mut::<Tracer>() {
             m.clear();
         }
 

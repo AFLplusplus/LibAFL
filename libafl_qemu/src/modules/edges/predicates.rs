@@ -18,7 +18,7 @@ pub struct Edges(GuestAddr, GuestAddr);
 
 /// List of predicates gathered over during one run
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct Predicates {
+pub struct Tracer {
     edges: Vec<Edges>,
     // Temporal storage to memoize the max value observed in 1 run
     maxmap: HashMap<GuestAddr, u64>,
@@ -26,12 +26,97 @@ pub struct Predicates {
     minmap: HashMap<GuestAddr, u64>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum PredicateType {
+    // Has Edge
+    HasEdge(Edges),
+    // Max is gt than
+    MaxGt(GuestAddr, u64),
+    // Min is lt than
+    MinLt(GuestAddr, u64),
+}
+
+/// Take one item from max map and find it's divider and its misclassification rate.
+#[allow(clippy::cast_precision_loss)]
+pub fn select_max(merged: &mut [(u64, bool)]) -> (u64, f64) {
+    // check how many crashes
+    let mut crashed = 0;
+    for (_, b) in merged.iter() {
+        if *b {
+            crashed += 1;
+        }
+    }
+    merged.sort_unstable();
+
+    let n = crashed;
+    let m = merged.len() - crashed;
+    let mut x = 0; // current crash;
+    let mut y = 0; // current safe
+
+    // Now we gonna compute x + m - y
+    let mut missclassification = n + m;
+    let mut idx_found = 0;
+    for (idx, item) in merged.iter().enumerate() {
+        if x + m - y < missclassification {
+            missclassification = x + m - y;
+            idx_found = idx;
+        }
+        if item.1 {
+            x += 1;
+        } else {
+            y += 1;
+        }
+    }
+    // println!("Best selector is {} {}", idx_found, missclassification);
+    let divider = merged[idx_found].0;
+    let rate = missclassification as f64 / n as f64;
+    (divider, rate)
+}
+
+/// Take one item from min map and find it's divider and its misclassification rate.
+#[allow(clippy::cast_precision_loss)]
+pub fn select_min(merged: &mut [(u64, bool)]) -> (u64, f64) {
+    // check how many crashes
+    let mut crashed = 0;
+    for (_, b) in merged.iter() {
+        if *b {
+            crashed += 1;
+        }
+    }
+    merged.sort_unstable();
+
+    let n = crashed;
+    let m = merged.len() - crashed;
+    let mut x = 0; // current crash;
+    let mut y = 0; // current safe
+
+    // Now we gonna compute x + m - y
+    let mut missclassification = n + m;
+    let mut idx_found = 0;
+    for (idx, item) in merged.iter().enumerate() {
+        if y + n - x < missclassification {
+            missclassification = y + n - x;
+            idx_found = idx;
+        }
+        if item.1 {
+            x += 1;
+        } else {
+            y += 1;
+        }
+    }
+    // println!("Best selector is {} {}", idx_found, missclassification);
+    let divider = merged[idx_found].0;
+    let rate = missclassification as f64 / n as f64;
+    (divider, rate)
+}
+
 /// List of predicates gathered over all runs.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PredicatesMap {
     edges: HashMap<Edges, (usize, usize)>,
-    max: HashMap<GuestAddr, Vec<(usize, bool)>>,
-    min: HashMap<GuestAddr, Vec<(usize, bool)>>,
+    max: HashMap<GuestAddr, Vec<(u64, bool)>>,
+    min: HashMap<GuestAddr, Vec<(u64, bool)>>,
+    synthesized: Vec<(PredicateType, f64)>,
 }
 
 impl PredicatesMap {
@@ -41,80 +126,57 @@ impl PredicatesMap {
             edges: HashMap::default(),
             max: HashMap::default(),
             min: HashMap::default(),
+            synthesized: Vec::new(),
         }
     }
 
-    pub fn generate_predicates() {
-        todo!("Actually generate predicates from the info")
+    pub fn add_edges(&mut self, edges: Edges, crash: bool) {
+        self.edges
+            .entry(edges)
+            .and_modify(|data| {
+                if crash {
+                    data.0 += 1;
+                    data.1 += 1;
+                } else {
+                    data.1 += 1;
+                }
+            })
+            .or_insert(if crash { (1, 1) } else { (0, 1) });
+    }
+
+    pub fn add_maxes(&mut self, addr: GuestAddr, ma: u64, was_crash: bool) {
+        self.max.entry(addr).or_default().push((ma, was_crash));
+    }
+
+    pub fn add_mins(&mut self, addr: GuestAddr, mi: u64, was_crash: bool) {
+        self.max.entry(addr).or_default().push((mi, was_crash));
     }
 
     #[allow(clippy::cast_precision_loss)]
-    #[deprecated]
-    pub fn sort_and_show(&self) {
-        let mut entries: Vec<_> = self.edges.iter().collect();
-
-        // Sort entries based on the ratio (first usize) / (second usize)
-        entries.sort_by(|a, b| {
-            let ratio_a = a.1 .0 as f64 / a.1 .1 as f64;
-            let ratio_b = b.1 .0 as f64 / b.1 .1 as f64;
-            ratio_b.partial_cmp(&ratio_a).unwrap()
-        });
-
-        // Take the top 10 entries (or fewer if there are less than 10)
-        let top_30 = entries.iter().take(30);
-
-        println!("Top 10 entries with highest ratio:");
-        for (i, (key, (first, second))) in top_30.enumerate() {
-            let ratio = *first as f64 / *second as f64;
-            println!(
-                "{}. {}: ({}, {}) - Ratio: {:.2}",
-                i + 1,
-                key,
-                first,
-                second,
-                ratio
-            );
-        }
-    }
-
-    /// Take one item from max or min map and find it's divider and its misclassification rate.
-    fn select(a: &Vec<usize>, b: &Vec<usize>) {
-        let mut merged: Vec<(usize, i32)> = Vec::new();
-        for item in a.iter() {
-            merged.push((*item, 1)); // crashing guys
-        }
-        for item in b.iter() {
-            merged.push((*item, 0)); // non crashing guys
+    pub fn synthesize(&mut self) {
+        let mut synthesized = vec![];
+        for (edge, (crash, all)) in &self.edges {
+            let pred = PredicateType::HasEdge(*edge);
+            synthesized.push((pred, *crash as f64 / *all as f64));
         }
 
-        merged.sort(); // nlogn no better way than this shit
-
-        let n = a.len(); // total crash
-        let m = b.len(); // total safe
-        let mut x = 0; // current crash;
-        let mut y = 0; // current safe
-
-        // Now we gonna compute x + m - y
-        let mut missclassification = n + m;
-        let mut idx_found = 0;
-        for (idx, item) in merged.iter().enumerate() {
-            if x + m - y < missclassification {
-                missclassification = x + m - y;
-                idx_found = idx;
-            }
-            if item.1 == 1 {
-                x += 1;
-            } else {
-                y += 1;
-            }
+        for (addr, max) in &mut self.max {
+            let (divider, rate) = select_max(max);
+            let pred = PredicateType::MaxGt(*addr, divider);
+            synthesized.push((pred, rate));
         }
-        println!("Best selector is {} {}", idx_found, missclassification);
+
+        for (addr, min) in &mut self.min {
+            let (divider, rate) = select_min(min);
+            let pred = PredicateType::MinLt(*addr, divider);
+            synthesized.push((pred, rate));
+        }
     }
 }
 
 impl_serdeany!(PredicatesMap);
-impl_serdeany!(Predicates);
-impl Predicates {
+impl_serdeany!(Tracer);
+impl Tracer {
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -220,29 +282,33 @@ where
         _observers: &OT,
         _testcase: &mut Testcase<I>,
     ) -> Result<(), libafl::Error> {
-        // do stuf for map
-        /*
-        let mut predicates = vec![];
-        let mut maxs = vec![];
+        let tracer = state.metadata::<Tracer>().unwrap();
+        // because of double borrow shit!
+        let mut edges = vec![];
+        let mut maxes = vec![];
         let mut mins = vec![];
-        for predicate in predicates {
-            if self.was_crash {
-                map.map
-                    .entry(predicate)
-                    .and_modify(|e| {
-                        e.0 += 1;
-                        e.1 += 1;
-                    })
-                    .or_insert((1, 1));
-            } else {
-                map.map
-                    .entry(predicate)
-                    .and_modify(|e| e.1 += 1)
-                    .or_insert((0, 1));
-            }
+        for e in tracer.edges() {
+            edges.push(*e);
         }
-        */
+        for (addr, ma) in tracer.maxmap() {
+            maxes.push((*addr, *ma));
+        }
+        for (addr, mi) in tracer.minmap() {
+            mins.push((*addr, *mi));
+        }
+
         let map = state.metadata_or_insert_with(PredicatesMap::new);
+
+        for e in edges {
+            map.add_edges(e, self.was_crash);
+        }
+        for (addr, ma) in maxes {
+            map.add_maxes(addr, ma, self.was_crash);
+        }
+        for (addr, mi) in mins {
+            map.add_mins(addr, mi, self.was_crash);
+        }
+
         Ok(())
     }
 }

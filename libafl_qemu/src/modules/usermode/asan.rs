@@ -13,7 +13,7 @@ use rangemap::RangeMap;
 
 use crate::{
     modules::{
-        calls::FullBacktraceCollector, edges::Predicates, snapshot::SnapshotModule,
+        calls::FullBacktraceCollector, edges::Tracer, snapshot::SnapshotModule,
         utils::filters::HasAddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::MemAccessInfo,
@@ -1028,7 +1028,7 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
     if h.use_rca() {
         let state = state.expect("state missing for rca");
         let predicates = state
-            .metadata_mut::<Predicates>()
+            .metadata_mut::<Tracer>()
             .expect("Predicates missing for rca");
         match N {
             1 => {

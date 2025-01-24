@@ -56,7 +56,7 @@ mod rca {
     use super::{super::EdgeCoverageVariant, QemuEdgesMapMetadata};
     use crate::{
         modules::{
-            edges::Predicates, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter,
+            edges::Tracer, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter,
         },
         qemu, EmulatorModules,
     };
@@ -92,9 +92,7 @@ mod rca {
                 },
                 _ => return,
             };
-            let predicates = state
-                .metadata_mut::<Predicates>()
-                .expect("Predicates not found!");
+            let predicates = state.metadata_mut::<Tracer>().expect("Tracer not found!");
             predicates.add_edges(src, dest);
         }
     }
