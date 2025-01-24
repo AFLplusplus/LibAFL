@@ -1095,6 +1095,9 @@ pub fn trace_write_asan<ET, I, S, const N: usize>(
 {
     let h: &mut AsanModule = emulator_modules.get_mut::<AsanModule>().unwrap();
     // todo review this shit
+    let value_after_write = unsafe {qemu.read_mem_val::<u32>(addr).unwrap() };
+    let rip = qemu.read_reg(Regs::Rip).unwrap(); // why getting rip would fail :P
+    println!("Value written is {} {} {}", value_after_write, rip, addr);
     if h.use_rca() {
         let state = state.expect("state missing for rca");
         let predicates = state
@@ -1132,7 +1135,6 @@ pub fn trace_write_asan<ET, I, S, const N: usize>(
             }
         };
     }
-
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.write::<N>(qemu, id as GuestAddr, addr);
 }

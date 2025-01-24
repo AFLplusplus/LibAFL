@@ -47,6 +47,13 @@ cc \
     ./libfuzzer_main.o \
     -o test2 \
     -lm -lz
+
+cc \
+	-O0 \
+    ./tests/test3.c \
+    ./libfuzzer_main.o \
+    -o test3 \
+    -lm -lz
 '''
 
 [tasks.test1]
@@ -78,6 +85,21 @@ args = [
   "--libafl-out",
   "./out",
   "./test2",
+]
+
+[tasks.test3]
+command = "cargo"
+args = [
+  "run",
+  "--profile",
+  "${PROFILE}",
+  "./test3",
+  "--",
+  "--libafl-in",
+  "../../inprocess/libfuzzer_libpng/corpus",
+  "--libafl-out",
+  "./out",
+  "./test3",
 ]
 dependencies = ["harness"]
 
