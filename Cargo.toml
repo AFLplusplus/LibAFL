@@ -127,7 +127,7 @@ z3 = "0.12.1"
 
 [workspace.lints.rust]
 # Deny
-warnings = { level = "deny", priority = -2 }
+warnings = { level = "deny", priority = -1 }
 
 # Forbid
 unexpected_cfgs = "forbid"
