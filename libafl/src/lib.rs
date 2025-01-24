@@ -86,7 +86,7 @@ pub use libafl_bolts::{nonzero, Error};
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod prelude {
-    #![allow(ambiguous_glob_reexports)]
+    #![expect(ambiguous_glob_reexports)]
 
     pub use super::{
         corpus::*, events::*, executors::*, feedbacks::*, fuzzer::*, generators::*, inputs::*,
