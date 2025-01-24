@@ -141,6 +141,7 @@ impl Qemu {
         GuestMaps::new()
     }
 
+    #[must_use]
     pub fn image_info(&self) -> ImageInfo {
         // # Safety
         // Safe because QEMU has been correctly initialized since it takes self as parameter.
