@@ -133,7 +133,7 @@ impl crate::ArchExtras for crate::CPU {
         &self,
         conv: CallingConvention,
         idx: i32,
-        val: T,
+        _val: T,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,

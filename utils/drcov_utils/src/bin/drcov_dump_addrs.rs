@@ -1,6 +1,6 @@
 use std::{
     fs::{create_dir_all, File},
-    io::Write,
+    io::{Error, Write},
     path::PathBuf,
 };
 
@@ -17,23 +17,25 @@ use libafl_targets::drcov::DrCovReader;
 pub struct Opt {
     #[arg(short, long, help = "DrCov traces to read", required = true)]
     pub inputs: Vec<PathBuf>,
+
     #[arg(
         short,
         long,
         help = "Output folder to write address files to. If none is set, this will output all addresses to stdout."
     )]
     pub out_dir: Option<PathBuf>,
-    #[arg(
-        short,
-        long,
-        help = "Print all the addresses when printing to stdout. Does not have any impact when writing addresses to a file."
-    )]
-    pub verbose: bool,
+
+    #[arg(short, long, help = "Print the metadata of the drcov file.")]
+    pub metadata: bool,
+
+    #[arg(short, long, help = "Dump the addresses.")]
+    pub addrs: bool,
+
     #[arg(short, long, help = "Sort the addresses from smallest to biggest.")]
     pub sort: bool,
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
     let opts = Opt::parse();
 
     if let Some(out_dir) = &opts.out_dir {
@@ -59,7 +61,7 @@ fn main() {
             blocks.sort_unstable();
         }
 
-        if let Some(out_dir) = &opts.out_dir {
+        let mut writer: Box<dyn Write> = if let Some(out_dir) = &opts.out_dir {
             // Write files to a directory
             let out_file = out_dir.join(
                 input
@@ -67,46 +69,47 @@ fn main() {
                     .expect("File without filename shouldn't exist"),
             );
 
-            let Ok(mut file) = File::create_new(&out_file).map_err(|err| {
+            let Ok(file) = File::create_new(&out_file).map_err(|err| {
                 eprintln!("Could not create file {out_file:?} - continuing: {err:?}");
             }) else {
                 continue;
             };
 
-            println!(
-                "Dumping {} addresses from drcov file {input:?} to {out_file:?}",
-                blocks.len()
-            );
+            println!("Dumping traces from drcov file {input:?} to {out_file:?}",);
 
-            for line in blocks {
-                file.write_all(format!("{line:#x}\n").as_bytes())
-                    .expect("Could not write to file");
-            }
+            Box::new(file)
         } else {
-            // dump to stdout
-            let modules = &drcov.module_entries;
-            println!("# {} Modules:", modules.len());
+            Box::new(std::io::stdout())
+        };
+
+        // dump to stdout
+        let modules = &drcov.module_entries;
+
+        if opts.metadata {
+            writeln!(writer, "# {} Modules:", modules.len())?;
             for module in &drcov.module_entries {
-                println!(
+                writeln!(
+                    writer,
                     "\t{} - [{:#020x}-{:#020x}] {}",
                     module.id,
                     module.base,
                     module.end,
                     module.path.display()
-                );
+                )?;
             }
-            println!();
+            writeln!(writer, "# {} Blocks covered in {input:?}.", blocks.len())?;
 
-            print!("# {} Blocks covered in {input:?}", blocks.len());
-            if opts.verbose {
-                println!(":");
-                for line in blocks {
-                    println!("{line:#x}");
-                }
-                println!();
-            } else {
-                println!(".");
+            if opts.addrs {
+                writeln!(writer)?;
+            }
+        }
+
+        if opts.addrs {
+            for line in blocks {
+                writeln!(writer, "{line:#x}")?;
             }
         }
     }
+
+    Ok(())
 }
