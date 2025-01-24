@@ -10,7 +10,7 @@ use std::{
     fs,
     fs::{File, OpenOptions},
     io,
-    io::{Read, Write},
+    io::{Read, Write, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
@@ -379,13 +379,13 @@ impl<I> InMemoryOnDiskCorpus<I> {
             lockfile.lock_exclusive()?;
 
             lockfile.read_to_string(&mut ctr)?;
-            ctr = ctr.trim().to_string();
-            if ctr.is_empty() {
-                ctr = String::from("1");
+            ctr = if ctr.is_empty() {
+                String::from("1")
             } else {
-                ctr = (ctr.parse::<u32>()? + 1).to_string();
-            }
+                (ctr.trim().parse::<u32>()? + 1).to_string()
+            };
 
+            lockfile.seek(SeekFrom::Start(0))?;
             lockfile.write_all(ctr.as_bytes())?;
         }
 
