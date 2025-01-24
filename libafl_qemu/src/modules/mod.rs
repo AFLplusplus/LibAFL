@@ -1,9 +1,7 @@
-use core::{fmt::Debug, ops::Range};
+use core::fmt::Debug;
 
 use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
-#[cfg(feature = "systemmode")]
-use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
     emu::EmulatorModules,
@@ -19,6 +17,7 @@ pub use usermode::*;
 #[cfg(feature = "systemmode")]
 pub mod systemmode;
 #[cfg(feature = "systemmode")]
+#[expect(unused_imports)]
 pub use systemmode::*;
 
 pub mod edges;

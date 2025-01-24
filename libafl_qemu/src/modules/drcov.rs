@@ -1,9 +1,9 @@
+#[cfg(feature = "usermode")]
 use std::{
     cmp::{max, min},
     ops::Range,
-    path::PathBuf,
-    sync::Mutex,
 };
+use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
@@ -304,6 +304,20 @@ where
             self.module_mapping.is_some(),
             "DrCov should have a module mapping already set."
         );
+
+        if self.full_trace {
+            emulator_modules.blocks(
+                Hook::Function(gen_unique_block_ids::<ET, F, I, S>),
+                Hook::Function(gen_block_lengths::<ET, F, I, S>),
+                Hook::Function(exec_trace_block::<ET, F, I, S>),
+            );
+        } else {
+            emulator_modules.blocks(
+                Hook::Function(gen_unique_block_ids::<ET, F, I, S>),
+                Hook::Function(gen_block_lengths::<ET, F, I, S>),
+                Hook::Empty,
+            );
+        };
     }
 
     fn post_exec<OT, ET>(
