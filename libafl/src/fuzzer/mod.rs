@@ -1,14 +1,14 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
+pub mod filter;
 pub mod replaying;
 
 use alloc::{string::ToString, vec::Vec};
-#[cfg(feature = "std")]
-use core::hash::Hash;
 use core::{fmt::Debug, time::Duration};
+use filter::InputFilter;
+use replaying::WrappedExecutesInput;
+use typed_builder::TypedBuilder;
 
-#[cfg(feature = "std")]
-use fastbloom::BloomFilter;
 use libafl_bolts::{current_time, tuples::MatchName};
 use serde::Serialize;
 
@@ -22,11 +22,9 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
-    mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::{HasCurrentStageId, StagesTuple},
-    start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
         HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
@@ -259,15 +257,21 @@ pub enum ExecuteInputResult {
 }
 
 /// Your default fuzzer instance, for everyday use.
-#[derive(Debug)]
-pub struct StdFuzzer<CS, F, IF, OF> {
+/// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
+///
+/// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
+///
+/// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
+#[derive(Debug, TypedBuilder)]
+pub struct StdFuzzer<CS, F, IF, R, OF> {
     scheduler: CS,
     feedback: F,
     objective: OF,
     input_filter: IF,
+    replaying_config: R,
 }
 
-impl<CS, F, I, IF, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, F, I, IF, R, OF, S> HasScheduler<I, S> for StdFuzzer<CS, F, IF, R, OF>
 where
     CS: Scheduler<I, S>,
 {
@@ -282,7 +286,7 @@ where
     }
 }
 
-impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, IF, R, OF> HasFeedback for StdFuzzer<CS, F, IF, R, OF> {
     type Feedback = F;
 
     fn feedback(&self) -> &Self::Feedback {
@@ -294,7 +298,7 @@ impl<CS, F, IF, OF> HasFeedback for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
+impl<CS, F, IF, R, OF> HasObjective for StdFuzzer<CS, F, IF, R, OF> {
     type Objective = OF;
 
     fn objective(&self) -> &OF {
@@ -306,7 +310,8 @@ impl<CS, F, IF, OF> HasObjective for StdFuzzer<CS, F, IF, OF> {
     }
 }
 
-impl<CS, EM, F, I, IF, OF, OT, S> ExecutionProcessor<EM, I, OT, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, EM, F, I, IF, R, OF, OT, S> ExecutionProcessor<EM, I, OT, S>
+    for StdFuzzer<CS, F, IF, R, OF>
 where
     CS: Scheduler<I, S>,
     EM: EventFirer<I, S> + CanSerializeObserver<OT>,
@@ -426,7 +431,7 @@ where
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        // Now send off the event
+        // Now send OF, f the event
         let observers_buf = match exec_res {
             ExecuteInputResult::Corpus => {
                 if manager.should_send() {
@@ -456,7 +461,7 @@ where
         observers_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        // Now send off the event
+        // Now send OF, f the event
         match exec_res {
             ExecuteInputResult::Corpus => {
                 if manager.should_send() {
@@ -515,7 +520,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> EvaluatorObservers<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, R, OF, S> EvaluatorObservers<E, EM, I, S> for StdFuzzer<CS, F, IF, R, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -530,6 +535,7 @@ where
         + HasExecutions
         + HasLastFoundTime,
     I: Input,
+    R: WrappedExecutesInput<Self, E, EM, I, S> + Clone,
 {
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
@@ -550,47 +556,7 @@ where
     }
 }
 
-trait InputFilter<I> {
-    fn should_execute(&mut self, input: &I) -> bool;
-}
-
-/// A pseudo-filter that will execute each input.
-#[derive(Debug)]
-pub struct NopInputFilter;
-impl<I> InputFilter<I> for NopInputFilter {
-    #[inline]
-    #[must_use]
-    fn should_execute(&mut self, _input: &I) -> bool {
-        true
-    }
-}
-
-/// A filter that probabilistically prevents duplicate execution of the same input based on a bloom filter.
-#[cfg(feature = "std")]
-#[derive(Debug)]
-pub struct BloomInputFilter {
-    bloom: BloomFilter,
-}
-
-#[cfg(feature = "std")]
-impl BloomInputFilter {
-    #[must_use]
-    fn new(items_count: usize, fp_p: f64) -> Self {
-        let bloom = BloomFilter::with_false_pos(fp_p).expected_items(items_count);
-        Self { bloom }
-    }
-}
-
-#[cfg(feature = "std")]
-impl<I: Hash> InputFilter<I> for BloomInputFilter {
-    #[inline]
-    #[must_use]
-    fn should_execute(&mut self, input: &I) -> bool {
-        !self.bloom.insert(input)
-    }
-}
-
-impl<CS, E, EM, F, I, IF, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, R, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IF, R, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
@@ -606,6 +572,7 @@ where
         + HasExecutions,
     I: Input,
     IF: InputFilter<I>,
+    R: WrappedExecutesInput<Self, E, EM, I, S> + Clone,
 {
     fn evaluate_filtered(
         &mut self,
@@ -743,7 +710,7 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, R, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, R, OF>
 where
     CS: Scheduler<I, S>,
     EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
@@ -866,45 +833,6 @@ where
         Ok(ret.unwrap())
     }
 }
-
-impl<CS, F, IF, OF> StdFuzzer<CS, F, IF, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and the provided duplicate input execution filter.
-    pub fn with_input_filter(scheduler: CS, feedback: F, objective: OF, input_filter: IF) -> Self {
-        Self {
-            scheduler,
-            feedback,
-            objective,
-            input_filter,
-        }
-    }
-}
-
-impl<CS, F, OF> StdFuzzer<CS, F, NopInputFilter, OF> {
-    /// Create a new [`StdFuzzer`] with standard behavior and no duplicate input execution filtering.
-    pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
-        Self::with_input_filter(scheduler, feedback, objective, NopInputFilter)
-    }
-}
-
-#[cfg(feature = "std")]
-impl<CS, F, OF> StdFuzzer<CS, F, BloomInputFilter, OF> {
-    /// Create a new [`StdFuzzer`], which, with a certain certainty, executes each input only once.
-    ///
-    /// This is achieved by hashing each input and using a bloom filter to differentiate inputs.
-    ///
-    /// Use this implementation if hashing each input is very fast compared to executing potential duplicate inputs.
-    pub fn with_bloom_input_filter(
-        scheduler: CS,
-        feedback: F,
-        objective: OF,
-        items_count: usize,
-        fp_p: f64,
-    ) -> Self {
-        let input_filter = BloomInputFilter::new(items_count, fp_p);
-        Self::with_input_filter(scheduler, feedback, objective, input_filter)
-    }
-}
-
 /// Structs with this trait will execute an input
 pub trait ExecutesInput<E, EM, I, S> {
     /// Runs the input and triggers observers and feedback
@@ -917,14 +845,14 @@ pub trait ExecutesInput<E, EM, I, S> {
     ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, E, EM, F, I, IF, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, R, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IF, R, OF>
 where
     CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
     S: HasExecutions + HasCorpus<I> + MaybeHasClientPerfMonitor,
+    R: WrappedExecutesInput<Self, E, EM, I, S> + Clone,
 {
-    /// Runs the input and triggers observers and feedback
     fn execute_input(
         &mut self,
         state: &mut S,
@@ -932,21 +860,9 @@ where
         event_mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        start_timer!(state);
-        executor.observers_mut().pre_exec_all(state, input)?;
-        mark_feature_time!(state, PerfFeature::PreExecObservers);
-
-        start_timer!(state);
-        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
-        mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        start_timer!(state);
-        executor
-            .observers_mut()
-            .post_exec_all(state, input, &exit_kind)?;
-        mark_feature_time!(state, PerfFeature::PostExecObservers);
-
-        Ok(exit_kind)
+        self.replaying_config
+            .clone()
+            .wrapped_execute_input(self, state, executor, event_mgr, input)
     }
 }
 
@@ -1017,6 +933,8 @@ mod tests {
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
+        filter::BloomInputFilter,
+        fuzzer::replaying::NoReplayingConfig,
         inputs::BytesInput,
         schedulers::StdScheduler,
         state::StdState,
@@ -1026,7 +944,13 @@ mod tests {
     fn filtered_execution() {
         let execution_count = RefCell::new(0);
         let scheduler = StdScheduler::new();
-        let mut fuzzer = StdFuzzer::with_bloom_input_filter(scheduler, (), (), 100, 1e-4);
+        let mut fuzzer = StdFuzzer::builder()
+            .scheduler(scheduler)
+            .feedback(())
+            .objective(())
+            .input_filter(BloomInputFilter::new(100, 1e-4))
+            .replaying_config(NoReplayingConfig)
+            .build();
         let mut state = StdState::new(
             StdRand::new(),
             InMemoryCorpus::new(),

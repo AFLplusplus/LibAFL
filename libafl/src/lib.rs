@@ -118,10 +118,12 @@ mod tests {
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
+        filter::NopInputFilter,
         fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        replaying::NoReplayingConfig,
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
@@ -164,7 +166,13 @@ mod tests {
         let objective = ConstFeedback::new(false);
 
         let scheduler = RandScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mut fuzzer = StdFuzzer::builder()
+            .input_filter(NopInputFilter)
+            .replaying_config(NoReplayingConfig)
+            .scheduler(scheduler)
+            .feedback(feedback)
+            .objective(objective)
+            .build();
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
