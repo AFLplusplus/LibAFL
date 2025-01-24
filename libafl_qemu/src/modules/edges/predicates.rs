@@ -26,7 +26,7 @@ pub struct Tracer {
     minmap: HashMap<GuestAddr, u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PredicateType {
     // Has Edge
     HasEdge(Edges),
@@ -46,7 +46,7 @@ pub fn select_max(merged: &mut [(u64, bool)]) -> (u64, f64) {
             crashed += 1;
         }
     }
-    merged.sort_unstable();
+    merged.sort_by(|a, b| a.0.cmp(&b.0));
 
     let n = crashed;
     let m = merged.len() - crashed;
@@ -83,7 +83,7 @@ pub fn select_min(merged: &mut [(u64, bool)]) -> (u64, f64) {
             crashed += 1;
         }
     }
-    merged.sort_unstable();
+    merged.sort_by(|a, b| a.0.cmp(&b.0));
 
     let n = crashed;
     let m = merged.len() - crashed;
@@ -127,6 +127,16 @@ impl PredicatesMap {
             max: HashMap::default(),
             min: HashMap::default(),
             synthesized: Vec::new(),
+        }
+    }
+
+    pub fn show(&self) {
+        let mut sorted_synthesized: Vec<(PredicateType, f64)> = self.synthesized.clone();
+        sorted_synthesized.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let top10: Vec<(PredicateType, f64)> = sorted_synthesized.into_iter().take(10).collect();
+
+        for i in top10.iter() {
+            println!("{:#?}", i);
         }
     }
 
