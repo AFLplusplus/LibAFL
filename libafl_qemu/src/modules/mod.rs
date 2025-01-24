@@ -12,6 +12,7 @@ use crate::{
 #[cfg(feature = "usermode")]
 pub mod usermode;
 #[cfg(feature = "usermode")]
+#[cfg_attr(feature = "hexagon", allow(unused_imports))]
 pub use usermode::*;
 
 #[cfg(feature = "systemmode")]
