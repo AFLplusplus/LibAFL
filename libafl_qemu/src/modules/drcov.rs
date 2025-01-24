@@ -295,7 +295,7 @@ where
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
-        _emulator_modules: &mut EmulatorModules<ET, I, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
     ) where
         ET: EmulatorModuleTuple<I, S>,
