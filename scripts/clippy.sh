@@ -59,10 +59,7 @@ for project in "${PROJECTS[@]}"; do
       features="--features=clippy"
    fi
    if [ -d "$project" ]; then
-      if [[ "$project" == "libafl_qemu" ]]; then
-        run_clippy "$project" "$features"
-        run_clippy "$project" "$features --no-default-features --features=systemmode,x86_64"
-      fi
+      run_clippy "$project" "$features"
    else
       echo "Warning: Directory $project does not exist. Skipping."
    fi
