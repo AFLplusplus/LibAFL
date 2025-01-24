@@ -1130,53 +1130,6 @@ impl AsanRuntime {
     }
 
     #[inline]
-    #[allow(non_snake_case)]
-    #[cfg(windows)]
-    pub fn hook_UnmapViewOfFile(
-        &mut self,
-        original: extern "C" fn(ptr: *const c_void) -> bool,
-        ptr: *const c_void,
-    ) -> bool {
-        log::trace!("hook_UnmapViewOfFile {:p}", ptr);
-
-        let mut size = 0;
-        // We need to get the mapping size before poisoning it
-        // Use VirtualQuery to get the size of the mapped memory
-        let mut mem_info = MEMORY_BASIC_INFORMATION {
-            BaseAddress: ptr::null_mut(),
-            AllocationBase: ptr::null_mut(),
-            AllocationProtect: 0,
-            RegionSize: 0,
-            State: 0,
-            Protect: 0,
-            Type: 0,
-        };
-
-        let result = unsafe {
-            VirtualQuery(
-                ptr as *const winapi::ctypes::c_void,
-                &mut mem_info,
-                size_of::<MEMORY_BASIC_INFORMATION>(),
-            )
-        };
-
-        if result == 0 {
-            log::error!("Failed to query virtual memory for poisoning");
-        } else {
-            size = mem_info.RegionSize;
-        }
-
-        let ret = original(ptr);
-
-        if size > 0 {
-            log::trace!("hook_UnmapViewOfFile poisons {} bytes at {:p} ", size, ptr);
-            self.poison(ptr as usize, size);
-        }
-
-        ret
-    }
-
-    #[inline]
     #[expect(non_snake_case)]
     #[cfg(windows)]
     pub fn hook_UnmapViewOfFile(
@@ -1221,7 +1174,7 @@ impl AsanRuntime {
         );
 
         if size > 0 {
-            self.poison(ptr as usize, size);
+            unsafe {self.poison(ptr as usize, size)};
         }
 
         ret

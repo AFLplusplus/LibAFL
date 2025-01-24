@@ -28,7 +28,7 @@ use frida_gum::{
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
-use libafl_bolts::{cli::FuzzerOptions, get_thread_id, AsSlice};
+use libafl_bolts::{cli::FuzzerOptions, get_thread_id};
 use libc::wchar_t;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
@@ -272,10 +272,6 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "fault address",
     "actual rip",
 ];
-
-thread_local! {
-    static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
-}
 
 /// The count of registers that need to be saved by the asan runtime
 #[cfg(target_arch = "aarch64")]

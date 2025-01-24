@@ -343,6 +343,8 @@ mod tests {
     use libafl_bolts::{
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
+    use std::{cell::RefCell, rc::Rc};
+    
     #[cfg(unix)]
     use mimalloc::MiMalloc;
 
@@ -428,11 +430,16 @@ mod tests {
 
         let coverage = CoverageRuntime::new();
         let asan = AsanRuntime::new(options);
-        let mut frida_helper = FridaInstrumentationHelper::new(
+        // let mut frida_helper = FridaInstrumentationHelper::new(
+        //     GUM.get().expect("Gum uninitialized"),
+        //     options,
+        //     tuple_list!(coverage, asan),
+        // );
+        let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
             GUM.get().expect("Gum uninitialized"),
             options,
             tuple_list!(coverage, asan),
-        );
+        )));
 
         // Run the tests for each function
         for test in tests {
@@ -505,7 +512,8 @@ mod tests {
                         &mut event_manager,
                     )
                     .unwrap(),
-                    &mut frida_helper,
+                    // &mut frida_helper,
+                    Rc::clone(&frida_helper)
                 );
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
@@ -531,7 +539,7 @@ mod tests {
             }
         }
 
-        frida_helper.deinit(GUM.get().expect("Gum uninitialized"));
+        frida_helper.borrow_mut().deinit(GUM.get().expect("Gum uninitialized"));
     }
 
     #[test]

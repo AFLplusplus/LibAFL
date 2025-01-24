@@ -61,7 +61,14 @@ impl<EM, H, OT, RT, S, TC, Z> Executor<EM, <S::Corpus as Corpus>::Input, S, Z>
 where
     EM: UsesState<State = S>,
     H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,
-    S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+    // S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input> + HasSolutions,
+    S: HasCorpus
+        + HasCurrentTestcase
+        + UsesInput<Input = <S::Corpus as Corpus>::Input>
+        + HasExecutions
+        + HasSolutions,
+    S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+    <S::Corpus as Corpus>::Input: Input,
     TC: TargetBytesConverter<Input = <S::Corpus as Corpus>::Input>,
     OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
     RT: FridaRuntimeTuple,
@@ -177,7 +184,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S, TC> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S, TC>
+impl<'a, 'b, H, OT, RT, S, TC> FridaInProcessExecutor<'a, 'b, H, OT, RT, S, TC>
 where
     RT: FridaRuntimeTuple,
 {

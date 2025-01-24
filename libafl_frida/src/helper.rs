@@ -454,24 +454,24 @@ impl FridaInstrumentationHelperBuilder {
                     start..(start + range.size() as u64),
                     (i as u16, module.path()),
                 );
-            }
-            for skip in skip_ranges {
-                match skip {
-                    SkipRange::Absolute(range) => ranges
-                        .borrow_mut()
-                        .remove(range.start as u64..range.end as u64),
-                    SkipRange::ModuleRelative { name, range } => {
-                        if name.eq(&module.name()){
-                            log::trace!("Skipping {:?} {:?}", name, range);
-                            let module_details = ModuleDetails::with_name(name).unwrap();
-                            let lib_start = module_details.range().base_address().0 as u64;
-                            ranges.borrow_mut().remove(
-                                (lib_start + range.start as u64)..(lib_start + range.end as u64),
-                            );
+                    for skip in &skip_ranges {
+                        match skip {
+                            SkipRange::Absolute(range) => ranges
+                                .borrow_mut()
+                                .remove(range.start as u64..range.end as u64),
+                            SkipRange::ModuleRelative { name, range } => {
+                                if name.eq(&module.name()){
+                                    log::trace!("Skipping {:?} {:?}", name, range);
+                                    let module_details = ModuleDetails::with_name(name.to_string()).unwrap();
+                                    let lib_start = module_details.range().base_address().0 as u64;
+                                    ranges.borrow_mut().remove(
+                                        (lib_start + range.start as u64)..(lib_start + range.end as u64),
+                                    );
+                                }
+                            }
                         }
                     }
                 }
-            }
             runtimes
                 .borrow_mut()
                 .init_all(gum, &ranges.borrow(), &module_map);
