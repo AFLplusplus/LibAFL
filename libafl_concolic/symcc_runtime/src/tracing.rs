@@ -1,4 +1,5 @@
 //! Tracing of expressions in a serialized form.
+#![allow(no_mangle_generic_items)]
 
 pub use libafl::observers::concolic::serialization_format::StdShMemMessageFileWriter;
 use libafl::observers::concolic::SymExpr;

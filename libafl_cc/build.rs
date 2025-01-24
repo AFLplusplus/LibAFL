@@ -1,11 +1,17 @@
-use std::{
-    env,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-    process::Command,
-    str,
-};
+#[cfg(any(
+    target_vendor = "apple",
+    feature = "ddg-instr",
+    feature = "function-logging",
+    feature = "cmplog-routines",
+    feature = "autotokens",
+    feature = "coverage-accounting",
+    feature = "cmplog-instructions",
+    feature = "ctx",
+    feature = "dump-cfg",
+    feature = "profiling",
+))]
+use std::path::PathBuf;
+use std::{env, fs::File, io::Write, path::Path, process::Command, str};
 
 #[cfg(target_vendor = "apple")]
 use glob::glob;
@@ -20,6 +26,17 @@ const LLVM_VERSION_MAX: u32 = 33;
 const LLVM_VERSION_MIN: u32 = 6;
 
 /// Get the extension for a shared object
+#[cfg(any(
+    feature = "ddg-instr",
+    feature = "function-logging",
+    feature = "cmplog-routines",
+    feature = "autotokens",
+    feature = "coverage-accounting",
+    feature = "cmplog-instructions",
+    feature = "ctx",
+    feature = "dump-cfg",
+    feature = "profiling",
+))]
 fn dll_extension<'a>() -> &'a str {
     if let Ok(vendor) = env::var("CARGO_CFG_TARGET_VENDOR") {
         if vendor == "apple" {
@@ -143,6 +160,17 @@ fn find_llvm_version() -> Option<i32> {
     None
 }
 
+#[cfg(any(
+    feature = "ddg-instr",
+    feature = "function-logging",
+    feature = "cmplog-routines",
+    feature = "autotokens",
+    feature = "coverage-accounting",
+    feature = "cmplog-instructions",
+    feature = "ctx",
+    feature = "dump-cfg",
+    feature = "profiling",
+))]
 #[expect(clippy::too_many_arguments)]
 fn build_pass(
     bindir_path: &Path,
