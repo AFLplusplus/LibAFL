@@ -251,7 +251,7 @@ fn parse_hex_to_u64(str: &str) -> Result<u64, ParseIntError> {
     u64::from_str_radix(&str[2..], 16)
 }
 
-fn parse_path(s: &str) -> Option<PathBuf> {
+fn parse_path(s: &str) -> PathBuf {
     let s = s.trim();
 
     // If first and last character is a quote, let's remove them
@@ -261,7 +261,7 @@ fn parse_path(s: &str) -> Option<PathBuf> {
         s
     };
 
-    Some(PathBuf::from(s))
+    PathBuf::from(s)
 }
 
 impl DrCovReader {
@@ -349,7 +349,7 @@ impl DrCovReader {
                 return Err(err("timestamp"));
             };
 
-            let Some(path) = split.next().and_then(parse_path) else {
+            let Some(path) = split.next().map(parse_path) else {
                 return Err(err("path"));
             };
 
