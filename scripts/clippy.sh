@@ -59,7 +59,7 @@ for project in "${PROJECTS[@]}"; do
       features="--features=clippy"
    fi
    if [ -d "$project" ]; then
-      run_clippy "$project" $features
+      run_clippy "$project" "$features"
    else
       echo "Warning: Directory $project does not exist. Skipping."
    fi

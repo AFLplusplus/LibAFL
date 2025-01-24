@@ -244,7 +244,7 @@ windows_alias = "unsupported"
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}"
 args = [
   "--coverage-path",
-  "${TARGET_DIR}/drcov.log",
+  "${TARGET_DIR}/cov.drcov",
   "--input-dir",
   "./corpus",
   "--",
@@ -294,11 +294,11 @@ script = '''
 cargo make ${FEATURE} || exit 1
 
 cargo run --manifest-path ../../../utils/drcov_utils/Cargo.toml --bin drcov_merge -- \
-  -i ${TARGET_DIR}/drcov-000.log ${TARGET_DIR}/drcov-001.log ${TARGET_DIR}/drcov-002.log ${TARGET_DIR}/drcov-003.log \
-  --output ${TARGET_DIR}/drcov-merged.log || exit 1
+  -i ${TARGET_DIR}/cov-000.drcov ${TARGET_DIR}/cov-001.drcov ${TARGET_DIR}/cov-002.drcov ${TARGET_DIR}/cov-003.drcov \
+  --output ${TARGET_DIR}/cov-merged.drcov || exit 1
 
 TMP=$(cargo run --manifest-path ../../../utils/drcov_utils/Cargo.toml --bin drcov_dump_addrs -- \
-  -i ${TARGET_DIR}/drcov-merged.log | wc -l || exit 1)
+  -i ${TARGET_DIR}/cov-merged.drcov -a | wc -l || exit 1)
 
 NB_BLOCKS=$((TMP - 1))
 
