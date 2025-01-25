@@ -419,7 +419,7 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, OF, S> for CommandExecutor<I, OT, S, T, HT, Pid>
+impl<EM, I, OF, OT, S, T, HT> Executor<EM, I, OF, S> for CommandExecutor<I, OT, S, T, HT, Pid>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: MatchName + ObserversTuple<I, S>,
