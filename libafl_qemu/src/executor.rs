@@ -295,17 +295,17 @@ where
     }
 }
 
-pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP> =
+pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> =
     StatefulInProcessForkExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, SP>;
 
 #[cfg(feature = "fork")]
-pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP> {
-    inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>,
+pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> {
+    inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>,
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP> Debug
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> Debug
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     C: Debug,
     CM: Debug,
@@ -327,8 +327,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
-    QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
+impl<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
+    QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
@@ -364,14 +364,16 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn inner(&self) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP> {
+    pub fn inner(
+        &self,
+    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OF, OT, S, SM, SP> {
         &self.inner
     }
 
     #[allow(clippy::type_complexity)]
     pub fn inner_mut(
         &mut self,
-    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP> {
+    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> {
         &mut self.inner
     }
 
@@ -386,7 +388,7 @@ where
 
 #[cfg(feature = "fork")]
 impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> Executor<EM, I, OF, S>
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     C: Clone,
     CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
@@ -425,8 +427,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP> HasObservers
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> HasObservers
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
