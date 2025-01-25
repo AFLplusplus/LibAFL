@@ -30,7 +30,8 @@ use crate::{
     schedulers::Scheduler,
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasObjective,
+    HasScheduler,
 };
 
 // The shared state for all [`PushStage`]s
@@ -254,14 +255,15 @@ where
         + HasCurrentCorpusId
         + HasNamedMetadata
         + HasMetadata,
-    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+    E: Executor<EM, I, Z::Objective, S> + HasObservers<Observers = OT>,
     EM: EventFirer<I, S> + EventRestarter<S> + HasEventManagerId + ProgressReporter<S>,
     OT: ObserversTuple<I, S>,
     PS: PushStage<EM, I, OT, S, Z>,
     Z: ExecutesInput<E, EM, I, S>
         + ExecutionProcessor<EM, I, OT, S>
         + EvaluatorObservers<E, EM, I, OT>
-        + HasScheduler<I, S>,
+        + HasScheduler<I, S>
+        + HasObjective,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

@@ -55,7 +55,7 @@ where
     }
 }
 
-impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
+impl<EM, H, I, OF, OT, RT, S, TC> Executor<EM, I, OF, S>
     for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
 where
     H: FnMut(&I) -> ExitKind,
@@ -68,7 +68,7 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -92,7 +92,7 @@ where
                 }
             }
         }
-        let res = self.base.run_target(fuzzer, state, mgr, input);
+        let res = self.base.run_target(objective, state, mgr, input);
         if self.helper.stalker_enabled() {
             self.stalker.deactivate();
         }

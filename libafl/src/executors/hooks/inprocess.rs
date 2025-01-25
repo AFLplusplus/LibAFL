@@ -256,7 +256,7 @@ impl<I, S> InProcessHooks<I, S> {
     /// Create new [`InProcessHooks`].
     #[cfg(windows)]
     #[allow(unused_variables)] // for `exec_tmout` without `std`
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF>(exec_tmout: Duration) -> Result<Self, Error>
     where
         E: Executor<EM, I, OF, S> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
@@ -264,7 +264,6 @@ impl<I, S> InProcessHooks<I, S> {
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
     {
         let ret;
         #[cfg(feature = "std")]
@@ -276,7 +275,6 @@ impl<I, S> InProcessHooks<I, S> {
                 I,
                 OF,
                 S,
-                Z,
             >();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
@@ -287,7 +285,6 @@ impl<I, S> InProcessHooks<I, S> {
                     I,
                     OF,
                     S,
-                    Z,
                 > as *const _;
             let timeout_handler =
                 crate::executors::hooks::windows::windows_exception_handler::inproc_timeout_handler::<
@@ -296,7 +293,6 @@ impl<I, S> InProcessHooks<I, S> {
                     I,
                     OF,
                     S,
-                    Z,
                 > as *const c_void;
             let timer = TimerStruct::new(exec_tmout, timeout_handler);
             ret = Ok(Self {

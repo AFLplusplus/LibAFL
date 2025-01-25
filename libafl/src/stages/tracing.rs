@@ -224,9 +224,10 @@ where
 
 impl<E, EM, I, SOT, S, Z> ShadowTracingStage<E, EM, I, SOT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers,
+    E: Executor<EM, I, Z::Objective, S> + HasObservers,
     S: HasExecutions + HasCorpus<I>,
     SOT: ObserversTuple<I, S>,
+    Z: HasObjective,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {

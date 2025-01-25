@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<C, E, I, O, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
+impl<C, E, I, O, OF, S, T, TS> MapCorpusMinimizer<C, E, I, O, S, T, TS>
 where
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     C: AsRef<O>,

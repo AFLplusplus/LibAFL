@@ -26,7 +26,7 @@ use crate::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasObjective,
 };
 
 /// Default name for `SyncFromDiskStage`; derived from AFL++
@@ -233,7 +233,7 @@ impl<E, EM, I, IC, ICB, DI, S, SHM, SP, Z> Stage<E, EM, S, Z>
 where
     DI: Input,
     EM: EventFirer<I, S>,
-    E: HasObservers + Executor<EM, I, S, Z>,
+    E: HasObservers + Executor<EM, I, Z::Objective, S>,
     for<'a> E::Observers: Deserialize<'a>,
     I: Input + Clone,
     IC: InputConverter<From = I, To = DI>,
@@ -247,7 +247,7 @@ where
         + MaybeHasClientPerfMonitor,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
+    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S> + HasObjective,
 {
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
