@@ -235,7 +235,7 @@ where
     }
 }
 
-impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM> Executor<EM, I, S>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM> Executor<EM, I, OF, S>
     for QemuExecutor<'_, C, CM, ED, ET, H, I, OT, S, SM>
 where
     C: Clone,
@@ -296,7 +296,7 @@ where
 }
 
 pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> =
-    StatefulInProcessForkExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, SP>;
+    StatefulInProcessForkExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OF, OT, S, SP>;
 
 #[cfg(feature = "fork")]
 pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> {
@@ -366,7 +366,7 @@ where
     #[allow(clippy::type_complexity)]
     pub fn inner(
         &self,
-    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OF, OT, S, SM, SP> {
+    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> {
         &self.inner
     }
 

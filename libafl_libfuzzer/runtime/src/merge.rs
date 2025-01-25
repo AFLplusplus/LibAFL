@@ -97,6 +97,7 @@ pub fn merge(
         }
     }
 
+    #[allow(clippy::deref_addrof)]
     let edges = unsafe { core::mem::take(&mut *&raw mut COUNTERS_MAPS) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
