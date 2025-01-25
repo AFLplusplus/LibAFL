@@ -15,7 +15,6 @@ pub mod windows_asan_handler {
             ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
         state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -23,7 +22,7 @@ pub mod windows_asan_handler {
 
     /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, I, OF, S, Z>()
+    pub unsafe extern "C" fn asan_death_handler<E, EM, I, OF, S>()
     where
         E: Executor<EM, I, OF, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
@@ -31,7 +30,6 @@ pub mod windows_asan_handler {
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
     {
         let data = &raw mut GLOBAL_STATE;
         (*data).set_in_handler(true);
@@ -77,7 +75,7 @@ pub mod windows_asan_handler {
             }
 
             let state = (*data).state_mut::<S>();
-            let fuzzer = (*data).fuzzer_mut::<Z>();
+            let objective = (*data).objective_mut::<OF>();
             let event_mgr = (*data).event_mgr_mut::<EM>();
 
             log::error!("Child crashed!");
@@ -85,11 +83,11 @@ pub mod windows_asan_handler {
             // Make sure we don't crash in the crash handler forever.
             let input = (*data).take_current_input::<I>();
 
-            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+            run_observers_and_save_state::<E, EM, I, OF, S>(
                 executor,
                 state,
                 input,
-                fuzzer,
+                objective,
                 event_mgr,
                 ExitKind::Crash,
             );
@@ -132,7 +130,6 @@ pub mod windows_exception_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
         state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -179,7 +176,7 @@ pub mod windows_exception_handler {
     /// # Safety
     /// Well, exception handling is not safe
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
+    pub fn setup_panic_hook<E, EM, I, OF, S>()
     where
         E: Executor<EM, I, OF, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
@@ -187,7 +184,6 @@ pub mod windows_exception_handler {
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -213,16 +209,16 @@ pub mod windows_exception_handler {
                 // We are fuzzing!
                 let executor = (*data).executor_mut::<E>();
                 let state = (*data).state_mut::<S>();
-                let fuzzer = (*data).fuzzer_mut::<Z>();
+                let objective = (*data).objective_mut::<OF>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
                 let input = (*data).take_current_input::<I>();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S>(
                     executor,
                     state,
                     input,
-                    fuzzer,
+                    objective,
                     event_mgr,
                     ExitKind::Crash,
                 );
@@ -238,7 +234,7 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OF, S>(
         _p0: *mut u8,
         global_state: *mut c_void,
         _p1: *mut u8,
@@ -249,7 +245,6 @@ pub mod windows_exception_handler {
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -273,7 +268,7 @@ pub mod windows_exception_handler {
         if data.in_target == 1 {
             let executor = data.executor_mut::<E>();
             let state = data.state_mut::<S>();
-            let fuzzer = data.fuzzer_mut::<Z>();
+            let objective = data.objective_mut::<OF>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
             if data.current_input_ptr.is_null() {
@@ -284,11 +279,11 @@ pub mod windows_exception_handler {
                 let input = (data.current_input_ptr as *const I).as_ref().unwrap();
                 data.current_input_ptr = ptr::null_mut();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S>(
                     executor,
                     state,
                     input,
-                    fuzzer,
+                    objective,
                     event_mgr,
                     ExitKind::Timeout,
                 );
@@ -308,7 +303,7 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -318,7 +313,6 @@ pub mod windows_exception_handler {
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
@@ -393,7 +387,7 @@ pub mod windows_exception_handler {
             }
 
             let state = data.state_mut::<S>();
-            let fuzzer = data.fuzzer_mut::<Z>();
+            let objective = data.objective_mut::<OF>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
             if is_crash {
@@ -416,11 +410,11 @@ pub mod windows_exception_handler {
                     }
                     log::error!("{}", std::str::from_utf8(&bsod).unwrap());
                 }
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S>(
                     executor,
                     state,
                     input,
-                    fuzzer,
+                    objective,
                     event_mgr,
                     ExitKind::Crash,
                 );
