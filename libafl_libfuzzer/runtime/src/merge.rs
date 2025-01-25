@@ -159,7 +159,6 @@ pub fn merge(
         )
     }, Ok)?;
 
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
@@ -179,11 +178,13 @@ pub fn merge(
     let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
         observers,
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         options.timeout(),
     )?;
+
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
 
     // In case the corpus is empty (on first run) or crashed while loading, reset
     if state.must_load_initial_inputs() && !options.dirs().is_empty() {
