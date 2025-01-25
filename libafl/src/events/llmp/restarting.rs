@@ -47,6 +47,8 @@ use libafl_bolts::{
 use serde::{de::DeserializeOwned, Serialize};
 use typed_builder::TypedBuilder;
 
+#[cfg(feature = "share_objectives")]
+use crate::corpus::{Corpus, Testcase};
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
 #[cfg(all(unix, not(miri)))]
