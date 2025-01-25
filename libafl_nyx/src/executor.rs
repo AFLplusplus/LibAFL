@@ -38,7 +38,7 @@ impl NyxExecutor<(), ()> {
     }
 }
 
-impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for NyxExecutor<S, OT>
+impl<EM, I, OF, OT, S> Executor<EM, I, OF, S> for NyxExecutor<S, OT>
 where
     S: HasExecutions,
     I: HasTargetBytes,
@@ -46,7 +46,7 @@ where
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
