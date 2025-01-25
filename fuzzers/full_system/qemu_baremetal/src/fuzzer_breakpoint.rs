@@ -177,9 +177,6 @@ pub fn fuzz() {
         let scheduler =
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-        // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
         // Setup an havoc mutator with a mutational stage
         let mutator = StdScheduledMutator::new(havoc_mutations());
         let calibration_feedback = MaxMapFeedback::new(&edges_observer);
@@ -193,7 +190,7 @@ pub fn fuzz() {
             emu,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
+            &mut objective,
             &mut state,
             &mut mgr,
             timeout,
@@ -202,6 +199,9 @@ pub fn fuzz() {
 
         // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
         executor.break_on_timeout();
+
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         if state.must_load_initial_inputs() {
             state

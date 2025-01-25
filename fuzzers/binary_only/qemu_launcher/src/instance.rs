@@ -222,9 +222,6 @@ impl<M: Monitor> Instance<'_, M> {
                            _state: &mut _,
                            input: &BytesInput| harness.run(input);
 
-        // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
         if let Some(rerun_input) = &self.options.rerun_input {
             // TODO: We might want to support non-bytes inputs at some point?
             let bytes = fs::read(rerun_input)
@@ -235,11 +232,14 @@ impl<M: Monitor> Instance<'_, M> {
                 emulator,
                 &mut harness,
                 observers,
-                &mut fuzzer,
+                &mut objective,
                 &mut state,
                 &mut self.mgr,
                 self.options.timeout,
             )?;
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             executor
                 .run_target(&mut fuzzer, &mut state, &mut self.mgr, &input)
@@ -257,7 +257,7 @@ impl<M: Monitor> Instance<'_, M> {
                 emulator,
                 &mut harness,
                 observers,
-                &mut fuzzer,
+                &mut objective,
                 &mut state,
                 &mut self.mgr,
                 self.options.timeout,
@@ -267,6 +267,9 @@ impl<M: Monitor> Instance<'_, M> {
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             let tracing = ShadowTracingStage::new(&mut executor);
 
@@ -296,11 +299,14 @@ impl<M: Monitor> Instance<'_, M> {
                 emulator,
                 &mut harness,
                 observers,
-                &mut fuzzer,
+                &mut objective,
                 &mut state,
                 &mut self.mgr,
                 self.options.timeout,
             )?;
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // Setup an havoc mutator with a mutational stage
             let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));

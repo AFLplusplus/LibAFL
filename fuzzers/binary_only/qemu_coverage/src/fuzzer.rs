@@ -252,18 +252,19 @@ pub fn fuzz() {
         });
 
         let scheduler = QueueScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut executor = QemuExecutor::new(
             emulator,
             &mut harness,
             (),
-            &mut fuzzer,
+            &mut objective,
             &mut state,
             &mut mgr,
             options.timeout,
         )
         .expect("Failed to create QemuExecutor");
+
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         if state.must_load_initial_inputs() {
             state

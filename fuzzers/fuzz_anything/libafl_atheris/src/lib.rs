@@ -205,9 +205,6 @@ pub extern "C" fn LLVMFuzzerRunDriver(
             Duration::from_millis(timeout_ms),
         )?;
 
-        // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
         // Secondary harness due to mut ownership
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
@@ -220,10 +217,13 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         let tracing = TracingStage::new(InProcessExecutor::new(
             &mut harness,
             tuple_list!(cmplog_observer),
-            &mut fuzzer,
+            &mut objective,
             &mut state,
             &mut mgr,
         )?);
+
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // Setup a randomic Input2State stage
         let i2s =
