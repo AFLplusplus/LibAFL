@@ -10,7 +10,7 @@ use libafl_bolts::{rands::Rand, Error};
 use crate::{
     corpus::{Corpus, CorpusId},
     impl_default_multipart,
-    inputs::{multi::MultipartInput, HasMutatorBytes, Input},
+    inputs::{multi::MultipartInput, HasMutatorBytes, Input, ResizableMutator},
     mutators::{
         mutations::{
             rand_range, BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator,
@@ -118,9 +118,8 @@ impl_default_multipart!(
 
 impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator
 where
-    S: HasCorpus + HasMaxSize + HasRand,
-    I: Input + HasMutatorBytes,
-    S::Corpus: Corpus<Input = MultipartInput<I>>,
+    S: HasCorpus<MultipartInput<I>> + HasMaxSize + HasRand,
+    I: Input + ResizableMutator<u8> + HasMutatorBytes,
 {
     fn mutate(
         &mut self,
@@ -141,7 +140,7 @@ where
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
-                let other_size = input.parts()[choice].bytes().len();
+                let other_size = input.parts()[choice].mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -156,7 +155,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(id, part)| (id, part.bytes().len()));
+                    .map(|(id, part)| (id, part.mutator_bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let Some(nz) = NonZero::new(size) else {
@@ -187,7 +186,7 @@ where
                         size,
                         target,
                         range,
-                        chosen.bytes(),
+                        chosen.mutator_bytes(),
                     ));
                 }
 
@@ -205,7 +204,7 @@ where
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
 
-        let other_size = other.parts()[choice].bytes().len();
+        let other_size = other.parts()[choice].mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -218,7 +217,7 @@ where
                 .nth(part_choice % parts)
                 .unwrap();
             drop(other_testcase);
-            let size = part.bytes().len();
+            let size = part.mutator_bytes().len();
             let Some(nz) = NonZero::new(size) else {
                 return Ok(MutationResult::Skipped);
             };
@@ -241,7 +240,7 @@ where
                 size,
                 target,
                 range,
-                other.parts()[choice].bytes(),
+                other.parts()[choice].mutator_bytes(),
             ))
         } else {
             // just add it!
@@ -254,9 +253,8 @@ where
 
 impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator
 where
-    S: HasCorpus + HasMaxSize + HasRand,
-    I: Input + HasMutatorBytes,
-    S::Corpus: Corpus<Input = MultipartInput<I>>,
+    S: HasCorpus<MultipartInput<I>> + HasMaxSize + HasRand,
+    I: Input + ResizableMutator<u8> + HasMutatorBytes,
 {
     fn mutate(
         &mut self,
@@ -277,7 +275,7 @@ where
                 let choice = name_choice % input.names().len();
                 let name = input.names()[choice].clone();
 
-                let other_size = input.parts()[choice].bytes().len();
+                let other_size = input.parts()[choice].mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -292,7 +290,7 @@ where
                     .parts_by_name(&name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
-                    .map(|(id, part)| (id, part.bytes().len()));
+                    .map(|(id, part)| (id, part.mutator_bytes().len()));
 
                 if let Some((part_idx, size)) = maybe_size {
                     let Some(nz) = NonZero::new(size) else {
@@ -318,7 +316,12 @@ where
                         }
                     };
 
-                    return Ok(Self::crossover_replace(part, target, range, chosen.bytes()));
+                    return Ok(Self::crossover_replace(
+                        part,
+                        target,
+                        range,
+                        chosen.mutator_bytes(),
+                    ));
                 }
 
                 return Ok(MutationResult::Skipped);
@@ -335,7 +338,7 @@ where
         let choice = name_choice % other.names().len();
         let name = &other.names()[choice];
 
-        let other_size = other.parts()[choice].bytes().len();
+        let other_size = other.parts()[choice].mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -348,7 +351,7 @@ where
                 .nth(part_choice % parts)
                 .unwrap();
             drop(other_testcase);
-            let size = part.bytes().len();
+            let size = part.mutator_bytes().len();
             let Some(nz) = NonZero::new(size) else {
                 return Ok(MutationResult::Skipped);
             };
@@ -369,7 +372,7 @@ where
                 part,
                 target,
                 range,
-                other.parts()[choice].bytes(),
+                other.parts()[choice].mutator_bytes(),
             ))
         } else {
             // just add it!

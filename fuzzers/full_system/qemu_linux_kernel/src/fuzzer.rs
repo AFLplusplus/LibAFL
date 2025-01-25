@@ -3,6 +3,8 @@
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
+#[cfg(not(feature = "nyx"))]
+use libafl::state::HasExecutions;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
@@ -10,12 +12,9 @@ use libafl::{
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::BytesInput,
+    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
-        I2SRandReplaceBinonly,
-    },
+    mutators::{havoc_mutations, scheduled::StdScheduledMutator, I2SRandReplaceBinonly},
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
@@ -30,19 +29,84 @@ use libafl_bolts::{
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
 };
+#[cfg(feature = "nyx")]
+use libafl_qemu::{command::nyx::NyxCommandManager, NyxEmulatorDriver};
+#[cfg(not(feature = "nyx"))]
+use libafl_qemu::{
+    command::StdCommandManager, modules::utils::filters::LINUX_PROCESS_ADDRESS_RANGE,
+    StdEmulatorDriver,
+};
 use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
-        cmplog::CmpLogObserver,
-        edges::{
-            edges_map_mut_ptr, StdEdgeCoverageClassicModule, EDGES_MAP_ALLOCATED_SIZE,
-            MAX_EDGES_FOUND,
-        },
-        CmpLogModule,
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
+        utils::filters::HasAddressFilterTuples, CmpLogModule, EmulatorModuleTuple,
     },
-    // StdEmulatorDriver
+    FastSnapshotManager, NopSnapshotManager, QemuInitError,
 };
+use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_DEFAULT_SIZE, MAX_EDGES_FOUND};
+
+#[cfg(feature = "nyx")]
+fn get_emulator<C, ET, I, S>(
+    args: Vec<String>,
+    modules: ET,
+) -> Result<
+    Emulator<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, NopSnapshotManager>,
+    QemuInitError,
+>
+where
+    ET: EmulatorModuleTuple<I, S>,
+    I: HasTargetBytes + Unpin,
+    S: Unpin,
+{
+    Emulator::empty()
+        .qemu_parameters(args)
+        .modules(modules)
+        .driver(NyxEmulatorDriver::builder().build())
+        .command_manager(NyxCommandManager::default())
+        .snapshot_manager(NopSnapshotManager::default())
+        .build()
+}
+
+#[cfg(not(feature = "nyx"))]
+fn get_emulator<C, ET, I, S>(
+    args: Vec<String>,
+    mut modules: ET,
+) -> Result<
+    Emulator<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, FastSnapshotManager>,
+    QemuInitError,
+>
+where
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
+    I: HasTargetBytes + Unpin,
+    S: HasExecutions + Unpin,
+{
+    // Allow linux process address space addresses as feedback
+    modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);
+
+    Emulator::builder()
+        .qemu_parameters(args)
+        .modules(modules)
+        .build()
+}
+
+#[allow(unused)]
+fn display_args() {
+    let args: Vec<String> = env::args().collect();
+
+    let mut arg_str = String::new();
+    for arg in args {
+        arg_str.push_str(&arg);
+        arg_str.push_str(" \\\n\t");
+    }
+    arg_str.pop();
+    arg_str.pop();
+    arg_str.pop();
+
+    log::info!("QEMU args:");
+    log::info!("\n{arg_str}");
+}
 
 pub fn fuzz() {
     env_logger::init();
@@ -61,39 +125,34 @@ pub fn fuzz() {
         // Initialize QEMU
         let args: Vec<String> = env::args().collect();
 
+        // Create an observation channel using the coverage map
+        let mut edges_observer = unsafe {
+            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+                "edges",
+                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_DEFAULT_SIZE),
+                &raw mut MAX_EDGES_FOUND,
+            ))
+            .track_indices()
+        };
+
         // Choose modules to use
         let modules = tuple_list!(
-            StdEdgeCoverageClassicModule::builder().build(),
+            StdEdgeCoverageClassicModule::builder()
+                .map_observer(edges_observer.as_mut())
+                .build()?,
             CmpLogModule::default(),
         );
 
-        // let driver = StdEmulatorDriver::builder()
-        //     .print_commands(true)
-        //     .build();
-
-        let emu = Emulator::builder()
-            .qemu_cli(args)
-            .modules(modules)
-            // .driver(driver)
-            .build()?;
+        let emu = get_emulator(args, modules)?;
 
         let devices = emu.list_devices();
         println!("Devices = {:?}", devices);
 
         // The wrapped harness function, calling out to the LLVM-style harness
-        let mut harness =
-            |emulator: &mut Emulator<_, _, _, _, _>, state: &mut _, input: &BytesInput| unsafe {
-                emulator.run(state, input).unwrap().try_into().unwrap()
-            };
-
-        // Create an observation channel using the coverage map
-        let edges_observer = unsafe {
-            HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
-                "edges",
-                OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
-                &raw mut MAX_EDGES_FOUND,
-            ))
-            .track_indices()
+        let mut harness = |emulator: &mut Emulator<_, _, _, _, _, _, _>,
+                           state: &mut _,
+                           input: &BytesInput| unsafe {
+            emulator.run(state, input).unwrap().try_into().unwrap()
         };
 
         // Create an observation channel to keep track of the execution time

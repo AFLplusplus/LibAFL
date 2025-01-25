@@ -28,9 +28,9 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
-    events::EventFirer,
+    events::{Event, EventFirer},
     executors::HasObservers,
-    inputs::UsesInput,
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
@@ -39,6 +39,7 @@ use crate::{
     std::string::ToString,
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };
+
 /// AFL++'s default stats update interval
 pub const AFL_FUZZER_STATS_UPDATE_INTERVAL_SECS: u64 = 60;
 
@@ -78,9 +79,9 @@ libafl_bolts::impl_serdeany!(FuzzTime);
 /// The [`AflStatsStage`] is a Stage that calculates and writes
 /// AFL++'s `fuzzer_stats` and `plot_data` information.
 #[derive(Debug, Clone)]
-pub struct AflStatsStage<C, E, EM, O, S, Z> {
+pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
     map_observer_handle: Handle<C>,
-    stats_file_path: PathBuf,
+    stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     start_time: u64,
     // the number of testcases that have been fuzzed
@@ -117,7 +118,7 @@ pub struct AflStatsStage<C, E, EM, O, S, Z> {
     autotokens_enabled: bool,
     /// The core we are bound to
     core_id: CoreId,
-    phantom_data: PhantomData<(O, E, EM, S, Z)>,
+    phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -239,20 +240,20 @@ pub struct AFLPlotData<'a> {
     edges_found: &'a u64,
 }
 
-impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, I, O, S, Z>
 where
+    C: AsRef<O> + Named,
     E: HasObservers,
-    EM: EventFirer + UsesState<State = S>,
-    Z: HasScheduler<<S::Corpus as Corpus>::Input, S>,
+    EM: EventFirer<I, S> + UsesState<State = S>,
+    Z: HasScheduler<I, S>,
     S: HasImported
-        + HasCorpus
+        + HasCorpus<I>
         + HasMetadata
         + HasStartTime
         + HasExecutions
         + HasNamedMetadata
         + Stoppable
-        + HasCurrentCorpusId
-        + UsesInput,
+        + HasCurrentCorpusId,
     E::Observers: MatchNameRef,
     O: MapObserver,
     C: AsRef<O> + Named,
@@ -264,7 +265,7 @@ where
         fuzzer: &mut Z,
         executor: &mut E,
         state: &mut S,
-        _manager: &mut EM,
+        manager: &mut EM,
     ) -> Result<(), Error> {
         let Some(corpus_idx) = state.current_corpus_id()? else {
             return Err(Error::illegal_state(
@@ -386,6 +387,7 @@ where
             execs_since_crash: total_executions - self.execs_at_last_objective,
             exec_timeout: self.exec_timeout,
             slowest_exec_ms: self.slowest_exec.as_millis(),
+            // TODO: getting rss_mb may take some extra millis, so might make sense to make this optional
             #[cfg(unix)]
             peak_rss_mb: peak_rss_mb_child_processes()?,
             #[cfg(not(unix))]
@@ -419,10 +421,36 @@ where
             saved_crashes: &stats.saved_crashes,
             execs_done: &stats.execs_done,
         };
-        self.write_fuzzer_stats(&stats)?;
+        self.maybe_write_fuzzer_stats(&stats)?;
         if self.plot_file_path.is_some() {
             self.write_plot_data(&plot_data)?;
         }
+
+        drop(testcase);
+
+        // We construct this simple json by hand to squeeze out some extra speed.
+        let json = format!(
+            "{{\
+                \"pending\":{},\
+                \"pending_fav\":{},\
+                \"own_finds:\"{},\
+                \"imported\":{}\
+            }}",
+            stats.pending_total, stats.pending_favs, stats.corpus_found, stats.corpus_imported
+        );
+
+        manager.fire(
+            state,
+            Event::UpdateUserStats {
+                name: Cow::Borrowed("AflStats"),
+                value: UserStats::new(
+                    UserStatsValue::String(Cow::Owned(json)),
+                    AggregatorOps::None,
+                ),
+                phantom: PhantomData,
+            },
+        )?;
+
         Ok(())
     }
 
@@ -435,29 +463,31 @@ where
     }
 }
 
-impl<C, E, EM, O, S, Z> AflStatsStage<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> AflStatsStage<C, E, EM, I, O, S, Z>
 where
     E: HasObservers,
-    EM: EventFirer,
-    S: HasImported + HasCorpus + HasMetadata + HasExecutions,
+    EM: EventFirer<I, S>,
+    S: HasImported + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
     O: MapObserver,
 {
     /// Builder for `AflStatsStage`
     #[must_use]
-    pub fn builder() -> AflStatsStageBuilder<C, E, EM, O, S, Z> {
+    pub fn builder() -> AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
         AflStatsStageBuilder::new()
     }
 
-    fn write_fuzzer_stats(&self, stats: &AFLFuzzerStats) -> Result<(), Error> {
-        let tmp_file = self
-            .stats_file_path
-            .parent()
-            .expect("fuzzer_stats file must have a parent!")
-            .join(".fuzzer_stats_tmp");
-        std::fs::write(&tmp_file, stats.to_string())?;
-        _ = std::fs::copy(&tmp_file, &self.stats_file_path)?;
-        std::fs::remove_file(tmp_file)?;
+    /// Writes a stats file, if a `stats_file_path` is set.
+    fn maybe_write_fuzzer_stats(&self, stats: &AFLFuzzerStats) -> Result<(), Error> {
+        if let Some(stats_file_path) = &self.stats_file_path {
+            let tmp_file = stats_file_path
+                .parent()
+                .expect("fuzzer_stats file must have a parent!")
+                .join(".fuzzer_stats_tmp");
+            std::fs::write(&tmp_file, stats.to_string())?;
+            _ = std::fs::copy(&tmp_file, stats_file_path)?;
+            std::fs::remove_file(tmp_file)?;
+        }
         Ok(())
     }
 
@@ -471,13 +501,13 @@ where
         Ok(())
     }
 
-    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
+    fn maybe_update_is_favored_size(&mut self, testcase: &Testcase<I>) {
         if testcase.has_metadata::<IsFavoredMetadata>() {
             self.is_favored_size += 1;
         }
     }
 
-    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
+    fn maybe_update_slowest_exec(&mut self, testcase: &Testcase<I>) {
         if let Some(exec_time) = testcase.exec_time() {
             if exec_time > &self.slowest_exec {
                 self.slowest_exec = *exec_time;
@@ -489,7 +519,7 @@ where
         self.has_fuzzed_size += 1;
     }
 
-    fn maybe_update_max_depth(&mut self, testcase: &Testcase<<S::Corpus as Corpus>::Input>) {
+    fn maybe_update_max_depth(&mut self, testcase: &Testcase<I>) {
         if let Ok(metadata) = testcase.metadata::<SchedulerTestcaseMetadata>() {
             if metadata.depth() > self.max_depth {
                 self.max_depth = metadata.depth();
@@ -502,11 +532,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_crash(
-        &mut self,
-        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
-        state: &S,
-    ) {
+    fn maybe_update_last_crash(&mut self, testcase: &Testcase<I>, state: &S) {
         #[cfg(feature = "track_hit_feedbacks")]
         if testcase
             .hit_objectives()
@@ -518,11 +544,7 @@ where
     }
 
     #[cfg(feature = "track_hit_feedbacks")]
-    fn maybe_update_last_hang(
-        &mut self,
-        testcase: &Testcase<<S::Corpus as Corpus>::Input>,
-        state: &S,
-    ) {
+    fn maybe_update_last_hang(&mut self, testcase: &Testcase<I>, state: &S) {
         if testcase
             .hit_objectives()
             .contains(&Cow::Borrowed(TIMEOUT_FEEDBACK_NAME))
@@ -578,8 +600,8 @@ impl Display for AFLPlotData<'_> {
     }
 }
 impl AFLPlotData<'_> {
-    fn get_header() -> String {
-        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found".to_string()
+    fn header() -> &'static str {
+        "# relative_time, cycles_done, cur_item, corpus_count, pending_total, pending_favs, total_edges, saved_crashes, saved_hangs, max_depth, execs_per_sec, execs_done, edges_found"
     }
 }
 impl Display for AFLFuzzerStats<'_> {
@@ -644,7 +666,7 @@ pub fn get_run_cmdline() -> Cow<'static, str> {
 
 /// The Builder for `AflStatsStage`
 #[derive(Debug)]
-pub struct AflStatsStageBuilder<C, E, EM, O, S, Z> {
+pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
     stats_file_path: Option<PathBuf>,
     plot_file_path: Option<PathBuf>,
     core_id: Option<CoreId>,
@@ -656,16 +678,16 @@ pub struct AflStatsStageBuilder<C, E, EM, O, S, Z> {
     banner: String,
     version: String,
     target_mode: String,
-    phantom_data: PhantomData<(O, E, EM, S, Z)>,
+    phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
 }
 
-impl<C, E, EM, O, S, Z> AflStatsStageBuilder<C, E, EM, O, S, Z>
+impl<C, E, EM, I, O, S, Z> AflStatsStageBuilder<C, E, EM, I, O, S, Z>
 where
-    E: HasObservers,
-    EM: EventFirer,
-    S: HasImported + HasCorpus + HasMetadata + HasExecutions,
     C: AsRef<O> + Named,
+    E: HasObservers,
+    EM: EventFirer<I, S>,
     O: MapObserver,
+    S: HasImported + HasMetadata + HasExecutions,
 {
     fn new() -> Self {
         Self {
@@ -757,10 +779,10 @@ where
             // check if it contains any data
             let file = File::open(path)?;
             if BufReader::new(file).lines().next().is_none() {
-                std::fs::write(path, AFLPlotData::get_header())?;
+                std::fs::write(path, AFLPlotData::header())?;
             }
         } else {
-            std::fs::write(path, AFLPlotData::get_header())?;
+            std::fs::write(path, AFLPlotData::header())?;
         }
         Ok(())
     }
@@ -777,20 +799,19 @@ where
     /// Cannot create the plot file (if provided)
     /// No `MapObserver` supplied to the builder
     /// No `stats_file_path` provieded
-    pub fn build(self) -> Result<AflStatsStage<C, E, EM, O, S, Z>, Error> {
-        if self.stats_file_path.is_none() {
-            return Err(Error::illegal_argument("Must set `stats_file_path`"));
-        }
-        let stats_file_path = self.stats_file_path.unwrap();
+    #[allow(clippy::type_complexity)]
+    pub fn build(self) -> Result<AflStatsStage<C, E, EM, I, O, S, Z>, Error> {
         if self.map_observer_handle.is_none() {
             return Err(Error::illegal_argument("Must set `map_observer`"));
         }
         if let Some(ref plot_file) = self.plot_file_path {
             Self::create_plot_data_file(plot_file)?;
         }
-        Self::create_fuzzer_stats_file(&stats_file_path)?;
+        if let Some(stats_file_path) = &self.stats_file_path {
+            Self::create_fuzzer_stats_file(stats_file_path)?;
+        }
         Ok(AflStatsStage {
-            stats_file_path,
+            stats_file_path: self.stats_file_path,
             plot_file_path: self.plot_file_path,
             map_observer_handle: self.map_observer_handle.unwrap(),
             start_time: current_time().as_secs(),

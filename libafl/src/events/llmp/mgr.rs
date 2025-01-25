@@ -1,13 +1,15 @@
-//! An [`crate::events::EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
+//! An event manager that forwards all events to other attached fuzzers on shared maps or via tcp,
 //! using low-level message passing, [`libafl_bolts::llmp`].
 
 #[cfg(feature = "std")]
 use alloc::string::ToString;
-use alloc::{boxed::Box, vec::Vec};
-use core::{marker::PhantomData, time::Duration};
+use alloc::vec::Vec;
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::TcpStream;
 
+#[cfg(feature = "std")]
+use libafl_bolts::tuples::MatchNameRef;
 #[cfg(feature = "llmp_compression")]
 use libafl_bolts::{
     compress::GzipCompressor,
@@ -16,7 +18,7 @@ use libafl_bolts::{
 use libafl_bolts::{
     current_time,
     llmp::{LlmpClient, LlmpClientDescription, LLMP_FLAG_FROM_MM},
-    shmem::{NopShMemProvider, ShMemProvider},
+    shmem::{NopShMem, ShMem, ShMemProvider},
     tuples::Handle,
     ClientId,
 };
@@ -25,47 +27,49 @@ use libafl_bolts::{
     llmp::{recv_tcp_msg, send_tcp_msg, TcpRequest, TcpResponse},
     IP_LOCALHOST,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
+#[cfg(feature = "share_objectives")]
+use crate::corpus::{Corpus, Testcase};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
+#[cfg(feature = "std")]
+use crate::events::{serialize_observers_adaptive, CanSerializeObserver};
 use crate::{
-    corpus::Corpus,
     events::{
         llmp::{LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER},
-        AdaptiveSerializer, CustomBufEventResult, CustomBufHandlerFn, Event, EventConfig,
-        EventFirer, EventManager, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
+        std_maybe_report_progress, std_on_restart, std_report_progress, AdaptiveSerializer,
+        AwaitRestartSafe, Event, EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter, SendExiting,
     },
-    executors::{Executor, HasObservers},
-    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
-    inputs::{NopInput, UsesInput},
-    observers::{ObserversTuple, TimeObserver},
-    state::{HasCorpus, HasExecutions, HasImported, HasLastReportTime, NopState, State, UsesState},
+    executors::HasObservers,
+    fuzzer::{EvaluatorObservers, ExecutionProcessor},
+    inputs::Input,
+    observers::TimeObserver,
+    stages::HasCurrentStageId,
+    state::{
+        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
+        MaybeHasClientPerfMonitor, Stoppable,
+    },
     Error, HasMetadata,
 };
 
 /// Default initial capacity of the event buffer - 4KB
 const INITIAL_EVENT_BUFFER_SIZE: usize = 1024 * 4;
 
-/// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
+/// An `EventManager` that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, `llmp`.
-pub struct LlmpEventManager<EMH, S, SP>
+pub struct LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    S: State,
-    SP: ShMemProvider,
+    SHM: ShMem,
 {
     /// We only send 1 testcase for every `throttle` second
     pub(crate) throttle: Option<Duration>,
-    /// Treat the incoming testcase as interesting always without evaluating them
-    always_interesting: bool,
     /// We sent last message at `last_sent`
     last_sent: Duration,
     hooks: EMH,
     /// The LLMP client for inter process communication
-    llmp: LlmpClient<SP>,
-    /// The custom buf handler
-    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
+    llmp: LlmpClient<SHM, SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     /// The configuration defines this specific fuzzer.
@@ -77,11 +81,11 @@ where
     serializations_cnt: usize,
     should_serialize_cnt: usize,
     pub(crate) time_ref: Option<Handle<TimeObserver>>,
-    phantom: PhantomData<S>,
     event_buffer: Vec<u8>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl LlmpEventManager<(), NopState<NopInput>, NopShMemProvider> {
+impl LlmpEventManager<(), (), (), NopShMem, ()> {
     /// Creates a builder for [`LlmpEventManager`]
     #[must_use]
     pub fn builder() -> LlmpEventManagerBuilder<()> {
@@ -94,7 +98,6 @@ impl LlmpEventManager<(), NopState<NopInput>, NopShMemProvider> {
 pub struct LlmpEventManagerBuilder<EMH> {
     throttle: Option<Duration>,
     hooks: EMH,
-    always_interesting: bool,
 }
 
 impl Default for LlmpEventManagerBuilder<()> {
@@ -110,7 +113,6 @@ impl LlmpEventManagerBuilder<()> {
         Self {
             throttle: None,
             hooks: (),
-            always_interesting: false,
         }
     }
 
@@ -119,17 +121,6 @@ impl LlmpEventManagerBuilder<()> {
         LlmpEventManagerBuilder {
             throttle: self.throttle,
             hooks,
-            always_interesting: self.always_interesting,
-        }
-    }
-
-    /// Set `always_interesting`
-    #[must_use]
-    pub fn always_interesting(self, always_interesting: bool) -> LlmpEventManagerBuilder<()> {
-        LlmpEventManagerBuilder {
-            throttle: self.throttle,
-            hooks: self.hooks,
-            always_interesting,
         }
     }
 }
@@ -143,21 +134,19 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     }
 
     /// Create a manager from a raw LLMP client
-    pub fn build_from_client<S, SP>(
+    pub fn build_from_client<I, S, SHM, SP>(
         self,
-        llmp: LlmpClient<SP>,
+        llmp: LlmpClient<SHM, SP>,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider,
-        S: State,
+        SHM: ShMem,
     {
         Ok(LlmpEventManager {
             throttle: self.throttle,
             last_sent: Duration::from_secs(0),
             hooks: self.hooks,
-            always_interesting: self.always_interesting,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -167,120 +156,78 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
             serializations_cnt: 0,
             should_serialize_cnt: 0,
             time_ref,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
             event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
+            phantom: PhantomData,
         })
     }
 
     /// Create an LLMP event manager on a port.
     /// It expects a broker to exist on this port.
     #[cfg(feature = "std")]
-    pub fn build_on_port<S, SP>(
+    pub fn build_on_port<I, S, SHM, SP>(
         self,
         shmem_provider: SP,
         port: u16,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider,
-        S: State,
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Ok(LlmpEventManager {
-            throttle: self.throttle,
-            last_sent: Duration::from_secs(0),
-            hooks: self.hooks,
-            always_interesting: self.always_interesting,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            configuration,
-            serialization_time: Duration::ZERO,
-            deserialization_time: Duration::ZERO,
-            serializations_cnt: 0,
-            should_serialize_cnt: 0,
-            time_ref,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-            event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
-        })
+        Self::build_from_client(self, llmp, configuration, time_ref)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
     /// stored by [`LlmpClient::to_env()`].
     #[cfg(feature = "std")]
-    pub fn build_existing_client_from_env<S, SP>(
+    pub fn build_existing_client_from_env<I, S, SHM, SP>(
         self,
         shmem_provider: SP,
         env_name: &str,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider,
-        S: State,
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
-        Ok(LlmpEventManager {
-            throttle: self.throttle,
-            last_sent: Duration::from_secs(0),
-            hooks: self.hooks,
-            always_interesting: self.always_interesting,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            configuration,
-            serialization_time: Duration::ZERO,
-            deserialization_time: Duration::ZERO,
-            serializations_cnt: 0,
-            should_serialize_cnt: 0,
-            time_ref,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-            event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
-        })
+        Self::build_from_client(self, llmp, configuration, time_ref)
     }
 
     /// Create an existing client from description
-    pub fn build_existing_client_from_description<S, SP>(
+    pub fn build_existing_client_from_description<I, S, SHM, SP>(
         self,
         shmem_provider: SP,
         description: &LlmpClientDescription,
         configuration: EventConfig,
         time_ref: Option<Handle<TimeObserver>>,
-    ) -> Result<LlmpEventManager<EMH, S, SP>, Error>
+    ) -> Result<LlmpEventManager<EMH, I, S, SHM, SP>, Error>
     where
-        SP: ShMemProvider,
-        S: State,
+        SHM: ShMem,
+        SP: ShMemProvider<ShMem = SHM>,
     {
         let llmp = LlmpClient::existing_client_from_description(shmem_provider, description)?;
-        Ok(LlmpEventManager {
-            throttle: self.throttle,
-            last_sent: Duration::from_secs(0),
-            hooks: self.hooks,
-            always_interesting: self.always_interesting,
-            llmp,
-            #[cfg(feature = "llmp_compression")]
-            compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
-            configuration,
-            serialization_time: Duration::ZERO,
-            deserialization_time: Duration::ZERO,
-            serializations_cnt: 0,
-            should_serialize_cnt: 0,
-            time_ref,
-            phantom: PhantomData,
-            custom_buf_handlers: vec![],
-            event_buffer: Vec::with_capacity(INITIAL_EVENT_BUFFER_SIZE),
-        })
+        Self::build_from_client(self, llmp, configuration, time_ref)
     }
 }
 
-impl<EMH, S, SP> AdaptiveSerializer for LlmpEventManager<EMH, S, SP>
+#[cfg(feature = "std")]
+impl<EMH, I, S, OT, SHM, SP> CanSerializeObserver<OT> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider,
-    S: State,
+    OT: MatchNameRef + Serialize,
+    SHM: ShMem,
+{
+    fn serialize_observers(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error> {
+        serialize_observers_adaptive::<Self, OT>(self, observers, 2, 80)
+    }
+}
+
+impl<EMH, I, S, SHM, SP> AdaptiveSerializer for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
 {
     fn serialization_time(&self) -> Duration {
         self.serialization_time
@@ -313,10 +260,10 @@ where
     }
 }
 
-impl<EMH, S, SP> core::fmt::Debug for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> Debug for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider,
-    S: State,
+    SHM: ShMem,
+    SP: Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventManager");
@@ -326,15 +273,13 @@ where
         let debug = debug.field("compressor", &self.compressor);
         debug
             .field("configuration", &self.configuration)
-            .field("phantom", &self.phantom)
             .finish_non_exhaustive()
     }
 }
 
-impl<EMH, S, SP> Drop for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> Drop for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    SP: ShMemProvider,
-    S: State,
+    SHM: ShMem,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -342,10 +287,9 @@ where
     }
 }
 
-impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    S: State,
-    SP: ShMemProvider,
+    SHM: ShMem,
 {
     /// Calling this function will tell the llmp broker that this client is exiting
     /// This should be called from the restarter not from the actual fuzzer client
@@ -379,13 +323,18 @@ where
         log::debug!("Asking he broker to be disconnected");
         Ok(())
     }
+}
 
+impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
     /// Describe the client event manager's LLMP parts in a restorable fashion
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
         self.llmp.describe()
     }
 
-    /// Write the config for a client [`EventManager`] to env vars, a new
+    /// Write the config for a client `EventManager` to env vars, a new
     /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
@@ -393,12 +342,9 @@ where
     }
 }
 
-impl<EMH, S, SP> LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
-    S::Corpus: Corpus<Input = S::Input>,
-    SP: ShMemProvider,
+    SHM: ShMem,
 {
     // Handle arriving events in the client
     fn handle_in_client<E, Z>(
@@ -407,17 +353,17 @@ where
         executor: &mut E,
         state: &mut S,
         client_id: ClientId,
-        event: Event<S::Input>,
+        event: Event<I>,
     ) -> Result<(), Error>
     where
-        E: Executor<Self, Z, State = S> + HasObservers,
-        E::Observers: ObserversTuple<S::Input, S> + Serialize,
-        for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-            + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
-            + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
+        S: HasImported + HasSolutions<I> + HasCurrentTestcase<I> + Stoppable,
+        EMH: EventManagerHooksTuple<I, S>,
+        I: Input,
+        E: HasObservers,
+        E::Observers: DeserializeOwned,
+        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
-        println!("Got event in client: {} from {:?}", event.name(), client_id);
+        log::trace!("Got event in client: {} from {client_id:?}", event.name());
         if !self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
         }
@@ -435,46 +381,39 @@ where
                 #[cfg(feature = "std")]
                 log::debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
 
-                if self.always_interesting {
-                    let item = fuzzer.add_input(state, executor, self, input)?;
-                    log::debug!("Added received Testcase as item #{item}");
-                } else {
-                    let res = if client_config.match_with(&self.configuration)
-                        && observers_buf.is_some()
+                let res = if client_config.match_with(&self.configuration)
+                    && observers_buf.is_some()
+                {
+                    let start = current_time();
+                    let observers: E::Observers =
+                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                     {
-                        let start = current_time();
-                        let observers: E::Observers =
-                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                        {
-                            self.deserialization_time = current_time() - start;
-                        }
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_with_observers += 1;
-                        }
-                        fuzzer
-                            .evaluate_execution(state, self, input, &observers, &exit_kind, false)?
-                    } else {
-                        #[cfg(feature = "scalability_introspection")]
-                        {
-                            state.scalability_monitor_mut().testcase_without_observers += 1;
-                        }
-                        fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
-                    };
-                    if let Some(item) = res.1 {
-                        *state.imported_mut() += 1;
-                        log::debug!("Added received Testcase {evt_name} as item #{item}");
-                    } else {
-                        log::debug!("Testcase {evt_name} was discarded");
+                        self.deserialization_time = current_time() - start;
                     }
+                    fuzzer.evaluate_execution(state, self, input, &observers, &exit_kind, false)?
+                } else {
+                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
+                };
+                if let Some(item) = res.1 {
+                    *state.imported_mut() += 1;
+                    log::debug!("Added received Testcase {evt_name} as item #{item}");
+                } else {
+                    log::debug!("Testcase {evt_name} was discarded");
                 }
             }
-            Event::CustomBuf { tag, buf } => {
-                for handler in &mut self.custom_buf_handlers {
-                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
-                        break;
-                    }
+
+            #[cfg(feature = "share_objectives")]
+            Event::Objective { input, .. } => {
+                log::debug!("Received new Objective");
+                let mut testcase = Testcase::from(input);
+                testcase.set_parent_id_optional(*state.corpus().current());
+
+                if let Ok(mut tc) = state.current_testcase_mut() {
+                    tc.found_objective();
                 }
+
+                state.solutions_mut().add(testcase)?;
+                log::info!("Added received Objective to Corpus");
             }
             Event::Stop => {
                 state.request_stop();
@@ -492,7 +431,11 @@ where
     }
 }
 
-impl<EMH, S: State, SP: ShMemProvider> LlmpEventManager<EMH, S, SP> {
+impl<EMH, I, S, SHM, SP> LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
     /// Send information that this client is exiting.
     /// The other side may free up all allocated memory.
     /// We are no longer allowed to send anything afterwards.
@@ -501,31 +444,13 @@ impl<EMH, S: State, SP: ShMemProvider> LlmpEventManager<EMH, S, SP> {
     }
 }
 
-impl<EMH, S, SP> UsesState for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> EventFirer<I, S> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    S: State,
-    SP: ShMemProvider,
+    I: Serialize,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
-    type State = S;
-}
-
-impl<EMH, S, SP> EventFirer for LlmpEventManager<EMH, S, SP>
-where
-    S: State,
-    SP: ShMemProvider,
-{
-    fn should_send(&self) -> bool {
-        if let Some(throttle) = self.throttle {
-            current_time() - self.last_sent > throttle
-        } else {
-            true
-        }
-    }
-    fn fire(
-        &mut self,
-        _state: &mut Self::State,
-        event: Event<<Self::State as UsesInput>::Input>,
-    ) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         #[cfg(feature = "llmp_compression")]
         let flags = LLMP_FLAG_INITIALIZED;
 
@@ -565,34 +490,48 @@ where
         #[cfg(not(feature = "llmp_compression"))]
         {
             self.llmp
-                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len]);
+                .send_buf(LLMP_TAG_EVENT_TO_BOTH, &self.event_buffer[..written_len])?;
         }
 
         self.last_sent = current_time();
         Ok(())
     }
-    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Option<Vec<u8>>, Error>
-    where
-        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
-    {
-        const SERIALIZE_TIME_FACTOR: u32 = 2;
-        const SERIALIZE_PERCENTAGE_THRESHOLD: usize = 80;
-        self.serialize_observers_adaptive(
-            observers,
-            SERIALIZE_TIME_FACTOR,
-            SERIALIZE_PERCENTAGE_THRESHOLD,
-        )
-    }
-
     fn configuration(&self) -> EventConfig {
         self.configuration
     }
+
+    fn should_send(&self) -> bool {
+        if let Some(throttle) = self.throttle {
+            current_time() - self.last_sent > throttle
+        } else {
+            true
+        }
+    }
 }
 
-impl<EMH, S, SP> EventRestarter for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> EventRestarter<S> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    S: State,
-    SP: ShMemProvider,
+    S: HasCurrentStageId,
+    SHM: ShMem,
+{
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        std_on_restart(self, state)
+    }
+}
+
+impl<EMH, I, S, SHM, SP> SendExiting for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    fn send_exiting(&mut self) -> Result<(), Error> {
+        self.llmp.sender_mut().send_exiting()
+    }
+}
+
+impl<EMH, I, S, SHM, SP> AwaitRestartSafe for LlmpEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
 {
     /// The LLMP client needs to wait until a broker has mapped all pages before shutting down.
     /// Otherwise, the OS may already have removed the shared maps.
@@ -602,37 +541,31 @@ where
     }
 }
 
-impl<E, EMH, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<EMH, S, SP>
+impl<E, EMH, I, S, SHM, SP, Z> EventProcessor<E, S, Z> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasImported + HasCorpus,
-    S::Corpus: Corpus<Input = S::Input>,
-    SP: ShMemProvider,
-    E: HasObservers + Executor<Self, Z, State = S>,
-    E::Observers: ObserversTuple<S::Input, S> + Serialize,
-    for<'a> E::Observers: Deserialize<'a>,
-    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
-        + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
+    E: HasObservers,
+    E::Observers: DeserializeOwned,
+    EMH: EventManagerHooksTuple<I, S>,
+    I: DeserializeOwned + Input,
+    S: HasImported + HasSolutions<I> + HasCurrentTestcase<I> + Stoppable,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
-    fn process(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        executor: &mut E,
-    ) -> Result<usize, Error> {
+    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         let mut count = 0;
         while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
-            assert!(
-                tag != _LLMP_TAG_EVENT_TO_BROKER,
+            assert_ne!(
+                tag, _LLMP_TAG_EVENT_TO_BROKER,
                 "EVENT_TO_BROKER parcel should not have arrived in the client!"
             );
 
             if client_id == self_id {
                 continue;
             }
+
             #[cfg(not(feature = "llmp_compression"))]
             let event_bytes = msg;
             #[cfg(feature = "llmp_compression")]
@@ -644,7 +577,8 @@ where
             } else {
                 msg
             };
-            let event: Event<S::Input> = postcard::from_bytes(event_bytes)?;
+
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
             log::debug!("Received event in normal llmp {}", event.name_detailed());
 
             // If the message comes from another machine, do not
@@ -664,45 +598,29 @@ where
     }
 }
 
-impl<E, EMH, S, SP, Z> EventManager<E, Z> for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> ProgressReporter<S> for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    E: HasObservers + Executor<Self, Z, State = S>,
-    E::Observers: ObserversTuple<S::Input, S> + Serialize,
-    for<'a> E::Observers: Deserialize<'a>,
-    EMH: EventManagerHooksTuple<S>,
-    S: State + HasExecutions + HasMetadata + HasLastReportTime + HasImported + HasCorpus,
-    S::Corpus: Corpus<Input = S::Input>,
-    SP: ShMemProvider,
-    Z: ExecutionProcessor<Self, <S::Corpus as Corpus>::Input, E::Observers, S>
-        + EvaluatorObservers<E, Self, <S::Corpus as Corpus>::Input, S>
-        + Evaluator<E, Self, <S::Corpus as Corpus>::Input, S>,
+    I: Serialize,
+    S: HasExecutions + HasLastReportTime + HasMetadata + MaybeHasClientPerfMonitor,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
-}
-
-impl<EMH, S, SP> HasCustomBufHandlers for LlmpEventManager<EMH, S, SP>
-where
-    S: State,
-    SP: ShMemProvider,
-{
-    fn add_custom_buf_handler(
+    fn maybe_report_progress(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &str, &[u8]) -> Result<CustomBufEventResult, Error>>,
-    ) {
-        self.custom_buf_handlers.push(handler);
+        state: &mut S,
+        monitor_timeout: Duration,
+    ) -> Result<(), Error> {
+        std_maybe_report_progress(self, state, monitor_timeout)
+    }
+
+    fn report_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        std_report_progress(self, state)
     }
 }
 
-impl<EMH, S, SP> ProgressReporter for LlmpEventManager<EMH, S, SP>
+impl<EMH, I, S, SHM, SP> HasEventManagerId for LlmpEventManager<EMH, I, S, SHM, SP>
 where
-    S: State + HasExecutions + HasMetadata + HasLastReportTime,
-    SP: ShMemProvider,
-{
-}
-
-impl<EMH, S, SP> HasEventManagerId for LlmpEventManager<EMH, S, SP>
-where
-    S: State,
-    SP: ShMemProvider,
+    SHM: ShMem,
 {
     /// Gets the id assigned to this staterestorer.
     fn mgr_id(&self) -> EventManagerId {

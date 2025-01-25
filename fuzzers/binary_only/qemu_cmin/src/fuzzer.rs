@@ -7,7 +7,7 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, NopCorpus},
-    events::{EventRestarter, SimpleRestartingEventManager},
+    events::{EventRestarter, SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
@@ -28,8 +28,8 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, CallingConvention,
-    Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExitError, QemuExitReason,
-    QemuForkExecutor, QemuShutdownCause, Regs,
+    Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
+    QemuShutdownCause, Regs,
 };
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 
@@ -95,6 +95,7 @@ pub struct FuzzerOptions {
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 pub fn fuzz() -> Result<(), Error> {
+    env_logger::init();
     let mut options = FuzzerOptions::parse();
 
     let corpus_dir = PathBuf::from(options.input);
@@ -107,13 +108,37 @@ pub fn fuzz() -> Result<(), Error> {
         .expect("Failed to read dir entry");
 
     let program = env::args().next().unwrap();
-    log::debug!("Program: {program:}");
+    log::info!("Program: {program:}");
 
     options.args.insert(0, program);
-    log::debug!("ARGS: {:#?}", options.args);
+    log::info!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
-    let qemu = Qemu::init(&options.args).unwrap();
+
+    let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
+    let edges = edges_shmem.as_slice_mut();
+    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
+
+    let mut edges_observer = unsafe {
+        HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
+            "edges",
+            NonNull::new(edges.as_mut_ptr())
+                .expect("The edge map pointer is null.")
+                .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
+        ))
+    };
+
+    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
+        .const_map_observer(edges_observer.as_mut())
+        .build()?);
+
+    let emulator = Emulator::empty()
+        .qemu_parameters(options.args)
+        .modules(modules)
+        .build()?;
+    let qemu = emulator.qemu();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer).unwrap();
@@ -121,25 +146,23 @@ pub fn fuzz() -> Result<(), Error> {
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
-    log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+    log::info!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
     qemu.entry_break(test_one_input_ptr);
 
     let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
-    log::debug!("Break at {pc:#x}");
+    log::info!("Break at {pc:#x}");
 
     let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
-    log::debug!("Return address = {ret_addr:#x}");
+    log::info!("Return address = {ret_addr:#x}");
     qemu.set_breakpoint(ret_addr);
 
     let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
-    log::debug!("Placing input at {input_addr:#x}");
+    log::info!("Placing input at {input_addr:#x}");
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
-
-    let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     let monitor = SimpleMonitor::with_user_monitor(|s| {
         println!("{s}");
@@ -155,19 +178,6 @@ pub fn fuzz() -> Result<(), Error> {
                 panic!("Failed to setup the restarter: {err}");
             }
         },
-    };
-
-    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
-    let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
-
-    let mut edges_observer = unsafe {
-        HitcountsMapObserver::new(ConstMapObserver::from_mut_ptr(
-            "edges",
-            NonNull::new(edges.as_mut_ptr())
-                .expect("The edge map pointer is null.")
-                .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
-        ))
     };
 
     let mut feedback = MaxMapFeedback::new(&edges_observer);
@@ -188,7 +198,7 @@ pub fn fuzz() -> Result<(), Error> {
     let scheduler = QueueScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
@@ -221,12 +231,6 @@ pub fn fuzz() -> Result<(), Error> {
 
         ExitKind::Ok
     };
-
-    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
-        .const_map_observer(edges_observer.as_mut())
-        .build()?);
-
-    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
     let mut executor = QemuForkExecutor::new(
         emulator,

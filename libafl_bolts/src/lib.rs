@@ -265,6 +265,19 @@ pub fn hash_std(input: &[u8]) -> u64 {
     }
 }
 
+/// Fast hash function for 64 bits integers minimizing collisions.
+/// Adapted from <https://xorshift.di.unimi.it/splitmix64.c>
+#[must_use]
+pub fn hash_64_fast(mut x: u64) -> u64 {
+    x = (x ^ (x.overflowing_shr(30).0))
+        .overflowing_mul(0xbf58476d1ce4e5b9)
+        .0;
+    x = (x ^ (x.overflowing_shr(27).0))
+        .overflowing_mul(0x94d049bb133111eb)
+        .0;
+    x ^ (x.overflowing_shr(31).0)
+}
+
 /// Hashes the input with a given hash
 ///
 /// Hashes the input with a given hash, depending on features:
@@ -665,6 +678,8 @@ impl From<pyo3::PyErr> for Error {
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
 #[cfg(feature = "prelude")]
 pub mod prelude {
+    #![allow(ambiguous_glob_reexports)]
+
     pub use super::{bolts_prelude::*, *};
 }
 
@@ -1295,6 +1310,27 @@ pub mod pybind {
         crate::rands::pybind::register(m)?;
         Ok(())
     }
+}
+
+/// Create a [`Vec`] of the given type with `nb_elts` elements, initialized in place.
+/// The closure must initialize [`Vec`] (of size `nb_elts` * `sizeo_of::<T>()`).
+///
+/// # Safety
+///
+/// The input closure should fully initialize the new [`Vec`], not leaving any uninitialized bytes.
+// TODO: Use MaybeUninit API at some point.
+#[cfg(feature = "alloc")]
+#[expect(clippy::uninit_vec)]
+pub unsafe fn vec_init<E, F, T>(nb_elts: usize, init_fn: F) -> Result<Vec<T>, E>
+where
+    F: FnOnce(&mut Vec<T>) -> Result<(), E>,
+{
+    let mut new_vec: Vec<T> = Vec::with_capacity(nb_elts);
+    new_vec.set_len(nb_elts);
+
+    init_fn(&mut new_vec)?;
+
+    Ok(new_vec)
 }
 
 #[cfg(test)]

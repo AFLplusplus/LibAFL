@@ -11,6 +11,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{
+    fmt::Debug,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
@@ -60,10 +61,7 @@ const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
 
 ///     s out served shared maps, as used on Android.
 #[derive(Debug)]
-pub struct ServedShMemProvider<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct ServedShMemProvider<SP> {
     stream: UnixStream,
     inner: SP,
     id: i32,
@@ -76,17 +74,14 @@ where
 /// [`ShMem`] that got served from a [`ShMemService`] via domain sockets and can now be used in this program.
 /// It works around Android's lack of "proper" shared maps.
 #[derive(Clone, Debug)]
-pub struct ServedShMem<SH>
-where
-    SH: ShMem,
-{
-    inner: ManuallyDrop<SH>,
+pub struct ServedShMem<SHM> {
+    inner: ManuallyDrop<SHM>,
     server_fd: i32,
 }
 
-impl<SH> Deref for ServedShMem<SH>
+impl<SHM> Deref for ServedShMem<SHM>
 where
-    SH: ShMem,
+    SHM: Deref<Target = [u8]>,
 {
     type Target = [u8];
 
@@ -95,18 +90,18 @@ where
     }
 }
 
-impl<SH> DerefMut for ServedShMem<SH>
+impl<SHM> DerefMut for ServedShMem<SHM>
 where
-    SH: ShMem,
+    SHM: DerefMut<Target = [u8]>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
 
-impl<SH> ShMem for ServedShMem<SH>
+impl<SHM> ShMem for ServedShMem<SHM>
 where
-    SH: ShMem,
+    SHM: ShMem,
 {
     fn id(&self) -> ShMemId {
         let client_id = self.inner.id();
@@ -114,10 +109,7 @@ where
     }
 }
 
-impl<SP> ServedShMemProvider<SP>
-where
-    SP: ShMemProvider,
-{
+impl<SP> ServedShMemProvider<SP> {
     /// Send a request to the server, and wait for a response
     #[expect(clippy::similar_names)] // id and fd
     fn send_receive(&mut self, request: ServedShMemRequest) -> Result<(i32, i32), Error> {
@@ -290,18 +282,12 @@ pub enum ServedShMemRequest {
 
 /// Client side communicating with the [`ShMemServer`]
 #[derive(Debug)]
-struct SharedShMemClient<SH>
-where
-    SH: ShMem,
-{
+struct SharedShMemClient<SHM> {
     stream: UnixStream,
-    maps: HashMap<i32, Vec<Rc<RefCell<SH>>>>,
+    maps: HashMap<i32, Vec<Rc<RefCell<SHM>>>>,
 }
 
-impl<SH> SharedShMemClient<SH>
-where
-    SH: ShMem,
-{
+impl<SHM> SharedShMemClient<SHM> {
     fn new(stream: UnixStream) -> Self {
         Self {
             stream,
@@ -312,11 +298,8 @@ where
 
 /// Response from Server to Client
 #[derive(Debug)]
-enum ServedShMemResponse<SP>
-where
-    SP: ShMemProvider,
-{
-    Mapping(Rc<RefCell<SP::ShMem>>),
+enum ServedShMemResponse<SHM> {
+    Mapping(Rc<RefCell<SHM>>),
     Id(i32),
     RefCount(u32),
 }
@@ -332,22 +315,19 @@ enum ShMemServiceStatus {
 /// The [`ShMemService`] is a service handing out [`ShMem`] pages via unix domain sockets.
 /// It is mainly used and needed on Android.
 #[derive(Debug, Clone)]
-pub enum ShMemService<SP>
-where
-    SP: ShMemProvider,
-{
+pub enum ShMemService<SP> {
     /// A started service
     Started {
         /// The background thread
         bg_thread: Arc<Mutex<ShMemServiceThread>>,
-        /// The pantom data
+        /// The phantom data
         phantom: PhantomData<SP>,
     },
     /// A failed service
     Failed {
         /// The error message
         err_msg: String,
-        /// The pantom data
+        /// The phantom data
         phantom: PhantomData<SP>,
     },
 }
@@ -412,7 +392,7 @@ where
         let syncpair = Arc::new((Mutex::new(ShMemServiceStatus::Starting), Condvar::new()));
         let childsyncpair = Arc::clone(&syncpair);
         let join_handle = thread::spawn(move || {
-            let mut worker = match ServedShMemServiceWorker::<SP>::new() {
+            let mut worker = match ServedShMemServiceWorker::<SP::ShMem, SP>::new() {
                 Ok(worker) => worker,
                 Err(e) => {
                     // Make sure the parent processes can continue
@@ -472,20 +452,18 @@ where
 
 /// The struct for the worker, handling incoming requests for [`ShMem`].
 #[expect(clippy::type_complexity)]
-struct ServedShMemServiceWorker<SP>
-where
-    SP: ShMemProvider,
-{
+struct ServedShMemServiceWorker<SHM, SP> {
     provider: SP,
-    clients: HashMap<RawFd, SharedShMemClient<SP::ShMem>>,
+    clients: HashMap<RawFd, SharedShMemClient<SHM>>,
     /// Maps from a pre-fork (parent) client id to its cloned maps.
-    forking_clients: HashMap<RawFd, HashMap<i32, Vec<Rc<RefCell<SP::ShMem>>>>>,
-    all_shmems: HashMap<i32, Weak<RefCell<SP::ShMem>>>,
+    forking_clients: HashMap<RawFd, HashMap<i32, Vec<Rc<RefCell<SHM>>>>>,
+    all_shmems: HashMap<i32, Weak<RefCell<SHM>>>,
 }
 
-impl<SP> ServedShMemServiceWorker<SP>
+impl<SHM, SP> ServedShMemServiceWorker<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create a new [`ShMemService`]
     fn new() -> Result<Self, Error> {
@@ -497,7 +475,7 @@ where
         })
     }
 
-    fn upgrade_shmem_with_id(&mut self, description_id: i32) -> Rc<RefCell<SP::ShMem>> {
+    fn upgrade_shmem_with_id(&mut self, description_id: i32) -> Rc<RefCell<SHM>> {
         self.all_shmems
             .get_mut(&description_id)
             .unwrap()
@@ -507,7 +485,7 @@ where
     }
 
     /// Read and handle the client request, send the answer over unix fd.
-    fn handle_request(&mut self, client_id: RawFd) -> Result<ServedShMemResponse<SP>, Error> {
+    fn handle_request(&mut self, client_id: RawFd) -> Result<ServedShMemResponse<SHM>, Error> {
         let request = self.read_request(client_id)?;
 
         // log::trace!("got ashmem client: {}, request:{:?}", client_id, request);
@@ -702,7 +680,6 @@ where
                             Ok(()) => (),
                             Err(e) => {
                                 log::info!("Ignoring failed read from client {e:?} {poll_fd:?}");
-                                continue;
                             }
                         };
                     } else {

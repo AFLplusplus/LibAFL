@@ -1,8 +1,7 @@
 #![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
-use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
+use std::{cell::UnsafeCell, mem::MaybeUninit, ops::Range, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
-use libafl::inputs::UsesInput;
 use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
@@ -24,8 +23,9 @@ use crate::SYS_newfstatat;
 use crate::{
     emu::EmulatorModules,
     modules::{
-        asan::AsanModule, EmulatorModule, EmulatorModuleTuple, NopAddressFilter, Range,
-        NOP_ADDRESS_FILTER,
+        asan::AsanModule,
+        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
+        EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{Hook, SyscallHookResult},
     Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
@@ -392,6 +392,20 @@ impl SnapshotModule {
 
             log::debug!("Start restore");
 
+            let new_brk = qemu.get_brk();
+            if new_brk < self.brk {
+                // The heap has shrunk below the snapshotted brk value. We need to remap those pages in the target.
+                // The next for loop will restore their content if needed.
+                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
+                log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
+                drop(qemu.map_fixed(
+                    aligned_new_brk,
+                    (self.brk - aligned_new_brk) as usize,
+                    MmapPerms::ReadWrite,
+                ));
+            }
+
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
@@ -523,7 +537,12 @@ impl SnapshotModule {
         }
     }
 
-    pub fn change_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn change_mapped_perms(
+        &mut self,
+        start: GuestAddr,
+        mut size: usize,
+        perms: Option<MmapPerms>,
+    ) {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
@@ -674,49 +693,52 @@ impl Default for SnapshotModule {
     }
 }
 
-impl<S> EmulatorModule<S> for SnapshotModule
+impl<I, S> EmulatorModule<I, S> for SnapshotModule
 where
-    S: Unpin + UsesInput,
+    I: Unpin,
+    S: Unpin,
 {
-    type ModuleAddressFilter = NopAddressFilter;
-
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         if emulator_modules.get::<AsanModule>().is_none() {
             // The ASan module, if present, will call the tracer hook for the snapshot helper as opt
             emulator_modules.writes(
                 Hook::Empty,
-                Hook::Function(trace_write_snapshot::<ET, S, 1>),
-                Hook::Function(trace_write_snapshot::<ET, S, 2>),
-                Hook::Function(trace_write_snapshot::<ET, S, 4>),
-                Hook::Function(trace_write_snapshot::<ET, S, 8>),
-                Hook::Function(trace_write_n_snapshot::<ET, S>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 1>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 2>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 4>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 8>),
+                Hook::Function(trace_write_n_snapshot::<ET, I, S>),
             );
         }
 
         if !self.accurate_unmap {
-            emulator_modules.syscalls(Hook::Function(filter_mmap_snapshot::<ET, S>));
+            emulator_modules.pre_syscalls(Hook::Function(filter_mmap_snapshot::<ET, I, S>));
         }
-        emulator_modules.after_syscalls(Hook::Function(trace_mmap_snapshot::<ET, S>));
+        emulator_modules.post_syscalls(Hook::Function(trace_mmap_snapshot::<ET, I, S>));
     }
 
     fn pre_exec<ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         if self.empty {
-            self.snapshot(emulator_modules.qemu());
+            self.snapshot(qemu);
         } else {
-            self.reset(emulator_modules.qemu());
+            self.reset(qemu);
         }
     }
+}
 
+impl HasAddressFilter for SnapshotModule {
+    type ModuleAddressFilter = NopAddressFilter;
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &NopAddressFilter
     }
@@ -726,36 +748,41 @@ where
     }
 }
 
-pub fn trace_write_snapshot<ET, S, const SIZE: usize>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+pub fn trace_write_snapshot<ET, I, S, const SIZE: usize>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, SIZE);
 }
 
-pub fn trace_write_n_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+pub fn trace_write_n_snapshot<ET, I, S>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, size);
 }
 
 #[expect(clippy::too_many_arguments)]
-pub fn filter_mmap_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+pub fn filter_mmap_snapshot<ET, I, S>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: GuestAddr,
@@ -768,8 +795,9 @@ pub fn filter_mmap_snapshot<ET, S>(
     _a7: GuestAddr,
 ) -> SyscallHookResult
 where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     if i64::from(sys_num) == SYS_munmap {
         let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
@@ -781,8 +809,9 @@ where
 }
 
 #[expect(non_upper_case_globals, clippy::too_many_arguments)]
-pub fn trace_mmap_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+pub fn trace_mmap_snapshot<ET, I, S>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     result: GuestAddr,
     sys_num: i32,
@@ -796,8 +825,9 @@ pub fn trace_mmap_snapshot<ET, S>(
     _a7: GuestAddr,
 ) -> GuestAddr
 where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {
@@ -845,18 +875,8 @@ where
             h.access(a0, a1 as usize);
         }
         SYS_brk => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-            if h.brk != result && result != 0 && result > h.initial_brk {
-                /* brk has changed, and it doesn't shrink below initial_brk. We change mapping from the snapshotted initial brk address to the new target_brk
-                 * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
-                 * It is safe to assume RW perms here
-                 */
-                h.change_mapped(
-                    h.initial_brk,
-                    (result - h.initial_brk) as usize,
-                    Some(MmapPerms::ReadWrite),
-                );
-            }
+            // We don't handle brk here. It is handled in the reset function only when it's needed.
+            log::debug!("New brk ({:#x?}) received.", result);
         }
         // mmap syscalls
         sys_const => {
@@ -892,7 +912,7 @@ where
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-                    h.change_mapped(a0, a1 as usize, Some(prot));
+                    h.change_mapped_perms(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
                 let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();

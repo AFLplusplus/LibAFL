@@ -7,7 +7,7 @@ use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    corpus::{InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,
@@ -18,8 +18,8 @@ use libafl::{
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
-    state::{HasExecutions, State, StdState, UsesState},
+    stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
+    state::{HasCorpus, HasExecutions, StdState},
 };
 use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 
@@ -35,11 +35,11 @@ fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-struct CustomExecutor<S: State> {
+struct CustomExecutor<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S: State> CustomExecutor<S> {
+impl<S> CustomExecutor<S> {
     pub fn new(_state: &S) -> Self {
         Self {
             phantom: PhantomData,
@@ -47,22 +47,17 @@ impl<S: State> CustomExecutor<S> {
     }
 }
 
-impl<S: State> UsesState for CustomExecutor<S> {
-    type State = S;
-}
-
-impl<EM, S, Z> Executor<EM, Z> for CustomExecutor<S>
+impl<EM, I, S, Z> Executor<EM, I, S, Z> for CustomExecutor<S>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    Self::Input: HasTargetBytes,
+    S: HasCorpus<I> + HasExecutions,
+    I: HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, libafl::Error> {
         // We need to keep track of the exec count.
         *state.executions_mut() += 1;
@@ -89,6 +84,12 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
+
+    let calibration_stage = CalibrationStage::new(&feedback);
+    let stats_stage = AflStatsStage::builder()
+        .map_observer(&observer)
+        .build()
+        .unwrap();
 
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and_fast!(
@@ -155,7 +156,11 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut stages = tuple_list!(
+        calibration_stage,
+        StdMutationalStage::new(mutator),
+        stats_stage
+    );
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)

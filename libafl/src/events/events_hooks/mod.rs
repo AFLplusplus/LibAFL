@@ -4,20 +4,17 @@
 //! other clients
 use libafl_bolts::ClientId;
 
-use crate::{events::Event, state::State, Error};
+use crate::{events::Event, Error};
 
 /// The `broker_hooks` that are run before and after the event manager calls `handle_in_client`
-pub trait EventManagerHook<S>
-where
-    S: State,
-{
+pub trait EventManagerHook<I, S> {
     /// The hook that runs before `handle_in_client`
     /// Return false if you want to cancel the subsequent event handling
     fn pre_exec(
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        event: &Event<I>,
     ) -> Result<bool, Error>;
 
     /// Triggered when the even manager decides to fire the event after processing
@@ -25,7 +22,7 @@ where
         &mut self,
         _state: &mut S,
         _client_id: ClientId,
-        _event: &Event<S::Input>,
+        _event: &Event<I>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -38,16 +35,13 @@ where
 }
 
 /// The tuples contains `broker_hooks` to be executed for `handle_in_client`
-pub trait EventManagerHooksTuple<S>
-where
-    S: State,
-{
+pub trait EventManagerHooksTuple<I, S> {
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        event: &Event<I>,
     ) -> Result<bool, Error>;
 
     /// Ran when the Event Manager decides to accept an event and propagates it
@@ -55,23 +49,20 @@ where
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        event: &Event<I>,
     ) -> Result<(), Error>;
 
     /// The hook that runs after `handle_in_client`
     fn post_exec_all(&mut self, state: &mut S, client_id: ClientId) -> Result<bool, Error>;
 }
 
-impl<S> EventManagerHooksTuple<S> for ()
-where
-    S: State,
-{
+impl<I, S> EventManagerHooksTuple<I, S> for () {
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
         _state: &mut S,
         _client_id: ClientId,
-        _event: &Event<S::Input>,
+        _event: &Event<I>,
     ) -> Result<bool, Error> {
         Ok(true)
     }
@@ -80,7 +71,7 @@ where
         &mut self,
         _state: &mut S,
         _client_id: ClientId,
-        _event: &Event<S::Input>,
+        _event: &Event<I>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -91,18 +82,17 @@ where
     }
 }
 
-impl<Head, Tail, S> EventManagerHooksTuple<S> for (Head, Tail)
+impl<Head, Tail, I, S> EventManagerHooksTuple<I, S> for (Head, Tail)
 where
-    Head: EventManagerHook<S>,
-    Tail: EventManagerHooksTuple<S>,
-    S: State,
+    Head: EventManagerHook<I, S>,
+    Tail: EventManagerHooksTuple<I, S>,
 {
     /// The hook that runs before `handle_in_client`
     fn pre_exec_all(
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        event: &Event<I>,
     ) -> Result<bool, Error> {
         let first = self.0.pre_exec(state, client_id, event)?;
         let second = self.1.pre_exec_all(state, client_id, event)?;
@@ -113,7 +103,7 @@ where
         &mut self,
         state: &mut S,
         client_id: ClientId,
-        event: &Event<S::Input>,
+        event: &Event<I>,
     ) -> Result<(), Error> {
         self.0.on_fire(state, client_id, event)?;
         self.1.on_fire_all(state, client_id, event)

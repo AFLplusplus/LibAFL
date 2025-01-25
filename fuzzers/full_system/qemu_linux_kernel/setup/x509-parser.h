@@ -7,6 +7,9 @@
 
 // From https://lore.kernel.org/kvm/20240304065703.GA24373@wunner.de/T/
 
+#ifndef X509_PARSER_H
+#define X509_PARSER_H
+
 #include <crypto/public_key.h>
 #include <keys/asymmetric-type.h>
 #include <linux/time64.h>
@@ -44,3 +47,5 @@ struct x509_certificate {
 
 struct x509_certificate *x509_cert_parse(const void *data, size_t datalen);
 void                     x509_free_certificate(struct x509_certificate *cert);
+
+#endif

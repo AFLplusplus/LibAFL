@@ -40,12 +40,15 @@ pub mod cpp_runtime {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
     #![allow(non_snake_case)]
+    #![allow(unused_attributes)]
+
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
 #[doc(hidden)]
 pub use ctor::ctor;
 use libafl::observers::concolic;
+pub use libafl_bolts::shmem::StdShMem;
 #[doc(hidden)]
 pub use libc::atexit;
 #[doc(hidden)]

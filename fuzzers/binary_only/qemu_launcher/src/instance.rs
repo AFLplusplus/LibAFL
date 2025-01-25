@@ -7,7 +7,7 @@ use libafl::events::SimpleEventManager;
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
-    events::{ClientDescription, EventRestarter, NopEventManager},
+    events::{ClientDescription, EventRestarter},
     executors::{Executor, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -26,20 +26,23 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
         ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
-    state::{HasCorpus, StdState, UsesState},
-    Error, HasMetadata, NopFuzzer,
+    state::{HasCorpus, StdState},
+    Error, HasMetadata,
 };
 #[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::shmem::StdShMemProvider;
+use libafl_bolts::shmem::{StdShMem, StdShMemProvider};
 use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
-    tuples::{tuple_list, Merge, Prepend},
+    tuples::{tuple_list, MatchFirstType, Merge, Prepend},
 };
 use libafl_qemu::{
     elf::EasyElf,
     modules::{
-        cmplog::CmpLogObserver, EmulatorModuleTuple, StdAddressFilter, StdEdgeCoverageModule,
+        cmplog::CmpLogObserver,
+        edges::EdgeCoverageFullVariant,
+        utils::filters::{HasAddressFilter, NopPageFilter, StdAddressFilter},
+        EdgeCoverageModule, EmulatorModuleTuple, StdEdgeCoverageModule,
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
@@ -49,21 +52,20 @@ use typed_builder::TypedBuilder;
 use crate::{harness::Harness, options::FuzzerOptions};
 
 pub type ClientState =
-    StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(feature = "simplemgr")]
-pub type ClientMgr<M> = SimpleEventManager<M, ClientState>;
+pub type ClientMgr<M> = SimpleEventManager<BytesInput, M, ClientState>;
 #[cfg(not(feature = "simplemgr"))]
-pub type ClientMgr<M> =
-    MonitorTypedEventManager<LlmpRestartingEventManager<(), ClientState, StdShMemProvider>, M>;
+pub type ClientMgr<M> = MonitorTypedEventManager<
+    LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
+    M,
+>;
 
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
     /// The harness. We create it before forking, then `take()` it inside the client.
-    #[builder(setter(strip_option))]
-    harness: Option<Harness>,
-    qemu: Qemu,
     mgr: ClientMgr<M>,
     client_description: ClientDescription,
     #[builder(default)]
@@ -106,9 +108,14 @@ impl<M: Monitor> Instance<'_, M> {
     }
 
     #[expect(clippy::too_many_lines)]
-    pub fn run<ET>(&mut self, modules: ET, state: Option<ClientState>) -> Result<(), Error>
+    pub fn run<ET>(
+        &mut self,
+        args: Vec<String>,
+        modules: ET,
+        state: Option<ClientState>,
+    ) -> Result<(), Error>
     where
-        ET: EmulatorModuleTuple<ClientState> + Debug,
+        ET: EmulatorModuleTuple<BytesInput, ClientState> + Debug,
     {
         // Create an observation channel using the coverage map
         let mut edges_observer = unsafe {
@@ -122,10 +129,21 @@ impl<M: Monitor> Instance<'_, M> {
 
         let edge_coverage_module = StdEdgeCoverageModule::builder()
             .map_observer(edges_observer.as_mut())
-            .address_filter(self.coverage_filter(self.qemu)?)
             .build()?;
 
         let modules = modules.prepend(edge_coverage_module);
+        let mut emulator = Emulator::empty()
+            .qemu_parameters(args)
+            .modules(modules)
+            .build()?;
+        let harness = Harness::init(emulator.qemu()).expect("Error setting up harness.");
+        let qemu = emulator.qemu();
+
+        // update address filter after qemu has been initialized
+        emulator.modules_mut()
+            .modules_mut()
+            .match_first_type_mut::<EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0>>()
+            .expect("Could not find back the edge module").update_address_filter(qemu, self.coverage_filter(qemu)?);
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
@@ -198,20 +216,14 @@ impl<M: Monitor> Instance<'_, M> {
 
         state.add_metadata(tokens);
 
-        let harness = self
-            .harness
-            .take()
-            .expect("The harness can never be None here!");
         harness.post_fork();
 
-        let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+        let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>,
                            _state: &mut _,
                            input: &BytesInput| harness.run(input);
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-        let emulator = Emulator::empty().qemu(self.qemu).modules(modules).build()?;
 
         if let Some(rerun_input) = &self.options.rerun_input {
             // TODO: We might want to support non-bytes inputs at some point?
@@ -230,12 +242,7 @@ impl<M: Monitor> Instance<'_, M> {
             )?;
 
             executor
-                .run_target(
-                    &mut NopFuzzer::new(),
-                    &mut state,
-                    &mut NopEventManager::new(),
-                    &input,
-                )
+                .run_target(&mut fuzzer, &mut state, &mut self.mgr, &input)
                 .expect("Error running target");
             // We're done :)
             process::exit(0);
@@ -311,9 +318,8 @@ impl<M: Monitor> Instance<'_, M> {
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        Z: Fuzzer<E, ClientMgr<M>, ClientState, ST>
+        Z: Fuzzer<E, ClientMgr<M>, BytesInput, ClientState, ST>
             + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
-        E: UsesState<State = ClientState>,
         ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
     {
         let corpus_dirs = [self.options.input_dir()];

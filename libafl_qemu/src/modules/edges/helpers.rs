@@ -51,7 +51,8 @@ mod generators {
     use std::{cmp::max, ptr};
 
     use hashbrown::hash_map::Entry;
-    use libafl::{inputs::UsesInput, HasMetadata};
+    use libafl::HasMetadata;
+    use libafl_bolts::hash_64_fast;
     use libafl_qemu_sys::GuestAddr;
 
     use super::{
@@ -59,8 +60,8 @@ mod generators {
         LIBAFL_QEMU_EDGES_MAP_SIZE_PTR,
     };
     use crate::{
-        modules::{hash_me, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
-        EmulatorModules,
+        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
+        EmulatorModules, Qemu,
     };
 
     fn get_mask<const IS_CONST_MAP: bool, const MAP_SIZE: usize>() -> usize {
@@ -77,17 +78,29 @@ mod generators {
         }
     }
 
-    pub fn gen_unique_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
-        emulator_modules: &mut EmulatorModules<ET, S>,
+    #[allow(unused_variables)]
+    pub fn gen_unique_edge_ids<
+        AF,
+        ET,
+        PF,
+        I,
+        S,
+        V,
+        const IS_CONST_MAP: bool,
+        const MAP_SIZE: usize,
+    >(
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         state: Option<&mut S>,
         src: GuestAddr,
         dest: GuestAddr,
     ) -> Option<u64>
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
         if let Some(module) =
@@ -108,10 +121,7 @@ mod generators {
 
             #[cfg(feature = "systemmode")]
             {
-                let paging_id = emulator_modules
-                    .qemu()
-                    .current_cpu()
-                    .and_then(|cpu| cpu.current_paging_id());
+                let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
                 if !module.must_instrument(src, paging_id)
                     && !module.must_instrument(dest, paging_id)
@@ -123,7 +133,7 @@ mod generators {
 
         let mask: usize = get_mask::<IS_CONST_MAP, MAP_SIZE>();
 
-        let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
+        let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing. Is the Executor initialized?");
         let meta = state.metadata_or_insert_with(QemuEdgesMapMetadata::new);
 
         match meta.map.entry((src, dest)) {
@@ -155,18 +165,30 @@ mod generators {
         }
     }
 
+    #[allow(unused_variables)]
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
-    pub fn gen_hashed_edge_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
-        emulator_modules: &mut EmulatorModules<ET, S>,
+    pub fn gen_hashed_edge_ids<
+        AF,
+        ET,
+        PF,
+        I,
+        S,
+        V,
+        const IS_CONST_MAP: bool,
+        const MAP_SIZE: usize,
+    >(
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: Option<&mut S>,
         src: GuestAddr,
         dest: GuestAddr,
     ) -> Option<u64>
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
         if let Some(module) =
@@ -179,10 +201,7 @@ mod generators {
 
             #[cfg(feature = "systemmode")]
             {
-                let paging_id = emulator_modules
-                    .qemu()
-                    .current_cpu()
-                    .and_then(|cpu| cpu.current_paging_id());
+                let paging_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
                 if !module.must_instrument(src, paging_id)
                     && !module.must_instrument(dest, paging_id)
@@ -194,7 +213,7 @@ mod generators {
             let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
             #[expect(clippy::unnecessary_cast)]
-            let id = (hash_me(src as u64) ^ hash_me(dest as u64)) & mask;
+            let id = (hash_64_fast(src as u64) ^ hash_64_fast(dest as u64)) & mask;
 
             if !IS_CONST_MAP {
                 unsafe {
@@ -210,17 +229,29 @@ mod generators {
     }
 
     #[expect(clippy::unnecessary_cast)]
+    #[allow(unused_variables)]
     #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
-    pub fn gen_hashed_block_ids<AF, ET, PF, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
-        emulator_modules: &mut EmulatorModules<ET, S>,
+    pub fn gen_hashed_block_ids<
+        AF,
+        ET,
+        PF,
+        I,
+        S,
+        V,
+        const IS_CONST_MAP: bool,
+        const MAP_SIZE: usize,
+    >(
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: Option<&mut S>,
         pc: GuestAddr,
     ) -> Option<u64>
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
         // first check if we should filter
@@ -235,10 +266,7 @@ mod generators {
             }
             #[cfg(feature = "systemmode")]
             {
-                let page_id = emulator_modules
-                    .qemu()
-                    .current_cpu()
-                    .and_then(|cpu| cpu.current_paging_id());
+                let page_id = qemu.current_cpu().and_then(|cpu| cpu.current_paging_id());
 
                 if !module.must_instrument(pc, page_id) {
                     return None;
@@ -248,7 +276,7 @@ mod generators {
 
         let mask = get_mask::<IS_CONST_MAP, MAP_SIZE>() as u64;
 
-        let id = hash_me(pc as u64) & mask;
+        let id = hash_64_fast(pc as u64) & mask;
 
         if !IS_CONST_MAP {
             unsafe {

@@ -37,7 +37,7 @@ use serde::{Deserialize, Serialize};
 pub use sync::*;
 #[cfg(feature = "std")]
 pub use time_tracker::TimeTrackingStageWrapper;
-pub use tmin::{MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage};
+pub use tmin::{ObserverEqualityFactory, ObserverEqualityFeedback, StdTMinMutationalStage};
 pub use tracing::{ShadowTracingStage, TracingStage};
 pub use tuneable::*;
 use tuple_list::NonEmptyTuple;
@@ -49,7 +49,7 @@ pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
     events::EventProcessor,
-    state::{HasExecutions, State, Stoppable},
+    state::{HasExecutions, Stoppable},
     Error, HasNamedMetadata,
 };
 
@@ -161,7 +161,7 @@ where
     Head: Stage<E, EM, S, Z>,
     Tail: StagesTuple<E, EM, S, Z> + HasConstLen,
     S: HasCurrentStageId + Stoppable,
-    EM: EventProcessor<E, Z>,
+    EM: EventProcessor<E, S, Z>,
 {
     /// Performs all stages in the tuple,
     /// Checks after every stage if state wants to stop
@@ -248,8 +248,8 @@ impl<E, EM, S, Z> IntoVec<Box<dyn Stage<E, EM, S, Z>>> for Vec<Box<dyn Stage<E, 
 
 impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn Stage<E, EM, S, Z>>>
 where
-    EM: EventProcessor<E, Z>,
-    S: HasCurrentStageId + State,
+    EM: EventProcessor<E, S, Z>,
+    S: HasCurrentStageId + Stoppable,
 {
     /// Performs all stages in the `Vec`
     /// Checks after every stage if state wants to stop
@@ -612,13 +612,6 @@ mod test {
     /// Test to test retries in stages
     #[test]
     fn test_tries_progress() -> Result<(), Error> {
-        // # Safety
-        // No concurrency per testcase
-        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
-        unsafe {
-            RetryCountRestartHelper::register();
-        }
-
         struct StageWithOneTry;
 
         impl Named for StageWithOneTry {
@@ -626,6 +619,13 @@ mod test {
                 static NAME: Cow<'static, str> = Cow::Borrowed("TestStage");
                 &NAME
             }
+        }
+
+        // # Safety
+        // No concurrency per testcase
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            RetryCountRestartHelper::register();
         }
 
         let mut state = StdState::nop()?;

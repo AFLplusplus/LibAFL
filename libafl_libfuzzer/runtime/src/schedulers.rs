@@ -6,7 +6,7 @@ use libafl::{
     feedbacks::MapNoveltiesMetadata,
     inputs::Input,
     schedulers::{RemovableScheduler, Scheduler},
-    state::{HasCorpus, State},
+    state::HasCorpus,
     Error, HasMetadata,
 };
 
@@ -20,7 +20,7 @@ pub struct MergeScheduler<I, S> {
 impl<I, S> RemovableScheduler<I, S> for MergeScheduler<I, S>
 where
     I: Input,
-    S: State + HasCorpus,
+    S: HasCorpus<I>,
 {
     fn on_remove(
         &mut self,
@@ -35,7 +35,7 @@ where
 
 impl<I, S> Scheduler<I, S> for MergeScheduler<I, S>
 where
-    S: State + HasCorpus,
+    S: HasCorpus<I>,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         self.all.insert(id);

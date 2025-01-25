@@ -11,7 +11,7 @@ use std::{
 
 use libafl::{
     corpus::Corpus,
-    inputs::{BytesInput, HasMutatorBytes, UsesInput},
+    inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{
         ComposedByMutations, MutationId, MutationResult, Mutator, MutatorsTuple, ScheduledMutator,
     },
@@ -152,7 +152,7 @@ where
     F: Fn(&mut dyn for<'b> FnMut(&'b mut S)) -> bool,
     M: ScheduledMutator<BytesInput, S>,
     M::Mutations: MutatorsTuple<BytesInput, S>,
-    S: HasMaxSize + UsesInput<Input = BytesInput>,
+    S: HasMaxSize,
 {
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize {
         let mut new_size = 0; // if access fails, the new len is zero
@@ -172,7 +172,7 @@ where
                     drop(result);
 
                     if succeeded {
-                        let target = intermediary.bytes();
+                        let target = intermediary.mutator_bytes();
                         if target.as_slice().len() > max_size {
                             self.result
                                 .replace(Err(Error::illegal_state("Mutation result was too long!")))
@@ -290,12 +290,12 @@ impl<S, SM> Named for LLVMCustomMutator<S, SM, false> {
 
 impl<S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<S, SM, false>
 where
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
+    S: HasRand + HasMaxSize + 'static,
     SM: ScheduledMutator<BytesInput, S> + 'static,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
     #[inline]
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut BytesInput) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
     }
 }
@@ -303,15 +303,15 @@ where
 impl<S, SM> ScheduledMutator<BytesInput, S> for LLVMCustomMutator<S, SM, false>
 where
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + 'static,
+    S: HasRand + HasMaxSize + 'static,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
-    fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
+    fn iterations(&self, state: &mut S, input: &BytesInput) -> u64 {
         let mutator = self.mutator.deref().borrow();
         mutator.iterations(state, input)
     }
 
-    fn schedule(&self, state: &mut S, input: &S::Input) -> MutationId {
+    fn schedule(&self, state: &mut S, input: &BytesInput) -> MutationId {
         let mutator = self.mutator.deref().borrow();
         mutator.schedule(state, input)
     }
@@ -319,12 +319,12 @@ where
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut BytesInput,
     ) -> Result<MutationResult, Error> {
         let seed = state.rand_mut().next();
-        let len_orig = input.bytes().len();
-        let len_max = state.max_size();
-        input.resize(len_max, 0);
+        let len_orig = input.mutator_bytes().len();
+        let max_len = state.max_size();
+        input.resize(max_len, 0);
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
@@ -335,9 +335,9 @@ where
         });
         let new_len = unsafe {
             libafl_targets_libfuzzer_custom_mutator(
-                input.bytes_mut().as_mut_ptr(),
+                input.mutator_bytes_mut().as_mut_ptr(),
                 len_orig,
-                len_max,
+                max_len,
                 seed as u32,
             )
         };
@@ -349,8 +349,9 @@ where
         if result.deref().borrow().is_err() {
             return result.replace(Ok(MutationResult::Skipped));
         }
-        if new_len > len_max {
-            return Err(Error::illegal_state("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
+
+        if new_len > max_len {
+            return Err(Error::illegal_state(format!("LLVMFuzzerCustomMutator returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
         }
         input.resize(new_len, 0);
         Ok(MutationResult::Mutated)
@@ -366,13 +367,12 @@ impl<S, SM> Named for LLVMCustomMutator<S, SM, true> {
 
 impl<S, SM> Mutator<BytesInput, S> for LLVMCustomMutator<S, SM, true>
 where
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
+    S: HasRand + HasMaxSize + HasCorpus<BytesInput> + 'static,
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S::Corpus: Corpus<Input = BytesInput>,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
     #[inline]
-    fn mutate(&mut self, state: &mut S, input: &mut S::Input) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut BytesInput) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input)
     }
 }
@@ -380,16 +380,15 @@ where
 impl<S, SM> ScheduledMutator<BytesInput, S> for LLVMCustomMutator<S, SM, true>
 where
     SM: ScheduledMutator<BytesInput, S> + 'static,
-    S: UsesInput<Input = BytesInput> + HasRand + HasMaxSize + HasCorpus + 'static,
-    S::Corpus: Corpus<Input = BytesInput>,
+    S: HasRand + HasMaxSize + HasCorpus<BytesInput> + 'static,
     SM::Mutations: MutatorsTuple<BytesInput, S>,
 {
-    fn iterations(&self, state: &mut S, input: &S::Input) -> u64 {
+    fn iterations(&self, state: &mut S, input: &BytesInput) -> u64 {
         let mutator = self.mutator.deref().borrow();
         mutator.iterations(state, input)
     }
 
-    fn schedule(&self, state: &mut S, input: &S::Input) -> MutationId {
+    fn schedule(&self, state: &mut S, input: &BytesInput) -> MutationId {
         let mutator = self.mutator.deref().borrow();
         mutator.schedule(state, input)
     }
@@ -397,7 +396,7 @@ where
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
-        input: &mut S::Input,
+        input: &mut BytesInput,
     ) -> Result<MutationResult, Error> {
         let id = random_corpus_id_with_disabled!(state.corpus(), state.rand_mut());
         // We don't want to use the testcase we're already using for splicing
@@ -409,16 +408,16 @@ where
 
         let mut other_testcase = state.corpus().get_from_all(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
-        let data2 = Vec::from(other.bytes());
+        let data2 = Vec::from(other.mutator_bytes());
         drop(other_testcase);
 
         let seed = state.rand_mut().next();
         let mut out = vec![0u8; state.max_size()];
 
-        let len_max = state.max_size();
+        let max_len = state.max_size();
         let len_orig = input.len();
 
-        input.resize(len_max, 0);
+        input.resize(max_len, 0);
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
@@ -429,12 +428,12 @@ where
         });
         let new_len = unsafe {
             libafl_targets_libfuzzer_custom_crossover(
-                input.bytes_mut().as_mut_ptr(),
+                input.mutator_bytes_mut().as_mut_ptr(),
                 len_orig,
                 data2.as_ptr(),
                 data2.len(),
                 out.as_mut_ptr(),
-                len_max,
+                max_len,
                 seed as u32,
             )
         };
@@ -447,8 +446,8 @@ where
             return result.replace(Ok(MutationResult::Skipped));
         }
 
-        if new_len > len_max {
-            return Err(Error::illegal_state("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}"));
+        if new_len > max_len {
+            return Err(Error::illegal_state(format!("LLVMFuzzerCustomCrossOver returned more bytes than allowed. Expected up to {max_len} but got {new_len}")));
         }
 
         input.resize(new_len, 0);

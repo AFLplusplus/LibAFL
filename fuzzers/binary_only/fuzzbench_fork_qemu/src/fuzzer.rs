@@ -176,7 +176,7 @@ fn fuzz(
     );
 
     let emulator = Emulator::empty()
-        .qemu_cli(args)
+        .qemu_parameters(args)
         .modules(emulator_modules)
         .build()?;
 
@@ -327,7 +327,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
