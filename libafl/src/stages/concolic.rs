@@ -20,7 +20,7 @@ use crate::{
     observers::{concolic::ConcolicObserver, ObserversTuple},
     stages::{RetryCountRestartHelper, Stage, TracingStage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasObjective,
 };
 #[cfg(feature = "concolic_mutation")]
 use crate::{
@@ -49,7 +49,7 @@ impl<EM, I, TE, S, Z> Named for ConcolicTracingStage<'_, EM, I, TE, S, Z> {
 
 impl<E, EM, I, TE, S, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<'_, EM, I, TE, S, Z>
 where
-    TE: Executor<EM, I, S, Z> + HasObservers,
+    TE: Executor<EM, I, Z::Objective, S> + HasObservers,
     TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
         + HasCorpus<I>
@@ -57,6 +57,7 @@ where
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
+    Z: HasObjective,
 {
     #[inline]
     fn perform(

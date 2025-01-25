@@ -32,7 +32,7 @@ use crate::{
 };
 
 /// Inner state of GenericInProcessExecutor-like structures.
-pub struct GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z> {
+pub struct GenericInProcessForkExecutorInner<EM, HT, I, OF, OT, S, SP> {
     pub(super) hooks: (InChildProcessHooks<I, S>, HT),
     pub(super) shmem_provider: SP,
     pub(super) observers: OT,
@@ -40,10 +40,10 @@ pub struct GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z> {
     pub(super) itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_os = "linux")))]
     pub(super) itimerval: Itimerval,
-    pub(super) phantom: PhantomData<(EM, I, S, Z)>,
+    pub(super) phantom: PhantomData<(EM, I, S, OF)>,
 }
 
-impl<EM, HT, I, OT, S, SP, Z> Debug for GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>
+impl<EM, HT, I, OF, OT, S, SP> Debug for GenericInProcessForkExecutorInner<EM, HT, I, OF, OT, S, SP>
 where
     HT: Debug,
     OT: Debug,
@@ -104,7 +104,7 @@ fn parse_itimerval(timeout: Duration) -> Itimerval {
     }
 }
 
-impl<EM, HT, I, OT, S, SP, Z> GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>
+impl<EM, HT, I, OF, OT, S, SP> GenericInProcessForkExecutorInner<EM, HT, I, OF, OT, S, SP>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -112,14 +112,14 @@ where
 {
     pub(super) unsafe fn pre_run_target_child(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
     ) -> Result<(), Error> {
         self.shmem_provider.post_fork(true)?;
 
-        self.enter_target(fuzzer, state, mgr, input);
+        self.enter_target(objective, state, mgr, input);
         self.hooks.pre_exec_all(state, input);
 
         self.observers
@@ -147,7 +147,7 @@ where
 
     pub(super) unsafe fn post_run_target_child(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -157,7 +157,7 @@ where
             .expect("Failed to run post_exec on observers");
 
         self.hooks.post_exec_all(state, input);
-        self.leave_target(fuzzer, state, mgr, input);
+        self.leave_target(objective, state, mgr, input);
 
         libc::_exit(0);
     }
@@ -195,14 +195,20 @@ where
     }
 }
 
-impl<EM, HT, I, OT, S, SP, Z> GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>
+impl<EM, HT, I, OF, OT, S, SP> GenericInProcessForkExecutorInner<EM, HT, I, OF, OT, S, SP>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
-    pub fn enter_target(&mut self, _fuzzer: &mut Z, state: &mut S, _event_mgr: &mut EM, input: &I) {
+    pub fn enter_target(
+        &mut self,
+        _objective: &mut OF,
+        state: &mut S,
+        _event_mgr: &mut EM,
+        input: &I,
+    ) {
         unsafe {
             let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
@@ -225,7 +231,7 @@ where
     /// This function marks the boundary between the fuzzer and the target.
     pub fn leave_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         _state: &mut S,
         _event_mgr: &mut EM,
         _input: &I,
@@ -238,7 +244,7 @@ where
     pub fn with_hooks(
         userhooks: HT,
         observers: OT,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
@@ -262,7 +268,7 @@ where
     pub fn with_hooks(
         userhooks: HT,
         observers: OT,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
@@ -284,8 +290,8 @@ where
     }
 }
 
-impl<EM, HT, I, OT, S, SP, Z> HasObservers
-    for GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>
+impl<EM, HT, I, OF, OT, S, SP> HasObservers
+    for GenericInProcessForkExecutorInner<EM, HT, I, OF, OT, S, SP>
 {
     type Observers = OT;
 

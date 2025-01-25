@@ -71,7 +71,7 @@ where
         state: &mut S,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers,
+        E: Executor<EM, I, OF, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         CS: Scheduler<I, S> + RemovableScheduler<I, S>,
         EM: EventFirer<I, S>,

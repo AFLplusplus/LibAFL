@@ -1570,7 +1570,7 @@ impl Default
     }
 }
 
-impl<EM, I, OT, S, SHM, TC, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SHM, TC>
+impl<EM, I, OF, OT, S, SHM, TC> Executor<EM, I, OF, S> for ForkserverExecutor<I, OT, S, SHM, TC>
 where
     OT: ObserversTuple<I, S>,
     S: HasExecutions,
@@ -1580,7 +1580,7 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,

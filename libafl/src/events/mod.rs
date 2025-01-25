@@ -655,10 +655,10 @@ impl AwaitRestartSafe for NopEventManager {
     fn await_restart_safe(&mut self) {}
 }
 
-impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
+impl<E, S, OF> EventProcessor<E, S, OF> for NopEventManager {
     fn process(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         _state: &mut S,
         _executor: &mut E,
     ) -> Result<usize, Error> {

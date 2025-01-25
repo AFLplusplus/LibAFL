@@ -19,7 +19,7 @@ use crate::{
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
-    Error, HasNamedMetadata,
+    Error, HasNamedMetadata, HasObjective,
 };
 
 /// A stage that runs a tracer executor
@@ -32,13 +32,14 @@ pub struct TracingStage<EM, I, TE, S, Z> {
 
 impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z>
 where
-    TE: Executor<EM, I, S, Z> + HasObservers,
+    TE: Executor<EM, I, Z::Objective, S> + HasObservers,
     TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
         + HasCorpus<I>
         + HasNamedMetadata
         + HasCurrentTestcase<I>
         + MaybeHasClientPerfMonitor,
+    Z: HasObjective,
 {
     /// Perform tracing on the given `CorpusId`. Useful for if wrapping [`TracingStage`] with your
     /// own stage and you need to manage [`super::NestedStageRetryCountRestartHelper`] differently
@@ -57,9 +58,9 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &input)?;
+        let exit_kind =
+            self.tracer_executor
+                .run_target(fuzzer.objective_mut(), state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
@@ -74,7 +75,7 @@ where
 
 impl<E, EM, I, TE, S, Z> Stage<E, EM, S, Z> for TracingStage<EM, I, TE, S, Z>
 where
-    TE: Executor<EM, I, S, Z> + HasObservers,
+    TE: Executor<EM, I, Z::Objective, S> + HasObservers,
     TE::Observers: ObserversTuple<I, S>,
     S: HasExecutions
         + HasCorpus<I>
@@ -82,6 +83,7 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
     I: Input,
+    Z: HasObjective,
 {
     #[inline]
     fn perform(
@@ -163,7 +165,7 @@ impl<E, EM, I, SOT, S, Z> Named for ShadowTracingStage<E, EM, I, SOT, S, Z> {
 impl<E, EM, I, SOT, S, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
     for ShadowTracingStage<E, EM, I, SOT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers,
+    E: Executor<EM, I, Z::Objective, S> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
     S: HasExecutions
@@ -173,6 +175,7 @@ where
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
+    Z: HasObjective,
 {
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::no_retry(state, &self.name)
@@ -203,7 +206,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer.objective_mut(), state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);

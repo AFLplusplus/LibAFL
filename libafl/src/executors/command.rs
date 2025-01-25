@@ -385,7 +385,7 @@ where
     }
 }
 
-impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T>
+impl<EM, I, OF, OT, S, T> Executor<EM, I, OF, S> for CommandExecutor<I, OT, S, T>
 where
     S: HasExecutions,
     T: CommandConfigurator<I> + Debug,
@@ -393,7 +393,7 @@ where
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
@@ -419,7 +419,7 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, S, Z> for CommandExecutor<I, OT, S, T, HT, Pid>
+impl<EM, I, OT, S, T, Z, HT> Executor<EM, I, OF, S> for CommandExecutor<I, OT, S, T, HT, Pid>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: MatchName + ObserversTuple<I, S>,
@@ -433,7 +433,7 @@ where
     /// just before the `exec` return (after forking).
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,

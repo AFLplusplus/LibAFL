@@ -25,7 +25,6 @@ use crate::{
         Executor, HasObservers,
     },
     feedbacks::Feedback,
-    fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -76,9 +75,9 @@ where
     /// the code.
     // TODO: Remove EM and Z from function bound and add it to struct instead to avoid possible type confusion
     #[inline]
-    pub unsafe fn enter_target<EM, Z>(
+    pub unsafe fn enter_target<EM, OF>(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -102,8 +101,8 @@ where
                 ptr::from_mut(mgr) as *mut c_void,
             );
             write_volatile(
-                &raw mut (*data).fuzzer_ptr,
-                ptr::from_mut(fuzzer) as *mut c_void,
+                &raw mut (*data).objective_ptr,
+                ptr::from_mut(objective) as *mut c_void,
             );
             compiler_fence(Ordering::SeqCst);
         }
@@ -111,9 +110,9 @@ where
 
     /// This function marks the boundary between the fuzzer and the target
     #[inline]
-    pub fn leave_target<EM, Z>(
+    pub fn leave_target<EM, OF>(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         _state: &mut S,
         _mgr: &mut EM,
         _input: &I,
@@ -134,26 +133,25 @@ where
     S: HasExecutions + HasSolutions<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn generic<E, EM, OF, Z>(
+    pub fn generic<E, EM, OF>(
         user_hooks: HT,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E: Executor<EM, I, OF, S> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_generic::<E, EM, OF, Z>(
+        Self::with_timeout_generic::<E, EM, OF>(
             user_hooks,
             observers,
-            fuzzer,
+            objective,
             state,
             event_mgr,
             Duration::from_millis(5000),
@@ -162,25 +160,24 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout_generic<E, EM, OF, Z>(
+    pub fn batched_timeout_generic<E, EM, OF>(
         user_hooks: HT,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
         exec_tmout: Duration,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E: Executor<EM, I, OF, S> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: HasObjective<Objective = OF>,
     {
-        let mut me = Self::with_timeout_generic::<E, EM, OF, Z>(
-            user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
+        let mut me = Self::with_timeout_generic::<E, EM, OF>(
+            user_hooks, observers, objective, state, event_mgr, exec_tmout,
         )?;
         me.hooks_mut().0.timer_mut().batch_mode = true;
         Ok(me)
@@ -194,24 +191,23 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout_generic<E, EM, OF, Z>(
+    pub fn with_timeout_generic<E, EM, OF>(
         user_hooks: HT,
         observers: OT,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _event_mgr: &mut EM,
         timeout: Duration,
     ) -> Result<Self, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E: Executor<EM, I, OF, S> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
-        let default = InProcessHooks::new::<E, EM, OF, Z>(timeout)?;
+        let default = InProcessHooks::new::<E, EM, OF>(timeout)?;
         let mut hooks = tuple_list!(default).merge(user_hooks);
         hooks.init_all(state);
 

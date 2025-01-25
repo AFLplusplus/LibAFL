@@ -109,7 +109,7 @@ where
     }
 }
 
-impl<E, I, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, MT, S>
+impl<E, I, MT, S, OF> EventProcessor<E, S, OF> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
@@ -117,7 +117,7 @@ where
 {
     fn process(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _executor: &mut E,
     ) -> Result<usize, Error> {

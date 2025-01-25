@@ -28,7 +28,7 @@ use crate::{
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     state::{HasExecutions, HasSolutions},
-    Error, HasObjective,
+    Error,
 };
 #[cfg(any(unix, windows))]
 use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
@@ -214,14 +214,13 @@ impl<I, S> InProcessHooks<I, S> {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)] // for `exec_tmout` without `std`
-    pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
+    pub fn new<E, EM, OF>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E: Executor<EM, I, OF, S> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
         // # Safety
@@ -231,7 +230,7 @@ impl<I, S> InProcessHooks<I, S> {
         #[cfg(all(not(miri), unix, feature = "std"))]
         let data = unsafe { &raw mut GLOBAL_STATE };
         #[cfg(feature = "std")]
-        unix_signal_handler::setup_panic_hook::<E, EM, I, OF, S, Z>();
+        unix_signal_handler::setup_panic_hook::<E, EM, I, OF, S>();
         // # Safety
         // Setting up the signal handlers with a pointer to the `GLOBAL_STATE` which should not be NULL at this point.
         // We are the sole users of `GLOBAL_STATE` right now, and only dereference it in case of Segfault/Panic.
@@ -243,10 +242,10 @@ impl<I, S> InProcessHooks<I, S> {
         compiler_fence(Ordering::SeqCst);
         Ok(Self {
             #[cfg(feature = "std")]
-            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S, Z>
+            crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, S>
                 as *const c_void,
             #[cfg(feature = "std")]
-            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S, Z>
+            timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, I, OF, S>
                 as *const _,
             #[cfg(feature = "std")]
             timer: TimerStruct::new(exec_tmout),
@@ -259,7 +258,7 @@ impl<I, S> InProcessHooks<I, S> {
     #[allow(unused_variables)] // for `exec_tmout` without `std`
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E: Executor<EM, I, OF, S> + HasObservers + HasInProcessHooks<I, S>,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
@@ -322,7 +321,7 @@ impl<I, S> InProcessHooks<I, S> {
     #[expect(unused_variables)]
     pub fn new<E, EM, OF, Z>(exec_tmout: Duration) -> Result<Self, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
+        E: Executor<EM, I, OF, S> + HasObservers + HasInProcessHooks<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I>,
@@ -358,8 +357,8 @@ pub struct InProcessExecutorHandlerData {
     pub state_ptr: *mut c_void,
     /// the pointer to the event mgr
     pub event_mgr_ptr: *mut c_void,
-    /// the pointer to the fuzzer
-    pub fuzzer_ptr: *mut c_void,
+    /// the pointer to the objective
+    pub objective_ptr: *mut c_void,
     /// the pointer to the executor
     pub executor_ptr: *const c_void,
     pub(crate) current_input_ptr: *const c_void,
@@ -406,10 +405,10 @@ impl InProcessExecutorHandlerData {
     }
 
     /// # Safety
-    /// Only safe if not called twice and if the fuzzer is not used from another borrow after this.
+    /// Only safe if not called twice and if the objective is not used from another borrow after this.
     #[cfg(any(unix, feature = "std"))]
-    pub(crate) unsafe fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
-        unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
+    pub(crate) unsafe fn objective_mut<'a, OF>(&self) -> &'a mut OF {
+        unsafe { (self.objective_ptr as *mut OF).as_mut().unwrap() }
     }
 
     /// # Safety
@@ -440,8 +439,8 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
     event_mgr_ptr: null_mut(),
-    // The fuzzer ptr for signal handling
-    fuzzer_ptr: null_mut(),
+    // The objective ptr for signal handling
+    objective_ptr: null_mut(),
     // The executor ptr for signal handling
     executor_ptr: ptr::null(),
     // The current input for signal handling
@@ -481,13 +480,13 @@ pub unsafe fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
     unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
 }
 
-/// Gets the inprocess [`crate::fuzzer::Fuzzer`]
+/// Gets the `Objective`
 ///
 /// # Safety
-/// Only safe if not called twice and if the fuzzer is not accessed from another borrow while this one is alive.
+/// Only safe if not called twice and if the objective is not accessed from another borrow while this one is alive.
 #[must_use]
-pub unsafe fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
-    unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
+pub unsafe fn inprocess_get_objective<'a, OF>() -> Option<&'a mut OF> {
+    unsafe { (GLOBAL_STATE.objective_ptr as *mut OF).as_mut() }
 }
 
 /// Gets the inprocess [`Executor`]

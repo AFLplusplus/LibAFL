@@ -35,19 +35,19 @@ impl<A, B> CombinedExecutor<A, B> {
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for CombinedExecutor<A, B>
+impl<A, B, EM, I, OF, S> Executor<EM, I, OF, S> for CombinedExecutor<A, B>
 where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
+    A: Executor<EM, I, OF, S>,
+    B: Executor<EM, I, OF, S>,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.primary.run_target(fuzzer, state, mgr, input)
+        self.primary.run_target(objective, state, mgr, input)
     }
 }
 

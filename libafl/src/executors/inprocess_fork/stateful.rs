@@ -24,10 +24,10 @@ use crate::{
 };
 
 /// The `StatefulInProcessForkExecutor` with no user hooks
-pub type StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z> =
-    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, (), I, OT, S, SP, Z>;
+pub type StatefulInProcessForkExecutor<'a, EM, ES, H, I, OF, OT, S, SP> =
+    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, (), I, OF, OT, S, SP>;
 
-impl<'a, H, I, OT, S, SP, ES, EM, Z> StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z>
+impl<'a, H, I, OF, OT, S, SP, ES, EM> StatefulInProcessForkExecutor<'a, EM, ES, H, I, OF, OT, S, SP>
 where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -38,7 +38,7 @@ where
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
         timeout: Duration,
@@ -49,7 +49,7 @@ where
             harness_fn,
             exposed_executor_state,
             observers,
-            fuzzer,
+            objective,
             state,
             event_mgr,
             timeout,
@@ -59,17 +59,17 @@ where
 }
 
 /// [`StatefulGenericInProcessForkExecutor`] is an executor that forks the current process before each execution. Harness can access some internal state.
-pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z> {
+pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OF, OT, S, SP> {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: &'a mut H,
     /// The state used as argument of the harness
     pub exposed_executor_state: ES,
     /// Inner state of the executor
-    pub inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
+    pub inner: GenericInProcessForkExecutorInner<EM, HT, I, OF, OT, S, SP>,
 }
 
-impl<H, HT, I, OT, S, SP, ES, EM, Z> Debug
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
+impl<H, HT, I, OF, OT, S, SP, ES, EM> Debug
+    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OF, OT, S, SP>
 where
     HT: Debug,
     OT: Debug,
@@ -92,8 +92,8 @@ where
     }
 }
 
-impl<EM, H, HT, I, OT, S, SP, Z, ES> Executor<EM, I, S, Z>
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
+impl<EM, H, HT, I, OF, OT, S, SP, ES> Executor<EM, I, OF, S>
+    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OF, OT, S, SP>
 where
     H: FnMut(&mut ES, &I) -> ExitKind + Sized,
     HT: ExecutorHooksTuple<I, S>,
@@ -104,7 +104,7 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -116,9 +116,11 @@ where
             match fork() {
                 Ok(ForkResult::Child) => {
                     // Child
-                    self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
+                    self.inner
+                        .pre_run_target_child(objective, state, mgr, input)?;
                     (self.harness_fn)(&mut self.exposed_executor_state, input);
-                    self.inner.post_run_target_child(fuzzer, state, mgr, input);
+                    self.inner
+                        .post_run_target_child(objective, state, mgr, input);
                     Ok(ExitKind::Ok)
                 }
                 Ok(ForkResult::Parent { child }) => {
@@ -131,8 +133,8 @@ where
     }
 }
 
-impl<'a, H, HT, I, OT, S, SP, ES, EM, Z>
-    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z>
+impl<'a, H, HT, I, OF, OT, S, SP, ES, EM>
+    StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OF, OT, S, SP>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -144,7 +146,7 @@ where
         harness_fn: &'a mut H,
         exposed_executor_state: ES,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
         timeout: Duration,
@@ -156,7 +158,7 @@ where
             inner: GenericInProcessForkExecutorInner::with_hooks(
                 userhooks,
                 observers,
-                fuzzer,
+                objective,
                 state,
                 event_mgr,
                 timeout,
@@ -178,8 +180,8 @@ where
     }
 }
 
-impl<H, HT, I, OT, S, SP, ES, EM, Z> HasObservers
-    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
+impl<H, HT, I, OF, OT, S, SP, ES, EM> HasObservers
+    for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OF, OT, S, SP>
 {
     type Observers = OT;
 

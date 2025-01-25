@@ -26,7 +26,7 @@ use crate::{
     stages::{RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasObjective,
 };
 
 const MAX_GENERALIZED_LEN: usize = 8192;
@@ -66,7 +66,7 @@ impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z>
     for GeneralizationStage<C, EM, BytesInput, O, E::Observers, S, Z>
 where
     C: CanTrack + AsRef<O> + Named,
-    E: Executor<EM, BytesInput, S, Z> + HasObservers,
+    E: Executor<EM, BytesInput, Z::Objective, S> + HasObservers,
     E::Observers: ObserversTuple<BytesInput, S>,
     O: MapObserver,
     S: HasExecutions
@@ -75,6 +75,7 @@ where
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
+    Z: HasObjective,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -370,15 +371,16 @@ where
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, BytesInput, S, Z> + HasObservers,
+        E: Executor<EM, BytesInput, Z::Objective, S> + HasObservers,
         E::Observers: ObserversTuple<BytesInput, S>,
+        Z: HasObjective,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
+        let exit_kind = executor.run_target(fuzzer.objective_mut(), state, manager, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
@@ -412,7 +414,8 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
+        E: Executor<EM, BytesInput, Z::Objective, S> + HasObservers<Observers = OT>,
+        Z: HasObjective,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -450,7 +453,8 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
+        E: Executor<EM, BytesInput, Z::Objective, S> + HasObservers<Observers = OT>,
+        Z: HasObjective,
     {
         let mut index = 0;
         while index < payload.len() {
