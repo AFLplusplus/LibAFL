@@ -54,6 +54,7 @@ pub extern "C" fn libafl_main() {
 }
 
 /// The actual fuzzer
+#[allow(dead_code)]
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &PacketData| {
@@ -143,18 +144,18 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()),
     );
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut restarting_mgr,
         Duration::new(10, 0),
     )?;
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.

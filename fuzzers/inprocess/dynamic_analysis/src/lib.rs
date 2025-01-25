@@ -328,9 +328,6 @@ fn fuzz(
         ),
     );
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -348,7 +345,7 @@ fn fuzz(
         tuple_list!(callhook.clone()),
         &mut harness,
         tuple_list!(edges_observer, time_observer, profiling_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         timeout,
@@ -360,13 +357,16 @@ fn fuzz(
             tuple_list!(callhook),
             &mut tracing_harness,
             tuple_list!(cmplog_observer),
-            &mut fuzzer,
+            &mut objective,
             &mut state,
             &mut mgr,
             timeout * 10,
         )?,
         // Give it more time!
     );
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);

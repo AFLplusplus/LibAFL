@@ -387,9 +387,6 @@ fn fuzz_binary(
         ),
     );
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -406,7 +403,7 @@ fn fuzz_binary(
     let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         timeout,
@@ -416,11 +413,14 @@ fn fuzz_binary(
     let tracing = TracingStage::new(InProcessExecutor::with_timeout(
         &mut tracing_harness,
         tuple_list!(cmplog_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         timeout * 10,
     )?);
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
@@ -619,9 +619,6 @@ fn fuzz_text(
         ),
     );
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -640,7 +637,7 @@ fn fuzz_text(
     let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         timeout,
@@ -649,12 +646,15 @@ fn fuzz_text(
     let tracing = TracingStage::new(InProcessExecutor::with_timeout(
         &mut tracing_harness,
         tuple_list!(cmplog_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         // Give it more time!
         timeout * 10,
     )?);
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The order of the stages matter!
     let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
