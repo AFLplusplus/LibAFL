@@ -196,12 +196,15 @@ pub fn fuzz() {
         let scheduler =
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
         // Create a QEMU in-process executor
         let mut executor = QemuExecutor::new(
             emu,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
-            &mut objective,
+            &mut fuzzer,
             &mut state,
             &mut mgr,
             timeout,
@@ -210,9 +213,6 @@ pub fn fuzz() {
 
         // Instead of calling the timeout handler and restart the process, trigger a breakpoint ASAP
         executor.break_on_timeout();
-
-        // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 

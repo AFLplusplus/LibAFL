@@ -340,6 +340,9 @@ fn fuzz(
         PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()),
     );
 
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness =
         |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
@@ -380,7 +383,7 @@ fn fuzz(
         emulator,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
-        &mut objective,
+        &mut fuzzer,
         &mut state,
         &mut mgr,
         timeout,
@@ -388,9 +391,6 @@ fn fuzz(
 
     // Show the cmplog observer
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
