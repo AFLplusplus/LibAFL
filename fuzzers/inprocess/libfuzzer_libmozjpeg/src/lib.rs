@@ -140,9 +140,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // A random policy to get testcasess from the corpus
     let scheduler = RandScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -157,10 +154,13 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(edges_observer, cmps_observer, allocs_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut restarting_mgr,
     )?;
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.

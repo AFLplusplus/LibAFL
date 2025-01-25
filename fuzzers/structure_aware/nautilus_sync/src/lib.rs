@@ -188,18 +188,18 @@ pub extern "C" fn libafl_main() {
         // A queue policy to get testcasess from the corpus
         let scheduler = QueueScheduler::new();
 
-        // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
         // Create the executor for an in-process function with just one observer
         let mut executor = InProcessExecutor::new(
             &mut harness,
             tuple_list!(observer),
-            &mut fuzzer,
+            &mut objective,
             &mut state,
             &mut mgr,
         )
         .expect("Failed to create the Executor");
+
+        // A fuzzer with feedbacks and a corpus scheduler
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.

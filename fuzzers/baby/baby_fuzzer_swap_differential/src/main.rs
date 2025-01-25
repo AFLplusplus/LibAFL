@@ -217,14 +217,11 @@ pub fn main() {
     // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // Create the executor for an in-process function with just one observer
     let first_executor = InProcessExecutor::new(
         &mut first_harness,
         tuple_list!(first_map_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
     )
@@ -232,11 +229,14 @@ pub fn main() {
     let second_executor = InProcessExecutor::new(
         &mut second_harness,
         tuple_list!(second_map_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
     )
     .expect("Failed to create the second executor");
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // create the differential executor, providing both the map swapper (which will ensure the
     // instrumentation picks the correct map to write to) and the map observer (which provides the

@@ -202,9 +202,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             let scheduler =
                 IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-            // A fuzzer with feedbacks and a corpus scheduler
-            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
             #[cfg(unix)]
             let observers = tuple_list!(edges_observer, time_observer, asan_observer);
             #[cfg(windows)]
@@ -216,12 +213,16 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 InProcessExecutor::new(
                     &mut frida_harness,
                     observers,
-                    &mut fuzzer,
+                    &mut objective,
                     &mut state,
                     &mut mgr,
                 )?,
                 &mut frida_helper,
             );
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
             // Create an observation channel using cmplog map
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 

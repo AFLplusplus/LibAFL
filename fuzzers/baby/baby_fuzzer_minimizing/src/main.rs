@@ -75,18 +75,18 @@ pub fn main() -> Result<(), Error> {
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
     )
     .expect("Failed to create the Executor");
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));
@@ -137,7 +137,7 @@ pub fn main() -> Result<(), Error> {
     let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
+    let mut executor = InProcessExecutor::new(&mut harness, (), &mut (), &mut state, &mut mgr)?;
 
     state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
 

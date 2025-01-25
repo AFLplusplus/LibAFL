@@ -291,9 +291,6 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let scheduler =
                     IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-                // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
                 let observers = tuple_list!(edges_observer, time_observer, asan_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
@@ -302,12 +299,15 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                     InProcessExecutor::new(
                         &mut frida_harness,
                         observers,
-                        &mut fuzzer,
+                        &mut objective,
                         &mut state,
                         &mut mgr,
                     )?,
                     &mut frida_helper,
                 );
+
+                // A fuzzer with feedbacks and a corpus scheduler
+                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 // In case the corpus is empty (on first run), reset
                 if state.must_load_initial_inputs() {
