@@ -770,7 +770,7 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, S, Z>() -> impl Executor<EM, BytesInput, S, Z>
+/// fn make_executor<EM, OF, S>() -> impl Executor<EM, BytesInput, OF, S>
 /// where
 ///     S: HasExecutions,
 /// {
