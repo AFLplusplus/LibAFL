@@ -65,7 +65,7 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     let mut executor = InProcessForkExecutor::new(
         &mut harness,
         (),
-        &mut fuzzer,
+        &mut (),
         &mut state,
         &mut mgr,
         options.timeout(),
