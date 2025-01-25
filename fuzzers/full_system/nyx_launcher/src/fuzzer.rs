@@ -110,6 +110,7 @@ impl Fuzzer {
 
             // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
             return client.run(
+                None,
                 MonitorTypedEventManager::<_, M>::new(
                     LlmpRestartingEventManagerBuilder::builder().build_on_port(
                         shmem_provider.clone(),
