@@ -167,7 +167,13 @@ where
         Z: HasObjective<Objective = OF> + HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
     {
         let mut inner = StatefulInProcessExecutor::with_timeout(
-            harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
+            harness_fn,
+            emulator,
+            observers,
+            fuzzer.objective_mut(),
+            state,
+            event_mgr,
+            timeout,
         )?;
 
         #[cfg(feature = "usermode")]
@@ -321,7 +327,7 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
     QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
 where
     EM: EventFirer<I, S> + EventRestarter<S>,
@@ -329,15 +335,13 @@ where
     OT: ObserversTuple<I, S>,
     S: HasSolutions<I>,
     SP: ShMemProvider,
-    Z: HasObjective,
-    Z::Objective: Feedback<EM, I, OT, S>,
 {
     #[expect(clippy::too_many_arguments)]
     pub fn new(
         emulator: Emulator<C, CM, ED, ET, I, S, SM>,
         harness_fn: &'a mut H,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
         shmem_provider: SP,
@@ -350,7 +354,7 @@ where
                 harness_fn,
                 emulator,
                 observers,
-                fuzzer.objective_mut(),
+                objective,
                 state,
                 event_mgr,
                 timeout,
@@ -360,16 +364,14 @@ where
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn inner(
-        &self,
-    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
+    pub fn inner(&self) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP> {
         &self.inner
     }
 
     #[allow(clippy::type_complexity)]
     pub fn inner_mut(
         &mut self,
-    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
+    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP> {
         &mut self.inner
     }
 
@@ -383,8 +385,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP, Z> Executor<EM, I, S, Z>
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> Executor<EM, I, OF, S>
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
 where
     C: Clone,
     CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
@@ -397,11 +399,10 @@ where
     I: Input + Unpin,
     S: HasExecutions + Unpin,
     SP: ShMemProvider,
-    Z: HasObjective<Objective = OF>,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -410,7 +411,7 @@ where
 
         self.inner.exposed_executor_state.pre_exec(state, input);
 
-        let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
+        let mut exit_kind = self.inner.run_target(objective, state, mgr, input)?;
 
         self.inner.exposed_executor_state.post_exec(
             input,
@@ -424,8 +425,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> HasObservers
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP> HasObservers
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP>
 where
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,

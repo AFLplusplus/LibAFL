@@ -91,9 +91,6 @@ pub fn main() {
     // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // Get the memory map of the current process
     let my_pid = i32::try_from(process::id()).unwrap();
     let process_maps = get_process_maps(my_pid).unwrap();
@@ -129,12 +126,15 @@ pub fn main() {
         tuple_list!(pt_hook),
         &mut harness,
         tuple_list!(observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         Duration::from_millis(5000),
     )
     .expect("Failed to create the Executor");
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());
