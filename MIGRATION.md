@@ -1,3 +1,6 @@
+# 0.15.0 -> 0.16.0
+- `Executor` has a new interface: It now only receives the objective instead of the fuzzer.
+  - Related: Most `Executor` implementations mirror this change — you now probably need to create your `Executor` before you create your `Fuzzer`.
 
 # 0.14.1 -> 0.15.0
 - `MmapShMem::new` and `MmapShMemProvider::new_shmem_with_id` now take `AsRef<Path>` instead of a byte array for the filename/id.
