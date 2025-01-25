@@ -7,7 +7,6 @@ use libafl::{
     inputs::Input,
     observers::ObserversTuple,
     state::{HasCurrentTestcase, HasExecutions, HasSolutions},
-    HasObjective,
 };
 
 /// Asan death callback type
