@@ -2,7 +2,7 @@
 use crate::events::Event;
 use crate::monitors::UserStats;
 use crate::monitors::{AggregatorOps, UserStatsValue};
-use crate::state::UsesState;
+
 use alloc::{string::String, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use std::{
@@ -28,9 +28,8 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
-    events::{Event, EventFirer},
+    events::EventFirer,
     executors::HasObservers,
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
@@ -119,6 +118,7 @@ pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
     /// The core we are bound to
     core_id: CoreId,
     phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
+    update_user_stats_enabled: bool,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -244,7 +244,7 @@ impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, I, O, 
 where
     C: AsRef<O> + Named,
     E: HasObservers,
-    EM: EventFirer<I, S> + UsesState<State = S>,
+    EM: EventFirer<I, S> ,
     Z: HasScheduler<I, S>,
     S: HasImported
         + HasCorpus<I>
@@ -276,7 +276,8 @@ where
         let corpus_idx_value = corpus_idx.0; // Extract `usize` value from `CorpusId`
 
         // Fire the UpdateUserStats event with the corpus index
-        _manager.fire(
+        if self.update_user_stats_enabled {
+        manager.fire(
             state,
             Event::UpdateUserStats {
                 name: Cow::Borrowed("Current Testcase Index"),
@@ -287,7 +288,7 @@ where
                 phantom: PhantomData,
             },
         )?;
-
+    }
         let testcase = state.corpus().get(corpus_idx)?.borrow();
         
         // NOTE: scheduled_count represents the amount of fuzz runs a
@@ -679,6 +680,7 @@ pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
     version: String,
     target_mode: String,
     phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
+    update_user_stats_enabled: bool,
 }
 
 impl<C, E, EM, I, O, S, Z> AflStatsStageBuilder<C, E, EM, I, O, S, Z>
@@ -703,6 +705,7 @@ where
             version: String::default(),
             target_mode: String::default(),
             phantom_data: PhantomData,
+            update_user_stats_enabled: false,
         }
     }
 
@@ -838,6 +841,7 @@ where
             dict_count: self.dict_count,
             core_id: self.core_id.unwrap_or(CoreId(0)),
             autotokens_enabled: self.uses_autotokens,
+            update_user_stats_enabled: self.update_user_stats_enabled, // Set field
             phantom_data: PhantomData,
         })
     }
