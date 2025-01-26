@@ -7,8 +7,7 @@ use std::{
 use clap::Parser;
 use libafl::{
     events::{
-        ClientDescription, EventConfig, Launcher, LlmpRestartingEventManagerBuilder,
-        MonitorTypedEventManager,
+        ClientDescription, EventConfig, Launcher, LlmpEventManagerBuilder, MonitorTypedEventManager,
     },
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
@@ -112,7 +111,7 @@ impl Fuzzer {
             return client.run(
                 None,
                 MonitorTypedEventManager::<_, M>::new(
-                    LlmpRestartingEventManagerBuilder::builder().build_on_port(
+                    LlmpEventManagerBuilder::builder().build_on_port(
                         shmem_provider.clone(),
                         broker_port,
                         EventConfig::AlwaysUnique,

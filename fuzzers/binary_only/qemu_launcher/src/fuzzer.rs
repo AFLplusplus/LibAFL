@@ -10,7 +10,7 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
-    events::{ClientDescription, LlmpRestartingEventManagerBuilder},
+    events::{ClientDescription, LlmpEventManagerBuilder},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
@@ -115,7 +115,7 @@ impl Fuzzer {
             return client.run(
                 None,
                 MonitorTypedEventManager::<_, M>::new(
-                    LlmpRestartingEventManagerBuilder::builder().build_on_port(
+                    LlmpEventManagerBuilder::builder().build_on_port(
                         shmem_provider.clone(),
                         broker_port,
                         EventConfig::AlwaysUnique,

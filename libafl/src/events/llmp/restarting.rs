@@ -383,20 +383,20 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 /// Builder for `LlmpRestartingEventManager`
 #[derive(Debug)]
-pub struct LlmpRestartingEventManagerBuilder<EMH> {
+pub struct LlmpEventManagerBuilder<EMH> {
     throttle: Option<Duration>,
     save_state: LlmpShouldSaveState,
     hooks: EMH,
 }
 
-impl Default for LlmpRestartingEventManagerBuilder<()> {
+impl Default for LlmpEventManagerBuilder<()> {
     fn default() -> Self {
         Self::builder()
     }
 }
 
-impl LlmpRestartingEventManagerBuilder<()> {
-    /// Create a new `LlmpRestartingEventManagerBuilder`
+impl LlmpEventManagerBuilder<()> {
+    /// Create a new `LlmpEventManagerBuilder`
     #[must_use]
     pub fn builder() -> Self {
         Self {
@@ -407,10 +407,10 @@ impl LlmpRestartingEventManagerBuilder<()> {
     }
 }
 
-impl LlmpRestartingEventManagerBuilder<()> {
+impl LlmpEventManagerBuilder<()> {
     /// Add hooks to it
-    pub fn hooks<EMH>(self, hooks: EMH) -> LlmpRestartingEventManagerBuilder<EMH> {
-        LlmpRestartingEventManagerBuilder {
+    pub fn hooks<EMH>(self, hooks: EMH) -> LlmpEventManagerBuilder<EMH> {
+        LlmpEventManagerBuilder {
             throttle: self.throttle,
             save_state: self.save_state,
             hooks,
@@ -418,7 +418,7 @@ impl LlmpRestartingEventManagerBuilder<()> {
     }
 }
 
-impl<EMH> LlmpRestartingEventManagerBuilder<EMH> {
+impl<EMH> LlmpEventManagerBuilder<EMH> {
     /// Change the sampling rate
     #[must_use]
     pub fn throttle(mut self, throttle: Duration) -> Self {
@@ -524,7 +524,7 @@ where
     SP: ShMemProvider<ShMem = SHM>,
 {
     /// Write the config for a client `EventManager` to env vars, a new
-    /// client can reattach using [`LlmpRestartingEventManagerBuilder::build_existing_client_from_env()`].
+    /// client can reattach using [`LlmpEventManagerBuilder::build_existing_client_from_env()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) {
         self.llmp.to_env(env_name).unwrap();
@@ -866,7 +866,7 @@ where
                         }
                         LlmpConnection::IsClient { client } => {
                             let mgr: LlmpRestartingEventManager<EMH, I, S, SP::ShMem, SP> =
-                                LlmpRestartingEventManagerBuilder::builder()
+                                LlmpEventManagerBuilder::builder()
                                     .hooks(self.hooks)
                                     .build_from_client(
                                         client,
@@ -892,7 +892,7 @@ where
                 }
                 ManagerKind::Client { client_description } => {
                     // We are a client
-                    let mgr = LlmpRestartingEventManagerBuilder::builder()
+                    let mgr = LlmpEventManagerBuilder::builder()
                         .hooks(self.hooks)
                         .build_on_port(
                             self.shmem_provider.clone(),
@@ -1025,7 +1025,7 @@ where
             if let Some((state_opt, mgr_description)) = staterestorer.restore()? {
                 (
                     state_opt,
-                    LlmpRestartingEventManagerBuilder::builder()
+                    LlmpEventManagerBuilder::builder()
                         .hooks(self.hooks)
                         .save_state(self.serialize_state)
                         .build_existing_client_from_description(
@@ -1041,7 +1041,7 @@ where
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    LlmpRestartingEventManagerBuilder::builder()
+                    LlmpEventManagerBuilder::builder()
                         .hooks(self.hooks)
                         .save_state(self.serialize_state)
                         .build_existing_client_from_env(
@@ -1086,7 +1086,7 @@ mod tests {
 
     use crate::{
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::llmp::restarting::{LlmpRestartingEventManagerBuilder, _ENV_FUZZER_SENDER},
+        events::llmp::restarting::{LlmpEventManagerBuilder, _ENV_FUZZER_SENDER},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,
@@ -1141,7 +1141,7 @@ mod tests {
             llmp_client.mark_safe_to_unmap();
         }
 
-        let mut llmp_mgr = LlmpRestartingEventManagerBuilder::builder()
+        let mut llmp_mgr = LlmpEventManagerBuilder::builder()
             .build_from_client(llmp_client, "fuzzer".into(), Some(time_ref.clone()), None)
             .unwrap();
 
@@ -1185,7 +1185,7 @@ mod tests {
         assert!(sc_cpy.has_content());
 
         let (mut state_clone, mgr_description) = staterestorer.restore().unwrap().unwrap();
-        let mut llmp_clone = LlmpRestartingEventManagerBuilder::builder()
+        let mut llmp_clone = LlmpEventManagerBuilder::builder()
             .build_existing_client_from_description(
                 shmem_provider,
                 &mgr_description,
