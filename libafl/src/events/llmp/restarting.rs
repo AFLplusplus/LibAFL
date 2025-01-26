@@ -99,6 +99,7 @@ pub struct LlmpRestartingEventManager<EMH, I, S, SHM, SP> {
     pub(crate) time_ref: Option<Handle<TimeObserver>>,
     event_buffer: Vec<u8>,
     /// The staterestorer to serialize the state for the next runner
+    /// If this is Some, this event manager can restart. Else it does not.
     staterestorer: Option<StateRestorer<SHM, SP>>,
     /// Decide if the state restorer must save the serialized state
     save_state: LlmpShouldSaveState,
@@ -434,6 +435,8 @@ impl<EMH> LlmpEventManagerBuilder<EMH> {
     }
 
     /// Create a manager from a raw LLMP client
+    /// If staterestorer is some then this restarting manager restarts
+    /// Otherwise this restarting manager does not restart
     pub fn build_from_client<I, S, SHM, SP>(
         self,
         llmp: LlmpClient<SHM, SP>,
