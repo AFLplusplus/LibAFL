@@ -311,6 +311,7 @@ impl PageFilter for NopPageFilter {
 }
 
 #[cfg(feature = "usermode")]
+#[allow(dead_code)]
 pub(crate) static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
     UnsafeCell::new(NopAddressFilter);
 #[cfg(feature = "systemmode")]

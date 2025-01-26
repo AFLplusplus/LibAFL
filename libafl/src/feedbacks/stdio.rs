@@ -46,7 +46,7 @@ impl StdOutToMetadataFeedback {
             .get(&self.o_ref)
             .ok_or(Error::illegal_state("StdOutObserver is missing"))?;
         let buffer = observer
-            .stdout
+            .output
             .as_ref()
             .ok_or(Error::illegal_state("StdOutObserver has no stdout"))?;
         let stdout = String::from_utf8_lossy(buffer).into_owned();
@@ -139,7 +139,7 @@ where
             .get(&self.o_ref)
             .ok_or(Error::illegal_state("StdErrObserver is missing"))?;
         let buffer = observer
-            .stderr
+            .output
             .as_ref()
             .ok_or(Error::illegal_state("StdErrObserver has no stderr"))?;
         let stderr = String::from_utf8_lossy(buffer).into_owned();

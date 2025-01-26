@@ -115,7 +115,9 @@ pub fn build() {
     let cross_cc = if cfg!(feature = "usermode") && (qemu_asan || qemu_asan_guest) {
         // TODO try to autodetect a cross compiler with the arch name (e.g. aarch64-linux-gnu-gcc)
         let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
-            println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
+            if cpu_target != env::consts::ARCH {
+                println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong since the selected cpu target ({cpu_target}) is different from the host arch ({}))", env::consts::ARCH);
+            }
             "cc".to_owned()
         });
         println!("cargo:rerun-if-env-changed=CROSS_CC");
