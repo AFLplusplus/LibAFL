@@ -666,6 +666,12 @@ where
     pub fn map_mut(&mut self) -> &mut OwnedMutSlice<'a, T> {
         &mut self.map
     }
+
+    /// Sets a custom initial value for the map observer
+    pub fn with_initial(mut self, initial: T) -> Self {
+        self.initial = initial;
+        self
+    }
 }
 
 impl<'a, T> StdMapObserver<'a, T, false>
