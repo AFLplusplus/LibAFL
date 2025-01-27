@@ -1,3 +1,14 @@
+env_scripts = ['''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''']
+
 [env]
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
@@ -360,6 +371,8 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script = '''
 echo "Profile: ${PROFILE}"
+
+export QEMU_LAUNCHER=${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher
 
 ./tests/injection/test.sh || exit 1
 ./tests/qasan/test.sh || exit 1
