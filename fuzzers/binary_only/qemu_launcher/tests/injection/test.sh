@@ -17,7 +17,7 @@ mkdir in || true
 
 echo aaaaaaaaaa > in/a
 
-timeout 10s "$QEMU_LAUNCHER" -o out -i in -j ../injections.toml -v -- ./static >/dev/null 2>fuzz.log || true
+timeout 10s "$QEMU_LAUNCHER" -o out -i in -j ../../injections.toml -v -- ./static >/dev/null 2>fuzz.log || true
 if ! grep -Ei "found.*injection" fuzz.log; then
     echo "Fuzzer does not generate any testcases or any crashes"
     echo "Logs:"
