@@ -1,4 +1,5 @@
-// taken from https://github.com/AFLplusplus/AFLplusplus/blob/da2d4d8258d725f79c2daa22bf3b1a59c593e472/frida_mode/test/fasan/test.c
+// taken from
+// https://github.com/AFLplusplus/AFLplusplus/blob/da2d4d8258d725f79c2daa22bf3b1a59c593e472/frida_mode/test/fasan/test.c
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -11,7 +12,6 @@
 
 #define LOG(x)                              \
   do {                                      \
-                                            \
     char buf[] = x;                         \
     write(STDOUT_FILENO, buf, sizeof(buf)); \
                                             \
@@ -23,7 +23,6 @@ void LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (buf == NULL) return;
 
   switch (*data) {
-
     /* Underflow */
     case 'U':
       LOG("Underflow\n");
@@ -63,13 +62,10 @@ void LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     default:
       LOG("Nop - No Error\n");
       break;
-
   }
-
 }
 
 int main(int argc, char **argv) {
-
   UNUSED_PARAMETER(argc);
   UNUSED_PARAMETER(argv);
 
@@ -86,6 +82,4 @@ int main(int argc, char **argv) {
 
   LOG("DONE\n");
   return 0;
-
 }
-

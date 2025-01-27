@@ -118,51 +118,32 @@ impl Client<'_> {
                 let drcov = self.options.drcov.as_ref().unwrap();
 
                 if is_asan {
-                    let modules = tuple_list!(DrCovModule::builder()
-                        .filename(drcov.clone())
-                        .full_trace(true)
-                        .build(),
-                        unsafe {
-                            AsanModule::builder()
-                                .env(&env)
-                                .asan_report()
-                                .build()
-                        }
+                    let modules = tuple_list!(
+                        DrCovModule::builder()
+                            .filename(drcov.clone())
+                            .full_trace(true)
+                            .build(),
+                        unsafe { AsanModule::builder().env(&env).asan_report().build() }
                     );
 
-                    instance_builder
-                        .build()
-                        .run(args, modules, state)
+                    instance_builder.build().run(args, modules, state)
                 } else {
                     let modules = tuple_list!(DrCovModule::builder()
                         .filename(drcov.clone())
                         .full_trace(true)
-                        .build(),
-                    );
+                        .build(),);
 
-                    instance_builder
-                        .build()
-                        .run(args, modules, state)
+                    instance_builder.build().run(args, modules, state)
                 }
             } else if is_asan {
-                let modules = tuple_list!(
-                    unsafe {
-                        AsanModule::builder()
-                            .env(&env)
-                            .asan_report()
-                            .build()
-                    }
-                );
+                let modules =
+                    tuple_list!(unsafe { AsanModule::builder().env(&env).asan_report().build() });
 
-                instance_builder
-                    .build()
-                    .run(args, modules, state)
+                instance_builder.build().run(args, modules, state)
             } else {
                 let modules = tuple_list!();
 
-                instance_builder
-                    .build()
-                    .run(args, modules, state)
+                instance_builder.build().run(args, modules, state)
             }
         } else if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {
@@ -178,7 +159,10 @@ impl Client<'_> {
             } else {
                 instance_builder.build().run(
                     args,
-                    tuple_list!(CmpLogModule::default(), AsanModule::builder().env(&env).build()),
+                    tuple_list!(
+                        CmpLogModule::default(),
+                        AsanModule::builder().env(&env).build()
+                    ),
                     state,
                 )
             }
@@ -208,9 +192,11 @@ impl Client<'_> {
                     state,
                 )
             } else {
-                instance_builder
-                    .build()
-                    .run(args, tuple_list!(AsanModule::builder().env(&env).build()), state)
+                instance_builder.build().run(
+                    args,
+                    tuple_list!(AsanModule::builder().env(&env).build()),
+                    state,
+                )
             }
         } else if is_asan_guest {
             instance_builder

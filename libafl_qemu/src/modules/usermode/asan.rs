@@ -1,29 +1,27 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
-use std::{borrow::Cow, env, fs, path::PathBuf, sync::Mutex};
-use std::fmt::Display;
-use std::pin::Pin;
-use libafl_qemu_sys::GuestAddr;
-use object::{Object, ObjectSection};
-use crate::{
-    emu::EmulatorModules,
-    modules::{utils::filters::StdAddressFilter, AddressFilter},
-    qemu::{Hook, QemuHooks, SyscallHookResult},
-};
+use std::{borrow::Cow, env, fmt::Display, fs, path::PathBuf, pin::Pin, sync::Mutex};
+
 use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, observers::ObserversTuple};
+use libafl_qemu_sys::GuestAddr;
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use object::{Object, ObjectSection};
 use rangemap::RangeMap;
+
 use crate::{
+    emu::EmulatorModules,
     modules::{
-        calls::FullBacktraceCollector, snapshot::SnapshotModule, utils::filters::HasAddressFilter,
-        EmulatorModule, EmulatorModuleTuple,
+        calls::FullBacktraceCollector,
+        snapshot::SnapshotModule,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
+        AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
-    qemu::MemAccessInfo,
+    qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},
     sys::TCGTemp,
     Qemu, QemuParams, Regs,
 };
@@ -138,13 +136,14 @@ pub struct AllocTreeItem {
     allocated: bool,
 }
 
-pub struct AsanErrorCallback(Box<dyn FnMut(&AsanGiovese, Qemu, GuestAddr, AsanError)>);
+type AsanErrorFn = Box<dyn FnMut(&AsanGiovese, Qemu, GuestAddr, AsanError)>;
+
+pub struct AsanErrorCallback(AsanErrorFn);
 
 impl AsanErrorCallback {
     /// Initialize a new [`AsanErrorCallback`]
-    pub fn new(
-        error_callback: Box<dyn FnMut(&AsanGiovese, Qemu, GuestAddr, AsanError)>
-    ) -> Self {
+    #[must_use]
+    pub fn new(error_callback: AsanErrorFn) -> Self {
         Self(error_callback)
     }
 
@@ -153,12 +152,21 @@ impl AsanErrorCallback {
     /// # Safety
     ///
     /// The `ASan` error report accesses [`FullBacktraceCollector`]
+    #[must_use]
     pub unsafe fn report() -> Self {
-        Self::new(Box::new(|rt, qemu, pc, err| asan_report(rt, qemu, pc, &err)))
+        Self::new(Box::new(|rt, qemu, pc, err| {
+            asan_report(rt, qemu, pc, &err)
+        }))
     }
 
-    pub fn call(&mut self, asan_giovese: &AsanGiovese, qemu: Qemu, pc: GuestAddr, error: AsanError) {
-        self.0(asan_giovese, qemu, pc, error)
+    pub fn call(
+        &mut self,
+        asan_giovese: &AsanGiovese,
+        qemu: Qemu,
+        pc: GuestAddr,
+        error: AsanError,
+    ) {
+        self.0(asan_giovese, qemu, pc, error);
     }
 }
 
@@ -213,6 +221,7 @@ impl core::fmt::Debug for AsanGiovese {
 }
 
 impl AsanModuleBuilder {
+    #[must_use]
     pub fn new(
         env: Option<Vec<(String, String)>>,
         detect_leaks: bool,
@@ -225,13 +234,14 @@ impl AsanModuleBuilder {
             detect_leaks,
             snapshot,
             filter,
-            error_callback
+            error_callback,
         }
     }
 
-    pub fn env(self, env: &Vec<(String, String)>) -> Self {
+    #[must_use]
+    pub fn env(self, env: &[(String, String)]) -> Self {
         Self::new(
-            Some(env.clone()),
+            Some(env.to_vec()),
             self.detect_leaks,
             self.snapshot,
             self.filter,
@@ -239,6 +249,7 @@ impl AsanModuleBuilder {
         )
     }
 
+    #[must_use]
     pub fn detect_leaks(self, detect_leaks: bool) -> Self {
         Self::new(
             self.env,
@@ -249,6 +260,7 @@ impl AsanModuleBuilder {
         )
     }
 
+    #[must_use]
     pub fn snapshot(self, snapshot: bool) -> Self {
         Self::new(
             self.env,
@@ -259,6 +271,7 @@ impl AsanModuleBuilder {
         )
     }
 
+    #[must_use]
     pub fn filter(self, filter: StdAddressFilter) -> Self {
         Self::new(
             self.env,
@@ -269,13 +282,14 @@ impl AsanModuleBuilder {
         )
     }
 
+    #[must_use]
     pub fn error_callback(self, callback: AsanErrorCallback) -> Self {
         Self::new(
             self.env,
             self.detect_leaks,
             self.snapshot,
             self.filter,
-            Some(callback)
+            Some(callback),
         )
     }
 
@@ -285,6 +299,7 @@ impl AsanModuleBuilder {
     ///
     /// The `ASan` error report accesses [`FullBacktraceCollector`].
     /// Check its safety note for more details.
+    #[must_use]
     pub unsafe fn asan_report(self) -> Self {
         Self::new(
             self.env,
@@ -295,6 +310,7 @@ impl AsanModuleBuilder {
         )
     }
 
+    #[must_use]
     pub fn build(self) -> AsanModule {
         AsanModule::new(
             self.env.unwrap().as_ref(),
@@ -308,13 +324,7 @@ impl AsanModuleBuilder {
 
 impl Default for AsanModuleBuilder {
     fn default() -> Self {
-        Self::new(
-            None,
-            false,
-            true,
-            StdAddressFilter::default(),
-            None,
-        )
+        Self::new(None, false, true, StdAddressFilter::default(), None)
     }
 }
 
