@@ -1008,6 +1008,7 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
@@ -1023,6 +1024,7 @@ pub fn trace_read_n_asan<ET, I, S>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
     size: usize,
 ) where
@@ -1039,6 +1041,7 @@ pub fn trace_write_asan<ET, I, S, const N: usize>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
@@ -1054,6 +1057,7 @@ pub fn trace_write_n_asan<ET, I, S>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
     size: usize,
 ) where
@@ -1091,6 +1095,7 @@ pub fn trace_write_asan_snapshot<ET, I, S, const N: usize>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
@@ -1110,6 +1115,7 @@ pub fn trace_write_n_asan_snapshot<ET, I, S>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
     size: usize,
 ) where
