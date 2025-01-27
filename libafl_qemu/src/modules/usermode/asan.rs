@@ -155,7 +155,7 @@ impl AsanErrorCallback {
     #[must_use]
     pub unsafe fn report() -> Self {
         Self::new(Box::new(|rt, qemu, pc, err| {
-            asan_report(rt, qemu, pc, &err)
+            asan_report(rt, qemu, pc, &err);
         }))
     }
 
