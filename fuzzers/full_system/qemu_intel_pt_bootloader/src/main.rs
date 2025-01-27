@@ -63,7 +63,7 @@ fn main() {
         .monitor(config::Monitor::Null)
         .serial(config::Serial::Null)
         .cpu("host")
-        .ram_size(config::RamSize::MB(1))
+        .ram_size(config::RamSize::MB(2))
         .drives([config::Drive::builder()
             .format(config::DiskImageFileFormat::Qcow2)
             .file("/mnt/libafl_qemu_tmpfs/boot.qcow2")
