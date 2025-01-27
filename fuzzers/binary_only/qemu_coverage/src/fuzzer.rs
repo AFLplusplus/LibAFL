@@ -136,7 +136,7 @@ pub fn fuzz() {
 
         let emulator_modules = tuple_list!(
             DrCovModule::builder().filename(cov_path.clone()).build(),
-            SnapshotModule::new()
+            SnapshotModule::new(),
         );
 
         let emulator = Emulator::empty()
@@ -288,11 +288,6 @@ pub fn fuzz() {
         .monitor(MultiMonitor::new(|s| println!("{s}")))
         .run_client(&mut run_client)
         .cores(&options.cores)
-        .stdout_file(if options.verbose {
-            None
-        } else {
-            Some("/dev/null")
-        })
         .build()
         .launch()
     {

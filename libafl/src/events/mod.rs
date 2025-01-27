@@ -96,7 +96,7 @@ impl SignalHandler for ShutdownSignalData {
 }
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
-/// by `1` in multiprocessed `EventManagers`, such as [`LlmpEventManager`].
+/// by `1` in multiprocessed `EventManagers`, such as [`LlmpRestartingEventManager`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EventManagerId(
@@ -377,7 +377,7 @@ impl<I> Event<I> {
 pub trait EventFirer<I, S> {
     /// Send off an [`Event`] to the broker
     ///
-    /// For multi-processed managers, such as [`LlmpEventManager`],
+    /// For multi-processed managers, such as [`LlmpRestartingEventManager`],
     /// this serializes the [`Event`] and commits it to the [`llmp`] page.
     /// In this case, if you `fire` faster than the broker can consume
     /// (for example for each [`Input`], on multiple cores)
