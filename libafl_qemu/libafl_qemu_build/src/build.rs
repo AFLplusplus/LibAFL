@@ -11,7 +11,7 @@ use crate::cargo_add_rpath;
 
 pub const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 pub const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-pub const QEMU_REVISION: &str = "eb1d01114cefa98375280ad9425f51294c78c5b9";
+pub const QEMU_REVISION: &str = "3f7b2d86635aaf03818aaec1d285dba88255f831";
 
 pub struct BuildResult {
     pub qemu_path: PathBuf,
