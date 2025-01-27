@@ -42,7 +42,7 @@ pub mod with_observers;
 pub mod hooks;
 
 /// How an execution finished.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
@@ -56,6 +56,8 @@ pub enum ExitKind {
     Oom,
     /// The run timed out
     Timeout,
+    /// The run reports inconsistent results, this means the input is not added to the corpus nor the solutions
+    Inconsistent,
     /// Special case for [`DiffExecutor`] when both exitkinds don't match
     Diff {
         /// The exitkind of the primary executor
@@ -68,7 +70,7 @@ pub enum ExitKind {
 }
 
 /// How one of the diffing executions finished.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
@@ -82,6 +84,8 @@ pub enum DiffExitKind {
     Oom,
     /// The run timed out
     Timeout,
+    /// The run reports inconsistent results
+    Inconsistent,
     /// One of the executors itelf repots a differential, we can't go into further details.
     Diff,
     // The run resulted in a custom `ExitKind`.
@@ -97,6 +101,7 @@ impl From<ExitKind> for DiffExitKind {
             ExitKind::Crash => DiffExitKind::Crash,
             ExitKind::Oom => DiffExitKind::Oom,
             ExitKind::Timeout => DiffExitKind::Timeout,
+            ExitKind::Inconsistent => DiffExitKind::Inconsistent,
             ExitKind::Diff { .. } => DiffExitKind::Diff,
         }
     }
