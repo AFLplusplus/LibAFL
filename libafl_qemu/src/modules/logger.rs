@@ -19,6 +19,7 @@ use crate::{
 /// A builder for [`LoggerModule`].
 ///
 /// By default, no event is logged.
+#[expect(clippy::struct_excessive_bools)]
 pub struct LoggerModuleBuilder<AF, PF> {
     calls: bool,
     cmps: bool,
@@ -55,67 +56,77 @@ impl Default for LoggerModuleBuilder<NopAddressFilter, NopPageFilter> {
 }
 
 impl<AF, PF> LoggerModuleBuilder<AF, PF> {
+    #[must_use]
     pub fn calls(mut self, calls: bool) -> Self {
         self.calls = calls;
 
         self
     }
 
+    #[must_use]
     pub fn cmps(mut self, cmps: bool) -> Self {
         self.cmps = cmps;
 
         self
     }
 
+    #[must_use]
     pub fn reads(mut self, reads: bool) -> Self {
         self.reads = reads;
 
         self
     }
 
+    #[must_use]
     pub fn writes(mut self, writes: bool) -> Self {
         self.writes = writes;
 
         self
     }
 
+    #[must_use]
     pub fn threads(mut self, threads: bool) -> Self {
         self.threads = threads;
 
         self
     }
 
+    #[must_use]
     pub fn syscalls(mut self, syscalls: bool) -> Self {
         self.syscalls = syscalls;
 
         self
     }
 
+    #[must_use]
     pub fn custom_insns(mut self, custom_insns: bool) -> Self {
         self.custom_insns = custom_insns;
 
         self
     }
 
+    #[must_use]
     pub fn edges(mut self, edges: bool) -> Self {
         self.edges = edges;
 
         self
     }
 
+    #[must_use]
     pub fn blocks(mut self, blocks: bool) -> Self {
         self.blocks = blocks;
 
         self
     }
 
+    #[must_use]
     pub fn instruction(mut self, instruction: GuestAddr) -> Self {
         let instructions = if let Some(insns) = &mut self.instruction {
             insns
         } else {
             self.instruction = Some(Vec::new());
 
-            &mut self.instruction.as_mut().unwrap()
+            self.instruction.as_mut().unwrap()
         };
 
         instructions.push(instruction);
@@ -123,6 +134,7 @@ impl<AF, PF> LoggerModuleBuilder<AF, PF> {
         self
     }
 
+    #[must_use]
     pub fn addr_filter<AF2>(self, addr_filter: AF2) -> LoggerModuleBuilder<AF2, PF> {
         LoggerModuleBuilder {
             calls: self.calls,
@@ -140,6 +152,7 @@ impl<AF, PF> LoggerModuleBuilder<AF, PF> {
         }
     }
 
+    #[must_use]
     pub fn page_filter<PF2>(self, page_filter: PF2) -> LoggerModuleBuilder<AF, PF2> {
         LoggerModuleBuilder {
             calls: self.calls,
@@ -157,6 +170,7 @@ impl<AF, PF> LoggerModuleBuilder<AF, PF> {
         }
     }
 
+    #[must_use]
     pub fn build(self) -> LoggerModule<AF, PF> {
         LoggerModule {
             calls: self.calls,
@@ -180,6 +194,7 @@ impl<AF, PF> LoggerModuleBuilder<AF, PF> {
 /// It can be configured through [`LoggerModuleBuilder`].
 #[derive(Debug)]
 #[expect(dead_code)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct LoggerModule<AF, PF> {
     calls: bool,
     cmps: bool,
@@ -197,11 +212,13 @@ pub struct LoggerModule<AF, PF> {
 }
 
 impl LoggerModule<NopAddressFilter, NopPageFilter> {
+    #[must_use]
     pub fn builder() -> LoggerModuleBuilder<NopAddressFilter, NopPageFilter> {
         LoggerModuleBuilder::default()
     }
 }
 
+#[expect(clippy::unnecessary_wraps)]
 fn gen_logger_rw<ET, I, S, const IS_WRITE: bool>(
     _qemu: Qemu,
     _emulator_modules: &mut EmulatorModules<ET, I, S>,
@@ -219,7 +236,8 @@ where
 
     let size = info.size();
     log::info!("[PC {pc:#x}] gen {kind} of {size} bytes");
-    Some(1)
+
+    Some(0)
 }
 
 fn exec_logger_rw<ET, I, S, const IS_WRITE: bool, const N: usize>(
