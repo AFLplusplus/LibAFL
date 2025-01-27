@@ -31,8 +31,7 @@ script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${
 dependencies = ["build_fuzzer"]
 
 [tasks.run]
-command = "cargo"
-args = ["run", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
 dependencies = ["build", "setcap"]
 
 [tasks.default]

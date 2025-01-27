@@ -29,7 +29,7 @@ use std::{
         raw::c_void,
     },
     path::Path,
-    ptr, slice,
+    ptr,
     sync::LazyLock,
 };
 
@@ -39,14 +39,18 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
+#[cfg(target_os = "linux")]
+use libafl_bolts::hash_64_fast;
 use libafl_bolts::Error;
 #[cfg(target_os = "linux")]
-use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
-use libipt::PtError;
+pub use libipt::{
+    asid::Asid, image::Image, image::SectionCache, image::SectionInfo, status::Status,
+};
 #[cfg(target_os = "linux")]
 use libipt::{
-    block::BlockDecoder, AddrConfig, AddrFilter, AddrFilterBuilder, AddrRange, BlockFlags,
-    ConfigBuilder, Cpu, Image, PtErrorCode, Status,
+    block::BlockDecoder, enc_dec_builder::AddrFilterRange, enc_dec_builder::AddrFilterType,
+    enc_dec_builder::AddrFilters, enc_dec_builder::AddrFiltersBuilder, enc_dec_builder::Cpu,
+    enc_dec_builder::EncoderDecoderBuilder, error::PtError, error::PtErrorCode,
 };
 #[cfg(target_os = "linux")]
 use num_enum::TryFromPrimitive;
@@ -86,14 +90,6 @@ static NR_ADDR_FILTERS: LazyLock<Result<u32, String>> = LazyLock::new(|| {
 });
 
 #[cfg(target_os = "linux")]
-static CURRENT_CPU: LazyLock<Option<Cpu>> = LazyLock::new(|| {
-    let cpuid = CpuId::new();
-    cpuid
-        .get_feature_info()
-        .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
-});
-
-#[cfg(target_os = "linux")]
 static PERF_EVENT_TYPE: LazyLock<Result<u32, String>> = LazyLock::new(|| {
     let path = format!("{PT_EVENT_PATH}/type");
     let s = fs::read_to_string(&path)
@@ -130,6 +126,8 @@ pub struct IntelPT {
     aux_tail: *mut u64,
     previous_decode_head: u64,
     ip_filters: Vec<RangeInclusive<usize>>,
+    // The lifetime of BlockDecoder<'a> is irrelevant during the building phase.
+    decoder_builder: EncoderDecoderBuilder<BlockDecoder<'static>>,
     #[cfg(feature = "export_raw")]
     last_decode_trace: Vec<u8>,
 }
@@ -185,12 +183,11 @@ impl IntelPT {
         self.ip_filters.clone()
     }
 
-    fn ip_filters_to_addr_filter(&self) -> AddrFilter {
-        let mut builder = AddrFilterBuilder::new();
-        let mut iter = self
-            .ip_filters
-            .iter()
-            .map(|f| AddrRange::new(*f.start() as u64, *f.end() as u64, AddrConfig::FILTER));
+    fn ip_filters_to_addr_filter(&self) -> AddrFilters {
+        let mut builder = AddrFiltersBuilder::new();
+        let mut iter = self.ip_filters.iter().map(|f| {
+            AddrFilterRange::new(*f.start() as u64, *f.end() as u64, AddrFilterType::FILTER)
+        });
         if let Some(f) = iter.next() {
             builder.addr0(f);
             if let Some(f) = iter.next() {
@@ -203,7 +200,7 @@ impl IntelPT {
                 }
             }
         }
-        builder.finish()
+        builder.build()
     }
 
     /// Start tracing
@@ -240,28 +237,37 @@ impl IntelPT {
         }
     }
 
-    //         // let read_mem = |buf: &mut [u8], addr: u64| {
-    //         //     let src = addr as *const u8;
-    //         //     let dst = buf.as_mut_ptr();
-    //         //     let size = buf.len();
-    //         //     unsafe {
-    //         //         ptr::copy_nonoverlapping(src, dst, size);
-    //         //     }
-    //         // };
+    // /// Fill the coverage map by decoding the PT traces and reading target memory through `read_mem`
+    // ///
+    // /// This function consumes the traces.
+    // ///
+    // /// # Example
+    // ///
+    // /// An example `read_mem` callback function for the (inprocess) `intel_pt_babyfuzzer` could be:
+    // /// ```
+    // /// let read_mem = |buf: &mut [u8], addr: u64| {
+    // ///     let src = addr as *const u8;
+    // ///     let dst = buf.as_mut_ptr();
+    // ///     let size = buf.len();
+    // ///     unsafe {
+    // ///         core::ptr::copy_nonoverlapping(src, dst, size);
+    // ///     }
+    // /// };
+    // /// ```
     // #[allow(clippy::cast_possible_wrap)]
-    // fn decode_with_callback<F: Fn(&mut [u8], u64)>(
-    //     &mut self,
-    //     read_memory: F,
-    //     copy_buffer: Option<&mut Vec<u8>>,
-    // ) -> Result<Vec<u64>, Error> {
-    //     self.decode(
+    // pub fn decode_with_callback<F, T>(&mut self, read_memory: F, map: &mut [T]) -> Result<(), Error>
+    // where
+    //     F: Fn(&mut [u8], u64),
+    //     T: SaturatingAdd + From<u8> + Debug,
+    // {
+    //     self.decode_traces_into_map_common(
+    //         None,
     //         Some(|buff: &mut [u8], addr: u64, _: Asid| {
     //             debug_assert!(i32::try_from(buff.len()).is_ok());
     //             read_memory(buff, addr);
     //             buff.len() as i32
     //         }),
-    //         None,
-    //         copy_buffer,
+    //         map,
     //     )
     // }
 
@@ -271,9 +277,29 @@ impl IntelPT {
     pub fn decode_traces_into_map<T>(
         &mut self,
         image: &mut Image,
-        map: &mut [T],
+        map_ptr: *mut T,
+        map_len: usize,
     ) -> Result<(), Error>
     where
+        T: SaturatingAdd + From<u8> + Debug,
+    {
+        self.decode_traces_into_map_common(
+            Some(image),
+            None::<fn(_: &mut [u8], _: u64, _: Asid) -> i32>,
+            map_ptr,
+            map_len,
+        )
+    }
+
+    fn decode_traces_into_map_common<F, T>(
+        &mut self,
+        image: Option<&mut Image>,
+        read_memory: Option<F>,
+        map_ptr: *mut T,
+        map_len: usize,
+    ) -> Result<(), Error>
+    where
+        F: Fn(&mut [u8], u64, Asid) -> i32,
         T: SaturatingAdd + From<u8> + Debug,
     {
         let head = unsafe { self.aux_head.read_volatile() };
@@ -304,31 +330,32 @@ impl IntelPT {
         // https://manpages.debian.org/bookworm/manpages-dev/perf_event_open.2.en.html#data_head
         smp_rmb();
 
-        let mut data = if head_wrap >= tail_wrap {
-            unsafe {
-                let ptr = self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8;
-                OwnedRefMut::Ref(slice::from_raw_parts_mut(ptr, len))
+        let (data_ptr, _owned_data) = unsafe {
+            if head_wrap >= tail_wrap {
+                let ptr = self.perf_aux_buffer.add(tail_wrap as usize).cast::<u8>();
+                (ptr, None)
+            } else {
+                // Head pointer wrapped, the trace is split
+                let mut owned_data = self.join_split_trace(head_wrap, tail_wrap);
+                (owned_data.as_mut_ptr(), Some(owned_data))
             }
-        } else {
-            // Head pointer wrapped, the trace is split
-            OwnedRefMut::Owned(self.join_split_trace(head_wrap, tail_wrap))
         };
         #[cfg(feature = "export_raw")]
         {
-            self.last_decode_trace = data.as_ref().to_vec();
+            self.last_decode_trace = Vec::with_capacity(len);
+            unsafe {
+                ptr::copy_nonoverlapping(data_ptr, self.last_decode_trace.as_mut_ptr(), len);
+                self.last_decode_trace.set_len(len);
+            }
         }
+        let builder = unsafe { self.decoder_builder.clone().buffer_from_raw(data_ptr, len) }
+            .filter(self.ip_filters_to_addr_filter());
 
-        let mut config = ConfigBuilder::new(data.as_mut()).map_err(error_from_pt_error)?;
-        config.filter(self.ip_filters_to_addr_filter());
-        if let Some(cpu) = &*CURRENT_CPU {
-            config.cpu(*cpu);
+        let mut decoder = builder.build().map_err(error_from_pt_error)?;
+        decoder.set_image(image).map_err(error_from_pt_error)?;
+        if let Some(rm) = read_memory {
+            decoder.image().set_callback(Some(rm));
         }
-        let flags = BlockFlags::END_ON_CALL.union(BlockFlags::END_ON_JUMP);
-        config.flags(flags);
-        let mut decoder = BlockDecoder::new(&config.finish()).map_err(error_from_pt_error)?;
-        decoder
-            .set_image(Some(image))
-            .map_err(error_from_pt_error)?;
 
         let mut previous_block_end_ip = 0;
         let mut status;
@@ -341,7 +368,8 @@ impl IntelPT {
                         &mut status,
                         &mut previous_block_end_ip,
                         skip,
-                        map,
+                        map_ptr,
+                        map_len,
                     )?;
                 }
                 Err(e) => {
@@ -362,28 +390,45 @@ impl IntelPT {
         Ok(())
     }
 
+    /// # Safety:
+    ///
+    /// The caller must ensure that `head_wrap` and `tail_wrap` have been wrapped properly, in other
+    /// words, this ensures that `head_wrap` and `tail_wrap` are < `self.perf_aux_buffer_size`.
     #[inline]
     #[must_use]
-    fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> Box<[u8]> {
-        let first_ptr = unsafe { self.perf_aux_buffer.add(tail_wrap as usize) as *mut u8 };
+    unsafe fn join_split_trace(&self, head_wrap: u64, tail_wrap: u64) -> Box<[u8]> {
+        // this function is unsafe, but let's make it safe when compiling in debug mode
+        debug_assert!(head_wrap < self.perf_aux_buffer_size as u64);
+        debug_assert!(tail_wrap < self.perf_aux_buffer_size as u64);
+
+        // SAFETY: tail_wrap is guaranteed to be < `self.perf_aux_buffer_size` from the fn safety
+        // preconditions
+        let first_ptr = unsafe { self.perf_aux_buffer.add(tail_wrap as usize) }.cast::<u8>();
         let first_len = self.perf_aux_buffer_size - tail_wrap as usize;
 
-        let second_ptr = self.perf_aux_buffer as *mut u8;
+        let second_ptr = self.perf_aux_buffer.cast::<u8>();
         let second_len = head_wrap as usize;
 
-        let mut vec = Vec::with_capacity(first_len + second_len);
-        vec.extend_from_slice(unsafe { slice::from_raw_parts(first_ptr, first_len) });
-        vec.extend_from_slice(unsafe { slice::from_raw_parts(second_ptr, second_len) });
-        vec.into_boxed_slice()
+        let mut data = Box::<[u8]>::new_uninit_slice(first_len + second_len);
+        unsafe {
+            ptr::copy_nonoverlapping(first_ptr, data.as_mut_ptr().cast(), first_len);
+            ptr::copy_nonoverlapping(
+                second_ptr,
+                data.as_mut_ptr().add(first_len).cast(),
+                second_len,
+            );
+            data.assume_init()
+        }
     }
 
     #[inline]
     fn decode_blocks<T>(
-        decoder: &mut BlockDecoder<()>,
+        decoder: &mut BlockDecoder,
         status: &mut Status,
         previous_block_end_ip: &mut u64,
         skip: u64,
-        map: &mut [T],
+        map_ptr: *mut T,
+        map_len: usize,
     ) -> Result<(), Error>
     where
         T: SaturatingAdd + From<u8> + Debug,
@@ -401,17 +446,18 @@ impl IntelPT {
                 };
             }
 
-            match decoder.next() {
+            match decoder.decode_next() {
                 Ok((b, s)) => {
                     *status = s;
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
 
                     if b.ninsn() > 0 && skip < offset {
                         let id = hash_64_fast(*previous_block_end_ip) ^ hash_64_fast(b.ip());
-                        // SAFETY: the index is < map.len() since the modulo operation is applied
-                        let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
-                        *map_loc = (*map_loc).saturating_add(&1u8.into());
-
+                        // SAFETY: the index is < map_len since the modulo operation is applied
+                        unsafe {
+                            let map_loc = map_ptr.add(id as usize % map_len);
+                            *map_loc = (*map_loc).saturating_add(&1u8.into());
+                        }
                         *previous_block_end_ip = b.end_ip();
                     }
 
@@ -421,7 +467,11 @@ impl IntelPT {
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
-                        log::trace!("PT error in block next {e:?}");
+                        let offset = decoder.offset().map_err(error_from_pt_error)?;
+                        log::trace!(
+                            "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
+                            previous_block_end_ip
+                        );
                     }
                     break 'block;
                 }
@@ -571,6 +621,13 @@ impl IntelPTBuilder {
         let aux_head = unsafe { &raw mut (*buff_metadata).aux_head };
         let aux_tail = unsafe { &raw mut (*buff_metadata).aux_tail };
 
+        let mut decoder_builder = EncoderDecoderBuilder::new()
+            .set_end_on_call(true)
+            .set_end_on_jump(true);
+        if let Some(cpu) = current_cpu() {
+            decoder_builder = decoder_builder.cpu(cpu);
+        }
+
         let mut intel_pt = IntelPT {
             fd,
             perf_buffer,
@@ -581,6 +638,7 @@ impl IntelPTBuilder {
             aux_tail,
             previous_decode_head: 0,
             ip_filters: Vec::with_capacity(*NR_ADDR_FILTERS.as_ref().unwrap_or(&0) as usize),
+            decoder_builder,
             #[cfg(feature = "export_raw")]
             last_decode_trace: Vec::new(),
         };
@@ -797,6 +855,7 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
 }
 
 /// Convert [`PtError`] into [`Error`]
+#[cfg(target_os = "linux")]
 #[inline]
 #[must_use]
 pub fn error_from_pt_error(err: PtError) -> Error {
@@ -974,6 +1033,15 @@ fn smp_rmb() {
 #[inline]
 const fn wrap_aux_pointer(ptr: u64, perf_aux_buffer_size: usize) -> u64 {
     ptr & (perf_aux_buffer_size as u64 - 1)
+}
+
+#[cfg(target_os = "linux")]
+#[inline]
+fn current_cpu() -> Option<Cpu> {
+    let cpuid = CpuId::new();
+    cpuid
+        .get_feature_info()
+        .map(|fi| Cpu::intel(fi.family_id().into(), fi.model_id(), fi.stepping_id()))
 }
 
 #[cfg(test)]

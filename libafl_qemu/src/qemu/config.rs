@@ -37,6 +37,16 @@ pub enum DiskImageFileFormat {
     Raw,
 }
 
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "cache=", serialize_all = "lowercase")]
+pub enum DriveCache {
+    WriteBack,
+    None,
+    WriteThrough,
+    DirectSync,
+    Unsafe,
+}
+
 #[derive(Debug, Clone, Default, TypedBuilder)]
 pub struct Drive {
     #[builder(default, setter(strip_option, into))]
@@ -45,6 +55,8 @@ pub struct Drive {
     format: Option<DiskImageFileFormat>,
     #[builder(default, setter(strip_option))]
     interface: Option<DriveInterface>,
+    #[builder(default, setter(strip_option))]
+    cache: Option<DriveCache>,
 }
 
 impl Display for Drive {
@@ -69,6 +81,9 @@ impl Display for Drive {
         }
         if let Some(interface) = &self.interface {
             write!(f, "{}{interface}", separator())?;
+        }
+        if let Some(cache) = &self.cache {
+            write!(f, "{}{cache}", separator())?;
         }
 
         Ok(())
@@ -175,6 +190,25 @@ impl<R: AsRef<str>> From<R> for Machine {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Cpu {
+    model: String,
+}
+
+impl Display for Cpu {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-cpu {}", self.model)
+    }
+}
+
+impl<R: AsRef<str>> From<R> for Cpu {
+    fn from(model: R) -> Self {
+        Self {
+            model: model.as_ref().to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, strum_macros::Display)]
 pub enum Snapshot {
     #[strum(serialize = "-snapshot")]
@@ -274,6 +308,26 @@ impl From<bool> for VgaPci {
     }
 }
 
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum DefaultDevices {
+    #[strum(serialize = "")]
+    ENABLE,
+    #[strum(serialize = "-nodefaults")]
+    DISABLE,
+}
+
+#[cfg(feature = "systemmode")]
+impl From<bool> for DefaultDevices {
+    fn from(default_devices: bool) -> Self {
+        if default_devices {
+            DefaultDevices::ENABLE
+        } else {
+            DefaultDevices::DISABLE
+        }
+    }
+}
+
 #[cfg(feature = "usermode")]
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -304,6 +358,8 @@ pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option, into))]
     bios: Option<Bios>,
+    #[builder(default, setter(strip_option, into))]
+    cpu: Option<Cpu>,
     #[builder(default, setter(into))]
     drives: Vec<Drive>,
     #[cfg(feature = "systemmode")]
@@ -329,6 +385,9 @@ pub struct QemuConfig {
     vga_pci: Option<VgaPci>,
     #[builder(default, setter(strip_option, into))]
     start_cpu: Option<StartCPU>,
+    #[cfg(feature = "systemmode")]
+    #[builder(default, setter(strip_option, into))]
+    default_devices: Option<DefaultDevices>,
     #[cfg(feature = "usermode")]
     #[builder(setter(into))]
     program: Program,
