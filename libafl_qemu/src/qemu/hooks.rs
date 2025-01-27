@@ -843,7 +843,7 @@ create_hook_types!(
             GuestAddr,
         ),
     >,
-    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, pc: u64, addr: GuestAddr)
+    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, pc: GuestAddr, addr: GuestAddr)
 );
 create_hook_types!(
     WriteExecN,
@@ -852,7 +852,7 @@ create_hook_types!(
         &mut EmulatorModules<ET, I, S>,
         Option<&mut S>,
         id: u64,
-        pc: u64,
+        pc: GuestAddr,
         addr: GuestAddr,
         size: usize,
     ),
