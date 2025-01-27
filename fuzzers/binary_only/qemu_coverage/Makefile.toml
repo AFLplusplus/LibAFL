@@ -241,15 +241,16 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.run_unix]
-command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE}"
-args = [
-  "--coverage-path",
-  "${TARGET_DIR}/cov.drcov",
-  "--input-dir",
-  "./corpus",
-  "--",
-  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
-]
+script_runner = "@shell"
+script = '''
+${TARGET_DIR}/${PROFILE_DIR}/qemu_coverage-${CARGO_MAKE_PROFILE} \
+  --coverage-path \
+  ${TARGET_DIR}/cov.drcov \
+  --input-dir \
+  ./corpus \
+  -- \
+  ${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}
+'''
 dependencies = ["harness", "fuzzer"]
 
 [tasks.test]

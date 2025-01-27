@@ -136,7 +136,7 @@ pub fn fuzz() {
 
         let emulator_modules = tuple_list!(
             DrCovModule::builder().filename(cov_path.clone()).build(),
-            SnapshotModule::new()
+            SnapshotModule::new(),
         );
 
         let emulator = Emulator::empty()

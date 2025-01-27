@@ -731,7 +731,14 @@ create_hook_types!(
 );
 create_hook_types!(
     ReadExec,
-    fn(Qemu, &mut EmulatorModules<ET, I, S>, Option<&mut S>, id: u64, addr: GuestAddr),
+    fn(
+        Qemu,
+        &mut EmulatorModules<ET, I, S>,
+        Option<&mut S>,
+        id: u64,
+        pc: GuestAddr,
+        addr: GuestAddr,
+    ),
     Box<
         dyn for<'a> FnMut(
             Qemu,
@@ -739,34 +746,50 @@ create_hook_types!(
             Option<&'a mut S>,
             u64,
             GuestAddr,
+            GuestAddr,
         ),
     >,
-    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, addr: GuestAddr)
+    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, pc: GuestAddr, addr: GuestAddr)
 );
 create_hook_types!(
     ReadExecN,
-    fn(Qemu, &mut EmulatorModules<ET, I, S>, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
+    fn(
+        Qemu,
+        &mut EmulatorModules<ET, I, S>,
+        Option<&mut S>,
+        id: u64,
+        pc: GuestAddr,
+        addr: GuestAddr,
+        size: usize,
+    ),
     Box<
         dyn for<'a> FnMut(
             Qemu,
             &'a mut EmulatorModules<ET, I, S>,
             Option<&'a mut S>,
             u64,
+            GuestAddr,
             GuestAddr,
             usize,
         ),
     >,
-    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, addr: GuestAddr, size: usize)
+    unsafe extern "C" fn(
+        libafl_qemu_opaque: *const (),
+        id: u64,
+        pc: GuestAddr,
+        addr: GuestAddr,
+        size: usize,
+    )
 );
 create_hook_id!(Read, libafl_qemu_remove_read_hook, true);
 create_gen_wrapper!(read, (pc: GuestAddr, addr: *mut TCGTemp, info: MemAccessInfo), u64, 5, ReadHookId);
-create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 0, 5, ReadHookId);
-create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 1, 5, ReadHookId);
-create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 2, 5, ReadHookId);
-create_exec_wrapper!(read, (id: u64, addr: GuestAddr), 3, 5, ReadHookId);
+create_exec_wrapper!(read, (id: u64, pc: GuestAddr, addr: GuestAddr), 0, 5, ReadHookId);
+create_exec_wrapper!(read, (id: u64, pc: GuestAddr, addr: GuestAddr), 1, 5, ReadHookId);
+create_exec_wrapper!(read, (id: u64, pc: GuestAddr, addr: GuestAddr), 2, 5, ReadHookId);
+create_exec_wrapper!(read, (id: u64, pc: GuestAddr, addr: GuestAddr), 3, 5, ReadHookId);
 create_exec_wrapper!(
     read,
-    (id: u64, addr: GuestAddr, size: usize),
+    (id: u64, addr: GuestAddr, pc: GuestAddr, size: usize),
     4,
     5,
     ReadHookId
@@ -802,7 +825,14 @@ create_hook_types!(
 );
 create_hook_types!(
     WriteExec,
-    fn(Qemu, &mut EmulatorModules<ET, I, S>, Option<&mut S>, id: u64, addr: GuestAddr),
+    fn(
+        Qemu,
+        &mut EmulatorModules<ET, I, S>,
+        Option<&mut S>,
+        id: u64,
+        pc: GuestAddr,
+        addr: GuestAddr,
+    ),
     Box<
         dyn for<'a> FnMut(
             Qemu,
@@ -810,34 +840,50 @@ create_hook_types!(
             Option<&'a mut S>,
             u64,
             GuestAddr,
+            GuestAddr,
         ),
     >,
-    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, addr: GuestAddr)
+    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, pc: u64, addr: GuestAddr)
 );
 create_hook_types!(
     WriteExecN,
-    fn(Qemu, &mut EmulatorModules<ET, I, S>, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
+    fn(
+        Qemu,
+        &mut EmulatorModules<ET, I, S>,
+        Option<&mut S>,
+        id: u64,
+        pc: u64,
+        addr: GuestAddr,
+        size: usize,
+    ),
     Box<
         dyn for<'a> FnMut(
             Qemu,
             &'a mut EmulatorModules<ET, I, S>,
             Option<&'a mut S>,
             u64,
+            GuestAddr,
             GuestAddr,
             usize,
         ),
     >,
-    unsafe extern "C" fn(libafl_qemu_opaque: *const (), id: u64, addr: GuestAddr, size: usize)
+    unsafe extern "C" fn(
+        libafl_qemu_opaque: *const (),
+        id: u64,
+        pc: GuestAddr,
+        addr: GuestAddr,
+        size: usize,
+    )
 );
 create_hook_id!(Write, libafl_qemu_remove_write_hook, true);
 create_gen_wrapper!(write, (pc: GuestAddr, addr: *mut TCGTemp, info: MemAccessInfo), u64, 5, WriteHookId);
-create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 0, 5, WriteHookId);
-create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 1, 5, WriteHookId);
-create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 2, 5, WriteHookId);
-create_exec_wrapper!(write, (id: u64, addr: GuestAddr), 3, 5, WriteHookId);
+create_exec_wrapper!(write, (id: u64, pc: GuestAddr, addr: GuestAddr), 0, 5, WriteHookId);
+create_exec_wrapper!(write, (id: u64, pc: GuestAddr, addr: GuestAddr), 1, 5, WriteHookId);
+create_exec_wrapper!(write, (id: u64, pc: GuestAddr, addr: GuestAddr), 2, 5, WriteHookId);
+create_exec_wrapper!(write, (id: u64, pc: GuestAddr, addr: GuestAddr), 3, 5, WriteHookId);
 create_exec_wrapper!(
     write,
-    (id: u64, addr: GuestAddr, size: usize),
+    (id: u64, pc: GuestAddr, addr: GuestAddr, size: usize),
     4,
     5,
     WriteHookId
@@ -1004,11 +1050,11 @@ impl QemuHooks {
         &self,
         data: T,
         gen: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
-        exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec8: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec_n: Option<unsafe extern "C" fn(T, u64, GuestAddr, usize)>,
+        exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec8: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec_n: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr, usize)>,
     ) -> ReadHookId {
         unsafe {
             let data: u64 = data.into().0;
@@ -1020,11 +1066,15 @@ impl QemuHooks {
                     libafl_qemu_sys::MemOpIdx,
                 ) -> u64,
             > = transmute(gen);
-            let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec1);
-            let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec2);
-            let exec4: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec4);
-            let exec8: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec8);
-            let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, usize)> =
+            let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec1);
+            let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec2);
+            let exec4: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec4);
+            let exec8: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec8);
+            let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr, usize)> =
                 transmute(exec_n);
             let num = libafl_qemu_sys::libafl_add_read_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
@@ -1038,11 +1088,11 @@ impl QemuHooks {
         &self,
         data: T,
         gen: Option<unsafe extern "C" fn(T, GuestAddr, *mut TCGTemp, MemAccessInfo) -> u64>,
-        exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec8: Option<unsafe extern "C" fn(T, u64, GuestAddr)>,
-        exec_n: Option<unsafe extern "C" fn(T, u64, GuestAddr, usize)>,
+        exec1: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec2: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec4: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec8: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr)>,
+        exec_n: Option<unsafe extern "C" fn(T, u64, GuestAddr, GuestAddr, usize)>,
     ) -> WriteHookId {
         unsafe {
             let data: u64 = data.into().0;
@@ -1054,11 +1104,15 @@ impl QemuHooks {
                     libafl_qemu_sys::MemOpIdx,
                 ) -> u64,
             > = transmute(gen);
-            let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec1);
-            let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec2);
-            let exec4: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec4);
-            let exec8: Option<unsafe extern "C" fn(u64, u64, GuestAddr)> = transmute(exec8);
-            let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, usize)> =
+            let exec1: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec1);
+            let exec2: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec2);
+            let exec4: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec4);
+            let exec8: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr)> =
+                transmute(exec8);
+            let exec_n: Option<unsafe extern "C" fn(u64, u64, GuestAddr, GuestAddr, usize)> =
                 transmute(exec_n);
             let num = libafl_qemu_sys::libafl_add_write_hook(
                 gen, exec1, exec2, exec4, exec8, exec_n, data,
