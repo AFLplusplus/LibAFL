@@ -27,7 +27,7 @@ use crate::{
 pub type StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z> =
     StatefulGenericInProcessForkExecutor<'a, EM, ES, H, (), I, OT, S, SP, Z>;
 
-impl<'a, H, I, OT, S, SP, ES, EM, Z> StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z>
+impl<'a, H, I, OT, S, SP, EM, ES, Z> StatefulInProcessForkExecutor<'a, EM, ES, H, I, OT, S, SP, Z>
 where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -68,7 +68,7 @@ pub struct StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP,
     pub inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
 }
 
-impl<H, HT, I, OT, S, SP, ES, EM, Z> Debug
+impl<H, HT, I, OT, S, SP, EM, ES, Z> Debug
     for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
 where
     HT: Debug,
@@ -131,7 +131,7 @@ where
     }
 }
 
-impl<'a, H, HT, I, OT, S, SP, ES, EM, Z>
+impl<'a, H, HT, I, OT, S, SP, EM, ES, Z>
     StatefulGenericInProcessForkExecutor<'a, EM, ES, H, HT, I, OT, S, SP, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
@@ -178,7 +178,7 @@ where
     }
 }
 
-impl<H, HT, I, OT, S, SP, ES, EM, Z> HasObservers
+impl<H, HT, I, OT, S, SP, EM, ES, Z> HasObservers
     for StatefulGenericInProcessForkExecutor<'_, EM, ES, H, HT, I, OT, S, SP, Z>
 {
     type Observers = OT;
