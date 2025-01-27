@@ -24,10 +24,6 @@ use crate::{
     Error,
 };
 
-/// The llmp event manager
-pub mod mgr;
-pub use mgr::*;
-
 /// The llmp restarting manager
 #[cfg(feature = "std")]
 pub mod restarting;

@@ -3,15 +3,12 @@
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, vec::Vec};
 #[cfg(feature = "alloc")]
-use core::ops::{Deref, DerefMut};
 use core::{
-    any::{type_name, TypeId},
-    cell::Cell,
+    any::type_name,
     fmt::{Debug, Formatter},
-    marker::PhantomData,
-    mem::transmute,
-    ops::{Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
 };
+use core::{any::TypeId, cell::Cell, marker::PhantomData, mem::transmute};
 
 #[cfg(feature = "alloc")]
 use serde::{Deserialize, Serialize};
