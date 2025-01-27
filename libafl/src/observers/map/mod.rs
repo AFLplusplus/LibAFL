@@ -668,6 +668,7 @@ where
     }
 
     /// Sets a custom initial value for the map observer
+    #[must_use]
     pub fn with_initial(mut self, initial: T) -> Self {
         self.initial = initial;
         self
