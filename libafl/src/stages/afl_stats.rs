@@ -118,7 +118,7 @@ pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
     /// The core we are bound to
     core_id: CoreId,
     phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
-    update_user_stats_enabled: bool,
+    report_current_corpus_idx: bool,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -276,7 +276,7 @@ where
         let corpus_idx_value = corpus_idx.0; // Extract `usize` value from `CorpusId`
 
         // Fire the UpdateUserStats event with the corpus index
-        if self.update_user_stats_enabled {
+        if self.report_current_corpus_idx {
         manager.fire(
             state,
             Event::UpdateUserStats {
@@ -680,7 +680,7 @@ pub struct AflStatsStageBuilder<C, E, EM, I, O, S, Z> {
     version: String,
     target_mode: String,
     phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
-    update_user_stats_enabled: bool,
+    report_current_corpus_idx: bool,
 }
 
 impl<C, E, EM, I, O, S, Z> AflStatsStageBuilder<C, E, EM, I, O, S, Z>
@@ -705,7 +705,7 @@ where
             version: String::default(),
             target_mode: String::default(),
             phantom_data: PhantomData,
-            update_user_stats_enabled: false,
+            report_current_corpus_idx: false,
         }
     }
 
@@ -841,7 +841,7 @@ where
             dict_count: self.dict_count,
             core_id: self.core_id.unwrap_or(CoreId(0)),
             autotokens_enabled: self.uses_autotokens,
-            update_user_stats_enabled: self.update_user_stats_enabled, // Set field
+            report_current_corpus_idx: self.report_current_corpus_idx, // Set field
             phantom_data: PhantomData,
         })
     }
