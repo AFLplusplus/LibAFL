@@ -3,10 +3,8 @@
 #include <string.h>
 #include <stdio.h>
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-  char array[40] = {};
-  char v = *(uint8_t *)Data;
-  v = v + 120;
-  // printf("%p %p %p\n", array, v, Data);
+  char *array = (char *)malloc(0x90);
+  uint8_t v = *(uint8_t *)Data;
 
   array[v] = 0x0;
   if (v % 2 == 0) {

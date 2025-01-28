@@ -217,13 +217,6 @@ fn fuzz(
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
     let text_addr = elf.get_section(".text", qemu.load_addr()).unwrap(); // 100% there is
-    let cov_filter = StdAddressFilter::allow_list(vec![text_addr]);
-
-    // update address filter after qemu has been initialized
-    emulator.modules_mut()
-            .modules_mut()
-            .match_first_type_mut::<EdgeCoverageModule<StdAddressFilter, NopPageFilter, EdgeCoverageFullVariant, false, 0>>()
-            .expect("Could not find back the edge module").update_address_filter(qemu, cov_filter);
 
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
@@ -315,11 +308,11 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        PredicateFeedback::new(),
+        PredicateFeedback::new(text_addr.clone()),
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_or!(CrashFeedback::new(), PredicateFeedback::new());
+    let mut objective = feedback_or!(CrashFeedback::new(), PredicateFeedback::new(text_addr));
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -443,7 +436,7 @@ fn fuzz(
     );
 
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop_for(&mut stages, &mut executor, &mut state, &mut mgr, 1)
         .expect("Error in the fuzzing loop");
 
     // Never reached

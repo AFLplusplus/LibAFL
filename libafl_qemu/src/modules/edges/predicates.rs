@@ -1,6 +1,6 @@
 use core::fmt;
 use std::borrow::Cow;
-
+use std::ops::Range;
 use hashbrown::HashMap;
 use libafl::{
     corpus::Testcase,
@@ -85,7 +85,8 @@ pub fn select_max(merged: &mut [(u64, bool)]) -> (u64, f64) {
     }
     // println!("Best selector is {} {}", idx_found, missclassification);
     let divider = merged[idx_found].0;
-    let rate = missclassification as f64 / (n + m) as f64;
+    let mut rate = missclassification as f64 / (n + m) as f64;
+    rate = 1.0 - rate;
     (divider, rate)
 }
 
@@ -122,7 +123,8 @@ pub fn select_min(merged: &mut [(u64, bool)]) -> (u64, f64) {
     }
     // println!("Best selector is {} {}", idx_found, missclassification);
     let divider = merged[idx_found].0;
-    let rate = missclassification as f64 / (n + m) as f64;
+    let mut rate = missclassification as f64 / (n + m) as f64;
+    rate = 1.0 - rate;
     (divider, rate)
 }
 
@@ -263,6 +265,7 @@ impl Tracer {
 #[derive(Default)]
 pub struct PredicateFeedback {
     was_crash: bool,
+    tracking_ip: Range<u64>,
 }
 
 impl Named for PredicateFeedback {
@@ -273,8 +276,20 @@ impl Named for PredicateFeedback {
 
 impl PredicateFeedback {
     #[must_use]
-    pub fn new() -> Self {
-        Self { was_crash: false }
+    pub fn new(range: Range<u64>) -> Self {
+        Self { was_crash: false, tracking_ip: range}  // sane default
+    }
+
+    #[must_use]
+    pub fn is_stack_ptr(&self, ptr: u64) -> bool {
+        let image_info = unsafe { libafl_get_image_info() };
+        let stack_end = unsafe { (*image_info).start_stack };
+        let stack_start = unsafe { (*image_info).stack_limit };
+        return ptr >= stack_start && stack_end >= ptr;
+    }
+    
+    pub fn is_text_ptr(&self, ptr: u64) -> bool {
+        self.tracking_ip.contains(&ptr)
     }
 }
 
@@ -310,19 +325,22 @@ where
 
         let tracer = state.metadata::<Tracer>().unwrap();
         // because of double borrow shit!
+        println!("{:#?}", self.tracking_ip);
         let mut edges = vec![];
         let mut maxes = vec![];
         let mut mins = vec![];
         for e in tracer.edges() {
-            edges.push(*e);
+            if self.is_text_ptr(e.0 as u64) && self.is_text_ptr(e.1 as u64) {
+                edges.push(*e);
+            }
         }
         for (addr, ma) in tracer.maxmap() {
-            if !is_stack_ptr(*ma) {
+            if !self.is_stack_ptr(*ma) && self.is_text_ptr(*addr as u64) {
                 maxes.push((*addr, *ma));
             }
         }
         for (addr, mi) in tracer.minmap() {
-            if !is_stack_ptr(*mi) {
+            if !self.is_stack_ptr(*mi) && self.is_text_ptr(*addr as u64) {
                 mins.push((*addr, *mi));
             }
         }
@@ -350,11 +368,4 @@ impl fmt::Display for Edges {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Edges({:#x}, {:#x})", self.0, self.1)
     }
-}
-
-pub fn is_stack_ptr(ptr: u64) -> bool {
-    let image_info = unsafe { libafl_get_image_info() };
-    let stack_end = unsafe { (*image_info).start_stack };
-    let stack_start = unsafe { (*image_info).stack_limit };
-    return ptr >= stack_start && stack_end >= ptr;
 }
