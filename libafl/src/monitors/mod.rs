@@ -1352,9 +1352,11 @@ impl<A: Monitor, B: Monitor> Monitor for CombinedMonitor<A, B> {
     }
 
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
-        *self.first.client_stats_mut() = self.client_stats.clone();
+        self.first.client_stats_mut().clone_from(&self.client_stats);
         self.first.display(event_msg, sender_id);
-        *self.second.client_stats_mut() = self.client_stats.clone();
+        self.second
+            .client_stats_mut()
+            .clone_from(&self.client_stats);
         self.second.display(event_msg, sender_id);
     }
 
