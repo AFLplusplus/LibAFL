@@ -98,6 +98,7 @@ pub struct SnapshotModule {
     pub empty: bool,
     pub accurate_unmap: bool,
     pub interval_filter: Vec<IntervalSnapshotFilter>,
+    auto_reset: bool,
 }
 
 impl core::fmt::Debug for SnapshotModule {
@@ -130,6 +131,7 @@ impl SnapshotModule {
             empty: true,
             accurate_unmap: false,
             interval_filter: Vec::<IntervalSnapshotFilter>::new(),
+            auto_reset: true,
         }
     }
 
@@ -148,6 +150,7 @@ impl SnapshotModule {
             empty: true,
             accurate_unmap: false,
             interval_filter,
+            auto_reset: true,
         }
     }
 
@@ -166,11 +169,16 @@ impl SnapshotModule {
             empty: true,
             accurate_unmap: false,
             interval_filter: Vec::<IntervalSnapshotFilter>::new(),
+            auto_reset: true,
         }
     }
 
     pub fn use_accurate_unmapping(&mut self) {
         self.accurate_unmap = true;
+    }
+
+    pub fn use_manual_reset(&mut self) {
+        self.auto_reset = false;
     }
 
     pub fn to_skip(&self, addr: GuestAddr) -> bool {
@@ -732,7 +740,9 @@ where
         if self.empty {
             self.snapshot(qemu);
         } else {
-            self.reset(qemu);
+            if self.auto_reset {
+                self.reset(qemu);
+            }
         }
     }
 }
