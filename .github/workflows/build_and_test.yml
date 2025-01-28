@@ -451,8 +451,6 @@ jobs:
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_windows_gdiplus
         run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
   windows-tinyinst-simple:
     runs-on: windows-latest

@@ -187,10 +187,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        #[cfg(unix)]
         let observers = tuple_list!(edges_observer, time_observer, asan_observer);
-        #[cfg(windows)]
-        let observers = tuple_list!(edges_observer, time_observer);
 
         // Create the executor for an in-process function with just one observer for edge coverage
         let executor = FridaInProcessExecutor::new(
