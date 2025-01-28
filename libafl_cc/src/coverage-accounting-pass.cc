@@ -218,13 +218,14 @@ llvmGetPassPluginInfo() {
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
   #if 1
-    #if LLVM_VERSION_MAJOR <= 13
-            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
-    #endif
             PB.registerOptimizerLastEPCallback(
-                [](ModulePassManager &MPM, OptimizationLevel OL) {
-                  MPM.addPass(AFLCoverage());
-                });
+                [](ModulePassManager &MPM, OptimizationLevel OL
+    #if LLVM_VERSION_MAJOR >= 20
+                   ,
+                   ThinOrFullLTOPhase Phase
+    #endif
+
+                ) { MPM.addPass(AFLCoverage()); });
   /* TODO LTO registration */
   #else
             using PipelineElement = typename PassBuilder::PipelineElement;
