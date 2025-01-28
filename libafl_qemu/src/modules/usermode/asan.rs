@@ -1,6 +1,17 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
-use std::{borrow::Cow, env, fmt::Display, fs, path::PathBuf, pin::Pin, sync::Mutex};
+
+use core::{fmt, slice};
+use std::{
+    borrow::Cow,
+    env,
+    fmt::{Debug, Display},
+    fs,
+    path::PathBuf,
+    pin::Pin,
+    process,
+    sync::Mutex,
+};
 
 use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, observers::ObserversTuple};
@@ -179,7 +190,7 @@ impl TryFrom<u32> for QasanAction {
 }
 
 impl Display for AsanError {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             AsanError::Read(addr, len) => write!(fmt, "Invalid {len} bytes read at {addr:#x}"),
             AsanError::Write(addr, len) => {
@@ -211,7 +222,7 @@ impl AllocTreeItem {
     }
 }
 
-impl core::fmt::Debug for AsanGiovese {
+impl Debug for AsanGiovese {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AsanGiovese")
             .field("alloc_tree", &self.alloc_tree)
@@ -685,7 +696,7 @@ impl AsanGiovese {
         unsafe {
             let h = qemu.g2h::<*const c_void>(page) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            std::slice::from_raw_parts_mut(shadow_addr, SHADOW_PAGE_SIZE)
+            slice::from_raw_parts_mut(shadow_addr, SHADOW_PAGE_SIZE)
         }
     }
 
@@ -694,7 +705,7 @@ impl AsanGiovese {
             cb.call(self, qemu, pc, error);
             self.error_callback = Some(cb);
         } else {
-            std::process::abort();
+            process::abort();
         }
     }
 
@@ -1292,7 +1303,7 @@ fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
 /// has been removed in version v0.23 for some reason.
 /// TODO: find another cleaner solution.
 mod addr2line_legacy {
-    use std::{borrow::Cow, ffi::OsString, fs::File, path::PathBuf, sync::Arc};
+    use std::{borrow::Cow, env, ffi::OsString, fs::File, path::PathBuf, sync::Arc};
 
     use addr2line::{gimli, LookupContinuation, LookupResult};
     use object::Object;
@@ -1312,7 +1323,7 @@ mod addr2line_legacy {
         r: &R,
     ) -> Result<PathBuf, gimli::Error> {
         let bytes = r.to_slice()?;
-        let s = std::str::from_utf8(&bytes).map_err(|_| gimli::Error::BadUtf8)?;
+        let s = str::from_utf8(&bytes).map_err(|_| gimli::Error::BadUtf8)?;
         Ok(PathBuf::from(s))
     }
 
@@ -1358,7 +1369,7 @@ mod addr2line_legacy {
             loader: &mut F,
             path: Option<PathBuf>,
         ) -> Option<gimli::DwarfPackage<R>> {
-            let mut path = path.map_or_else(std::env::current_exe, Ok).ok()?;
+            let mut path = path.map_or_else(env::current_exe, Ok).ok()?;
             let dwp_extension = path.extension().map_or_else(
                 || OsString::from("dwp"),
                 |previous_extension| {
