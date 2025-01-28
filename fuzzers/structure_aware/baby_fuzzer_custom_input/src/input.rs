@@ -2,14 +2,13 @@ use core::num::NonZeroUsize;
 use std::{borrow::Cow, hash::Hash};
 
 use libafl::{
-    corpus::CorpusId,
     generators::{Generator, RandBytesGenerator},
     inputs::{BytesInput, HasTargetBytes, Input},
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error, SerdeAny,
 };
-use libafl_bolts::{generic_hash_std, rands::Rand, Named};
+use libafl_bolts::{rands::Rand, Named};
 use serde::{Deserialize, Serialize};
 
 /// The custom [`Input`] type used in this example, consisting of a byte array part, a byte array that is not always present, and a boolean
@@ -28,11 +27,7 @@ pub struct CustomInput {
 }
 
 /// Hash-based implementation
-impl Input for CustomInput {
-    fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        format!("{:016x}", generic_hash_std(self))
-    }
-}
+impl Input for CustomInput {}
 
 impl CustomInput {
     /// Returns a mutable reference to the byte array

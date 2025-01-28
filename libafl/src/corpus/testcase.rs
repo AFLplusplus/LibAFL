@@ -264,6 +264,8 @@ impl<I> Testcase<I> {
     }
 
     /// Create a new Testcase instance given an input and a `filename`
+    /// If locking is enabled, make sure that testcases with the same input have the same filename
+    /// to prevent ending up with duplicate testcases
     #[inline]
     pub fn with_filename(input: I, filename: String) -> Self {
         Self {

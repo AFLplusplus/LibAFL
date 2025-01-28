@@ -352,7 +352,7 @@ impl<I> Event<I> {
     {
         match self {
             Event::NewTestcase { input, .. } => {
-                Cow::Owned(format!("Testcase {}", input.generate_name(None)))
+                Cow::Owned(format!("Testcase {}", input.generate_name()))
             }
             Event::UpdateExecStats { .. } => Cow::Borrowed("Client Heartbeat"),
             Event::UpdateUserStats { .. } => Cow::Borrowed("UserStats"),

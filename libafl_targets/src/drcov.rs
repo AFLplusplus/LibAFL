@@ -255,7 +255,7 @@ fn parse_path(s: &str) -> PathBuf {
     let s = s.trim();
 
     // If first and last character is a quote, let's remove them
-    let s = if s.starts_with('\"') && s.ends_with('\"'){
+    let s = if s.starts_with('\"') && s.ends_with('\"') {
         &s[1..s.len() - 1]
     } else {
         s
