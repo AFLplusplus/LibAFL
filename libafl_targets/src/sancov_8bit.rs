@@ -83,7 +83,6 @@ mod observers {
         slice::{from_raw_parts, Iter, IterMut},
     };
 
-    use ahash::RandomState;
     use libafl::{
         observers::{DifferentialObserver, MapObserver, Observer},
         Error,
@@ -228,11 +227,6 @@ mod observers {
                 }
             }
             res
-        }
-
-        #[inline]
-        fn hash_simple(&self) -> u64 {
-            RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
         }
 
         fn reset_map(&mut self) -> Result<(), Error> {

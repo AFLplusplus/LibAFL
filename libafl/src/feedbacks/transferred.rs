@@ -20,7 +20,7 @@ pub const TRANSFERRED_FEEDBACK_NAME: Cow<'static, str> =
 
 /// Metadata which denotes whether we are currently transferring an input.
 ///
-/// Implementors of multi-node communication systems (like [`crate::events::LlmpEventManager`]) should wrap any
+/// Implementors of multi-node communication systems (like [`crate::events::LlmpRestartingEventManager`]) should wrap any
 /// [`crate::EvaluatorObservers::evaluate_input_with_observers`] or
 /// [`crate::ExecutionProcessor::process_execution`] calls with setting this metadata to true/false
 /// before and after.

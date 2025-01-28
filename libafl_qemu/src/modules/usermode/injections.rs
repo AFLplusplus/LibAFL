@@ -24,7 +24,7 @@ use crate::{
     elf::EasyElf,
     emu::EmulatorModules,
     modules::{
-        utils::filters::{NopAddressFilter, NOP_ADDRESS_FILTER},
+        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
         EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{ArchExtras, Hook, SyscallHookResult},
@@ -34,6 +34,7 @@ use crate::{
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
 /// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>
+#[expect(non_upper_case_globals)]
 const SYS_execve: u8 = 221;
 
 /// Parses `injections.yaml`
@@ -268,8 +269,6 @@ where
     I: Unpin,
     S: Unpin,
 {
-    type ModuleAddressFilter = NopAddressFilter;
-
     fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
@@ -344,6 +343,10 @@ where
             }
         }
     }
+}
+
+impl HasAddressFilter for InjectionModule {
+    type ModuleAddressFilter = NopAddressFilter;
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &NopAddressFilter

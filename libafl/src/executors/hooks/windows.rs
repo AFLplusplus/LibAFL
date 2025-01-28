@@ -9,7 +9,6 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
-        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
@@ -17,9 +16,9 @@ pub mod windows_asan_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     /// # Safety
@@ -28,11 +27,10 @@ pub mod windows_asan_handler {
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         let data = &raw mut GLOBAL_STATE;
@@ -127,7 +125,6 @@ pub mod windows_exception_handler {
     };
 
     use crate::{
-        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
@@ -136,9 +133,9 @@ pub mod windows_exception_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -186,11 +183,10 @@ pub mod windows_exception_handler {
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
     {
         let old_hook = panic::take_hook();
@@ -249,12 +245,11 @@ pub mod windows_exception_handler {
     ) where
         E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = I>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -319,12 +314,11 @@ pub mod windows_exception_handler {
     ) where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
-        S::Solutions: Corpus<Input = I>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {

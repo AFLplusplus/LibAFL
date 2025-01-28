@@ -1,13 +1,12 @@
 //! Setup asan death callbback
 
 use libafl::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     HasObjective,
 };
 
@@ -34,10 +33,9 @@ pub unsafe fn setup_asan_callback<E, EM, I, OF, S, Z>(_executor: &E, _event_mgr:
 where
     E: Executor<EM, I, S, Z> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
-    EM: EventFirer<State = S> + EventRestarter<State = S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
-    S::Solutions: Corpus<Input = I>,
+    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
     Z: HasObjective<Objective = OF>,
     I: Input + Clone,
 {

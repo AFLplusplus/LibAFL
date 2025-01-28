@@ -76,7 +76,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     };
 
     let mut run_client = |state: Option<_>,
-                          mut mgr: LlmpRestartingEventManager<_, _, _>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 

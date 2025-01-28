@@ -6,15 +6,14 @@ use core::marker::PhantomData;
 use libafl_bolts::{compress::GzipCompressor, llmp::LLMP_FLAG_COMPRESSED};
 use libafl_bolts::{
     llmp::{Flags, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
-    shmem::ShMemProvider,
     ClientId,
 };
+use serde::de::DeserializeOwned;
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     events::{llmp::LLMP_TAG_EVENT_TO_BOTH, BrokerEventResult, Event},
-    inputs::Input,
     monitors::Monitor,
     Error,
 };
@@ -40,15 +39,14 @@ pub struct StdLlmpEventHook<I, MT> {
     phantom: PhantomData<I>,
 }
 
-impl<I, MT, SP> LlmpHook<SP> for StdLlmpEventHook<I, MT>
+impl<I, MT, SHM, SP> LlmpHook<SHM, SP> for StdLlmpEventHook<I, MT>
 where
-    I: Input,
+    I: DeserializeOwned,
     MT: Monitor,
-    SP: ShMemProvider,
 {
     fn on_new_message(
         &mut self,
-        _broker_inner: &mut LlmpBrokerInner<SP>,
+        _broker_inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         #[cfg(feature = "llmp_compression")] msg_flags: &mut Flags,
@@ -90,7 +88,6 @@ where
 
 impl<I, MT> StdLlmpEventHook<I, MT>
 where
-    I: Input,
     MT: Monitor,
 {
     /// Create an event broker from a raw broker.

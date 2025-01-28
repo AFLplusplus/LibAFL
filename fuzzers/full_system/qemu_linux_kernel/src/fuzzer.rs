@@ -4,7 +4,7 @@ use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
 #[cfg(not(feature = "nyx"))]
-use libafl::state::{HasExecutions, State};
+use libafl::state::HasExecutions;
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig},
@@ -40,8 +40,8 @@ use libafl_qemu::{
     emu::Emulator,
     executor::QemuExecutor,
     modules::{
-        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule, CmpLogModule,
-        EmulatorModuleTuple,
+        cmplog::CmpLogObserver, edges::StdEdgeCoverageClassicModule,
+        utils::filters::HasAddressFilterTuples, CmpLogModule, EmulatorModuleTuple,
     },
     FastSnapshotManager, NopSnapshotManager, QemuInitError,
 };
@@ -78,9 +78,9 @@ fn get_emulator<C, ET, I, S>(
     QemuInitError,
 >
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
-    S: State + HasExecutions + Unpin,
+    S: HasExecutions + Unpin,
 {
     // Allow linux process address space addresses as feedback
     modules.allow_address_range_all(LINUX_PROCESS_ADDRESS_RANGE);

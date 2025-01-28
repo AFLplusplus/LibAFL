@@ -1,5 +1,5 @@
 use std::{
-    intrinsics::copy_nonoverlapping, mem::MaybeUninit, slice::from_raw_parts_mut,
+    mem::MaybeUninit, ops::Range, ptr::copy_nonoverlapping, slice::from_raw_parts_mut,
     str::from_utf8_unchecked_mut,
 };
 
@@ -19,6 +19,18 @@ use crate::{Qemu, CPU};
 pub struct GuestMaps {
     self_maps_root: *mut IntervalTreeRoot,
     pageflags_node: *mut IntervalTreeNode,
+}
+
+/// Information about the image loaded by QEMU.
+pub struct ImageInfo {
+    pub code: Range<GuestAddr>,
+    pub data: Range<GuestAddr>,
+    pub stack: Range<GuestAddr>,
+    pub vdso: GuestAddr,
+    pub entry: GuestAddr,
+    pub brk: GuestAddr,
+    pub alignment: GuestAddr,
+    pub exec_stack: bool,
 }
 
 // Consider a private new only for Emulator
@@ -127,6 +139,33 @@ impl Qemu {
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
         GuestMaps::new()
+    }
+
+    #[must_use]
+    pub fn image_info(&self) -> ImageInfo {
+        // # Safety
+        // Safe because QEMU has been correctly initialized since it takes self as parameter.
+        let image_info = unsafe { *libafl_qemu_sys::libafl_get_image_info() };
+
+        let code_start = image_info.start_code;
+        let code_end = image_info.end_code;
+
+        let data_start = image_info.start_data;
+        let data_end = image_info.end_data;
+
+        let stack_start = image_info.stack_limit;
+        let stack_end = image_info.start_stack;
+
+        ImageInfo {
+            code: code_start..code_end,
+            data: data_start..data_end,
+            stack: stack_start..stack_end,
+            vdso: image_info.vdso,
+            entry: image_info.entry,
+            brk: image_info.brk,
+            alignment: image_info.alignment,
+            exec_stack: image_info.exec_stack,
+        }
     }
 
     #[must_use]

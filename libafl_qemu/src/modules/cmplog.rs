@@ -19,7 +19,8 @@ use crate::{capstone, qemu::ArchExtras, CallingConvention};
 use crate::{
     emu::EmulatorModules,
     modules::{
-        utils::filters::StdAddressFilter, AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
+        AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::Hook,
     Qemu,
@@ -75,10 +76,6 @@ where
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
-
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
@@ -95,6 +92,12 @@ where
             Hook::Raw(trace_cmp8_cmplog),
         );
     }
+}
+
+impl HasAddressFilter for CmpLogModule {
+    type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(feature = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.address_filter
@@ -143,10 +146,6 @@ where
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
-
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
     fn first_exec<ET>(
@@ -165,6 +164,12 @@ where
             Hook::Raw(trace_cmp8_cmplog),
         );
     }
+}
+
+impl HasAddressFilter for CmpLogChildModule {
+    type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(feature = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.address_filter
@@ -202,7 +207,7 @@ where
             return None;
         }
     }
-    let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing");
+    let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing. Is the Executor initialized?");
     if state.metadata_map().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
     }
@@ -408,10 +413,6 @@ where
     I: Unpin,
     S: Unpin,
 {
-    type ModuleAddressFilter = StdAddressFilter;
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = NopPageFilter;
-
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
@@ -426,6 +427,13 @@ where
             Hook::Empty,
         );
     }
+}
+
+#[cfg(feature = "usermode")]
+impl HasAddressFilter for CmpLogRoutinesModule {
+    type ModuleAddressFilter = StdAddressFilter;
+    #[cfg(feature = "systemmode")]
+    type ModulePageFilter = NopPageFilter;
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.address_filter

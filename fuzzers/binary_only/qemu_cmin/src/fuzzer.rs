@@ -7,7 +7,7 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, NopCorpus},
-    events::{EventRestarter, SimpleRestartingEventManager},
+    events::{EventRestarter, SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
@@ -95,6 +95,7 @@ pub struct FuzzerOptions {
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 pub fn fuzz() -> Result<(), Error> {
+    env_logger::init();
     let mut options = FuzzerOptions::parse();
 
     let corpus_dir = PathBuf::from(options.input);
@@ -107,10 +108,10 @@ pub fn fuzz() -> Result<(), Error> {
         .expect("Failed to read dir entry");
 
     let program = env::args().next().unwrap();
-    log::debug!("Program: {program:}");
+    log::info!("Program: {program:}");
 
     options.args.insert(0, program);
-    log::debug!("ARGS: {:#?}", options.args);
+    log::info!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
 
@@ -145,21 +146,21 @@ pub fn fuzz() -> Result<(), Error> {
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
-    log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+    log::info!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
     qemu.entry_break(test_one_input_ptr);
 
     let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
-    log::debug!("Break at {pc:#x}");
+    log::info!("Break at {pc:#x}");
 
     let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
-    log::debug!("Return address = {ret_addr:#x}");
+    log::info!("Return address = {ret_addr:#x}");
     qemu.set_breakpoint(ret_addr);
 
     let input_addr = qemu
         .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
         .unwrap();
-    log::debug!("Placing input at {input_addr:#x}");
+    log::info!("Placing input at {input_addr:#x}");
 
     let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 

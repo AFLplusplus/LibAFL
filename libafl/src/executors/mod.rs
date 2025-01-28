@@ -221,7 +221,7 @@ mod test {
         let nonempty_input = BytesInput::new(vec![1u8]);
         let mut executor = NopExecutor::new();
         let mut fuzzer = NopFuzzer::new();
-        let mut mgr: NopEventManager<NopState<BytesInput>> = NopEventManager::new();
+        let mut mgr: NopEventManager = NopEventManager::new();
         let mut state: NopState<BytesInput> = NopState::new();
 
         executor

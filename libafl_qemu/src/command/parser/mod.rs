@@ -11,7 +11,7 @@ use crate::{
         IsCommand, LoadCommand, LqprintfCommand, NativeExitKind, SaveCommand, StartCommand,
         StdCommandManager, TestCommand, VersionCommand,
     },
-    modules::EmulatorModuleTuple,
+    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
     sync_exit::ExitArgs,
     GuestReg, IsSnapshotManager, Qemu, QemuMemoryChunk, Regs, StdEmulatorDriver,
 };
@@ -92,7 +92,7 @@ pub struct StartPhysCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartPhysCommandParser
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -121,7 +121,7 @@ pub struct StartVirtCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, StdCommandManager<S>, StdEmulatorDriver, ET, I, S, SM>
     for StartVirtCommandParser
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -242,7 +242,7 @@ pub struct VaddrFilterAllowRangeCommandParser;
 impl<C, CM, ED, ET, I, S, SM> NativeCommandParser<C, CM, ED, ET, I, S, SM>
     for VaddrFilterAllowRangeCommandParser
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: Unpin,
     S: Unpin,
 {

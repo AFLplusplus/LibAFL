@@ -162,7 +162,7 @@ pub extern "C" fn libafl_main() {
     );
 
     let mut run_client = |state: Option<_>,
-                          mut restarting_mgr: LlmpRestartingEventManager<_, _, _>,
+                          mut restarting_mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         // Create an observation channel using the coverage map
         let edges_observer =

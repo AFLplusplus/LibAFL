@@ -15,7 +15,7 @@ use crate::{
         parser::NativeCommandParser,
         CommandError, NativeExitKind,
     },
-    modules::EmulatorModuleTuple,
+    modules::{utils::filters::HasAddressFilterTuples, EmulatorModuleTuple},
     sync_exit::ExitArgs,
     IsSnapshotManager, NyxEmulatorDriver, Qemu, QemuMemoryChunk, Regs,
 };
@@ -80,7 +80,7 @@ pub struct SubmitCR3CommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for SubmitCR3CommandParser
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -100,7 +100,7 @@ pub struct RangeSubmitCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for RangeSubmitCommandParser
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,
@@ -188,7 +188,7 @@ pub struct NextPayloadCommandParser;
 impl<C, ET, I, S, SM> NativeCommandParser<C, NyxCommandManager<S>, NyxEmulatorDriver, ET, I, S, SM>
     for NextPayloadCommandParser
 where
-    ET: EmulatorModuleTuple<I, S>,
+    ET: EmulatorModuleTuple<I, S> + HasAddressFilterTuples,
     I: HasTargetBytes + Unpin,
     S: Unpin,
     SM: IsSnapshotManager,

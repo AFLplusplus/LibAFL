@@ -707,25 +707,23 @@ impl LlmpMsg {
 
 /// An Llmp instance
 #[derive(Debug)]
-pub enum LlmpConnection<HT, SP>
-where
-    SP: ShMemProvider,
-{
+pub enum LlmpConnection<HT, SHM, SP> {
     /// A broker and a thread using this tcp background thread
     IsBroker {
         /// The [`LlmpBroker`] of this [`LlmpConnection`].
-        broker: LlmpBroker<HT, SP>,
+        broker: LlmpBroker<HT, SHM, SP>,
     },
     /// A client, connected to the port
     IsClient {
         /// The [`LlmpClient`] of this [`LlmpConnection`].
-        client: LlmpClient<SP>,
+        client: LlmpClient<SHM, SP>,
     },
 }
 
-impl<SP> LlmpConnection<(), SP>
+impl<SHM, SP> LlmpConnection<(), SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     #[cfg(feature = "std")]
     /// Creates either a broker, if the tcp port is not bound, or a client, connected to this port.
@@ -776,10 +774,11 @@ where
     }
 }
 
-impl<MT, SP> LlmpConnection<MT, SP>
+impl<MT, SHM, SP> LlmpConnection<MT, SHM, SP>
 where
-    MT: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    MT: LlmpHookTuple<SHM, SP>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Describe this in a reproducible fashion, if it's a client
     pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
@@ -793,7 +792,7 @@ where
     pub fn existing_client_from_description(
         shmem_provider: SP,
         description: &LlmpClientDescription,
-    ) -> Result<LlmpConnection<MT, SP>, Error> {
+    ) -> Result<LlmpConnection<MT, SHM, SP>, Error> {
         Ok(LlmpConnection::IsClient {
             client: LlmpClient::existing_client_from_description(shmem_provider, description)?,
         })
@@ -891,23 +890,20 @@ struct LlmpClientExitInfo {
 
 /// Sending end on a (unidirectional) sharedmap channel
 #[derive(Debug)]
-pub struct LlmpSender<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpSender<SHM, SP> {
     /// ID of this sender.
     id: ClientId,
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
     last_msg_sent: *const LlmpMsg,
     /// A vec of page wrappers, each containing an initialized [`ShMem`]
-    out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
+    out_shmems: Vec<LlmpSharedMap<SHM>>,
     /// A vec of pages that we previously used, but that have served its purpose
     /// (no potential receivers are left).
     /// Instead of freeing them, we keep them around to potentially reuse them later,
     /// if they are still large enough.
     /// This way, the OS doesn't have to spend time zeroing pages, and getting rid of our old pages
-    unused_shmem_cache: Vec<LlmpSharedMap<SP::ShMem>>,
+    unused_shmem_cache: Vec<LlmpSharedMap<SHM>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
     /// By keeping the message history around,
@@ -920,9 +916,10 @@ where
 }
 
 /// An actor on the sending part of the shared map
-impl<SP> LlmpSender<SP>
+impl<SHM, SP> LlmpSender<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create a new [`LlmpSender`] using a given [`ShMemProvider`], and `id`.
     /// If `keep_pages_forever` is `true`, `ShMem` will never be freed.
@@ -953,47 +950,6 @@ where
         })
     }
 
-    /// ID of this sender.
-    #[must_use]
-    pub fn id(&self) -> ClientId {
-        self.id
-    }
-
-    /// Completely reset the current sender map.
-    /// Afterwards, no receiver should read from it at a different location.
-    /// This is only useful if all connected llmp parties start over, for example after a crash.
-    ///
-    /// # Safety
-    /// Only safe if you really really restart the page on everything connected
-    /// No receiver should read from this page at a different location.
-    pub unsafe fn reset(&mut self) {
-        llmp_page_init(
-            &mut self.out_shmems.last_mut().unwrap().shmem,
-            self.id,
-            true,
-        );
-        self.last_msg_sent = ptr::null_mut();
-    }
-
-    /// Reads the stored sender / client id for the given `env_name` (by appending `_CLIENT_ID`).
-    /// If the content of the env is `_NULL`, returns [`Option::None`].
-    #[cfg(feature = "std")]
-    #[inline]
-    fn client_id_from_env(env_name: &str) -> Result<Option<ClientId>, Error> {
-        let client_id_str = env::var(format!("{env_name}_CLIENT_ID"))?;
-        Ok(if client_id_str == _NULL_ENV_STR {
-            None
-        } else {
-            Some(ClientId(client_id_str.parse()?))
-        })
-    }
-
-    /// Writes the `id` to an env var
-    #[cfg(feature = "std")]
-    fn client_id_to_env(env_name: &str, id: ClientId) {
-        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{}", id.0));
-    }
-
     /// Reattach to a vacant `out_shmem`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(mut shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
@@ -1013,62 +969,12 @@ where
         Ok(ret)
     }
 
-    /// Store the info to this sender to env.
-    /// A new client can reattach to it using [`LlmpSender::on_existing_from_env()`].
-    #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        let current_out_shmem = self.out_shmems.last().unwrap();
-        current_out_shmem.shmem.write_to_env(env_name)?;
-        Self::client_id_to_env(env_name, self.id);
-        unsafe { current_out_shmem.msg_to_env(self.last_msg_sent, env_name) }
-    }
-
-    /// Waits for this sender to be save to unmap.
-    /// If a receiver is involved, this function should always be called.
-    pub fn await_safe_to_unmap_blocking(&self) {
-        #[cfg(feature = "std")]
-        let mut ctr = 0_u16;
-        loop {
-            if self.safe_to_unmap() {
-                return;
-            }
-            hint::spin_loop();
-            // We log that we're looping -> see when we're blocking.
-            #[cfg(feature = "std")]
-            {
-                ctr = ctr.wrapping_add(1);
-                if ctr == 0 {
-                    log::info!("Awaiting safe_to_unmap_blocking");
-                }
-            }
-        }
-    }
-
-    /// If we are allowed to unmap this client
-    pub fn safe_to_unmap(&self) -> bool {
-        let current_out_shmem = self.out_shmems.last().unwrap();
-        unsafe {
-            // log::info!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
-            (*current_out_shmem.page())
-                .receivers_joined_count
-                .load(Ordering::Relaxed)
-                >= 1
-        }
-    }
-
-    /// For debug purposes: Mark save to unmap, even though it might not have been read by a receiver yet.
-    /// # Safety
-    /// If this method is called, the page may be unmapped before it is read by any receiver.
-    pub unsafe fn mark_safe_to_unmap(&mut self) {
-        (*self.out_shmems.last_mut().unwrap().page_mut()).receiver_joined();
-    }
-
     /// Reattach to a vacant `out_shmem`.
     /// It is essential, that the receiver (or someone else) keeps a pointer to this map
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_shmem(
         shmem_provider: SP,
-        current_out_shmem: SP::ShMem,
+        current_out_shmem: SHM,
         last_msg_sent_offset: Option<u64>,
     ) -> Result<Self, Error> {
         let mut out_shmem = LlmpSharedMap::existing(current_out_shmem);
@@ -1138,176 +1044,13 @@ where
         }
     }
 
-    /// Intern: Special allocation function for `EOP` messages (and nothing else!)
-    /// The normal alloc will fail if there is not enough space for `buf_len_padded + EOP`
-    /// So if [`alloc_next`] fails, create new page if necessary, use this function,
-    /// place `EOP`, commit `EOP`, reset, alloc again on the new space.
-    unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, Error> {
-        let map = self.out_shmems.last_mut().unwrap();
-        let page = map.page_mut();
-        let last_msg = self.last_msg_sent;
-        assert!((*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
-                "PROGRAM ABORT : BUG: EOP does not fit in page! page {page:?}, size_current {:?}, size_total {:?}",
-                &raw const (*page).size_used, &raw const (*page).size_total);
-
-        let ret: *mut LlmpMsg = if last_msg.is_null() {
-            (*page).messages.as_mut_ptr()
-        } else {
-            llmp_next_msg_ptr_checked(map, last_msg, EOP_MSG_SIZE)?
-        };
-        assert!(
-            (*ret).tag != LLMP_TAG_UNINITIALIZED,
-            "Did not call send() on last message!"
-        );
-
-        (*ret).buf_len = size_of::<LlmpPayloadSharedMapInfo>() as u64;
-
-        // We don't need to pad the EOP message: it'll always be the last in this page.
-        (*ret).buf_len_padded = (*ret).buf_len;
-        (*ret).message_id = if last_msg.is_null() {
-            MessageId(1)
-        } else {
-            MessageId((*last_msg).message_id.0 + 1)
-        };
-        (*ret).tag = LLMP_TAG_END_OF_PAGE;
-        (*page).size_used += EOP_MSG_SIZE;
-        Ok(ret)
-    }
-
-    /// Intern: Will return a ptr to the next msg buf, or None if map is full.
-    /// Never call [`alloc_next`] without either sending or cancelling the last allocated message for this page!
-    /// There can only ever be up to one message allocated per page at each given time.
-    unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
-        let map = self.out_shmems.last_mut().unwrap();
-        let page = map.page_mut();
-        let last_msg = self.last_msg_sent;
-
-        assert!(
-            !self.has_unsent_message,
-            "Called alloc without calling send inbetween"
-        );
-
-        #[cfg(feature = "llmp_debug")]
-        log::info!(
-            "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
-            buf_len,
-            page,
-            &map.shmem.id().as_str(),
-            last_msg
-        );
-
-        let msg_start = (*page).messages.as_mut_ptr() as usize + (*page).size_used;
-
-        // Make sure the end of our msg is aligned.
-        let buf_len_padded = llmp_align(msg_start + buf_len + size_of::<LlmpMsg>())
-            - msg_start
-            - size_of::<LlmpMsg>();
-
-        #[cfg(feature = "llmp_debug")]
-        log::trace!(
-            "{page:?} {:?} size_used={:x} buf_len_padded={:x} EOP_MSG_SIZE={:x} size_total={}",
-            &(*page),
-            (*page).size_used,
-            buf_len_padded,
-            EOP_MSG_SIZE,
-            (*page).size_total
-        );
-
-        // For future allocs, keep track of the maximum (aligned) alloc size we used
-        (*page).max_alloc_size = max(
-            (*page).max_alloc_size,
-            size_of::<LlmpMsg>() + buf_len_padded,
-        );
-
-        // We need enough space for the current page size_used + payload + padding
-        if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
-            > (*page).size_total
-        {
-            #[cfg(feature = "llmp_debug")]
-            log::info!("LLMP: Page full.");
-
-            /* We're full. */
-            return None;
-        }
-
-        let ret = msg_start as *mut LlmpMsg;
-
-        /* We need to start with 1 for ids, as current message id is initialized
-         * with 0... */
-        (*ret).message_id = if last_msg.is_null() {
-            MessageId(1)
-        } else if (*page).current_msg_id.load(Ordering::Relaxed) == (*last_msg).message_id.0 {
-            MessageId((*last_msg).message_id.0 + 1)
-        } else {
-            /* Oops, wrong usage! */
-            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", &raw const (*page).current_msg_id, (*last_msg).message_id);
-        };
-
-        (*ret).buf_len = buf_len as u64;
-        (*ret).buf_len_padded = buf_len_padded as u64;
-        (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
-
-        (*llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
-        (*ret).tag = LLMP_TAG_UNINITIALIZED;
-
-        self.has_unsent_message = true;
-
-        Some(ret)
-    }
-
-    /// Commit the message last allocated by [`alloc_next`] to the queue.
-    /// After commiting, the msg shall no longer be altered!
-    /// It will be read by the consuming threads (`broker->clients` or `client->broker`)
-    /// If `overwrite_client_id` is `false`, the message's `sender` won't be touched (for broker forwarding)
-    #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
-    unsafe fn send(&mut self, msg: *mut LlmpMsg, overwrite_client_id: bool) -> Result<(), Error> {
-        // log::info!("Sending msg {:?}", msg);
-
-        assert!(self.last_msg_sent != msg, "Message sent twice!");
-        assert!(
-            (*msg).tag != LLMP_TAG_UNSET,
-            "No tag set on message with id {:?}",
-            (*msg).message_id
-        );
-        // A client gets the sender id assigned to by the broker during the initial handshake.
-        if overwrite_client_id {
-            (*msg).sender = self.id;
-        }
-        let page = self.out_shmems.last_mut().unwrap().page_mut();
-        if msg.is_null() || !llmp_msg_in_page(page, msg) {
-            return Err(Error::unknown(format!(
-                "Llmp Message {msg:?} is null or not in current page"
-            )));
-        }
-
-        let mid = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
-        (*msg).message_id.0 = mid;
-
-        // Make sure all things have been written to the page, and commit the message to the page
-        (*page)
-            .current_msg_id
-            .store((*msg).message_id.0, Ordering::Release);
-
-        self.last_msg_sent = msg;
-        self.has_unsent_message = false;
-
-        log::debug!(
-            "[{} - {:#x}] Send message with id {}",
-            self.id.0,
-            ptr::from_ref::<Self>(self) as u64,
-            mid
-        );
-
-        Ok(())
-    }
-
     /// Grab an unused `LlmpSharedMap` from `unused_shmem_cache` or allocate a new map,
     /// if no suitable maps could be found.
     unsafe fn new_or_unused_shmem(
         &mut self,
         sender_id: ClientId,
         next_min_shmem_size: usize,
-    ) -> Result<LlmpSharedMap<<SP>::ShMem>, Error> {
+    ) -> Result<LlmpSharedMap<SHM>, Error> {
         // Find a shared map that has been released to reuse, from which all receivers left / finished reading.
         let cached_shmem = self
             .unused_shmem_cache
@@ -1549,20 +1292,6 @@ where
         }
     }
 
-    /// Describe this [`LlmpClient`] in a way that it can be restored later, using [`Self::on_existing_from_description`].
-    pub fn describe(&self) -> Result<LlmpDescription, Error> {
-        let map = self.out_shmems.last().unwrap();
-        let last_message_offset = if self.last_msg_sent.is_null() {
-            None
-        } else {
-            Some(unsafe { map.msg_to_offset(self.last_msg_sent) }?)
-        };
-        Ok(LlmpDescription {
-            shmem: map.shmem.description(),
-            last_message_offset,
-        })
-    }
-
     /// Create this client on an existing map from the given description.
     /// Acquired with [`self.describe`].
     pub fn on_existing_from_description(
@@ -1584,12 +1313,282 @@ where
     }
 }
 
+impl<SHM, SP> LlmpSender<SHM, SP>
+where
+    SHM: ShMem,
+{
+    /// ID of this sender.
+    #[must_use]
+    pub fn id(&self) -> ClientId {
+        self.id
+    }
+
+    /// Completely reset the current sender map.
+    /// Afterwards, no receiver should read from it at a different location.
+    /// This is only useful if all connected llmp parties start over, for example after a crash.
+    ///
+    /// # Safety
+    /// Only safe if you really really restart the page on everything connected
+    /// No receiver should read from this page at a different location.
+    pub unsafe fn reset(&mut self) {
+        llmp_page_init(
+            &mut self.out_shmems.last_mut().unwrap().shmem,
+            self.id,
+            true,
+        );
+        self.last_msg_sent = ptr::null_mut();
+    }
+
+    /// Reads the stored sender / client id for the given `env_name` (by appending `_CLIENT_ID`).
+    /// If the content of the env is `_NULL`, returns [`Option::None`].
+    #[cfg(feature = "std")]
+    #[inline]
+    fn client_id_from_env(env_name: &str) -> Result<Option<ClientId>, Error> {
+        let client_id_str = env::var(format!("{env_name}_CLIENT_ID"))?;
+        Ok(if client_id_str == _NULL_ENV_STR {
+            None
+        } else {
+            Some(ClientId(client_id_str.parse()?))
+        })
+    }
+
+    /// Writes the `id` to an env var
+    #[cfg(feature = "std")]
+    fn client_id_to_env(env_name: &str, id: ClientId) {
+        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{}", id.0));
+    }
+
+    /// Store the info to this sender to env.
+    /// A new client can reattach to it using [`LlmpSender::on_existing_from_env()`].
+    #[cfg(feature = "std")]
+    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
+        let current_out_shmem = self.out_shmems.last().unwrap();
+        current_out_shmem.shmem.write_to_env(env_name)?;
+        Self::client_id_to_env(env_name, self.id);
+        unsafe { current_out_shmem.msg_to_env(self.last_msg_sent, env_name) }
+    }
+
+    /// Waits for this sender to be save to unmap.
+    /// If a receiver is involved, this function should always be called.
+    pub fn await_safe_to_unmap_blocking(&self) {
+        #[cfg(feature = "std")]
+        let mut ctr = 0_u16;
+        loop {
+            if self.safe_to_unmap() {
+                return;
+            }
+            hint::spin_loop();
+            // We log that we're looping -> see when we're blocking.
+            #[cfg(feature = "std")]
+            {
+                ctr = ctr.wrapping_add(1);
+                if ctr == 0 {
+                    log::info!("Awaiting safe_to_unmap_blocking");
+                }
+            }
+        }
+    }
+
+    /// If we are allowed to unmap this client
+    pub fn safe_to_unmap(&self) -> bool {
+        let current_out_shmem = self.out_shmems.last().unwrap();
+        unsafe {
+            // log::info!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
+            (*current_out_shmem.page())
+                .receivers_joined_count
+                .load(Ordering::Relaxed)
+                >= 1
+        }
+    }
+
+    /// For debug purposes: Mark save to unmap, even though it might not have been read by a receiver yet.
+    /// # Safety
+    /// If this method is called, the page may be unmapped before it is read by any receiver.
+    pub unsafe fn mark_safe_to_unmap(&mut self) {
+        (*self.out_shmems.last_mut().unwrap().page_mut()).receiver_joined();
+    }
+
+    /// Intern: Special allocation function for `EOP` messages (and nothing else!)
+    /// The normal alloc will fail if there is not enough space for `buf_len_padded + EOP`
+    /// So if [`alloc_next`] fails, create new page if necessary, use this function,
+    /// place `EOP`, commit `EOP`, reset, alloc again on the new space.
+    unsafe fn alloc_eop(&mut self) -> Result<*mut LlmpMsg, Error> {
+        let map = self.out_shmems.last_mut().unwrap();
+        let page = map.page_mut();
+        let last_msg = self.last_msg_sent;
+        assert!((*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
+                "PROGRAM ABORT : BUG: EOP does not fit in page! page {page:?}, size_current {:?}, size_total {:?}",
+                &raw const (*page).size_used, &raw const (*page).size_total);
+
+        let ret: *mut LlmpMsg = if last_msg.is_null() {
+            (*page).messages.as_mut_ptr()
+        } else {
+            llmp_next_msg_ptr_checked(map, last_msg, EOP_MSG_SIZE)?
+        };
+        assert!(
+            (*ret).tag != LLMP_TAG_UNINITIALIZED,
+            "Did not call send() on last message!"
+        );
+
+        (*ret).buf_len = size_of::<LlmpPayloadSharedMapInfo>() as u64;
+
+        // We don't need to pad the EOP message: it'll always be the last in this page.
+        (*ret).buf_len_padded = (*ret).buf_len;
+        (*ret).message_id = if last_msg.is_null() {
+            MessageId(1)
+        } else {
+            MessageId((*last_msg).message_id.0 + 1)
+        };
+        (*ret).tag = LLMP_TAG_END_OF_PAGE;
+        (*page).size_used += EOP_MSG_SIZE;
+        Ok(ret)
+    }
+
+    /// Intern: Will return a ptr to the next msg buf, or None if map is full.
+    /// Never call [`alloc_next`] without either sending or cancelling the last allocated message for this page!
+    /// There can only ever be up to one message allocated per page at each given time.
+    unsafe fn alloc_next_if_space(&mut self, buf_len: usize) -> Option<*mut LlmpMsg> {
+        let map = self.out_shmems.last_mut().unwrap();
+        let page = map.page_mut();
+        let last_msg = self.last_msg_sent;
+
+        assert!(
+            !self.has_unsent_message,
+            "Called alloc without calling send inbetween"
+        );
+
+        #[cfg(feature = "llmp_debug")]
+        log::info!(
+            "Allocating {} bytes on page {:?} / map {:?} (last msg: {:?})",
+            buf_len,
+            page,
+            &map.shmem.id().as_str(),
+            last_msg
+        );
+
+        let msg_start = (*page).messages.as_mut_ptr() as usize + (*page).size_used;
+
+        // Make sure the end of our msg is aligned.
+        let buf_len_padded = llmp_align(msg_start + buf_len + size_of::<LlmpMsg>())
+            - msg_start
+            - size_of::<LlmpMsg>();
+
+        #[cfg(feature = "llmp_debug")]
+        log::trace!(
+            "{page:?} {:?} size_used={:x} buf_len_padded={:x} EOP_MSG_SIZE={:x} size_total={}",
+            &(*page),
+            (*page).size_used,
+            buf_len_padded,
+            EOP_MSG_SIZE,
+            (*page).size_total
+        );
+
+        // For future allocs, keep track of the maximum (aligned) alloc size we used
+        (*page).max_alloc_size = max(
+            (*page).max_alloc_size,
+            size_of::<LlmpMsg>() + buf_len_padded,
+        );
+
+        // We need enough space for the current page size_used + payload + padding
+        if (*page).size_used + size_of::<LlmpMsg>() + buf_len_padded + EOP_MSG_SIZE
+            > (*page).size_total
+        {
+            #[cfg(feature = "llmp_debug")]
+            log::info!("LLMP: Page full.");
+
+            /* We're full. */
+            return None;
+        }
+
+        let ret = msg_start as *mut LlmpMsg;
+
+        /* We need to start with 1 for ids, as current message id is initialized
+         * with 0... */
+        (*ret).message_id = if last_msg.is_null() {
+            MessageId(1)
+        } else if (*page).current_msg_id.load(Ordering::Relaxed) == (*last_msg).message_id.0 {
+            MessageId((*last_msg).message_id.0 + 1)
+        } else {
+            /* Oops, wrong usage! */
+            panic!("BUG: The current message never got committed using send! (page->current_msg_id {:?}, last_msg->message_id: {:?})", &raw const (*page).current_msg_id, (*last_msg).message_id);
+        };
+
+        (*ret).buf_len = buf_len as u64;
+        (*ret).buf_len_padded = buf_len_padded as u64;
+        (*page).size_used += size_of::<LlmpMsg>() + buf_len_padded;
+
+        (*llmp_next_msg_ptr(ret)).tag = LLMP_TAG_UNSET;
+        (*ret).tag = LLMP_TAG_UNINITIALIZED;
+
+        self.has_unsent_message = true;
+
+        Some(ret)
+    }
+
+    /// Commit the message last allocated by [`alloc_next`] to the queue.
+    /// After commiting, the msg shall no longer be altered!
+    /// It will be read by the consuming threads (`broker->clients` or `client->broker`)
+    /// If `overwrite_client_id` is `false`, the message's `sender` won't be touched (for broker forwarding)
+    #[inline(never)] // Not inlined to make cpu-level reodering (hopefully?) improbable
+    unsafe fn send(&mut self, msg: *mut LlmpMsg, overwrite_client_id: bool) -> Result<(), Error> {
+        // log::info!("Sending msg {:?}", msg);
+
+        assert!(self.last_msg_sent != msg, "Message sent twice!");
+        assert!(
+            (*msg).tag != LLMP_TAG_UNSET,
+            "No tag set on message with id {:?}",
+            (*msg).message_id
+        );
+        // A client gets the sender id assigned to by the broker during the initial handshake.
+        if overwrite_client_id {
+            (*msg).sender = self.id;
+        }
+        let page = self.out_shmems.last_mut().unwrap().page_mut();
+        if msg.is_null() || !llmp_msg_in_page(page, msg) {
+            return Err(Error::unknown(format!(
+                "Llmp Message {msg:?} is null or not in current page"
+            )));
+        }
+
+        let mid = (*page).current_msg_id.load(Ordering::Relaxed) + 1;
+        (*msg).message_id.0 = mid;
+
+        // Make sure all things have been written to the page, and commit the message to the page
+        (*page)
+            .current_msg_id
+            .store((*msg).message_id.0, Ordering::Release);
+
+        self.last_msg_sent = msg;
+        self.has_unsent_message = false;
+
+        log::debug!(
+            "[{} - {:#x}] Send message with id {}",
+            self.id.0,
+            ptr::from_ref::<Self>(self) as u64,
+            mid
+        );
+
+        Ok(())
+    }
+
+    /// Describe this [`LlmpClient`] in a way that it can be restored later, using [`Self::on_existing_from_description`].
+    pub fn describe(&self) -> Result<LlmpDescription, Error> {
+        let map = self.out_shmems.last().unwrap();
+        let last_message_offset = if self.last_msg_sent.is_null() {
+            None
+        } else {
+            Some(unsafe { map.msg_to_offset(self.last_msg_sent) }?)
+        };
+        Ok(LlmpDescription {
+            shmem: map.shmem.description(),
+            last_message_offset,
+        })
+    }
+}
+
 /// Receiving end on a (unidirectional) sharedmap channel
 #[derive(Debug)]
-pub struct LlmpReceiver<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpReceiver<SHM, SP> {
     /// Client Id of this receiver
     id: ClientId,
     /// Pointer to the last message received
@@ -1600,15 +1599,16 @@ where
     /// The shmem provider
     shmem_provider: SP,
     /// current page. After EOP, this gets replaced with the new one
-    current_recv_shmem: LlmpSharedMap<SP::ShMem>,
+    current_recv_shmem: LlmpSharedMap<SHM>,
     /// Caches the highest msg id we've seen so far
     highest_msg_id: MessageId,
 }
 
 /// Receiving end of an llmp channel
-impl<SP> LlmpReceiver<SP>
+impl<SHM, SP> LlmpReceiver<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reattach to a vacant `recv_shmem`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
@@ -1620,21 +1620,12 @@ where
         )
     }
 
-    /// Store the info to this receiver to env.
-    /// A new client can reattach to it using [`LlmpReceiver::on_existing_from_env()`]
-    #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        let current_out_shmem = &self.current_recv_shmem;
-        current_out_shmem.shmem.write_to_env(env_name)?;
-        unsafe { current_out_shmem.msg_to_env(self.last_msg_recvd, env_name) }
-    }
-
     /// Create a Receiver, reattaching to an existing sender map.
     /// It is essential, that the sender (or someone else) keeps a pointer to the `sender_shmem`
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_shmem(
         shmem_provider: SP,
-        current_sender_shmem: SP::ShMem,
+        current_sender_shmem: SHM,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
         let mut current_recv_shmem = LlmpSharedMap::existing(current_sender_shmem);
@@ -1868,20 +1859,6 @@ where
         }
     }
 
-    /// Describe this client in a way, that it can be restored later with [`Self::on_existing_from_description`]
-    pub fn describe(&self) -> Result<LlmpDescription, Error> {
-        let map = &self.current_recv_shmem;
-        let last_message_offset = if self.last_msg_recvd.is_null() {
-            None
-        } else {
-            Some(unsafe { map.msg_to_offset(self.last_msg_recvd) }?)
-        };
-        Ok(LlmpDescription {
-            shmem: map.shmem.description(),
-            last_message_offset,
-        })
-    }
-
     /// Create this client on an existing map from the given description. acquired with `self.describe`
     pub fn on_existing_from_description(
         mut shmem_provider: SP,
@@ -1895,12 +1872,38 @@ where
     }
 }
 
-/// A page wrapper
-#[derive(Clone, Debug)]
-pub struct LlmpSharedMap<SHM>
+/// Receiving end of an llmp channel
+impl<SHM, SP> LlmpReceiver<SHM, SP>
 where
     SHM: ShMem,
 {
+    /// Store the info to this receiver to env.
+    /// A new client can reattach to it using [`LlmpReceiver::on_existing_from_env()`]
+    #[cfg(feature = "std")]
+    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
+        let current_out_shmem = &self.current_recv_shmem;
+        current_out_shmem.shmem.write_to_env(env_name)?;
+        unsafe { current_out_shmem.msg_to_env(self.last_msg_recvd, env_name) }
+    }
+
+    /// Describe this client in a way, that it can be restored later with [`Self::on_existing_from_description`]
+    pub fn describe(&self) -> Result<LlmpDescription, Error> {
+        let map = &self.current_recv_shmem;
+        let last_message_offset = if self.last_msg_recvd.is_null() {
+            None
+        } else {
+            Some(unsafe { map.msg_to_offset(self.last_msg_recvd) }?)
+        };
+        Ok(LlmpDescription {
+            shmem: map.shmem.description(),
+            last_message_offset,
+        })
+    }
+}
+
+/// A page wrapper
+#[derive(Clone, Debug)]
+pub struct LlmpSharedMap<SHM> {
     /// Shmem containg the actual (unsafe) page,
     /// shared between one `LlmpSender` and one `LlmpReceiver`
     shmem: SHM,
@@ -2050,18 +2053,15 @@ where
 
 /// The inner state of [`LlmpBroker`]
 #[derive(Debug)]
-pub struct LlmpBrokerInner<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpBrokerInner<SHM, SP> {
     /// Broadcast map from broker to all clients
-    llmp_out: LlmpSender<SP>,
+    llmp_out: LlmpSender<SHM, SP>,
     /// Users of Llmp can add message handlers in the broker.
     /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     /// The backing values of `llmp_clients` [`ClientId`]s will always be sorted (but not gapless)
     /// Make sure to always increase `num_clients_seen` when pushing a new [`LlmpReceiver`] to  `llmp_clients`!
-    llmp_clients: Vec<LlmpReceiver<SP>>,
+    llmp_clients: Vec<LlmpReceiver<SHM, SP>>,
     /// The own listeners we spawned via `launch_listener` or `crate_attach_to_tcp`.
     /// Listeners will be ignored for `exit_cleanly_after` and they are never considered to have timed out.
     listeners: Vec<ClientId>,
@@ -2078,12 +2078,9 @@ where
 
 /// The broker (node 0)
 #[derive(Debug)]
-pub struct LlmpBroker<HT, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpBroker<HT, SHM, SP> {
     /// The broker
-    inner: LlmpBrokerInner<SP>,
+    inner: LlmpBrokerInner<SHM, SP>,
     /// Llmp hooks
     hooks: HT,
 }
@@ -2118,10 +2115,11 @@ pub trait Broker {
     fn nb_listeners(&self) -> usize;
 }
 
-impl<HT, SP> Broker for LlmpBroker<HT, SP>
+impl<HT, SHM, SP> Broker for LlmpBroker<HT, SHM, SP>
 where
-    HT: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    HT: LlmpHookTuple<SHM, SP>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn is_shutting_down(&self) -> bool {
         self.inner.is_shutting_down()
@@ -2215,15 +2213,12 @@ impl CtrlHandler for LlmpShutdownSignalHandler {
 }
 
 /// Llmp hooks
-pub trait LlmpHook<SP>
-where
-    SP: ShMemProvider,
-{
+pub trait LlmpHook<SHM, SP> {
     /// Hook called whenever a new message is received. It receives an llmp message as input, does
     /// something with it (read, transform, forward, etc...) and decides to discard it or not.
     fn on_new_message(
         &mut self,
-        broker_inner: &mut LlmpBrokerInner<SP>,
+        broker_inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -2238,14 +2233,11 @@ where
 }
 
 /// A tuple of Llmp hooks. They are evaluated sequentially, and returns if one decides to filter out the evaluated message.
-pub trait LlmpHookTuple<SP>
-where
-    SP: ShMemProvider,
-{
+pub trait LlmpHookTuple<SHM, SP> {
     /// Call all hook callbacks on new message.
     fn on_new_message_all(
         &mut self,
-        inner: &mut LlmpBrokerInner<SP>,
+        inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -2257,13 +2249,10 @@ where
     fn on_timeout_all(&mut self) -> Result<(), Error>;
 }
 
-impl<SP> LlmpHookTuple<SP> for ()
-where
-    SP: ShMemProvider,
-{
+impl<SHM, SP> LlmpHookTuple<SHM, SP> for () {
     fn on_new_message_all(
         &mut self,
-        _inner: &mut LlmpBrokerInner<SP>,
+        _inner: &mut LlmpBrokerInner<SHM, SP>,
         _client_id: ClientId,
         _msg_tag: &mut Tag,
         _msg_flags: &mut Flags,
@@ -2278,15 +2267,14 @@ where
     }
 }
 
-impl<Head, Tail, SP> LlmpHookTuple<SP> for (Head, Tail)
+impl<Head, Tail, SHM, SP> LlmpHookTuple<SHM, SP> for (Head, Tail)
 where
-    Head: LlmpHook<SP>,
-    Tail: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    Head: LlmpHook<SHM, SP>,
+    Tail: LlmpHookTuple<SHM, SP>,
 {
     fn on_new_message_all(
         &mut self,
-        inner: &mut LlmpBrokerInner<SP>,
+        inner: &mut LlmpBrokerInner<SHM, SP>,
         client_id: ClientId,
         msg_tag: &mut Tag,
         msg_flags: &mut Flags,
@@ -2315,15 +2303,12 @@ where
     }
 }
 
-impl<SP> LlmpBroker<(), SP>
-where
-    SP: ShMemProvider,
-{
+impl<SHM, SP> LlmpBroker<(), SHM, SP> {
     /// Add hooks to a hookless [`LlmpBroker`].
     /// We do not support replacing hooks for now.
-    pub fn add_hooks<HT>(self, hooks: HT) -> LlmpBroker<HT, SP>
+    pub fn add_hooks<HT>(self, hooks: HT) -> LlmpBroker<HT, SHM, SP>
     where
-        HT: LlmpHookTuple<SP>,
+        HT: LlmpHookTuple<SHM, SP>,
     {
         LlmpBroker {
             inner: self.inner,
@@ -2446,10 +2431,11 @@ impl Brokers {
     }
 }
 
-impl<HT, SP> LlmpBroker<HT, SP>
+impl<HT, SHM, SP> LlmpBroker<HT, SHM, SP>
 where
-    HT: LlmpHookTuple<SP>,
-    SP: ShMemProvider,
+    HT: LlmpHookTuple<SHM, SP>,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create and initialize a new [`LlmpBroker`], associated with some hooks.
     pub fn new(shmem_provider: SP, hooks: HT) -> Result<Self, Error> {
@@ -2496,12 +2482,12 @@ where
     }
 
     /// Get the inner state of the broker
-    pub fn inner(&self) -> &LlmpBrokerInner<SP> {
+    pub fn inner(&self) -> &LlmpBrokerInner<SHM, SP> {
         &self.inner
     }
 
     /// Get the inner mutable state of the broker
-    pub fn inner_mut(&mut self) -> &mut LlmpBrokerInner<SP> {
+    pub fn inner_mut(&mut self) -> &mut LlmpBrokerInner<SHM, SP> {
         &mut self.inner
     }
 
@@ -2829,9 +2815,10 @@ where
 
 /// The broker forwards all messages to its own bus-like broadcast map.
 /// It may intercept messages passing through.
-impl<SP> LlmpBrokerInner<SP>
+impl<SHM, SP> LlmpBrokerInner<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Create and initialize a new [`LlmpBrokerInner`], associated with some hooks.
     pub fn new(shmem_provider: SP) -> Result<Self, Error> {
@@ -2917,7 +2904,7 @@ where
     /// Will increase `num_clients_seen`.
     /// The backing values of `llmp_clients` [`ClientId`]s will always be sorted (but not gapless)
     /// returns the [`ClientId`] of the new client.
-    pub fn add_client(&mut self, mut client_receiver: LlmpReceiver<SP>) -> ClientId {
+    pub fn add_client(&mut self, mut client_receiver: LlmpReceiver<SHM, SP>) -> ClientId {
         let id = self.peek_next_client_id();
         client_receiver.id = id;
         self.llmp_clients.push(client_receiver);
@@ -2932,7 +2919,7 @@ where
 
     /// Registers a new client for the given sharedmap str and size.
     /// Returns the id of the new client in [`broker.client_shmem`]
-    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) -> ClientId {
+    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SHM>) -> ClientId {
         // Tell the client it may unmap its initial allocated shmem page now.
         // Since we now have a handle to it, it won't be umapped too early (only after we also unmap it)
         client_page.mark_safe_to_unmap();
@@ -3090,7 +3077,7 @@ where
     /// Upon receiving this message, the broker should map the announced page and start tracking it for new messages.
     #[cfg(feature = "std")]
     fn announce_new_client(
-        sender: &mut LlmpSender<SP>,
+        sender: &mut LlmpSender<SHM, SP>,
         shmem_description: &ShMemDescription,
     ) -> Result<(), Error> {
         unsafe {
@@ -3108,7 +3095,7 @@ where
 
     /// Tell the broker to disconnect this client from it.
     #[cfg(feature = "std")]
-    fn announce_client_exit(sender: &mut LlmpSender<SP>, client_id: u32) -> Result<(), Error> {
+    fn announce_client_exit(sender: &mut LlmpSender<SHM, SP>, client_id: u32) -> Result<(), Error> {
         // # Safety
         // No user-provided potentially unsafe parameters.
         unsafe {
@@ -3280,7 +3267,7 @@ where
         mut stream: TcpStream,
         request: &TcpRequest,
         current_client_id: &mut ClientId,
-        sender: &mut LlmpSender<SP>,
+        sender: &mut LlmpSender<SHM, SP>,
         broker_shmem_description: &ShMemDescription,
     ) {
         match request {
@@ -3451,144 +3438,24 @@ pub struct LlmpClientDescription {
 
 /// Client side of LLMP
 #[derive(Debug)]
-pub struct LlmpClient<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct LlmpClient<SHM, SP> {
     /// Outgoing channel to the broker
-    sender: LlmpSender<SP>,
+    sender: LlmpSender<SHM, SP>,
     /// Incoming (broker) broadcast map
-    receiver: LlmpReceiver<SP>,
+    receiver: LlmpReceiver<SHM, SP>,
 }
 
 /// `n` clients connect to a broker. They share an outgoing map with the broker,
 /// and get incoming messages from the shared broker bus
-impl<SP> LlmpClient<SP>
+impl<SHM, SP> LlmpClient<SHM, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
-    /// Reattach to a vacant client map.
-    /// It is essential, that the broker (or someone else) kept a pointer to the `out_shmem`
-    /// else reattach will get a new, empty page, from the OS, or fail
-    #[allow(clippy::needless_pass_by_value)] // no longer necessary on nightly
-    pub fn on_existing_shmem(
-        shmem_provider: SP,
-        _current_out_shmem: SP::ShMem,
-        _last_msg_sent_offset: Option<u64>,
-        current_broker_shmem: SP::ShMem,
-        last_msg_recvd_offset: Option<u64>,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            receiver: LlmpReceiver::on_existing_shmem(
-                shmem_provider.clone(),
-                current_broker_shmem.clone(),
-                last_msg_recvd_offset,
-            )?,
-            sender: LlmpSender::on_existing_shmem(
-                shmem_provider,
-                current_broker_shmem,
-                last_msg_recvd_offset,
-            )?,
-        })
-    }
-
-    /// Recreate this client from a previous [`client.to_env()`]
-    #[cfg(feature = "std")]
-    pub fn on_existing_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
-        Ok(Self {
-            sender: LlmpSender::on_existing_from_env(
-                shmem_provider.clone(),
-                &format!("{env_name}_SENDER"),
-            )?,
-            receiver: LlmpReceiver::on_existing_from_env(
-                shmem_provider,
-                &format!("{env_name}_RECEIVER"),
-            )?,
-        })
-    }
-
-    /// Write the current state to env.
-    /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_shmem()`].
-    #[cfg(feature = "std")]
-    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        self.sender.to_env(&format!("{env_name}_SENDER"))?;
-        self.receiver.to_env(&format!("{env_name}_RECEIVER"))
-    }
-
-    /// Describe this client in a way that it can be recreated, for example after crash
-    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
-        Ok(LlmpClientDescription {
-            sender: self.sender.describe()?,
-            receiver: self.receiver.describe()?,
-        })
-    }
-
-    /// Create an existing client from description
-    pub fn existing_client_from_description(
-        shmem_provider: SP,
-        description: &LlmpClientDescription,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            sender: LlmpSender::on_existing_from_description(
-                shmem_provider.clone(),
-                &description.sender,
-            )?,
-            receiver: LlmpReceiver::on_existing_from_description(
-                shmem_provider,
-                &description.receiver,
-            )?,
-        })
-    }
-
-    /// Outgoing channel to the broker
-    #[must_use]
-    pub fn sender(&self) -> &LlmpSender<SP> {
-        &self.sender
-    }
-
-    /// Outgoing channel to the broker (mut)
-    #[must_use]
-    pub fn sender_mut(&mut self) -> &mut LlmpSender<SP> {
-        &mut self.sender
-    }
-
-    /// Incoming (broker) broadcast map
-    #[must_use]
-    pub fn receiver(&self) -> &LlmpReceiver<SP> {
-        &self.receiver
-    }
-
-    /// Incoming (broker) broadcast map (mut)
-    #[must_use]
-    pub fn receiver_mut(&mut self) -> &mut LlmpReceiver<SP> {
-        &mut self.receiver
-    }
-
-    /// Waits for the sender to be save to unmap.
-    /// If a receiver is involved on the other side, this function should always be called.
-    pub fn await_safe_to_unmap_blocking(&self) {
-        self.sender.await_safe_to_unmap_blocking();
-    }
-
-    /// If we are allowed to unmap this client
-    pub fn safe_to_unmap(&self) -> bool {
-        self.sender.safe_to_unmap()
-    }
-
-    /// For debug purposes: mark the client as save to unmap, even though it might not have been read.
-    ///
-    /// # Safety
-    /// This should only be called in a debug scenario.
-    /// Calling this in other contexts may lead to a premature page unmap and result in a crash in another process,
-    /// or an unexpected read from an empty page in a receiving process.
-    pub unsafe fn mark_safe_to_unmap(&mut self) {
-        self.sender.mark_safe_to_unmap();
-    }
-
     /// Creates a new [`LlmpClient`]
     pub fn new(
         mut shmem_provider: SP,
-        initial_broker_shmem: LlmpSharedMap<SP::ShMem>,
+        initial_broker_shmem: LlmpSharedMap<SHM>,
         sender_id: ClientId,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -3629,11 +3496,61 @@ where
         Ok(Self { sender, receiver })
     }
 
-    /// Commits a msg to the client's out map
-    /// # Safety
-    /// Needs to be called with a proper msg pointer
-    pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
-        self.sender.send(msg, true)
+    /// Reattach to a vacant client map.
+    /// It is essential, that the broker (or someone else) kept a pointer to the `out_shmem`
+    /// else reattach will get a new, empty page, from the OS, or fail
+    #[allow(clippy::needless_pass_by_value)] // no longer necessary on nightly
+    pub fn on_existing_shmem(
+        shmem_provider: SP,
+        _current_out_shmem: SHM,
+        _last_msg_sent_offset: Option<u64>,
+        current_broker_shmem: SHM,
+        last_msg_recvd_offset: Option<u64>,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            receiver: LlmpReceiver::on_existing_shmem(
+                shmem_provider.clone(),
+                current_broker_shmem.clone(),
+                last_msg_recvd_offset,
+            )?,
+            sender: LlmpSender::on_existing_shmem(
+                shmem_provider,
+                current_broker_shmem,
+                last_msg_recvd_offset,
+            )?,
+        })
+    }
+
+    /// Recreate this client from a previous [`client.to_env()`]
+    #[cfg(feature = "std")]
+    pub fn on_existing_from_env(shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
+        Ok(Self {
+            sender: LlmpSender::on_existing_from_env(
+                shmem_provider.clone(),
+                &format!("{env_name}_SENDER"),
+            )?,
+            receiver: LlmpReceiver::on_existing_from_env(
+                shmem_provider,
+                &format!("{env_name}_RECEIVER"),
+            )?,
+        })
+    }
+
+    /// Create an existing client from description
+    pub fn existing_client_from_description(
+        shmem_provider: SP,
+        description: &LlmpClientDescription,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            sender: LlmpSender::on_existing_from_description(
+                shmem_provider.clone(),
+                &description.sender,
+            )?,
+            receiver: LlmpReceiver::on_existing_from_description(
+                shmem_provider,
+                &description.receiver,
+            )?,
+        })
     }
 
     /// Allocates a message of the given size, tags it, and sends it off.
@@ -3774,6 +3691,81 @@ where
         }
 
         Ok(ret)
+    }
+}
+
+impl<SHM, SP> LlmpClient<SHM, SP>
+where
+    SHM: ShMem,
+{
+    /// Waits for the sender to be save to unmap.
+    /// If a receiver is involved on the other side, this function should always be called.
+    pub fn await_safe_to_unmap_blocking(&self) {
+        self.sender.await_safe_to_unmap_blocking();
+    }
+
+    /// If we are allowed to unmap this client
+    pub fn safe_to_unmap(&self) -> bool {
+        self.sender.safe_to_unmap()
+    }
+
+    /// For debug purposes: mark the client as save to unmap, even though it might not have been read.
+    ///
+    /// # Safety
+    /// This should only be called in a debug scenario.
+    /// Calling this in other contexts may lead to a premature page unmap and result in a crash in another process,
+    /// or an unexpected read from an empty page in a receiving process.
+    pub unsafe fn mark_safe_to_unmap(&mut self) {
+        self.sender.mark_safe_to_unmap();
+    }
+
+    /// Commits a msg to the client's out map
+    /// # Safety
+    /// Needs to be called with a proper msg pointer
+    pub unsafe fn send(&mut self, msg: *mut LlmpMsg) -> Result<(), Error> {
+        self.sender.send(msg, true)
+    }
+
+    /// Write the current state to env.
+    /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_shmem()`].
+    #[cfg(feature = "std")]
+    pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
+        self.sender.to_env(&format!("{env_name}_SENDER"))?;
+        self.receiver.to_env(&format!("{env_name}_RECEIVER"))
+    }
+
+    /// Describe this client in a way that it can be recreated, for example after crash
+    pub fn describe(&self) -> Result<LlmpClientDescription, Error> {
+        Ok(LlmpClientDescription {
+            sender: self.sender.describe()?,
+            receiver: self.receiver.describe()?,
+        })
+    }
+}
+
+impl<SHM, SP> LlmpClient<SHM, SP> {
+    /// Outgoing channel to the broker
+    #[must_use]
+    pub fn sender(&self) -> &LlmpSender<SHM, SP> {
+        &self.sender
+    }
+
+    /// Outgoing channel to the broker (mut)
+    #[must_use]
+    pub fn sender_mut(&mut self) -> &mut LlmpSender<SHM, SP> {
+        &mut self.sender
+    }
+
+    /// Incoming (broker) broadcast map
+    #[must_use]
+    pub fn receiver(&self) -> &LlmpReceiver<SHM, SP> {
+        &self.receiver
+    }
+
+    /// Incoming (broker) broadcast map (mut)
+    #[must_use]
+    pub fn receiver_mut(&mut self) -> &mut LlmpReceiver<SHM, SP> {
+        &mut self.receiver
     }
 }
 

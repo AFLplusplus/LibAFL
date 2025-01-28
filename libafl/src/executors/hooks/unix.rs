@@ -9,7 +9,6 @@ pub mod unix_signal_handler {
     use libc::siginfo_t;
 
     use crate::{
-        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             common_signals,
@@ -19,9 +18,9 @@ pub mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr = unsafe fn(
@@ -81,10 +80,9 @@ pub mod unix_signal_handler {
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
-        S::Solutions: Corpus<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
@@ -131,12 +129,11 @@ pub mod unix_signal_handler {
     ) where
         E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCurrentTestcase + HasCorpus + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
-        S::Solutions: Corpus<Input = I>,
     {
         // this stuff is for batch timeout
         if !data.executor_ptr.is_null()
@@ -188,12 +185,11 @@ pub mod unix_signal_handler {
     ) where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions + HasCorpus + HasCurrentTestcase + UsesInput<Input = I>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
-        S::Solutions: Corpus<Input = I>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = _context.map(|p| {

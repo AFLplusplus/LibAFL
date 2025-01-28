@@ -764,9 +764,12 @@ where
                 .match_first_type_mut::<DrCovRuntime>()
             {
                 log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
+
+                // We can maybe remove the `basic_block_size as u64`` cast in the future
+                #[allow(trivial_numeric_casts)]
                 rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
                     basic_block_start,
-                    basic_block_start + basic_block_size as u64,
+                    basic_block_start + (basic_block_size as u64),
                 ));
             }
         }

@@ -9,16 +9,15 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::{
-    corpus::Corpus,
     executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
     inputs::Input,
     state::{HasCurrentTestcase, HasSolutions},
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{NopTargetBytesConverter, TargetBytesConverter, UsesInput},
+    inputs::{NopTargetBytesConverter, TargetBytesConverter},
     observers::ObserversTuple,
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::HasExecutions,
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
@@ -59,10 +58,9 @@ where
 impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
     for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
 where
-    EM: UsesState<State = S>,
     H: FnMut(&I) -> ExitKind,
-    S: HasCorpus + HasExecutions + UsesInput<Input = I>,
-    TC: TargetBytesConverter<Input = I>,
+    S: HasExecutions,
+    TC: TargetBytesConverter<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
 {
@@ -129,7 +127,6 @@ impl<H, I, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H,
 impl<'a, 'b, 'c, H, I, OT, RT, S>
     FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, NopTargetBytesConverter<I>>
 where
-    S: HasCorpus,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
@@ -228,10 +225,9 @@ impl<'a, 'b, 'c, H, I, OT, RT, S, TC> HasInProcessHooks<I, S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
 where
     H: FnMut(&I) -> ExitKind,
-    S: HasSolutions + HasCorpus + HasCurrentTestcase + HasExecutions + UsesInput<Input = I>,
-    S::Solutions: Corpus<Input = I>,
+    S: HasSolutions<I> + HasCurrentTestcase<I> + HasExecutions,
     I: Input,
-    TC: TargetBytesConverter<Input = I>,
+    TC: TargetBytesConverter<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
 {

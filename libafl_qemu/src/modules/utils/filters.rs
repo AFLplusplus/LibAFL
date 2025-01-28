@@ -69,6 +69,64 @@ where
     }
 }
 
+/// Offers accessors to modules' address filters.
+pub trait HasAddressFilter {
+    type ModuleAddressFilter: AddressFilter;
+    #[cfg(feature = "systemmode")]
+    type ModulePageFilter: PageFilter;
+    fn address_filter(&self) -> &Self::ModuleAddressFilter;
+
+    fn address_filter_mut(&mut self) -> &mut Self::ModuleAddressFilter;
+
+    fn update_address_filter(&mut self, qemu: Qemu, filter: Self::ModuleAddressFilter) {
+        *self.address_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
+    }
+
+    #[cfg(feature = "systemmode")]
+    fn page_filter(&self) -> &Self::ModulePageFilter;
+    #[cfg(feature = "systemmode")]
+    fn page_filter_mut(&mut self) -> &mut Self::ModulePageFilter;
+    #[cfg(feature = "systemmode")]
+    fn update_page_filter(&mut self, qemu: Qemu, filter: Self::ModulePageFilter) {
+        *self.page_filter_mut() = filter;
+        // Necessary because some hooks filter during TB generation.
+        qemu.flush_jit();
+    }
+}
+
+pub trait HasAddressFilterTuples {
+    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>);
+
+    #[cfg(feature = "systemmode")]
+    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr);
+}
+
+impl HasAddressFilterTuples for () {
+    fn allow_address_range_all(&mut self, _address_range: Range<GuestAddr>) {}
+
+    #[cfg(feature = "systemmode")]
+    fn allow_page_id_all(&mut self, _page_id: GuestPhysAddr) {}
+}
+
+impl<Head, Tail> HasAddressFilterTuples for (Head, Tail)
+where
+    Head: HasAddressFilter,
+    Tail: HasAddressFilterTuples,
+{
+    fn allow_address_range_all(&mut self, address_range: Range<GuestAddr>) {
+        self.0.address_filter_mut().register(address_range.clone());
+        self.1.allow_address_range_all(address_range);
+    }
+
+    #[cfg(feature = "systemmode")]
+    fn allow_page_id_all(&mut self, page_id: GuestPhysAddr) {
+        self.0.page_filter_mut().register(page_id);
+        self.1.allow_page_id_all(page_id);
+    }
+}
+
 /// An address filter list.
 ///
 /// It will allow anything in the registered ranges, and deny anything else.
@@ -253,6 +311,7 @@ impl PageFilter for NopPageFilter {
 }
 
 #[cfg(feature = "usermode")]
+#[allow(dead_code)]
 pub(crate) static mut NOP_ADDRESS_FILTER: UnsafeCell<NopAddressFilter> =
     UnsafeCell::new(NopAddressFilter);
 #[cfg(feature = "systemmode")]

@@ -7,7 +7,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedMutSlice, AsSlice, AsSliceMut, HasLen, Named, Truncate};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -350,7 +349,7 @@ pub mod macros {
 ///
 /// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
 pub trait MapObserver:
-    HasLen + Named + Serialize + DeserializeOwned + AsRef<Self> + AsMut<Self> + Hash
+    HasLen + Named + Serialize + DeserializeOwned + AsRef<Self> + AsMut<Self>
 // where
 //     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
 {
@@ -368,9 +367,6 @@ pub trait MapObserver:
 
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64;
-
-    /// Compute the hash of the map without needing to provide a hasher
-    fn hash_simple(&self) -> u64;
 
     /// Get the initial value for `reset()`
     fn initial(&self) -> Self::Entry;
@@ -524,11 +520,6 @@ where
     #[inline]
     fn usable_count(&self) -> usize {
         self.as_slice().len()
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]

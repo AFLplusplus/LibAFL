@@ -10,7 +10,7 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{EventConfig, Launcher, MonitorTypedEventManager};
 use libafl::{
-    events::{ClientDescription, LlmpEventManager, LlmpRestartingEventManager},
+    events::{ClientDescription, LlmpEventManagerBuilder},
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
@@ -34,6 +34,7 @@ pub struct Fuzzer {
 
 impl Fuzzer {
     pub fn new() -> Fuzzer {
+        env_logger::init();
         let options = FuzzerOptions::parse();
         options.validate();
         Fuzzer { options }
@@ -113,23 +114,27 @@ impl Fuzzer {
             // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
             return client.run(
                 None,
-                MonitorTypedEventManager::<_, M>::new(LlmpRestartingEventManager::new(
-                    LlmpEventManager::builder()
-                        .build_on_port(
-                            shmem_provider.clone(),
-                            broker_port,
-                            EventConfig::AlwaysUnique,
-                            None,
-                        )
-                        .unwrap(),
-                    StateRestorer::new(shmem_provider.new_shmem(0x1000).unwrap()),
-                )),
+                MonitorTypedEventManager::<_, M>::new(
+                    LlmpEventManagerBuilder::builder().build_on_port(
+                        shmem_provider.clone(),
+                        broker_port,
+                        EventConfig::AlwaysUnique,
+                        None,
+                        Some(StateRestorer::new(
+                            shmem_provider.new_shmem(0x1000).unwrap(),
+                        )),
+                    )?,
+                ),
                 ClientDescription::new(0, 0, CoreId(0)),
             );
         }
 
         #[cfg(feature = "simplemgr")]
-        return client.run(None, SimpleEventManager::new(monitor), CoreId(0));
+        return client.run(
+            None,
+            SimpleEventManager::new(monitor),
+            ClientDescription::new(0, 0, CoreId(0)),
+        );
 
         // Build and run the Launcher / fuzzer.
         #[cfg(not(feature = "simplemgr"))]
