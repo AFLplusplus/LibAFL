@@ -99,7 +99,6 @@ llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "AutoTokensPass", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
-
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL
   #if LLVM_VERSION_MAJOR >= 20
