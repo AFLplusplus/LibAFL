@@ -59,18 +59,18 @@ impl<A, B, DOT, I, OTA, OTB, S> DiffExecutor<A, B, DOT, I, OTA, OTB, S> {
     }
 }
 
-impl<A, B, DOT, EM, I, S, Z> Executor<EM, I, S, Z>
+impl<A, B, DOT, EM, I, OF, S> Executor<EM, I, OF, S>
     for DiffExecutor<A, B, DOT, I, A::Observers, B::Observers, S>
 where
-    A: Executor<EM, I, S, Z> + HasObservers,
-    B: Executor<EM, I, S, Z> + HasObservers,
+    A: Executor<EM, I, OF, S> + HasObservers,
+    B: Executor<EM, I, OF, S> + HasObservers,
     <A as HasObservers>::Observers: ObserversTuple<I, S>,
     <B as HasObservers>::Observers: ObserversTuple<I, S>,
     DOT: DifferentialObserversTuple<A::Observers, B::Observers, I, S> + MatchName,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -81,7 +81,7 @@ where
             .differential
             .pre_observe_first_all(observers.primary.as_mut())?;
         observers.primary.as_mut().pre_exec_all(state, input)?;
-        let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
+        let ret1 = self.primary.run_target(objective, state, mgr, input)?;
         observers
             .primary
             .as_mut()
@@ -93,7 +93,7 @@ where
             .differential
             .pre_observe_second_all(observers.secondary.as_mut())?;
         observers.secondary.as_mut().pre_exec_all(state, input)?;
-        let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
+        let ret2 = self.secondary.run_target(objective, state, mgr, input)?;
         observers
             .secondary
             .as_mut()

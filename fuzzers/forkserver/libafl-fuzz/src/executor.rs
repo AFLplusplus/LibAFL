@@ -200,7 +200,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
         false
     };
 
-    #[expect(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
+    #[allow(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
     let permission = if is_library {
         u32::from(S_IRUSR) // user can read
     } else {
@@ -332,20 +332,20 @@ pub enum SupportedExecutors<FSV, I, OT, S> {
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, I, OT, FSV, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<FSV, I, OT, S>
+impl<S, I, OF, OT, FSV, EM> Executor<EM, I, OF, S> for SupportedExecutors<FSV, I, OT, S>
 where
     S: HasCorpus<I>,
-    FSV: Executor<EM, I, S, Z>,
+    FSV: Executor<EM, I, OF, S>,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
         match self {
-            Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
+            Self::Forkserver(fsrv, _) => fsrv.run_target(objective, state, mgr, input),
         }
     }
 }

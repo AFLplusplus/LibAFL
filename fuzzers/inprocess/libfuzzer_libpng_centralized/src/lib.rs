@@ -203,9 +203,6 @@ pub extern "C" fn libafl_main() {
             let scheduler =
                 IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-            // A fuzzer with feedbacks and a corpus scheduler
-            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
@@ -221,7 +218,7 @@ pub extern "C" fn libafl_main() {
             let mut executor = InProcessExecutor::batched_timeout(
                 &mut harness,
                 tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
+                &mut objective,
                 &mut state,
                 &mut mgr,
                 opt.timeout,
@@ -231,11 +228,14 @@ pub extern "C" fn libafl_main() {
             let mut executor = InProcessExecutor::with_timeout(
                 &mut harness,
                 tuple_list!(edges_observer, time_observer),
-                &mut fuzzer,
+                &mut objective,
                 &mut state,
                 &mut mgr,
                 opt.timeout,
             )?;
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // The actual target run starts here.
             // Call LLVMFUzzerInitialize() if present.

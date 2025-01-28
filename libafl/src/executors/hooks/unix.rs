@@ -17,7 +17,6 @@ pub mod unix_signal_handler {
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
-        fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
         state::{HasCurrentTestcase, HasExecutions, HasSolutions},
@@ -76,14 +75,13 @@ pub mod unix_signal_handler {
     }
 
     /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
+    pub fn setup_panic_hook<E, EM, I, OF, S>()
     where
-        E: Executor<EM, I, S, Z> + HasObservers,
+        E: Executor<EM, I, OF, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
         let old_hook = panic::take_hook();
@@ -96,14 +94,14 @@ pub mod unix_signal_handler {
                 let executor = (*data).executor_mut::<E>();
                 let state = (*data).state_mut::<S>();
                 let input = (*data).take_current_input::<I>();
-                let fuzzer = (*data).fuzzer_mut::<Z>();
+                let objective = (*data).objective_mut::<OF>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S>(
                     executor,
                     state,
                     input,
-                    fuzzer,
+                    objective,
                     event_mgr,
                     ExitKind::Crash,
                 );
@@ -121,18 +119,17 @@ pub mod unix_signal_handler {
     /// Well, signal handling is not safe
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_timeout_handler<E, EM, I, OF, S>(
         _signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
+        E: Executor<EM, I, OF, S> + HasInProcessHooks<I, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
         // this stuff is for batch timeout
@@ -153,16 +150,16 @@ pub mod unix_signal_handler {
         let executor = data.executor_mut::<E>();
         let state = data.state_mut::<S>();
         let event_mgr = data.event_mgr_mut::<EM>();
-        let fuzzer = data.fuzzer_mut::<Z>();
+        let objective = data.objective_mut::<OF>();
         let input = data.take_current_input::<I>();
 
         log::error!("Timeout in fuzz run.");
 
-        run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+        run_observers_and_save_state::<E, EM, I, OF, S>(
             executor,
             state,
             input,
-            fuzzer,
+            objective,
             event_mgr,
             ExitKind::Timeout,
         );
@@ -177,18 +174,17 @@ pub mod unix_signal_handler {
     /// # Safety
     /// Well, signal handling is not safe
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S>(
         signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers,
+        E: Executor<EM, I, OF, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
         S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
@@ -203,7 +199,7 @@ pub mod unix_signal_handler {
             // disarms timeout in case of timeout
             let state = data.state_mut::<S>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let fuzzer = data.fuzzer_mut::<Z>();
+            let objective = data.objective_mut::<OF>();
             let input = data.take_current_input::<I>();
 
             log::error!("Child crashed!");
@@ -229,11 +225,11 @@ pub mod unix_signal_handler {
                 }
             }
 
-            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+            run_observers_and_save_state::<E, EM, I, OF, S>(
                 executor,
                 state,
                 input,
-                fuzzer,
+                objective,
                 event_mgr,
                 ExitKind::Crash,
             );

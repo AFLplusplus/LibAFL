@@ -18,18 +18,18 @@ pub struct WithObservers<E, I, OT, S> {
     phantom: PhantomData<(I, S)>,
 }
 
-impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, I, OT, S>
+impl<E, EM, I, OF, OT, S> Executor<EM, I, OF, S> for WithObservers<E, I, OT, S>
 where
-    E: Executor<EM, I, S, Z>,
+    E: Executor<EM, I, OF, S>,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.executor.run_target(fuzzer, state, mgr, input)
+        self.executor.run_target(objective, state, mgr, input)
     }
 }
 

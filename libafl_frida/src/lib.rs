@@ -463,8 +463,6 @@ mod tests {
 
             let mut event_manager = NopEventManager::new();
 
-            let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
-
             let observers = tuple_list!(
                 asan_obs //,
             );
@@ -492,13 +490,15 @@ mod tests {
                     InProcessExecutor::new(
                         &mut harness,
                         observers, // tuple_list!(),
-                        &mut fuzzer,
+                        &mut objective,
                         &mut state,
                         &mut event_manager,
                     )
                     .unwrap(),
                     &mut frida_helper,
                 );
+
+                let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
                 let mut stages = tuple_list!(StdMutationalStage::with_max_iterations(

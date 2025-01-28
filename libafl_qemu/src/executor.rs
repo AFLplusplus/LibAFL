@@ -83,13 +83,13 @@ pub(crate) static BREAK_ON_TMOUT: AtomicBool = AtomicBool::new(false);
 /// # Safety
 /// Can call through the `unix_signal_handler::inproc_timeout_handler`.
 /// Calling this method multiple times concurrently can lead to race conditions.
-pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
+pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S>(
     signal: Signal,
     info: &mut siginfo_t,
     context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
-    E: HasObservers + HasInProcessHooks<I, S> + Executor<EM, I, S, Z>,
+    E: HasObservers + HasInProcessHooks<I, S> + Executor<EM, I, OF, S>,
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
@@ -97,7 +97,6 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions + HasSolutions<I> + Unpin + HasCurrentTestcase<I>,
     I: Input,
-    Z: HasObjective<Objective = OF>,
 {
     #[cfg(feature = "systemmode")]
     {
@@ -110,7 +109,6 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
                 I,
                 OF,
                 S,
-                Z,
             >(signal, info, context, data);
         }
     }
@@ -128,7 +126,6 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
             I,
             OF,
             S,
-            Z,
         >(signal, info, context, data);
     }
 }
@@ -170,7 +167,13 @@ where
         Z: HasObjective<Objective = OF> + HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
     {
         let mut inner = StatefulInProcessExecutor::with_timeout(
-            harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
+            harness_fn,
+            emulator,
+            observers,
+            fuzzer.objective_mut(),
+            state,
+            event_mgr,
+            timeout,
         )?;
 
         #[cfg(feature = "usermode")]
@@ -178,23 +181,18 @@ where
             inner.inprocess_hooks_mut().crash_handler =
                 inproc_qemu_crash_handler::<ET, I, S> as *const c_void;
 
-            let handler =
-                |qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>, host_sig| {
-                    eprintln!("Crashed with signal {host_sig}");
-                    unsafe {
-                        libafl::executors::inprocess::generic_inproc_crash_handler::<
-                            Self,
-                            EM,
-                            I,
-                            OF,
-                            S,
-                            Z,
-                        >();
-                    }
-                    if let Some(cpu) = qemu.current_cpu() {
-                        eprint!("Context:\n{}", cpu.display_context());
-                    }
-                };
+            let handler = |qemu: Qemu,
+                           _emulator_modules: &mut EmulatorModules<ET, I, S>,
+                           host_sig| {
+                eprintln!("Crashed with signal {host_sig}");
+                unsafe {
+                    libafl::executors::inprocess::generic_inproc_crash_handler::<Self, EM, I, OF, S>(
+                    );
+                }
+                if let Some(cpu) = qemu.current_cpu() {
+                    eprint!("Context:\n{}", cpu.display_context());
+                }
+            };
 
             // # Safety
             // We assume our crash handlers to be safe/quit after execution.
@@ -213,7 +211,6 @@ where
             I,
             OF,
             S,
-            Z,
         > as *const c_void;
 
         Ok(Self {
@@ -238,7 +235,7 @@ where
     }
 }
 
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> Executor<EM, I, S, Z>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM> Executor<EM, I, OF, S>
     for QemuExecutor<'_, C, CM, ED, ET, H, I, OT, S, SM>
 where
     C: Clone,
@@ -252,7 +249,7 @@ where
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -266,7 +263,7 @@ where
             .exposed_executor_state_mut()
             .pre_exec(state, input);
 
-        let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
+        let mut exit_kind = self.inner.run_target(objective, state, mgr, input)?;
 
         self.inner.exposed_executor_state.post_exec(
             input,
@@ -298,17 +295,17 @@ where
     }
 }
 
-pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> =
-    StatefulInProcessForkExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, SP, Z>;
+pub type QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> =
+    StatefulInProcessForkExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OF, OT, S, SP>;
 
 #[cfg(feature = "fork")]
-pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
-    inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>,
+pub struct QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> {
+    inner: QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>,
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> Debug
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> Debug
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     C: Debug,
     CM: Debug,
@@ -330,23 +327,21 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
-    QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
+    QemuForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasSolutions<I>,
     SP: ShMemProvider,
-    Z: HasObjective,
-    Z::Objective: Feedback<EM, I, OT, S>,
 {
     #[expect(clippy::too_many_arguments)]
     pub fn new(
         emulator: Emulator<C, CM, ED, ET, I, S, SM>,
         harness_fn: &'a mut H,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
         shmem_provider: SP,
@@ -359,7 +354,7 @@ where
                 harness_fn,
                 emulator,
                 observers,
-                fuzzer,
+                objective,
                 state,
                 event_mgr,
                 timeout,
@@ -371,14 +366,14 @@ where
     #[allow(clippy::type_complexity)]
     pub fn inner(
         &self,
-    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
+    ) -> &QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> {
         &self.inner
     }
 
     #[allow(clippy::type_complexity)]
     pub fn inner_mut(
         &mut self,
-    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> {
+    ) -> &mut QemuInProcessForkExecutor<'a, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> {
         &mut self.inner
     }
 
@@ -392,8 +387,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP, Z> Executor<EM, I, S, Z>
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> Executor<EM, I, OF, S>
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     C: Clone,
     CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
@@ -406,11 +401,10 @@ where
     I: Input + Unpin,
     S: HasExecutions + Unpin,
     SP: ShMemProvider,
-    Z: HasObjective<Objective = OF>,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -419,7 +413,7 @@ where
 
         self.inner.exposed_executor_state.pre_exec(state, input);
 
-        let mut exit_kind = self.inner.run_target(fuzzer, state, mgr, input)?;
+        let mut exit_kind = self.inner.run_target(objective, state, mgr, input)?;
 
         self.inner.exposed_executor_state.post_exec(
             input,
@@ -433,8 +427,8 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z> HasObservers
-    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, SP, Z>
+impl<C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP> HasObservers
+    for QemuForkExecutor<'_, C, CM, ED, EM, ET, H, I, OF, OT, S, SM, SP>
 where
     ET: EmulatorModuleTuple<I, S>,
     OT: ObserversTuple<I, S>,

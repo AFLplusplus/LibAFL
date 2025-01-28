@@ -39,10 +39,10 @@ pub mod stateful;
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub type InProcessForkExecutor<'a, EM, H, I, OT, S, SP, Z> =
-    GenericInProcessForkExecutor<'a, EM, H, (), I, OT, S, SP, Z>;
+pub type InProcessForkExecutor<'a, EM, H, I, OF, OT, S, SP> =
+    GenericInProcessForkExecutor<'a, EM, H, (), I, OF, OT, S, SP>;
 
-impl<'a, H, I, OT, S, SP, EM, Z> InProcessForkExecutor<'a, EM, H, I, OT, S, SP, Z>
+impl<'a, H, I, OF, OT, S, SP, EM> InProcessForkExecutor<'a, EM, H, I, OF, OT, S, SP>
 where
     OT: ObserversTuple<I, S>,
 {
@@ -50,7 +50,7 @@ where
     pub fn new(
         harness_fn: &'a mut H,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
         timeout: Duration,
@@ -60,7 +60,7 @@ where
             tuple_list!(),
             harness_fn,
             observers,
-            fuzzer,
+            objective,
             state,
             event_mgr,
             timeout,
@@ -73,13 +73,13 @@ where
 ///
 /// On Linux, when fuzzing a Rust target, set `panic = "abort"` in your `Cargo.toml` (see [Cargo documentation](https://doc.rust-lang.org/cargo/reference/profiles.html#panic)).
 /// Else panics can not be caught by `LibAFL`.
-pub struct GenericInProcessForkExecutor<'a, EM, H, HT, I, OT, S, SP, Z> {
+pub struct GenericInProcessForkExecutor<'a, EM, H, HT, I, OF, OT, S, SP> {
     harness_fn: &'a mut H,
-    inner: GenericInProcessForkExecutorInner<EM, HT, I, OT, S, SP, Z>,
+    inner: GenericInProcessForkExecutorInner<EM, HT, I, OF, OT, S, SP>,
 }
 
-impl<H, HT, I, OT, S, SP, EM, Z> Debug
-    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SP, Z>
+impl<H, HT, I, OF, OT, S, SP, EM> Debug
+    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OF, OT, S, SP>
 where
     HT: Debug,
     OT: Debug,
@@ -102,8 +102,8 @@ where
     }
 }
 
-impl<EM, H, HT, I, OT, S, SP, Z> Executor<EM, I, S, Z>
-    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SP, Z>
+impl<EM, H, HT, I, OF, OT, S, SP> Executor<EM, I, OF, S>
+    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OF, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     HT: ExecutorHooksTuple<I, S>,
@@ -114,7 +114,7 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -126,9 +126,11 @@ where
             match fork() {
                 Ok(ForkResult::Child) => {
                     // Child
-                    self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
+                    self.inner
+                        .pre_run_target_child(objective, state, mgr, input)?;
                     (self.harness_fn)(input);
-                    self.inner.post_run_target_child(fuzzer, state, mgr, input);
+                    self.inner
+                        .post_run_target_child(objective, state, mgr, input);
                     Ok(ExitKind::Ok)
                 }
                 Ok(ForkResult::Parent { child }) => {
@@ -141,7 +143,7 @@ where
     }
 }
 
-impl<'a, H, HT, I, OT, S, SP, EM, Z> GenericInProcessForkExecutor<'a, EM, H, HT, I, OT, S, SP, Z>
+impl<'a, H, HT, I, OF, OT, S, SP, EM> GenericInProcessForkExecutor<'a, EM, H, HT, I, OF, OT, S, SP>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
@@ -152,7 +154,7 @@ where
         userhooks: HT,
         harness_fn: &'a mut H,
         observers: OT,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         event_mgr: &mut EM,
         timeout: Duration,
@@ -164,7 +166,7 @@ where {
             inner: GenericInProcessForkExecutorInner::with_hooks(
                 userhooks,
                 observers,
-                fuzzer,
+                objective,
                 state,
                 event_mgr,
                 timeout,
@@ -186,8 +188,8 @@ where {
     }
 }
 
-impl<H, HT, I, OT, S, SP, EM, Z> HasObservers
-    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OT, S, SP, Z>
+impl<H, HT, I, OF, OT, S, SP, EM> HasObservers
+    for GenericInProcessForkExecutor<'_, EM, H, HT, I, OF, OT, S, SP>
 {
     type Observers = OT;
     #[inline]

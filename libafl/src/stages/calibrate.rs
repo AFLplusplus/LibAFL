@@ -24,7 +24,7 @@ use crate::{
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions},
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasObjective,
 };
 
 /// AFL++'s `CAL_CYCLES_FAST` + 1
@@ -91,7 +91,7 @@ pub struct CalibrationStage<C, E, I, O, OT, S> {
 
 impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, I, O, OT, S>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+    E: Executor<EM, I, Z::Objective, S> + HasObservers<Observers = OT>,
     EM: EventFirer<I, S>,
     O: MapObserver,
     C: AsRef<O>,
@@ -104,7 +104,7 @@ where
         + HasExecutions
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, I, S> + HasObjective,
     I: Input,
 {
     #[inline]
@@ -135,7 +135,7 @@ where
 
         let mut start = current_time();
 
-        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+        let exit_kind = executor.run_target(fuzzer.objective_mut(), state, mgr, &input)?;
         let mut total_time = if exit_kind == ExitKind::Ok {
             current_time() - start
         } else {
@@ -184,7 +184,7 @@ where
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
 
-            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+            let exit_kind = executor.run_target(fuzzer.objective_mut(), state, mgr, &input)?;
             if exit_kind != ExitKind::Ok {
                 if !has_errors {
                     mgr.log(

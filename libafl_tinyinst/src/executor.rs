@@ -42,7 +42,7 @@ impl<S, SHM, OT> Debug for TinyInstExecutor<S, SHM, OT> {
     }
 }
 
-impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for TinyInstExecutor<S, SHM, OT>
+impl<EM, I, OF, OT, S, SHM> Executor<EM, I, OF, S> for TinyInstExecutor<S, SHM, OT>
 where
     S: HasExecutions,
     I: HasTargetBytes,
@@ -51,7 +51,7 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,

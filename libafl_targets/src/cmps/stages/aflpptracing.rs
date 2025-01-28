@@ -8,7 +8,7 @@ use libafl::{
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase},
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasObjective,
 };
 use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
@@ -36,13 +36,14 @@ impl<EM, TE, S, Z> Named for AFLppCmplogTracingStage<'_, EM, TE, S, Z> {
 
 impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for AFLppCmplogTracingStage<'_, EM, TE, S, Z>
 where
-    TE: HasObservers + Executor<EM, BytesInput, S, Z>,
+    TE: HasObservers + Executor<EM, BytesInput, Z::Objective, S>,
     TE::Observers: MatchNameRef + ObserversTuple<BytesInput, S>,
     S: HasCorpus<BytesInput>
         + HasCurrentTestcase<BytesInput>
         + HasMetadata
         + HasNamedMetadata
         + HasCurrentCorpusId,
+    Z: HasObjective,
 {
     #[inline]
     fn perform(
@@ -71,9 +72,12 @@ where
             .observers_mut()
             .pre_exec_all(state, &unmutated_input)?;
 
-        let exit_kind =
-            self.tracer_executor
-                .run_target(fuzzer, state, manager, &unmutated_input)?;
+        let exit_kind = self.tracer_executor.run_target(
+            fuzzer.objective_mut(),
+            state,
+            manager,
+            &unmutated_input,
+        )?;
 
         self.tracer_executor
             .observers_mut()
@@ -101,9 +105,12 @@ where
             .observers_mut()
             .pre_exec_all(state, &mutated_input)?;
 
-        let exit_kind = self
-            .tracer_executor
-            .run_target(fuzzer, state, manager, &mutated_input)?;
+        let exit_kind = self.tracer_executor.run_target(
+            fuzzer.objective_mut(),
+            state,
+            manager,
+            &mutated_input,
+        )?;
 
         self.tracer_executor
             .observers_mut()

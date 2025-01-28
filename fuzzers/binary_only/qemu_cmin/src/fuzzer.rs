@@ -7,7 +7,7 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, NopCorpus},
-    events::{EventRestarter, SendExiting, SimpleRestartingEventManager},
+    events::{SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
@@ -196,7 +196,6 @@ pub fn fuzz() -> Result<(), Error> {
     });
 
     let scheduler = QueueScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
@@ -236,12 +235,14 @@ pub fn fuzz() -> Result<(), Error> {
         emulator,
         &mut harness,
         tuple_list!(edges_observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
         shmem_provider,
         core::time::Duration::from_millis(5000),
     )?;
+
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     println!("Importing {} seeds...", files.len());
 

@@ -192,9 +192,6 @@ unsafe fn fuzz(
                 let scheduler =
                     IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-                // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
                 #[cfg(unix)]
                 let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
@@ -206,12 +203,15 @@ unsafe fn fuzz(
                     InProcessExecutor::new(
                         &mut frida_harness,
                         observers,
-                        &mut fuzzer,
+                        &mut objective,
                         &mut state,
                         &mut mgr,
                     )?,
                     &mut frida_helper,
                 );
+
+                // A fuzzer with feedbacks and a corpus scheduler
+                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 // In case the corpus is empty (on first run), reset
                 if state.must_load_initial_inputs() {
@@ -312,9 +312,6 @@ unsafe fn fuzz(
                 let scheduler =
                     IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-                // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
                 #[cfg(unix)]
                 let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
@@ -326,12 +323,15 @@ unsafe fn fuzz(
                     InProcessExecutor::new(
                         &mut frida_harness,
                         observers,
-                        &mut fuzzer,
+                        &mut objective,
                         &mut state,
                         &mut mgr,
                     )?,
                     &mut frida_helper,
                 );
+
+                // A fuzzer with feedbacks and a corpus scheduler
+                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 // In case the corpus is empty (on first run), reset
                 if state.must_load_initial_inputs() {
@@ -447,9 +447,6 @@ unsafe fn fuzz(
                 let scheduler =
                     IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-                // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
                 #[cfg(unix)]
                 let observers = tuple_list!(edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
@@ -461,12 +458,15 @@ unsafe fn fuzz(
                     InProcessExecutor::new(
                         &mut frida_harness,
                         observers,
-                        &mut fuzzer,
+                        &mut objective,
                         &mut state,
                         &mut mgr,
                     )?,
                     &mut frida_helper,
                 );
+
+                // A fuzzer with feedbacks and a corpus scheduler
+                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 // In case the corpus is empty (on first run), reset
                 if state.must_load_initial_inputs() {

@@ -1151,7 +1151,7 @@ mod tests {
         let scheduler = RandScheduler::new();
 
         let feedback = ConstFeedback::new(true);
-        let objective = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
@@ -1159,7 +1159,7 @@ mod tests {
         let mut executor = InProcessExecutor::new(
             &mut harness,
             tuple_list!(time),
-            &mut fuzzer,
+            &mut objective,
             &mut state,
             &mut llmp_mgr,
         )

@@ -22,7 +22,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasExecutions},
-    Error, HasMetadata, HasScheduler,
+    Error, HasMetadata, HasObjective, HasScheduler,
 };
 
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
@@ -71,11 +71,11 @@ where
         state: &mut S,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers,
+        E: Executor<EM, I, Z::Objective, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         CS: Scheduler<I, S> + RemovableScheduler<I, S>,
         EM: EventFirer<I, S>,
-        Z: HasScheduler<I, S, Scheduler = CS>,
+        Z: HasScheduler<I, S, Scheduler = CS> + HasObjective,
     {
         // don't delete this else it won't work after restart
         let current = *state.corpus().current();
@@ -113,7 +113,7 @@ where
 
             // Execute the input; we cannot rely on the metadata already being present.
             executor.observers_mut().pre_exec_all(state, &input)?;
-            let kind = executor.run_target(fuzzer, state, manager, &input)?;
+            let kind = executor.run_target(fuzzer.objective_mut(), state, manager, &input)?;
             executor
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;

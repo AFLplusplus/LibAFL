@@ -23,7 +23,7 @@ use crate::{
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasObjective,
 };
 
 /// The unique id for this stage
@@ -76,7 +76,7 @@ where
 
 impl<E, F, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers,
+    E: Executor<EM, I, Z::Objective, S> + HasObservers,
     F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
     S: HasMetadata
@@ -86,7 +86,7 @@ where
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, I, S> + HasObjective,
     I: MutatedTransform<I, S> + Clone,
 {
     #[inline]
@@ -114,12 +114,12 @@ where
 
 impl<E, F, EM, I, M, S, Z> PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers,
+    E: Executor<EM, I, Z::Objective, S> + HasObservers,
     F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
     S: HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
     I: MutatedTransform<I, S> + Clone,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, I, S> + HasObjective,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {

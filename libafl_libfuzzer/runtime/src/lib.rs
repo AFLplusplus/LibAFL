@@ -419,8 +419,6 @@ macro_rules! fuzz_with {
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()));
 
-            // A fuzzer with feedbacks and a corpus scheduler
-            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
@@ -447,13 +445,27 @@ macro_rules! fuzz_with {
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = InProcessExecutor::with_timeout(
-                    &mut harness,
-                    observers,
-                    &mut fuzzer,
-                    &mut state,
-                    &mut mgr,
-                    $options.timeout(),
-                )?;
+                &mut harness,
+                observers,
+                &mut objective,
+                &mut state,
+                &mut mgr,
+                $options.timeout(),
+            )?;
+
+            // Setup a tracing stage in which we log comparisons
+            let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
+                &mut tracing_harness,
+                tuple_list!(cmplog_observer),
+                &mut objective,
+                &mut state,
+                &mut mgr,
+            )?), ()));
+
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
 
             // In case the corpus is empty (on first run) or crashed while loading, reset
             if state.must_load_initial_inputs() {
@@ -486,15 +498,6 @@ macro_rules! fuzz_with {
                     );
                 }
             }
-
-            // Setup a tracing stage in which we log comparisons
-            let tracing = IfStage::new(|_, _, _, _| Ok(!$options.skip_tracing()), (TracingStage::new(InProcessExecutor::new(
-                &mut tracing_harness,
-                tuple_list!(cmplog_observer),
-                &mut fuzzer,
-                &mut state,
-                &mut mgr,
-            )?), ()));
 
             // The order of the stages matter!
             let mut stages = tuple_list!(

@@ -15,7 +15,7 @@ use libafl::{
     schedulers::QueueScheduler,
     state::StdState,
 };
-use libafl_bolts::{rands::StdRand, tuples::tuple_list, AsSlice, nonzero};
+use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 use std::path::PathBuf;
 /* ANCHOR_END: use */
 
@@ -88,21 +88,21 @@ fn main() {
     let scheduler = QueueScheduler::new();
     /* ANCHOR: state_with_feedback_and_objective */
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-    /* ANCHOR_END: state_with_feedback_and_objective */
-
     /* ANCHOR: executor_with_observer */
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
     )
     .expect("Failed to create the Executor");
     /* ANCHOR_END: executor_with_observer */
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    /* ANCHOR_END: state_with_feedback_and_objective */
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));

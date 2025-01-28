@@ -7,7 +7,7 @@ use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,
@@ -47,14 +47,14 @@ impl<S> CustomExecutor<S> {
     }
 }
 
-impl<EM, I, S, Z> Executor<EM, I, S, Z> for CustomExecutor<S>
+impl<EM, I, OF, S> Executor<EM, I, OF, S> for CustomExecutor<S>
 where
     S: HasCorpus<I> + HasExecutions,
     I: HasTargetBytes,
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _objective: &mut OF,
         state: &mut S,
         _mgr: &mut EM,
         input: &I,

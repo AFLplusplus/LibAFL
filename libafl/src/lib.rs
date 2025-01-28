@@ -127,7 +127,7 @@ mod tests {
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        StdFuzzer,
+        HasObjective as _, StdFuzzer,
     };
 
     #[test]
@@ -172,7 +172,7 @@ mod tests {
         let mut executor = InProcessExecutor::new(
             &mut harness,
             tuple_list!(),
-            &mut fuzzer,
+            fuzzer.objective_mut(),
             &mut state,
             &mut event_manager,
         )

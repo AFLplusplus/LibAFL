@@ -126,20 +126,20 @@ pub fn main() {
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     let generalization = GeneralizationStage::new(&observer);
 
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(observer),
-        &mut fuzzer,
+        &mut objective,
         &mut state,
         &mut mgr,
     )
     .expect("Failed to create the Executor");
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);

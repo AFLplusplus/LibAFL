@@ -149,9 +149,6 @@ fn fuzz(
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -167,12 +164,15 @@ fn fuzz(
         InProcessExecutor::new(
             &mut harness,
             tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
+            &mut objective,
             &mut state,
             &mut restarting_mgr,
         )?,
         tuple_list!(cmplog_observer),
     );
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The actual target run starts here.
     // Call LLVMFUzzerInitialize() if present.

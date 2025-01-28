@@ -201,9 +201,6 @@ where
             let scheduler =
                 IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-            // A fuzzer with feedbacks and a corpus scheduler
-            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
                 let target = input.target_bytes();
@@ -217,13 +214,16 @@ where
                 InProcessExecutor::with_timeout(
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
-                    &mut fuzzer,
+                    &mut objective,
                     &mut state,
                     &mut mgr,
                     timeout,
                 )?,
                 tuple_list!(cmplog_observer),
             );
+
+            // A fuzzer with feedbacks and a corpus scheduler
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
             // In case the corpus is empty (on first run), reset
             if state.must_load_initial_inputs() {

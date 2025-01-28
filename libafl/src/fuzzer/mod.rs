@@ -513,7 +513,7 @@ where
 impl<CS, E, EM, F, I, IF, OF, S> EvaluatorObservers<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
-    E: HasObservers + Executor<EM, I, S, Self>,
+    E: HasObservers + Executor<EM, I, OF, S>,
     E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
     EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
     F: Feedback<EM, I, E::Observers, S>,
@@ -588,7 +588,7 @@ impl<I: Hash> InputFilter<I> for BloomInputFilter {
 impl<CS, E, EM, F, I, IF, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
-    E: HasObservers + Executor<EM, I, S, Self>,
+    E: HasObservers + Executor<EM, I, OF, S>,
     E::Observers: MatchName + ObserversTuple<I, S> + Serialize,
     EM: EventFirer<I, S> + CanSerializeObserver<E::Observers>,
     F: Feedback<EM, I, E::Observers, S>,
@@ -916,7 +916,7 @@ pub trait ExecutesInput<E, EM, I, S> {
 impl<CS, E, EM, F, I, IF, OF, S> ExecutesInput<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
-    E: Executor<EM, I, S, Self> + HasObservers,
+    E: Executor<EM, I, OF, S> + HasObservers,
     E::Observers: ObserversTuple<I, S>,
     S: HasExecutions + HasCorpus<I> + MaybeHasClientPerfMonitor,
 {
@@ -933,7 +933,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
+        let exit_kind = executor.run_target(&mut self.objective, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         start_timer!(state);
@@ -1036,9 +1036,14 @@ mod tests {
             *execution_count.borrow_mut() += 1;
             ExitKind::Ok
         };
-        let mut executor =
-            InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut manager)
-                .unwrap();
+        let mut executor = InProcessExecutor::new(
+            &mut harness,
+            (),
+            &mut fuzzer.objective,
+            &mut state,
+            &mut manager,
+        )
+        .unwrap();
         let input = BytesInput::new(vec![1, 2, 3]);
         assert!(fuzzer
             .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())

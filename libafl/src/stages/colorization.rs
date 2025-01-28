@@ -24,7 +24,7 @@ use crate::{
     observers::ObserversTuple,
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand},
-    Error, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata, HasObjective,
 };
 
 // Bigger range is better
@@ -78,7 +78,8 @@ impl<C, E, EM, I, O, S, Z> Named for ColorizationStage<C, E, EM, I, O, S, Z> {
 impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for ColorizationStage<C, E, EM, I, O, S, Z>
 where
     EM: EventFirer<I, S>,
-    E: HasObservers + Executor<EM, I, S, Z>,
+    Z: HasObjective,
+    E: HasObservers + Executor<EM, I, Z::Objective, S>,
     S: HasCorpus<I> + HasMetadata + HasRand + HasNamedMetadata + HasCurrentCorpusId,
     E::Observers: ObserversTuple<I, S>,
     I: ResizableMutator<u8> + HasMutatorBytes + Clone,
@@ -155,7 +156,8 @@ where
     EM: EventFirer<I, S>,
     O: Hash,
     C: AsRef<O> + Named,
-    E: HasObservers + Executor<EM, I, S, Z>,
+    Z: HasObjective,
+    E: HasObservers + Executor<EM, I, Z::Objective, S>,
     E::Observers: ObserversTuple<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand + HasCurrentCorpusId + HasCurrentTestcase<I>,
     I: ResizableMutator<u8> + HasMutatorBytes + Clone,
@@ -313,7 +315,7 @@ where
     ) -> Result<usize, Error> {
         executor.observers_mut().pre_exec_all(state, input)?;
 
-        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
+        let exit_kind = executor.run_target(fuzzer.objective_mut(), state, manager, input)?;
 
         let observers = executor.observers();
         let observer = observers[observer_handle].as_ref();

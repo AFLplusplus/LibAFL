@@ -117,11 +117,11 @@ pub trait HasObservers {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, I, S, Z> {
+pub trait Executor<EM, I, OF, S> {
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        objective: &mut OF,
         state: &mut S,
         mgr: &mut EM,
         input: &I,
@@ -193,14 +193,14 @@ mod test {
         }
     }
 
-    impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor<S>
+    impl<EM, I, OF, S> Executor<EM, I, OF, S> for NopExecutor<S>
     where
         S: HasExecutions,
         I: HasTargetBytes,
     {
         fn run_target(
             &mut self,
-            _fuzzer: &mut Z,
+            _objective: &mut OF,
             state: &mut S,
             _mgr: &mut EM,
             input: &I,
