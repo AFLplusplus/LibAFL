@@ -436,7 +436,7 @@ fn fuzz(
     );
 
     fuzzer
-        .fuzz_loop_for(&mut stages, &mut executor, &mut state, &mut mgr, 1)
+        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 
     // Never reached

@@ -1,6 +1,6 @@
 use core::fmt;
-use std::borrow::Cow;
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
+
 use hashbrown::HashMap;
 use libafl::{
     corpus::Testcase,
@@ -32,21 +32,30 @@ pub enum PredicateType {
     // Has Edge
     HasEdge(Edges),
     // Max is gt than
-    MaxGt(GuestAddr, u64),
+    MaxGt(GuestAddr, (u64, u64)),
     // Min is lt than
-    MinLt(GuestAddr, u64),
+    MinLt(GuestAddr, (u64, u64)),
 }
-
 
 impl fmt::Debug for PredicateType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PredicateType::HasEdge(edges) => write!(f, "PredicateType::HasEdge({:x} -> {:x})", edges.0, edges.1),
+            PredicateType::HasEdge(edges) => {
+                write!(f, "CRASH if has edge from {:x} to {:x}", edges.0, edges.1)
+            }
             PredicateType::MaxGt(addr, value) => {
-                write!(f, "PredicateType::MaxGt(addr: {:x}, value: {})", addr, value)
+                write!(
+                    f,
+                    "Crash if load at addr: {:x} is larger than value: {}-{}",
+                    addr, value.0, value.1
+                )
             }
             PredicateType::MinLt(addr, value) => {
-                write!(f, "PredicateType::MinLt(addr: {:x}, value: {})", addr, value)
+                write!(
+                    f,
+                    "Crash if load at addr: {:x} is less than value: {}-{}",
+                    addr, value.0, value.1
+                )
             }
         }
     }
@@ -54,7 +63,7 @@ impl fmt::Debug for PredicateType {
 
 /// Take one item from max map and find it's divider and its misclassification rate.
 #[allow(clippy::cast_precision_loss)]
-pub fn select_max(merged: &mut [(u64, bool)]) -> (u64, f64) {
+pub fn select_max(merged: &mut [(u64, bool)]) -> ((u64, u64), f64) {
     // check how many crashes
     let mut crashed = 0;
     for (_, b) in merged.iter() {
@@ -84,15 +93,20 @@ pub fn select_max(merged: &mut [(u64, bool)]) -> (u64, f64) {
         }
     }
     // println!("Best selector is {} {}", idx_found, missclassification);
-    let divider = merged[idx_found].0;
+    let end = merged[idx_found].0;
+    let start = if let Some(e) = merged.get(idx_found - 1) {
+        e.0
+    } else {
+        u64::MAX
+    };
     let mut rate = missclassification as f64 / (n + m) as f64;
     rate = 1.0 - rate;
-    (divider, rate)
+    ((start, end), rate)
 }
 
 /// Take one item from min map and find it's divider and its misclassification rate.
 #[allow(clippy::cast_precision_loss)]
-pub fn select_min(merged: &mut [(u64, bool)]) -> (u64, f64) {
+pub fn select_min(merged: &mut [(u64, bool)]) -> ((u64, u64), f64) {
     // check how many crashes
     let mut crashed = 0;
     for (_, b) in merged.iter() {
@@ -122,10 +136,16 @@ pub fn select_min(merged: &mut [(u64, bool)]) -> (u64, f64) {
         }
     }
     // println!("Best selector is {} {}", idx_found, missclassification);
-    let divider = merged[idx_found].0;
+    let start = merged[idx_found].0;
+    let end = if let Some(e) = merged.get(idx_found + 1) {
+        e.0
+    } else {
+        u64::MIN
+    };
+
     let mut rate = missclassification as f64 / (n + m) as f64;
     rate = 1.0 - rate;
-    (divider, rate)
+    ((start, end), rate)
 }
 
 /// List of predicates gathered over all runs.
@@ -153,8 +173,8 @@ impl PredicatesMap {
         sorted_synthesized.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let top10: Vec<(PredicateType, f64)> = sorted_synthesized.into_iter().take(10).collect();
 
-        for i in top10.iter() {
-            println!("{:#?}", i);
+        for i in &top10 {
+            println!("{i:#?}");
         }
     }
 
@@ -277,7 +297,10 @@ impl Named for PredicateFeedback {
 impl PredicateFeedback {
     #[must_use]
     pub fn new(range: Range<u64>) -> Self {
-        Self { was_crash: false, tracking_ip: range}  // sane default
+        Self {
+            was_crash: false,
+            tracking_ip: range,
+        } // sane default
     }
 
     #[must_use]
@@ -285,9 +308,9 @@ impl PredicateFeedback {
         let image_info = unsafe { libafl_get_image_info() };
         let stack_end = unsafe { (*image_info).start_stack };
         let stack_start = unsafe { (*image_info).stack_limit };
-        return ptr >= stack_start && stack_end >= ptr;
+        ptr >= stack_start && stack_end >= ptr
     }
-    
+    #[must_use]
     pub fn is_text_ptr(&self, ptr: u64) -> bool {
         self.tracking_ip.contains(&ptr)
     }
@@ -322,7 +345,6 @@ where
         _observers: &OT,
         _testcase: &mut Testcase<I>,
     ) -> Result<(), libafl::Error> {
-
         let tracer = state.metadata::<Tracer>().unwrap();
         // because of double borrow shit!
         println!("{:#?}", self.tracking_ip);
@@ -330,17 +352,17 @@ where
         let mut maxes = vec![];
         let mut mins = vec![];
         for e in tracer.edges() {
-            if self.is_text_ptr(e.0 as u64) && self.is_text_ptr(e.1 as u64) {
+            if self.is_text_ptr(e.0) && self.is_text_ptr(e.1) {
                 edges.push(*e);
             }
         }
         for (addr, ma) in tracer.maxmap() {
-            if !self.is_stack_ptr(*ma) && self.is_text_ptr(*addr as u64) {
+            if !self.is_stack_ptr(*ma) && self.is_text_ptr(*addr) {
                 maxes.push((*addr, *ma));
             }
         }
         for (addr, mi) in tracer.minmap() {
-            if !self.is_stack_ptr(*mi) && self.is_text_ptr(*addr as u64) {
+            if !self.is_stack_ptr(*mi) && self.is_text_ptr(*addr) {
                 mins.push((*addr, *mi));
             }
         }

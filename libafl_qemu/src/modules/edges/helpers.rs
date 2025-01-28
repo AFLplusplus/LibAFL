@@ -210,7 +210,6 @@ mod generators {
                     }
                 }
                 // GuestAddress is u32 for 32 bit guests
-                #[expect(clippy::unnecessary_cast)]
                 id
             }
         };
