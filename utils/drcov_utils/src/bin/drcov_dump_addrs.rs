@@ -1,11 +1,12 @@
 use std::{
     fs::{create_dir_all, File},
-    io::{Error, Write},
+    io::Write,
     path::PathBuf,
 };
 
 use clap::Parser;
 use libafl_targets::drcov::DrCovReader;
+use walkdir::WalkDir;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -105,23 +106,15 @@ fn process(opts: &Opt, input: &PathBuf) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+#[must_use]
 pub fn find_drcov_files(dir: &PathBuf) -> Vec<PathBuf> {
     let mut drcov_files = Vec::new();
 
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if let Ok(metadata) = path.symlink_metadata() {
-                    if !metadata.file_type().is_symlink() {
-                        // Recurse into directories that are not symlinks
-                        drcov_files.extend(find_drcov_files(&path));
-                    }
-                }
-            } else if let Some(ext) = path.extension() {
-                if ext == "drcov" {
-                    drcov_files.push(path);
-                }
+    for entry in WalkDir::new(dir) {
+        let entry = entry.unwrap().into_path();
+        if let Some(ext) = entry.extension() {
+            if ext == "drcov" {
+                drcov_files.push(entry);
             }
         }
     }
@@ -129,7 +122,7 @@ pub fn find_drcov_files(dir: &PathBuf) -> Vec<PathBuf> {
     drcov_files
 }
 
-fn main() -> Result<(), Error> {
+fn main() {
     let opts = Opt::parse();
 
     if let Some(out_dir) = &opts.out_dir {
@@ -158,6 +151,4 @@ fn main() -> Result<(), Error> {
             let _ = process(&opts, &drcov_file);
         }
     }
-
-    Ok(())
 }
