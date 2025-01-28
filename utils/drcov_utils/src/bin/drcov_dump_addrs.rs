@@ -15,7 +15,12 @@ use libafl_targets::drcov::DrCovReader;
     long_about = "Writes a list of all addresses from a DrCovFile"
 )]
 pub struct Opt {
-    #[arg(short, long, help = "DrCov traces to read", required = true)]
+    #[arg(
+        short,
+        long,
+        help = "DrCov traces or directories to read",
+        required = true
+    )]
     pub inputs: Vec<PathBuf>,
 
     #[arg(
@@ -35,79 +40,113 @@ pub struct Opt {
     pub sort: bool,
 }
 
+fn process(opts: &Opt, input: &PathBuf) -> Result<(), std::io::Error> {
+    let Ok(drcov) = DrCovReader::read(&input)
+        .map_err(|err| eprintln!("Ignored coverage file {input:?}, reason: {err:?}"))
+    else {
+        return Ok(());
+    };
+
+    let mut blocks = drcov.basic_block_addresses_u64();
+
+    if opts.sort {
+        blocks.sort_unstable();
+    }
+
+    let mut writer: Box<dyn Write> = if let Some(out_dir) = &opts.out_dir {
+        // Write files to a directory
+        let out_file = out_dir.join(
+            input
+                .file_name()
+                .expect("File without filename shouldn't exist"),
+        );
+
+        let Ok(file) = File::create_new(&out_file).map_err(|err| {
+            eprintln!("Could not create file {out_file:?} - continuing: {err:?}");
+        }) else {
+            return Ok(());
+        };
+
+        println!("Dumping traces from drcov file {input:?} to {out_file:?}",);
+
+        Box::new(file)
+    } else {
+        Box::new(std::io::stdout())
+    };
+
+    // dump to stdout
+    let modules = &drcov.module_entries;
+
+    if opts.metadata {
+        writeln!(writer, "# {} Modules:", modules.len())?;
+        for module in &drcov.module_entries {
+            writeln!(
+                writer,
+                "\t{} - [{:#020x}-{:#020x}] {}",
+                module.id,
+                module.base,
+                module.end,
+                module.path.display()
+            )?;
+        }
+        writeln!(writer, "# {} Blocks covered in {input:?}.", blocks.len())?;
+
+        if opts.addrs {
+            writeln!(writer)?;
+        }
+    }
+
+    if opts.addrs {
+        for line in blocks {
+            writeln!(writer, "{line:#x}")?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn find_drcov_files(dir: &PathBuf) -> Vec<PathBuf> {
+    let mut drcov_files = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if let Ok(metadata) = path.symlink_metadata() {
+                    if !metadata.file_type().is_symlink() {
+                        // Recurse into directories that are not symlinks
+                        drcov_files.extend(find_drcov_files(&path));
+                    }
+                }
+            } else if let Some(ext) = path.extension() {
+                if ext == "drcov" {
+                    drcov_files.push(path);
+                }
+            }
+        }
+    }
+
+    drcov_files
+}
+
 fn main() -> Result<(), Error> {
     let opts = Opt::parse();
 
     if let Some(out_dir) = &opts.out_dir {
         if !out_dir.exists() {
             if let Err(err) = create_dir_all(out_dir) {
-                eprint!("Failed to create dir {out_dir:?}: {err:?}");
+                eprintln!("Failed to create dir {out_dir:?}: {err:?}");
             }
         }
 
         assert!(out_dir.is_dir(), "Out_dir {out_dir:?} not a directory!");
     }
 
-    for input in opts.inputs {
-        let Ok(drcov) = DrCovReader::read(&input)
-            .map_err(|err| eprint!("Ignored coverage file {input:?}, reason: {err:?}"))
-        else {
-            continue;
-        };
-
-        let mut blocks = drcov.basic_block_addresses_u64();
-
-        if opts.sort {
-            blocks.sort_unstable();
-        }
-
-        let mut writer: Box<dyn Write> = if let Some(out_dir) = &opts.out_dir {
-            // Write files to a directory
-            let out_file = out_dir.join(
-                input
-                    .file_name()
-                    .expect("File without filename shouldn't exist"),
-            );
-
-            let Ok(file) = File::create_new(&out_file).map_err(|err| {
-                eprintln!("Could not create file {out_file:?} - continuing: {err:?}");
-            }) else {
-                continue;
-            };
-
-            println!("Dumping traces from drcov file {input:?} to {out_file:?}",);
-
-            Box::new(file)
-        } else {
-            Box::new(std::io::stdout())
-        };
-
-        // dump to stdout
-        let modules = &drcov.module_entries;
-
-        if opts.metadata {
-            writeln!(writer, "# {} Modules:", modules.len())?;
-            for module in &drcov.module_entries {
-                writeln!(
-                    writer,
-                    "\t{} - [{:#020x}-{:#020x}] {}",
-                    module.id,
-                    module.base,
-                    module.end,
-                    module.path.display()
-                )?;
-            }
-            writeln!(writer, "# {} Blocks covered in {input:?}.", blocks.len())?;
-
-            if opts.addrs {
-                writeln!(writer)?;
-            }
-        }
-
-        if opts.addrs {
-            for line in blocks {
-                writeln!(writer, "{line:#x}")?;
-            }
+    for input in &opts.inputs {
+        let drcovs = find_drcov_files(input);
+        for drcov_file in drcovs {
+            println!("file: {:#?}", drcov_file);
+            let _ = process(&opts, &drcov_file);
         }
     }
 
