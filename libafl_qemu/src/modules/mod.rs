@@ -1,10 +1,7 @@
-use core::{fmt::Debug, ops::Range};
+use core::fmt::Debug;
 
 use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::tuples::{MatchFirstType, SplitBorrowExtractFirstType};
-use libafl_qemu_sys::GuestAddr;
-#[cfg(feature = "systemmode")]
-use libafl_qemu_sys::GuestPhysAddr;
 
 use crate::{
     emu::EmulatorModules,
@@ -15,6 +12,7 @@ use crate::{
 #[cfg(feature = "usermode")]
 pub mod usermode;
 #[cfg(feature = "usermode")]
+#[cfg_attr(feature = "hexagon", allow(unused_imports))]
 pub use usermode::*;
 
 #[cfg(feature = "systemmode")]
@@ -45,6 +43,9 @@ pub use cmplog::CmpLogModule;
 pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
 pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
+
+pub mod logger;
+pub use logger::LoggerModule;
 
 pub mod utils;
 

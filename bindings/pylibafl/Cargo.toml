@@ -30,5 +30,7 @@ pyo3-build-config = { workspace = true }
 name = "pylibafl"
 crate-type = ["cdylib"]
 
-[profile.dev]
-panic = "abort"
+# TODO: find a way to fix this when a solution is found
+# https://github.com/rust-lang/cargo/issues/9330
+# [profile.dev]
+# panic = "abort"

@@ -93,13 +93,14 @@ extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CmpLogRoutines", "v0.1",
           [](PassBuilder &PB) {
-  #if LLVM_VERSION_MAJOR <= 13
-            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
-  #endif
             PB.registerOptimizerLastEPCallback(
-                [](ModulePassManager &MPM, OptimizationLevel OL) {
-                  MPM.addPass(CmpLogRoutines());
-                });
+                [](ModulePassManager &MPM, OptimizationLevel OL
+  #if LLVM_VERSION_MAJOR >= 20
+                   ,
+                   ThinOrFullLTOPhase Phase
+  #endif
+
+                ) { MPM.addPass(CmpLogRoutines()); });
           }};
 }
 #else

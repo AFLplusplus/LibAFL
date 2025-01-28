@@ -1,5 +1,5 @@
 #![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
-use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
+use std::{cell::UnsafeCell, mem::MaybeUninit, ops::Range, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
 use libafl::HasMetadata;
@@ -26,7 +26,7 @@ use crate::{
     modules::{
         asan::AsanModule,
         utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
-        EmulatorModule, EmulatorModuleTuple, Range,
+        EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{Hook, SyscallHookResult},
     Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
@@ -754,6 +754,7 @@ pub fn trace_write_snapshot<ET, I, S, const SIZE: usize>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
@@ -769,6 +770,7 @@ pub fn trace_write_n_snapshot<ET, I, S>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
     size: usize,
 ) where

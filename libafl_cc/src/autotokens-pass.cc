@@ -63,13 +63,6 @@
 
 #include <iostream>
 
-#define FATAL(x...)               \
-  do {                            \
-    fprintf(stderr, "FATAL: " x); \
-    exit(1);                      \
-                                  \
-  } while (0)
-
 using namespace llvm;
 
 namespace {
@@ -107,13 +100,13 @@ llvmGetPassPluginInfo() {
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
 
-  #if LLVM_VERSION_MAJOR <= 13
-            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
-  #endif
             PB.registerOptimizerLastEPCallback(
-                [](ModulePassManager &MPM, OptimizationLevel OL) {
-                  MPM.addPass(AutoTokensPass());
-                });
+                [](ModulePassManager &MPM, OptimizationLevel OL
+  #if LLVM_VERSION_MAJOR >= 20
+                   ,
+                   ThinOrFullLTOPhase Phase
+  #endif
+                ) { MPM.addPass(AutoTokensPass()); });
           }};
 }
 #else

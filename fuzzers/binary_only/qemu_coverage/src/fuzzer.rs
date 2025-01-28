@@ -135,11 +135,8 @@ pub fn fuzz() {
         cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
 
         let emulator_modules = tuple_list!(
-            DrCovModule::builder()
-                .filename(cov_path.clone())
-                .full_trace(false)
-                .build(),
-            SnapshotModule::new()
+            DrCovModule::builder().filename(cov_path.clone()).build(),
+            SnapshotModule::new(),
         );
 
         let emulator = Emulator::empty()
@@ -291,11 +288,6 @@ pub fn fuzz() {
         .monitor(MultiMonitor::new(|s| println!("{s}")))
         .run_client(&mut run_client)
         .cores(&options.cores)
-        .stdout_file(if options.verbose {
-            None
-        } else {
-            Some("/dev/null")
-        })
         .build()
         .launch()
     {
