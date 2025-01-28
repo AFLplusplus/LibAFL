@@ -1319,11 +1319,14 @@ pub struct CombinedMonitor<A, B> {
 
 impl<A: Monitor, B: Monitor> CombinedMonitor<A, B> {
     /// Create a new combined monitor
-    pub fn new(first: A, second: B) -> Self {
+    pub fn new(mut first: A, mut second: B) -> Self {
+        let start_time = current_time();
+        first.set_start_time(start_time);
+        second.set_start_time(start_time);
         Self {
             first,
             second,
-            start_time: current_time(),
+            start_time,
             client_stats: vec![],
         }
     }
