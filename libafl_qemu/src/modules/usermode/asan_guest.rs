@@ -160,6 +160,7 @@ fn guest_trace_error_asan<ET, I, S>(
     _emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     _addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
@@ -175,6 +176,7 @@ fn guest_trace_error_n_asan<ET, I, S>(
     _emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     _addr: GuestAddr,
     _n: usize,
 ) where
