@@ -95,11 +95,12 @@ extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CmpLogInstructions", "v0.1",
           [](PassBuilder &PB) {
-  #if LLVM_VERSION_MAJOR <= 13
-            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
-  #endif
   #if LLVM_VERSION_MAJOR >= 16
+    #if LLVM_VERSION_MAJOR >= 20
+            PB.registerPipelineStartEPCallback(
+    #else
             PB.registerOptimizerEarlyEPCallback(
+    #endif
   #else
             PB.registerOptimizerLastEPCallback(
   #endif
