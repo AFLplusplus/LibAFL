@@ -1302,3 +1302,74 @@ impl Default for ClientPerfMonitor {
         Self::new()
     }
 }
+
+/// A combined monitor consisting of multiple [`Monitor`]s
+#[derive(Debug, Clone)]
+pub struct CombinedMonitor<A, B> {
+    first: A,
+    second: B,
+    start_time: Duration,
+    /// Client stats. This will be maintained to be consistent with
+    /// client stats of first and second monitor.
+    ///
+    /// Currently, the client stats will be synced to first and second
+    /// before each display call.
+    client_stats: Vec<ClientStats>,
+}
+
+impl<A: Monitor, B: Monitor> CombinedMonitor<A, B> {
+    /// Create a new combined monitor
+    pub fn new(first: A, second: B) -> Self {
+        Self {
+            first,
+            second,
+            start_time: current_time(),
+            client_stats: vec![],
+        }
+    }
+}
+
+impl<A: Monitor, B: Monitor> Monitor for CombinedMonitor<A, B> {
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        &mut self.client_stats
+    }
+
+    fn client_stats(&self) -> &[ClientStats] {
+        &self.client_stats
+    }
+
+    fn start_time(&self) -> Duration {
+        self.start_time
+    }
+
+    fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
+        self.first.set_start_time(time);
+        self.second.set_start_time(time);
+    }
+
+    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
+        *self.first.client_stats_mut() = self.client_stats.clone();
+        self.first.display(event_msg, sender_id);
+        *self.second.client_stats_mut() = self.client_stats.clone();
+        self.second.display(event_msg, sender_id);
+    }
+
+    fn aggregate(&mut self, name: &str) {
+        self.first.aggregate(name);
+        self.second.aggregate(name);
+    }
+}
+
+/// Variadic macro to create a chain of [`Monitor`]
+#[macro_export]
+macro_rules! combine_monitor {
+    ( $last:expr ) => { $last };
+
+    ( $last:expr, ) => { $last };
+
+    ( $head:expr, $($tail:expr),+ $(,)?) => {
+        // recursive call
+        $crate::monitors::CombinedMonitor::new($head , $crate::combine_monitor!($($tail),+))
+    };
+}
