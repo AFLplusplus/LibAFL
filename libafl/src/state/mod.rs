@@ -32,7 +32,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
     feedbacks::StateInitializer,
-    fuzzer::{Evaluator, ExecuteInputResult},
+    fuzzer::ExecuteInputResult,
     generators::Generator,
     inputs::{Input, NopInput},
     stages::{HasCurrentStageId, HasNestedStageStatus, StageId},
@@ -656,7 +656,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         if let Some(remaining) = self.remaining_initial_files.as_ref() {
             // everything was loaded
@@ -680,7 +679,6 @@ where
     ) -> Result<ExecuteInputResult, Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         log::info!("Loading file {path:?} ...");
         let input = match (config.loader)(fuzzer, self, path) {
@@ -714,7 +712,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         loop {
             match self.next_file() {
@@ -778,7 +775,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
             fuzzer,
@@ -805,7 +801,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
         self.continue_loading_initial_inputs_custom(
@@ -831,7 +826,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         self.load_initial_inputs_custom_by_filenames(
             fuzzer,
@@ -856,7 +850,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
         self.continue_loading_initial_inputs_custom(
@@ -882,7 +875,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         self.canonicalize_input_dirs(in_dirs)?;
         self.continue_loading_initial_inputs_custom(
@@ -923,7 +915,6 @@ where
     ) -> Result<(), Error>
     where
         EM: EventFirer<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         if self.multicore_inputs_processed.unwrap_or(false) {
             self.continue_loading_initial_inputs_custom(
@@ -1018,7 +1009,6 @@ where
     where
         EM: EventFirer<I, Self>,
         G: Generator<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -1056,7 +1046,6 @@ where
     where
         EM: EventFirer<I, Self>,
         G: Generator<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -1073,7 +1062,6 @@ where
     where
         EM: EventFirer<I, Self>,
         G: Generator<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }

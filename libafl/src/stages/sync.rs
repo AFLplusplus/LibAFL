@@ -19,7 +19,6 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
-    fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter},
     stages::{RetryCountRestartHelper, Stage},
     state::{
@@ -77,7 +76,6 @@ impl<CB, E, EM, I, S, Z> Named for SyncFromDiskStage<CB, E, EM, I, S, Z> {
 impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
-    Z: Evaluator<E, EM, I, S>,
     S: HasCorpus<I>
         + HasRand
         + HasMetadata
@@ -179,7 +177,6 @@ impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, 
 where
     I: Input,
     S: HasCorpus<I>,
-    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
@@ -247,7 +244,6 @@ where
         + MaybeHasClientPerfMonitor,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {

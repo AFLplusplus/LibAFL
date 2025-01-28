@@ -13,7 +13,6 @@ use libafl_bolts::{rands::Rand, Named};
 use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
-    fuzzer::Evaluator,
     inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
@@ -153,7 +152,6 @@ where
         + HasNamedMetadata
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    Z: Evaluator<E, EM, I2, S>,
 {
     #[inline]
     fn perform(
@@ -185,7 +183,6 @@ where
     M: Mutator<I, S>,
     I: MutatedTransform<I, S> + Input + Clone,
     S: HasCorpus<I> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
-    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -206,7 +203,6 @@ where
     I2: Input,
     M: Mutator<I1, S>,
     S: HasCorpus<I2> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
-    Z: Evaluator<E, EM, I2, S>,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -239,7 +235,6 @@ where
     I2: Input,
     M: Mutator<I1, S>,
     S: HasRand + HasCurrentTestcase<I2> + MaybeHasClientPerfMonitor,
-    Z: Evaluator<E, EM, I2, S>,
 {
     /// Runs this (mutational) stage for the given testcase
     fn perform_mutational(
@@ -314,7 +309,6 @@ where
     I: Clone + MutatedTransform<I, S>,
     M: MultiMutator<I, S>,
     S: HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
-    Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {

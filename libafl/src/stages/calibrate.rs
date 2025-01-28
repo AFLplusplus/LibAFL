@@ -17,7 +17,6 @@ use crate::{
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
-    fuzzer::Evaluator,
     inputs::Input,
     monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
@@ -104,7 +103,6 @@ where
         + HasExecutions
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId,
-    Z: Evaluator<E, EM, I, S>,
     I: Input,
 {
     #[inline]

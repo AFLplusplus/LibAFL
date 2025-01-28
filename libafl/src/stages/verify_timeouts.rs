@@ -14,7 +14,7 @@ use crate::{
     inputs::BytesInput,
     observers::ObserversTuple,
     stages::Stage,
-    Evaluator, HasMetadata,
+    HasMetadata,
 };
 
 /// Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are
@@ -83,7 +83,6 @@ impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, I, S>
 where
     E::Observers: ObserversTuple<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers + HasTimeout,
-    Z: Evaluator<E, EM, I, S>,
     S: HasMetadata,
     I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {

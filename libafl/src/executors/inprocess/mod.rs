@@ -16,8 +16,6 @@ use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
 #[cfg(any(unix, feature = "std"))]
 use crate::executors::hooks::inprocess::GLOBAL_STATE;
-#[cfg(any(unix, feature = "std"))]
-use crate::ExecutionProcessor;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
@@ -445,7 +443,7 @@ where
     OF: Feedback<EM, I, E::Observers, S>,
     S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
     I: Input + Clone,
-    Z: HasObjective<Objective = OF> + ExecutionProcessor<EM, I, E::Observers, S>,
+    Z: HasObjective<Objective = OF>,
 {
     let data = &raw mut GLOBAL_STATE;
     let in_handler = (*data).set_in_handler(true);

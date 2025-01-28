@@ -26,7 +26,7 @@ use crate::{
     schedulers::Scheduler,
     start_timer,
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand, MaybeHasClientPerfMonitor},
-    Error, ExecutionProcessor, HasMetadata, HasScheduler,
+    Error, HasMetadata, HasScheduler,
 };
 
 /// The default maximum number of mutations to perform per input.
@@ -79,7 +79,7 @@ where
 impl<EM, M, I, OT, S, Z> PushStage<EM, I, OT, S, Z> for StdMutationalPushStage<EM, M, I, OT, S, Z>
 where
     EM: EventFirer<I, S>,
-    Z: HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
+    Z: HasScheduler<I, S>,
     S: HasCorpus<I> + HasRand + MaybeHasClientPerfMonitor,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S> + Serialize,
@@ -196,7 +196,7 @@ where
     OT: ObserversTuple<I, S> + Serialize,
     M: Mutator<I, S>,
     I: Clone + Debug + Input,
-    Z: HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
+    Z: HasScheduler<I, S>,
 {
     type Item = Result<I, Error>;
 
@@ -217,7 +217,7 @@ where
     OT: ObserversTuple<I, S> + Serialize,
     M: Mutator<I, S>,
     I: Clone + Debug + Input,
-    Z: HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
+    Z: HasScheduler<I, S>,
 {
     /// Creates a new default mutational stage
     #[must_use]

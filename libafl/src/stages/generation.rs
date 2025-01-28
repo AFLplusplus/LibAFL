@@ -6,7 +6,7 @@
 
 use core::marker::PhantomData;
 
-use crate::{generators::Generator, stages::Stage, state::HasRand, Error, Evaluator};
+use crate::{generators::Generator, stages::Stage, state::HasRand, Error};
 
 /// A [`Stage`] that generates a single input via a [`Generator`] and evaluates
 /// it using the fuzzer, possibly adding it to the corpus.
@@ -26,7 +26,6 @@ impl<E, EM, G, I, S, Z> Stage<E, EM, S, Z> for GenStage<G, I, S, Z>
 where
     G: Generator<I, S>,
     S: HasRand,
-    Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
     fn perform(

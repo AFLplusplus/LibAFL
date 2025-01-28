@@ -18,7 +18,7 @@ use crate::{
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
-    Error, Evaluator, HasMetadata, HasNamedMetadata,
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 #[cfg_attr(
@@ -162,7 +162,6 @@ pub struct TuneableMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> MutationalStage<S> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
     S: HasRand + HasNamedMetadata + HasMetadata + HasExecutions + HasCurrentTestcase<I>,
     I: MutatedTransform<I, S> + Clone,
 {
@@ -193,7 +192,6 @@ where
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
     S: HasRand
         + HasNamedMetadata
         + HasMetadata
@@ -230,7 +228,6 @@ where
 impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
     S: HasRand
         + HasNamedMetadata
         + HasExecutions
@@ -459,7 +456,6 @@ where
 impl<E, EM, I, M, S, Z> TuneableMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
-    Z: Evaluator<E, EM, I, S>,
     S: HasRand + HasNamedMetadata,
 {
     /// Creates a new transforming mutational stage

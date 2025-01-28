@@ -13,7 +13,6 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
-    fuzzer::Evaluator,
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
@@ -86,7 +85,6 @@ where
         + HasCurrentTestcase<I>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
-    Z: Evaluator<E, EM, I, S>,
     I: MutatedTransform<I, S> + Clone,
 {
     #[inline]
@@ -119,7 +117,6 @@ where
     M: Mutator<I, S>,
     S: HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
     I: MutatedTransform<I, S> + Clone,
-    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {

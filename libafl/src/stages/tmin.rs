@@ -37,8 +37,7 @@ use crate::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasMaxSize, HasSolutions,
         MaybeHasClientPerfMonitor,
     },
-    Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasMetadata, HasNamedMetadata,
-    HasScheduler,
+    Error, ExecutesInput, HasFeedback, HasMetadata, HasNamedMetadata, HasScheduler,
 };
 
 /// The default corpus entry minimising mutational stage
@@ -60,10 +59,7 @@ pub struct StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> {
 impl<E, EM, F, FF, I, M, S, Z> Stage<E, EM, S, Z>
     for StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
 where
-    Z: HasScheduler<I, S>
-        + ExecutionProcessor<EM, I, E::Observers, S>
-        + ExecutesInput<E, EM, I, S>
-        + HasFeedback,
+    Z: HasScheduler<I, S> + ExecutesInput<E, EM, I, S> + HasFeedback,
     Z::Scheduler: RemovableScheduler<I, S>,
     E: HasObservers,
     E::Observers: ObserversTuple<I, S> + Serialize,
@@ -130,10 +126,7 @@ pub static TMIN_STAGE_NAME: &str = "tmin";
 
 impl<E, EM, F, FF, I, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z>
 where
-    Z: HasScheduler<I, S>
-        + ExecutionProcessor<EM, I, E::Observers, S>
-        + ExecutesInput<E, EM, I, S>
-        + HasFeedback,
+    Z: HasScheduler<I, S> + ExecutesInput<E, EM, I, S> + HasFeedback,
     Z::Scheduler: RemovableScheduler<I, S>,
     E: HasObservers,
     E::Observers: ObserversTuple<I, S> + Serialize,

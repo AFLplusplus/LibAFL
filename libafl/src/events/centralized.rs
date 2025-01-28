@@ -36,7 +36,6 @@ use crate::{
         LogSeverity, ProgressReporter, SendExiting,
     },
     executors::HasObservers,
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
     observers::TimeObserver,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
@@ -330,7 +329,6 @@ where
     S: Stoppable,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         if self.is_main {
@@ -447,7 +445,6 @@ where
     where
         E: HasObservers,
         E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client.sender().id();
@@ -492,7 +489,6 @@ where
     where
         E: HasObservers,
         E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
     {
         log::debug!("handle_in_main!");
 

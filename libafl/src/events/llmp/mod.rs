@@ -18,7 +18,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::corpus::{Corpus, Testcase};
 use crate::{
     events::{Event, EventFirer},
-    fuzzer::EvaluatorObservers,
+    fuzzer::evaluate_input_with_observers,
     inputs::{Input, InputConverter, NopInput, NopInputConverter},
     state::{HasCurrentTestcase, HasSolutions, NopState},
     Error,
@@ -263,7 +263,6 @@ where
     where
         ICB: InputConverter<To = I, From = DI>,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
             Event::NewTestcase {
@@ -275,7 +274,8 @@ where
                     return Ok(());
                 };
 
-                let res = fuzzer.evaluate_input_with_observers(
+                let res = evaluate_input_with_observers(
+                    fuzzer,
                     state,
                     executor,
                     manager,
@@ -330,7 +330,6 @@ where
         ICB: InputConverter<To = I, From = DI>,
         DI: DeserializeOwned + Input,
         S: HasCurrentTestcase<I> + HasSolutions<I>,
-        Z: EvaluatorObservers<E, EM, I, S>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
