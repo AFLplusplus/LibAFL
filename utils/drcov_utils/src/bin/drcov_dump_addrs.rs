@@ -143,9 +143,18 @@ fn main() -> Result<(), Error> {
     }
 
     for input in &opts.inputs {
-        let drcovs = find_drcov_files(input);
+        let drcovs = if input.is_dir() {
+            find_drcov_files(input)
+        } else {
+            let mut files = vec![];
+            if let Some(ext) = input.extension() {
+                if ext == "drcov" {
+                    files.push(input.clone());
+                }
+            }
+            files
+        };
         for drcov_file in drcovs {
-            println!("file: {:#?}", drcov_file);
             let _ = process(&opts, &drcov_file);
         }
     }
