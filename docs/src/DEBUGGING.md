@@ -25,8 +25,11 @@ You should *never* use the `EDGES_MAP`'s size as this is just the size of the al
 ## Q. I still have problems with my fuzzer.
 Finally, if you really have no idea what is going on, run your fuzzer with logging enabled. (You can use `env_logger`, `SimpleStdoutLogger`, `SimpleStderrLogger` from `libafl_bolts`. `fuzzbench_text` has an example to show how to use it.) (Don't forget to enable stdout and stderr), and you can open an issue or ask us in Discord.
 
-## Q. My fuzzer died of ``Storing state in crashed fuzzer instance did not work''.
+## Q. My fuzzer died of `Storing state in crashed fuzzer instance did not work`.
 If the exit code is zero, then this is because either your harness exited or you are using fuzzer_loop_for and forgot to add `mgr.on_restart` at the end of the fuzzer. In the first case, you should patch your harness not to exit. (or use `utils/deexit`).
 
 ## Q. I can't leave the TUI screen
 Type `q` then you leave TUI.
+
+## Q. I see `QEMU internal SIGSEGV {code=MAPERR, addr=0x48}` and my QEMU fuzzer doesn't run.
+Are you running QEMU fuzzer on WSL? You have to enable vsyscall https://github.com/microsoft/WSL/issues/4694#issuecomment-556095344.
