@@ -174,6 +174,28 @@ impl<R: AsRef<str>> From<R> for AppendKernelCmd {
     }
 }
 
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone)]
+pub struct InitRD {
+    path: PathBuf,
+}
+
+#[cfg(feature = "systemmode")]
+impl Display for InitRD {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-initrd {}", self.path.to_str().unwrap())
+    }
+}
+
+#[cfg(feature = "systemmode")]
+impl<R: AsRef<Path>> From<R> for InitRD {
+    fn from(path: R) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LoadVM {
     path: PathBuf,
@@ -413,6 +435,9 @@ pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option, into))]
     append_kernel_cmd: Option<AppendKernelCmd>,
+    #[cfg(feature = "systemmode")]
+    #[builder(default, setter(strip_option, into))]
+    initrd: Option<InitRD>,
     #[cfg(feature = "usermode")]
     #[builder(setter(into))]
     program: Program,
