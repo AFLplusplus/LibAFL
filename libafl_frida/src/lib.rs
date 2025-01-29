@@ -61,7 +61,7 @@ pub mod pthread_hook;
 #[cfg(feature = "cmplog")]
 pub mod cmplog_rt;
 
-/// The `LibAFL` firda helper
+/// The `LibAFL` frida helper
 pub mod helper;
 
 pub mod drcov_rt;
@@ -71,6 +71,9 @@ pub mod executor;
 
 /// Utilities
 pub mod utils;
+
+/// The frida helper shutdown observer, needed to remove the instrumentation upon crashing
+pub mod frida_helper_shutdown_observer;
 
 // for parsing asan and cmplog cores
 
@@ -356,6 +359,7 @@ mod tests {
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
         helper::FridaInstrumentationHelper,
+        frida_helper_shutdown_observer::FridaHelperObserver,        
     };
     #[cfg(unix)]
     #[global_allocator]
@@ -457,6 +461,7 @@ mod tests {
             let mut feedback = ConstFeedback::new(true);
 
             let asan_obs = AsanErrorsObserver::from_static_asan_errors();
+            let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
@@ -481,6 +486,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
+                frida_helper_observer,
                 asan_obs //,
             );
 
