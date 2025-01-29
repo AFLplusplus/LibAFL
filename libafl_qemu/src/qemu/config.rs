@@ -152,6 +152,28 @@ impl<R: AsRef<Path>> From<R> for Kernel {
     }
 }
 
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone)]
+pub struct AppendKernelCmd {
+    cmdline: String,
+}
+
+#[cfg(feature = "systemmode")]
+impl Display for AppendKernelCmd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-append {}", self.cmdline)
+    }
+}
+
+#[cfg(feature = "systemmode")]
+impl<R: AsRef<str>> From<R> for AppendKernelCmd {
+    fn from(cmdline: R) -> Self {
+        Self {
+            cmdline: cmdline.as_ref().to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LoadVM {
     path: PathBuf,
@@ -388,6 +410,9 @@ pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option, into))]
     default_devices: Option<DefaultDevices>,
+    #[cfg(feature = "systemmode")]
+    #[builder(default, setter(strip_option, into))]
+    append_kernel_cmd: Option<AppendKernelCmd>,
     #[cfg(feature = "usermode")]
     #[builder(setter(into))]
     program: Program,
