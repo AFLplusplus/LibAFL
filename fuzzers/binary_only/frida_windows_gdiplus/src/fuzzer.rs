@@ -53,6 +53,7 @@ use libafl_frida::{
     helper::FridaInstrumentationHelper,
 };
 use libafl_targets::cmplog::CmpLogObserver;
+use std::{cell::RefCell, rc::Rc};
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
@@ -105,13 +106,14 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let coverage = CoverageRuntime::new();
                 let asan = AsanRuntime::new(options);
 
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
+                let frida_helper =
+                    Rc::new(RefCell::new(FridaInstrumentationHelper::new(                
+                        &gum, options, tuple_list!(coverage, asan))));
                 //
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -193,7 +195,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         &mut mgr,
                         options.timeout,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset
@@ -220,14 +222,14 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
-
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
+                let frida_helper =
+                    Rc::new(RefCell::new(FridaInstrumentationHelper::new(                
+                        &gum, options, tuple_list!(coverage, cmplog))));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -306,7 +308,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         &mut state,
                         &mut mgr,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset
@@ -350,13 +352,14 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 let coverage = CoverageRuntime::new();
 
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
+                let frida_helper =
+                    Rc::new(RefCell::new(FridaInstrumentationHelper::new(                
+                        &gum, options, tuple_list!(coverage))));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -437,7 +440,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         &mut mgr,
                         options.timeout,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset
