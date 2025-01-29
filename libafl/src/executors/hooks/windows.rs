@@ -132,7 +132,8 @@ pub mod windows_exception_handler {
 
     use crate::{
         corpus::Corpus,
-        events::{EventFirer, EventRestarter}, executors::{
+        events::{EventFirer, EventRestarter},
+        executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
             inprocess::{run_observers_and_save_state, HasInProcessHooks},
             Executor, ExitKind, HasObservers,
@@ -437,7 +438,7 @@ pub mod windows_exception_handler {
             if is_crash {
                 log::warn!("Running observers and exiting!");
                 // // I want to disable the hooks before doing anything, especially before taking a stack dump
-                let input = data.take_current_input::<<S::Corpus as Corpus>::Input>();                // log::set_max_level(log::LevelFilter::Trace);
+                let input = data.take_current_input::<<S::Corpus as Corpus>::Input>(); // log::set_max_level(log::LevelFilter::Trace);
                 run_observers_and_save_state::<E, EM, OF, S, Z>(
                     executor,
                     state,

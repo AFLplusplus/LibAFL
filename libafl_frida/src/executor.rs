@@ -120,7 +120,9 @@ where
                 abort();
             }
         }
-        self.helper.borrow_mut().post_exec(target_bytes.as_slice())?;
+        self.helper
+            .borrow_mut()
+            .post_exec(target_bytes.as_slice())?;
         res
     }
 }
@@ -251,7 +253,7 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b,  H, OT, RT, S, TC> HasInProcessHooks<S>
+impl<'a, 'b, H, OT, RT, S, TC> HasInProcessHooks<S>
     for FridaInProcessExecutor<'a, 'b, H, OT, RT, S, TC>
 where
     H: FnMut(&<S::Corpus as Corpus>::Input) -> ExitKind,

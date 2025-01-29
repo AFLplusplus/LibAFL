@@ -13,7 +13,7 @@ use std::{
     ptr::write_volatile,
     rc::Rc,
     sync::{Mutex, MutexGuard},
-    u64
+    u64,
 };
 
 use backtrace::Backtrace;
@@ -520,7 +520,7 @@ impl AsanRuntime {
     /// This will dereference at the address.
     pub unsafe fn poison(&mut self, address: usize, size: usize) {
         let start = self.allocator_mut().map_to_shadow(address);
-        if self.allocator_mut().valid_shadow(start, size){
+        if self.allocator_mut().valid_shadow(start, size) {
             Allocator::poison(start, size);
         }
     }

@@ -1,13 +1,13 @@
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use libafl::executors::ExitKind;
-use libafl::observers::Observer;
-use serde::Serialize;
-use serde::de::{self, Deserialize, Deserializer, Visitor, MapAccess};
-use libafl_bolts::{Error, Named};
 use libafl::inputs::HasTargetBytes;
+use libafl::observers::Observer;
+use libafl_bolts::{Error, Named};
+use serde::de::{self, Deserialize, Deserializer, MapAccess, Visitor};
+use serde::Serialize;
 use std::borrow::Cow;
-use std::fmt;
 use std::cell::RefCell;
+use std::fmt;
 use std::rc::Rc;
 
 #[allow(clippy::unsafe_derive_deserialize)]
@@ -22,18 +22,15 @@ pub struct FridaHelperObserver<'a, RT> {
 
 impl<'a, RT> FridaHelperObserver<'a, RT>
 where
-    RT: FridaRuntimeTuple + 'a
-    {
+    RT: FridaRuntimeTuple + 'a,
+{
     /// Creates a new [`FridaHelperObserver`] with the given name.
     #[must_use]
     pub fn new(
         // helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
-        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>
-        ) -> Self
-    {
-        Self {
-            helper,
-        }
+        helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
+    ) -> Self {
+        Self { helper }
     }
 }
 
@@ -44,12 +41,7 @@ where
     RT: FridaRuntimeTuple + 'a,
     I: HasTargetBytes,
 {
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        input: &I,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if *exit_kind == ExitKind::Crash {
             // Custom implementation logic for `FridaInProcessExecutor`
             log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
@@ -60,25 +52,25 @@ where
     }
 }
 
-impl<'a,  RT> Named for FridaHelperObserver<'a,  RT> {
+impl<'a, RT> Named for FridaHelperObserver<'a, RT> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("FridaHelperObserver");
         &NAME
     }
 }
 
-impl<'de, 'a, RT> Deserialize<'de> for FridaHelperObserver<'a,  RT> {
+impl<'de, 'a, RT> Deserialize<'de> for FridaHelperObserver<'a, RT> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct FridaHelperObserverVisitor<'a,  RT> {
+        struct FridaHelperObserverVisitor<'a, RT> {
             // marker: std::marker::PhantomData<&'b mut FridaInstrumentationHelper<'a, RT>>,
             marker: std::marker::PhantomData<&'a RT>,
         }
 
-        impl<'de, 'a, RT> Visitor<'de> for FridaHelperObserverVisitor<'a,  RT> {
-            type Value = FridaHelperObserver<'a,  RT>;
+        impl<'de, 'a, RT> Visitor<'de> for FridaHelperObserverVisitor<'a, RT> {
+            type Value = FridaHelperObserver<'a, RT>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a FridaHelperObserver struct")
@@ -89,7 +81,9 @@ impl<'de, 'a, RT> Deserialize<'de> for FridaHelperObserver<'a,  RT> {
                 M: MapAccess<'de>,
             {
                 // Construct the struct without deserializing `helper`
-                Err(de::Error::custom("Cannot deserialize `FridaHelperObserver` with a mutable reference"))
+                Err(de::Error::custom(
+                    "Cannot deserialize `FridaHelperObserver` with a mutable reference",
+                ))
             }
         }
 

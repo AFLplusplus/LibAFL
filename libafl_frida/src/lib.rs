@@ -347,7 +347,7 @@ mod tests {
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
     use std::{cell::RefCell, rc::Rc};
-    
+
     #[cfg(unix)]
     use mimalloc::MiMalloc;
 
@@ -358,8 +358,8 @@ mod tests {
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
+        frida_helper_shutdown_observer::FridaHelperObserver,
         helper::FridaInstrumentationHelper,
-        frida_helper_shutdown_observer::FridaHelperObserver,        
     };
     #[cfg(unix)]
     #[global_allocator]
@@ -519,7 +519,7 @@ mod tests {
                     )
                     .unwrap(),
                     // &mut frida_helper,
-                    Rc::clone(&frida_helper)
+                    Rc::clone(&frida_helper),
                 );
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
@@ -545,7 +545,9 @@ mod tests {
             }
         }
 
-        frida_helper.borrow_mut().deinit(GUM.get().expect("Gum uninitialized"));
+        frida_helper
+            .borrow_mut()
+            .deinit(GUM.get().expect("Gum uninitialized"));
     }
 
     #[test]

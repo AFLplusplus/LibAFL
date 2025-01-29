@@ -1134,10 +1134,8 @@ impl AsanRuntime {
     #[cfg(windows)]
     pub fn hook_UnmapViewOfFile(
         &mut self,
-        original: extern "C" fn(
-            ptr: *const c_void
-        ) -> bool,
-        ptr: *const c_void
+        original: extern "C" fn(ptr: *const c_void) -> bool,
+        ptr: *const c_void,
     ) -> bool {
         log::info!("hook_UnmapViewOfFile {:p}", ptr);
 
@@ -1169,12 +1167,10 @@ impl AsanRuntime {
             log::info!("Size of mapped memory: {} bytes", size);
         }
 
-        let ret = original(
-            ptr,
-        );
+        let ret = original(ptr);
 
         if size > 0 {
-            unsafe {self.poison(ptr as usize, size)};
+            unsafe { self.poison(ptr as usize, size) };
         }
 
         ret
