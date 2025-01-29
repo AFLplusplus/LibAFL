@@ -39,8 +39,6 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use super::{std_maybe_report_progress, std_report_progress, AwaitRestartSafe, SendExiting};
-#[cfg(feature = "share_objectives")]
-use crate::corpus::{Corpus, Testcase};
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -565,12 +563,7 @@ impl<EMH, I, S> Drop for TcpEventManager<EMH, I, S> {
 impl<EMH, I, S> TcpEventManager<EMH, I, S>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions
-        + HasMetadata
-        + HasImported
-        + HasSolutions<I>
-        + HasCurrentTestcase<I>
-        + Stoppable,
+    S: HasExecutions + HasMetadata + HasImported + Stoppable,
 {
     /// Write the client id for a client `EventManager` to env vars
     pub fn to_env(&self, env_name: &str) {
@@ -623,16 +616,14 @@ where
 
             #[cfg(feature = "share_objectives")]
             Event::Objective { input, .. } => {
-                log::debug!("Received new Objective");
-                let mut testcase = Testcase::from(input);
-                testcase.set_parent_id_optional(*state.corpus().current());
+                log::info!("Received new Objective");
 
-                if let Ok(mut tc) = state.current_testcase_mut() {
-                    tc.found_objective();
+                let res =
+                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?;
+                if let Some(item) = res.1 {
+                    *state.imported_mut() += 1;
+                    log::info!("Added received Testcase as item #{item}");
                 }
-
-                state.solutions_mut().add(testcase)?;
-                log::info!("Added received Objective to Corpus");
             }
             Event::Stop => {
                 state.request_stop();

@@ -753,6 +753,7 @@ pub fn trace_write_snapshot<ET, I, S, const SIZE: usize>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
@@ -768,6 +769,7 @@ pub fn trace_write_n_snapshot<ET, I, S>(
     emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
     size: usize,
 ) where
