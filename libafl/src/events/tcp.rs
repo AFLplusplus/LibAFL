@@ -48,7 +48,6 @@ use crate::{
     },
     inputs::Input,
     monitors::Monitor,
-    observers::ObserversTuple,
     stages::HasCurrentStageId,
     state::{
         HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,

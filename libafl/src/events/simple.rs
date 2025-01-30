@@ -287,7 +287,10 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     staterestorer: StateRestorer<SHM, SP>,
 }
 
-impl<I, MT, S, SHM, SP> RecordSerializationTime for SimpleEventManager<I, MT, S, SHM, SP> {}
+impl<I, MT, S, SHM, SP> RecordSerializationTime
+    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+{
+}
 
 #[cfg(feature = "std")]
 impl<I, MT, S, SHM, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>

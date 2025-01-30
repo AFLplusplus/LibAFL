@@ -90,7 +90,6 @@ impl CentralizedEventManagerBuilder {
     }
 
     /// Creates a new [`CentralizedEventManager`].
-    #[expect(clippy::type_complexity)]
     pub fn build_from_client<EM, I, S, SP>(
         self,
         inner: EM,
@@ -469,8 +468,6 @@ where
                     client_config,
                     ref observers_buf,
                     forward_id,
-                    #[cfg(feature = "multi_machine")]
-                    node_id,
                     ..
                 } => {
                     log::debug!(
