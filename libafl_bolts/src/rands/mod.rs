@@ -371,7 +371,7 @@ impl Rand for Lehmer64Rand {
     #[inline]
     #[expect(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
-        self.s *= 0xda942042e4dd58b5;
+        self.s = self.s.wrapping_mul(0xda942042e4dd58b5);
         (self.s >> 64) as u64
     }
 }
