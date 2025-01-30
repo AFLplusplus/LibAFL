@@ -31,9 +31,9 @@ use crate::{
     common::HasMetadata,
     events::{
         serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
-        AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer,
-        EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
-        LogSeverity, ProgressReporter, SendExiting,
+        AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer, EventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
+        SendExiting,
     },
     inputs::Input,
     observers::TimeObserver,
@@ -45,19 +45,18 @@ pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]
-pub struct CentralizedEventManager<EM, EMH, I, S, SHM, SP> {
+pub struct CentralizedEventManager<EM, I, S, SHM, SP> {
     inner: EM,
     /// The centralized LLMP client for inter process communication
     client: LlmpClient<SHM, SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     time_ref: Option<Handle<TimeObserver>>,
-    hooks: EMH,
     is_main: bool,
     phantom: PhantomData<(I, S)>,
 }
 
-impl CentralizedEventManager<(), (), (), (), (), ()> {
+impl CentralizedEventManager<(), (), (), (), ()> {
     /// Creates a builder for [`CentralizedEventManager`]
     #[must_use]
     pub fn builder() -> CentralizedEventManagerBuilder {
@@ -92,19 +91,17 @@ impl CentralizedEventManagerBuilder {
 
     /// Creates a new [`CentralizedEventManager`].
     #[expect(clippy::type_complexity)]
-    pub fn build_from_client<EM, EMH, I, S, SP>(
+    pub fn build_from_client<EM, I, S, SP>(
         self,
         inner: EM,
-        hooks: EMH,
         client: LlmpClient<SP::ShMem, SP>,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SP::ShMem, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, I, S, SP::ShMem, SP>, Error>
     where
         SP: ShMemProvider,
     {
         Ok(CentralizedEventManager {
             inner,
-            hooks,
             client,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::with_threshold(COMPRESS_THRESHOLD),
@@ -118,60 +115,56 @@ impl CentralizedEventManagerBuilder {
     ///
     /// If the port is not yet bound, it will act as a broker; otherwise, it
     /// will act as a client.
-    pub fn build_on_port<EM, EMH, I, S, SHM, SP>(
+    pub fn build_on_port<EM, I, S, SHM, SP>(
         self,
         inner: EM,
-        hooks: EMH,
         shmem_provider: SP,
         port: u16,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::create_attach_to_tcp(shmem_provider, port)?;
-        Self::build_from_client(self, inner, hooks, client, time_obs)
+        Self::build_from_client(self, inner, client, time_obs)
     }
 
     /// If a client respawns, it may reuse the existing connection, previously
     /// stored by [`LlmpClient::to_env()`].
-    pub fn build_existing_client_from_env<EM, EMH, I, S, SHM, SP>(
+    pub fn build_existing_client_from_env<EM, I, S, SHM, SP>(
         self,
         inner: EM,
-        hooks: EMH,
         shmem_provider: SP,
         env_name: &str,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::on_existing_from_env(shmem_provider, env_name)?;
-        Self::build_from_client(self, inner, hooks, client, time_obs)
+        Self::build_from_client(self, inner, client, time_obs)
     }
 
     /// Create an existing client from description
-    pub fn existing_client_from_description<EM, EMH, I, S, SHM, SP>(
+    pub fn existing_client_from_description<EM, I, S, SHM, SP>(
         self,
         inner: EM,
-        hooks: EMH,
         shmem_provider: SP,
         description: &LlmpClientDescription,
         time_obs: Option<Handle<TimeObserver>>,
-    ) -> Result<CentralizedEventManager<EM, EMH, I, S, SHM, SP>, Error>
+    ) -> Result<CentralizedEventManager<EM, I, S, SHM, SP>, Error>
     where
         SHM: ShMem,
         SP: ShMemProvider<ShMem = SHM>,
     {
         let client = LlmpClient::existing_client_from_description(shmem_provider, description)?;
-        Self::build_from_client(self, inner, hooks, client, time_obs)
+        Self::build_from_client(self, inner, client, time_obs)
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> RecordSerializationTime
-    for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> RecordSerializationTime for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: RecordSerializationTime,
 {
@@ -181,7 +174,7 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> AdaptiveSerializer for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> AdaptiveSerializer for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: AdaptiveSerializer,
 {
@@ -216,10 +209,9 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> EventFirer<I, S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> EventFirer<I, S> for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: HasEventManagerId + EventFirer<I, S>,
-    EMH: EventManagerHooksTuple<I, S>,
     S: Stoppable,
     I: Input,
     SHM: ShMem,
@@ -274,7 +266,7 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> EventRestarter<S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> EventRestarter<S> for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: EventRestarter<S>,
     SHM: ShMem,
@@ -288,8 +280,7 @@ where
     }
 }
 
-impl<EM, EMH, I, OT, S, SHM, SP> CanSerializeObserver<OT>
-    for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, OT, S, SHM, SP> CanSerializeObserver<OT> for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: AdaptiveSerializer,
     OT: MatchNameRef + Serialize,
@@ -304,7 +295,7 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> SendExiting for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> SendExiting for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: SendExiting,
     SHM: ShMem,
@@ -321,7 +312,7 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> AwaitRestartSafe for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> AwaitRestartSafe for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     SHM: ShMem,
     EM: AwaitRestartSafe,
@@ -333,11 +324,9 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> EventProcessor<I, S>
-    for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> EventProcessor<I, S> for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: EventProcessor<I, S> + HasEventManagerId + EventFirer<I, S>,
-    EMH: EventManagerHooksTuple<I, S>,
     I: Input,
     S: Stoppable,
     SHM: ShMem,
@@ -359,10 +348,9 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> ProgressReporter<S> for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: EventFirer<I, S> + HasEventManagerId,
-    EMH: EventManagerHooksTuple<I, S>,
     I: Input,
     S: HasExecutions + HasMetadata + HasLastReportTime + Stoppable + MaybeHasClientPerfMonitor,
     SHM: ShMem,
@@ -381,7 +369,7 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> HasEventManagerId for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> HasEventManagerId for CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: HasEventManagerId,
 {
@@ -390,7 +378,7 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> CentralizedEventManager<EM, I, S, SHM, SP>
 where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
@@ -412,10 +400,9 @@ where
     }
 }
 
-impl<EM, EMH, I, S, SHM, SP> CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> CentralizedEventManager<EM, I, S, SHM, SP>
 where
     EM: HasEventManagerId + EventFirer<I, S>,
-    EMH: EventManagerHooksTuple<I, S>,
     I: Input,
     S: Stoppable,
     SHM: ShMem,

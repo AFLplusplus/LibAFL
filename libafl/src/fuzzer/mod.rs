@@ -833,12 +833,11 @@ where
                 *state.imported_mut() += 1;
                 log::debug!("Added received input as item #{item}");
 
+                // for centralize
                 manager.post_receive(state, event)?;
             } else {
                 log::debug!("Received input was discarded");
             }
-
-            // for centralize
         }
 
         // Mark the elapsed time for the manager

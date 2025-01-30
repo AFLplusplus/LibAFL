@@ -602,7 +602,9 @@ pub trait EventProcessor<I, S> {
     /// Return the vector that needs to be evaluated
     fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error>;
 
-    fn post_receive(&mut self, state: &mut S, event_vec: Event<I>) -> Result<(), Error>;
+    /// Run the post processing routine after the fuzzer deemed this event as interesting
+    /// For example, in centralized manager you wanna send this an event.
+    fn post_receive(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -833,6 +835,7 @@ where
     }
 }
 
+/// Record the deserialization time for this event manager
 pub trait RecordSerializationTime {
     /// Set the deserialization time (mut)
     fn set_deserialization_time(&mut self, _dur: Duration) {}
