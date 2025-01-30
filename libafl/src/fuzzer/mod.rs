@@ -820,6 +820,7 @@ where
                         )?;
                         res.1
                     }
+                    #[cfg(feature = "share_objectives")]
                     Event::Objective { ref input, .. } => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
