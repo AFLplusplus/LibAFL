@@ -47,8 +47,6 @@ use libafl_bolts::{
 use serde::{de::DeserializeOwned, Serialize};
 use typed_builder::TypedBuilder;
 
-#[cfg(feature = "share_objectives")]
-use crate::corpus::{Corpus, Testcase};
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
 #[cfg(all(unix, not(miri)))]
@@ -575,7 +573,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        S: HasImported + HasSolutions<I> + HasCurrentTestcase<I> + Stoppable,
+        S: HasImported + Stoppable,
         EMH: EventManagerHooksTuple<I, S>,
         I: Input,
         E: HasObservers,
@@ -623,16 +621,17 @@ where
 
             #[cfg(feature = "share_objectives")]
             Event::Objective { input, .. } => {
-                log::debug!("Received new Objective");
-                let mut testcase = Testcase::from(input);
-                testcase.set_parent_id_optional(*state.corpus().current());
+                #[cfg(feature = "std")]
+                log::debug!("[{}] Received new Objective", std::process::id());
 
-                if let Ok(mut tc) = state.current_testcase_mut() {
-                    tc.found_objective();
+                let res =
+                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?;
+                if let Some(item) = res.1 {
+                    *state.imported_mut() += 1;
+                    log::debug!("Added received Objective {evt_name} as item #{item}");
+                } else {
+                    log::debug!("Objective {evt_name} was discarded");
                 }
-
-                state.solutions_mut().add(testcase)?;
-                log::info!("Added received Objective to Corpus");
             }
             Event::Stop => {
                 state.request_stop();
