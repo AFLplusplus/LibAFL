@@ -1013,6 +1013,8 @@ impl Default for NopFuzzer {
     }
 }
 
+impl RecordSerializationTime for NopFuzzer {}
+
 impl<E, EM, I, S, ST> Fuzzer<E, EM, I, S, ST> for NopFuzzer
 where
     EM: ProgressReporter<S>,
