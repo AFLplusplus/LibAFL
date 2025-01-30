@@ -26,7 +26,4 @@ where
         }
         Ok(true)
     }
-    fn post_exec(&mut self, _state: &mut S, _client_id: ClientId) -> Result<bool, Error> {
-        Ok(true)
-    }
 }
