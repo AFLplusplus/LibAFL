@@ -901,6 +901,6 @@ mod tests {
                 assert_eq!("test", o.0.name());
             }
             _ => panic!("mistmatch"),
-        };
+        }
     }
 }

@@ -40,7 +40,7 @@ pub enum OptionsParseError<'a> {
     OptionValueParseFailed(&'a str, &'a str),
 }
 
-impl<'a> Display for OptionsParseError<'a> {
+impl Display for OptionsParseError<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             OptionsParseError::MultipleModesSelected => {

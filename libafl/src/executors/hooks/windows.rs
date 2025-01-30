@@ -358,7 +358,7 @@ pub mod windows_exception_handler {
             }
         } else {
             log::error!("Crashed without exception (probably due to SIGABRT)");
-        };
+        }
 
         if data.current_input_ptr.is_null() {
             {

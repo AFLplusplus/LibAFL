@@ -858,7 +858,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
     match std::fs::read_to_string("/proc/self/maps") {
         Ok(maps) => writer.write_all(maps.as_bytes())?,
         Err(e) => writeln!(writer, "Couldn't load mappings: {e:?}")?,
-    };
+    }
 
     Ok(())
 }
