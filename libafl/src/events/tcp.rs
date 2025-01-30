@@ -738,10 +738,10 @@ where
 
                         let buf = &buf[4..];
                         #[cfg(feature = "tcp_compression")]
-                        let buf = self.compressor.decompress(buf)?;
+                        let buf = &self.compressor.decompress(buf)?;
 
                         // make decompressed vec and slice compatible
-                        let event = postcard::from_bytes(&buf)?;
+                        let event = postcard::from_bytes(buf)?;
 
                         self.handle_in_client(fuzzer, executor, state, other_client_id, event)?;
                         count += 1;

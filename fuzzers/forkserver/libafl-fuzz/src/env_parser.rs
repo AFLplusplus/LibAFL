@@ -40,7 +40,7 @@ pub fn parse_envs(opt: &mut Opt) -> Result<(), Error> {
     if let Ok(res) = std::env::var("AFL_MAP_SIZE") {
         let map_size = validate_map_size(res.parse()?)?;
         opt.map_size = Some(map_size);
-    };
+    }
     if let Ok(res) = std::env::var("AFL_IGNORE_TIMEOUT") {
         opt.ignore_timeouts = parse_bool(&res)?;
     }

@@ -268,7 +268,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
         let size = input.codes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
-        };
+        }
 
         // # Safety
         // it's larger than 1

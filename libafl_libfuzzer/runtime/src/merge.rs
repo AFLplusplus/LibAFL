@@ -97,7 +97,7 @@ pub fn merge(
         }
     }
 
-    let edges = unsafe { core::mem::take(&mut *&raw mut COUNTERS_MAPS) };
+    let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");
@@ -236,7 +236,6 @@ pub fn merge(
                     .on_remove(&mut state, id, &Some(testcase))?;
             } else {
                 // False-positive: file_path is used just below
-                #[expect(clippy::needless_borrows_for_generic_args)]
                 rename(&file_path, &new_file_path)?;
                 *file_path = new_file_path;
             }

@@ -282,12 +282,12 @@ impl IntelPT {
             return Err(Error::unknown(
                 "Intel PT: aux buffer head is behind aux tail.",
             ));
-        };
+        }
         if self.previous_decode_head < tail {
             return Err(Error::unknown(
                 "Intel PT: aux previous head is behind aux tail.",
             ));
-        };
+        }
         let len = (head - tail) as usize;
         if len >= self.perf_aux_buffer_size {
             log::warn!(
@@ -350,7 +350,7 @@ impl IntelPT {
                     }
                     break 'sync;
                 }
-            };
+            }
         }
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
@@ -398,7 +398,7 @@ impl IntelPT {
                         log::trace!("PT error in event {e:?}");
                         break 'block;
                     }
-                };
+                }
             }
 
             match decoder.next() {
@@ -432,6 +432,7 @@ impl IntelPT {
 
     /// Get the raw trace used in the last decoding
     #[cfg(feature = "export_raw")]
+    #[must_use]
     pub fn last_decode_trace(&self) -> Vec<u8> {
         self.last_decode_trace.clone()
     }
@@ -784,7 +785,7 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
                     "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
                 )),
             }
-        };
+        }
     }
     #[cfg(not(target_os = "linux"))]
     reasons.push("Only linux hosts are supported at the moment".to_owned());
@@ -854,7 +855,7 @@ fn availability_in_linux() -> Result<(), String> {
             }
         }
         Err(e) => reasons.push(format!("Failed to read linux capabilities: {e}")),
-    };
+    }
 
     if reasons.is_empty() {
         Ok(())

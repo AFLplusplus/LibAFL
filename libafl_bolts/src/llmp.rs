@@ -1174,7 +1174,7 @@ where
     pub fn alloc_next(&mut self, buf_len: usize) -> Result<*mut LlmpMsg, Error> {
         if let Some(msg) = unsafe { self.alloc_next_if_space(buf_len) } {
             return Ok(msg);
-        };
+        }
 
         /* no more space left! We'll have to start a new page */
         unsafe {
@@ -1767,7 +1767,7 @@ where
 
             // Store the last msg for next time
             self.last_msg_recvd = msg;
-        };
+        }
         Ok(ret)
     }
 
@@ -2745,7 +2745,7 @@ where
                                 "Error adding client! PANIC! {e:?}"
                             )));
                         }
-                    };
+                    }
                 }
                 // handle all other messages
                 _ => {
@@ -2957,7 +2957,7 @@ where
                     "Unexpected response from B2B server received.".to_string(),
                 ))
             }
-        };
+        }
 
         let hostname = hostname::get()
             .unwrap_or_else(|_| "<unknown>".into())
@@ -3282,7 +3282,7 @@ where
                 match Self::announce_new_client(sender, shmem_description) {
                     Ok(()) => (),
                     Err(e) => log::info!("Error forwarding client on map: {e:?}"),
-                };
+                }
 
                 if let Err(e) = send_tcp_msg(
                     &mut stream,
@@ -3291,7 +3291,7 @@ where
                     },
                 ) {
                     log::info!("An error occurred sending via tcp {e}");
-                };
+                }
                 current_client_id.0 += 1;
             }
             TcpRequest::RemoteBrokerHello { hostname } => {
@@ -3315,11 +3315,11 @@ where
                 {
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
                         log::info!("B2B: Error announcing client {shmem_description:?}");
-                    };
+                    }
                     current_client_id.0 += 1;
                 }
             }
-        };
+        }
     }
 
     #[cfg(feature = "std")]
@@ -3417,7 +3417,7 @@ where
                         );
                     }
                     ListenerStream::Empty() => {}
-                };
+                }
             }
         });
 

@@ -543,7 +543,7 @@ impl Qemu {
                     .expect("Could not set QEMU Config.");
             }
             QemuParams::Cli(_) => {}
-        };
+        }
 
         let args = params.to_cli();
 
@@ -1049,7 +1049,7 @@ impl QemuMemoryChunk {
                     .unwrap()
                     .read_mem_unchecked(vaddr.try_into().unwrap(), output_sliced);
             },
-        };
+        }
 
         Ok(output_sliced.len().try_into().unwrap())
     }
@@ -1095,7 +1095,7 @@ impl QemuMemoryChunk {
                     .unwrap()
                     .write_mem(vaddr.try_into().unwrap(), input_sliced)?;
             }
-        };
+        }
 
         Ok(input_sliced.len().try_into().unwrap())
     }
