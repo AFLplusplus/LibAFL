@@ -97,7 +97,7 @@ fn find_llvm_config() -> Result<String, String> {
         Err(err) => {
             println!("cargo:warning={err}");
         }
-    };
+    }
 
     #[cfg(any(target_os = "solaris", target_os = "illumos"))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
