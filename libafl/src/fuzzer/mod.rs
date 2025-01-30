@@ -8,7 +8,7 @@ use std::hash::Hash;
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
 use libafl_bolts::{current_time, tuples::MatchName};
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
@@ -16,6 +16,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
         CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+        SendExiting,
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -27,7 +28,7 @@ use crate::{
     start_timer,
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
-        HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+        HasSolutions, MaybeHasClientPerfMonitor, Stoppable, HasImported,
     },
     Error, HasMetadata,
 };
@@ -727,11 +728,20 @@ where
 impl<CS, E, EM, F, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
-    EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
+    E: HasObservers + Executor<EM, I, S, Self>,
+    E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
+    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S>,
+    I: Input,
+    F: Feedback<EM, I, E::Observers, S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    EM: ProgressReporter<S> + SendExiting + EventProcessor<I, S>,
     S: HasExecutions
         + HasMetadata
         + HasCorpus<I>
+        + HasSolutions<I>
         + HasLastReportTime
+        + HasLastFoundTime
+        + HasImported
         + HasTestcase<I>
         + HasCurrentCorpusId
         + HasCurrentStageId
@@ -775,7 +785,61 @@ where
         state.introspection_monitor_mut().start_timer();
 
         // Execute the manager
-        manager.process(self, state, executor)?;
+        let events_received = manager.receive(state)?;
+        // todo make this into a trait
+        for (event, with_observers) in events_received {
+            // at this point event is either newtestcase or objectives
+            let res = if with_observers {
+                match event {
+                    Event::NewTestcase {
+                        input,
+                        observers_buf,
+                        exit_kind,
+                        ..
+                    } => {
+                        let start = current_time();
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                        {
+                            // fix this
+                            // self.deserialization_time = current_time() - start;
+                        }
+                        let res = self.evaluate_execution(
+                            state, manager, input, &observers, &exit_kind, false,
+                        )?;
+                        res.1
+                    }
+                    _ => None,
+                }
+            } else {
+                match event {
+                    Event::NewTestcase { input, .. } => {
+                        let res = self.evaluate_input_with_observers(
+                            state, executor, manager, input, false,
+                        )?;
+                        res.1
+                    }
+                    Event::Objective {
+                        input,
+                        ..
+                    } => {
+                        let res = self.evaluate_input_with_observers(
+                            state, executor, manager, input, false,
+                        )?;
+                        res.1
+                    }
+                    _ => None,
+                }
+            };
+            if let Some(item) = res {
+                *state.imported_mut() += 1;
+                log::debug!("Added received Objective as item #{item}");
+            } else {
+                log::debug!("Objective was discarded");
+            }
+
+            // for centralize
+        }
 
         // Mark the elapsed time for the manager
         #[cfg(feature = "introspection")]
@@ -951,7 +1015,7 @@ impl Default for NopFuzzer {
 
 impl<E, EM, I, S, ST> Fuzzer<E, EM, I, S, ST> for NopFuzzer
 where
-    EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
+    EM: ProgressReporter<S>,
     ST: StagesTuple<E, EM, S, Self>,
     S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId,
 {

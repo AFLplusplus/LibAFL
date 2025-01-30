@@ -22,7 +22,7 @@ use libafl_bolts::{
     tuples::{Handle, MatchNameRef},
     ClientId,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 use super::AwaitRestartSafe;
 #[cfg(feature = "llmp_compression")]
@@ -35,8 +35,6 @@ use crate::{
         EventManagerHooksTuple, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
         LogSeverity, ProgressReporter, SendExiting,
     },
-    executors::HasObservers,
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
     observers::TimeObserver,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
@@ -305,6 +303,12 @@ where
         self.client.sender_mut().send_exiting()?;
         self.inner.send_exiting()
     }
+
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.on_shutdown()?;
+        self.client.sender_mut().send_exiting()
+    }
 }
 
 impl<EM, EMH, I, S, SHM, SP> AwaitRestartSafe for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
@@ -319,34 +323,27 @@ where
     }
 }
 
-impl<E, EM, EMH, I, S, SHM, SP, Z> EventProcessor<E, S, Z>
+impl<EM, EMH, I, S, SHM, SP> EventProcessor<I, S>
     for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
-    E: HasObservers,
-    E::Observers: DeserializeOwned,
-    EM: EventProcessor<E, S, Z> + HasEventManagerId + EventFirer<I, S>,
+    EM: EventProcessor<I, S> + HasEventManagerId + EventFirer<I, S>,
     EMH: EventManagerHooksTuple<I, S>,
     I: Input,
     S: Stoppable,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
         if self.is_main {
             // main node
-            self.receive_from_secondary(fuzzer, state, executor)
+            self.receive_from_secondary(state)
             // self.inner.process(fuzzer, state, executor)
         } else {
             // The main node does not process incoming events from the broker ATM
-            self.inner.process(fuzzer, state, executor)
+            self.inner.receive(state)
         }
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.inner.on_shutdown()?;
-        self.client.sender_mut().send_exiting()
-    }
 }
 
 impl<EM, EMH, I, S, SHM, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
@@ -438,20 +435,11 @@ where
         Ok(())
     }
 
-    fn receive_from_secondary<E, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        executor: &mut E,
-    ) -> Result<usize, Error>
-    where
-        E: HasObservers,
-        E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
+    fn receive_from_secondary(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error>
     {
         // TODO: Get around local event copy by moving handle_in_client
+        let mut event_vec = vec![];
         let self_id = self.client.sender().id();
-        let mut count = 0;
         while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
             assert!(
                 tag == _LLMP_TAG_TO_MAIN,
@@ -474,116 +462,52 @@ where
             };
             let event: Event<I> = postcard::from_bytes(event_bytes)?;
             log::debug!("Processor received message {}", event.name_detailed());
-            self.handle_in_main(fuzzer, executor, state, client_id, event)?;
-            count += 1;
-        }
-        Ok(count)
-    }
 
-    // Handle arriving events in the main node
-    fn handle_in_main<E, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        client_id: ClientId,
-        event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        E: HasObservers,
-        E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
-    {
-        log::debug!("handle_in_main!");
+            let event_name = event.name_detailed();
 
-        let event_name = event.name_detailed();
+            match event {
+                Event::NewTestcase {
+                    client_config,
+                    ref observers_buf,
+                    forward_id,
+                    #[cfg(feature = "multi_machine")]
+                    node_id,
+                    ..
+                } => {
+                    log::debug!(
+                        "Received {} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
+                        event_name
+                    );
 
-        match event {
-            Event::NewTestcase {
-                input,
-                client_config,
-                exit_kind,
-                corpus_size,
-                observers_buf,
-                time,
-                forward_id,
-                #[cfg(feature = "multi_machine")]
-                node_id,
-            } => {
-                log::debug!(
-                    "Received {} from {client_id:?} ({client_config:?}, forward {forward_id:?})",
-                    event_name
-                );
-
-                let res =
-                    if client_config.match_with(&self.configuration()) && observers_buf.is_some() {
-                        let observers: E::Observers =
-                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                    if client_config.match_with(&self.configuration())
+                        && observers_buf.is_some()
+                    {
                         log::debug!(
                             "[{}] Running fuzzer with event {}",
                             process::id(),
                             event_name
                         );
-                        fuzzer.evaluate_execution(
-                            state,
-                            self,
-                            input.clone(),
-                            &observers,
-                            &exit_kind,
-                            false,
-                        )?
+                        event_vec.push((event, true));
                     } else {
                         log::debug!(
                             "[{}] Running fuzzer with event {}",
                             process::id(),
                             event_name
                         );
-                        fuzzer.evaluate_input_with_observers(
-                            state,
-                            executor,
-                            self,
-                            input.clone(),
-                            false,
-                        )?
-                    };
-
-                if let Some(item) = res.1 {
-                    let event = Event::NewTestcase {
-                        input,
-                        client_config,
-                        exit_kind,
-                        corpus_size,
-                        observers_buf,
-                        time,
-                        forward_id,
-                        #[cfg(feature = "multi_machine")]
-                        node_id,
-                    };
-
-                    self.hooks.on_fire_all(state, client_id, &event)?;
-
-                    log::debug!(
-                        "[{}] Adding received Testcase {} as item #{item}...",
-                        process::id(),
-                        event_name
-                    );
-
-                    self.inner.fire(state, event)?;
-                } else {
-                    log::debug!("[{}] {} was discarded...)", process::id(), event_name);
+                        event_vec.push((event, false));
+                    }
+                }
+                Event::Stop => {
+                    state.request_stop();
+                }
+                _ => {
+                    return Err(Error::unknown(format!(
+                        "Received illegal message that message should not have arrived: {:?}.",
+                        event.name()
+                    )));
                 }
             }
-            Event::Stop => {
-                state.request_stop();
-            }
-            _ => {
-                return Err(Error::unknown(format!(
-                    "Received illegal message that message should not have arrived: {:?}.",
-                    event.name()
-                )));
-            }
         }
-
-        Ok(())
+        Ok(event_vec)
     }
 }

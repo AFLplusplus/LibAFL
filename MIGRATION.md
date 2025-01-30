@@ -1,3 +1,6 @@
+# 0.15.0 -> ????
+- `EventManager` is refactored to avoid calling function from `Fuzzer`, thus we do not evaluate testcases in `EventManager` anymore.
+  - Related: `EventProcessor` will have only 1 function `receive()`, it will only receive testcases but not evaluate testcases.
 
 # 0.14.1 -> 0.15.0
 - `MmapShMem::new` and `MmapShMemProvider::new_shmem_with_id` now take `AsRef<Path>` instead of a byte array for the filename/id.

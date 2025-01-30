@@ -585,6 +585,9 @@ pub trait SendExiting {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error>;
+
+    /// Shutdown gracefully; typically without saving state.
+    fn on_shutdown(&mut self) -> Result<(), Error>;
 }
 
 /// Wait until it's safe to restart
@@ -594,13 +597,11 @@ pub trait AwaitRestartSafe {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, S, Z> {
+pub trait EventProcessor<I, S> {
     /// Lookup for incoming events and process them.
-    /// Return the number of processes events or an error
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
+    /// Return the vector that needs to be evaluated
+    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error>;
 
-    /// Shutdown gracefully; typically without saving state.
-    fn on_shutdown(&mut self) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -648,6 +649,10 @@ impl SendExiting for NopEventManager {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl AwaitRestartSafe for NopEventManager {
@@ -655,19 +660,14 @@ impl AwaitRestartSafe for NopEventManager {
     fn await_restart_safe(&mut self) {}
 }
 
-impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
-    fn process(
+impl<I, S> EventProcessor<I, S> for NopEventManager {
+    fn receive(
         &mut self,
-        _fuzzer: &mut Z,
         _state: &mut S,
-        _executor: &mut E,
-    ) -> Result<usize, Error> {
-        Ok(0)
+    ) -> Result<Vec<(Event<I>, bool)>, Error> {
+        Ok(Vec::new())
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
 }
 
 impl<OT> CanSerializeObserver<OT> for NopEventManager
@@ -774,6 +774,10 @@ where
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.inner.send_exiting()
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.on_shutdown()
+    }
 }
 
 impl<EM, M> AwaitRestartSafe for MonitorTypedEventManager<EM, M>
@@ -786,17 +790,13 @@ where
     }
 }
 
-impl<E, EM, M, S, Z> EventProcessor<E, S, Z> for MonitorTypedEventManager<EM, M>
+impl<EM, I, M, S> EventProcessor<I, S> for MonitorTypedEventManager<EM, M>
 where
-    EM: EventProcessor<E, S, Z>,
+    EM: EventProcessor<I, S>,
 {
     #[inline]
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        self.inner.process(fuzzer, state, executor)
-    }
-
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.inner.on_shutdown()
+    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+        self.inner.receive(state)
     }
 }
 

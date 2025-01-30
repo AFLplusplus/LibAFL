@@ -37,7 +37,6 @@ use libafl_bolts::{
     shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
     staterestore::StateRestorer,
     tuples::{tuple_list, Handle, MatchNameRef},
-    ClientId,
 };
 #[cfg(feature = "std")]
 use libafl_bolts::{
@@ -60,8 +59,6 @@ use crate::{
         EventRestarter, HasEventManagerId, LlmpShouldSaveState, ProgressReporter, SendExiting,
         StdLlmpEventHook, LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER,
     },
-    executors::HasObservers,
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
     monitors::Monitor,
     observers::TimeObserver,
@@ -286,6 +283,10 @@ where
         // This way, the broker can clean up the pages, and eventually exit.
         self.llmp.sender_mut().send_exiting()
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 impl<EMH, I, S, SHM, SP> AwaitRestartSafe for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
@@ -300,68 +301,93 @@ where
     }
 }
 
-impl<E, EMH, I, S, SHM, SP, Z> EventProcessor<E, S, Z>
-    for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> EventProcessor<I, S> for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    E: HasObservers,
-    E::Observers: DeserializeOwned,
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned + Input,
     S: HasImported + HasCurrentTestcase<I> + HasSolutions<I> + Stoppable + Serialize,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        let res = {
-            // TODO: Get around local event copy by moving handle_in_client
-            let self_id = self.llmp.sender().id();
-            let mut count = 0;
-            while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
-                assert_ne!(
-                    tag, _LLMP_TAG_EVENT_TO_BROKER,
-                    "EVENT_TO_BROKER parcel should not have arrived in the client!"
-                );
+    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+        let mut event_vec = vec![];
+        // TODO: Get around local event copy by moving handle_in_client
+        let self_id = self.llmp.sender().id();
+        while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
+            assert_ne!(
+                tag, _LLMP_TAG_EVENT_TO_BROKER,
+                "EVENT_TO_BROKER parcel should not have arrived in the client!"
+            );
 
-                if client_id == self_id {
-                    continue;
-                }
-
-                #[cfg(not(feature = "llmp_compression"))]
-                let event_bytes = msg;
-                #[cfg(feature = "llmp_compression")]
-                let compressed;
-                #[cfg(feature = "llmp_compression")]
-                let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-                    compressed = self.compressor.decompress(msg)?;
-                    &compressed
-                } else {
-                    msg
-                };
-
-                let event: Event<I> = postcard::from_bytes(event_bytes)?;
-                log::debug!("Received event in normal llmp {}", event.name_detailed());
-
-                // If the message comes from another machine, do not
-                // consider other events than new testcase.
-                if !event.is_new_testcase() && (flags & LLMP_FLAG_FROM_MM == LLMP_FLAG_FROM_MM) {
-                    continue;
-                }
-
-                self.handle_in_client(fuzzer, executor, state, client_id, event)?;
-                count += 1;
+            if client_id == self_id {
+                continue;
             }
-            count
-        };
-        if self.staterestorer.is_some() {
-            self.intermediate_save()?;
+
+            #[cfg(not(feature = "llmp_compression"))]
+            let event_bytes = msg;
+            #[cfg(feature = "llmp_compression")]
+            let compressed;
+            #[cfg(feature = "llmp_compression")]
+            let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
+                compressed = self.compressor.decompress(msg)?;
+                &compressed
+            } else {
+                msg
+            };
+
+            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            log::debug!("Received event in normal llmp {}", event.name_detailed());
+
+            // If the message comes from another machine, do not
+            // consider other events than new testcase.
+            if !event.is_new_testcase() && (flags & LLMP_FLAG_FROM_MM == LLMP_FLAG_FROM_MM) {
+                continue;
+            }
+
+            log::trace!("Got event in client: {} from {client_id:?}", event.name());
+            if !self.hooks.pre_exec_all(state, client_id, &event)? {
+                return Ok(Vec::new());
+            }
+            let evt_name = event.name_detailed();
+            match event {
+                Event::NewTestcase {
+                    client_config,
+                    ref observers_buf,
+                    #[cfg(feature = "std")]
+                    forward_id,
+                    ..
+                } => {
+                    #[cfg(feature = "std")]
+                    log::debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
+
+                    if client_config.match_with(&self.configuration) && observers_buf.is_some() {
+                        event_vec.push((event, true));
+                    } else {
+                        event_vec.push((event, false));
+                    }
+                }
+
+                #[cfg(feature = "share_objectives")]
+                Event::Objective { .. } => {
+                    #[cfg(feature = "std")]
+                    log::debug!("[{}] Received new Objective", std::process::id());
+
+                    event_vec.push((event, false));
+                }
+                Event::Stop => {
+                    state.request_stop();
+                }
+                _ => {
+                    return Err(Error::unknown(format!(
+                        "Received illegal message that message should not have arrived: {:?}.",
+                        event.name()
+                    )));
+                }
+            }
         }
-        Ok(res)
+        Ok(event_vec)
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
-    }
 }
 
 impl<EMH, I, S, SHM, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
@@ -560,91 +586,6 @@ where
             sr.reset();
         }
 
-        Ok(())
-    }
-
-    // Handle arriving events in the client
-    fn handle_in_client<E, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        client_id: ClientId,
-        event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        S: HasImported + Stoppable,
-        EMH: EventManagerHooksTuple<I, S>,
-        I: Input,
-        E: HasObservers,
-        E::Observers: DeserializeOwned,
-        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
-    {
-        log::trace!("Got event in client: {} from {client_id:?}", event.name());
-        if !self.hooks.pre_exec_all(state, client_id, &event)? {
-            return Ok(());
-        }
-        let evt_name = event.name_detailed();
-        match event {
-            Event::NewTestcase {
-                input,
-                client_config,
-                exit_kind,
-                observers_buf,
-                #[cfg(feature = "std")]
-                forward_id,
-                ..
-            } => {
-                #[cfg(feature = "std")]
-                log::debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
-
-                let res = if client_config.match_with(&self.configuration)
-                    && observers_buf.is_some()
-                {
-                    let start = current_time();
-                    let observers: E::Observers =
-                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    {
-                        self.deserialization_time = current_time() - start;
-                    }
-                    fuzzer.evaluate_execution(state, self, input, &observers, &exit_kind, false)?
-                } else {
-                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
-                };
-                if let Some(item) = res.1 {
-                    *state.imported_mut() += 1;
-                    log::debug!("Added received Testcase {evt_name} as item #{item}");
-                } else {
-                    log::debug!("Testcase {evt_name} was discarded");
-                }
-            }
-
-            #[cfg(feature = "share_objectives")]
-            Event::Objective { input, .. } => {
-                #[cfg(feature = "std")]
-                log::debug!("[{}] Received new Objective", std::process::id());
-
-                let res =
-                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?;
-                if let Some(item) = res.1 {
-                    *state.imported_mut() += 1;
-                    log::debug!("Added received Objective {evt_name} as item #{item}");
-                } else {
-                    log::debug!("Objective {evt_name} was discarded");
-                }
-            }
-            Event::Stop => {
-                state.request_stop();
-            }
-            _ => {
-                return Err(Error::unknown(format!(
-                    "Received illegal message that message should not have arrived: {:?}.",
-                    event.name()
-                )));
-            }
-        }
-
-        self.hooks.post_exec_all(state, client_id)?;
         Ok(())
     }
 
