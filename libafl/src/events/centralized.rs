@@ -24,7 +24,7 @@ use libafl_bolts::{
 };
 use serde::Serialize;
 
-use super::AwaitRestartSafe;
+use super::{AwaitRestartSafe, RecordSerializationTime};
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
@@ -170,6 +170,17 @@ impl CentralizedEventManagerBuilder {
     }
 }
 
+impl<EM, EMH, I, S, SHM, SP> RecordSerializationTime
+    for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
+where
+    EM: RecordSerializationTime,
+{
+    /// Set the deserialization time (mut)
+    fn set_deserialization_time(&mut self, dur: Duration) {
+        self.inner.set_deserialization_time(dur);
+    }
+}
+
 impl<EM, EMH, I, S, SHM, SP> AdaptiveSerializer for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
 where
     EM: AdaptiveSerializer,
@@ -304,7 +315,6 @@ where
         self.inner.send_exiting()
     }
 
-
     fn on_shutdown(&mut self) -> Result<(), Error> {
         self.inner.on_shutdown()?;
         self.client.sender_mut().send_exiting()
@@ -344,6 +354,9 @@ where
         }
     }
 
+    fn post_receive(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+        self.inner.fire(state, event)
+    }
 }
 
 impl<EM, EMH, I, S, SHM, SP> ProgressReporter<S> for CentralizedEventManager<EM, EMH, I, S, SHM, SP>
@@ -435,8 +448,7 @@ where
         Ok(())
     }
 
-    fn receive_from_secondary(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error>
-    {
+    fn receive_from_secondary(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let mut event_vec = vec![];
         let self_id = self.client.sender().id();
@@ -479,9 +491,7 @@ where
                         event_name
                     );
 
-                    if client_config.match_with(&self.configuration())
-                        && observers_buf.is_some()
-                    {
+                    if client_config.match_with(&self.configuration()) && observers_buf.is_some() {
                         log::debug!(
                             "[{}] Running fuzzer with event {}",
                             process::id(),

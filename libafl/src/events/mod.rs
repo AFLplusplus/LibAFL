@@ -602,6 +602,7 @@ pub trait EventProcessor<I, S> {
     /// Return the vector that needs to be evaluated
     fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error>;
 
+    fn post_receive(&mut self, state: &mut S, event_vec: Event<I>) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -661,13 +662,13 @@ impl AwaitRestartSafe for NopEventManager {
 }
 
 impl<I, S> EventProcessor<I, S> for NopEventManager {
-    fn receive(
-        &mut self,
-        _state: &mut S,
-    ) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, _state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
         Ok(Vec::new())
     }
 
+    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<OT> CanSerializeObserver<OT> for NopEventManager
@@ -798,6 +799,9 @@ where
     fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
         self.inner.receive(state)
     }
+    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<EM, M, S> ProgressReporter<S> for MonitorTypedEventManager<EM, M>
@@ -827,6 +831,11 @@ where
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
     }
+}
+
+pub trait RecordSerializationTime {
+    /// Set the deserialization time (mut)
+    fn set_deserialization_time(&mut self, _dur: Duration) {}
 }
 
 /// Collected stats to decide if observers must be serialized or not

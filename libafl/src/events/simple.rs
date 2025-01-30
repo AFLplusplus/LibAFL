@@ -119,23 +119,24 @@ where
     MT: Monitor,
     S: Stoppable,
 {
-    fn receive(
-        &mut self,
-        state: &mut S,
-    ) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
         while let Some(event) = self.events.pop() {
             match event {
                 Event::Stop => {
                     state.request_stop();
                 }
-                _ => return Err(Error::unknown(format!(
-                    "Received illegal message that message should not have arrived: {event:?}."
-                ))),
+                _ => {
+                    return Err(Error::unknown(format!(
+                        "Received illegal message that message should not have arrived: {event:?}."
+                    )))
+                }
             }
         }
         Ok(Vec::new())
     }
-
+    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<I, MT, OT, S> CanSerializeObserver<OT> for SimpleEventManager<I, MT, S>
@@ -357,8 +358,7 @@ impl<I, MT, S, SHM, SP> AwaitRestartSafe for SimpleRestartingEventManager<I, MT,
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SHM, SP> EventProcessor<I, S>
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+impl<I, MT, S, SHM, SP> EventProcessor<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
@@ -370,6 +370,9 @@ where
         self.inner.receive(state)
     }
 
+    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 #[cfg(feature = "std")]

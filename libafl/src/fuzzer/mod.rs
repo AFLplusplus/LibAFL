@@ -16,7 +16,7 @@ use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
         CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
-        SendExiting,
+        RecordSerializationTime, SendExiting,
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -27,8 +27,8 @@ use crate::{
     stages::{HasCurrentStageId, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
-        HasSolutions, MaybeHasClientPerfMonitor, Stoppable, HasImported,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastFoundTime,
+        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -99,7 +99,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -110,7 +110,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         obs_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
@@ -121,7 +121,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -138,7 +138,7 @@ pub trait EvaluatorObservers<E, EM, I, S> {
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 }
@@ -152,7 +152,7 @@ pub trait Evaluator<E, EM, I, S> {
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback,
@@ -162,7 +162,7 @@ pub trait Evaluator<E, EM, I, S> {
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback.
@@ -402,7 +402,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -432,11 +432,12 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         observers_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
+        let input = input.clone();
         // Now send off the event
         match exec_res {
             ExecuteInputResult::Corpus => {
@@ -480,13 +481,13 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
-        let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
+        let exec_res = self.check_results(state, manager, input, observers, exit_kind)?;
+        let corpus_id = self.process_execution(state, manager, input, &exec_res, observers)?;
         if send_events {
             self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
         }
@@ -520,7 +521,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -594,7 +595,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         if self.input_filter.should_execute(&input) {
             self.evaluate_input(state, executor, manager, input)
@@ -610,7 +611,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, true)
     }
@@ -730,7 +731,7 @@ where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
-    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S>,
+    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S> + RecordSerializationTime,
     I: Input,
     F: Feedback<EM, I, E::Observers, S>,
     OF: Feedback<EM, I, E::Observers, S>,
@@ -792,8 +793,8 @@ where
             let res = if with_observers {
                 match event {
                     Event::NewTestcase {
-                        input,
-                        observers_buf,
+                        ref input,
+                        ref observers_buf,
                         exit_kind,
                         ..
                     } => {
@@ -801,8 +802,8 @@ where
                         let observers: E::Observers =
                             postcard::from_bytes(observers_buf.as_ref().unwrap())?;
                         {
-                            // fix this
-                            // self.deserialization_time = current_time() - start;
+                            let dur = current_time() - start;
+                            manager.set_deserialization_time(dur);
                         }
                         let res = self.evaluate_execution(
                             state, manager, input, &observers, &exit_kind, false,
@@ -813,16 +814,13 @@ where
                 }
             } else {
                 match event {
-                    Event::NewTestcase { input, .. } => {
+                    Event::NewTestcase { ref input, .. } => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
                         )?;
                         res.1
                     }
-                    Event::Objective {
-                        input,
-                        ..
-                    } => {
+                    Event::Objective { ref input, .. } => {
                         let res = self.evaluate_input_with_observers(
                             state, executor, manager, input, false,
                         )?;
@@ -833,9 +831,11 @@ where
             };
             if let Some(item) = res {
                 *state.imported_mut() += 1;
-                log::debug!("Added received Objective as item #{item}");
+                log::debug!("Added received input as item #{item}");
+
+                manager.post_receive(state, event)?;
             } else {
-                log::debug!("Objective was discarded");
+                log::debug!("Received input was discarded");
             }
 
             // for centralize
@@ -1090,22 +1090,22 @@ mod tests {
                 .unwrap();
         let input = BytesInput::new(vec![1, 2, 3]);
         assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_input(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(1, *execution_count.borrow()); // evaluate_input does not add it to the filter
 
         assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(2, *execution_count.borrow()); // at to the filter
 
         assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(2, *execution_count.borrow()); // the harness is not called
 
         assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_input(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(3, *execution_count.borrow()); // evaluate_input ignores filters
     }

@@ -56,8 +56,9 @@ use crate::{
         launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
         std_report_progress, AdaptiveSerializer, AwaitRestartSafe, CanSerializeObserver, Event,
         EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId, LlmpShouldSaveState, ProgressReporter, SendExiting,
-        StdLlmpEventHook, LLMP_TAG_EVENT_TO_BOTH, _LLMP_TAG_EVENT_TO_BROKER,
+        EventRestarter, HasEventManagerId, LlmpShouldSaveState, ProgressReporter,
+        RecordSerializationTime, SendExiting, StdLlmpEventHook, LLMP_TAG_EVENT_TO_BOTH,
+        _LLMP_TAG_EVENT_TO_BROKER,
     },
     inputs::Input,
     monitors::Monitor,
@@ -99,6 +100,15 @@ pub struct LlmpRestartingEventManager<EMH, I, S, SHM, SP> {
     /// Decide if the state restorer must save the serialized state
     save_state: LlmpShouldSaveState,
     phantom: PhantomData<(I, S)>,
+}
+
+impl<EMH, I, S, SHM, SP> RecordSerializationTime for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
+where
+    SHM: ShMem,
+{
+    fn set_deserialization_time(&mut self, dur: Duration) {
+        self.deserialization_time = dur;
+    }
 }
 
 impl<EMH, I, S, SHM, SP> AdaptiveSerializer for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
@@ -388,6 +398,9 @@ where
         Ok(event_vec)
     }
 
+    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<EMH, I, S, SHM, SP> HasEventManagerId for LlmpRestartingEventManager<EMH, I, S, SHM, SP>

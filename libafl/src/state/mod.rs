@@ -694,7 +694,7 @@ where
             let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
             Ok(ExecuteInputResult::Corpus)
         } else {
-            let (res, _) = fuzzer.evaluate_input(self, executor, manager, input.clone())?;
+            let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
             if res == ExecuteInputResult::None {
                 fuzzer.add_disabled_input(self, input)?;
                 log::warn!("input {:?} was not interesting, adding as disabled.", &path);
@@ -1027,7 +1027,7 @@ where
                 let _: CorpusId = fuzzer.add_input(self, executor, manager, input)?;
                 added += 1;
             } else {
-                let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                let (res, _) = fuzzer.evaluate_input(self, executor, manager, &input)?;
                 if res != ExecuteInputResult::None {
                     added += 1;
                 }

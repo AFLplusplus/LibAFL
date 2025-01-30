@@ -1,4 +1,4 @@
-//! Hooks for event managers, especifically these are used to hook before `handle_in_client`.
+//! Hooks for event managers, especifically these are used to hook before `receive`.
 //!
 //! This will allow user to define pre/post-processing code when the event manager receives any message from
 //! other clients
@@ -6,7 +6,7 @@ use libafl_bolts::ClientId;
 
 use crate::{events::Event, Error};
 
-/// The `broker_hooks` that are run before and after the event manager calls `handle_in_client`
+/// The `broker_hooks` that are run before and after the event manager calls `receive`
 pub trait EventManagerHook<I, S> {
     /// The hook that runs before `receive`
     /// Return false if you want to cancel the subsequent event handling
@@ -18,7 +18,7 @@ pub trait EventManagerHook<I, S> {
     ) -> Result<bool, Error>;
 }
 
-/// The tuples contains `broker_hooks` to be executed for `handle_in_client`
+/// The tuples contains `broker_hooks` to be executed for `receive`
 pub trait EventManagerHooksTuple<I, S> {
     /// The hook that runs before `receive`
     fn pre_exec_all(
@@ -46,7 +46,7 @@ where
     Head: EventManagerHook<I, S>,
     Tail: EventManagerHooksTuple<I, S>,
 {
-    /// The hook that runs before `handle_in_client`
+    /// The hook that runs before `receive`
     fn pre_exec_all(
         &mut self,
         state: &mut S,
