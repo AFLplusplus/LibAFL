@@ -22,7 +22,7 @@ use libafl_bolts::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::{std_on_restart, AwaitRestartSafe, ProgressReporter};
+use super::{std_on_restart, AwaitRestartSafe, ProgressReporter, RecordSerializationTime};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
@@ -70,6 +70,8 @@ where
             .finish_non_exhaustive()
     }
 }
+
+impl<I, MT, S> RecordSerializationTime for SimpleEventManager<I, MT, S> {}
 
 impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
@@ -284,6 +286,8 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SHM, SP>,
 }
+
+impl<I, MT, S, SHM, SP> RecordSerializationTime for SimpleEventManager<I, MT, S, SHM, SP> {}
 
 #[cfg(feature = "std")]
 impl<I, MT, S, SHM, SP> EventFirer<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>

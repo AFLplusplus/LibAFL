@@ -627,6 +627,8 @@ impl NopEventManager {
     }
 }
 
+impl RecordSerializationTime for NopEventManager {}
+
 impl<I, S> EventFirer<I, S> for NopEventManager {
     fn should_send(&self) -> bool {
         true
@@ -709,6 +711,8 @@ pub struct MonitorTypedEventManager<EM, M> {
     inner: EM,
     phantom: PhantomData<M>,
 }
+
+impl<EM, M> RecordSerializationTime for MonitorTypedEventManager<EM, M> {}
 
 impl<EM, M> MonitorTypedEventManager<EM, M> {
     /// Creates a new `EventManager` that wraps another manager, but captures a `monitor` type as well.
