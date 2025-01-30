@@ -459,7 +459,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         // In case the system is configured oddly, we may have trouble finding the SDK. Manually add the linker flag, just in case.
         sdk_path = find_macos_sdk_libs();
         ldflags.push(&sdk_path);
-    };
+    }
 
     #[cfg(feature = "ddg-instr")]
     build_pass(

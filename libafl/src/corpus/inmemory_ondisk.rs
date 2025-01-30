@@ -486,7 +486,7 @@ mod tests {
             Ok(None) => (),
             Ok(_) => panic!("File {path:?} did not exist even though it should have?"),
             Err(e) => panic!("An unexpected error occurred: {e}"),
-        };
+        }
         drop(f);
         fs::remove_file(path).unwrap();
     }

@@ -1742,7 +1742,7 @@ mod tests {
                     {
                         MutationResult::Mutated => new_testcases.push(mutant),
                         MutationResult::Skipped => (),
-                    };
+                    }
                 }
             }
             inputs.append(&mut new_testcases);

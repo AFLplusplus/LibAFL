@@ -832,7 +832,7 @@ where
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.inner_mut().connect_b2b(remote_broker_addr)?;
-                };
+                }
 
                 if let Some(exit_cleanly_after) = self.exit_cleanly_after {
                     broker.set_exit_after(exit_cleanly_after);
