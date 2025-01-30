@@ -715,7 +715,11 @@ where
         Ok(event_vec)
     }
 
-    fn post_receive(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+    fn interesting_testcase_event(
+        &mut self,
+        _state: &mut S,
+        _event: Event<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -886,8 +890,8 @@ where
         self.tcp_mgr.receive(state)
     }
 
-    fn post_receive(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
-        self.tcp_mgr.post_receive(state, event)
+    fn interesting_testcase_event(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+        self.tcp_mgr.interesting_testcase_event(state, event)
     }
 }
 

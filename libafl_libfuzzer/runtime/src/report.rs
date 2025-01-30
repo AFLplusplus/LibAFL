@@ -30,7 +30,7 @@ where
         + HasCurrentStageId
         + Stoppable,
     E: HasObservers,
-    EM: ProgressReporter<S> + EventProcessor<E, S, F>,
+    EM: ProgressReporter<S> + EventProcessor<I, S>,
     ST: StagesTuple<E, EM, S, F>,
 {
     let meta = state

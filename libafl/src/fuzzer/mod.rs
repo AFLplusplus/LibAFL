@@ -835,7 +835,7 @@ where
                 log::debug!("Added received input as item #{item}");
 
                 // for centralize
-                manager.post_receive(state, event)?;
+                manager.interesting_testcase_event(state, event)?;
             } else {
                 log::debug!("Received input was discarded");
             }

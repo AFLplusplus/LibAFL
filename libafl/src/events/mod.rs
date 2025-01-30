@@ -587,6 +587,7 @@ pub trait SendExiting {
     fn send_exiting(&mut self) -> Result<(), Error>;
 
     /// Shutdown gracefully; typically without saving state.
+    /// This is usually called from `fuzz_loop`.
     fn on_shutdown(&mut self) -> Result<(), Error>;
 }
 
@@ -604,7 +605,7 @@ pub trait EventProcessor<I, S> {
 
     /// Run the post processing routine after the fuzzer deemed this event as interesting
     /// For example, in centralized manager you wanna send this an event.
-    fn post_receive(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn interesting_testcase_event(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -670,7 +671,11 @@ impl<I, S> EventProcessor<I, S> for NopEventManager {
         Ok(Vec::new())
     }
 
-    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn interesting_testcase_event(
+        &mut self,
+        _state: &mut S,
+        _event_vec: Event<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -805,7 +810,11 @@ where
     fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
         self.inner.receive(state)
     }
-    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn interesting_testcase_event(
+        &mut self,
+        _state: &mut S,
+        _event_vec: Event<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

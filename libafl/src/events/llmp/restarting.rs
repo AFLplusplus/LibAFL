@@ -398,7 +398,11 @@ where
         Ok(event_vec)
     }
 
-    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn interesting_testcase_event(
+        &mut self,
+        _state: &mut S,
+        _event_vec: Event<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

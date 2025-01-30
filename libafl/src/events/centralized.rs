@@ -342,7 +342,7 @@ where
         }
     }
 
-    fn post_receive(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn interesting_testcase_event(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
 }

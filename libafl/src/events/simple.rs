@@ -136,7 +136,11 @@ where
         }
         Ok(Vec::new())
     }
-    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn interesting_testcase_event(
+        &mut self,
+        _state: &mut S,
+        _event_vec: Event<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -378,7 +382,11 @@ where
         self.inner.receive(state)
     }
 
-    fn post_receive(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+    fn interesting_testcase_event(
+        &mut self,
+        _state: &mut S,
+        _event_vec: Event<I>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
