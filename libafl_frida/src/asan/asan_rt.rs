@@ -1998,6 +1998,7 @@ impl AsanRuntime {
     /// Generate the instrumentation blobs for the current arch.
     #[cfg(target_arch = "aarch64")]
     #[expect(clippy::cast_possible_wrap)]
+    #[expect(clippy::unnecessary_semicolon)]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops_report
@@ -2689,7 +2690,7 @@ impl AsanRuntime {
                     Aarch64Register::X0,
                     Aarch64Register::X1,
                 );
-            };
+            }
         }
 
         let displacement = displacement
