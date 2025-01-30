@@ -524,10 +524,10 @@ where
         input: &I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        let exit_kind = self.execute_input(state, executor, manager, &input)?;
+        let exit_kind = self.execute_input(state, executor, manager, input)?;
         let observers = executor.observers();
 
-        self.scheduler.on_evaluation(state, &input, &*observers)?;
+        self.scheduler.on_evaluation(state, input, &*observers)?;
 
         self.evaluate_execution(state, manager, input, &*observers, &exit_kind, send_events)
     }
@@ -597,7 +597,7 @@ where
         manager: &mut EM,
         input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        if self.input_filter.should_execute(&input) {
+        if self.input_filter.should_execute(input) {
             self.evaluate_input(state, executor, manager, input)
         } else {
             Ok((ExecuteInputResult::None, None))
