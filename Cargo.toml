@@ -25,8 +25,8 @@ members = [
   "utils/gramatron/construct_automata",
   "utils/libafl_benches",
   "utils/libafl_jumper",
-  "bindings/pylibafl",
 ]
+
 default-members = [
   "libafl",
   "libafl_bolts",
@@ -36,6 +36,7 @@ default-members = [
 ]
 
 exclude = [
+  "bindings/pylibafl",
   "fuzzers",
   "libafl_libfuzzer_runtime",
   "utils/noaslr",
