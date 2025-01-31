@@ -1,22 +1,38 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
-use std::{borrow::Cow, env, fs, path::PathBuf, sync::Mutex};
+
+use core::{fmt, slice};
+use std::{
+    borrow::Cow,
+    env,
+    fmt::{Debug, Display},
+    fs,
+    path::PathBuf,
+    pin::Pin,
+    process,
+    sync::Mutex,
+};
 
 use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, observers::ObserversTuple};
+use libafl_qemu_sys::GuestAddr;
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use object::{Object, ObjectSection};
 use rangemap::RangeMap;
 
 use crate::{
+    emu::EmulatorModules,
     modules::{
-        calls::FullBacktraceCollector, snapshot::SnapshotModule, utils::filters::HasAddressFilter,
-        EmulatorModule, EmulatorModuleTuple,
+        calls::FullBacktraceCollector,
+        snapshot::SnapshotModule,
+        utils::filters::{HasAddressFilter, StdAddressFilter},
+        AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
-    qemu::MemAccessInfo,
+    qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},
     sys::TCGTemp,
     Qemu, QemuParams, Regs,
 };
@@ -40,6 +56,25 @@ pub const SHADOW_PAGE_MASK: GuestAddr = !(SHADOW_PAGE_SIZE as GuestAddr - 1);
 
 pub const DEFAULT_REDZONE_SIZE: usize = 128;
 
+#[derive(Debug)]
+pub struct AsanModule {
+    env: Vec<(String, String)>,
+    enabled: bool,
+    detect_leaks: bool,
+    empty: bool,
+    rt: Pin<Box<AsanGiovese>>,
+    filter: StdAddressFilter,
+}
+
+pub struct AsanGiovese {
+    pub alloc_tree: Mutex<IntervalTree<GuestAddr, AllocTreeItem>>,
+    pub saved_tree: IntervalTree<GuestAddr, AllocTreeItem>,
+    pub error_callback: Option<AsanErrorCallback>,
+    pub dirty_shadow: Mutex<HashSet<GuestAddr>>,
+    pub saved_shadow: HashMap<GuestAddr, Vec<i8>>,
+    pub snapshot_shadow: bool,
+}
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
 #[repr(u64)]
 pub enum QasanAction {
@@ -54,14 +89,6 @@ pub enum QasanAction {
     Enable,
     Disable,
     SwapState,
-}
-
-impl TryFrom<u32> for QasanAction {
-    type Error = num_enum::TryFromPrimitiveError<QasanAction>;
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        QasanAction::try_from(u64::from(value))
-    }
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, PartialEq)]
@@ -105,8 +132,65 @@ pub enum AsanError {
     Signal(i32),
 }
 
-impl core::fmt::Display for AsanError {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+pub struct AsanModuleBuilder {
+    env: Option<Vec<(String, String)>>,
+    detect_leaks: bool,
+    snapshot: bool,
+    filter: StdAddressFilter,
+    error_callback: Option<AsanErrorCallback>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AllocTreeItem {
+    backtrace: Vec<GuestAddr>,
+    free_backtrace: Vec<GuestAddr>,
+    allocated: bool,
+}
+
+type AsanErrorFn = Box<dyn FnMut(&AsanGiovese, Qemu, GuestAddr, AsanError)>;
+
+pub struct AsanErrorCallback(AsanErrorFn);
+
+impl AsanErrorCallback {
+    /// Initialize a new [`AsanErrorCallback`]
+    #[must_use]
+    pub fn new(error_callback: AsanErrorFn) -> Self {
+        Self(error_callback)
+    }
+
+    /// Special [`AsanErrorCallback`] providing a full report in case of QASAN trigger.
+    ///
+    /// # Safety
+    ///
+    /// The `ASan` error report accesses [`FullBacktraceCollector`]
+    #[must_use]
+    pub unsafe fn report() -> Self {
+        Self::new(Box::new(|rt, qemu, pc, err| {
+            asan_report(rt, qemu, pc, &err);
+        }))
+    }
+
+    pub fn call(
+        &mut self,
+        asan_giovese: &AsanGiovese,
+        qemu: Qemu,
+        pc: GuestAddr,
+        error: AsanError,
+    ) {
+        self.0(asan_giovese, qemu, pc, error);
+    }
+}
+
+impl TryFrom<u32> for QasanAction {
+    type Error = num_enum::TryFromPrimitiveError<QasanAction>;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        QasanAction::try_from(u64::from(value))
+    }
+}
+
+impl Display for AsanError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             AsanError::Read(addr, len) => write!(fmt, "Invalid {len} bytes read at {addr:#x}"),
             AsanError::Write(addr, len) => {
@@ -120,15 +204,6 @@ impl core::fmt::Display for AsanError {
             AsanError::Signal(sig) => write!(fmt, "Signal {sig} received"),
         }
     }
-}
-
-pub type AsanErrorCallback = Box<dyn FnMut(&AsanGiovese, Qemu, GuestAddr, AsanError)>;
-
-#[derive(Debug, Clone)]
-pub struct AllocTreeItem {
-    backtrace: Vec<GuestAddr>,
-    free_backtrace: Vec<GuestAddr>,
-    allocated: bool,
 }
 
 impl AllocTreeItem {
@@ -146,32 +221,218 @@ impl AllocTreeItem {
         self.allocated = false;
     }
 }
-use std::pin::Pin;
 
-use libafl_qemu_sys::GuestAddr;
-use object::{Object, ObjectSection};
-
-use crate::{
-    emu::EmulatorModules,
-    modules::{utils::filters::StdAddressFilter, AddressFilter},
-    qemu::{Hook, QemuHooks, SyscallHookResult},
-};
-
-pub struct AsanGiovese {
-    pub alloc_tree: Mutex<IntervalTree<GuestAddr, AllocTreeItem>>,
-    pub saved_tree: IntervalTree<GuestAddr, AllocTreeItem>,
-    pub error_callback: Option<AsanErrorCallback>,
-    pub dirty_shadow: Mutex<HashSet<GuestAddr>>,
-    pub saved_shadow: HashMap<GuestAddr, Vec<i8>>,
-    pub snapshot_shadow: bool,
-}
-
-impl core::fmt::Debug for AsanGiovese {
+impl Debug for AsanGiovese {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AsanGiovese")
             .field("alloc_tree", &self.alloc_tree)
             .field("dirty_shadow", &self.dirty_shadow)
             .finish_non_exhaustive()
+    }
+}
+
+impl AsanModuleBuilder {
+    #[must_use]
+    pub fn new(
+        env: Option<Vec<(String, String)>>,
+        detect_leaks: bool,
+        snapshot: bool,
+        filter: StdAddressFilter,
+        error_callback: Option<AsanErrorCallback>,
+    ) -> Self {
+        Self {
+            env,
+            detect_leaks,
+            snapshot,
+            filter,
+            error_callback,
+        }
+    }
+
+    #[must_use]
+    pub fn env(self, env: &[(String, String)]) -> Self {
+        Self::new(
+            Some(env.to_vec()),
+            self.detect_leaks,
+            self.snapshot,
+            self.filter,
+            self.error_callback,
+        )
+    }
+
+    #[must_use]
+    pub fn detect_leaks(self, detect_leaks: bool) -> Self {
+        Self::new(
+            self.env,
+            detect_leaks,
+            self.snapshot,
+            self.filter,
+            self.error_callback,
+        )
+    }
+
+    #[must_use]
+    pub fn snapshot(self, snapshot: bool) -> Self {
+        Self::new(
+            self.env,
+            self.detect_leaks,
+            snapshot,
+            self.filter,
+            self.error_callback,
+        )
+    }
+
+    #[must_use]
+    pub fn filter(self, filter: StdAddressFilter) -> Self {
+        Self::new(
+            self.env,
+            self.detect_leaks,
+            self.snapshot,
+            filter,
+            self.error_callback,
+        )
+    }
+
+    #[must_use]
+    pub fn error_callback(self, callback: AsanErrorCallback) -> Self {
+        Self::new(
+            self.env,
+            self.detect_leaks,
+            self.snapshot,
+            self.filter,
+            Some(callback),
+        )
+    }
+
+    /// Get an ASAN report in case of problem.
+    ///
+    /// # Safety
+    ///
+    /// The `ASan` error report accesses [`FullBacktraceCollector`].
+    /// Check its safety note for more details.
+    #[must_use]
+    pub unsafe fn asan_report(self) -> Self {
+        Self::new(
+            self.env,
+            self.detect_leaks,
+            self.snapshot,
+            self.filter,
+            Some(AsanErrorCallback::report()),
+        )
+    }
+
+    #[must_use]
+    pub fn build(self) -> AsanModule {
+        AsanModule::new(
+            self.env.unwrap().as_ref(),
+            self.detect_leaks,
+            self.snapshot,
+            self.filter,
+            self.error_callback,
+        )
+    }
+}
+
+impl Default for AsanModuleBuilder {
+    fn default() -> Self {
+        Self::new(None, false, true, StdAddressFilter::default(), None)
+    }
+}
+
+impl AsanModule {
+    #[must_use]
+    pub fn builder() -> AsanModuleBuilder {
+        AsanModuleBuilder::default()
+    }
+
+    #[must_use]
+    pub fn new(
+        env: &[(String, String)],
+        detect_leaks: bool,
+        snapshot: bool,
+        filter: StdAddressFilter,
+        error_callback: Option<AsanErrorCallback>,
+    ) -> Self {
+        let mut rt = AsanGiovese::new();
+
+        rt.set_snapshot_shadow(snapshot);
+        if let Some(cb) = error_callback {
+            rt.set_error_callback(cb);
+        }
+
+        Self {
+            env: env.to_vec(),
+            enabled: true,
+            detect_leaks,
+            empty: true,
+            rt,
+            filter,
+        }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
+        self.filter.allowed(&addr)
+    }
+
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn alloc(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
+        self.rt.allocation(pc, start, end);
+    }
+
+    pub fn dealloc(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+        self.rt.deallocation(qemu, pc, addr);
+    }
+
+    #[must_use]
+    pub fn is_poisoned(&self, qemu: Qemu, addr: GuestAddr, size: usize) -> bool {
+        AsanGiovese::is_invalid_access_n(qemu, addr, size)
+    }
+
+    pub fn read<const N: usize>(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+        if self.enabled() && AsanGiovese::is_invalid_access::<N>(qemu, addr) {
+            self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, N));
+        }
+    }
+
+    pub fn read_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
+        if self.enabled() && AsanGiovese::is_invalid_access_n(qemu, addr, size) {
+            self.rt
+                .report_or_crash(qemu, pc, AsanError::Read(addr, size));
+        }
+    }
+
+    pub fn write<const N: usize>(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
+        if self.enabled() && AsanGiovese::is_invalid_access::<N>(qemu, addr) {
+            self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, N));
+        }
+    }
+
+    pub fn write_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
+        if self.enabled() && AsanGiovese::is_invalid_access_n(qemu, addr, size) {
+            self.rt
+                .report_or_crash(qemu, pc, AsanError::Write(addr, size));
+        }
+    }
+
+    pub fn poison(&mut self, qemu: Qemu, addr: GuestAddr, size: usize, poison: PoisonKind) {
+        self.rt.poison(qemu, addr, size, poison.into());
+    }
+
+    pub fn unpoison(&mut self, qemu: Qemu, addr: GuestAddr, size: usize) {
+        AsanGiovese::unpoison(qemu, addr, size);
+    }
+
+    pub fn reset(&mut self, qemu: Qemu) -> AsanRollback {
+        self.rt.rollback(qemu, self.detect_leaks)
     }
 }
 
@@ -435,22 +696,22 @@ impl AsanGiovese {
         unsafe {
             let h = qemu.g2h::<*const c_void>(page) as isize;
             let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            std::slice::from_raw_parts_mut(shadow_addr, SHADOW_PAGE_SIZE)
+            slice::from_raw_parts_mut(shadow_addr, SHADOW_PAGE_SIZE)
         }
     }
 
     pub fn report_or_crash(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            cb(self, qemu, pc, error);
+            cb.call(self, qemu, pc, error);
             self.error_callback = Some(cb);
         } else {
-            std::process::abort();
+            process::abort();
         }
     }
 
     pub fn report(&mut self, qemu: Qemu, pc: GuestAddr, error: AsanError) {
         if let Some(mut cb) = self.error_callback.take() {
-            cb(self, qemu, pc, error);
+            cb.call(self, qemu, pc, error);
             self.error_callback = Some(cb);
         }
     }
@@ -646,167 +907,6 @@ impl AsanGiovese {
         }
 
         ret
-    }
-}
-
-pub enum QemuAsanOptions {
-    None,
-    Snapshot,
-    DetectLeaks,
-    SnapshotDetectLeaks,
-}
-
-pub type AsanChildModule = AsanModule;
-
-#[derive(Debug)]
-pub struct AsanModule {
-    env: Vec<(String, String)>,
-    enabled: bool,
-    detect_leaks: bool,
-    empty: bool,
-    rt: Pin<Box<AsanGiovese>>,
-    filter: StdAddressFilter,
-}
-
-impl AsanModule {
-    #[must_use]
-    pub fn default(env: &[(String, String)]) -> Self {
-        Self::new(StdAddressFilter::default(), &QemuAsanOptions::Snapshot, env)
-    }
-
-    #[must_use]
-    pub fn new(
-        filter: StdAddressFilter,
-        options: &QemuAsanOptions,
-        env: &[(String, String)],
-    ) -> Self {
-        let (snapshot, detect_leaks) = match options {
-            QemuAsanOptions::None => (false, false),
-            QemuAsanOptions::Snapshot => (true, false),
-            QemuAsanOptions::DetectLeaks => (false, true),
-            QemuAsanOptions::SnapshotDetectLeaks => (true, true),
-        };
-
-        let mut rt = AsanGiovese::new();
-        rt.set_snapshot_shadow(snapshot);
-
-        Self {
-            env: env.to_vec(),
-            enabled: true,
-            detect_leaks,
-            empty: true,
-            rt,
-            filter,
-        }
-    }
-
-    #[must_use]
-    pub fn with_error_callback(
-        filter: StdAddressFilter,
-        error_callback: AsanErrorCallback,
-        options: &QemuAsanOptions,
-        env: &[(String, String)],
-    ) -> Self {
-        let (snapshot, detect_leaks) = match options {
-            QemuAsanOptions::None => (false, false),
-            QemuAsanOptions::Snapshot => (true, false),
-            QemuAsanOptions::DetectLeaks => (false, true),
-            QemuAsanOptions::SnapshotDetectLeaks => (true, true),
-        };
-
-        let mut rt = AsanGiovese::new();
-        rt.set_snapshot_shadow(snapshot);
-        rt.set_error_callback(error_callback);
-
-        Self {
-            env: env.to_vec(),
-            enabled: true,
-            detect_leaks,
-            empty: true,
-            rt,
-            filter,
-        }
-    }
-
-    /// # Safety
-    /// The `ASan` error report accesses [`FullBacktraceCollector`]
-    #[must_use]
-    pub unsafe fn with_asan_report(
-        filter: StdAddressFilter,
-        options: &QemuAsanOptions,
-        env: &[(String, String)],
-    ) -> Self {
-        Self::with_error_callback(
-            filter,
-            Box::new(|rt, qemu, pc, err| unsafe { asan_report(rt, qemu, pc, &err) }),
-            options,
-            env,
-        )
-    }
-
-    #[must_use]
-    pub fn must_instrument(&self, addr: GuestAddr) -> bool {
-        self.filter.allowed(&addr)
-    }
-
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    pub fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
-    }
-
-    pub fn alloc(&mut self, pc: GuestAddr, start: GuestAddr, end: GuestAddr) {
-        self.rt.allocation(pc, start, end);
-    }
-
-    pub fn dealloc(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        self.rt.deallocation(qemu, pc, addr);
-    }
-
-    #[must_use]
-    pub fn is_poisoned(&self, qemu: Qemu, addr: GuestAddr, size: usize) -> bool {
-        AsanGiovese::is_invalid_access_n(qemu, addr, size)
-    }
-
-    pub fn read<const N: usize>(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access::<N>(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Read(addr, N));
-        }
-    }
-
-    pub fn read_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
-        if self.enabled() && AsanGiovese::is_invalid_access_n(qemu, addr, size) {
-            self.rt
-                .report_or_crash(qemu, pc, AsanError::Read(addr, size));
-        }
-    }
-
-    pub fn write<const N: usize>(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr) {
-        if self.enabled() && AsanGiovese::is_invalid_access::<N>(qemu, addr) {
-            self.rt.report_or_crash(qemu, pc, AsanError::Write(addr, N));
-        }
-    }
-
-    pub fn write_n(&mut self, qemu: Qemu, pc: GuestAddr, addr: GuestAddr, size: usize) {
-        if self.enabled() && AsanGiovese::is_invalid_access_n(qemu, addr, size) {
-            self.rt
-                .report_or_crash(qemu, pc, AsanError::Write(addr, size));
-        }
-    }
-
-    pub fn poison(&mut self, qemu: Qemu, addr: GuestAddr, size: usize, poison: PoisonKind) {
-        self.rt.poison(qemu, addr, size, poison.into());
-    }
-
-    pub fn unpoison(&mut self, qemu: Qemu, addr: GuestAddr, size: usize) {
-        AsanGiovese::unpoison(qemu, addr, size);
-    }
-
-    pub fn reset(&mut self, qemu: Qemu) -> AsanRollback {
-        self.rt.rollback(qemu, self.detect_leaks)
     }
 }
 
@@ -1203,7 +1303,7 @@ fn load_file_section<'input, 'arena, Endian: addr2line::gimli::Endianity>(
 /// has been removed in version v0.23 for some reason.
 /// TODO: find another cleaner solution.
 mod addr2line_legacy {
-    use std::{borrow::Cow, ffi::OsString, fs::File, path::PathBuf, sync::Arc};
+    use std::{borrow::Cow, env, ffi::OsString, fs::File, path::PathBuf, sync::Arc};
 
     use addr2line::{gimli, LookupContinuation, LookupResult};
     use object::Object;
@@ -1223,7 +1323,7 @@ mod addr2line_legacy {
         r: &R,
     ) -> Result<PathBuf, gimli::Error> {
         let bytes = r.to_slice()?;
-        let s = std::str::from_utf8(&bytes).map_err(|_| gimli::Error::BadUtf8)?;
+        let s = str::from_utf8(&bytes).map_err(|_| gimli::Error::BadUtf8)?;
         Ok(PathBuf::from(s))
     }
 
@@ -1269,7 +1369,7 @@ mod addr2line_legacy {
             loader: &mut F,
             path: Option<PathBuf>,
         ) -> Option<gimli::DwarfPackage<R>> {
-            let mut path = path.map_or_else(std::env::current_exe, Ok).ok()?;
+            let mut path = path.map_or_else(env::current_exe, Ok).ok()?;
             let dwp_extension = path.extension().map_or_else(
                 || OsString::from("dwp"),
                 |previous_extension| {
