@@ -755,6 +755,7 @@ where
         + HasSolutions<I>
         + HasExecutions
         + HasLastFoundTime
+        + MaybeHasClientPerfMonitor
         + HasCurrentCorpusId
         + HasImported,
 {
