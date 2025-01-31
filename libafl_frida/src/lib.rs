@@ -348,7 +348,6 @@ mod tests {
     };
     use std::{cell::RefCell, rc::Rc};
 
-    #[cfg(unix)]
     use mimalloc::MiMalloc;
 
     use crate::{
@@ -361,14 +360,13 @@ mod tests {
         frida_helper_shutdown_observer::FridaHelperObserver,
         helper::FridaInstrumentationHelper,
     };
-    #[cfg(unix)]
     #[global_allocator]
     static GLOBAL: MiMalloc = MiMalloc;
-    #[cfg(windows)]
-    use dlmalloc::GlobalDlmalloc;
-    #[cfg(windows)]
-    #[global_allocator]
-    static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
+    // #[cfg(windows)]
+    // use dlmalloc::GlobalDlmalloc;
+    // #[cfg(windows)]
+    // #[global_allocator]
+    // static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
     static GUM: OnceLock<Gum> = OnceLock::new();
 
