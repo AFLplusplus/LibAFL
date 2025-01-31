@@ -90,20 +90,88 @@ impl Display for Drive {
     }
 }
 
-#[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "-serial ", serialize_all = "lowercase")]
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct Tcp {
+    #[builder(default, setter(strip_option))]
+    host: Option<String>,
+    port: u16,
+    #[builder(default, setter(strip_option))]
+    server: Option<bool>,
+    #[builder(default, setter(strip_option))]
+    wait: Option<bool>,
+    #[builder(default, setter(strip_option))]
+    nodelay: Option<bool>,
+    #[builder(default, setter(strip_option))]
+    reconnect_ms: Option<usize>,
+}
+
+impl Display for Tcp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "tcp:{}", self.host.as_ref().unwrap_or(&"".to_owned()))?;
+        write!(f, ":{}", self.port)?;
+        let server = match self.server {
+            Some(true) => ",server=on",
+            Some(false) => ",server=off",
+            None => "",
+        };
+        write!(f, "{server}")?;
+        let wait = match self.wait {
+            Some(true) => ",wait=on",
+            Some(false) => ",wait=off",
+            None => "",
+        };
+        write!(f, "{wait}")?;
+        let nodelay = match self.nodelay {
+            Some(true) => ",nodelay=on",
+            Some(false) => ",nodelay=off",
+            None => "",
+        };
+        write!(f, "{nodelay}")?;
+        if let Some(ms) = self.reconnect_ms {
+            write!(f, "{ms}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Serial {
     None,
     Null,
     Stdio,
+    Tcp(Tcp),
 }
 
-#[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "-monitor ", serialize_all = "lowercase")]
+impl Display for Serial {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "-serial ")?;
+        match self {
+            Serial::None => write!(f, "none"),
+            Serial::Null => write!(f, "null"),
+            Serial::Stdio => write!(f, "stdio"),
+            Serial::Tcp(tcp) => write!(f, "{tcp}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Monitor {
     None,
     Null,
     Stdio,
+    Tcp(Tcp),
+}
+
+impl Display for Monitor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "-monitor ")?;
+        match self {
+            Monitor::None => write!(f, "none"),
+            Monitor::Null => write!(f, "null"),
+            Monitor::Stdio => write!(f, "stdio"),
+            Monitor::Tcp(tcp) => write!(f, "{tcp}"),
+        }
+    }
 }
 
 /// Set the directory for the BIOS, VGA BIOS and keymaps.
