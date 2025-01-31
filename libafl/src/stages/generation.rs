@@ -37,7 +37,7 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         let input = self.0.generate(state)?;
-        fuzzer.evaluate_filtered(state, executor, manager, input)?;
+        fuzzer.evaluate_filtered(state, executor, manager, &input)?;
         Ok(())
     }
 

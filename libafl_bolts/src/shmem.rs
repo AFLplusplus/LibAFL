@@ -1234,7 +1234,7 @@ pub mod unix_shmem {
                         return Err(Error::unknown(
                             "Failed to set the ashmem mapping's size".to_string(),
                         ));
-                    };
+                    }
 
                     let map = mmap(
                         ptr::null_mut(),
@@ -1269,7 +1269,7 @@ pub mod unix_shmem {
                         return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
                         ));
-                    };
+                    }
 
                     let map = mmap(
                         ptr::null_mut(),

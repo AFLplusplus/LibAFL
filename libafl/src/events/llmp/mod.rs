@@ -276,7 +276,7 @@ where
                     state,
                     executor,
                     manager,
-                    converter.convert(input)?,
+                    &converter.convert(input)?,
                     false,
                 )?;
 
@@ -298,7 +298,7 @@ where
                     state,
                     executor,
                     manager,
-                    converter.convert(input)?,
+                    &converter.convert(input)?,
                     false,
                 )?;
 

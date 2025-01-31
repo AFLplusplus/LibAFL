@@ -512,11 +512,9 @@ macro_rules! fuzz_with {
                 grimoire,
             );
 
-            #[expect(clippy::unnecessary_mut_passed)] // the functions may not require these many `mut`s
             $operation(&$options, &mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
         };
 
-        #[expect(clippy::redundant_closure_call)]
         $and_then(closure)
     }};
 
@@ -592,7 +590,7 @@ pub const STDERR_FD_VAR: &str = "_LIBAFL_LIBFUZZER_STDERR_FD";
 /// Will dereference all parameters.
 /// This will then call the (potentially unsafe) harness.
 /// The fuzzer itself should catch any side effects and, hence be reasonably safe, if the `harness_fn` parameter is correct.
-#[expect(non_snake_case, clippy::similar_names, clippy::missing_safety_doc)]
+#[expect(clippy::similar_names)]
 #[no_mangle]
 pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     argc: *mut c_int,

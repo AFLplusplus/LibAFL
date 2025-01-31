@@ -57,7 +57,7 @@ impl<'data, 'tree: 'data, 'ctx: 'data, W: Write, T: TreeLike> Unparser<'data, 't
             Some(UnparseStep::Script(num, expr)) => self.unwrap_script(num, &expr),
             Some(UnparseStep::PushBuffer()) => self.push_buffer(),
             None => return false,
-        };
+        }
         true
     }
 

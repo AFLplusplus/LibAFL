@@ -166,7 +166,7 @@ where
             }
             shmem_content.buf_len = len;
             shmem_content.is_disk = false;
-        };
+        }
         Ok(())
     }
 

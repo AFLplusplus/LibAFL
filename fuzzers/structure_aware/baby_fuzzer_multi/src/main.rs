@@ -151,7 +151,7 @@ pub fn main() {
     ]);
 
     fuzzer
-        .evaluate_input(&mut state, &mut executor, &mut mgr, initial)
+        .evaluate_input(&mut state, &mut executor, &mut mgr, &initial)
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator

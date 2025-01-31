@@ -145,7 +145,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
+        1 << (1 + state.rand_mut().below_or_zero(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
@@ -233,7 +233,7 @@ where
             }
             let meta = LogMutationMetadata::new(log);
             testcase.add_metadata(meta);
-        };
+        }
         // Always reset the log for each run
         self.mutation_log.clear();
         Ok(())
