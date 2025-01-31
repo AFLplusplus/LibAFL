@@ -381,7 +381,7 @@ where
                     #[cfg(feature = "std")]
                     log::debug!("[{}] Received new Objective", std::process::id());
 
-                    Ok(Some((event, false)))
+                    return Ok(Some((event, false)));
                 }
                 Event::Stop => {
                     state.request_stop();
