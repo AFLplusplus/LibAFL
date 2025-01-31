@@ -85,7 +85,7 @@ where
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
-        };
+        }
         Ok(())
     }
 }

@@ -113,14 +113,13 @@ llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "CtxPass", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
-
-  #if LLVM_VERSION_MAJOR <= 13
-            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
+            PB.registerOptimizerLastEPCallback([](ModulePassManager &MPM,
+                                                  OptimizationLevel  OL
+  #if LLVM_VERSION_MAJOR >= 20
+                                                  ,
+                                                  ThinOrFullLTOPhase Phase
   #endif
-            PB.registerOptimizerLastEPCallback(
-                [](ModulePassManager &MPM, OptimizationLevel OL) {
-                  MPM.addPass(CtxPass());
-                });
+                                               ) { MPM.addPass(CtxPass()); });
           }};
 }
 #else

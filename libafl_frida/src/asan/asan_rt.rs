@@ -23,7 +23,7 @@ use frida_gum::instruction_writer::X86Register;
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
-    Module, ModuleDetails, ModuleMap, NativePointer, PageProtection, RangeDetails,
+    Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
@@ -94,6 +94,25 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
 
 thread_local! {
     static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
+}
+
+#[inline]
+#[cfg(target_arch = "aarch64")]
+unsafe fn thread_local_initted() -> bool {
+    let mut tid: u64;
+    std::arch::asm!(
+        "mrs {tid}, TPIDRRO_EL0",
+        tid = out(reg) tid,
+    );
+    tid &= 0xffff_ffff_ffff_fff8;
+    let tlsptr = tid as *const u64;
+    tlsptr.add(0x102).read() != 0u64
+}
+
+#[inline]
+#[cfg(not(target_arch = "aarch64"))]
+unsafe fn thread_local_initted() -> bool {
+    true
 }
 
 /// The count of registers that need to be saved by the asan runtime
@@ -174,8 +193,8 @@ impl FridaRuntime for AsanRuntime {
             .extend(self.skip_ranges.iter().map(|skip| match skip {
                 SkipRange::Absolute(range) => range.start,
                 SkipRange::ModuleRelative { name, range } => {
-                    let module_details = ModuleDetails::with_name(name.clone()).unwrap();
-                    let lib_start = module_details.range().base_address().0 as usize;
+                    let module = Module::load(gum, name);
+                    let lib_start = module.range().base_address().0 as usize;
                     lib_start + range.start
                 }
             }));
@@ -456,37 +475,42 @@ impl AsanRuntime {
     #[expect(clippy::too_many_lines)]
     pub fn register_hooks(&mut self, gum: &Gum) {
         let mut interceptor = Interceptor::obtain(gum);
-        let module = Module::obtain(gum);
+        let process = Process::obtain(gum);
         macro_rules! hook_func {
-            //No library case
             ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    log::trace!("Hooking {}", stringify!($name));
 
-                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = Module::find_global_export_by_name(stringify!($name)).expect("Failed to find function");
+                    log::warn!("Hooking {} = {:?}", stringify!($name), target_function.0);
 
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
                     let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap();
 
-                    #[allow(non_snake_case)] // depends on the values the macro is invoked with
+                    #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
-                     let original = [<$name:snake:upper _PTR>].get().unwrap();
-
-                     if !ASAN_IN_HOOK.get() && this.hooks_enabled {
-                        ASAN_IN_HOOK.set(true);
-                        let ret = this.[<hook_ $name>](*original, $($param),*);
-                        ASAN_IN_HOOK.set(false);
-                        ret
-                    } else {
-                        let ret = (original)($($param),*);
-                        ret
+                        let original = [<$name:snake:upper _PTR>].get().unwrap();
+                        if this.hooks_enabled {
+                            if thread_local_initted() {
+                                if !ASAN_IN_HOOK.get() {
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = this.[<hook_ $name>](*original, $($param),*);
+                                    ASAN_IN_HOOK.set(false);
+                                    ret
+                                 } else {
+                                    (original)($($param),*)
+                                 }
+                            } else {
+                                (original)($($param),*)
+                            }
+                        } else {
+                            (original)($($param),*)
+                        }
                     }
-                 }
 
                     let self_ptr = core::ptr::from_ref(self) as usize;
                     let _ = interceptor.replace(
@@ -501,9 +525,10 @@ impl AsanRuntime {
             //Library specific macro rule. lib and lib_ident are both needed because we need to generate a unique static variable and only name is insufficient. In addition, the lib name could contain invalid characters (i.e., lib.so is an invalid name)
             ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
                 paste::paste! {
-                    log::trace!("Hooking {}:{}", $lib, stringify!($name));
 
-                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    log::warn!("Hooking {}:{}", $lib, stringify!($name));
+                    let target_function = process.find_module_by_name($lib).expect("Failed to find module").find_export_by_name(stringify!($name)).expect("Failed to find function");
+                    log::warn!("Hooking {}:{} = {:?}", $lib, stringify!($name), target_function.0);
 
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
@@ -516,14 +541,21 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        if !ASAN_IN_HOOK.get() && this.hooks_enabled {
-                            ASAN_IN_HOOK.set(true);
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
-                            ret
+                        if this.hooks_enabled {
+                            if thread_local_initted() {
+                                if !ASAN_IN_HOOK.get() {
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = this.[<hook_ $name>](*original, $($param),*);
+                                    ASAN_IN_HOOK.set(false);
+                                    ret
+                                 } else {
+                                    (original)($($param),*)
+                                 }
+                            } else {
+                                (original)($($param),*)
+                            }
                         } else {
-                            let ret = (original)($($param),*);
-                            ret
+                            (original)($($param),*)
                         }
                     }
 
@@ -539,35 +571,48 @@ impl AsanRuntime {
             };
         }
 
-        #[expect(unused_macro_rules)]
+        #[allow(unused_macro_rules)]
         macro_rules! hook_func_with_check {
-            //No library case
-            ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+            ($name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty, $always_enabled:expr) => {
                 paste::paste! {
-                    log::trace!("Hooking {}", stringify!($name));
-                    let target_function = module.find_export_by_name(None, stringify!($name)).expect("Failed to find function");
+                    let target_function = Module::find_global_export_by_name(stringify!($name)).expect("Failed to find function");
 
+                    log::warn!("Hooking {} = {:?}", stringify!($name), target_function.0);
                     static [<$name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
-
-
 
                     let _ = [<$name:snake:upper _PTR>].set(unsafe {std::mem::transmute::<*const c_void, extern "C" fn($($param: $param_type),*) -> $return_type>(target_function.0)}).unwrap_or_else(|e| println!("{:?}", e));
 
-                    #[allow(non_snake_case)] // depends on the values the macro is invoked with
+                    #[allow(non_snake_case)]
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
                         //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
                         //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
-                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
-                            ASAN_IN_HOOK.set(true);
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
-                            ret
+                        if $always_enabled || this.hooks_enabled {
+                            if thread_local_initted() {
+                                if !ASAN_IN_HOOK.get() {
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = if this.[<hook_check_ $name>]($($param),*) {
+                                        this.[<hook_ $name>](*original, $($param),*)
+                                    } else {
+                                        (original)($($param),*)
+                                    };
+                                    ASAN_IN_HOOK.set(false);
+                                    ret
+                                 } else {
+                                    (original)($($param),*)
+                                 }
+                            } else {
+                                let ret = if $always_enabled && this.[<hook_check_ $name>]($($param),*) {
+                                    this.[<hook_ $name>](*original, $($param),*)
+                                } else {
+                                    (original)($($param),*)
+                                };
+                                ret
+                            }
                         } else {
-                            let ret = (original)($($param),*);
-                            ret
+                            (original)($($param),*)
                         }
 
                     }
@@ -582,11 +627,11 @@ impl AsanRuntime {
                 }
             };
             //Library specific macro rule. lib and lib_ident are both needed because we need to generate a unique static variable and only name is insufficient. In addition, the lib name could contain invalid characters (i.e., lib.so is an invalid name)
-            ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty) => {
+            ($lib:literal, $lib_ident:ident, $name:ident, ($($param:ident : $param_type:ty),*), $return_type:ty, $always_enabled:expr) => {
                 paste::paste! {
-                    log::trace!("Hooking {}:{}", $lib, stringify!($name));
-                    let target_function = module.find_export_by_name(Some($lib), stringify!($name)).expect("Failed to find function");
+                    let target_function = process.find_module_by_name($lib).expect("Failed to find module").find_export_by_name(stringify!($name)).expect("Failed to find function");
 
+                    log::warn!("Hooking {}:{} = {:?}", $lib, stringify!($name), target_function.0);
                     static [<$lib_ident:snake:upper _ $name:snake:upper _PTR>]: std::sync::OnceLock<extern "C" fn($($param: $param_type),*) -> $return_type> = std::sync::OnceLock::new();
 
 
@@ -600,14 +645,30 @@ impl AsanRuntime {
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
                         //don't check if hooks are enabled as there are certain cases where we want to run the hook even if we are out of the program
                         //For example, sometimes libafl will allocate certain things during the run and free them after the run. This results in a bug where a buffer will come from libafl-frida alloc and be freed in the normal allocator.
-                        if !ASAN_IN_HOOK.get() && this.[<hook_check_ $name>]($($param),*){
-                            ASAN_IN_HOOK.set(true);
-                            let ret = this.[<hook_ $name>](*original, $($param),*);
-                            ASAN_IN_HOOK.set(false);
-                            ret
+                        if $always_enabled || this.hooks_enabled {
+                            if thread_local_initted() {
+                                if !ASAN_IN_HOOK.get() {
+                                    ASAN_IN_HOOK.set(true);
+                                    let ret = if this.[<hook_check_ $name>]($($param),*) {
+                                        this.[<hook_ $name>](*original, $($param),*)
+                                    } else {
+                                        (original)($($param),*)
+                                    };
+                                    ASAN_IN_HOOK.set(false);
+                                    ret
+                                 } else {
+                                    (original)($($param),*)
+                                 }
+                            } else {
+                                let ret = if $always_enabled && this.[<hook_check_ $name>]($($param),*) {
+                                    this.[<hook_ $name>](*original, $($param),*)
+                                } else {
+                                    (original)($($param),*)
+                                };
+                                ret
+                            }
                         } else {
-                            let ret = (original)($($param),*);
-                            ret
+                            (original)($($param),*)
                         }
 
                     }
@@ -629,9 +690,9 @@ impl AsanRuntime {
         #[cfg(not(windows))]
         hook_func!(calloc, (nmemb: usize, size: usize), *mut c_void);
         #[cfg(not(windows))]
-        hook_func!(realloc, (ptr: *mut c_void, size: usize), *mut c_void);
+        hook_func_with_check!(realloc, (ptr: *mut c_void, size: usize), *mut c_void, false);
         #[cfg(not(windows))]
-        hook_func_with_check!(free, (ptr: *mut c_void), usize);
+        hook_func_with_check!(free, (ptr: *mut c_void), usize, true);
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(memalign, (size: usize, alignment: usize), *mut c_void);
         #[cfg(not(windows))]
@@ -642,6 +703,28 @@ impl AsanRuntime {
         );
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(malloc_usable_size, (ptr: *mut c_void), usize);
+        #[cfg(target_vendor = "apple")]
+        hook_func!(valloc, (size: usize), *mut c_void);
+        #[cfg(target_vendor = "apple")]
+        hook_func_with_check!(reallocf, (ptr: *mut c_void, size: usize), *mut c_void, false);
+        #[cfg(target_vendor = "apple")]
+        hook_func_with_check!(malloc_size, (ptr: *mut c_void), usize, false);
+        #[cfg(target_vendor = "apple")]
+        hook_func_with_check!(malloc_good_size, (ptr: *mut c_void), usize, false);
+        #[cfg(target_vendor = "apple")]
+        hook_func!("libSystem.B.dylib", libSystemB, os_log_type_enabled, (oslog: *mut c_void, r#type: u8), bool);
+        #[cfg(target_vendor = "apple")]
+        hook_func!("libSystem.B.dylib", libSystemB, _os_log_impl, (dso: *const c_void, log: *mut c_void, r#type: u8, format: *const c_char, buf: *const u8, size: u32), ());
+        #[cfg(target_vendor = "apple")]
+        hook_func!("libSystem.B.dylib", libSystemB, _os_log_fault_impl, (dso: *const c_void, log: *mut c_void, r#type: u8, format: *const c_char, buf: *const u8, size: u32), ());
+        #[cfg(target_vendor = "apple")]
+        hook_func!("libSystem.B.dylib", libSystemB, _os_log_error_impl, (dso: *const c_void, log: *mut c_void, r#type: u8, format: *const c_char, buf: *const u8, size: u32), ());
+        #[cfg(target_vendor = "apple")]
+        hook_func!("libSystem.B.dylib", libSystemB, _os_log_debug_impl, (dso: *const c_void, log: *mut c_void, r#type: u8, format: *const c_char, buf: *const u8, size: u32), ());
+        #[cfg(target_vendor = "apple")]
+        hook_func!("libc++.1.dylib", libcpp, __cxa_allocate_exception, (size: usize), *const c_void);
+        #[cfg(target_vendor = "apple")]
+        hook_func!("libc++.1.dylib", libcpp, __cxa_free_exception, (ptr: *mut c_void), usize);
         // // #[cfg(windows)]
         // hook_priv_func!(
         //     "c:\\windows\\system32\\ntdll.dll",
@@ -674,7 +757,8 @@ impl AsanRuntime {
         macro_rules! hook_heap_windows {
             ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking allocator functions in {}", $libname);
-            for export in module.enumerate_exports($libname) {
+            if let Some(module) = process.find_module_by_name($libname) {
+            for export in module.enumerate_exports() {
                 // log::trace!("- {}", export.name);
                 match &export.name[..] {
                     "NtGdiCreateCompatibleDC" => {
@@ -693,16 +777,16 @@ impl AsanRuntime {
                         hook_func!($libname, $lib_ident, RtlAllocateHeap, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
                     }
                     "HeapFree" => {
-                        hook_func_with_check!($libname, $lib_ident, HeapFree, (handle: *mut c_void, flags: u32, mem: *mut c_void), bool);
+                        hook_func_with_check!($libname, $lib_ident, HeapFree, (handle: *mut c_void, flags: u32, mem: *mut c_void), bool, true);
                     }
                     "RtlFreeHeap" => {
-                        hook_func_with_check!($libname, $lib_ident, RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
+                        hook_func_with_check!($libname, $lib_ident, RtlFreeHeap, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize, true);
                     }
                     "HeapSize" => {
-                        hook_func_with_check!($libname, $lib_ident, HeapSize, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
+                        hook_func_with_check!($libname, $lib_ident, HeapSize, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize, false);
                     }
                     "RtlSizeHeap" => {
-                        hook_func_with_check!($libname, $lib_ident, RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *mut c_void), usize);
+                        hook_func_with_check!($libname, $lib_ident, RtlSizeHeap , (handle: *mut c_void, flags: u32, mem: *mut c_void), usize, false);
                     }
                     "RtlReAllocateHeap" => {
                         hook_func!(
@@ -737,22 +821,22 @@ impl AsanRuntime {
                         hook_func!($libname, $lib_ident, LocalReAlloc, (mem: *mut c_void, size: usize, flags: u32), *mut c_void);
                     }
                     "LocalHandle" => {
-                        hook_func_with_check!($libname, $lib_ident, LocalHandle, (mem: *mut c_void), *mut c_void);
+                        hook_func_with_check!($libname, $lib_ident, LocalHandle, (mem: *mut c_void), *mut c_void, false);
                     }
                     "LocalLock" => {
-                        hook_func_with_check!($libname, $lib_ident, LocalLock, (mem: *mut c_void), *mut c_void);
+                        hook_func_with_check!($libname, $lib_ident, LocalLock, (mem: *mut c_void), *mut c_void, false);
                     }
                     "LocalUnlock" => {
-                        hook_func_with_check!($libname, $lib_ident, LocalUnlock, (mem: *mut c_void), bool);
+                        hook_func_with_check!($libname, $lib_ident, LocalUnlock, (mem: *mut c_void), bool, false);
                     }
                     "LocalSize" => {
-                        hook_func_with_check!($libname, $lib_ident, LocalSize, (mem: *mut c_void),usize);
+                        hook_func_with_check!($libname, $lib_ident, LocalSize, (mem: *mut c_void),usize, false);
                     }
                     "LocalFree" => {
-                        hook_func_with_check!($libname, $lib_ident, LocalFree, (mem: *mut c_void), *mut c_void);
+                        hook_func_with_check!($libname, $lib_ident, LocalFree, (mem: *mut c_void), *mut c_void, true);
                     }
                     "LocalFlags" => {
-                        hook_func_with_check!($libname, $lib_ident, LocalFlags, (mem: *mut c_void),u32);
+                        hook_func_with_check!($libname, $lib_ident, LocalFlags, (mem: *mut c_void),u32, false);
                     }
                     "GlobalAlloc" => {
                         hook_func!($libname, $lib_ident, GlobalAlloc, (flags: u32, size: usize), *mut c_void);
@@ -761,22 +845,22 @@ impl AsanRuntime {
                         hook_func!($libname, $lib_ident, GlobalReAlloc, (mem: *mut c_void, flags: u32, size: usize), *mut c_void);
                     }
                     "GlobalHandle" => {
-                        hook_func_with_check!($libname, $lib_ident, GlobalHandle, (mem: *mut c_void), *mut c_void);
+                        hook_func_with_check!($libname, $lib_ident, GlobalHandle, (mem: *mut c_void), *mut c_void, false);
                     }
                     "GlobalLock" => {
-                        hook_func_with_check!($libname, $lib_ident, GlobalLock, (mem: *mut c_void), *mut c_void);
+                        hook_func_with_check!($libname, $lib_ident, GlobalLock, (mem: *mut c_void), *mut c_void, false);
                     }
                     "GlobalUnlock" => {
-                        hook_func_with_check!($libname, $lib_ident, GlobalUnlock, (mem: *mut c_void), bool);
+                        hook_func_with_check!($libname, $lib_ident, GlobalUnlock, (mem: *mut c_void), bool, false);
                     }
                     "GlobalSize" => {
-                        hook_func_with_check!($libname, $lib_ident, GlobalSize, (mem: *mut c_void),usize);
+                        hook_func_with_check!($libname, $lib_ident, GlobalSize, (mem: *mut c_void),usize, false);
                     }
                     "GlobalFree" => {
-                        hook_func_with_check!($libname, $lib_ident, GlobalFree, (mem: *mut c_void), *mut c_void);
+                        hook_func_with_check!($libname, $lib_ident, GlobalFree, (mem: *mut c_void), *mut c_void, true);
                     }
                     "GlobalFlags" => {
-                        hook_func_with_check!($libname, $lib_ident, GlobalFlags, (mem: *mut c_void),u32);
+                        hook_func_with_check!($libname, $lib_ident, GlobalFlags, (mem: *mut c_void),u32, false);
                     }
                     "memmove" => {
                         hook_func!(
@@ -813,10 +897,10 @@ impl AsanRuntime {
                         hook_func!($libname, $lib_ident, _o_realloc, (ptr: *mut c_void, size: usize), *mut c_void);
                     }
                     "free" => {
-                        hook_func_with_check!($libname, $lib_ident, free, (ptr: *mut c_void), usize);
+                        hook_func_with_check!($libname, $lib_ident, free, (ptr: *mut c_void), usize, true);
                     }
                     "_o_free" | "o_free" => {
-                        hook_func_with_check!($libname, $lib_ident, _o_free, (ptr: *mut c_void), usize);
+                        hook_func_with_check!($libname, $lib_ident, _o_free, (ptr: *mut c_void), usize, true);
                     }
                     "_write" => {
                         hook_func!(
@@ -860,7 +944,7 @@ impl AsanRuntime {
                     }
                     _ => (),
                 }
-            }
+            }}
             }
         }
         #[cfg(windows)]
@@ -900,7 +984,8 @@ impl AsanRuntime {
         macro_rules! hook_cpp {
            ($libname:literal, $lib_ident:ident) => {
             log::info!("Hooking c++ functions in {}", $libname);
-            for export in module.enumerate_exports($libname) {
+            if let Some(module) = process.find_module_by_name($libname) {
+            for export in module.enumerate_exports() {
                 match &export.name[..] {
                     "_Znam" => {
                         hook_func!($libname, $lib_ident, _Znam, (size: usize), *mut c_void);
@@ -1034,7 +1119,7 @@ impl AsanRuntime {
                     }
                     _ => {}
                 }
-            }
+            }}
            }
         }
         #[cfg(target_os = "linux")]
@@ -1057,6 +1142,7 @@ impl AsanRuntime {
 
         #[cfg(not(windows))]
         hook_func!(
+
             mmap,
             (
                 addr: *const c_void,
@@ -1074,6 +1160,7 @@ impl AsanRuntime {
         // Hook libc functions which may access allocated memory
         #[cfg(not(windows))]
         hook_func!(
+
             write,
             (fd: i32, buf: *const c_void, count: usize),
             usize
@@ -1081,22 +1168,26 @@ impl AsanRuntime {
         #[cfg(not(windows))]
         hook_func!(read, (fd: i32, buf: *mut c_void, count: usize), usize);
         hook_func!(
+
             fgets,
             (s: *mut c_void, size: u32, stream: *mut c_void),
             *mut c_void
         );
         hook_func!(
+
             memcmp,
             (s1: *const c_void, s2: *const c_void, n: usize),
             i32
         );
         hook_func!(
+
             memcpy,
             (dest: *mut c_void, src: *const c_void, n: usize),
             *mut c_void
         );
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(
+
             mempcpy,
             (dest: *mut c_void, src: *const c_void, n: usize),
             *mut c_void
@@ -1109,23 +1200,27 @@ impl AsanRuntime {
         //     *mut c_void
         // );
         hook_func!(
+
             memset,
             (s: *mut c_void, c: i32, n: usize),
             *mut c_void
         );
         hook_func!(
+
             memchr,
             (s: *mut c_void, c: i32, n: usize),
             *mut c_void
         );
         #[cfg(not(any(target_vendor = "apple", windows)))]
         hook_func!(
+
             memrchr,
             (s: *mut c_void, c: i32, n: usize),
             *mut c_void
         );
         #[cfg(not(windows))]
         hook_func!(
+
             memmem,
             (
                 haystack: *const c_void,
@@ -1150,39 +1245,46 @@ impl AsanRuntime {
         hook_func!(strrchr, (s: *mut c_char, c: i32), *mut c_char);
         #[cfg(not(windows))]
         hook_func!(
+
             strcasecmp,
             (s1: *const c_char, s2: *const c_char),
             i32
         );
         #[cfg(not(windows))]
         hook_func!(
+
             strncasecmp,
             (s1: *const c_char, s2: *const c_char, n: usize),
             i32
         );
         hook_func!(
+
             strcat,
             (dest: *mut c_char, src: *const c_char),
             *mut c_char
         );
         hook_func!(strcmp, (s1: *const c_char, s2: *const c_char), i32);
         hook_func!(
+
             strncmp,
             (s1: *const c_char, s2: *const c_char, n: usize),
             i32
         );
         hook_func!(
+
             strcpy,
             (dest: *mut c_char, src: *const c_char),
             *mut c_char
         );
         hook_func!(
+
             strncpy,
             (dest: *mut c_char, src: *const c_char, n: usize),
             *mut c_char
         );
         #[cfg(not(windows))]
         hook_func!(
+
             stpcpy,
             (dest: *mut c_char, src: *const c_char),
             *mut c_char
@@ -1194,12 +1296,14 @@ impl AsanRuntime {
         hook_func!(strlen, (s: *const c_char), usize);
         hook_func!(strnlen, (s: *const c_char, n: usize), usize);
         hook_func!(
+
             strstr,
             (haystack: *const c_char, needle: *const c_char),
             *mut c_char
         );
         #[cfg(not(windows))]
         hook_func!(
+
             strcasestr,
             (haystack: *const c_char, needle: *const c_char),
             *mut c_char
@@ -1209,6 +1313,7 @@ impl AsanRuntime {
         hook_func!(atoll, (nptr: *const c_char), i64);
         hook_func!(wcslen, (s: *const wchar_t), usize);
         hook_func!(
+
             wcscpy,
             (dest: *mut wchar_t, src: *const wchar_t),
             *mut wchar_t
@@ -1216,18 +1321,21 @@ impl AsanRuntime {
         hook_func!(wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
         #[cfg(target_vendor = "apple")]
         hook_func!(
+
             memset_pattern4,
             (s: *mut c_void, c: *const c_void, n: usize),
             ()
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
+
             memset_pattern8,
             (s: *mut c_void, c: *const c_void, n: usize),
             ()
         );
         #[cfg(target_vendor = "apple")]
         hook_func!(
+
             memset_pattern16,
             (s: *mut c_void, c: *const c_void, n: usize),
             ()
@@ -1397,16 +1505,19 @@ impl AsanRuntime {
                     backtrace,
                 ))
             };
-            AsanErrors::get_mut_blocking().report_error(error);
+            #[allow(clippy::manual_assert)]
+            if AsanErrors::get_mut_blocking().report_error(error) {
+                panic!("ASAN: Crashing target!");
+            }
 
             // This is not even a mem instruction??
-        } else {
-            AsanErrors::get_mut_blocking().report_error(AsanError::Unknown((
-                self.regs,
-                actual_pc,
-                (None, None, 0, fault_address),
-                backtrace,
-            )));
+        } else if AsanErrors::get_mut_blocking().report_error(AsanError::Unknown((
+            self.regs,
+            actual_pc,
+            (None, None, 0, fault_address),
+            backtrace,
+        ))) {
+            panic!("ASAN: Crashing target!");
         }
 
         // log::info!("ASAN Error, attach the debugger!");
@@ -1536,7 +1647,10 @@ impl AsanRuntime {
                 backtrace,
             ))
         };
-        AsanErrors::get_mut_blocking().report_error(error);
+        #[allow(clippy::manual_assert)]
+        if AsanErrors::get_mut_blocking().report_error(error) {
+            panic!("ASAN: Crashing target!");
+        }
         self.enable_hooks();
     }
 
@@ -1884,6 +1998,7 @@ impl AsanRuntime {
     /// Generate the instrumentation blobs for the current arch.
     #[cfg(target_arch = "aarch64")]
     #[expect(clippy::cast_possible_wrap)]
+    #[expect(clippy::unnecessary_semicolon)]
     fn generate_instrumentation_blobs(&mut self) {
         let mut ops_report = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops_report
@@ -2575,7 +2690,7 @@ impl AsanRuntime {
                     Aarch64Register::X0,
                     Aarch64Register::X1,
                 );
-            };
+            }
         }
 
         let displacement = displacement

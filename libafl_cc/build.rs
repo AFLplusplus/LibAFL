@@ -97,7 +97,7 @@ fn find_llvm_config() -> Result<String, String> {
         Err(err) => {
             println!("cargo:warning={err}");
         }
-    };
+    }
 
     #[cfg(any(target_os = "solaris", target_os = "illumos"))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
@@ -459,7 +459,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         // In case the system is configured oddly, we may have trouble finding the SDK. Manually add the linker flag, just in case.
         sdk_path = find_macos_sdk_libs();
         ldflags.push(&sdk_path);
-    };
+    }
 
     #[cfg(feature = "ddg-instr")]
     build_pass(

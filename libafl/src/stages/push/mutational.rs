@@ -289,7 +289,7 @@ where
             ) {
                 self.push_stage_helper_mut().end_of_iter(shared_state, true);
                 return Some(Err(err));
-            };
+            }
 
             if let Err(err) = shared_state
                 .event_mgr
@@ -297,7 +297,7 @@ where
             {
                 self.push_stage_helper_mut().end_of_iter(shared_state, true);
                 return Some(Err(err));
-            };
+            }
         } else {
             self.push_stage_helper_mut().reset_exit_kind();
         }

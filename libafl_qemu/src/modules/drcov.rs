@@ -242,7 +242,7 @@ where
                 Hook::Function(gen_block_lengths::<ET, F, I, S>),
                 Hook::Empty,
             );
-        };
+        }
 
         if self.module_mapping.is_none() {
             log::info!("Auto-filling module mapping for DrCov module from QEMU mapping.");
