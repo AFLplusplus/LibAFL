@@ -162,20 +162,6 @@ pub trait Evaluator<E, EM, I, S> {
         executor: &mut E,
         manager: &mut EM,
         input: I,
-    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_events(state, executor, manager, input, true)
-    }
-
-    /// Runs the input and triggers observers and feedback,
-    /// returns if is interesting an (option) the index of the new testcase in the corpus
-    /// This version has a boolean to decide if send events to the manager.
-    fn evaluate_input_events(
-        &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
-        send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback.
@@ -618,15 +604,14 @@ where
 
     /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
-    fn evaluate_input_events(
+    fn evaluate_input(
         &mut self,
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
         input: I,
-        send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        self.evaluate_input_with_observers(state, executor, manager, input, send_events)
+        self.evaluate_input_with_observers(state, executor, manager, input, true)
     }
 
     /// Adds an input, even if it's not considered `interesting` by any of the executors

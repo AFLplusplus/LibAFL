@@ -182,7 +182,7 @@ where
                             actual[..target.as_slice().len()].copy_from_slice(target.as_slice());
                             new_size = target.as_slice().len();
                         }
-                    };
+                    }
                     return;
                 }
             }

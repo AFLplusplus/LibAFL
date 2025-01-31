@@ -9,7 +9,14 @@ keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
 categories = ["development-tools::testing"]
 
-include = ["/src", "/Cargo.toml", "/build.rs", "/runtime"]
+include = [
+  "/src",
+  "/Cargo.toml",
+  "/build.rs",
+  "/runtime",
+  "LICENSE-MIT",
+  "LICENSE-APACHE",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

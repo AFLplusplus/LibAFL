@@ -253,21 +253,28 @@ class AnalysisPass : public ModulePass {
   }
 
   bool isMemorySensitiveFn(StringRef &n) {
-    if (n.equals_insensitive("write") || n.equals_insensitive("read") || n.equals_insensitive("fgets") ||
-        n.equals_insensitive("memcmp") || n.equals_insensitive("memcpy") || n.equals_insensitive("mempcpy") ||
-        n.equals_insensitive("memmove") || n.equals_insensitive("memset") || n.equals_insensitive("memchr") ||
-        n.equals_insensitive("memrchr") || n.equals_insensitive("memmem") || n.equals_insensitive("bzero") ||
-        n.equals_insensitive("explicit_bzero") || n.equals_insensitive("bcmp") || n.equals_insensitive("strchr") ||
-        n.equals_insensitive("strrchr") || n.equals_insensitive("strcasecmp") || n.equals_insensitive("strncat") ||
-        n.equals_insensitive("strerror") || n.equals_insensitive("strncasecmp") || n.equals_insensitive("strcat") ||
-        n.equals_insensitive("strcmp") || n.equals_insensitive("strspn") || n.equals_insensitive("strncmp") ||
-        n.equals_insensitive("strcpy") || n.equals_insensitive("strncpy") || n.equals_insensitive("strcoll") ||
-        n.equals_insensitive("stpcpy") || n.equals_insensitive("strdup") || n.equals_insensitive("strlen") ||
-        n.equals_insensitive("strxfrm") || n.equals_insensitive("strtok") || n.equals_insensitive("strnlen") ||
-        n.equals_insensitive("strstr") || n.equals_insensitive("strcasestr") || n.equals_insensitive("strscpn") ||
-        n.equals_insensitive("strpbrk") || n.equals_insensitive("atoi") || n.equals_insensitive("atol") ||
-        n.equals_insensitive("atoll") || n.equals_insensitive("wcslen") || n.equals_insensitive("wcscpy") ||
-        n.equals_insensitive("wcscmp")) {
+    if (n.equals_insensitive("write") || n.equals_insensitive("read") ||
+        n.equals_insensitive("fgets") || n.equals_insensitive("memcmp") ||
+        n.equals_insensitive("memcpy") || n.equals_insensitive("mempcpy") ||
+        n.equals_insensitive("memmove") || n.equals_insensitive("memset") ||
+        n.equals_insensitive("memchr") || n.equals_insensitive("memrchr") ||
+        n.equals_insensitive("memmem") || n.equals_insensitive("bzero") ||
+        n.equals_insensitive("explicit_bzero") ||
+        n.equals_insensitive("bcmp") || n.equals_insensitive("strchr") ||
+        n.equals_insensitive("strrchr") || n.equals_insensitive("strcasecmp") ||
+        n.equals_insensitive("strncat") || n.equals_insensitive("strerror") ||
+        n.equals_insensitive("strncasecmp") || n.equals_insensitive("strcat") ||
+        n.equals_insensitive("strcmp") || n.equals_insensitive("strspn") ||
+        n.equals_insensitive("strncmp") || n.equals_insensitive("strcpy") ||
+        n.equals_insensitive("strncpy") || n.equals_insensitive("strcoll") ||
+        n.equals_insensitive("stpcpy") || n.equals_insensitive("strdup") ||
+        n.equals_insensitive("strlen") || n.equals_insensitive("strxfrm") ||
+        n.equals_insensitive("strtok") || n.equals_insensitive("strnlen") ||
+        n.equals_insensitive("strstr") || n.equals_insensitive("strcasestr") ||
+        n.equals_insensitive("strscpn") || n.equals_insensitive("strpbrk") ||
+        n.equals_insensitive("atoi") || n.equals_insensitive("atol") ||
+        n.equals_insensitive("atoll") || n.equals_insensitive("wcslen") ||
+        n.equals_insensitive("wcscpy") || n.equals_insensitive("wcscmp")) {
       return true;
     } else {
       return false;
@@ -275,11 +282,15 @@ class AnalysisPass : public ModulePass {
   }
 
   bool isMallocFn(StringRef &n) {
-    if (n.equals_insensitive("malloc") || n.equals_insensitive("calloc") || n.equals_insensitive("realloc") ||
-        n.equals_insensitive("reallocarray") || n.equals_insensitive("memalign") ||
-        n.equals_insensitive("__libc_memalign") || n.equals_insensitive("aligned_alloc") ||
-        n.equals_insensitive("posix_memalign") || n.equals_insensitive("valloc") ||
-        n.equals_insensitive("pvalloc") || n.equals_insensitive("mmap")) {
+    if (n.equals_insensitive("malloc") || n.equals_insensitive("calloc") ||
+        n.equals_insensitive("realloc") ||
+        n.equals_insensitive("reallocarray") ||
+        n.equals_insensitive("memalign") ||
+        n.equals_insensitive("__libc_memalign") ||
+        n.equals_insensitive("aligned_alloc") ||
+        n.equals_insensitive("posix_memalign") ||
+        n.equals_insensitive("valloc") || n.equals_insensitive("pvalloc") ||
+        n.equals_insensitive("mmap")) {
       return true;
     } else {
       return false;
@@ -287,7 +298,8 @@ class AnalysisPass : public ModulePass {
   }
 
   bool isFreeFn(StringRef &n) {
-    if (n.equals_insensitive("free") || n.equals_insensitive("cfree") || n.equals_insensitive("munmap")) {
+    if (n.equals_insensitive("free") || n.equals_insensitive("cfree") ||
+        n.equals_insensitive("munmap")) {
       return true;
     } else {
       return false;
@@ -304,10 +316,13 @@ class AnalysisPass : public ModulePass {
     // operator new(unsigned long, std::align_val_t)
     // operator new(unsigned long, std::align_val_t, std::nothrow_t const&)
 
-    if (n.equals_insensitive("_Znam") || n.equals_insensitive("_ZnamRKSt9nothrow_t") ||
+    if (n.equals_insensitive("_Znam") ||
+        n.equals_insensitive("_ZnamRKSt9nothrow_t") ||
         n.equals_insensitive("_ZnamSt11align_val_t") ||
-        n.equals_insensitive("_ZnamSt11align_val_tRKSt9nothrow_t") || n.equals_insensitive("_Znwm") ||
-        n.equals_insensitive("_ZnwmRKSt9nothrow_t") || n.equals_insensitive("_ZnwmSt11align_val_t") ||
+        n.equals_insensitive("_ZnamSt11align_val_tRKSt9nothrow_t") ||
+        n.equals_insensitive("_Znwm") ||
+        n.equals_insensitive("_ZnwmRKSt9nothrow_t") ||
+        n.equals_insensitive("_ZnwmSt11align_val_t") ||
         n.equals_insensitive("_ZnwmSt11align_val_tRKSt9nothrow_t")) {
       return true;
     } else {
@@ -331,10 +346,13 @@ class AnalysisPass : public ModulePass {
 
     if (n.equals_insensitive("_ZdaPv") || n.equals_insensitive("_ZdaPvm") ||
         n.equals_insensitive("_ZdaPvmSt11align_val_t") ||
-        n.equals_insensitive("_ZdaPvRKSt9nothrow_t") || n.equals_insensitive("_ZdaPvSt11align_val_t") ||
-        n.equals_insensitive("_ZdaPvSt11align_val_tRKSt9nothrow_t") || n.equals_insensitive("_ZdlPv") ||
-        n.equals_insensitive("_ZdlPvm") || n.equals_insensitive("_ZdlPvmSt11align_val_t") ||
-        n.equals_insensitive("_ZdlPvRKSt9nothrow_t") || n.equals_insensitive("_ZdlPvSt11align_val_t") ||
+        n.equals_insensitive("_ZdaPvRKSt9nothrow_t") ||
+        n.equals_insensitive("_ZdaPvSt11align_val_t") ||
+        n.equals_insensitive("_ZdaPvSt11align_val_tRKSt9nothrow_t") ||
+        n.equals_insensitive("_ZdlPv") || n.equals_insensitive("_ZdlPvm") ||
+        n.equals_insensitive("_ZdlPvmSt11align_val_t") ||
+        n.equals_insensitive("_ZdlPvRKSt9nothrow_t") ||
+        n.equals_insensitive("_ZdlPvSt11align_val_t") ||
         n.equals_insensitive("_ZdlPvSt11align_val_tRKSt9nothrow_t")
 
     ) {

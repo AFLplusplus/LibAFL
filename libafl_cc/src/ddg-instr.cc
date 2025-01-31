@@ -773,15 +773,12 @@ llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "DDGInstrPass", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
-
-            PB.registerOptimizerLastEPCallback([](ModulePassManager &MPM,
-                                                  OptimizationLevel OL
+            PB.registerOptimizerLastEPCallback(
+                [](ModulePassManager &MPM, OptimizationLevel OL
 #if LLVM_VERSION_MAJOR >= 20
-                                                  ,
-                                                  ThinOrFullLTOPhase Phase
-#endif                                                  
-                                                  ) {
-              MPM.addPass(DDGInstrModulePass());
-            });
+                   ,
+                   ThinOrFullLTOPhase Phase
+#endif
+                ) { MPM.addPass(DDGInstrModulePass()); });
           }};
 }

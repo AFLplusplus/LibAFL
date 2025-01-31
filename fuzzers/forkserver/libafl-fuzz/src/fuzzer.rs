@@ -363,7 +363,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         // Enable autodict if configured
         if !opt.no_autodict {
             executor_builder = executor_builder.autotokens(&mut tokens);
-        };
+        }
 
         // Finalize and build our Executor
         SupportedExecutors::Forkserver(

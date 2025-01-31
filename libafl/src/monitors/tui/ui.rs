@@ -758,7 +758,7 @@ impl TuiUi {
                     Cell::from(Span::raw("not measured")),
                     Cell::from(Span::raw(format!("{:.2}%", client.unmeasured * 100.0))),
                 ]));
-            };
+            }
         }
 
         let table = Table::default()
