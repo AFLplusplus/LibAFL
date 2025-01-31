@@ -470,9 +470,7 @@ where
                     )?;
                 }
             }
-            ExecuteInputResult::Solution =>
-            {
-                #[cfg(feature = "share_objectives")]
+            ExecuteInputResult::Solution => {
                 if manager.should_send() {
                     manager.fire(
                         state,
