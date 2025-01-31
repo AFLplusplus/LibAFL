@@ -44,7 +44,7 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         std_on_restart, BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple,
-        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        EventManagerId, EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter,
     },
     inputs::Input,
     monitors::Monitor,
@@ -621,7 +621,7 @@ where
     }
 }
 
-impl<EMH, I, S> EventProcessor<I, S> for TcpEventManager<EMH, I, S>
+impl<EMH, I, S> EventReceiver<I, S> for TcpEventManager<EMH, I, S>
 where
     EMH: EventManagerHooksTuple<I, S>,
     S: HasExecutions
@@ -632,13 +632,11 @@ where
         + Stoppable,
     I: DeserializeOwned,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client_id;
         let mut len_buf = [0_u8; 4];
-        let mut event_vec = vec![];
         self.tcp.set_nonblocking(true).expect("set to non-blocking");
-
         // read all pending messages
         loop {
             match self.tcp.read_exact(&mut len_buf) {
@@ -667,7 +665,7 @@ where
                         let event = postcard::from_bytes(buf)?;
 
                         if !self.hooks.pre_exec_all(state, other_client_id, &event)? {
-                            return Ok(Vec::new());
+                            continue;
                         }
                         match event {
                             Event::NewTestcase {
@@ -677,18 +675,17 @@ where
                                 ..
                             } => {
                                 log::info!("Received new Testcase from {other_client_id:?} ({client_config:?}, forward {forward_id:?})");
-                                let _res = if client_config.match_with(&self.configuration)
+                                if client_config.match_with(&self.configuration)
                                     && observers_buf.is_some()
                                 {
-                                    event_vec.push((event, true));
-                                } else {
-                                    event_vec.push((event, true));
-                                };
+                                    return Ok(Some((event, true)));
+                                }
+                                return Ok(Some((event, false)));
                             }
                             #[cfg(feature = "share_objectives")]
                             Event::Objective { .. } => {
                                 log::info!("Received new Objective");
-                                event_vec.push((event, false));
+                                return Ok(Some((event, false)));
                             }
                             Event::Stop => {
                                 state.request_stop();
@@ -712,7 +709,7 @@ where
             }
         }
         self.tcp.set_nonblocking(false).expect("set to blocking");
-        Ok(event_vec)
+        Ok(None)
     }
 
     fn interesting_testcase_event(
@@ -873,7 +870,7 @@ where
     }
 }
 
-impl<EMH, I, S, SHM, SP> EventProcessor<I, S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> EventReceiver<I, S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned,
@@ -886,7 +883,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         self.tcp_mgr.receive(state)
     }
 

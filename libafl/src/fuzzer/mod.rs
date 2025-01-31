@@ -15,7 +15,7 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
-        CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+        CanSerializeObserver, Event, EventConfig, EventFirer, EventReceiver, ProgressReporter,
         RecordSerializationTime, SendExiting,
     },
     executors::{Executor, ExitKind, HasObservers},
@@ -141,6 +141,19 @@ pub trait EvaluatorObservers<E, EM, I, S> {
         input: &I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
+}
+
+/// Receives and event from event manager and then evaluates it
+pub trait EventProcessor<E, EM, I, S> {
+    /// Asks event manager to see if there's any event to evaluate
+    /// If there is any, then evaluates it.
+    /// After, run the post processing routines, for example, re-sending the events to the other  
+    fn process_events(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+    ) -> Result<(), Error>;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
@@ -726,69 +739,34 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, OF>
+impl<CS, E, EM, F, I, IF, OF, S> EventProcessor<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
     E: HasObservers + Executor<EM, I, S, Self>,
     E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
-    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S> + RecordSerializationTime,
-    I: Input,
+    EM: EventReceiver<I, S>
+        + RecordSerializationTime
+        + CanSerializeObserver<E::Observers>
+        + EventFirer<I, S>,
     F: Feedback<EM, I, E::Observers, S>,
+    I: Input,
     OF: Feedback<EM, I, E::Observers, S>,
-    EM: ProgressReporter<S> + SendExiting + EventProcessor<I, S>,
-    S: HasExecutions
-        + HasMetadata
-        + HasCorpus<I>
+    S: HasCorpus<I>
         + HasSolutions<I>
-        + HasLastReportTime
+        + HasExecutions
         + HasLastFoundTime
-        + HasImported
-        + HasTestcase<I>
         + HasCurrentCorpusId
-        + HasCurrentStageId
-        + Stoppable
-        + MaybeHasClientPerfMonitor,
-    ST: StagesTuple<E, EM, S, Self>,
+        + HasImported,
 {
-    fn fuzz_one(
+    fn process_events(
         &mut self,
-        stages: &mut ST,
-        executor: &mut E,
         state: &mut S,
+        executor: &mut E,
         manager: &mut EM,
-    ) -> Result<CorpusId, Error> {
-        // Init timer for scheduler
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().start_timer();
-
-        // Get the next index from the scheduler
-        let id = if let Some(id) = state.current_corpus_id()? {
-            id // we are resuming
-        } else {
-            let id = self.scheduler.next(state)?;
-            state.set_corpus_id(id)?; // set up for resume
-            id
-        };
-
-        // Mark the elapsed time for the scheduler
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().mark_scheduler_time();
-
-        // Mark the elapsed time for the scheduler
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().reset_stage_index();
-
-        // Execute all stages
-        stages.perform_all(self, executor, state, manager)?;
-
-        // Init timer for manager
-        #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().start_timer();
-
-        // Execute the manager
-        let events_received = manager.receive(state)?;
+    ) -> Result<(), Error> {
         // todo make this into a trait
-        for (event, with_observers) in events_received {
+        // Execute the manager
+        while let Some((event, with_observers)) = manager.receive(state)? {
             // at this point event is either newtestcase or objectives
             let res = if with_observers {
                 match event {
@@ -840,6 +818,70 @@ where
                 log::debug!("Received input was discarded");
             }
         }
+        Ok(())
+    }
+}
+
+impl<CS, E, EM, F, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, OF>
+where
+    CS: Scheduler<I, S>,
+    E: HasObservers + Executor<EM, I, S, Self>,
+    E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
+    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S> + RecordSerializationTime,
+    I: Input,
+    F: Feedback<EM, I, E::Observers, S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    EM: ProgressReporter<S> + SendExiting + EventReceiver<I, S>,
+    S: HasExecutions
+        + HasMetadata
+        + HasCorpus<I>
+        + HasSolutions<I>
+        + HasLastReportTime
+        + HasLastFoundTime
+        + HasImported
+        + HasTestcase<I>
+        + HasCurrentCorpusId
+        + HasCurrentStageId
+        + Stoppable
+        + MaybeHasClientPerfMonitor,
+    ST: StagesTuple<E, EM, S, Self>,
+{
+    fn fuzz_one(
+        &mut self,
+        stages: &mut ST,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<CorpusId, Error> {
+        // Init timer for scheduler
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().start_timer();
+
+        // Get the next index from the scheduler
+        let id = if let Some(id) = state.current_corpus_id()? {
+            id // we are resuming
+        } else {
+            let id = self.scheduler.next(state)?;
+            state.set_corpus_id(id)?; // set up for resume
+            id
+        };
+
+        // Mark the elapsed time for the scheduler
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().mark_scheduler_time();
+
+        // Mark the elapsed time for the scheduler
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().reset_stage_index();
+
+        // Execute all stages
+        stages.perform_all(self, executor, state, manager)?;
+
+        // Init timer for manager
+        #[cfg(feature = "introspection")]
+        state.introspection_monitor_mut().start_timer();
+
+        self.process_events(state, executor, manager)?;
 
         // Mark the elapsed time for the manager
         #[cfg(feature = "introspection")]

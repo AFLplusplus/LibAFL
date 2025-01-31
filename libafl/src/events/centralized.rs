@@ -32,7 +32,7 @@ use crate::{
     events::{
         serialize_observers_adaptive, std_maybe_report_progress, std_report_progress,
         AdaptiveSerializer, CanSerializeObserver, Event, EventConfig, EventFirer, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
+        EventReceiver, EventRestarter, HasEventManagerId, LogSeverity, ProgressReporter,
         SendExiting,
     },
     inputs::Input,
@@ -323,15 +323,15 @@ where
     }
 }
 
-impl<EM, I, S, SHM, SP> EventProcessor<I, S> for CentralizedEventManager<EM, I, S, SHM, SP>
+impl<EM, I, S, SHM, SP> EventReceiver<I, S> for CentralizedEventManager<EM, I, S, SHM, SP>
 where
-    EM: EventProcessor<I, S> + HasEventManagerId + EventFirer<I, S>,
+    EM: EventReceiver<I, S> + HasEventManagerId + EventFirer<I, S>,
     I: Input,
     S: Stoppable,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         if self.is_main {
             // main node
             self.receive_from_secondary(state)
@@ -434,9 +434,8 @@ where
         Ok(())
     }
 
-    fn receive_from_secondary(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive_from_secondary(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
-        let mut event_vec = vec![];
         let self_id = self.client.sender().id();
         while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
             assert!(
@@ -475,21 +474,16 @@ where
                         event_name
                     );
 
+                    log::debug!(
+                        "[{}] Running fuzzer with event {}",
+                        process::id(),
+                        event_name
+                    );
+
                     if client_config.match_with(&self.configuration()) && observers_buf.is_some() {
-                        log::debug!(
-                            "[{}] Running fuzzer with event {}",
-                            process::id(),
-                            event_name
-                        );
-                        event_vec.push((event, true));
-                    } else {
-                        log::debug!(
-                            "[{}] Running fuzzer with event {}",
-                            process::id(),
-                            event_name
-                        );
-                        event_vec.push((event, false));
+                        return Ok(Some((event, true)));
                     }
+                    return Ok(Some((event, false)));
                 }
                 Event::Stop => {
                     state.request_stop();
@@ -502,6 +496,6 @@ where
                 }
             }
         }
-        Ok(event_vec)
+        Ok(None)
     }
 }

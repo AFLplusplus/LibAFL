@@ -1,7 +1,7 @@
 use std::ffi::c_int;
 
 use libafl::{
-    events::{EventProcessor, ProgressReporter, SimpleEventManager},
+    events::{EventReceiver, ProgressReporter, SimpleEventManager},
     executors::HasObservers,
     feedbacks::MapFeedbackMetadata,
     monitors::SimpleMonitor,
@@ -30,7 +30,7 @@ where
         + HasCurrentStageId
         + Stoppable,
     E: HasObservers,
-    EM: ProgressReporter<S> + EventProcessor<I, S>,
+    EM: ProgressReporter<S> + EventReceiver<I, S>,
     ST: StagesTuple<E, EM, S, F>,
 {
     let meta = state

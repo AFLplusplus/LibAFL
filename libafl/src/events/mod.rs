@@ -597,11 +597,11 @@ pub trait AwaitRestartSafe {
     fn await_restart_safe(&mut self);
 }
 
-/// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<I, S> {
+/// [`EventReceiver`] process all the incoming messages
+pub trait EventReceiver<I, S> {
     /// Lookup for incoming events and process them.
-    /// Return the vector that needs to be evaluated
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error>;
+    /// Return the event, if any, that needs to be evaluated
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error>;
 
     /// Run the post processing routine after the fuzzer deemed this event as interesting
     /// For example, in centralized manager you wanna send this an event.
@@ -666,9 +666,9 @@ impl AwaitRestartSafe for NopEventManager {
     fn await_restart_safe(&mut self) {}
 }
 
-impl<I, S> EventProcessor<I, S> for NopEventManager {
-    fn receive(&mut self, _state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
-        Ok(Vec::new())
+impl<I, S> EventReceiver<I, S> for NopEventManager {
+    fn receive(&mut self, _state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        Ok(None)
     }
 
     fn interesting_testcase_event(
@@ -802,12 +802,12 @@ where
     }
 }
 
-impl<EM, I, M, S> EventProcessor<I, S> for MonitorTypedEventManager<EM, M>
+impl<EM, I, M, S> EventReceiver<I, S> for MonitorTypedEventManager<EM, M>
 where
-    EM: EventProcessor<I, S>,
+    EM: EventReceiver<I, S>,
 {
     #[inline]
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         self.inner.receive(state)
     }
     fn interesting_testcase_event(

@@ -1,6 +1,9 @@
-# 0.15.0 -> ????
+# 0.15.0 -> 0.16.0
 - `EventManager` is refactored to avoid calling function from `Fuzzer`, thus we do not evaluate testcases in `EventManager` anymore.
-  - Related: `EventProcessor` will have only 1 function `receive()`, it will only receive testcases but not evaluate testcases.
+  - Now we have `EventReceiver` in `events` module, and `EventProessor` in `fuzzer` module.
+  - `EventReceiver` is responsible for receiving testcases and delegates its evaluation to `EventProcessor`.
+  - `EventProcessor` is responsible for evaluating the testcases passed by the `EventReceiver`.
+  - Since we don't evaluate the `EventManager` anymore. `on_fire` and `post_exec` have been deleted from `EventManagerHook`.
 
 # 0.14.1 -> 0.15.0
 - `MmapShMem::new` and `MmapShMemProvider::new_shmem_with_id` now take `AsRef<Path>` instead of a byte array for the filename/id.

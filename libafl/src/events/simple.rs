@@ -28,7 +28,7 @@ use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
-        Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
         SendExiting,
     },
     monitors::Monitor,
@@ -115,13 +115,13 @@ where
     }
 }
 
-impl<I, MT, S> EventProcessor<I, S> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventReceiver<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
     S: Stoppable,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         while let Some(event) = self.events.pop() {
             match event {
                 Event::Stop => {
@@ -134,7 +134,7 @@ where
                 }
             }
         }
-        Ok(Vec::new())
+        Ok(None)
     }
     fn interesting_testcase_event(
         &mut self,
@@ -370,7 +370,7 @@ impl<I, MT, S, SHM, SP> AwaitRestartSafe for SimpleRestartingEventManager<I, MT,
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SHM, SP> EventProcessor<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+impl<I, MT, S, SHM, SP> EventReceiver<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
@@ -378,7 +378,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         self.inner.receive(state)
     }
 

@@ -13,7 +13,7 @@ use std::{
 use libafl::{
     corpus::Corpus,
     events::{
-        launcher::Launcher, EventConfig, EventProcessor, ProgressReporter, SimpleEventManager,
+        launcher::Launcher, EventConfig, EventReceiver, ProgressReporter, SimpleEventManager,
         SimpleRestartingEventManager,
     },
     executors::ExitKind,
@@ -68,7 +68,7 @@ where
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,
-    EM: ProgressReporter<S> + EventProcessor<I, S>,
+    EM: ProgressReporter<S> + EventReceiver<I, S>,
     ST: StagesTuple<E, EM, S, F>,
 {
     if let Some(solution) = state.solutions().last() {

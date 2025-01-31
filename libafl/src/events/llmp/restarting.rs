@@ -55,7 +55,7 @@ use crate::{
     events::{
         launcher::ClientDescription, serialize_observers_adaptive, std_maybe_report_progress,
         std_report_progress, AdaptiveSerializer, AwaitRestartSafe, CanSerializeObserver, Event,
-        EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventProcessor,
+        EventConfig, EventFirer, EventManagerHooksTuple, EventManagerId, EventReceiver,
         EventRestarter, HasEventManagerId, LlmpShouldSaveState, ProgressReporter,
         RecordSerializationTime, SendExiting, StdLlmpEventHook, LLMP_TAG_EVENT_TO_BOTH,
         _LLMP_TAG_EVENT_TO_BROKER,
@@ -311,7 +311,7 @@ where
     }
 }
 
-impl<EMH, I, S, SHM, SP> EventProcessor<I, S> for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> EventReceiver<I, S> for LlmpRestartingEventManager<EMH, I, S, SHM, SP>
 where
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned + Input,
@@ -319,8 +319,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Vec<(Event<I>, bool)>, Error> {
-        let mut event_vec = vec![];
+    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
@@ -356,7 +355,7 @@ where
 
             log::trace!("Got event in client: {} from {client_id:?}", event.name());
             if !self.hooks.pre_exec_all(state, client_id, &event)? {
-                return Ok(Vec::new());
+                continue;
             }
             let evt_name = event.name_detailed();
             match event {
@@ -371,10 +370,10 @@ where
                     log::debug!("[{}] Received new Testcase {evt_name} from {client_id:?} ({client_config:?}, forward {forward_id:?})", std::process::id());
 
                     if client_config.match_with(&self.configuration) && observers_buf.is_some() {
-                        event_vec.push((event, true));
-                    } else {
-                        event_vec.push((event, false));
+                        return Ok(Some((event, true)));
                     }
+
+                    return Ok(Some((event, false)));
                 }
 
                 #[cfg(feature = "share_objectives")]
@@ -382,7 +381,7 @@ where
                     #[cfg(feature = "std")]
                     log::debug!("[{}] Received new Objective", std::process::id());
 
-                    event_vec.push((event, false));
+                    Ok(Some((event, false)))
                 }
                 Event::Stop => {
                     state.request_stop();
@@ -395,7 +394,7 @@ where
                 }
             }
         }
-        Ok(event_vec)
+        Ok(None)
     }
 
     fn interesting_testcase_event(
