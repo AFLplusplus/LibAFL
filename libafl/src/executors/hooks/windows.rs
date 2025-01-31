@@ -9,7 +9,6 @@ pub mod windows_asan_handler {
     };
 
     use crate::{
-        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::GLOBAL_STATE, inprocess::run_observers_and_save_state, Executor,
@@ -17,27 +16,22 @@ pub mod windows_asan_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, S, Z>()
+    pub unsafe extern "C" fn asan_death_handler<E, EM, I, OF, S, Z>()
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions
-            + HasSolutions
-            + HasCurrentTestcase
-            + HasCorpus
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        I: Input + Clone,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
     {
         let data = &raw mut GLOBAL_STATE;
         (*data).set_in_handler(true);
@@ -89,9 +83,9 @@ pub mod windows_asan_handler {
             log::error!("Child crashed!");
 
             // Make sure we don't crash in the crash handler forever.
-            let input = (*data).take_current_input::<<S::Corpus as Corpus>::Input>();
+            let input = (*data).take_current_input::<I>();
 
-            run_observers_and_save_state::<E, EM, OF, S, Z>(
+            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                 executor,
                 state,
                 input,
@@ -131,7 +125,6 @@ pub mod windows_exception_handler {
     };
 
     use crate::{
-        corpus::Corpus,
         events::{EventFirer, EventRestarter},
         executors::{
             hooks::inprocess::{HasTimeout, InProcessExecutorHandlerData, GLOBAL_STATE},
@@ -140,9 +133,9 @@ pub mod windows_exception_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::{Input, UsesInput},
+        inputs::Input,
         observers::ObserversTuple,
-        state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+        state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -186,20 +179,15 @@ pub mod windows_exception_handler {
     /// # Safety
     /// Well, exception handling is not safe
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, OF, S, Z>()
+    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
     where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions
-            + HasSolutions
-            + HasCurrentTestcase
-            + HasCorpus
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        I: Input + Clone,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
@@ -228,9 +216,9 @@ pub mod windows_exception_handler {
                 let fuzzer = (*data).fuzzer_mut::<Z>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
 
-                let input = (*data).take_current_input::<<S::Corpus as Corpus>::Input>();
+                let input = (*data).take_current_input::<I>();
 
-                run_observers_and_save_state::<E, EM, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -250,23 +238,18 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, S, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OF, S, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasInProcessHooks<S> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions
-            + HasSolutions
-            + HasCurrentTestcase
-            + HasCorpus
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        I: Input + Clone,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -298,12 +281,10 @@ pub mod windows_exception_handler {
             } else {
                 log::error!("Timeout in fuzz run.");
 
-                let input = (data.current_input_ptr as *const <S::Corpus as Corpus>::Input)
-                    .as_ref()
-                    .unwrap();
+                let input = (data.current_input_ptr as *const I).as_ref().unwrap();
                 data.current_input_ptr = ptr::null_mut();
 
-                run_observers_and_save_state::<E, EM, OF, S, Z>(
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,
@@ -327,22 +308,17 @@ pub mod windows_exception_handler {
     ///
     /// # Safety
     /// Well, exception handling is not safe
-    pub unsafe fn inproc_crash_handler<E, EM, OF, S, Z>(
+    pub unsafe fn inproc_crash_handler<E, EM, I, OF, S, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, <S::Corpus as Corpus>::Input, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-        S: HasExecutions
-            + HasSolutions
-            + HasCorpus
-            + HasCurrentTestcase
-            + UsesInput<Input = <S::Corpus as Corpus>::Input>,
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        I: Input + Clone,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
         Z: HasObjective<Objective = OF>,
-        <S::Corpus as Corpus>::Input: Input + Clone,
-        S::Solutions: Corpus<Input = <S::Corpus as Corpus>::Input>,
     {
         // Have we set a timer_before?
         if data.ptp_timer.is_some() {
@@ -438,8 +414,8 @@ pub mod windows_exception_handler {
             if is_crash {
                 log::warn!("Running observers and exiting!");
                 // // I want to disable the hooks before doing anything, especially before taking a stack dump
-                let input = data.take_current_input::<<S::Corpus as Corpus>::Input>(); // log::set_max_level(log::LevelFilter::Trace);
-                run_observers_and_save_state::<E, EM, OF, S, Z>(
+                let input = data.take_current_input::<I>(); // log::set_max_level(log::LevelFilter::Trace);
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
                     input,

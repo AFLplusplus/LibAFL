@@ -9,10 +9,9 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
-#[cfg(feature = "injections")]
-use libafl_qemu::modules::injections::InjectionModule;
 use libafl_qemu::modules::{
     asan::AsanModule, asan_guest::AsanGuestModule, cmplog::CmpLogModule, DrCovModule,
+    InjectionModule,
 };
 
 use crate::{
@@ -23,7 +22,7 @@ use crate::{
 
 #[expect(clippy::module_name_repetitions)]
 pub type ClientState =
-    StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 pub struct Client<'a> {
     options: &'a FuzzerOptions,
@@ -61,11 +60,11 @@ impl Client<'_> {
         let core_id = client_description.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);
-        log::debug!("ARGS: {:#?}", args);
+        log::info!("ARGS: {:#?}", args);
 
         let mut env = self.env();
         Harness::edit_env(&mut env);
-        log::debug!("ENV: {:#?}", env);
+        log::info!("ENV: {:#?}", env);
 
         let is_asan = self.options.is_asan_core(core_id);
         let is_asan_guest = self.options.is_asan_guest_core(core_id);
@@ -75,7 +74,7 @@ impl Client<'_> {
         }
 
         #[cfg(not(feature = "injections"))]
-        let injection_module = None;
+        let injection_module = Option::<InjectionModule>::None;
 
         #[cfg(feature = "injections")]
         let injection_module = self
@@ -95,10 +94,14 @@ impl Client<'_> {
 
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let extra_tokens = injection_module
-            .as_ref()
-            .map(|h| h.tokens.clone())
-            .unwrap_or_default();
+        let extra_tokens = if cfg!(feature = "injections") {
+            injection_module
+                .as_ref()
+                .map(|h| h.tokens.clone())
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
         let instance_builder = Instance::builder()
             .options(self.options)

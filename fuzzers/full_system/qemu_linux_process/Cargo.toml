@@ -1,6 +1,6 @@
 [package]
 name = "qemu_linux_process"
-version = "0.14.1"
+version = "0.15.0"
 authors = ["Romain Malmain <rmalmain@pm.me>"]
 edition = "2021"
 
@@ -27,6 +27,7 @@ libafl_qemu = { path = "../../../libafl_qemu", default-features = false, feature
 ] }
 env_logger = "0.11.5"
 libafl_targets = { path = "../../../libafl_targets" }
+log = "0.4.22"
 
 [build-dependencies]
 libafl_qemu_build = { path = "../../../libafl_qemu/libafl_qemu_build" }

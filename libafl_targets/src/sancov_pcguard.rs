@@ -205,7 +205,7 @@ extern "C" {
 #[no_mangle]
 #[allow(unused_assignments)] // cfg dependent
 pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
-    #[allow(unused_mut)] // cfg dependent
+    #[allow(unused_variables, unused_mut)] // cfg dependent
     let mut pos = *guard as usize;
 
     #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]

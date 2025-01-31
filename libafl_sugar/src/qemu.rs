@@ -150,7 +150,7 @@ where
         let time_ref = time_observer.handle();
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                               _core_id| {
             let time_observer = time_observer.clone();
 
@@ -231,7 +231,7 @@ where
                     }
                 };
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>,
                                    _state: &mut _,
                                    input: &BytesInput| {
                     let target = input.target_bytes();
@@ -352,7 +352,7 @@ where
                     .build()
                     .unwrap());
 
-                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>,
+                let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>,
                                    _state: &mut _,
                                    input: &BytesInput| {
                     let target = input.target_bytes();

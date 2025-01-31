@@ -1,24 +1,32 @@
 //! Tracing of expressions in a serialized form.
+#![allow(no_mangle_generic_items)]
 
 pub use libafl::observers::concolic::serialization_format::StdShMemMessageFileWriter;
 use libafl::observers::concolic::SymExpr;
+use libafl_bolts::shmem::ShMem;
 
 use crate::{RSymExpr, Runtime};
 
 /// Traces the expressions according to the format described in [`libafl::observers::concolic::serialization_format`].
 ///
 /// The format can be read from elsewhere to perform processing of the expressions outside of the runtime.
-pub struct TracingRuntime {
-    writer: StdShMemMessageFileWriter,
+pub struct TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
+    writer: StdShMemMessageFileWriter<SHM>,
     trace_locations: bool,
 }
 
-impl TracingRuntime {
+impl<SHM> TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
     /// Creates the runtime, tracing using the given writer.
     /// When `trace_locations` is true, location information for calls, returns and basic blocks will also be part of the trace.
     /// Tracing location information can drastically increase trace size. It is therefore recommended to not active this if not needed.
     #[must_use]
-    pub fn new(writer: StdShMemMessageFileWriter, trace_locations: bool) -> Self {
+    pub fn new(writer: StdShMemMessageFileWriter<SHM>, trace_locations: bool) -> Self {
         Self {
             writer,
             trace_locations,
@@ -62,7 +70,10 @@ macro_rules! binary_expression_builder {
     };
 }
 
-impl Runtime for TracingRuntime {
+impl<SHM> Runtime for TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
     #[no_mangle]
     fn build_integer_from_buffer(
         &mut self,
@@ -201,7 +212,10 @@ impl Runtime for TracingRuntime {
     }
 }
 
-impl Drop for TracingRuntime {
+impl<SHM> Drop for TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
     fn drop(&mut self) {
         // manually end the writer to update the length prefix
         self.writer

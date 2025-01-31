@@ -1,8 +1,8 @@
 # Fuzzbench Harness
 
 This folder contains an example fuzzer tailored for fuzzbench.
-It uses the best possible setting, with the exception of a SimpleRestartingEventManager instead of an LlmpEventManager - since fuzzbench is single threaded.
-Real fuzz campaigns should consider using multithreaded LlmpEventManager, see the other examples.
+It uses the best possible setting, with the exception of a SimpleRestartingEventManager instead of an LlmpRestartingEventManager - since fuzzbench is single threaded.
+Real fuzz campaigns should consider using multithreaded LlmpRestaringtEventManager, see the other examples.
 
 ## Build
 

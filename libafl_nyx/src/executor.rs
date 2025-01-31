@@ -5,17 +5,16 @@ use std::{
 };
 
 use libafl::{
-    corpus::Corpus,
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
-    inputs::{HasTargetBytes, UsesInput},
+    inputs::HasTargetBytes,
     observers::{ObserversTuple, StdOutObserver},
-    state::{HasCorpus, HasExecutions, UsesState},
+    state::HasExecutions,
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
 use libnyx::NyxReturnValue;
 
-use crate::helper::NyxHelper;
+use crate::{cmplog::CMPLOG_ENABLED, helper::NyxHelper};
 
 /// executor for nyx standalone mode
 pub struct NyxExecutor<S, OT> {
@@ -39,19 +38,18 @@ impl NyxExecutor<(), ()> {
     }
 }
 
-impl<EM, S, Z, OT> Executor<EM, <S::Corpus as Corpus>::Input, S, Z> for NyxExecutor<S, OT>
+impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for NyxExecutor<S, OT>
 where
-    EM: UsesState<State = S>,
-    S: HasCorpus + HasExecutions + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    <S::Corpus as Corpus>::Input: HasTargetBytes,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
+    S: HasExecutions,
+    I: HasTargetBytes,
+    OT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
         _mgr: &mut EM,
-        input: &<S::Corpus as Corpus>::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
@@ -81,6 +79,13 @@ where
 
         self.helper.nyx_process.set_input(buffer, size);
         self.helper.nyx_process.set_hprintf_fd(hprintf_fd);
+
+        unsafe {
+            if CMPLOG_ENABLED == 1 {
+                self.helper.nyx_process.option_set_redqueen_mode(true);
+                self.helper.nyx_process.option_apply();
+            }
+        }
 
         // exec will take care of trace_bits, so no need to reset
         let exit_kind = match self.helper.nyx_process.exec() {
@@ -115,7 +120,14 @@ where
                 .read_to_end(&mut stdout)
                 .map_err(|e| Error::illegal_state(format!("Failed to read Nyx stdout: {e}")))?;
 
-            ob.observe_stdout(&stdout);
+            ob.observe(&stdout);
+        }
+
+        unsafe {
+            if CMPLOG_ENABLED == 1 {
+                self.helper.nyx_process.option_set_redqueen_mode(false);
+                self.helper.nyx_process.option_apply();
+            }
         }
 
         Ok(exit_kind)

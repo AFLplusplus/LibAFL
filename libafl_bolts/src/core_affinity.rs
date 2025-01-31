@@ -251,6 +251,7 @@ mod linux {
     use super::CoreId;
     use crate::Error;
 
+    #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         let full_set = get_affinity_mask()?;
         let mut core_ids: Vec<CoreId> = Vec::new();

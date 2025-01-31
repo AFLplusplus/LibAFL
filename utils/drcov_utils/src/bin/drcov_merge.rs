@@ -24,6 +24,7 @@ pub struct Opt {
 }
 
 fn main() {
+    env_logger::init();
     let opts = Opt::parse();
 
     assert!(

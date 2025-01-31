@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use libafl::{inputs::UsesInput, observers::VarLenMapObserver, HasMetadata};
+use libafl::{observers::VarLenMapObserver, HasMetadata};
 use libafl_bolts::Error;
 use libafl_qemu_sys::GuestAddr;
 #[cfg(feature = "systemmode")]
@@ -34,6 +34,8 @@ pub use child::{
 };
 use libafl::observers::ConstLenMapObserver;
 
+use super::utils::filters::HasAddressFilter;
+
 /// Standard edge coverage module, adapted to most use cases
 pub type StdEdgeCoverageModule = StdEdgeCoverageFullModule;
 
@@ -49,42 +51,46 @@ trait EdgeCoverageVariant<AF, PF, const IS_CONST_MAP: bool, const MAP_SIZE: usiz
 {
     const DO_SIDE_EFFECTS: bool = true;
 
-    fn jit_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn jit_hitcount<ET, I, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
     {
         panic!("JIT hitcount is not supported.")
     }
 
-    fn jit_no_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn jit_no_hitcount<ET, I, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
     {
         panic!("JIT no hitcount is not supported.")
     }
 
-    fn fn_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn fn_hitcount<ET, I, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
     {
         panic!("Func hitcount is not supported.")
     }
 
-    fn fn_no_hitcount<ET, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, S>)
+    fn fn_no_hitcount<ET, I, S>(&mut self, _emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         AF: AddressFilter,
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
         PF: PageFilter,
-        S: Unpin + UsesInput + HasMetadata,
+        I: Unpin,
+        S: HasMetadata + Unpin,
     {
         panic!("Func no hitcount is not supported.")
     }
@@ -314,27 +320,24 @@ where
     }
 }
 
-impl<S, AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize> EmulatorModule<S>
+impl<I, S, AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize> EmulatorModule<I, S>
     for EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>
 where
     AF: AddressFilter + 'static,
     PF: PageFilter + 'static,
-    S: Unpin + UsesInput + HasMetadata,
+    I: Unpin,
+    S: Unpin + HasMetadata,
     V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE> + 'static,
 {
-    type ModuleAddressFilter = AF;
-
-    #[cfg(feature = "systemmode")]
-    type ModulePageFilter = PF;
     const HOOKS_DO_SIDE_EFFECTS: bool = V::DO_SIDE_EFFECTS;
 
     fn first_exec<ET>(
         &mut self,
         _qemu: Qemu,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         if self.use_hitcounts {
             if self.use_jit {
@@ -348,7 +351,18 @@ where
             self.variant.fn_no_hitcount(emulator_modules);
         }
     }
+}
 
+impl<AF, PF, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize> HasAddressFilter
+    for EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>
+where
+    AF: AddressFilter,
+    PF: PageFilter,
+{
+    type ModuleAddressFilter = AF;
+
+    #[cfg(feature = "systemmode")]
+    type ModulePageFilter = PF;
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &self.address_filter
     }

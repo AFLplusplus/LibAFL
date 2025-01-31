@@ -9,8 +9,7 @@ use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryCorpus},
     events::{
-        launcher::Launcher, ClientDescription, EventConfig, EventRestarter,
-        LlmpRestartingEventManager,
+        launcher::Launcher, ClientDescription, EventConfig, LlmpRestartingEventManager, SendExiting,
     },
     executors::ExitKind,
     fuzzer::StdFuzzer,
@@ -30,7 +29,7 @@ use libafl_bolts::{
 };
 use libafl_qemu::{
     elf::EasyElf,
-    modules::{drcov::DrCovModule, utils::filters::StdAddressFilter},
+    modules::{drcov::DrCovModule, SnapshotModule},
     ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
     QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
 };
@@ -102,6 +101,7 @@ pub struct FuzzerOptions {
 pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
 
 pub fn fuzz() {
+    env_logger::init();
     let mut options = FuzzerOptions::parse();
 
     let corpus_files = options
@@ -116,23 +116,28 @@ pub fn fuzz() {
     let files_per_core = (num_files as f64 / num_cores as f64).ceil() as usize;
 
     let program = env::args().next().unwrap();
-    log::debug!("Program: {program:}");
+    log::info!("Program: {program:}");
 
     options.args.insert(0, program);
-    log::debug!("ARGS: {:#?}", options.args);
+    log::info!("ARGS: {:#?}", options.args);
 
     env::remove_var("LD_LIBRARY_PATH");
 
     let mut run_client = |state: Option<_>,
-                          mut mgr: LlmpRestartingEventManager<_, _, _>,
+                          mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         let mut cov_path = options.coverage_path.clone();
+        let core_id = client_description.core_id();
 
-        let emulator_modules = tuple_list!(DrCovModule::builder()
-            .filter(StdAddressFilter::default())
-            .filename(cov_path.clone())
-            .full_trace(false)
-            .build());
+        let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
+        let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
+        let core = core_id.0;
+        cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+
+        let emulator_modules = tuple_list!(
+            DrCovModule::builder().filename(cov_path.clone()).build(),
+            SnapshotModule::new(),
+        );
 
         let emulator = Emulator::empty()
             .qemu_parameters(options.args.clone())
@@ -147,12 +152,12 @@ pub fn fuzz() {
         let test_one_input_ptr = elf
             .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
             .expect("Symbol LLVMFuzzerTestOneInput not found");
-        log::debug!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
+        log::info!("LLVMFuzzerTestOneInput @ {test_one_input_ptr:#x}");
 
         qemu.entry_break(test_one_input_ptr);
 
         for m in qemu.mappings() {
-            log::debug!(
+            log::info!(
                 "Mapping: 0x{:016x}-0x{:016x}, {}",
                 m.start(),
                 m.end(),
@@ -161,23 +166,23 @@ pub fn fuzz() {
         }
 
         let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
-        log::debug!("Break at {pc:#x}");
+        log::info!("Break at {pc:#x}");
 
         let ret_addr: GuestAddr = qemu.read_return_address().unwrap();
-        log::debug!("Return address = {ret_addr:#x}");
+        log::info!("Return address = {ret_addr:#x}");
 
         qemu.set_breakpoint(ret_addr);
 
         let input_addr = qemu
             .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
             .unwrap();
-        log::debug!("Placing input at {input_addr:#x}");
+        log::info!("Placing input at {input_addr:#x}");
 
         let stack_ptr: GuestAddr = qemu.read_reg(Regs::Sp).unwrap();
 
-        let reset = |buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
+        let reset = |qemu: Qemu, buf: &[u8], len: GuestReg| -> Result<(), QemuRWError> {
             unsafe {
-                let _ = qemu.write_mem(input_addr, buf);
+                qemu.write_mem(input_addr, buf)?;
                 qemu.write_reg(Regs::Pc, test_one_input_ptr)?;
                 qemu.write_reg(Regs::Sp, stack_ptr)?;
                 qemu.write_return_address(ret_addr)?;
@@ -197,7 +202,9 @@ pub fn fuzz() {
         };
 
         let mut harness =
-            |_emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            |emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+                let qemu = emulator.qemu();
+
                 let target = input.target_bytes();
                 let mut buf = target.as_slice();
                 let mut len = buf.len();
@@ -206,7 +213,8 @@ pub fn fuzz() {
                     len = MAX_INPUT_SIZE;
                 }
                 let len = len as GuestReg;
-                reset(buf, len).unwrap();
+                reset(qemu, buf, len).unwrap();
+
                 ExitKind::Ok
             };
 
@@ -215,6 +223,7 @@ pub fn fuzz() {
             .cores
             .position(core_id)
             .expect("Failed to get core index");
+
         let files = corpus_files
             .iter()
             .skip(files_per_core * core_idx)
@@ -245,11 +254,6 @@ pub fn fuzz() {
         let scheduler = QueueScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let coverage_name = cov_path.file_stem().unwrap().to_str().unwrap();
-        let coverage_extension = cov_path.extension().unwrap_or_default().to_str().unwrap();
-        let core = core_id.0;
-        cov_path.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
-
         let mut executor = QemuExecutor::new(
             emulator,
             &mut harness,
@@ -268,10 +272,10 @@ pub fn fuzz() {
                     println!("Failed to load initial corpus at {:?}", &options.input_dir);
                     process::exit(0);
                 });
-            log::debug!("We imported {} inputs from disk.", state.corpus().count());
+            log::info!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        log::debug!("Processed {} inputs from disk.", files.len());
+        log::info!("Processed {} inputs from disk.", files.len());
 
         mgr.send_exiting()?;
         Err(Error::ShuttingDown)?
@@ -284,11 +288,6 @@ pub fn fuzz() {
         .monitor(MultiMonitor::new(|s| println!("{s}")))
         .run_client(&mut run_client)
         .cores(&options.cores)
-        .stdout_file(if options.verbose {
-            None
-        } else {
-            Some("/dev/null")
-        })
         .build()
         .launch()
     {
