@@ -331,18 +331,18 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         if self.is_main {
             // main node
             self.receive_from_secondary(state)
             // self.inner.process(fuzzer, state, executor)
         } else {
             // The main node does not process incoming events from the broker ATM
-            self.inner.receive(state)
+            self.inner.try_receive(state)
         }
     }
 
-    fn interesting_testcase_event(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
         self.inner.fire(state, event)
     }
 }
@@ -489,7 +489,7 @@ where
                     state.request_stop();
                 }
                 _ => {
-                    return Err(Error::unknown(format!(
+                    return Err(Error::illegal_state(format!(
                         "Received illegal message that message should not have arrived: {:?}.",
                         event.name()
                     )));

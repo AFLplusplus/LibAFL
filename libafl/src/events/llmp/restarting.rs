@@ -319,7 +319,7 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender().id();
         while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
@@ -354,7 +354,7 @@ where
             }
 
             log::trace!("Got event in client: {} from {client_id:?}", event.name());
-            if !self.hooks.pre_exec_all(state, client_id, &event)? {
+            if !self.hooks.pre_receive_all(state, client_id, &event)? {
                 continue;
             }
             let evt_name = event.name_detailed();
@@ -397,11 +397,7 @@ where
         Ok(None)
     }
 
-    fn interesting_testcase_event(
-        &mut self,
-        _state: &mut S,
-        _event_vec: Event<I>,
-    ) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }

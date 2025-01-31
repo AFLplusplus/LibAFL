@@ -450,7 +450,6 @@ where
         observers_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        let input = input.clone();
         // Now send off the event
         match exec_res {
             ExecuteInputResult::Corpus => {
@@ -458,7 +457,7 @@ where
                     manager.fire(
                         state,
                         Event::NewTestcase {
-                            input,
+                            input: input.clone(),
                             observers_buf,
                             exit_kind: *exit_kind,
                             corpus_size: state.corpus().count(),
@@ -471,13 +470,15 @@ where
                     )?;
                 }
             }
-            ExecuteInputResult::Solution => {
+            ExecuteInputResult::Solution =>
+            {
+                #[cfg(feature = "share_objectives")]
                 if manager.should_send() {
                     manager.fire(
                         state,
                         Event::Objective {
                             #[cfg(feature = "share_objectives")]
-                            input,
+                            input: input.clone(),
 
                             objective_size: state.solutions().count(),
                             time: current_time(),
@@ -767,7 +768,7 @@ where
     ) -> Result<(), Error> {
         // todo make this into a trait
         // Execute the manager
-        while let Some((event, with_observers)) = manager.receive(state)? {
+        while let Some((event, with_observers)) = manager.try_receive(state)? {
             // at this point event is either newtestcase or objectives
             let res = if with_observers {
                 match event {
@@ -814,7 +815,7 @@ where
                 log::debug!("Added received input as item #{item}");
 
                 // for centralize
-                manager.interesting_testcase_event(state, event)?;
+                manager.on_interesting(state, event)?;
             } else {
                 log::debug!("Received input was discarded");
             }

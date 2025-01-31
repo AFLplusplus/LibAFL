@@ -632,7 +632,7 @@ where
         + Stoppable,
     I: DeserializeOwned,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client_id;
         let mut len_buf = [0_u8; 4];
@@ -712,11 +712,7 @@ where
         Ok(None)
     }
 
-    fn interesting_testcase_event(
-        &mut self,
-        _state: &mut S,
-        _event: Event<I>,
-    ) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -883,12 +879,12 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
-        self.tcp_mgr.receive(state)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.tcp_mgr.try_receive(state)
     }
 
-    fn interesting_testcase_event(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
-        self.tcp_mgr.interesting_testcase_event(state, event)
+    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+        self.tcp_mgr.on_interesting(state, event)
     }
 }
 

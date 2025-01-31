@@ -121,7 +121,7 @@ where
     MT: Monitor,
     S: Stoppable,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         while let Some(event) = self.events.pop() {
             match event {
                 Event::Stop => {
@@ -136,11 +136,7 @@ where
         }
         Ok(None)
     }
-    fn interesting_testcase_event(
-        &mut self,
-        _state: &mut S,
-        _event_vec: Event<I>,
-    ) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -378,15 +374,11 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
-        self.inner.receive(state)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.inner.try_receive(state)
     }
 
-    fn interesting_testcase_event(
-        &mut self,
-        _state: &mut S,
-        _event_vec: Event<I>,
-    ) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }

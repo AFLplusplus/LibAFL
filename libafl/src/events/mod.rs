@@ -601,11 +601,11 @@ pub trait AwaitRestartSafe {
 pub trait EventReceiver<I, S> {
     /// Lookup for incoming events and process them.
     /// Return the event, if any, that needs to be evaluated
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error>;
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error>;
 
     /// Run the post processing routine after the fuzzer deemed this event as interesting
     /// For example, in centralized manager you wanna send this an event.
-    fn interesting_testcase_event(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -667,15 +667,11 @@ impl AwaitRestartSafe for NopEventManager {
 }
 
 impl<I, S> EventReceiver<I, S> for NopEventManager {
-    fn receive(&mut self, _state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+    fn try_receive(&mut self, _state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         Ok(None)
     }
 
-    fn interesting_testcase_event(
-        &mut self,
-        _state: &mut S,
-        _event_vec: Event<I>,
-    ) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -807,14 +803,10 @@ where
     EM: EventReceiver<I, S>,
 {
     #[inline]
-    fn receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
-        self.inner.receive(state)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.inner.try_receive(state)
     }
-    fn interesting_testcase_event(
-        &mut self,
-        _state: &mut S,
-        _event_vec: Event<I>,
-    ) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
