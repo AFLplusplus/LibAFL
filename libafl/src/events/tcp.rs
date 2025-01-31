@@ -664,7 +664,7 @@ where
                         // make decompressed vec and slice compatible
                         let event = postcard::from_bytes(buf)?;
 
-                        if !self.hooks.pre_receive(state, other_client_id, &event)? {
+                        if !self.hooks.pre_receive_all(state, other_client_id, &event)? {
                             continue;
                         }
                         match event {
