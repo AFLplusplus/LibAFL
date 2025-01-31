@@ -3,9 +3,12 @@
 
 #[cfg(any(target_vendor = "apple", target_os = "openbsd"))]
 use core::mem::size_of;
-use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 use std::process::Command;
+use std::{
+    io::{BufWriter, Write},
+    vec::Vec,
+};
 
 #[cfg(unix)]
 use libc::siginfo_t;
@@ -1108,6 +1111,24 @@ pub fn generate_minibsod<W: Write>(
     writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
     write_minibsod(writer)
+}
+
+/// Generates a mini-BSOD given a signal and context and dump it to a [`Vec`]
+#[cfg(unix)]
+pub fn generate_minibsod_to_vec(
+    signal: Signal,
+    siginfo: &siginfo_t,
+    ucontext: Option<&ucontext_t>,
+) -> Result<Vec<u8>, std::io::Error> {
+    let mut bsod = Vec::new();
+    {
+        let mut writer = BufWriter::new(&mut bsod);
+
+        generate_minibsod(&mut writer, signal, siginfo, ucontext)?;
+
+        writer.flush()?;
+    }
+    Ok(bsod)
 }
 
 /// Generates a mini-BSOD given an `EXCEPTION_POINTERS` structure.

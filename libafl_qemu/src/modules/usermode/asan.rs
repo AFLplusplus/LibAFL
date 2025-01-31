@@ -9,12 +9,12 @@ use std::{
     fs,
     path::PathBuf,
     pin::Pin,
-    process,
     sync::Mutex,
 };
 
 use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, observers::ObserversTuple};
+use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::GuestAddr;
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
@@ -73,6 +73,17 @@ pub struct AsanGiovese {
     pub dirty_shadow: Mutex<HashSet<GuestAddr>>,
     pub saved_shadow: HashMap<GuestAddr, Vec<i8>>,
     pub snapshot_shadow: bool,
+    pub target_crash: AsanTargetCrash,
+    pub error_found: bool,
+}
+
+pub struct AsanModuleBuilder {
+    env: Option<Vec<(String, String)>>,
+    detect_leaks: bool,
+    snapshot: bool,
+    filter: StdAddressFilter,
+    error_callback: Option<AsanErrorCallback>,
+    target_crash: AsanTargetCrash,
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
@@ -132,12 +143,11 @@ pub enum AsanError {
     Signal(i32),
 }
 
-pub struct AsanModuleBuilder {
-    env: Option<Vec<(String, String)>>,
-    detect_leaks: bool,
-    snapshot: bool,
-    filter: StdAddressFilter,
-    error_callback: Option<AsanErrorCallback>,
+#[derive(Clone, Debug)]
+pub enum AsanTargetCrash {
+    Never,
+    OnFirstError,
+    OnTargetStop,
 }
 
 #[derive(Debug, Clone)]
@@ -239,6 +249,7 @@ impl AsanModuleBuilder {
         snapshot: bool,
         filter: StdAddressFilter,
         error_callback: Option<AsanErrorCallback>,
+        target_crash: AsanTargetCrash,
     ) -> Self {
         Self {
             env,
@@ -246,6 +257,7 @@ impl AsanModuleBuilder {
             snapshot,
             filter,
             error_callback,
+            target_crash,
         }
     }
 
@@ -257,6 +269,7 @@ impl AsanModuleBuilder {
             self.snapshot,
             self.filter,
             self.error_callback,
+            self.target_crash,
         )
     }
 
@@ -268,6 +281,7 @@ impl AsanModuleBuilder {
             self.snapshot,
             self.filter,
             self.error_callback,
+            self.target_crash,
         )
     }
 
@@ -279,6 +293,7 @@ impl AsanModuleBuilder {
             snapshot,
             self.filter,
             self.error_callback,
+            self.target_crash,
         )
     }
 
@@ -290,6 +305,7 @@ impl AsanModuleBuilder {
             self.snapshot,
             filter,
             self.error_callback,
+            self.target_crash,
         )
     }
 
@@ -301,6 +317,7 @@ impl AsanModuleBuilder {
             self.snapshot,
             self.filter,
             Some(callback),
+            self.target_crash,
         )
     }
 
@@ -318,6 +335,18 @@ impl AsanModuleBuilder {
             self.snapshot,
             self.filter,
             Some(AsanErrorCallback::report()),
+            self.target_crash,
+        )
+    }
+
+    pub fn target_crash(self, target_crash: AsanTargetCrash) -> Self {
+        Self::new(
+            self.env,
+            self.detect_leaks,
+            self.snapshot,
+            self.filter,
+            self.error_callback,
+            target_crash,
         )
     }
 
@@ -329,13 +358,21 @@ impl AsanModuleBuilder {
             self.snapshot,
             self.filter,
             self.error_callback,
+            self.target_crash,
         )
     }
 }
 
 impl Default for AsanModuleBuilder {
     fn default() -> Self {
-        Self::new(None, false, true, StdAddressFilter::default(), None)
+        Self::new(
+            None,
+            false,
+            true,
+            StdAddressFilter::default(),
+            None,
+            AsanTargetCrash::OnFirstError,
+        )
     }
 }
 
@@ -352,6 +389,7 @@ impl AsanModule {
         snapshot: bool,
         filter: StdAddressFilter,
         error_callback: Option<AsanErrorCallback>,
+        target_crash: AsanTargetCrash,
     ) -> Self {
         let mut rt = AsanGiovese::new();
 
@@ -359,6 +397,8 @@ impl AsanModule {
         if let Some(cb) = error_callback {
             rt.set_error_callback(cb);
         }
+
+        rt.set_target_crash(target_crash);
 
         Self {
             env: env.to_vec(),
@@ -484,6 +524,8 @@ impl AsanGiovese {
             dirty_shadow: Mutex::new(HashSet::default()),
             saved_shadow: HashMap::default(),
             snapshot_shadow: true, // By default, track the dirty shadow pages
+            target_crash: AsanTargetCrash::OnFirstError,
+            error_found: false,
         };
         Box::pin(res)
     }
@@ -545,6 +587,10 @@ impl AsanGiovese {
 
     fn set_snapshot_shadow(&mut self, snapshot_shadow: bool) {
         self.snapshot_shadow = snapshot_shadow;
+    }
+
+    fn set_target_crash(&mut self, target_crash: AsanTargetCrash) {
+        self.target_crash = target_crash;
     }
 
     #[inline]
@@ -704,8 +750,14 @@ impl AsanGiovese {
         if let Some(mut cb) = self.error_callback.take() {
             cb.call(self, qemu, pc, error);
             self.error_callback = Some(cb);
-        } else {
-            process::abort();
+        }
+
+        match self.target_crash {
+            AsanTargetCrash::OnFirstError => unsafe {
+                qemu.target_signal(Signal::SigSegmentationFault);
+            },
+
+            _ => {}
         }
     }
 
@@ -1033,6 +1085,8 @@ where
     ) where
         ET: EmulatorModuleTuple<I, S>,
     {
+        self.rt.error_found = false;
+
         if self.empty {
             self.rt.snapshot(qemu);
             self.empty = false;
@@ -1051,6 +1105,14 @@ where
         ET: EmulatorModuleTuple<I, S>,
         OT: ObserversTuple<I, S>,
     {
+        match self.rt.target_crash {
+            AsanTargetCrash::OnTargetStop => unsafe {
+                qemu.target_signal(Signal::SigSegmentationFault);
+            },
+
+            _ => {}
+        }
+
         if self.reset(qemu) == AsanRollback::HasLeaks {
             *exit_kind = ExitKind::Crash;
         }

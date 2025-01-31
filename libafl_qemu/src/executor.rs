@@ -6,6 +6,7 @@ use core::{
 };
 #[cfg(feature = "usermode")]
 use std::ptr;
+use std::str;
 #[cfg(feature = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -21,26 +22,28 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, ExecutionProcessor, HasScheduler,
 };
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
 use libafl_bolts::{
+    minibsod,
     os::unix_signals::{ucontext_t, Signal},
     tuples::RefIndexable,
 };
 #[cfg(feature = "systemmode")]
 use libafl_qemu_sys::libafl_exit_request_timeout;
-#[cfg(feature = "usermode")]
-use libafl_qemu_sys::libafl_qemu_handle_crash;
 use libc::siginfo_t;
 
 #[cfg(feature = "usermode")]
 use crate::EmulatorModules;
 #[cfg(feature = "usermode")]
 use crate::Qemu;
-use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
+use crate::{
+    command::CommandManager, modules::EmulatorModuleTuple, run_target_crash_hooks, Emulator,
+    EmulatorDriver, QemuSignalContext,
+};
 
 type EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> =
     StatefulInProcessExecutor<'a, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S>;
@@ -50,31 +53,103 @@ pub struct QemuExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> {
     first_exec: bool,
 }
 
+/// LibAFL QEMU main crash handler.
+/// Be careful, it can come after QEMU's native crash handler if a signal is caught by QEMU but
+/// not by LibAFL.
+///
+/// Signals handlers can be nested.
+///
 /// # Safety
 ///
 /// This should be used as a crash handler, and nothing else.
 #[cfg(feature = "usermode")]
-unsafe fn inproc_qemu_crash_handler<ET, I, S>(
+unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
-    _data: &mut InProcessExecutorHandlerData,
+    data: &mut InProcessExecutorHandlerData,
 ) where
     ET: EmulatorModuleTuple<I, S>,
-    I: Unpin,
-    S: Unpin,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<I, S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I> + Unpin,
+    Z: HasObjective<Objective = OF>,
+    I: Input + Clone + Unpin,
 {
+    log::debug!("QEMU signal handler has been triggered (signal {signal})");
+
     let puc = match &mut context {
         Some(v) => ptr::from_mut::<ucontext_t>(*v) as *mut c_void,
         None => ptr::null_mut(),
     };
 
-    // run modules' crash callback
-    if let Some(emulator_modules) = EmulatorModules::<ET, I, S>::emulator_modules_mut() {
-        emulator_modules.modules_mut().on_crash_all();
+    if let Some(qemu) = Qemu::get() {
+        // QEMU is already initialized, we have to route the signal to QEMU's handler or
+        // consider it as a host (i.e. fuzzer) signal
+
+        if qemu.is_running() {
+            // QEMU is running, we must determine if we are coming from qemu's signal handler or not
+            log::debug!("Signal has been triggered while QEMU was running");
+
+            match qemu.signal_ctx() {
+                QemuSignalContext::OutOfQemuSignalHandler => {
+                    // we did not run QEMU's signal handler, run it not
+                    log::debug!("It's a simple signal, let QEMU handle it first");
+
+                    qemu.run_signal_handler(signal.into(), info, puc);
+
+                    // if we are there, we can safely to execution
+                    return;
+                }
+                QemuSignalContext::InQemuSignalHandlerHost => {
+                    // we are running in a nested signal handling
+                    // and the signal is a host QEMU signal
+
+                    let si_addr = { info.si_addr() as usize };
+                    log::error!("QEMU Host crash crashed at addr 0x{si_addr:x}... Bug in QEMU or Emulator modules? Exiting.\n");
+
+                    if let Some(cpu) = qemu.current_cpu() {
+                        eprint!("QEMU Context:\n{}", cpu.display_context());
+                    }
+                }
+                QemuSignalContext::InQemuSignalHandlerTarget => {
+                    // we are running in a nested signal handler and the signal is a target signal.
+                    // run qemu hooks then report the crash.
+
+                    log::debug!("QEMU Target signal received that should be handled by host. Most likely a target crash.");
+
+                    log::debug!("Running crash hooks.");
+                    run_target_crash_hooks::<ET, I, S>(signal.into());
+
+                    assert!(data.maybe_report_crash::<E, EM, I, OF, S, Z>(None));
+
+                    if let Some(cpu) = qemu.current_cpu() {
+                        eprint!("QEMU Context:\n{}", cpu.display_context());
+                    }
+                }
+            }
+        } else {
+            // qemu is not running, it is a bug in LibAFL
+            let si_addr = { info.si_addr() as usize };
+            log::error!("The fuzzer crashed at addr 0x{si_addr:x}... Bug in the fuzzer? Exiting.");
+
+            let bsod = minibsod::generate_minibsod_to_vec(signal, info, context.as_deref());
+
+            if let Ok(bsod) = bsod {
+                if let Ok(bsod_str) = str::from_utf8(&bsod) {
+                    log::error!("\n{}", bsod_str);
+                } else {
+                    log::error!("convert minibsod to string failed");
+                }
+            } else {
+                log::error!("generate_minibsod failed");
+            }
+        }
     }
 
-    libafl_qemu_handle_crash(signal as i32, info, puc);
+    libc::_exit(128 + (signal as i32));
 }
 
 #[cfg(feature = "systemmode")]
@@ -176,34 +251,7 @@ where
         #[cfg(feature = "usermode")]
         {
             inner.inprocess_hooks_mut().crash_handler =
-                inproc_qemu_crash_handler::<ET, I, S> as *const c_void;
-
-            let handler =
-                |qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>, host_sig| {
-                    eprintln!("Crashed with signal {host_sig}");
-                    unsafe {
-                        libafl::executors::inprocess::generic_inproc_crash_handler::<
-                            Self,
-                            EM,
-                            I,
-                            OF,
-                            S,
-                            Z,
-                        >();
-                    }
-                    if let Some(cpu) = qemu.current_cpu() {
-                        eprint!("Context:\n{}", cpu.display_context());
-                    }
-                };
-
-            // # Safety
-            // We assume our crash handlers to be safe/quit after execution.
-            unsafe {
-                inner
-                    .exposed_executor_state_mut()
-                    .modules_mut()
-                    .crash_closure(Box::new(handler));
-            }
+                inproc_qemu_crash_handler::<Self, EM, ET, I, OF, S, Z> as *const c_void;
         }
 
         inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<

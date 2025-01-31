@@ -14,10 +14,6 @@ use core::{
 
 use libafl_bolts::tuples::{tuple_list, RefIndexable};
 
-#[cfg(any(unix, feature = "std"))]
-use crate::executors::hooks::inprocess::GLOBAL_STATE;
-#[cfg(any(unix, feature = "std"))]
-use crate::ExecutionProcessor;
 use crate::{
     corpus::{Corpus, Testcase},
     events::{Event, EventFirer, EventRestarter},
@@ -429,45 +425,6 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     event_mgr.on_restart(state).unwrap();
 
     log::info!("Bye!");
-}
-
-// TODO remove this after executor refactor and libafl qemu new executor
-/// Expose a version of the crash handler that can be called from e.g. an emulator
-///
-/// # Safety
-/// This will directly access `GLOBAL_STATE` and related data pointers
-#[cfg(any(unix, feature = "std"))]
-pub unsafe fn generic_inproc_crash_handler<E, EM, I, OF, S, Z>()
-where
-    E: Executor<EM, I, S, Z> + HasObservers,
-    E::Observers: ObserversTuple<I, S>,
-    EM: EventFirer<I, S> + EventRestarter<S>,
-    OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-    I: Input + Clone,
-    Z: HasObjective<Objective = OF> + ExecutionProcessor<EM, I, E::Observers, S>,
-{
-    let data = &raw mut GLOBAL_STATE;
-    let in_handler = (*data).set_in_handler(true);
-
-    if (*data).is_valid() {
-        let executor = (*data).executor_mut::<E>();
-        let state = (*data).state_mut::<S>();
-        let event_mgr = (*data).event_mgr_mut::<EM>();
-        let fuzzer = (*data).fuzzer_mut::<Z>();
-        let input = (*data).take_current_input::<I>();
-
-        run_observers_and_save_state::<E, EM, I, OF, S, Z>(
-            executor,
-            state,
-            input,
-            fuzzer,
-            event_mgr,
-            ExitKind::Crash,
-        );
-    }
-
-    (*data).set_in_handler(in_handler);
 }
 
 #[cfg(test)]

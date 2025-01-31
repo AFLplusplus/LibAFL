@@ -54,6 +54,7 @@ pub use hooks::*;
 use libafl_bolts::{vec_init, AsSliceMut};
 
 static mut QEMU_IS_INITIALIZED: bool = false;
+static mut QEMU_IS_RUNNING: bool = false;
 
 pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
@@ -631,7 +632,9 @@ impl Qemu {
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(&self) -> Result<QemuExitReason, QemuExitError> {
+        QEMU_IS_RUNNING = true;
         self.run_inner();
+        QEMU_IS_RUNNING = false;
 
         let exit_reason = unsafe { libafl_get_exit_reason() };
         if exit_reason.is_null() {
@@ -901,6 +904,10 @@ impl Qemu {
     #[must_use]
     pub fn host_page_size(&self) -> usize {
         unsafe { libafl_qemu_sys::libafl_qemu_host_page_size() }
+    }
+
+    pub fn is_running(&self) -> bool {
+        unsafe { QEMU_IS_RUNNING }
     }
 }
 
