@@ -14,7 +14,7 @@ impl<I, S> EventManagerHook<I, S> for LibAflFuzzEventHook
 where
     S: Stoppable,
 {
-    fn pre_exec(
+    fn pre_receive(
         &mut self,
         state: &mut S,
         _client_id: ClientId,
