@@ -78,7 +78,6 @@ pub type LibaflFuzzState =
 #[cfg(not(feature = "fuzzbench"))]
 type LibaflFuzzManager = CentralizedEventManager<
     LlmpRestartingEventManager<(), BytesInput, LibaflFuzzState, StdShMem, StdShMemProvider>,
-    (),
     BytesInput,
     LibaflFuzzState,
     StdShMem,

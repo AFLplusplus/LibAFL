@@ -14,7 +14,7 @@ impl<I, S> EventManagerHook<I, S> for LibAflFuzzEventHook
 where
     S: Stoppable,
 {
-    fn pre_exec(
+    fn pre_receive(
         &mut self,
         state: &mut S,
         _client_id: ClientId,
@@ -24,9 +24,6 @@ where
             // TODO: dump state
             state.request_stop();
         }
-        Ok(true)
-    }
-    fn post_exec(&mut self, _state: &mut S, _client_id: ClientId) -> Result<bool, Error> {
         Ok(true)
     }
 }

@@ -45,11 +45,11 @@ use crate::{
     EmulatorDriver, QemuSignalContext,
 };
 
-type EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> =
-    StatefulInProcessExecutor<'a, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S>;
+type EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> =
+    StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>;
 
-pub struct QemuExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> {
-    inner: EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM>,
+pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
+    inner: EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>,
     first_exec: bool,
 }
 
@@ -208,7 +208,8 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     }
 }
 
-impl<C, CM, ED, ET, H, I, OT, S, SM> Debug for QemuExecutor<'_, C, CM, ED, ET, H, I, OT, S, SM>
+impl<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> Debug
+    for QemuExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>
 where
     OT: Debug,
 {
@@ -219,7 +220,8 @@ where
     }
 }
 
-impl<'a, C, CM, ED, ET, H, I, OT, S, SM> QemuExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM>
+impl<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>
+    QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>
 where
     ET: EmulatorModuleTuple<I, S>,
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
@@ -227,7 +229,7 @@ where
     OT: ObserversTuple<I, S>,
     S: Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
 {
-    pub fn new<EM, OF, Z>(
+    pub fn new<OF>(
         emulator: Emulator<C, CM, ED, ET, I, S, SM>,
         harness_fn: &'a mut H,
         observers: OT,
@@ -255,7 +257,7 @@ where
         }
 
         inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
-            StatefulInProcessExecutor<'a, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S>,
+            StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>,
             EM,
             ET,
             I,
@@ -270,7 +272,7 @@ where
         })
     }
 
-    pub fn inner(&self) -> &EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> {
+    pub fn inner(&self) -> &EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
         &self.inner
     }
 
@@ -281,13 +283,13 @@ where
 
     pub fn inner_mut(
         &mut self,
-    ) -> &mut EmulatorInProcessExecutor<'a, C, CM, ED, ET, H, I, OT, S, SM> {
+    ) -> &mut EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
         &mut self.inner
     }
 }
 
 impl<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> Executor<EM, I, S, Z>
-    for QemuExecutor<'_, C, CM, ED, ET, H, I, OT, S, SM>
+    for QemuExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>
 where
     C: Clone,
     CM: CommandManager<C, ED, ET, I, S, SM, Commands = C>,
@@ -327,8 +329,8 @@ where
     }
 }
 
-impl<C, CM, ED, ET, H, I, OT, S, SM> HasObservers
-    for QemuExecutor<'_, C, CM, ED, ET, H, I, OT, S, SM>
+impl<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> HasObservers
+    for QemuExecutor<'_, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>
 where
     ET: EmulatorModuleTuple<I, S>,
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,

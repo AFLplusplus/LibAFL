@@ -78,7 +78,7 @@ pub struct AsanGiovese {
 }
 
 pub struct AsanModuleBuilder {
-    env: Option<Vec<(String, String)>>,
+    env: Vec<(String, String)>,
     detect_leaks: bool,
     snapshot: bool,
     filter: StdAddressFilter,
@@ -142,6 +142,7 @@ pub enum AsanError {
     MemLeak(Interval<GuestAddr>),
     Signal(i32),
 }
+
 
 #[derive(Clone, Debug)]
 pub enum AsanTargetCrash {
@@ -244,7 +245,7 @@ impl Debug for AsanGiovese {
 impl AsanModuleBuilder {
     #[must_use]
     pub fn new(
-        env: Option<Vec<(String, String)>>,
+        env: Vec<(String, String)>,
         detect_leaks: bool,
         snapshot: bool,
         filter: StdAddressFilter,
@@ -264,7 +265,7 @@ impl AsanModuleBuilder {
     #[must_use]
     pub fn env(self, env: &[(String, String)]) -> Self {
         Self::new(
-            Some(env.to_vec()),
+            env.to_vec(),
             self.detect_leaks,
             self.snapshot,
             self.filter,
@@ -353,7 +354,7 @@ impl AsanModuleBuilder {
     #[must_use]
     pub fn build(self) -> AsanModule {
         AsanModule::new(
-            self.env.unwrap().as_ref(),
+            self.env.as_ref(),
             self.detect_leaks,
             self.snapshot,
             self.filter,
@@ -365,8 +366,11 @@ impl AsanModuleBuilder {
 
 impl Default for AsanModuleBuilder {
     fn default() -> Self {
+        let env = env::vars()
+            .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
+            .collect::<Vec<(String, String)>>();
         Self::new(
-            None,
+            env,
             false,
             true,
             StdAddressFilter::default(),

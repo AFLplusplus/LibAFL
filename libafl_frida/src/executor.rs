@@ -29,8 +29,8 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use crate::windows_hooks::initialize;
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC> {
-    base: InProcessExecutor<'a, H, I, OT, S>,
+pub struct FridaInProcessExecutor<'a, 'b, 'c, EM, H, I, OT, RT, S, TC, Z> {
+    base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
     /// `thread_id` for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
@@ -42,7 +42,8 @@ pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC> {
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<H, I, OT, RT, S, TC> Debug for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
+impl<EM, H, I, OT, RT, S, TC, Z> Debug
+    for FridaInProcessExecutor<'_, '_, '_, EM, H, I, OT, RT, S, TC, Z>
 where
     OT: Debug,
 {
@@ -56,7 +57,7 @@ where
 }
 
 impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
-    for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
+    for FridaInProcessExecutor<'_, '_, '_, EM, H, I, OT, RT, S, TC, Z>
 where
     H: FnMut(&I) -> ExitKind,
     S: HasExecutions,
@@ -111,7 +112,9 @@ where
     }
 }
 
-impl<H, I, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC> {
+impl<EM, H, I, OT, RT, S, TC, Z> HasObservers
+    for FridaInProcessExecutor<'_, '_, '_, EM, H, I, OT, RT, S, TC, Z>
+{
     type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -124,15 +127,15 @@ impl<H, I, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H,
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S>
-    FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, NopTargetBytesConverter<I>>
+impl<'a, 'b, 'c, EM, H, I, OT, RT, S, Z>
+    FridaInProcessExecutor<'a, 'b, 'c, EM, H, I, OT, RT, S, NopTargetBytesConverter<I>, Z>
 where
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
+        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(
@@ -147,7 +150,7 @@ where
     /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
     pub fn on_thread(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
+        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
         thread_id: u32,
     ) -> Self {
@@ -161,14 +164,15 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S, TC> FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
+impl<'a, 'b, 'c, EM, H, I, OT, RT, S, TC, Z>
+    FridaInProcessExecutor<'a, 'b, 'c, EM, H, I, OT, RT, S, TC, Z>
 where
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn with_target_bytes_converter(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
+        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
         thread_id: Option<u32>,
         target_bytes_converter: TC,
@@ -221,8 +225,8 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, I, OT, RT, S, TC> HasInProcessHooks<I, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
+impl<'a, 'b, 'c, EM, H, I, OT, RT, S, TC, Z> HasInProcessHooks<I, S>
+    for FridaInProcessExecutor<'a, 'b, 'c, EM, H, I, OT, RT, S, TC, Z>
 where
     H: FnMut(&I) -> ExitKind,
     S: HasSolutions<I> + HasCurrentTestcase<I> + HasExecutions,
