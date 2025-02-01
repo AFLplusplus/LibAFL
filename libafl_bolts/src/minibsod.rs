@@ -3,12 +3,9 @@
 
 #[cfg(any(target_vendor = "apple", target_os = "openbsd"))]
 use core::mem::size_of;
+use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 use std::process::Command;
-use std::{
-    io::{BufWriter, Write},
-};
-
 #[cfg(unix)]
 use std::vec::Vec;
 
