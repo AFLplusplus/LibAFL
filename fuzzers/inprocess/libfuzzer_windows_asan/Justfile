@@ -34,9 +34,9 @@ fuzzer:
     
 [windows]
 test:
-    start "" "${FUZZER_NAME}.exe"
-    start "" "${FUZZER_NAME}.exe"
-    ping -n 10 127.0.0.1>NUL && taskkill /im ${FUZZER_NAME}.exe /F
+    start "" "{{FUZZER_NAME}}.exe"
+    start "" "{{FUZZER_NAME}}.exe"
+    ping -n 10 127.0.0.1>NUL && taskkill /im {{FUZZER_NAME}}.exe /F
     >nul 2>nul dir /a-d "crashes\*" && (echo Files exist) || (exit /b 1337)
 
 [linux]
