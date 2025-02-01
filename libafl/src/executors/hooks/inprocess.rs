@@ -12,7 +12,7 @@ use core::{
 
 #[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 use libafl_bolts::minibsod::{generate_minibsod_to_vec, BsodInfo};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
@@ -445,7 +445,7 @@ impl InProcessExecutorHandlerData {
     /// # Safety
     ///
     /// Should only be called to signal a crash in the target
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "std"))]
     pub unsafe fn maybe_report_crash<E, EM, I, OF, S, Z>(
         &mut self,
         bsod_info: Option<BsodInfo>,

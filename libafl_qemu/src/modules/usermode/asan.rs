@@ -143,7 +143,6 @@ pub enum AsanError {
     Signal(i32),
 }
 
-
 #[derive(Clone, Debug)]
 pub enum AsanTargetCrash {
     Never,
