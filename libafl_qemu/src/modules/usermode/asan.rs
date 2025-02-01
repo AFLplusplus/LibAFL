@@ -336,8 +336,8 @@ impl AsanModuleBuilder {
 impl Default for AsanModuleBuilder {
     fn default() -> Self {
         let env = env::vars()
-        .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
-        .collect::<Vec<(String, String)>>();
+            .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
+            .collect::<Vec<(String, String)>>();
 
         Self::new(env, false, true, StdAddressFilter::default(), None)
     }
