@@ -26,6 +26,10 @@ runs:
       uses: baptiste0928/cargo-install@v3
       with:
         crate: cargo-make
+    - name: install just
+      uses: extractions/setup-just@v2
+      with:
+        just-version: 1.5.0  # optional semver specification, otherwise latest
     - name: install wasm-pack
       uses: baptiste0928/cargo-install@v3
       with:
