@@ -53,9 +53,9 @@ pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
     first_exec: bool,
 }
 
-/// LibAFL QEMU main crash handler.
+/// `LibAFL` QEMU main crash handler.
 /// Be careful, it can come after QEMU's native crash handler if a signal is caught by QEMU but
-/// not by LibAFL.
+/// not by `LibAFL`.
 ///
 /// Signals handlers can be nested.
 ///

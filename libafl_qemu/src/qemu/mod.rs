@@ -906,6 +906,7 @@ impl Qemu {
         unsafe { libafl_qemu_sys::libafl_qemu_host_page_size() }
     }
 
+    #[must_use]
     pub fn is_running(&self) -> bool {
         unsafe { QEMU_IS_RUNNING }
     }

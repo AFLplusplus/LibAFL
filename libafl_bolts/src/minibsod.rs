@@ -27,6 +27,17 @@ use windows::Win32::System::Diagnostics::Debug::{CONTEXT, EXCEPTION_POINTERS};
 #[cfg(unix)]
 use crate::os::unix_signals::{ucontext_t, Signal};
 
+/// Necessary info to print a mini-BSOD.
+#[derive(Debug)]
+pub struct BsodInfo {
+    /// the signal
+    pub signal: Signal,
+    /// siginfo
+    pub siginfo: siginfo_t,
+    /// ucontext
+    pub ucontext: Option<ucontext_t>,
+}
+
 /// Write the content of all important registers
 #[cfg(all(
     any(target_os = "linux", target_os = "android"),

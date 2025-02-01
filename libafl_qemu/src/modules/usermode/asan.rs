@@ -340,6 +340,7 @@ impl AsanModuleBuilder {
         )
     }
 
+    #[must_use]
     pub fn target_crash(self, target_crash: AsanTargetCrash) -> Self {
         Self::new(
             self.env,
@@ -756,12 +757,10 @@ impl AsanGiovese {
             self.error_callback = Some(cb);
         }
 
-        match self.target_crash {
-            AsanTargetCrash::OnFirstError => unsafe {
+        if let AsanTargetCrash::OnFirstError = self.target_crash {
+            unsafe {
                 qemu.target_signal(Signal::SigSegmentationFault);
-            },
-
-            _ => {}
+            }
         }
     }
 
@@ -1109,12 +1108,10 @@ where
         ET: EmulatorModuleTuple<I, S>,
         OT: ObserversTuple<I, S>,
     {
-        match self.rt.target_crash {
-            AsanTargetCrash::OnTargetStop => unsafe {
+        if let AsanTargetCrash::OnTargetStop = self.rt.target_crash {
+            unsafe {
                 qemu.target_signal(Signal::SigSegmentationFault);
-            },
-
-            _ => {}
+            }
         }
 
         if self.reset(qemu) == AsanRollback::HasLeaks {

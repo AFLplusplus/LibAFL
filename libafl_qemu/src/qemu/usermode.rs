@@ -307,6 +307,7 @@ impl Qemu {
         }
     }
 
+    #[must_use]
     pub fn signal_ctx(&self) -> QemuSignalContext {
         unsafe {
             let qemu_signal_ctx = *libafl_qemu_sys::libafl_qemu_signal_context();
@@ -326,7 +327,14 @@ impl Qemu {
     /// Runs QEMU signal's handler
     /// If it is already running, returns true.
     /// In that case, it would most likely mean we are in a signal loop.
-    pub unsafe fn run_signal_handler(
+    ///
+    /// # Safety
+    ///
+    /// Run QEMU's native signal handler.
+    ///
+    /// Needlessly to say, it should be used very carefully.
+    /// It will run QEMU's signal handler, and maybe propagate new signals.
+    pub(crate) unsafe fn run_signal_handler(
         &self,
         host_sig: c_int,
         info: *mut siginfo_t,
@@ -336,6 +344,11 @@ impl Qemu {
     }
 
     /// Emulate a signal coming from the target
+    ///
+    /// # Safety
+    ///
+    /// This may raise a signal to host. Some signals could have a funky behaviour.
+    /// SIGSEGV is safe to use.
     pub unsafe fn target_signal(&self, signal: Signal) {
         QEMU_IS_RUNNING = true;
         libafl_qemu_sys::libafl_set_in_target_signal_ctx();

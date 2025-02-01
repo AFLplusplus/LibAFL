@@ -1,5 +1,4 @@
 //! The hook for `InProcessExecutor`
-use alloc::vec::Vec;
 #[cfg(all(target_os = "linux", feature = "std"))]
 use core::mem::zeroed;
 #[cfg(any(unix, all(windows, feature = "std")))]
@@ -10,16 +9,15 @@ use core::{
     ptr::{self, null_mut},
     time::Duration,
 };
-use std::io::{BufWriter, Write};
 
 #[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
+#[cfg(unix)]
+use libafl_bolts::minibsod::{generate_minibsod_to_vec, BsodInfo};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
-use libafl_bolts::os::unix_signals::Signal;
 #[cfg(all(windows, feature = "std"))]
 use libafl_bolts::os::windows_exceptions::setup_exception_handler;
-use libc::{siginfo_t, ucontext_t};
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 
@@ -391,17 +389,6 @@ pub struct InProcessExecutorHandlerData {
 unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
-/// Necessary info to print a mini-BSOD.
-#[derive(Debug)]
-pub struct BsodInfo {
-    /// the signal
-    pub signal: Signal,
-    /// siginfo
-    pub siginfo: siginfo_t,
-    /// ucontext
-    pub ucontext: Option<ucontext_t>,
-}
-
 impl InProcessExecutorHandlerData {
     /// # Safety
     /// Only safe if not called twice and if the executor is not used from another borrow after this.
@@ -454,6 +441,11 @@ impl InProcessExecutorHandlerData {
 
     /// if data is valid, safely report a crash and return true.
     /// return false otherwise.
+    ///
+    /// # Safety
+    ///
+    /// Should only be called to signal a crash in the target
+    #[cfg(unix)]
     pub unsafe fn maybe_report_crash<E, EM, I, OF, S, Z>(
         &mut self,
         bsod_info: Option<BsodInfo>,
@@ -478,23 +470,16 @@ impl InProcessExecutorHandlerData {
             log::error!("Target crashed!");
 
             if let Some(bsod_info) = bsod_info {
-                let mut bsod = Vec::new();
-                {
-                    let mut writer = BufWriter::new(&mut bsod);
-                    let _ = writeln!(writer, "input: {:?}", input.generate_name(None));
-                    let bsod = libafl_bolts::minibsod::generate_minibsod(
-                        &mut writer,
-                        bsod_info.signal,
-                        &bsod_info.siginfo,
-                        bsod_info.ucontext.as_ref(),
-                    );
-                    if bsod.is_err() {
-                        log::error!("generate_minibsod failed");
+                let bsod = generate_minibsod_to_vec(
+                    bsod_info.signal,
+                    &bsod_info.siginfo,
+                    bsod_info.ucontext.as_ref(),
+                );
+
+                if let Ok(bsod) = bsod {
+                    if let Ok(r) = std::str::from_utf8(&bsod) {
+                        log::error!("{}", r);
                     }
-                    let _ = writer.flush();
-                }
-                if let Ok(r) = std::str::from_utf8(&bsod) {
-                    log::error!("{}", r);
                 }
             }
 
