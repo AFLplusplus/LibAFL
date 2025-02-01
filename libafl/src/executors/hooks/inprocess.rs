@@ -23,18 +23,19 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
-#[cfg(all(unix, feature = "std"))]
-use crate::{state::HasCorpus, executors::{hooks::unix::unix_signal_handler, inprocess::run_observers_and_save_state, ExitKind}};
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{
-        hooks::ExecutorHook,
-        inprocess::{HasInProcessHooks},
-        Executor, HasObservers,
-    },
+    executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     state::{HasExecutions, HasSolutions},
     Error, HasObjective,
+};
+#[cfg(all(unix, feature = "std"))]
+use crate::{
+    executors::{
+        hooks::unix::unix_signal_handler, inprocess::run_observers_and_save_state, ExitKind,
+    },
+    state::HasCorpus,
 };
 #[cfg(any(unix, windows))]
 use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
