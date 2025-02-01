@@ -4,12 +4,13 @@ use core::{
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
-#[cfg(feature = "usermode")]
-use std::ptr;
-use std::str;
 #[cfg(feature = "systemmode")]
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "usermode")]
+use std::{ptr, str};
 
+#[cfg(feature = "usermode")]
+use libafl::state::HasCorpus;
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{
@@ -22,13 +23,14 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     Error, ExecutionProcessor, HasScheduler,
 };
+#[cfg(feature = "usermode")]
+use libafl_bolts::minibsod;
 #[cfg(feature = "fork")]
 use libafl_bolts::shmem::ShMemProvider;
 use libafl_bolts::{
-    minibsod,
     os::unix_signals::{ucontext_t, Signal},
     tuples::RefIndexable,
 };
@@ -38,12 +40,9 @@ use libc::siginfo_t;
 
 #[cfg(feature = "usermode")]
 use crate::EmulatorModules;
+use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
 #[cfg(feature = "usermode")]
-use crate::Qemu;
-use crate::{
-    command::CommandManager, modules::EmulatorModuleTuple, run_target_crash_hooks, Emulator,
-    EmulatorDriver, QemuSignalContext,
-};
+use crate::{run_target_crash_hooks, EmulatorModules, Qemu, QemuSignalContext};
 
 type EmulatorInProcessExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> =
     StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>;
