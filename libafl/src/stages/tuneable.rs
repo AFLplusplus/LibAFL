@@ -445,7 +445,7 @@ where
         }
 
         let (untransformed, post) = input.try_transform_into(state)?;
-        let (_, corpus_id) = fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
+        let (_, corpus_id) = fuzzer.evaluate_filtered(state, executor, manager, &untransformed)?;
 
         start_timer!(state);
         self.mutator_mut().post_exec(state, corpus_id)?;

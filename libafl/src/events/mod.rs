@@ -585,6 +585,10 @@ pub trait SendExiting {
     /// Send information that this client is exiting.
     /// No need to restart us any longer, and no need to print an error, either.
     fn send_exiting(&mut self) -> Result<(), Error>;
+
+    /// Shutdown gracefully; typically without saving state.
+    /// This is usually called from `fuzz_loop`.
+    fn on_shutdown(&mut self) -> Result<(), Error>;
 }
 
 /// Wait until it's safe to restart
@@ -593,14 +597,15 @@ pub trait AwaitRestartSafe {
     fn await_restart_safe(&mut self);
 }
 
-/// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, S, Z> {
+/// [`EventReceiver`] process all the incoming messages
+pub trait EventReceiver<I, S> {
     /// Lookup for incoming events and process them.
-    /// Return the number of processes events or an error
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
+    /// Return the event, if any, that needs to be evaluated
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error>;
 
-    /// Shutdown gracefully; typically without saving state.
-    fn on_shutdown(&mut self) -> Result<(), Error>;
+    /// Run the post processing routine after the fuzzer deemed this event as interesting
+    /// For example, in centralized manager you wanna send this an event.
+    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 }
 /// The id of this `EventManager`.
 /// For multi processed `EventManagers`,
@@ -622,6 +627,8 @@ impl NopEventManager {
         NopEventManager {}
     }
 }
+
+impl RecordSerializationTime for NopEventManager {}
 
 impl<I, S> EventFirer<I, S> for NopEventManager {
     fn should_send(&self) -> bool {
@@ -648,6 +655,10 @@ impl SendExiting for NopEventManager {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl AwaitRestartSafe for NopEventManager {
@@ -655,17 +666,12 @@ impl AwaitRestartSafe for NopEventManager {
     fn await_restart_safe(&mut self) {}
 }
 
-impl<E, S, Z> EventProcessor<E, S, Z> for NopEventManager {
-    fn process(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _executor: &mut E,
-    ) -> Result<usize, Error> {
-        Ok(0)
+impl<I, S> EventReceiver<I, S> for NopEventManager {
+    fn try_receive(&mut self, _state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        Ok(None)
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -706,6 +712,8 @@ pub struct MonitorTypedEventManager<EM, M> {
     inner: EM,
     phantom: PhantomData<M>,
 }
+
+impl<EM, M> RecordSerializationTime for MonitorTypedEventManager<EM, M> {}
 
 impl<EM, M> MonitorTypedEventManager<EM, M> {
     /// Creates a new `EventManager` that wraps another manager, but captures a `monitor` type as well.
@@ -774,6 +782,10 @@ where
     fn send_exiting(&mut self) -> Result<(), Error> {
         self.inner.send_exiting()
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.inner.on_shutdown()
+    }
 }
 
 impl<EM, M> AwaitRestartSafe for MonitorTypedEventManager<EM, M>
@@ -786,17 +798,16 @@ where
     }
 }
 
-impl<E, EM, M, S, Z> EventProcessor<E, S, Z> for MonitorTypedEventManager<EM, M>
+impl<EM, I, M, S> EventReceiver<I, S> for MonitorTypedEventManager<EM, M>
 where
-    EM: EventProcessor<E, S, Z>,
+    EM: EventReceiver<I, S>,
 {
     #[inline]
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        self.inner.process(fuzzer, state, executor)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.inner.try_receive(state)
     }
-
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.inner.on_shutdown()
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -827,6 +838,12 @@ where
     fn mgr_id(&self) -> EventManagerId {
         self.inner.mgr_id()
     }
+}
+
+/// Record the deserialization time for this event manager
+pub trait RecordSerializationTime {
+    /// Set the deserialization time (mut)
+    fn set_deserialization_time(&mut self, _dur: Duration) {}
 }
 
 /// Collected stats to decide if observers must be serialized or not
