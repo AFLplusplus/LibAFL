@@ -7,8 +7,10 @@ use core::mem::size_of;
 use std::process::Command;
 use std::{
     io::{BufWriter, Write},
-    vec::Vec,
 };
+
+#[cfg(unix)]
+use std::vec::Vec;
 
 #[cfg(unix)]
 use libc::siginfo_t;
@@ -29,6 +31,7 @@ use crate::os::unix_signals::{ucontext_t, Signal};
 
 /// Necessary info to print a mini-BSOD.
 #[derive(Debug)]
+#[cfg(unix)]
 pub struct BsodInfo {
     /// the signal
     pub signal: Signal,
@@ -1098,7 +1101,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 }
 
 /// Generates a mini-BSOD given a signal and context.
-#[cfg(unix)]
+#[cfg(all(unix))]
 #[expect(clippy::non_ascii_literal)]
 pub fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
