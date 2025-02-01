@@ -5,6 +5,7 @@ PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { 
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
 LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
 
+set windows-powershell := true
 alias cc := cxx
 
 [windows]

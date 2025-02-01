@@ -8,6 +8,7 @@ LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
 LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
 LIBTOOL := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_libtool"
 
+set windows-powershell := true
 alias cc := cxx
 
 [linux]
