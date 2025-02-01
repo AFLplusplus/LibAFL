@@ -393,47 +393,47 @@ unsafe impl Sync for InProcessExecutorHandlerData {}
 impl InProcessExecutorHandlerData {
     /// # Safety
     /// Only safe if not called twice and if the executor is not used from another borrow after this.
-    #[cfg(any(all(unix, feature = "std"), windows))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called twice and if the state is not used from another borrow after this.
-    #[cfg(any(all(unix, feature = "std"), windows))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called twice and if the event manager is not used from another borrow after this.
-    #[cfg(any(all(unix, feature = "std"), windows))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called twice and if the fuzzer is not used from another borrow after this.
-    #[cfg(any(all(unix, feature = "std"), windows))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called concurrently.
-    #[cfg(any(all(unix, feature = "std"), windows))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = ptr::null();
         r
     }
 
-    #[cfg(any(all(unix, feature = "std"), windows))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
 
-    #[cfg(any(all(unix, feature = "std"), windows))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) fn set_in_handler(&mut self, v: bool) -> bool {
         let old = self.in_handler;
         self.in_handler = v;
