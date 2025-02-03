@@ -423,6 +423,6 @@ impl<S> Mutator<bool, S> for BoolInvertMutator {
 
 impl Named for BoolInvertMutator {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("BoolMutator")
+        &Cow::Borrowed("BoolInvertMutator")
     }
 }
