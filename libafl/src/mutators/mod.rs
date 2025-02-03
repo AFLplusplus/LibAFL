@@ -408,21 +408,21 @@ impl Named for NopMutator {
     }
 }
 
-/// [`Mutator`] that flips a boolean value.
+/// [`Mutator`] that inverts a boolean value.
 ///
-/// Mostly useful in combination with [`mapping::MappingMutator`]s.
+/// Mostly useful in combination with [`mapping::MappingMutator`]s to mutate parts of a complex input.
 #[derive(Debug)]
-pub struct BoolMutator;
+pub struct BoolInvertMutator;
 
-impl<S> Mutator<bool, S> for BoolMutator {
+impl<S> Mutator<bool, S> for BoolInvertMutator {
     fn mutate(&mut self, _state: &mut S, input: &mut bool) -> Result<MutationResult, Error> {
         *input = !*input;
         Ok(MutationResult::Mutated)
     }
 }
 
-impl Named for BoolMutator {
+impl Named for BoolInvertMutator {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("BoolMutator")
+        &Cow::Borrowed("BoolInvertMutator")
     }
 }
