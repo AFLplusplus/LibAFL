@@ -666,7 +666,7 @@ where
                     log::error!("Error polling for activity: {e:?}");
                     continue;
                 }
-            };
+            }
             let copied_poll_fds: Vec<PollFd> = poll_fds.clone();
             for poll_fd in copied_poll_fds {
                 let revents = poll_fd.revents().expect("revents should not be None");
@@ -681,7 +681,7 @@ where
                             Err(e) => {
                                 log::info!("Ignoring failed read from client {e:?} {poll_fd:?}");
                             }
-                        };
+                        }
                     } else {
                         let (stream, _addr) = match listener.accept_unix_addr() {
                             Ok(stream_val) => stream_val,
@@ -716,7 +716,7 @@ where
                             Err(e) => {
                                 log::info!("Ignoring failed read from client {e:?}");
                             }
-                        };
+                        }
                     }
                 } else {
                     //log::warn!("Unknown revents flags: {:?}", revents);

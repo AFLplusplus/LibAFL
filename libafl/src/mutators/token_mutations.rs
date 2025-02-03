@@ -2083,7 +2083,7 @@ fn check_if_text(buf: &[u8], max_len: usize) -> TextType {
     }
     if percent_ascii >= 99 {
         return TextType::Ascii(ascii);
-    };
+    }
     TextType::None
 }
 

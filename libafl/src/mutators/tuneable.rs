@@ -132,7 +132,7 @@ where
                 iters
             } else {
                 // fall back to random
-                1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
+                1 << (1 + state.rand_mut().below_or_zero(self.max_stack_pow))
             }
         } else {
             // We will sample using the mutation probabilities.

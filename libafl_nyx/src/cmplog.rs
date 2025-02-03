@@ -3,7 +3,6 @@
 //! Reads and parses the redqueen results written by QEMU-Nyx and adds them to the state as `CmpValuesMetadata`.
 use std::borrow::Cow;
 
-use lazy_static::lazy_static;
 use libafl::{
     executors::ExitKind,
     observers::{CmpValues, CmpValuesMetadata, Observer},
@@ -107,12 +106,12 @@ struct RedqueenEvent {
 
 impl RedqueenEvent {
     fn new(line: &str) -> Result<Self, String> {
-        lazy_static! {
-            static ref RE: regex::Regex = regex::Regex::new(
-                r"([0-9a-fA-F]+)\s+(CMP|SUB|STR)\s+(\d+)\s+([0-9a-fA-F]+)-([0-9a-fA-F]+)(\sIMM)?"
+        static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+            regex::Regex::new(
+                r"([0-9a-fA-F]+)\s+(CMP|SUB|STR)\s+(\d+)\s+([0-9a-fA-F]+)-([0-9a-fA-F]+)(\sIMM)?",
             )
-            .expect("Invalid regex pattern");
-        }
+            .expect("Invalid regex pattern")
+        });
 
         let captures = RE
             .captures(line)

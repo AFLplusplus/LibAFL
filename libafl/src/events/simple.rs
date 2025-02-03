@@ -22,13 +22,13 @@ use libafl_bolts::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::{std_on_restart, AwaitRestartSafe, ProgressReporter};
+use super::{std_on_restart, AwaitRestartSafe, ProgressReporter, RecordSerializationTime};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
-        Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
         SendExiting,
     },
     monitors::Monitor,
@@ -71,6 +71,8 @@ where
     }
 }
 
+impl<I, MT, S> RecordSerializationTime for SimpleEventManager<I, MT, S> {}
+
 impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
@@ -85,7 +87,7 @@ where
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
-        };
+        }
         Ok(())
     }
 }
@@ -93,6 +95,10 @@ where
 impl<I, MT, S> SendExiting for SimpleEventManager<I, MT, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 
@@ -109,27 +115,29 @@ where
     }
 }
 
-impl<E, I, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventReceiver<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
     S: Stoppable,
 {
-    fn process(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _executor: &mut E,
-    ) -> Result<usize, Error> {
-        let count = self.events.len();
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         while let Some(event) = self.events.pop() {
-            self.handle_in_client(state, &event)?;
+            match event {
+                Event::Stop => {
+                    state.request_stop();
+                }
+                _ => {
+                    return Err(Error::unknown(format!(
+                        "Received illegal message that message should not have arrived: {event:?}."
+                    )))
+                }
+            }
         }
-        Ok(count)
+        Ok(None)
     }
-
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -263,20 +271,6 @@ where
             Event::Stop => Ok(BrokerEventResult::Forward),
         }
     }
-
-    // Handle arriving events in the client
-    #[allow(clippy::unused_self)]
-    fn handle_in_client(&mut self, state: &mut S, event: &Event<I>) -> Result<(), Error> {
-        match event {
-            Event::Stop => {
-                state.request_stop();
-                Ok(())
-            }
-            _ => Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {event:?}."
-            ))),
-        }
-    }
 }
 
 /// Provides a `builder` which can be used to build a [`SimpleRestartingEventManager`].
@@ -291,6 +285,12 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     inner: SimpleEventManager<I, MT, S>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SHM, SP>,
+}
+
+#[cfg(feature = "std")]
+impl<I, MT, S, SHM, SP> RecordSerializationTime
+    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+{
 }
 
 #[cfg(feature = "std")]
@@ -352,6 +352,10 @@ where
         self.staterestorer.send_exiting();
         Ok(())
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 #[cfg(feature = "std")]
@@ -362,8 +366,7 @@ impl<I, MT, S, SHM, SP> AwaitRestartSafe for SimpleRestartingEventManager<I, MT,
 }
 
 #[cfg(feature = "std")]
-impl<E, I, MT, S, SHM, SP, Z> EventProcessor<E, S, Z>
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+impl<I, MT, S, SHM, SP> EventReceiver<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
@@ -371,12 +374,12 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        self.inner.process(fuzzer, state, executor)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.inner.try_receive(state)
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 

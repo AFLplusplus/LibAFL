@@ -30,7 +30,7 @@ use libafl_bolts::{
     tuples::tuple_list,
     ClientId,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{broadcast, broadcast::error::RecvError, mpsc},
@@ -39,20 +39,15 @@ use tokio::{
 use typed_builder::TypedBuilder;
 
 use super::{std_maybe_report_progress, std_report_progress, AwaitRestartSafe, SendExiting};
-#[cfg(feature = "share_objectives")]
-use crate::corpus::{Corpus, Testcase};
 #[cfg(all(unix, not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         std_on_restart, BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple,
-        EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        EventManagerId, EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter,
     },
-    executors::{Executor, HasObservers},
-    fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
     monitors::Monitor,
-    observers::ObserversTuple,
     stages::HasCurrentStageId,
     state::{
         HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
@@ -565,87 +560,11 @@ impl<EMH, I, S> Drop for TcpEventManager<EMH, I, S> {
 impl<EMH, I, S> TcpEventManager<EMH, I, S>
 where
     EMH: EventManagerHooksTuple<I, S>,
-    S: HasExecutions
-        + HasMetadata
-        + HasImported
-        + HasSolutions<I>
-        + HasCurrentTestcase<I>
-        + Stoppable,
+    S: HasExecutions + HasMetadata + HasImported + Stoppable,
 {
     /// Write the client id for a client `EventManager` to env vars
     pub fn to_env(&self, env_name: &str) {
         env::set_var(env_name, format!("{}", self.client_id.0));
-    }
-
-    // Handle arriving events in the client
-    fn handle_in_client<E, Z>(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        client_id: ClientId,
-        event: Event<I>,
-    ) -> Result<(), Error>
-    where
-        E: Executor<Self, I, S, Z> + HasObservers,
-        E::Observers: Serialize + ObserversTuple<I, S>,
-        for<'a> E::Observers: Deserialize<'a>,
-        Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
-    {
-        if !self.hooks.pre_exec_all(state, client_id, &event)? {
-            return Ok(());
-        }
-        match event {
-            Event::NewTestcase {
-                input,
-                client_config,
-                exit_kind,
-                observers_buf,
-                forward_id,
-                ..
-            } => {
-                log::info!("Received new Testcase from {client_id:?} ({client_config:?}, forward {forward_id:?})");
-
-                let _res = if client_config.match_with(&self.configuration)
-                    && observers_buf.is_some()
-                {
-                    let observers: E::Observers =
-                        postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    fuzzer.evaluate_execution(state, self, input, &observers, &exit_kind, false)?
-                } else {
-                    fuzzer.evaluate_input_with_observers(state, executor, self, input, false)?
-                };
-                if let Some(item) = _res.1 {
-                    *state.imported_mut() += 1;
-                    log::info!("Added received Testcase as item #{item}");
-                }
-            }
-
-            #[cfg(feature = "share_objectives")]
-            Event::Objective { input, .. } => {
-                log::debug!("Received new Objective");
-                let mut testcase = Testcase::from(input);
-                testcase.set_parent_id_optional(*state.corpus().current());
-
-                if let Ok(mut tc) = state.current_testcase_mut() {
-                    tc.found_objective();
-                }
-
-                state.solutions_mut().add(testcase)?;
-                log::info!("Added received Objective to Corpus");
-            }
-            Event::Stop => {
-                state.request_stop();
-            }
-            _ => {
-                return Err(Error::unknown(format!(
-                    "Received illegal message that message should not have arrived: {:?}.",
-                    event.name()
-                )))
-            }
-        }
-        self.hooks.post_exec_all(state, client_id)?;
-        Ok(())
     }
 }
 
@@ -702,11 +621,8 @@ where
     }
 }
 
-impl<E, EMH, I, S, Z> EventProcessor<E, S, Z> for TcpEventManager<EMH, I, S>
+impl<EMH, I, S> EventReceiver<I, S> for TcpEventManager<EMH, I, S>
 where
-    E: HasObservers + Executor<Self, I, S, Z>,
-    E::Observers: Serialize + ObserversTuple<I, S>,
-    for<'a> E::Observers: Deserialize<'a>,
     EMH: EventManagerHooksTuple<I, S>,
     S: HasExecutions
         + HasMetadata
@@ -715,16 +631,12 @@ where
         + HasCurrentTestcase<I>
         + Stoppable,
     I: DeserializeOwned,
-    Z: ExecutionProcessor<Self, I, E::Observers, S> + EvaluatorObservers<E, Self, I, S>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.client_id;
         let mut len_buf = [0_u8; 4];
-        let mut count = 0;
-
         self.tcp.set_nonblocking(true).expect("set to non-blocking");
-
         // read all pending messages
         loop {
             match self.tcp.read_exact(&mut len_buf) {
@@ -747,16 +659,46 @@ where
 
                         let buf = &buf[4..];
                         #[cfg(feature = "tcp_compression")]
-                        let buf = self.compressor.decompress(buf)?;
+                        let buf = &self.compressor.decompress(buf)?;
 
                         // make decompressed vec and slice compatible
-                        let event = postcard::from_bytes(&buf)?;
+                        let event = postcard::from_bytes(buf)?;
 
-                        self.handle_in_client(fuzzer, executor, state, other_client_id, event)?;
-                        count += 1;
+                        if !self.hooks.pre_receive_all(state, other_client_id, &event)? {
+                            continue;
+                        }
+                        match event {
+                            Event::NewTestcase {
+                                client_config,
+                                ref observers_buf,
+                                forward_id,
+                                ..
+                            } => {
+                                log::info!("Received new Testcase from {other_client_id:?} ({client_config:?}, forward {forward_id:?})");
+                                if client_config.match_with(&self.configuration)
+                                    && observers_buf.is_some()
+                                {
+                                    return Ok(Some((event, true)));
+                                }
+                                return Ok(Some((event, false)));
+                            }
+                            #[cfg(feature = "share_objectives")]
+                            Event::Objective { .. } => {
+                                log::info!("Received new Objective");
+                                return Ok(Some((event, false)));
+                            }
+                            Event::Stop => {
+                                state.request_stop();
+                            }
+                            _ => {
+                                return Err(Error::unknown(format!(
+                                    "Received illegal message that message should not have arrived: {:?}.",
+                                    event.name()
+                                )))
+                            }
+                        }
                     }
                 }
-
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
                     // no new data on the socket
                     break;
@@ -767,12 +709,11 @@ where
             }
         }
         self.tcp.set_nonblocking(false).expect("set to blocking");
-
-        Ok(count)
+        Ok(None)
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -790,6 +731,10 @@ impl<EMH, I, S> SendExiting for TcpEventManager<EMH, I, S> {
         //TODO: Should not be needed since TCP does that for us
         //self.tcp.sender.send_exiting()
         Ok(())
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 
@@ -879,6 +824,10 @@ where
         // This way, the broker can clean up the pages, and eventually exit.
         self.tcp_mgr.send_exiting()
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 impl<EMH, I, S, SHM, SP> AwaitRestartSafe for TcpRestartingEventManager<EMH, I, S, SHM, SP>
@@ -917,12 +866,8 @@ where
     }
 }
 
-impl<E, EMH, I, S, SHM, SP, Z> EventProcessor<E, S, Z>
-    for TcpRestartingEventManager<EMH, I, S, SHM, SP>
+impl<EMH, I, S, SHM, SP> EventReceiver<I, S> for TcpRestartingEventManager<EMH, I, S, SHM, SP>
 where
-    E: HasObservers + Executor<TcpEventManager<EMH, I, S>, I, S, Z>,
-    for<'a> E::Observers: Deserialize<'a>,
-    E::Observers: ObserversTuple<I, S> + Serialize,
     EMH: EventManagerHooksTuple<I, S>,
     I: DeserializeOwned,
     S: HasExecutions
@@ -933,15 +878,13 @@ where
         + Stoppable,
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
-    Z: ExecutionProcessor<TcpEventManager<EMH, I, S>, I, E::Observers, S>
-        + EvaluatorObservers<E, TcpEventManager<EMH, I, S>, I, S>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        self.tcp_mgr.process(fuzzer, state, executor)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.tcp_mgr.try_receive(state)
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+        self.tcp_mgr.on_interesting(state, event)
     }
 }
 

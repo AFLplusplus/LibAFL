@@ -44,6 +44,9 @@ pub mod drcov;
 #[cfg(not(cpu_target = "hexagon"))]
 pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 
+pub mod logger;
+pub use logger::LoggerModule;
+
 pub mod utils;
 
 /// [`EmulatorModule`] is a trait designed to define modules that interact with the QEMU emulator

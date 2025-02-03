@@ -134,7 +134,7 @@ where
                 testcase.filename_mut().replace(name);
                 testcase.file_path_mut().replace(path);
             }
-        };
+        }
         self.touch(id, corpus)?;
         Ok(id)
     }
@@ -156,9 +156,12 @@ where
     fn count_all(&self) -> usize {
         self.count_disabled().saturating_add(self.count_disabled())
     }
+
+    #[expect(clippy::used_underscore_items)]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self._add(RefCell::new(testcase), false)
     }
+    #[expect(clippy::used_underscore_items)]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self._add(RefCell::new(testcase), true)
     }
@@ -171,14 +174,16 @@ where
         unimplemented!("It is unsafe to use this corpus variant with replace!");
     }
 
+    #[expect(clippy::used_underscore_items)]
     fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self._get(id, &self.mapping.enabled)
     }
 
+    #[expect(clippy::used_underscore_items)]
     fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         match self._get(id, &self.mapping.enabled) {
             Ok(input) => Ok(input),
-            Err(Error::KeyNotFound(..)) => return self._get(id, &self.mapping.disabled),
+            Err(Error::KeyNotFound(..)) => self._get(id, &self.mapping.disabled),
             Err(e) => Err(e),
         }
     }

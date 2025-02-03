@@ -49,7 +49,7 @@ pub(crate) fn extract_metadata(bytes: &[u8]) -> UnicodeIdentificationMetadata {
                 core::str::from_utf8(&bytes[i..][..e.valid_up_to()]).unwrap()
             });
             if !s.is_empty() {
-                let mut entries = bitvec![0; s.bytes().len()];
+                let mut entries = bitvec![0; s.len()];
                 for (c_idx, _) in s.char_indices() {
                     entries.set(c_idx, true);
                     visited.set(i + c_idx, true);

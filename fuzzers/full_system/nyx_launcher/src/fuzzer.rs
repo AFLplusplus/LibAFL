@@ -7,8 +7,7 @@ use std::{
 use clap::Parser;
 use libafl::{
     events::{
-        ClientDescription, EventConfig, Launcher, LlmpEventManager, LlmpRestartingEventManager,
-        MonitorTypedEventManager,
+        ClientDescription, EventConfig, Launcher, LlmpEventManagerBuilder, MonitorTypedEventManager,
     },
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
@@ -111,17 +110,17 @@ impl Fuzzer {
             // To rerun an input, instead of using a launcher, we create dummy parameters and run the client directly.
             return client.run(
                 None,
-                MonitorTypedEventManager::<_, M>::new(LlmpRestartingEventManager::new(
-                    LlmpEventManager::builder()
-                        .build_on_port(
-                            shmem_provider.clone(),
-                            broker_port,
-                            EventConfig::AlwaysUnique,
-                            None,
-                        )
-                        .unwrap(),
-                    StateRestorer::new(shmem_provider.new_shmem(0x1000).unwrap()),
-                )),
+                MonitorTypedEventManager::<_, M>::new(
+                    LlmpEventManagerBuilder::builder().build_on_port(
+                        shmem_provider.clone(),
+                        broker_port,
+                        EventConfig::AlwaysUnique,
+                        None,
+                        Some(StateRestorer::new(
+                            shmem_provider.new_shmem(0x1000).unwrap(),
+                        )),
+                    )?,
+                ),
                 ClientDescription::new(0, 0, CoreId(0)),
             );
         }
