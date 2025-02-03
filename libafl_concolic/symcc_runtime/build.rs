@@ -260,6 +260,6 @@ fn build_dep_check(tools: &[&str]) {
         } else {
             println!("ERROR: missing build tool {tool}");
             exit(1);
-        };
+        }
     }
 }

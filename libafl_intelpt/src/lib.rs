@@ -98,7 +98,7 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
                     "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
                 )),
             }
-        };
+        }
     }
     #[cfg(not(target_os = "linux"))]
     reasons.push("Only linux hosts are supported at the moment".to_owned());

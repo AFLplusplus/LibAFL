@@ -163,7 +163,7 @@ where
             let reserve = if meta.map.is_empty() {
                 map_iter.size_hint().0
             } else {
-                (map_iter.size_hint().0 + 1) / 2
+                map_iter.size_hint().0.div_ceil(2)
             };
             meta.map.reserve(reserve);
 

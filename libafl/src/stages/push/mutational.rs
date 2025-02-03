@@ -161,7 +161,7 @@ where
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
 
-        fuzzer.evaluate_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        fuzzer.evaluate_execution(state, event_mgr, &last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
         self.mutator.post_exec(state, self.current_corpus_id)?;
@@ -289,7 +289,7 @@ where
             ) {
                 self.push_stage_helper_mut().end_of_iter(shared_state, true);
                 return Some(Err(err));
-            };
+            }
 
             if let Err(err) = shared_state
                 .event_mgr
@@ -297,7 +297,7 @@ where
             {
                 self.push_stage_helper_mut().end_of_iter(shared_state, true);
                 return Some(Err(err));
-            };
+            }
         } else {
             self.push_stage_helper_mut().reset_exit_kind();
         }

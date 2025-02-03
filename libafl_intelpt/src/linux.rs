@@ -279,12 +279,12 @@ impl IntelPT {
             return Err(Error::unknown(
                 "Intel PT: aux buffer head is behind aux tail.",
             ));
-        };
+        }
         if self.previous_decode_head < tail {
             return Err(Error::unknown(
                 "Intel PT: aux previous head is behind aux tail.",
             ));
-        };
+        }
         let len = (head - tail) as usize;
         if len >= self.perf_aux_buffer_size {
             log::warn!(
@@ -312,6 +312,7 @@ impl IntelPT {
             }
         };
         #[cfg(feature = "export_raw")]
+        #[must_use]
         {
             self.last_decode_trace = Vec::with_capacity(len);
             unsafe {
@@ -349,7 +350,7 @@ impl IntelPT {
                     }
                     break 'sync;
                 }
-            };
+            }
         }
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
@@ -414,7 +415,7 @@ impl IntelPT {
                         log::trace!("PT error in event {e:?}");
                         break 'block;
                     }
-                };
+                }
             }
 
             match decoder.decode_next() {
@@ -792,7 +793,7 @@ pub(crate) fn availability_in_linux() -> Result<(), String> {
             }
         }
         Err(e) => reasons.push(format!("Failed to read linux capabilities: {e}")),
-    };
+    }
 
     if reasons.is_empty() {
         Ok(())

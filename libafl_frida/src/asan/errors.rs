@@ -561,7 +561,7 @@ impl AsanErrors {
                 }
                 backtrace_printer.print_trace(backtrace, output).unwrap();
             }
-        };
+        }
 
         self.errors.push(error);
 

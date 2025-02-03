@@ -40,29 +40,32 @@ pub mod inner;
 pub mod stateful;
 
 /// The process executor simply calls a target function, as mutable reference to a closure.
-pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mut H, (), I, OT, S>;
+pub type InProcessExecutor<'a, EM, H, I, OT, S, Z> =
+    GenericInProcessExecutor<EM, H, &'a mut H, (), I, OT, S, Z>;
 
 /// The inprocess executor that allows hooks
-pub type HookableInProcessExecutor<'a, H, HT, I, OT, S> =
-    GenericInProcessExecutor<H, &'a mut H, HT, I, OT, S>;
+pub type HookableInProcessExecutor<'a, EM, H, HT, I, OT, S, Z> =
+    GenericInProcessExecutor<EM, H, &'a mut H, HT, I, OT, S, Z>;
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<I, OT, S> = GenericInProcessExecutor<
+pub type OwnedInProcessExecutor<EM, I, OT, S, Z> = GenericInProcessExecutor<
+    EM,
     dyn FnMut(&I) -> ExitKind,
     Box<dyn FnMut(&I) -> ExitKind>,
     (),
     I,
     OT,
     S,
+    Z,
 >;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
-pub struct GenericInProcessExecutor<H, HB, HT, I, OT, S> {
+pub struct GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z> {
     harness_fn: HB,
-    inner: GenericInProcessExecutorInner<HT, I, OT, S>,
+    inner: GenericInProcessExecutorInner<EM, HT, I, OT, S, Z>,
     phantom: PhantomData<(*const H, HB)>,
 }
 
-impl<H, HB, HT, I, OT, S> Debug for GenericInProcessExecutor<H, HB, HT, I, OT, S>
+impl<EM, H, HB, HT, I, OT, S, Z> Debug for GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>
 where
     OT: Debug,
 {
@@ -75,7 +78,7 @@ where
 }
 
 impl<EM, H, HB, HT, I, OT, S, Z> Executor<EM, I, S, Z>
-    for GenericInProcessExecutor<H, HB, HT, I, OT, S>
+    for GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>
 where
     S: HasExecutions,
     OT: ObserversTuple<I, S>,
@@ -106,7 +109,9 @@ where
     }
 }
 
-impl<H, HB, HT, I, OT, S> HasObservers for GenericInProcessExecutor<H, HB, HT, I, OT, S> {
+impl<EM, H, HB, HT, I, OT, S, Z> HasObservers
+    for GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>
+{
     type Observers = OT;
 
     #[inline]
@@ -120,7 +125,7 @@ impl<H, HB, HT, I, OT, S> HasObservers for GenericInProcessExecutor<H, HB, HT, I
     }
 }
 
-impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
+impl<'a, EM, H, I, OT, S, Z> InProcessExecutor<'a, EM, H, I, OT, S, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
@@ -128,7 +133,7 @@ where
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn new<EM, OF, Z>(
+    pub fn new<OF>(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -140,7 +145,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_generic::<EM, OF, Z>(
+        Self::with_timeout_generic::<OF>(
             tuple_list!(),
             harness_fn,
             observers,
@@ -153,7 +158,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout<EM, OF, Z>(
+    pub fn batched_timeout<OF>(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -166,7 +171,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
+        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
             tuple_list!(),
             observers,
             fuzzer,
@@ -190,7 +195,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout<EM, OF, Z>(
+    pub fn with_timeout<OF>(
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -203,7 +208,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
             tuple_list!(),
             observers,
             fuzzer,
@@ -220,7 +225,7 @@ where
     }
 }
 
-impl<H, HB, HT, I, OT, S> GenericInProcessExecutor<H, HB, HT, I, OT, S>
+impl<EM, H, HB, HT, I, OT, S, Z> GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     HB: BorrowMut<H>,
@@ -230,7 +235,7 @@ where
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
-    pub fn generic<EM, OF, Z>(
+    pub fn generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
@@ -243,7 +248,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        Self::with_timeout_generic::<EM, OF, Z>(
+        Self::with_timeout_generic::<OF>(
             user_hooks,
             harness_fn,
             observers,
@@ -256,7 +261,7 @@ where
 
     /// Create a new in mem executor with the default timeout and use batch mode(5 sec)
     #[cfg(all(feature = "std", target_os = "linux"))]
-    pub fn batched_timeout_generic<EM, OF, Z>(
+    pub fn batched_timeout_generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
@@ -271,7 +276,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, EM, OF, Z>(
+        let inner = GenericInProcessExecutorInner::batched_timeout_generic::<Self, OF>(
             user_hooks, observers, fuzzer, state, event_mgr, exec_tmout,
         )?;
 
@@ -290,7 +295,7 @@ where
     /// * `observers` - the observers observing the target during execution
     ///
     /// This may return an error on unix, if signal handler setup fails
-    pub fn with_timeout_generic<EM, OF, Z>(
+    pub fn with_timeout_generic<OF>(
         user_hooks: HT,
         harness_fn: HB,
         observers: OT,
@@ -304,7 +309,7 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF>,
     {
-        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, EM, OF, Z>(
+        let inner = GenericInProcessExecutorInner::with_timeout_generic::<Self, OF>(
             user_hooks, observers, fuzzer, state, event_mgr, timeout,
         )?;
 
@@ -349,8 +354,8 @@ pub trait HasInProcessHooks<I, S> {
     fn inprocess_hooks_mut(&mut self) -> &mut InProcessHooks<I, S>;
 }
 
-impl<H, HB, HT, I, OT, S> HasInProcessHooks<I, S>
-    for GenericInProcessExecutor<H, HB, HT, I, OT, S>
+impl<EM, H, HB, HT, I, OT, S, Z> HasInProcessHooks<I, S>
+    for GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>
 {
     /// the timeout handler
     #[inline]

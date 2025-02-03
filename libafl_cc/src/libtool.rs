@@ -108,7 +108,7 @@ impl ToolWrapper for LibtoolWrapper {
                     }
                 }
                 _ => (),
-            };
+            }
             new_args.push(args[i].as_ref().to_string());
             i += 1;
         }

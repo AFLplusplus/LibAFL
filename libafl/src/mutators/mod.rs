@@ -407,3 +407,22 @@ impl Named for NopMutator {
         &Cow::Borrowed("NopMutator")
     }
 }
+
+/// [`Mutator`] that flips a boolean value.
+///
+/// Mostly useful in combination with [`mapping::MappingMutator`]s.
+#[derive(Debug)]
+pub struct BoolMutator;
+
+impl<S> Mutator<bool, S> for BoolMutator {
+    fn mutate(&mut self, _state: &mut S, input: &mut bool) -> Result<MutationResult, Error> {
+        *input = !*input;
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl Named for BoolMutator {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("BoolMutator")
+    }
+}
