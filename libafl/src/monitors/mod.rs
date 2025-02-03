@@ -1357,7 +1357,7 @@ impl<A: Monitor, B: Monitor> Monitor for CombinedMonitor<A, B> {
     }
 
     fn client_stats(&self) -> &[ClientStats] {
-        &self.first.client_stats()
+        self.first.client_stats()
     }
 
     fn start_time(&self) -> Duration {
