@@ -504,8 +504,8 @@ pub trait Monitor {
     /// The client monitor (mutable)
     ///
     /// This method is for internal usage only, you shall never call this method directly.
-    /// If you want to update one client stats, use [`update_client_stats_for`]. If you
-    /// want to update all client stats together, use [`update_all_client_stats`].
+    /// If you want to update one client stats, use [`update_client_stats_for`][Self::update_client_stats_for]. If you
+    /// want to update all client stats together, use [`update_all_client_stats`][Self::update_all_client_stats].
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
 
     /// The client monitor
