@@ -53,6 +53,8 @@ use libafl_bolts::{
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
+use crate::corpus::CorpusId;
+
 /// An input for the target
 #[cfg(not(feature = "std"))]
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
@@ -67,7 +69,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
     }
 
     /// Generate a name for this input
-    fn generate_name(&self) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         format!("{:016x}", generic_hash_std(self))
     }
 }
@@ -95,7 +97,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
     }
 
     /// Generate a name for this input, the user is responsible for making each name of testcase unique.
-    fn generate_name(&self) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         format!("{:016x}", generic_hash_std(self))
     }
 }

@@ -90,7 +90,7 @@ where
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add(testcase)?;
         let testcase = &mut self.get(id).unwrap().borrow_mut();
-        self.save_testcase(testcase)?;
+        self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
     }
@@ -100,7 +100,7 @@ where
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add_disabled(testcase)?;
         let testcase = &mut self.get_from_all(id).unwrap().borrow_mut();
-        self.save_testcase(testcase)?;
+        self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
     }
@@ -111,7 +111,7 @@ where
         let entry = self.inner.replace(id, testcase)?;
         self.remove_testcase(&entry)?;
         let testcase = &mut self.get(id).unwrap().borrow_mut();
-        self.save_testcase(testcase)?;
+        self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(entry)
     }
@@ -318,7 +318,12 @@ impl<I> InMemoryOnDiskCorpus<I> {
     /// if testcases with the same input are not given the same filename.
     /// Only rename when you know what you are doing.
     #[inline]
-    pub fn rename_testcase(&self, testcase: &mut Testcase<I>, filename: String) -> Result<(), Error>
+    pub fn rename_testcase(
+        &self,
+        testcase: &mut Testcase<I>,
+        filename: String,
+        id: Option<CorpusId>,
+    ) -> Result<(), Error>
     where
         I: Input,
     {
@@ -337,7 +342,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let new_file_path = self.dir_path.join(&new_filename);
             self.remove_testcase(testcase)?;
             *testcase.filename_mut() = Some(new_filename);
-            self.save_testcase(testcase)?;
+            self.save_testcase(testcase, id)?;
             *testcase.file_path_mut() = Some(new_file_path);
 
             Ok(())
@@ -348,13 +353,13 @@ impl<I> InMemoryOnDiskCorpus<I> {
         }
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>) -> Result<(), Error>
+    fn save_testcase(&self, testcase: &mut Testcase<I>, id: Option<CorpusId>) -> Result<(), Error>
     where
         I: Input,
     {
         let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name()
+            testcase.input().as_ref().unwrap().generate_name(id)
         });
 
         let mut ctr = String::new();
