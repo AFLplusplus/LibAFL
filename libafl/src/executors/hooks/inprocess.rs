@@ -6,7 +6,7 @@ use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
     marker::PhantomData,
-    ptr::{self, null_mut},
+    ptr::{self, null_mut, write, write_volatile},
     time::Duration,
 };
 
@@ -196,9 +196,22 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
     fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {
+        // # Safety
+        // _Technically_ this and `post_exec` could race against each other.
+        // Theoretically, one could end up in a state with timeout_handler set, and crash_handler not,
+        // or vice versa.
+        // In practice though, it's not clear how this would be an issue.
+        // Therefore, we will ignore this very slight edge-case for performance.
+        // We are a fuzzer, after all.
         #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
+
+            assert!(
+                ((*data).timeout_handler.is_null()) && ((*data).crash_handler.is_null()),
+                "Called InProcesssHooks::pre_exec multiple times! This is not supported."
+            );
+
             (*data).crash_handler = self.crash_handler;
             (*data).timeout_handler = self.timeout_handler;
         }
@@ -209,6 +222,16 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
 
     /// Call after running a target.
     fn post_exec(&mut self, _state: &mut S, _input: &I) {
+        // # Safety
+        // Setting to null is safe (nobody should be able to use the functions in the meantime).
+        #[cfg(feature = "std")]
+        unsafe {
+            let data = &raw mut GLOBAL_STATE;
+
+            (*data).crash_handler = null_mut();
+            (*data).timeout_handler = null_mut();
+        }
+
         // timeout stuff
         // # Safety
         // We're calling this only once per execution, in a single thread.

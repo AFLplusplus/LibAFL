@@ -22,7 +22,8 @@ pub mod windows_asan_handler {
     };
 
     /// # Safety
-    /// ASAN deatch handler
+    /// ASan deatch handler.
+    /// Don't call in a different context.
     pub unsafe extern "C" fn asan_death_handler<E, EM, I, OF, S, Z>()
     where
         E: Executor<EM, I, S, Z> + HasObservers,
