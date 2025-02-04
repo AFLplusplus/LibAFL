@@ -234,6 +234,7 @@ impl<I, S> InProcessHooks<I, S> {
             setup_signal_handler(data)?;
         }
 
+        #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
             (*data).crash_handler =
