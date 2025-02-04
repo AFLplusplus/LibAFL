@@ -134,8 +134,18 @@ impl IntelPT {
                     Ok(()) => String::new(),
                     Err(reasons) => format!(" Possible reasons: {reasons}"),
                 };
+                let not_enough_filters = if filters.len() > nr_addr_filters().unwrap_or(0) as usize
+                {
+                    format!(
+                        " Not enough filters, trying to set {} filters while {} available.",
+                        filters.len(),
+                        nr_addr_filters().unwrap_or(0)
+                    )
+                } else {
+                    String::new()
+                };
                 Err(Error::last_os_error(format!(
-                    "Failed to set IP filters.{availability}"
+                    "Failed to set IP filters.{not_enough_filters}{availability}"
                 )))
             }
             0 => {
