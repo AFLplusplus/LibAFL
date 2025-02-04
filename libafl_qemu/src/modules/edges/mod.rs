@@ -194,11 +194,17 @@ impl<AF, PF, V, const IS_INITIALIZED: bool, const IS_CONST_MAP: bool, const MAP_
     #[must_use]
     pub fn const_map_observer<O, const NEW_MAP_SIZE: usize>(
         self,
-        _const_map_observer: &mut O,
+        const_map_observer: &mut O,
     ) -> EdgeCoverageModuleBuilder<AF, PF, V, true, true, NEW_MAP_SIZE>
     where
         O: ConstLenMapObserver<NEW_MAP_SIZE>,
     {
+        let map_ptr = const_map_observer.map_slice_mut().as_mut_ptr() as *mut u8;
+
+        unsafe {
+            LIBAFL_QEMU_EDGES_MAP_PTR = map_ptr;
+        }
+
         EdgeCoverageModuleBuilder::<AF, PF, V, true, true, NEW_MAP_SIZE>::new(
             self.variant,
             self.address_filter,

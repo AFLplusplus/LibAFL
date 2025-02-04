@@ -68,7 +68,7 @@ mod generators {
         if IS_CONST_MAP {
             const {
                 assert!(
-                    !IS_CONST_MAP || MAP_SIZE > 0,
+                    MAP_SIZE > 0,
                     "The size of a const map should be bigger than 0."
                 );
                 MAP_SIZE.overflowing_sub(1).0
@@ -107,7 +107,9 @@ mod generators {
             emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
         {
             unsafe {
-                assert!(LIBAFL_QEMU_EDGES_MAP_MASK_MAX > 0);
+                if !IS_CONST_MAP {
+                    assert!(LIBAFL_QEMU_EDGES_MAP_MASK_MAX > 0);
+                }
                 let edges_map_size_ptr = &raw const LIBAFL_QEMU_EDGES_MAP_SIZE_PTR;
                 assert_ne!(*edges_map_size_ptr, ptr::null_mut());
             }
