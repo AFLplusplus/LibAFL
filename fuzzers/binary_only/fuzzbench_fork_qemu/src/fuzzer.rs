@@ -56,7 +56,7 @@ use libafl_qemu::{
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
 };
-use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
+use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -155,7 +155,6 @@ fn fuzz(
 
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
     let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     // Create an observation channel using the coverage map
     let mut edges_observer = unsafe {
