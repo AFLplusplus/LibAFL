@@ -51,6 +51,7 @@ use libafl_qemu::{
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
     modules::edges::StdEdgeCoverageModule,
+    modules::AsanModule,
     Emulator,
     GuestReg,
     //snapshot::QemuSnapshotHelper,

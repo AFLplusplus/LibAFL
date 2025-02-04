@@ -6,6 +6,8 @@ use core::mem::size_of;
 use std::io::{BufWriter, Write};
 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
 use std::process::Command;
+#[cfg(unix)]
+use std::vec::Vec;
 
 #[cfg(unix)]
 use libc::siginfo_t;
@@ -23,6 +25,18 @@ use windows::Win32::System::Diagnostics::Debug::{CONTEXT, EXCEPTION_POINTERS};
 
 #[cfg(unix)]
 use crate::os::unix_signals::{ucontext_t, Signal};
+
+/// Necessary info to print a mini-BSOD.
+#[derive(Debug)]
+#[cfg(unix)]
+pub struct BsodInfo {
+    /// the signal
+    pub signal: Signal,
+    /// siginfo
+    pub siginfo: siginfo_t,
+    /// ucontext
+    pub ucontext: Option<ucontext_t>,
+}
 
 /// Write the content of all important registers
 #[cfg(all(
@@ -1108,6 +1122,24 @@ pub fn generate_minibsod<W: Write>(
     writeln!(writer, "{:?}", backtrace::Backtrace::new())?;
     writeln!(writer, "{:━^100}", " MAPS ")?;
     write_minibsod(writer)
+}
+
+/// Generates a mini-BSOD given a signal and context and dump it to a [`Vec`]
+#[cfg(unix)]
+pub fn generate_minibsod_to_vec(
+    signal: Signal,
+    siginfo: &siginfo_t,
+    ucontext: Option<&ucontext_t>,
+) -> Result<Vec<u8>, std::io::Error> {
+    let mut bsod = Vec::new();
+    {
+        let mut writer = BufWriter::new(&mut bsod);
+
+        generate_minibsod(&mut writer, signal, siginfo, ucontext)?;
+
+        writer.flush()?;
+    }
+    Ok(bsod)
 }
 
 /// Generates a mini-BSOD given an `EXCEPTION_POINTERS` structure.

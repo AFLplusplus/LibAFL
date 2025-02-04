@@ -25,7 +25,7 @@ tests_expected=(
   "is 0 bytes to the right of the 10-byte chunk"
   "is 1 bytes to the left of the 10-byte chunk"
   "is 0 bytes inside the 10-byte chunk"
-  "is 0 bytes to the right of the 10-byte chunk"
+  "Invalid 11 bytes write at"
   "is 0 bytes inside the 10-byte chunk"
   "Test-Limits - No Error"
 )

@@ -81,8 +81,13 @@ exec_sec = {}
             )
             .expect("Failed to write to the Toml file");
 
-            for (i, client) in self.client_stats_mut().iter_mut().enumerate() {
-                let exec_sec = client.execs_per_sec(cur_time);
+            for i in 0..(self.client_stats().len()) {
+                let client_id = ClientId(i as u32);
+                let exec_sec = self.update_client_stats_for(client_id, |client_stat| {
+                    client_stat.execs_per_sec(cur_time)
+                });
+
+                let client = self.client_stats_for(client_id);
 
                 write!(
                     &mut file,
