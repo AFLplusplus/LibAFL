@@ -12,6 +12,8 @@ use core::{
 
 #[cfg(all(target_os = "linux", feature = "std"))]
 use libafl_bolts::current_time;
+#[cfg(all(unix, feature = "std"))]
+use libafl_bolts::minibsod::{generate_minibsod_to_vec, BsodInfo};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use libafl_bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
@@ -21,14 +23,19 @@ use windows::Win32::System::Threading::{CRITICAL_SECTION, PTP_TIMER};
 
 #[cfg(feature = "std")]
 use crate::executors::hooks::timer::TimerStruct;
-#[cfg(all(unix, feature = "std"))]
-use crate::executors::hooks::unix::unix_signal_handler;
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{hooks::ExecutorHook, inprocess::HasInProcessHooks, Executor, HasObservers},
     feedbacks::Feedback,
     state::{HasExecutions, HasSolutions},
     Error, HasObjective,
+};
+#[cfg(all(unix, feature = "std"))]
+use crate::{
+    executors::{
+        hooks::unix::unix_signal_handler, inprocess::run_observers_and_save_state, ExitKind,
+    },
+    state::HasCorpus,
 };
 #[cfg(any(unix, windows))]
 use crate::{inputs::Input, observers::ObserversTuple, state::HasCurrentTestcase};
@@ -386,51 +393,110 @@ unsafe impl Sync for InProcessExecutorHandlerData {}
 impl InProcessExecutorHandlerData {
     /// # Safety
     /// Only safe if not called twice and if the executor is not used from another borrow after this.
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called twice and if the state is not used from another borrow after this.
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called twice and if the event manager is not used from another borrow after this.
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called twice and if the fuzzer is not used from another borrow after this.
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
     /// # Safety
     /// Only safe if not called concurrently.
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) unsafe fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = ptr::null();
         r
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
 
-    #[cfg(any(unix, feature = "std"))]
+    #[cfg(all(feature = "std", any(unix, windows)))]
     pub(crate) fn set_in_handler(&mut self, v: bool) -> bool {
         let old = self.in_handler;
         self.in_handler = v;
         old
+    }
+
+    /// if data is valid, safely report a crash and return true.
+    /// return false otherwise.
+    ///
+    /// # Safety
+    ///
+    /// Should only be called to signal a crash in the target
+    #[cfg(all(unix, feature = "std"))]
+    pub unsafe fn maybe_report_crash<E, EM, I, OF, S, Z>(
+        &mut self,
+        bsod_info: Option<BsodInfo>,
+    ) -> bool
+    where
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+        Z: HasObjective<Objective = OF>,
+        I: Input + Clone,
+    {
+        if self.is_valid() {
+            let executor = self.executor_mut::<E>();
+            // disarms timeout in case of timeout
+            let state = self.state_mut::<S>();
+            let event_mgr = self.event_mgr_mut::<EM>();
+            let fuzzer = self.fuzzer_mut::<Z>();
+            let input = self.take_current_input::<I>();
+
+            log::error!("Target crashed!");
+
+            if let Some(bsod_info) = bsod_info {
+                let bsod = generate_minibsod_to_vec(
+                    bsod_info.signal,
+                    &bsod_info.siginfo,
+                    bsod_info.ucontext.as_ref(),
+                );
+
+                if let Ok(bsod) = bsod {
+                    if let Ok(r) = std::str::from_utf8(&bsod) {
+                        log::error!("{}", r);
+                    }
+                }
+            }
+
+            run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                executor,
+                state,
+                input,
+                fuzzer,
+                event_mgr,
+                ExitKind::Crash,
+            );
+
+            return true;
+        }
+
+        false
     }
 }
 

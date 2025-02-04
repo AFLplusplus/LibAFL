@@ -6,8 +6,6 @@
 use core::{ffi::c_void, fmt::Debug, mem::transmute, ptr};
 
 use libafl::executors::hooks::inprocess::inprocess_get_state;
-#[cfg(feature = "usermode")]
-use libafl_qemu_sys::libafl_dump_core_hook;
 use libafl_qemu_sys::{CPUArchStatePtr, CPUStatePtr, FatPtr, GuestAddr, GuestUsize};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, FromPyObject};
@@ -1240,13 +1238,6 @@ impl QemuHooks {
             ) -> GuestAddr = transmute(callback);
             let num = libafl_qemu_sys::libafl_add_post_syscall_hook(Some(callback), data);
             PostSyscallHookId(num)
-        }
-    }
-
-    #[expect(clippy::unused_self)]
-    pub(crate) fn set_crash_hook(self, callback: extern "C" fn(i32)) {
-        unsafe {
-            libafl_dump_core_hook = Some(callback);
         }
     }
 }
