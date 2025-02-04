@@ -94,8 +94,10 @@ where
             let executor_ptr = ptr::from_ref(self) as *const c_void;
             self.inner
                 .enter_target(fuzzer, state, mgr, input, executor_ptr);
+            // the first hook is special
+            // it is for setting crash handlers
+            self.inner.hooks.0.enter_target_hooks();
         }
-        self.inner.hooks.pre_exec_all(state, input);
 
         let ret = self.harness_fn.borrow_mut()(input);
 

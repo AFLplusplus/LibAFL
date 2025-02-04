@@ -195,7 +195,17 @@ impl<I, S> HasTimeout for InProcessHooks<I, S> {
 impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
     fn init(&mut self, _state: &mut S) {}
     /// Call before running a target.
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) {}
+
+    /// Call after running a target.
+    fn post_exec(&mut self, _state: &mut S, _input: &I) {}
+}
+
+impl<I, S> InProcessHooks<I, S> {
+    /// Setting up crash handler
+    // # Safety
+    // Don't call this from multiple threads. It is accesing a global variable.
+    pub unsafe fn enter_target_hooks(&mut self) {
         #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -207,17 +217,15 @@ impl<I, S> ExecutorHook<I, S> for InProcessHooks<I, S> {
         self.timer_mut().set_timer();
     }
 
-    /// Call after running a target.
-    fn post_exec(&mut self, _state: &mut S, _input: &I) {
+    /// Resetting pointers to crash handler
+    pub unsafe fn leave_target_hooks(&mut self) {
         // timeout stuff
         // # Safety
         // We're calling this only once per execution, in a single thread.
         #[cfg(all(feature = "std", not(all(miri, target_vendor = "apple"))))]
         self.timer_mut().unset_timer();
     }
-}
 
-impl<I, S> InProcessHooks<I, S> {
     /// Create new [`InProcessHooks`].
     #[cfg(unix)]
     #[allow(unused_variables)] // for `exec_tmout` without `std`
