@@ -86,6 +86,8 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
+
+        // unsafe operations for settings up pointers
         unsafe {
             let executor_ptr = ptr::from_ref(self) as *const c_void;
             self.inner
