@@ -6,7 +6,7 @@ CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
 
-set windows-powershell := true
+
 alias build := fuzzer
 
 cc:

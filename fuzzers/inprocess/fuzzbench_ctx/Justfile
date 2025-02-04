@@ -5,9 +5,9 @@ PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { 
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
 FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
 
-set windows-powershell := true
+
 alias build := fuzzer
-set windows-powershell := true
+
 alias cc := cxx
 
 [linux]
