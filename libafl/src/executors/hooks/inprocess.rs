@@ -6,7 +6,7 @@ use core::sync::atomic::{compiler_fence, Ordering};
 use core::{
     ffi::c_void,
     marker::PhantomData,
-    ptr::{self, null_mut, write, write_volatile},
+    ptr::{self, null_mut},
     time::Duration,
 };
 
