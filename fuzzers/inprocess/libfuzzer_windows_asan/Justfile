@@ -5,7 +5,8 @@ PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { 
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
 LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
 
-set windows-powershell := true
+#[windows]
+set shell := ["cmd.exe", "/c"]
 alias cc := cxx
 
 [windows]
@@ -24,7 +25,7 @@ cxx:
 
 [windows]
 fuzzer: cxx
-    {{LIBAFL_CXX}} ./harness.cpp -o {{FUZZER_NAME}}.exe
+    .\target\{{PROFILE}}\libafl_cxx .\harness.cpp -o {{FUZZER_NAME}}.exe
 
 [linux]
 [macos]
@@ -33,9 +34,9 @@ fuzzer:
 
     
 [windows]
-test:
-    start "" "{{FUZZER_NAME}}.exe"
-    start "" "{{FUZZER_NAME}}.exe"
+test: fuzzer
+    start {{FUZZER_NAME}}.exe
+    start {{FUZZER_NAME}}.exe
     ping -n 10 127.0.0.1>NUL && taskkill /im {{FUZZER_NAME}}.exe /F
     >nul 2>nul dir /a-d "crashes\*" && (echo Files exist) || (exit /b 1337)
 
