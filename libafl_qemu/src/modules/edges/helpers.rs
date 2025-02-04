@@ -68,7 +68,7 @@ mod generators {
         if IS_CONST_MAP {
             const {
                 assert!(
-                    MAP_SIZE > 0,
+                    !IS_CONST_MAP || MAP_SIZE > 0,
                     "The size of a const map should be bigger than 0."
                 );
                 MAP_SIZE.overflowing_sub(1).0
