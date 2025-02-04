@@ -454,8 +454,9 @@ impl Monitor for TuiMonitor {
         }
 
         self.client_stats_insert(sender_id);
-        let client = self.client_stats_mut_for(sender_id);
-        let exec_sec = client.execs_per_sec_pretty(cur_time);
+        let exec_sec =
+            self.update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time));
+        let client = self.client_stats_for(sender_id);
 
         let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {

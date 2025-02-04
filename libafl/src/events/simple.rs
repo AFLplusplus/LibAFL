@@ -209,9 +209,9 @@ where
         match event {
             Event::NewTestcase { corpus_size, .. } => {
                 monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_corpus_size(*corpus_size as u64);
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_corpus_size(*corpus_size as u64);
+                });
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -220,18 +220,18 @@ where
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(ClientId(0));
-                let client = monitor.client_stats_mut_for(ClientId(0));
-
-                client.update_executions(*executions, *time);
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_executions(*executions, *time);
+                });
 
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats { name, value, .. } => {
                 monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_user_stats(name.clone(), value.clone());
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_user_stats(name.clone(), value.clone());
+                });
                 monitor.aggregate(name);
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
@@ -245,17 +245,18 @@ where
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(ClientId(0));
-                let client = monitor.client_stats_mut_for(ClientId(0));
-                client.update_executions(*executions, *time);
-                client.update_introspection_monitor((**introspection_monitor).clone());
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_executions(*executions, *time);
+                    client_stat.update_introspection_monitor((**introspection_monitor).clone());
+                });
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_objective_size(*objective_size as u64);
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_objective_size(*objective_size as u64);
+                });
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -542,7 +543,7 @@ where
 
                 // reload the state of the monitor to display the correct stats after restarts
                 monitor.set_start_time(start_time);
-                *monitor.client_stats_mut() = clients_stats;
+                monitor.update_all_client_stats(clients_stats);
 
                 (
                     Some(state),
