@@ -205,7 +205,7 @@ impl<I, S> InProcessHooks<I, S> {
     /// Setting up crash handler
     // # Safety
     // Don't call this from multiple threads. It is accesing a global variable.
-    pub unsafe fn enter_target_hooks(&mut self) {
+    pub(crate) unsafe fn enter_target_hooks(&mut self) {
         #[cfg(feature = "std")]
         unsafe {
             let data = &raw mut GLOBAL_STATE;
@@ -218,7 +218,7 @@ impl<I, S> InProcessHooks<I, S> {
     }
 
     /// Resetting pointers to crash handler
-    pub unsafe fn leave_target_hooks(&mut self) {
+    pub(crate) fn leave_target_hooks(&mut self) {
         // timeout stuff
         // # Safety
         // We're calling this only once per execution, in a single thread.
