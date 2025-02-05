@@ -145,7 +145,7 @@ pub struct MemAccessInfo {
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct CPU {
-    ptr: CPUStatePtr,
+    cpu_ptr: CPUStatePtr,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -288,12 +288,12 @@ impl CPU {
     #[must_use]
     #[expect(clippy::cast_sign_loss)]
     pub fn index(&self) -> usize {
-        unsafe { libafl_qemu_cpu_index(self.ptr) as usize }
+        unsafe { libafl_qemu_cpu_index(self.cpu_ptr) as usize }
     }
 
     pub fn trigger_breakpoint(&self) {
         unsafe {
-            libafl_qemu_trigger_breakpoint(self.ptr);
+            libafl_qemu_trigger_breakpoint(self.cpu_ptr);
         }
     }
 
@@ -301,7 +301,7 @@ impl CPU {
 
     #[must_use]
     pub fn num_regs(&self) -> i32 {
-        unsafe { libafl_qemu_num_regs(self.ptr) }
+        unsafe { libafl_qemu_num_regs(self.cpu_ptr) }
     }
 
     pub fn read_reg<R>(&self, reg: R) -> Result<GuestReg, QemuRWError>
@@ -311,12 +311,12 @@ impl CPU {
         unsafe {
             let reg_id = reg.clone().into();
             let mut val = MaybeUninit::uninit();
-            let success = libafl_qemu_read_reg(self.ptr, reg_id, val.as_mut_ptr() as *mut u8);
+            let success = libafl_qemu_read_reg(self.cpu_ptr, reg_id, val.as_mut_ptr() as *mut u8);
             if success == 0 {
                 Err(QemuRWError::wrong_reg(
                     QemuRWErrorKind::Write,
                     reg,
-                    Some(self.ptr),
+                    Some(self.cpu_ptr),
                 ))
             } else {
                 #[cfg(feature = "be")]
@@ -340,12 +340,13 @@ impl CPU {
         #[cfg(not(feature = "be"))]
         let val = GuestReg::to_le(val.into());
 
-        let success = unsafe { libafl_qemu_write_reg(self.ptr, reg_id, &raw const val as *mut u8) };
+        let success =
+            unsafe { libafl_qemu_write_reg(self.cpu_ptr, reg_id, &raw const val as *mut u8) };
         if success == 0 {
             Err(QemuRWError::wrong_reg(
                 QemuRWErrorKind::Write,
                 reg,
-                Some(self.ptr),
+                Some(self.cpu_ptr),
             ))
         } else {
             Ok(())
@@ -357,7 +358,7 @@ impl CPU {
         // TODO use gdbstub's target_cpu_memory_rw_debug
         let ret = unsafe {
             libafl_qemu_sys::cpu_memory_rw_debug(
-                self.ptr,
+                self.cpu_ptr,
                 addr as GuestVirtAddr,
                 buf.as_mut_ptr() as *mut _,
                 buf.len(),
@@ -368,7 +369,7 @@ impl CPU {
         if ret != 0 {
             Err(QemuRWError::wrong_mem_location(
                 QemuRWErrorKind::Read,
-                self.ptr,
+                self.cpu_ptr,
                 addr,
                 buf.len(),
             ))
@@ -394,7 +395,7 @@ impl CPU {
         // TODO use gdbstub's target_cpu_memory_rw_debug
         let ret = unsafe {
             libafl_qemu_sys::cpu_memory_rw_debug(
-                self.ptr,
+                self.cpu_ptr,
                 addr as GuestVirtAddr,
                 buf.as_ptr() as *mut _,
                 buf.len(),
@@ -405,7 +406,7 @@ impl CPU {
         if ret != 0 {
             Err(QemuRWError::wrong_mem_location(
                 QemuRWErrorKind::Write,
-                self.ptr,
+                self.cpu_ptr,
                 addr,
                 buf.len(),
             ))
@@ -415,7 +416,7 @@ impl CPU {
     }
 
     pub fn reset(&self) {
-        unsafe { libafl_qemu_sys::cpu_reset(self.ptr) };
+        unsafe { libafl_qemu_sys::cpu_reset(self.cpu_ptr) };
     }
 
     #[must_use]
@@ -423,7 +424,7 @@ impl CPU {
         unsafe {
             let mut saved = MaybeUninit::<CPUArchState>::uninit();
             copy_nonoverlapping(
-                libafl_qemu_sys::cpu_env(self.ptr.as_mut().unwrap()),
+                libafl_qemu_sys::cpu_env(self.cpu_ptr.as_mut().unwrap()),
                 saved.as_mut_ptr(),
                 1,
             );
@@ -435,7 +436,7 @@ impl CPU {
         unsafe {
             copy_nonoverlapping(
                 saved,
-                libafl_qemu_sys::cpu_env(self.ptr.as_mut().unwrap()),
+                libafl_qemu_sys::cpu_env(self.cpu_ptr.as_mut().unwrap()),
                 1,
             );
         }
@@ -443,7 +444,7 @@ impl CPU {
 
     #[must_use]
     pub fn raw_ptr(&self) -> CPUStatePtr {
-        self.ptr
+        self.cpu_ptr
     }
 
     #[must_use]
@@ -714,17 +715,19 @@ impl Qemu {
         if ptr.is_null() {
             None
         } else {
-            Some(CPU { ptr })
+            Some(CPU { cpu_ptr: ptr })
         }
     }
 
     #[must_use]
     #[expect(clippy::cast_possible_wrap)]
-    pub fn cpu_from_index(&self, index: usize) -> CPU {
-        unsafe {
-            CPU {
-                ptr: libafl_qemu_get_cpu(index as i32),
-            }
+    pub fn cpu_from_index(&self, index: usize) -> Option<CPU> {
+        let cpu_ptr = unsafe { libafl_qemu_get_cpu(index as i32) };
+
+        if cpu_ptr.is_null() {
+            None
+        } else {
+            CPU { cpu_ptr }
         }
     }
 
