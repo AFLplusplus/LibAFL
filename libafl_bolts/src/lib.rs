@@ -1010,7 +1010,8 @@ pub fn get_thread_id() -> u64 {
 /// Return thread ID using Rust's `std::thread`
 pub fn get_thread_id() -> u64 {
     // Fallback for other platforms
-    std::thread::current().id().as_u64().into()
+    let thread_id = std::thread::current().id();
+    unsafe { std::mem::transmute::<_, u64>(thread_id) }
 }
 
 #[cfg(feature = "std")]
