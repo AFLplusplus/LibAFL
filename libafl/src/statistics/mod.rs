@@ -7,6 +7,7 @@ pub mod user_stats;
 
 use alloc::{borrow::Cow, string::String};
 use core::time::Duration;
+
 use hashbrown::HashMap;
 use libafl_bolts::current_time;
 use serde::{Deserialize, Serialize};

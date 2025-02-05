@@ -47,8 +47,10 @@ use prometheus_client::{
 // using tide for the HTTP server library (fast, async, simple)
 use tide::Request;
 
-use crate::statistics::{user_stats::UserStatsValue, ClientStats};
-use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
+use crate::{
+    monitors::Monitor,
+    statistics::{manager::ClientStatsManager, user_stats::UserStatsValue, ClientStats},
+};
 
 /// Prometheus metrics for global and each client.
 #[derive(Clone, Debug, Default)]

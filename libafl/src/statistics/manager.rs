@@ -1,12 +1,13 @@
 //! Client statistics manager
 
+use alloc::{string::String, vec::Vec};
 use core::time::Duration;
 
-use super::{user_stats::UserStatsValue, ClientStats};
-use alloc::{string::String, vec::Vec};
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, ClientId};
 use serde::{Deserialize, Serialize};
+
+use super::{user_stats::UserStatsValue, ClientStats};
 
 /// Manager of all client's statistics
 #[derive(Serialize, Deserialize, Debug)]

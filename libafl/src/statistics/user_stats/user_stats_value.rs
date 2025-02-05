@@ -2,6 +2,7 @@
 
 use alloc::borrow::Cow;
 use core::fmt;
+
 use serde::{Deserialize, Serialize};
 
 /// The actual value for the userstats

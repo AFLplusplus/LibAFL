@@ -30,11 +30,14 @@ use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
-use crate::statistics::{
-    user_stats::{AggregatorOps, UserStats, UserStatsValue},
-    ClientStats,
+use crate::{
+    monitors::Monitor,
+    statistics::{
+        manager::ClientStatsManager,
+        user_stats::{AggregatorOps, UserStats, UserStatsValue},
+        ClientStats,
+    },
 };
-use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
 
 #[expect(missing_docs)]
 pub mod ui;

@@ -4,9 +4,8 @@ mod user_stats_value;
 use alloc::string::ToString;
 use core::fmt;
 
-pub use user_stats_value::*;
-
 use serde::{Deserialize, Serialize};
+pub use user_stats_value::*;
 
 use super::manager::ClientStatsManager;
 
