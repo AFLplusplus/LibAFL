@@ -8,11 +8,7 @@ use frida_gum::{
     Gum, MemoryRange, NativePointer,
 };
 #[cfg(windows)]
-use libafl::{
-    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
-    inputs::Input,
-    state::{HasCurrentTestcase, HasSolutions},
-};
+use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{Input, NopTargetBytesConverter, TargetBytesConverter},
