@@ -249,16 +249,12 @@ where
 
         let data = &raw mut GLOBAL_STATE;
         #[cfg(feature = "usermode")]
-        // # Safety
-        // dereferencing from mut static is unsafe
         unsafe {
             // rewrite the crash handler pointer
             (*data).crash_handler =
                 inproc_qemu_crash_handler::<Self, EM, ET, I, OF, S, Z> as *const c_void;
         }
 
-        // # Safety
-        // dereferencing from mut static is unsafe
         unsafe {
             // rewrite the timeout handler pointer
             (*data).timeout_handler = inproc_qemu_timeout_handler::<
