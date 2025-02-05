@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use std::{path::PathBuf, ptr::null};
+use std::{cell::RefCell, path::PathBuf, ptr::null, rc::Rc};
 
 use frida_gum::Gum;
 use libafl::{
@@ -43,12 +43,11 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
+    frida_helper_shutdown_observer::FridaHelperObserver,
     helper::FridaInstrumentationHelper,
-    frida_helper_shutdown_observer::FridaHelperObserver,   
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
-use std::{cell::RefCell, rc::Rc};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -115,13 +114,17 @@ unsafe fn fuzz(
                 let asan = AsanRuntime::new(options);
 
                 #[cfg(unix)]
-                let frida_helper = Rc::new(RefCell::new(
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan))
-                ));
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage, asan),
+                )));
                 #[cfg(windows)]
-                let frida_helper = Rc::new(RefCell::new(
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage))
-                ));
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    &options,
+                    tuple_list!(coverage),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -201,7 +204,12 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
                 #[cfg(windows)]
                 let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
@@ -243,9 +251,11 @@ unsafe fn fuzz(
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
 
-                let mut frida_helper = Rc::new(RefCell::new(
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog))
-                ));
+                let mut frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage, cmplog),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -323,7 +333,12 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
                 #[cfg(windows)]
                 let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
@@ -380,9 +395,11 @@ unsafe fn fuzz(
 
                 let coverage = CoverageRuntime::new();
 
-                let mut frida_helper = Rc::new(RefCell::new(
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage))
-                ));
+                let mut frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
@@ -460,7 +477,12 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
                 #[cfg(windows)]
                 let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 

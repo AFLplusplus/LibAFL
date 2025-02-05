@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use std::path::PathBuf;
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use frida_gum::Gum;
 use libafl::{
@@ -40,12 +40,11 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
+    frida_helper_shutdown_observer::FridaHelperObserver,
     helper::{FridaInstrumentationHelper, IfElseRuntime},
-    frida_helper_shutdown_observer::FridaHelperObserver,    
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
-use std::{cell::RefCell, rc::Rc};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -106,8 +105,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         let options_clone = options.clone();
         let client_description_clone2 = client_description.clone();
         let options_clone2 = options.clone();
-        let frida_helper = Rc::new(RefCell::new(
-            FridaInstrumentationHelper::new(
+        let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
             &gum,
             options,
             tuple_list!(
@@ -127,7 +125,11 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe {
-            StdMapObserver::from_mut_ptr("edges", frida_helper.borrow_mut().map_mut_ptr().unwrap(), MAP_SIZE)
+            StdMapObserver::from_mut_ptr(
+                "edges",
+                frida_helper.borrow_mut().map_mut_ptr().unwrap(),
+                MAP_SIZE,
+            )
         })
         .track_indices();
 
@@ -191,7 +193,12 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
+        let observers = tuple_list!(
+            frida_helper_observer,
+            edges_observer,
+            time_observer,
+            asan_observer
+        );
 
         // Create the executor for an in-process function with just one observer for edge coverage
         let executor = FridaInProcessExecutor::new(

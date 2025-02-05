@@ -131,6 +131,7 @@ pub struct AsanInHookGuard;
 
 impl AsanInHookGuard {
     /// Constructor to save the current last error
+    #[must_use]
     pub fn new() -> Self {
         ASAN_IN_HOOK.set(true);
         AsanInHookGuard
