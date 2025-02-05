@@ -13,11 +13,9 @@ use libafl::{
     monitors::{tui::TuiMonitor, Monitor, MultiMonitor},
     Error,
 };
-use libafl_bolts::{current_time};
+use libafl_bolts::current_time;
 #[cfg(not(feature = "simplemgr"))]
-use libafl_bolts::{
-    shmem::{ShMemProvider, StdShMemProvider},
-};
+use libafl_bolts::shmem::{ShMemProvider, StdShMemProvider};
 #[cfg(unix)]
 use {
     nix::unistd::dup,

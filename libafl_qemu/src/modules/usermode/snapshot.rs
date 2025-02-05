@@ -739,10 +739,8 @@ where
     {
         if self.empty {
             self.snapshot(qemu);
-        } else {
-            if self.auto_reset {
-                self.reset(qemu);
-            }
+        } else if self.auto_reset {
+            self.reset(qemu);
         }
     }
 }
