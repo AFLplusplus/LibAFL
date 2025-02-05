@@ -970,6 +970,7 @@ impl SimpleStdoutLogger {
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(target_os = "windows")]
 #[allow(clippy::cast_ptr_alignment)]
 #[must_use]
@@ -1003,14 +1004,16 @@ pub fn get_thread_id() -> u64 {
     unsafe { syscall(SYS_gettid) as u64 }
 }
 
+#[cfg(feature = "std")]
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 #[must_use]
 /// Return thread ID using Rust's `std::thread`
 pub fn get_thread_id() -> u64 {
     // Fallback for other platforms
-    thread::current().id().as_u64().into()
+    std::thread::current().id().as_u64().into()
 }
 
+#[cfg(feature = "std")]
 #[cfg(target_os = "windows")]
 mod windows_logging {
     use std::ptr;
