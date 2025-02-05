@@ -34,13 +34,11 @@ use crate::{
     monitors::Monitor,
     stages::HasCurrentStageId,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
+    statistics::{manager::ClientStatsManager, ClientStats},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
-use crate::{
-    monitors::{ClientStats, SimplePrintingMonitor},
-    state::HasSolutions,
-};
+use crate::{monitors::SimplePrintingMonitor, state::HasSolutions};
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
@@ -55,6 +53,7 @@ pub struct SimpleEventManager<I, MT, S> {
     /// The events that happened since the last `handle_in_broker`
     events: Vec<Event<I>>,
     phantom: PhantomData<S>,
+    client_stats_manager: ClientStatsManager,
 }
 
 impl<I, MT, S> Debug for SimpleEventManager<I, MT, S>
@@ -84,7 +83,7 @@ where
     }
 
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        match Self::handle_in_broker(&mut self.monitor, &event)? {
+        match Self::handle_in_broker(&mut self.monitor, &mut self.client_stats_manager, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
         }
@@ -199,41 +198,46 @@ where
         Self {
             monitor,
             events: vec![],
+            client_stats_manager: ClientStatsManager::default(),
             phantom: PhantomData,
         }
     }
 
     /// Handle arriving events in the broker
     #[expect(clippy::unnecessary_wraps)]
-    fn handle_in_broker(monitor: &mut MT, event: &Event<I>) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(
+        monitor: &mut MT,
+        client_stats_manager: &mut ClientStatsManager,
+        event: &Event<I>,
+    ) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase { corpus_size, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_corpus_size(*corpus_size as u64);
                 });
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateExecStats {
                 time, executions, ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_executions(*executions, *time);
                 });
 
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats { name, value, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_user_stats(name.clone(), value.clone());
                 });
-                monitor.aggregate(name);
-                monitor.display(event.name(), ClientId(0));
+                client_stats_manager.aggregate(name);
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
@@ -244,20 +248,20 @@ where
                 ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_executions(*executions, *time);
                     client_stat.update_introspection_monitor((**introspection_monitor).clone());
                 });
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
                     client_stat.update_objective_size(*objective_size as u64);
                 });
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -327,7 +331,7 @@ where
         self.staterestorer.save(&(
             state,
             self.inner.monitor.start_time(),
-            self.inner.monitor.client_stats(),
+            self.inner.client_stats_manager.client_stats(),
         ))
     }
 }
@@ -543,12 +547,12 @@ where
 
                 // reload the state of the monitor to display the correct stats after restarts
                 monitor.set_start_time(start_time);
-                monitor.update_all_client_stats(clients_stats);
+                let mut this = SimpleRestartingEventManager::launched(monitor, staterestorer);
+                this.inner
+                    .client_stats_manager
+                    .update_all_client_stats(clients_stats);
 
-                (
-                    Some(state),
-                    SimpleRestartingEventManager::launched(monitor, staterestorer),
-                )
+                (Some(state), this)
             }
         };
 

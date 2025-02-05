@@ -47,8 +47,8 @@ use uuid::Uuid;
 use crate::{
     executors::ExitKind,
     inputs::Input,
-    monitors::UserStats,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
+    statistics::user_stats::UserStats,
     Error, HasMetadata,
 };
 
