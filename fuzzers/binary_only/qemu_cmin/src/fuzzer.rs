@@ -2,12 +2,13 @@
 //!
 #[cfg(feature = "i386")]
 use core::mem::size_of;
+use core::time::Duration;
 use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, NopCorpus},
-    events::{EventRestarter, SendExiting, SimpleRestartingEventManager},
+    events::{SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
     fuzzer::StdFuzzer,
@@ -27,9 +28,10 @@ use libafl_bolts::{
     AsSlice, AsSliceMut,
 };
 use libafl_qemu::{
-    elf::EasyElf, modules::edges::StdEdgeCoverageChildModule, ArchExtras, CallingConvention,
-    Emulator, GuestAddr, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
-    QemuShutdownCause, Regs,
+    elf::EasyElf,
+    modules::{edges::StdEdgeCoverageChildModule, SnapshotModule},
+    ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, QemuExecutor,
+    QemuExitError, QemuExitReason, QemuShutdownCause, Regs,
 };
 use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
 
@@ -130,9 +132,12 @@ pub fn fuzz() -> Result<(), Error> {
         ))
     };
 
-    let modules = tuple_list!(StdEdgeCoverageChildModule::builder()
-        .const_map_observer(edges_observer.as_mut())
-        .build()?);
+    let modules = tuple_list!(
+        StdEdgeCoverageChildModule::builder()
+            .const_map_observer(edges_observer.as_mut())
+            .build()?,
+        SnapshotModule::new()
+    );
 
     let emulator = Emulator::empty()
         .qemu_parameters(options.args)
@@ -198,49 +203,49 @@ pub fn fuzz() -> Result<(), Error> {
     let scheduler = QueueScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
-        let target = input.target_bytes();
-        let mut buf = target.as_slice();
-        let mut len = buf.len();
-        if len > MAX_INPUT_SIZE {
-            buf = &buf[0..MAX_INPUT_SIZE];
-            len = MAX_INPUT_SIZE;
-        }
-        let len = len as GuestReg;
-
-        unsafe {
-            qemu.write_mem(input_addr, buf).expect("qemu write failed.");
-
-            qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-            qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
-            qemu.write_return_address(ret_addr).unwrap();
-            qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
-                .unwrap();
-            qemu.write_function_argument(CallingConvention::Cdecl, 1, len)
-                .unwrap();
-
-            match qemu.run() {
-                Ok(QemuExitReason::Breakpoint(_)) => {}
-                Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(Signal::SigInterrupt))) => {
-                    process::exit(0)
-                }
-                Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
-                _ => panic!("Unexpected QEMU exit."),
+    let mut harness =
+        |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+            let target = input.target_bytes();
+            let mut buf = target.as_slice();
+            let mut len = buf.len();
+            if len > MAX_INPUT_SIZE {
+                buf = &buf[0..MAX_INPUT_SIZE];
+                len = MAX_INPUT_SIZE;
             }
-        }
+            let len = len as GuestReg;
 
-        ExitKind::Ok
-    };
+            unsafe {
+                qemu.write_mem(input_addr, buf).expect("qemu write failed.");
 
-    let mut executor = QemuForkExecutor::new(
+                qemu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
+                qemu.write_reg(Regs::Sp, stack_ptr).unwrap();
+                qemu.write_return_address(ret_addr).unwrap();
+                qemu.write_function_argument(CallingConvention::Cdecl, 0, input_addr)
+                    .unwrap();
+                qemu.write_function_argument(CallingConvention::Cdecl, 1, len)
+                    .unwrap();
+
+                match qemu.run() {
+                    Ok(QemuExitReason::Breakpoint(_)) => {}
+                    Ok(QemuExitReason::End(QemuShutdownCause::HostSignal(
+                        Signal::SigInterrupt,
+                    ))) => process::exit(0),
+                    Err(QemuExitError::UnexpectedExit) => return ExitKind::Crash,
+                    _ => panic!("Unexpected QEMU exit."),
+                }
+            }
+
+            ExitKind::Ok
+        };
+
+    let mut executor = QemuExecutor::new(
         emulator,
         &mut harness,
         tuple_list!(edges_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        shmem_provider,
-        core::time::Duration::from_millis(5000),
+        Duration::from_millis(5000),
     )?;
 
     println!("Importing {} seeds...", files.len());
