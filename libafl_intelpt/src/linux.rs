@@ -322,7 +322,6 @@ impl IntelPT {
             }
         };
         #[cfg(feature = "export_raw")]
-        #[must_use]
         {
             self.last_decode_trace = Vec::with_capacity(len);
             unsafe {
@@ -464,6 +463,7 @@ impl IntelPT {
 
     /// Get the raw trace used in the last decoding
     #[cfg(feature = "export_raw")]
+    #[must_use]
     pub fn last_decode_trace(&self) -> Vec<u8> {
         self.last_decode_trace.clone()
     }
