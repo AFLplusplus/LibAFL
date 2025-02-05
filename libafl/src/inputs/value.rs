@@ -1,9 +1,9 @@
 //! Newtype pattern style wrapper for [`super::Input`]s
 
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{fmt::Debug, hash::Hash};
 
-use libafl_bolts::{generic_hash_std, rands::Rand};
+use libafl_bolts::rands::Rand;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use {
@@ -12,7 +12,7 @@ use {
 };
 
 use super::Input;
-use crate::{corpus::CorpusId, mutators::numeric::Numeric};
+use crate::mutators::numeric::Numeric;
 
 /// Newtype pattern wrapper around an underlying structure to implement inputs
 ///
@@ -56,11 +56,7 @@ impl<I: Copy> Copy for ValueInput<I> {}
 macro_rules! impl_input_for_value_input {
     ($($t:ty => $name:ident),+ $(,)?) => {
         $(
-            impl Input for ValueInput<$t> {
-                fn generate_name(&self, _id: Option<CorpusId>) -> String {
-                    format!("{:016x}", generic_hash_std(self))
-                }
-            }
+            impl Input for ValueInput<$t> {}
 
             /// Input wrapping a <$t>
             pub type $name = ValueInput<$t>;
@@ -86,10 +82,6 @@ impl_input_for_value_input!(
 
 /// manually implemented because files can be written more efficiently
 impl Input for ValueInput<Vec<u8>> {
-    fn generate_name(&self, _id: Option<CorpusId>) -> String {
-        format!("{:016x}", generic_hash_std(self))
-    }
-
     /// Write this input to the file
     #[cfg(feature = "std")]
     fn to_file<P>(&self, path: P) -> Result<(), Error>

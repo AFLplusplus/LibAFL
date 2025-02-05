@@ -8,14 +8,15 @@ use std::hash::Hash;
 #[cfg(feature = "std")]
 use fastbloom::BloomFilter;
 use libafl_bolts::{current_time, tuples::MatchName};
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
-        CanSerializeObserver, Event, EventConfig, EventFirer, EventProcessor, ProgressReporter,
+        CanSerializeObserver, Event, EventConfig, EventFirer, EventReceiver, ProgressReporter,
+        RecordSerializationTime, SendExiting,
     },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -26,8 +27,8 @@ use crate::{
     stages::{HasCurrentStageId, StagesTuple},
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasLastFoundTime, HasLastReportTime,
-        HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastFoundTime,
+        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -98,7 +99,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -109,7 +110,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         obs_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
@@ -120,7 +121,7 @@ pub trait ExecutionProcessor<EM, I, OT, S> {
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -137,9 +138,22 @@ pub trait EvaluatorObservers<E, EM, I, S> {
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
+}
+
+/// Receives and event from event manager and then evaluates it
+pub trait EventProcessor<E, EM, I, S> {
+    /// Asks event manager to see if there's any event to evaluate
+    /// If there is any, then evaluates it.
+    /// After, run the post processing routines, for example, re-sending the events to the other  
+    fn process_events(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+    ) -> Result<(), Error>;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
@@ -151,7 +165,7 @@ pub trait Evaluator<E, EM, I, S> {
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback,
@@ -161,7 +175,7 @@ pub trait Evaluator<E, EM, I, S> {
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback.
@@ -401,7 +415,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         observers: &OT,
         exit_kind: &ExitKind,
@@ -431,7 +445,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         exec_res: &ExecuteInputResult,
         observers_buf: Option<Vec<u8>>,
         exit_kind: &ExitKind,
@@ -443,7 +457,7 @@ where
                     manager.fire(
                         state,
                         Event::NewTestcase {
-                            input,
+                            input: input.clone(),
                             observers_buf,
                             exit_kind: *exit_kind,
                             corpus_size: state.corpus().count(),
@@ -462,7 +476,7 @@ where
                         state,
                         Event::Objective {
                             #[cfg(feature = "share_objectives")]
-                            input,
+                            input: input.clone(),
 
                             objective_size: state.solutions().count(),
                             time: current_time(),
@@ -479,13 +493,13 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: I,
+        input: &I,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        let exec_res = self.check_results(state, manager, &input, observers, exit_kind)?;
-        let corpus_id = self.process_execution(state, manager, &input, &exec_res, observers)?;
+        let exec_res = self.check_results(state, manager, input, observers, exit_kind)?;
+        let corpus_id = self.process_execution(state, manager, input, &exec_res, observers)?;
         if send_events {
             self.serialize_and_dispatch(state, manager, input, &exec_res, observers, exit_kind)?;
         }
@@ -519,13 +533,13 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        let exit_kind = self.execute_input(state, executor, manager, &input)?;
+        let exit_kind = self.execute_input(state, executor, manager, input)?;
         let observers = executor.observers();
 
-        self.scheduler.on_evaluation(state, &input, &*observers)?;
+        self.scheduler.on_evaluation(state, input, &*observers)?;
 
         self.evaluate_execution(state, manager, input, &*observers, &exit_kind, send_events)
     }
@@ -593,9 +607,9 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
-        if self.input_filter.should_execute(&input) {
+        if self.input_filter.should_execute(input) {
             self.evaluate_input(state, executor, manager, input)
         } else {
             Ok((ExecuteInputResult::None, None))
@@ -609,7 +623,7 @@ where
         state: &mut S,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: &I,
     ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, true)
     }
@@ -724,14 +738,107 @@ where
     }
 }
 
+impl<CS, E, EM, F, I, IF, OF, S> EventProcessor<E, EM, I, S> for StdFuzzer<CS, F, IF, OF>
+where
+    CS: Scheduler<I, S>,
+    E: HasObservers + Executor<EM, I, S, Self>,
+    E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
+    EM: EventReceiver<I, S>
+        + RecordSerializationTime
+        + CanSerializeObserver<E::Observers>
+        + EventFirer<I, S>,
+    F: Feedback<EM, I, E::Observers, S>,
+    I: Input,
+    OF: Feedback<EM, I, E::Observers, S>,
+    S: HasCorpus<I>
+        + HasSolutions<I>
+        + HasExecutions
+        + HasLastFoundTime
+        + MaybeHasClientPerfMonitor
+        + HasCurrentCorpusId
+        + HasImported,
+{
+    fn process_events(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        // todo make this into a trait
+        // Execute the manager
+        while let Some((event, with_observers)) = manager.try_receive(state)? {
+            // at this point event is either newtestcase or objectives
+            let res = if with_observers {
+                match event {
+                    Event::NewTestcase {
+                        ref input,
+                        ref observers_buf,
+                        exit_kind,
+                        ..
+                    } => {
+                        let start = current_time();
+                        let observers: E::Observers =
+                            postcard::from_bytes(observers_buf.as_ref().unwrap())?;
+                        {
+                            let dur = current_time() - start;
+                            manager.set_deserialization_time(dur);
+                        }
+                        let res = self.evaluate_execution(
+                            state, manager, input, &observers, &exit_kind, false,
+                        )?;
+                        res.1
+                    }
+                    _ => None,
+                }
+            } else {
+                match event {
+                    Event::NewTestcase { ref input, .. } => {
+                        let res = self.evaluate_input_with_observers(
+                            state, executor, manager, input, false,
+                        )?;
+                        res.1
+                    }
+                    #[cfg(feature = "share_objectives")]
+                    Event::Objective { ref input, .. } => {
+                        let res = self.evaluate_input_with_observers(
+                            state, executor, manager, input, false,
+                        )?;
+                        res.1
+                    }
+                    _ => None,
+                }
+            };
+            if let Some(item) = res {
+                *state.imported_mut() += 1;
+                log::debug!("Added received input as item #{item}");
+
+                // for centralize
+                manager.on_interesting(state, event)?;
+            } else {
+                log::debug!("Received input was discarded");
+            }
+        }
+        Ok(())
+    }
+}
+
 impl<CS, E, EM, F, I, IF, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, IF, OF>
 where
     CS: Scheduler<I, S>,
-    EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
+    E: HasObservers + Executor<EM, I, S, Self>,
+    E::Observers: DeserializeOwned + Serialize + ObserversTuple<I, S>,
+    EM: CanSerializeObserver<E::Observers> + EventFirer<I, S> + RecordSerializationTime,
+    I: Input,
+    F: Feedback<EM, I, E::Observers, S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    EM: ProgressReporter<S> + SendExiting + EventReceiver<I, S>,
     S: HasExecutions
         + HasMetadata
         + HasCorpus<I>
+        + HasSolutions<I>
         + HasLastReportTime
+        + HasLastFoundTime
+        + HasImported
         + HasTestcase<I>
         + HasCurrentCorpusId
         + HasCurrentStageId
@@ -775,8 +882,7 @@ where
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().start_timer();
 
-        // Execute the manager
-        manager.process(self, state, executor)?;
+        self.process_events(state, executor, manager)?;
 
         // Mark the elapsed time for the manager
         #[cfg(feature = "introspection")]
@@ -952,7 +1058,7 @@ impl Default for NopFuzzer {
 
 impl<E, EM, I, S, ST> Fuzzer<E, EM, I, S, ST> for NopFuzzer
 where
-    EM: ProgressReporter<S> + EventProcessor<E, S, Self>,
+    EM: ProgressReporter<S>,
     ST: StagesTuple<E, EM, S, Self>,
     S: HasMetadata + HasExecutions + HasLastReportTime + HasCurrentStageId,
 {
@@ -1027,22 +1133,22 @@ mod tests {
                 .unwrap();
         let input = BytesInput::new(vec![1, 2, 3]);
         assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_input(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(1, *execution_count.borrow()); // evaluate_input does not add it to the filter
 
         assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(2, *execution_count.borrow()); // at to the filter
 
         assert!(fuzzer
-            .evaluate_filtered(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_filtered(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(2, *execution_count.borrow()); // the harness is not called
 
         assert!(fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut manager, input.clone())
+            .evaluate_input(&mut state, &mut executor, &mut manager, &input)
             .is_ok());
         assert_eq!(3, *execution_count.borrow()); // evaluate_input ignores filters
     }

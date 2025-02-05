@@ -1,19 +1,20 @@
 use std::{
-    mem::MaybeUninit, ops::Range, ptr::copy_nonoverlapping, slice::from_raw_parts_mut,
+    ffi::c_void, mem::MaybeUninit, ops::Range, ptr::copy_nonoverlapping, slice::from_raw_parts_mut,
     str::from_utf8_unchecked_mut,
 };
 
+use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
     exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
     libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
     libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps, GuestAddr, GuestUsize,
     IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
-use libc::{c_int, c_uchar, strlen};
+use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
 
-use crate::{Qemu, CPU};
+use crate::{qemu::QEMU_IS_RUNNING, Qemu, CPU};
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
@@ -31,6 +32,15 @@ pub struct ImageInfo {
     pub brk: GuestAddr,
     pub alignment: GuestAddr,
     pub exec_stack: bool,
+}
+
+pub enum QemuSignalContext {
+    /// We are not in QEMU's signal handler, no signal is being propagated.
+    OutOfQemuSignalHandler,
+    /// We are propagating a host signal from QEMU signal handler.
+    InQemuSignalHandlerHost,
+    /// We are propagating a target signal from QEMU signal handler
+    InQemuSignalHandlerTarget,
 }
 
 // Consider a private new only for Emulator
@@ -295,6 +305,54 @@ impl Qemu {
         } else {
             Err(format!("Failed to unmap {addr}"))
         }
+    }
+
+    #[must_use]
+    pub fn signal_ctx(&self) -> QemuSignalContext {
+        unsafe {
+            let qemu_signal_ctx = *libafl_qemu_sys::libafl_qemu_signal_context();
+
+            if qemu_signal_ctx.in_qemu_sig_hdlr {
+                if qemu_signal_ctx.is_target_signal {
+                    QemuSignalContext::InQemuSignalHandlerTarget
+                } else {
+                    QemuSignalContext::InQemuSignalHandlerHost
+                }
+            } else {
+                QemuSignalContext::OutOfQemuSignalHandler
+            }
+        }
+    }
+
+    /// Runs QEMU signal's handler
+    /// If it is already running, returns true.
+    /// In that case, it would most likely mean we are in a signal loop.
+    ///
+    /// # Safety
+    ///
+    /// Run QEMU's native signal handler.
+    ///
+    /// Needlessly to say, it should be used very carefully.
+    /// It will run QEMU's signal handler, and maybe propagate new signals.
+    pub(crate) unsafe fn run_signal_handler(
+        &self,
+        host_sig: c_int,
+        info: *mut siginfo_t,
+        puc: *mut c_void,
+    ) {
+        libafl_qemu_sys::libafl_qemu_native_signal_handler(host_sig, info, puc);
+    }
+
+    /// Emulate a signal coming from the target
+    ///
+    /// # Safety
+    ///
+    /// This may raise a signal to host. Some signals could have a funky behaviour.
+    /// SIGSEGV is safe to use.
+    pub unsafe fn target_signal(&self, signal: Signal) {
+        QEMU_IS_RUNNING = true;
+        libafl_qemu_sys::libafl_set_in_target_signal_ctx();
+        libc::raise(signal.into());
     }
 }
 

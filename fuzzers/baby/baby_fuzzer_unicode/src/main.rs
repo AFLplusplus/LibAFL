@@ -123,7 +123,7 @@ pub fn main() {
             &mut state,
             &mut executor,
             &mut mgr,
-            BytesInput::new(vec![b'a']),
+            &BytesInput::new(vec![b'a']),
         )
         .unwrap();
 

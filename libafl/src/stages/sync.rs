@@ -148,7 +148,7 @@ where
                 .left_to_sync
                 .retain(|p| p != &path);
             log::debug!("Syncing and evaluating {:?}", path);
-            fuzzer.evaluate_input(state, executor, manager, input)?;
+            fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
 
         #[cfg(feature = "introspection")]

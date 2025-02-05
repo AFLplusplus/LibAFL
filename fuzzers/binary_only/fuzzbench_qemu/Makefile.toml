@@ -56,20 +56,28 @@ cc \
     -lm -lz
 '''
 
-[tasks.test1]
-command = "cargo"
-args = [
-  "run",
-  "--profile",
-  "${PROFILE}",
-  "./test1",
-  "--",
-  "--libafl-in",
-  "../../inprocess/libfuzzer_libpng/corpus",
-  "--libafl-out",
-  "./out",
-  "./test1",
-]
+# Run the fuzzer
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script = '''
+cargo build \
+  --profile \
+  ${PROFILE}
+
+${TARGET_DIR}/${PROFILE_DIR}/fuzzbench_qemu \
+  --libafl-in \
+  ../../inprocess/libfuzzer_libpng/corpus \
+  --libafl-out \
+  ./out \
+  ./${FUZZER_NAME} \
+  -- \
+  ./${FUZZER_NAME}
+'''
 dependencies = ["harness"]
 
 [tasks.test2]

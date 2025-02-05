@@ -161,7 +161,7 @@ where
     ) -> Result<(), Error> {
         // todo: is_interesting, etc.
 
-        fuzzer.evaluate_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        fuzzer.evaluate_execution(state, event_mgr, &last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
         self.mutator.post_exec(state, self.current_corpus_id)?;

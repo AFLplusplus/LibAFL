@@ -16,7 +16,7 @@ use crate::{corpus::CorpusId, inputs::Input};
 
 /// An input composed of multiple parts. Use in situations where subcomponents are not necessarily
 /// related, or represent distinct parts of the input.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct MultipartInput<I> {
     parts: Vec<I>,
     names: Vec<String>,
