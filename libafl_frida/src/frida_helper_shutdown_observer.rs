@@ -1,14 +1,13 @@
-use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
-use libafl::executors::ExitKind;
-use libafl::inputs::HasTargetBytes;
-use libafl::observers::Observer;
+use std::{borrow::Cow, cell::RefCell, fmt, rc::Rc};
+
+use libafl::{executors::ExitKind, inputs::HasTargetBytes, observers::Observer};
 use libafl_bolts::{Error, Named};
-use serde::de::{self, Deserialize, Deserializer, MapAccess, Visitor};
-use serde::Serialize;
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::fmt;
-use std::rc::Rc;
+use serde::{
+    de::{self, Deserialize, Deserializer, MapAccess, Visitor},
+    Serialize,
+};
+
+use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Serialize, Debug)]
@@ -52,14 +51,14 @@ where
     }
 }
 
-impl<'a, RT> Named for FridaHelperObserver<'a, RT> {
+impl<RT> Named for FridaHelperObserver<'_, RT> {
     fn name(&self) -> &Cow<'static, str> {
         static NAME: Cow<'static, str> = Cow::Borrowed("FridaHelperObserver");
         &NAME
     }
 }
 
-impl<'de, 'a, RT> Deserialize<'de> for FridaHelperObserver<'a, RT> {
+impl<'de, RT> Deserialize<'de> for FridaHelperObserver<'_, RT> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,

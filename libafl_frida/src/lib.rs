@@ -326,7 +326,7 @@ impl Default for FridaOptions {
 #[cfg(test)]
 mod tests {
     use core::num::NonZero;
-    use std::sync::OnceLock;
+    use std::{cell::RefCell, rc::Rc, sync::OnceLock};
 
     use clap::Parser;
     use frida_gum::Gum;
@@ -346,8 +346,6 @@ mod tests {
     use libafl_bolts::{
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
-    use std::{cell::RefCell, rc::Rc};
-
     use mimalloc::MiMalloc;
 
     use crate::{
@@ -567,8 +565,14 @@ mod tests {
 
         SimpleStdoutLogger::set_logger().unwrap();
 
-        let out_dir = std::env::var_os("OUT_DIR").unwrap();
-        let out_dir = out_dir.to_string_lossy().to_string();
+        if let Ok(out_dir) = std::env::var("OUT_DIR") {
+            println!("OUT_DIR is set to: {out_dir}");
+        } else {
+            println!("OUT_DIR is not set!");
+            return;
+        }
+
+        let out_dir = std::env::var("OUT_DIR").unwrap();
         // Check if the harness dynamic library is present, if not - skip the test
         #[cfg(unix)]
         let test_harness_name = "test_harness.so";

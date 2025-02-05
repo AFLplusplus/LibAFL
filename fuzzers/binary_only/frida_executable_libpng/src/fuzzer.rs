@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use std::{path::PathBuf, ptr::null};
+use std::{cell::RefCell, path::PathBuf, ptr::null, rc::Rc};
 
 use frida_gum::Gum;
 use libafl::{
@@ -43,6 +43,7 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
+    frida_helper_shutdown_observer::FridaHelperObserver,
     helper::FridaInstrumentationHelper,
 };
 use libafl_targets::cmplog::CmpLogObserver;
@@ -113,16 +114,22 @@ unsafe fn fuzz(
                 let asan = AsanRuntime::new(options);
 
                 #[cfg(unix)]
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage, asan),
+                )));
                 #[cfg(windows)]
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    &options,
+                    tuple_list!(coverage),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -131,6 +138,7 @@ unsafe fn fuzz(
                 let time_observer = TimeObserver::new("time");
                 #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -196,9 +204,14 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -210,7 +223,7 @@ unsafe fn fuzz(
                         &mut state,
                         &mut mgr,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset
@@ -238,13 +251,16 @@ unsafe fn fuzz(
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
 
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
+                let mut frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage, cmplog),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -253,6 +269,7 @@ unsafe fn fuzz(
                 let time_observer = TimeObserver::new("time");
                 #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -316,9 +333,14 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -330,7 +352,7 @@ unsafe fn fuzz(
                         &mut state,
                         &mut mgr,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset
@@ -373,13 +395,16 @@ unsafe fn fuzz(
 
                 let coverage = CoverageRuntime::new();
 
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
+                let mut frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -388,6 +413,7 @@ unsafe fn fuzz(
                 let time_observer = TimeObserver::new("time");
                 #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -451,9 +477,14 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -465,7 +496,7 @@ unsafe fn fuzz(
                         &mut state,
                         &mut mgr,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset

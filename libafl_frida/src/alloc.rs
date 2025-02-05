@@ -571,6 +571,7 @@ impl Allocator {
     }
 
     /// Is this a valid and mapped shadow address?
+    #[must_use]
     pub fn valid_shadow(&self, start: usize, size: usize) -> bool {
         let range_to_check = start..(start + size);
         let valid = self

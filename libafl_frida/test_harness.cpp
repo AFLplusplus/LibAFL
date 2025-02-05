@@ -9,7 +9,7 @@
   #include <windows.h>
   #include <winnt.h>
   #include <winternl.h>
-   
+
 BOOL APIENTRY DllMain(HANDLE hModule, DWORD ul_reason_for_call,
                       LPVOID lpReserved) {
   (void)hModule;
@@ -203,7 +203,8 @@ EXTERN int heap_oob_memcpy_write_avx(const uint8_t *_data, size_t _size) {
   (void)_data;
   (void)_size;
 
-  // Using 127 bytes to make sure to fall on the AVX instruction in the optimized implementation
+  // Using 127 bytes to make sure to fall on the AVX instruction in the
+  // optimized implementation
   const size_t REAL_SIZE = 127;
   const size_t LARGER_SIZE = REAL_SIZE + 1;
 
