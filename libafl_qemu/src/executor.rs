@@ -39,7 +39,11 @@ use libafl_bolts::{
 use libafl_qemu_sys::libafl_exit_request_timeout;
 use libc::siginfo_t;
 
-use crate::{command::CommandManager, modules::EmulatorModuleTuple, Emulator, EmulatorDriver};
+use crate::{
+    command::CommandManager,
+    modules::{edges::Tracer, EmulatorModuleTuple},
+    Emulator, EmulatorDriver,
+};
 #[cfg(feature = "usermode")]
 use crate::{run_target_crash_hooks, EmulatorModules, Qemu, QemuSignalContext};
 

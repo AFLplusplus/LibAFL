@@ -13,6 +13,8 @@ pub mod asan;
 #[cfg(not(cpu_target = "hexagon"))]
 pub use asan::AsanModule;
 
+pub mod tracer;
+
 #[cfg(not(cpu_target = "hexagon"))]
 pub mod asan_guest;
 #[cfg(not(cpu_target = "hexagon"))]

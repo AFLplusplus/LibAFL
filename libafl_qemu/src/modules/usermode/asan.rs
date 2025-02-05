@@ -13,7 +13,7 @@ use std::{
 };
 
 use hashbrown::{HashMap, HashSet};
-use libafl::{executors::ExitKind, observers::ObserversTuple};
+use libafl::{executors::ExitKind, observers::ObserversTuple, HasMetadata};
 use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::GuestAddr;
 use libc::{
@@ -28,6 +28,7 @@ use crate::{
     emu::EmulatorModules,
     modules::{
         calls::FullBacktraceCollector,
+        edges::Tracer,
         snapshot::SnapshotModule,
         utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
@@ -1168,9 +1169,9 @@ where
 pub fn trace_read_asan<ET, I, S, const N: usize>(
     qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
-    state: Option<&mut S>,
+    _state: Option<&mut S>,
     id: u64,
-    pc: GuestAddr,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
@@ -1178,44 +1179,6 @@ pub fn trace_read_asan<ET, I, S, const N: usize>(
     S: Unpin + HasMetadata,
 {
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
-
-    if h.use_rca() {
-        let state = state.expect("state missing for rca");
-        let predicates = state
-            .metadata_mut::<Tracer>()
-            .expect("Predicates missing for rca");
-        match N {
-            1 => {
-                let value = unsafe { qemu.read_mem_val::<u8>(addr) };
-                if let Ok(value) = value {
-                    predicates.update_max_min(pc, u64::from(value));
-                }
-            }
-            2 => {
-                let value: Result<u16, crate::QemuRWError> =
-                    unsafe { qemu.read_mem_val::<u16>(addr) };
-                if let Ok(value) = value {
-                    predicates.update_max_min(pc, u64::from(value));
-                }
-            }
-            4 => {
-                let value = unsafe { qemu.read_mem_val::<u32>(addr) };
-                if let Ok(value) = value {
-                    predicates.update_max_min(pc, u64::from(value));
-                }
-            }
-            8 => {
-                let value = unsafe { qemu.read_mem_val::<u64>(addr) };
-                if let Ok(value) = value {
-                    predicates.update_max_min(pc, value);
-                }
-            }
-            _ => {
-                unreachable!("Impossible. else you coded it wrong.")
-            }
-        };
-    }
-
     h.read::<N>(qemu, id as GuestAddr, addr);
 }
 
@@ -1284,7 +1247,7 @@ pub fn trace_write_asan<ET, I, S, const N: usize>(
             _ => {
                 unreachable!("Impossible. else you coded it wrong.")
             }
-        };
+        }
     }
     let h = emulator_modules.get_mut::<AsanModule>().unwrap();
     h.write::<N>(qemu, id as GuestAddr, addr);

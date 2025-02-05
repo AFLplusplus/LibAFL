@@ -104,8 +104,9 @@ llvmGetPassPluginInfo() {
   #else
             PB.registerOptimizerLastEPCallback(
   #endif
-                [](ModulePassManager &MPM, OptimizationLevel OL
-                ) { MPM.addPass(CmpLogInstructions()); });
+                [](ModulePassManager &MPM, OptimizationLevel OL) {
+                  MPM.addPass(CmpLogInstructions());
+                });
           }};
 }
 #else

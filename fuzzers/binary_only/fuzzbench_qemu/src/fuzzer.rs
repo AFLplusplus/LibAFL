@@ -48,9 +48,11 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
+    modules::asan::AsanModuleBuilder,
     // asan::{init_with_asan, QemuAsanHelper},
     modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::StdEdgeCoverageModule,
+    modules::edges::{PredicateFeedback, StdEdgeCoverageModule, Tracer},
+    modules::tracer::TracerModule,
     modules::AsanModule,
     Emulator,
     GuestReg,
@@ -190,8 +192,9 @@ fn fuzz(
         .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
         .collect::<Vec<(String, String)>>();
 
-    let mut asan = AsanModule::default(&env);
-    asan.use_rca = true;
+    let mut asan = AsanModuleBuilder::default().build();
+    let mut tracer = TracerModule::default();
+    tracer.set_use_rca(true);
 
     let modules = tuple_list!(
         StdEdgeCoverageModule::builder()
@@ -201,6 +204,7 @@ fn fuzz(
             .unwrap(),
         CmpLogModule::default(),
         asan,
+        tracer,
         //QemuSnapshotHelper::new()
     );
 
