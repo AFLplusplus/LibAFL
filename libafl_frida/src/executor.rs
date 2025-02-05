@@ -15,9 +15,9 @@ use libafl::{
 };
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{Input, NopTargetBytesConverter, TargetBytesConverter},
     observers::ObserversTuple,
-    state::HasExecutions,
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
@@ -91,6 +91,7 @@ where
                     );
                 } else {
                     self.stalker.follow_me::<NoneEventSink>(transformer, None);
+                    self.stalker.deactivate();
                 }
             }
             // We removed the fuzzer from the stalked ranges,
@@ -98,6 +99,7 @@ where
             // so that Stalker knows to pick it despite the module being excluded
             let harness_fn_ref: &H = self.base.harness();
             let ptr: *const H = harness_fn_ref as *const H;
+            log::info!("Activating Stalker for {:p}", ptr);
             self.stalker.activate(NativePointer(ptr as *mut c_void));
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
