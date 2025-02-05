@@ -17,7 +17,7 @@ use serde::Serialize;
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::statistics::perf_stats::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,

@@ -159,7 +159,8 @@ impl Monitor for SimplePrintingMonitor {
             // Print the client performance monitor.
             println!(
                 "Client {:03}:\n{}",
-                sender_id.0, self.client_stats[sender_id.0 as usize].introspection_monitor
+                sender_id.0,
+                client_stats_manager.client_stats()[sender_id.0 as usize].introspection_stats
             );
             // Separate the spacing just a bit
             println!();

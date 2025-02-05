@@ -107,7 +107,7 @@ pub struct EventManagerId(
 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
-use crate::monitors::ClientPerfMonitor;
+use crate::statistics::perf_stats::ClientPerfStats;
 use crate::{observers::TimeObserver, stages::HasCurrentStageId};
 
 /// The log event severity
@@ -294,7 +294,7 @@ pub enum Event<I> {
         /// The executions of this client
         executions: u64,
         /// Current performance statistics
-        introspection_monitor: Box<ClientPerfMonitor>,
+        introspection_stats: Box<ClientPerfStats>,
 
         /// phantomm data
         phantom: PhantomData<I>,
@@ -518,13 +518,13 @@ where
             .set_current_time(libafl_bolts::cpu::read_time_counter());
 
         // Send the current monitor over to the manager. This `.clone` shouldn't be
-        // costly as `ClientPerfMonitor` impls `Copy` since it only contains `u64`s
+        // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s
         reporter.fire(
             state,
             Event::UpdatePerfMonitor {
                 executions,
                 time: cur,
-                introspection_monitor: Box::new(state.introspection_monitor().clone()),
+                introspection_stats: Box::new(state.introspection_stats().clone()),
                 phantom: PhantomData,
             },
         )?;

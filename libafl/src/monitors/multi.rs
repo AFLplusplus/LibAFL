@@ -1,6 +1,6 @@
 //! The [`MultiMonitor`] displays both cumulative and per-client stats.
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::{
     fmt::{Debug, Formatter, Write},
     time::Duration,
@@ -8,10 +8,7 @@ use core::{
 
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 
-use crate::{
-    monitors::{ClientStats, Monitor},
-    statistics::manager::ClientStatsManager,
-};
+use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
 
 /// Tracking monitor during fuzzing and display both per-client and cumulative info.
 #[derive(Clone)]
@@ -21,7 +18,6 @@ where
 {
     print_fn: F,
     start_time: Duration,
-    client_stats: Vec<ClientStats>,
 }
 
 impl<F> Debug for MultiMonitor<F>
@@ -31,7 +27,6 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("MultiMonitor")
             .field("start_time", &self.start_time)
-            .field("client_stats", &self.client_stats)
             .finish_non_exhaustive()
     }
 }
@@ -99,8 +94,13 @@ where
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, client) in self.client_stats.iter().filter(|x| x.enabled).enumerate() {
-                let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_monitor);
+            for (i, client) in client_stats_manager
+                .client_stats()
+                .iter()
+                .filter(|x| x.enabled)
+                .enumerate()
+            {
+                let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_stats);
                 (self.print_fn)(&fmt);
             }
 
@@ -119,7 +119,6 @@ where
         Self {
             print_fn,
             start_time: current_time(),
-            client_stats: vec![],
         }
     }
 
@@ -128,7 +127,6 @@ where
         Self {
             print_fn,
             start_time,
-            client_stats: vec![],
         }
     }
 }

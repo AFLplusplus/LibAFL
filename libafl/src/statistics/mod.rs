@@ -10,6 +10,8 @@ use core::time::Duration;
 
 use hashbrown::HashMap;
 use libafl_bolts::current_time;
+#[cfg(feature = "introspection")]
+use perf_stats::ClientPerfStats;
 use serde::{Deserialize, Serialize};
 use user_stats::UserStats;
 
@@ -48,7 +50,7 @@ pub struct ClientStats {
     pub user_stats: HashMap<Cow<'static, str>, UserStats>,
     /// Client performance statistics
     #[cfg(feature = "introspection")]
-    pub introspection_stats: perf_stats::ClientPerfStats,
+    pub introspection_stats: ClientPerfStats,
 }
 
 impl ClientStats {
@@ -160,10 +162,10 @@ impl ClientStats {
         self.user_stats.get(name)
     }
 
-    /// Update the current [`ClientPerfMonitor`] with the given [`ClientPerfMonitor`]
+    /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     #[cfg(feature = "introspection")]
-    pub fn update_introspection_monitor(&mut self, introspection_monitor: ClientPerfMonitor) {
-        self.introspection_monitor = introspection_monitor;
+    pub fn update_introspection_monitor(&mut self, introspection_stats: ClientPerfStats) {
+        self.introspection_stats = introspection_stats;
     }
 }
 

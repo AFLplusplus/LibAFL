@@ -91,7 +91,8 @@ pub mod prelude {
 
     pub use super::{
         corpus::*, events::*, executors::*, feedbacks::*, fuzzer::*, generators::*, inputs::*,
-        monitors::*, mutators::*, observers::*, schedulers::*, stages::*, state::*, *,
+        monitors::*, mutators::*, observers::*, schedulers::*, stages::*, state::*, statistics::*,
+        *,
     };
 }
 

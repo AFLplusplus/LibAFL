@@ -1,4 +1,4 @@
-//!
+//! Statistics related to introspection
 
 use alloc::{string::String, vec::Vec};
 use core::fmt;
@@ -124,7 +124,7 @@ impl From<usize> for PerfFeature {
 pub const NUM_PERF_FEATURES: usize = PerfFeature::Count as usize;
 
 impl ClientPerfStats {
-    /// Create a blank [`ClientPerfMonitor`] with the `start_time` and `current_time` with
+    /// Create a blank [`ClientPerfStats`] with the `start_time` and `current_time` with
     /// the current clock counter
     #[must_use]
     pub fn new() -> Self {
@@ -155,7 +155,7 @@ impl ClientPerfStats {
         self.timer_start = Some(libafl_bolts::cpu::read_time_counter());
     }
 
-    /// Update the current [`ClientPerfMonitor`] with the given [`ClientPerfMonitor`]
+    /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     pub fn update(&mut self, monitor: &ClientPerfStats) {
         self.set_current_time(monitor.current_time);
         self.update_scheduler(monitor.scheduler);

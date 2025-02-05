@@ -29,7 +29,7 @@ use serde_json::Value;
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
-use super::{ClientPerfMonitor, PerfFeature};
+use crate::statistics::perf_stats::{ClientPerfStats, PerfFeature};
 use crate::{
     monitors::Monitor,
     statistics::{
@@ -151,7 +151,7 @@ pub struct PerfTuiContext {
 impl PerfTuiContext {
     /// Get the data for performance metrics
     #[expect(clippy::cast_precision_loss)]
-    pub fn grab_data(&mut self, m: &ClientPerfMonitor) {
+    pub fn grab_data(&mut self, m: &ClientPerfStats) {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = m.elapsed_cycles() as f64;
 
@@ -497,7 +497,7 @@ impl Monitor for TuiMonitor {
                     .introspection
                     .entry(i + 1)
                     .or_default()
-                    .grab_data(&client.introspection_monitor);
+                    .grab_data(&client.introspection_stats);
             }
         }
     }

@@ -165,7 +165,7 @@ where
             Event::UpdatePerfMonitor {
                 time,
                 executions,
-                introspection_monitor,
+                introspection_stats,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
@@ -176,7 +176,7 @@ where
                     // Update the normal monitor for this client
                     client_stat.update_executions(*executions, *time);
                     // Update the performance monitor for this client
-                    client_stat.update_introspection_monitor((**introspection_monitor).clone());
+                    client_stat.update_introspection_monitor((**introspection_stats).clone());
                 });
 
                 // Display the monitor via `.display` only on core #1
