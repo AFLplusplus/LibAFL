@@ -41,6 +41,7 @@ use libafl_frida::{
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
     helper::{FridaInstrumentationHelper, IfElseRuntime},
+    frida_helper_shutdown_observer::FridaHelperObserver,    
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
@@ -133,6 +134,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
         let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+        let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
@@ -189,7 +191,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+        let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
 
         // Create the executor for an in-process function with just one observer for edge coverage
         let executor = FridaInProcessExecutor::new(

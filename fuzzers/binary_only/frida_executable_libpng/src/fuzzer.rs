@@ -44,6 +44,7 @@ use libafl_frida::{
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
     helper::FridaInstrumentationHelper,
+    frida_helper_shutdown_observer::FridaHelperObserver,   
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
@@ -134,6 +135,7 @@ unsafe fn fuzz(
                 let time_observer = TimeObserver::new("time");
                 #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -199,9 +201,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -257,6 +259,7 @@ unsafe fn fuzz(
                 let time_observer = TimeObserver::new("time");
                 #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -320,9 +323,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -393,6 +396,7 @@ unsafe fn fuzz(
                 let time_observer = TimeObserver::new("time");
                 #[cfg(unix)]
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -456,9 +460,9 @@ unsafe fn fuzz(
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
                 #[cfg(unix)]
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer, asan_observer);
                 #[cfg(windows)]
-                let observers = tuple_list!(edges_observer, time_observer);
+                let observers = tuple_list!(frida_helper_observer, edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
