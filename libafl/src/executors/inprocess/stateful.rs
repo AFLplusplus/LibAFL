@@ -87,8 +87,6 @@ where
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
 
-        // # Safety
-        // Don't call this from multiple thread
         unsafe {
             let executor_ptr = ptr::from_ref(self) as *const c_void;
             self.inner
