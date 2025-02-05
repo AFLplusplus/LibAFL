@@ -278,7 +278,7 @@ impl<I, S> InProcessHooks<I, S> {
             >();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
-            let crash_handler =
+            (*data).crash_handler =
                 crate::executors::hooks::windows::windows_exception_handler::inproc_crash_handler::<
                     E,
                     EM,
@@ -296,10 +296,9 @@ impl<I, S> InProcessHooks<I, S> {
                     S,
                     Z,
                 > as *const c_void;
+            (*data).timeout_handler = timeout_handler;
             let timer = TimerStruct::new(exec_tmout, timeout_handler);
             ret = Ok(Self {
-                crash_handler,
-                timeout_handler,
                 timer,
                 phantom: PhantomData,
             });
