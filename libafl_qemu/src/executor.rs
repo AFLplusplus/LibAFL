@@ -60,7 +60,7 @@ pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
 ///
 /// This should be used as a crash handler, and nothing else.
 #[cfg(feature = "usermode")]
-unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
+pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
@@ -161,7 +161,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
-    E: HasObservers + HasInProcessHooks<I, S> + Executor<EM, I, S, Z>,
+    E: HasObservers + HasInProcessHooks<I, S>,
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,

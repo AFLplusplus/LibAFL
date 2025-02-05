@@ -376,7 +376,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     event_mgr: &mut EM,
     exitkind: ExitKind,
 ) where
-    E: Executor<EM, I, S, Z> + HasObservers,
+    E: HasObservers,
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
