@@ -22,7 +22,7 @@ impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
     }
 
     #[must_use]
-    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> Option<bool> {
         self.qemu.access_ok(kind, addr, size)
     }
 

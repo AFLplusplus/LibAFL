@@ -189,10 +189,12 @@ impl Qemu {
     }
 
     #[must_use]
-    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> bool {
-        self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
-            .access_ok(kind, addr, size)
+    pub fn access_ok(&self, kind: VerifyAccess, addr: GuestAddr, size: usize) -> Option<bool> {
+        Some(
+            self.current_cpu()
+                .or_else(|| self.cpu_from_index(0))?
+                .access_ok(kind, addr, size),
+        )
     }
 
     pub fn force_dfl(&self) {

@@ -727,8 +727,19 @@ impl Qemu {
         if cpu_ptr.is_null() {
             None
         } else {
-            CPU { cpu_ptr }
+            Some(CPU { cpu_ptr })
         }
+    }
+
+    /// # Safety
+    ///
+    /// CPU will be incorrect if CPU index does not exist
+    #[must_use]
+    #[expect(clippy::cast_possible_wrap)]
+    pub unsafe fn cpu_from_index_unchecked(&self, index: usize) -> CPU {
+        let cpu_ptr = unsafe { libafl_qemu_get_cpu(index as i32) };
+
+        CPU { cpu_ptr }
     }
 
     #[must_use]
@@ -737,23 +748,29 @@ impl Qemu {
     }
 
     /// Read a value from a guest address, taking into account the potential indirections with the current CPU.
+    /// Uses the 0th CPU if no CPU is currently running.
     pub fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) -> Result<(), QemuRWError> {
         self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
+            .or_else(|| self.cpu_from_index(0))
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
             .read_mem(addr, buf)
     }
 
     /// Read a value from a guest address, taking into account the potential indirections with the current CPU.
+    /// Uses the 0th CPU if no CPU is currently running.
     pub fn read_mem_vec(&self, addr: GuestAddr, len: usize) -> Result<Vec<u8>, QemuRWError> {
         self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
+            .or_else(|| self.cpu_from_index(0))
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Read))?
             .read_mem_vec(addr, len)
     }
 
     /// Write a value to a guest address, taking into account the potential indirections with the current CPU.
+    /// Uses the 0th CPU if no CPU is currently running.
     pub fn write_mem(&self, addr: GuestAddr, buf: &[u8]) -> Result<(), QemuRWError> {
         self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
+            .or_else(|| self.cpu_from_index(0))
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
             .write_mem(addr, buf)
     }
 
@@ -791,11 +808,11 @@ impl Qemu {
     /// This may only be safely used for valid guest addresses.
     ///
     /// In any case, no check will be performed on the correctness of the operation.
-    ///
+    /// Also, the there must be a current CPU (or a CPU at index 0).
     /// Please refer to [`CPU::read_mem`] for more details.
     pub unsafe fn read_mem_unchecked(&self, addr: GuestAddr, buf: &mut [u8]) {
         self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
+            .unwrap_or_else(|| self.cpu_from_index_unchecked(0))
             .read_mem_unchecked(addr, buf);
     }
 
@@ -807,10 +824,11 @@ impl Qemu {
     /// In any case, no check will be performed on the correctness of the operation.
     ///
     /// This may only be safely used for valid guest addresses.
+    /// Also, the there must be a current CPU (or a CPU at index 0).
     /// Please refer to [`CPU::write_mem`] for more details.
     pub unsafe fn write_mem_unchecked(&self, addr: GuestAddr, buf: &[u8]) {
         self.current_cpu()
-            .unwrap_or_else(|| self.cpu_from_index(0))
+            .unwrap_or_else(|| self.cpu_from_index_unchecked(0))
             .write_mem_unchecked(addr, buf);
     }
 
