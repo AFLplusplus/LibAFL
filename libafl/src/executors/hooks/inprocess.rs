@@ -359,10 +359,10 @@ pub struct InProcessExecutorHandlerData {
 
     /// The timeout handler
     #[cfg(feature = "std")]
-    pub(crate) crash_handler: *const c_void,
+    pub crash_handler: *const c_void,
     /// The timeout handler
     #[cfg(feature = "std")]
-    pub(crate) timeout_handler: *const c_void,
+    pub timeout_handler: *const c_void,
 
     #[cfg(all(windows, feature = "std"))]
     pub(crate) ptp_timer: Option<PTP_TIMER>,
@@ -486,7 +486,7 @@ impl InProcessExecutorHandlerData {
 }
 
 /// Exception handling needs some nasty unsafe.
-pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
     // The state ptr for signal handling
     state_ptr: null_mut(),
     // The event manager ptr for signal handling
