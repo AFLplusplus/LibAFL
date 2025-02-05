@@ -90,16 +90,19 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         *state.executions_mut() += 1;
+
         unsafe {
             let executor_ptr = ptr::from_ref(self) as *const c_void;
             self.inner
                 .enter_target(fuzzer, state, mgr, input, executor_ptr);
         }
+
         self.inner.hooks.pre_exec_all(state, input);
 
         let ret = self.harness_fn.borrow_mut()(input);
 
         self.inner.hooks.post_exec_all(state, input);
+
         self.inner.leave_target(fuzzer, state, mgr, input);
         Ok(ret)
     }

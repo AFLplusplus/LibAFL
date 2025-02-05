@@ -120,7 +120,7 @@ strum_macros = "0.26.4"
 syscall-numbers = "4.0.0"
 meminterval = { workspace = true }
 thread_local = "1.1.8"
-capstone = "0.12.0"
+capstone = "0.13.0"
 rangemap = { workspace = true }
 log = { workspace = true }
 object = "0.36.4"
