@@ -381,7 +381,7 @@ impl Display for Signal {
             Signal::SigTerm => write!(f, "SIGTERM")?,
             Signal::SigInterrupt => write!(f, "SIGINT")?,
             Signal::SigTrap => write!(f, "SIGTRAP")?,
-        };
+        }
 
         Ok(())
     }

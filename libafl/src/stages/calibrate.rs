@@ -198,8 +198,8 @@ where
 
                 if iter < CAL_STAGE_MAX {
                     iter += 2;
-                };
-            };
+                }
+            }
 
             total_time += current_time() - start;
 
@@ -234,7 +234,7 @@ where
                             usize::from(*history == O::Entry::default());
                         *history = O::Entry::max_value();
                         unstable_entries.push(idx);
-                    };
+                    }
                 }
 
                 if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
