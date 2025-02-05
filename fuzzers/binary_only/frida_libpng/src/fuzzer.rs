@@ -44,6 +44,7 @@ use libafl_frida::{
 };
 use libafl_targets::cmplog::CmpLogObserver;
 use mimalloc::MiMalloc;
+use std::{cell::RefCell, rc::Rc};
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -104,7 +105,8 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         let options_clone = options.clone();
         let client_description_clone2 = client_description.clone();
         let options_clone2 = options.clone();
-        let mut frida_helper = FridaInstrumentationHelper::new(
+        let frida_helper = Rc::new(RefCell::new(
+            FridaInstrumentationHelper::new(
             &gum,
             options,
             tuple_list!(
@@ -120,11 +122,11 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 ),
                 coverage
             ),
-        );
+        )));
 
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe {
-            StdMapObserver::from_mut_ptr("edges", frida_helper.map_mut_ptr().unwrap(), MAP_SIZE)
+            StdMapObserver::from_mut_ptr("edges", frida_helper.borrow_mut().map_mut_ptr().unwrap(), MAP_SIZE)
         })
         .track_indices();
 
@@ -200,7 +202,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 &mut mgr,
                 options.timeout,
             )?,
-            &mut frida_helper,
+            Rc::clone(&frida_helper),
         );
         // Create an observation channel using cmplog map
         let cmplog_observer = CmpLogObserver::new("cmplog", true);
