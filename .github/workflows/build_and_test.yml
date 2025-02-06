@@ -20,7 +20,6 @@ concurrency:
 jobs:
   common:
     strategy:
-      fail-fast: false
       matrix:
         os: [ ubuntu-24.04, windows-latest, macOS-latest ]
     runs-on: ${{ matrix.os }}
@@ -238,6 +237,7 @@ jobs:
     needs:
       - fuzzers-preflight
     strategy:
+      fail-fast: false
       matrix:
         os: [ ubuntu-24.04 ]
         fuzzer:
@@ -320,8 +320,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
   changes:
     runs-on: ubuntu-24.04
