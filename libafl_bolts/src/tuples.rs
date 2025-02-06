@@ -6,9 +6,10 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     any::type_name,
     fmt::{Debug, Formatter},
+    marker::PhantomData,
     ops::{Deref, DerefMut, Index, IndexMut},
 };
-use core::{any::TypeId, marker::PhantomData, mem::transmute};
+use core::{any::TypeId, mem::transmute};
 
 #[cfg(feature = "alloc")]
 use serde::{Deserialize, Serialize};

@@ -1,52 +1,52 @@
 [workspace]
 resolver = "2"
 members = [
-    "libafl",
-    "libafl_bolts",
-    "libafl_cc",
-    "libafl_concolic/symcc_runtime",
-    "libafl_concolic/symcc_libafl",
-    "libafl_derive",
-    "libafl_frida",
-    "libafl_intelpt",
-    "libafl_libfuzzer",
-    "libafl_nyx",
-    "libafl_targets",
-    "libafl_tinyinst",
-    "libafl_qemu",
-    "libafl_qemu/libafl_qemu_build",
-    "libafl_qemu/libafl_qemu_sys",
-    "libafl_sugar",
-    "libafl_concolic/test/dump_constraints",
-    "libafl_concolic/test/runtime_test",
-    "utils/build_and_test_fuzzers",
-    "utils/deexit",
-    "utils/drcov_utils",
-    "utils/gramatron/construct_automata",
-    "utils/libafl_benches",
-    "utils/libafl_jumper",
+  "libafl",
+  "libafl_bolts",
+  "libafl_cc",
+  "libafl_concolic/symcc_runtime",
+  "libafl_concolic/symcc_libafl",
+  "libafl_derive",
+  "libafl_frida",
+  "libafl_intelpt",
+  "libafl_libfuzzer",
+  "libafl_nyx",
+  "libafl_targets",
+  "libafl_tinyinst",
+  "libafl_qemu",
+  "libafl_qemu/libafl_qemu_build",
+  "libafl_qemu/libafl_qemu_sys",
+  "libafl_sugar",
+  "libafl_concolic/test/dump_constraints",
+  "libafl_concolic/test/runtime_test",
+  "utils/build_and_test_fuzzers",
+  "utils/deexit",
+  "utils/drcov_utils",
+  "utils/gramatron/construct_automata",
+  "utils/libafl_benches",
+  "utils/libafl_jumper",
 ]
 
 default-members = [
-    "libafl",
-    "libafl_bolts",
-    "libafl_cc",
-    "libafl_derive",
-    "libafl_targets",
+  "libafl",
+  "libafl_bolts",
+  "libafl_cc",
+  "libafl_derive",
+  "libafl_targets",
 ]
 
 exclude = [
-    "bindings/pylibafl",
-    "fuzzers",
-    "libafl_libfuzzer_runtime",
-    "utils/noaslr",
-    "utils/gdb_qemu",
-    "utils/libafl_fmt",
-    "utils/desyscall",
-    "utils/multi_machine_generator",
-    "scripts",
-    # additional crates
-    "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
+  "bindings/pylibafl",
+  "fuzzers",
+  "libafl_libfuzzer_runtime",
+  "utils/noaslr",
+  "utils/gdb_qemu",
+  "utils/libafl_fmt",
+  "utils/desyscall",
+  "utils/multi_machine_generator",
+  "scripts",
+  # additional crates
+  "libafl_concolic/test/symcc/util/symcc_fuzzing_helper",
 ]
 
 [workspace.package]
@@ -104,7 +104,7 @@ num_enum = { version = "0.7.3", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 paste = "1.0.15"
 postcard = { version = "1.0.10", features = [
-    "alloc",
+  "alloc",
 ], default-features = false } # no_std compatible serde serialization format
 pyo3 = "0.23.2"
 pyo3-build-config = "0.23.2"
