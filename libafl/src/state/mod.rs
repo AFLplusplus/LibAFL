@@ -115,7 +115,7 @@ pub trait HasClientPerfMonitor {
     fn introspection_stats(&self) -> &ClientPerfStats;
 
     /// Mutatable ref to [`ClientPerfStats`]
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfStats;
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats;
 }
 
 /// Intermediate trait for `HasClientPerfMonitor`
@@ -1146,7 +1146,7 @@ impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
         &self.introspection_stats
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfStats {
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
         &mut self.introspection_stats
     }
 }
@@ -1299,7 +1299,7 @@ impl<I> HasClientPerfMonitor for NopState<I> {
         unimplemented!();
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfStats {
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
         unimplemented!();
     }
 }

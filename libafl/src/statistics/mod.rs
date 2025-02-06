@@ -164,7 +164,7 @@ impl ClientStats {
 
     /// Update the current [`ClientPerfStats`] with the given [`ClientPerfStats`]
     #[cfg(feature = "introspection")]
-    pub fn update_introspection_monitor(&mut self, introspection_stats: ClientPerfStats) {
+    pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
         self.introspection_stats = introspection_stats;
     }
 }

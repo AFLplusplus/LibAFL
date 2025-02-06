@@ -395,7 +395,6 @@ pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
 
     start_time: Duration,
-    client_stats: Vec<ClientStats>,
 }
 
 impl From<TuiMonitorConfig> for TuiMonitor {
@@ -443,7 +442,7 @@ impl Monitor for TuiMonitor {
                 .add(run_time, client_stats_manager.objective_size());
             ctx.execs_per_sec_timed.add(run_time, execsec);
             ctx.total_execs = totalexec;
-            ctx.clients_num = self.client_stats.len();
+            ctx.clients_num = client_stats_manager.client_stats().len();
             ctx.total_map_density = get_map_density(client_stats_manager);
             ctx.total_solutions = client_stats_manager.objective_size();
             ctx.total_cycles_done = 0;
@@ -490,7 +489,12 @@ impl Monitor for TuiMonitor {
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client IDs that have never sent anything.
-            for (i, client) in self.client_stats.iter().filter(|x| x.enabled).enumerate() {
+            for (i, client) in client_stats_manager
+                .client_stats()
+                .iter()
+                .filter(|x| x.enabled)
+                .enumerate()
+            {
                 self.context
                     .write()
                     .unwrap()
@@ -564,7 +568,6 @@ impl TuiMonitor {
         Self {
             context,
             start_time,
-            client_stats: vec![],
         }
     }
 

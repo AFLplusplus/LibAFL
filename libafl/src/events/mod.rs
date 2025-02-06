@@ -514,7 +514,7 @@ where
     #[cfg(feature = "introspection")]
     {
         state
-            .introspection_monitor_mut()
+            .introspection_stats_mut()
             .set_current_time(libafl_bolts::cpu::read_time_counter());
 
         // Send the current monitor over to the manager. This `.clone` shouldn't be

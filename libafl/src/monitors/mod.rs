@@ -28,7 +28,7 @@ use libafl_bolts::{current_time, format_duration_hms, ClientId};
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub use prometheus::PrometheusMonitor;
 
-use crate::statistics::{manager::ClientStatsManager, ClientStats};
+use crate::statistics::manager::ClientStatsManager;
 
 /// The monitor trait keeps track of all the client's monitor, and offers methods to display them.
 pub trait Monitor {
@@ -177,7 +177,6 @@ where
     print_fn: F,
     start_time: Duration,
     print_user_monitor: bool,
-    client_stats: Vec<ClientStats>,
 }
 
 impl<F> Debug for SimpleMonitor<F>
@@ -187,7 +186,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimpleMonitor")
             .field("start_time", &self.start_time)
-            .field("client_stats", &self.client_stats)
             .finish_non_exhaustive()
     }
 }
@@ -261,7 +259,6 @@ where
             print_fn,
             start_time: current_time(),
             print_user_monitor: false,
-            client_stats: vec![],
         }
     }
 
@@ -271,7 +268,6 @@ where
             print_fn,
             start_time,
             print_user_monitor: false,
-            client_stats: vec![],
         }
     }
 
@@ -281,7 +277,6 @@ where
             print_fn,
             start_time: current_time(),
             print_user_monitor: true,
-            client_stats: vec![],
         }
     }
 }
@@ -292,7 +287,7 @@ macro_rules! start_timer {
     ($state:expr) => {{
         // Start the timer
         #[cfg(feature = "introspection")]
-        $state.introspection_monitor_mut().start_timer();
+        $state.introspection_stats_mut().start_timer();
     }};
 }
 
@@ -302,9 +297,7 @@ macro_rules! mark_feature_time {
     ($state:expr, $feature:expr) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
-        $state
-            .introspection_monitor_mut()
-            .mark_feature_time($feature);
+        $state.introspection_stats_mut().mark_feature_time($feature);
     }};
 }
 
@@ -314,7 +307,7 @@ macro_rules! mark_feedback_time {
     ($state:expr) => {{
         // Mark the elapsed time for the given feature
         #[cfg(feature = "introspection")]
-        $state.introspection_monitor_mut().mark_feedback_time();
+        $state.introspection_stats_mut().mark_feedback_time();
     }};
 }
 

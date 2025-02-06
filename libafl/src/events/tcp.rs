@@ -383,7 +383,7 @@ where
                     // Update the normal monitor for this client
                     client.update_executions(*executions, *time);
                     // Update the performance monitor for this client
-                    client.update_introspection_monitor((**introspection_stats).clone());
+                    client.update_introspection_stats((**introspection_stats).clone());
                 });
 
                 // Display the monitor via `.display` only on core #1

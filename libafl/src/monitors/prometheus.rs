@@ -49,7 +49,7 @@ use tide::Request;
 
 use crate::{
     monitors::Monitor,
-    statistics::{manager::ClientStatsManager, user_stats::UserStatsValue, ClientStats},
+    statistics::{manager::ClientStatsManager, user_stats::UserStatsValue},
 };
 
 /// Prometheus metrics for global and each client.
@@ -74,7 +74,6 @@ where
     start_time: Duration,
     prometheus_global_stats: PrometheusStats, // global prometheus metrics
     prometheus_client_stats: PrometheusStats, // per-client prometheus metrics
-    client_stats: Vec<ClientStats>,           // per-client statistics
 }
 
 impl<F> Debug for PrometheusMonitor<F>
@@ -84,7 +83,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PrometheusMonitor")
             .field("start_time", &self.start_time)
-            .field("client_stats", &self.client_stats)
             .finish_non_exhaustive()
     }
 }
@@ -346,7 +344,6 @@ where
         let prometheus_global_stats_clone = prometheus_global_stats.clone();
         let prometheus_client_stats = PrometheusStats::default();
         let prometheus_client_stats_clone = prometheus_client_stats.clone();
-        let client_stats = Vec::<ClientStats>::default();
 
         // Need to run the metrics server in a different thread to avoid blocking
         thread::spawn(move || {
@@ -363,7 +360,6 @@ where
             start_time: current_time(),
             prometheus_global_stats,
             prometheus_client_stats,
-            client_stats,
         }
     }
     /// Creates the monitor with a given `start_time`.
@@ -372,7 +368,6 @@ where
         let prometheus_global_stats_clone = prometheus_global_stats.clone();
         let prometheus_client_stats = PrometheusStats::default();
         let prometheus_client_stats_clone = prometheus_client_stats.clone();
-        let client_stats = Vec::<ClientStats>::default();
 
         thread::spawn(move || {
             block_on(serve_metrics(
@@ -388,7 +383,6 @@ where
             start_time,
             prometheus_global_stats,
             prometheus_client_stats,
-            client_stats,
         }
     }
 }
