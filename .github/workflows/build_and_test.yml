@@ -358,6 +358,7 @@ jobs:
           - ./fuzzers/binary_only/qemu_cmin
           - ./fuzzers/binary_only/qemu_coverage
           - ./fuzzers/binary_only/qemu_launcher
+          - ./fuzzers/binary_only/qemu_tmin
 
           # Full-system
           - ./fuzzers/full_system/qemu_baremetal
