@@ -198,7 +198,7 @@ where
                 // Otherwise, Stalker starts messing with our hooks and their callbacks
                 // wrecking havoc and causing deadlocks
                 stalker.exclude(&MemoryRange::new(
-                    NativePointer(range.base_address().0 as *mut c_void),
+                    NativePointer(range.base_address().0),
                     range.size(),
                 ));
                 break;

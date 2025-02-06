@@ -13,7 +13,6 @@ use std::{
     ptr::write_volatile,
     rc::Rc,
     sync::{Mutex, MutexGuard},
-    u64,
 };
 
 use backtrace::Backtrace;
@@ -430,17 +429,6 @@ impl AsanRuntime {
     pub fn reset_allocations(&mut self) {
         self.allocator_mut().reset();
     }
-
-    /// Gets the allocator
-    // #[must_use]
-    // pub fn allocator(&self) -> &Allocator {
-    //     &self.allocator
-    // }
-
-    // /// Gets the allocator (mutable)
-    // pub fn allocator_mut(&mut self) -> &mut Allocator {
-    //     &mut self.allocator
-    // }
 
     /// Gets the allocator
     pub fn allocator(&self) -> MutexGuard<Allocator> {
