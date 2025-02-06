@@ -88,9 +88,10 @@ where
         (self.print_fn)(&global_fmt);
 
         self.client_stats_insert(sender_id);
-        let client = self.client_stats_mut_for(sender_id);
         let cur_time = current_time();
-        let exec_sec = client.execs_per_sec_pretty(cur_time);
+        let exec_sec =
+            self.update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time));
+        let client = self.client_stats_for(sender_id);
 
         let pad = " ".repeat(head.len());
         let mut fmt = format!(

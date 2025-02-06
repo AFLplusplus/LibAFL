@@ -375,6 +375,9 @@ echo "Profile: ${PROFILE}"
 export QEMU_LAUNCHER=${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher
 
 ./tests/injection/test.sh || exit 1
+
+# complie again with simple mgr
+cargo build --profile=${PROFILE} --features="simplemgr" --target-dir=${TARGET_DIR}
 ./tests/qasan/test.sh || exit 1
 '''
 dependencies = ["build_unix"]

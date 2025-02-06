@@ -73,7 +73,7 @@ macro_rules! hook_to_repr {
 static mut EMULATOR_MODULES: *mut () = ptr::null_mut();
 
 #[cfg(feature = "usermode")]
-pub extern "C" fn crash_hook_wrapper<ET, I, S>(target_sig: i32)
+pub extern "C" fn run_target_crash_hooks<ET, I, S>(target_sig: i32)
 where
     ET: EmulatorModuleTuple<I, S>,
     S: Unpin,
@@ -974,8 +974,6 @@ where
     pub fn crash_function(&mut self, hook: CrashHookFn<ET, I, S>) {
         // # Safety
         // Will cast the valid hook to a ptr.
-        self.qemu_hooks
-            .set_crash_hook(crash_hook_wrapper::<ET, I, S>);
         self.hook_collection
             .crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
@@ -985,8 +983,6 @@ where
         // # Safety
         // Will cast the hook to a [`FatPtr`].
         unsafe {
-            self.qemu_hooks
-                .set_crash_hook(crash_hook_wrapper::<ET, I, S>);
             self.hook_collection
                 .crash_hooks
                 .push(HookRepr::Closure(transmute(hook)));

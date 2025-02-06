@@ -63,6 +63,13 @@ struct chunk_begin {
 
 } __attribute__((packed));
 
+struct chunk_struct {
+  struct chunk_begin begin;
+  char               redzone[REDZONE_SIZE];
+  size_t             prev_size_padding;
+
+} __attribute__((packed));
+
 #ifdef USE_LIBC_ALLOC
 
 void *(*__lq_libc_memalign)(size_t, size_t);
@@ -170,14 +177,14 @@ void *__libqasan_malloc(size_t size) {
 
   struct chunk_begin *p = backend_memalign(
       ALLOC_ALIGN_SIZE,
-      sizeof(struct chunk_begin) + qasan_align_up(size, ALLOC_ALIGN_SIZE));
+      sizeof(struct chunk_struct) + qasan_align_up(size, ALLOC_ALIGN_SIZE));
 
   QASAN_SWAP(state);
 
   if (!p) return NULL;
 
   QASAN_UNPOISON(
-      p, sizeof(struct chunk_begin) + qasan_align_up(size, ALLOC_ALIGN_SIZE));
+      p, sizeof(struct chunk_struct) + qasan_align_up(size, ALLOC_ALIGN_SIZE));
 
   p->requested_size = size;
   p->aligned_orig = NULL;
@@ -274,13 +281,13 @@ int __libqasan_posix_memalign(void **ptr, size_t align, size_t len) {
 
   char *orig = backend_memalign(
       ALLOC_ALIGN_SIZE,
-      sizeof(struct chunk_begin) + qasan_align_up(size, ALLOC_ALIGN_SIZE));
+      sizeof(struct chunk_struct) + qasan_align_up(size, ALLOC_ALIGN_SIZE));
 
   QASAN_SWAP(state);
 
   if (!orig) return ENOMEM;
 
-  QASAN_UNPOISON(orig, sizeof(struct chunk_begin) +
+  QASAN_UNPOISON(orig, sizeof(struct chunk_struct) +
                            qasan_align_up(size, ALLOC_ALIGN_SIZE));
 
   char *data = orig + sizeof(struct chunk_begin);
