@@ -232,7 +232,7 @@ impl Drop for LastErrorGuard {
         unsafe {
             SetLastError(self.last_error);
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         set_errno(self.last_error);
     }
 }
@@ -1806,7 +1806,7 @@ impl AsanRuntime {
         } else if let Some(metadata) = self
             .allocator
             .lock()
-            .unwrap()            
+            .unwrap()
             .find_metadata(fault_address, self.regs[base_reg as usize])
         {
             let asan_readwrite_error = AsanReadWriteError {
