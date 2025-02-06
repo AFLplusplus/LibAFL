@@ -27,7 +27,7 @@
 //!
 //! When using docker, you may need to point `prometheus.yml` to the `docker0` interface or `host.docker.internal`
 
-use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
+use alloc::{borrow::Cow, fmt::Debug, string::String};
 use core::{fmt, fmt::Write, time::Duration};
 use std::{
     string::ToString,
