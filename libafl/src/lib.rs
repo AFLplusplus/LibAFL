@@ -79,6 +79,7 @@ pub mod observers;
 pub mod schedulers;
 pub mod stages;
 pub mod state;
+pub mod statistics;
 
 pub use fuzzer::*;
 pub use libafl_bolts::{nonzero, Error};
@@ -90,7 +91,8 @@ pub mod prelude {
 
     pub use super::{
         corpus::*, events::*, executors::*, feedbacks::*, fuzzer::*, generators::*, inputs::*,
-        monitors::*, mutators::*, observers::*, schedulers::*, stages::*, state::*, *,
+        monitors::*, mutators::*, observers::*, schedulers::*, stages::*, state::*, statistics::*,
+        *,
     };
 }
 

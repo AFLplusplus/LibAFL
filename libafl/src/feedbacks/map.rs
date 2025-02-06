@@ -25,8 +25,8 @@ use crate::{
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver},
+    statistics::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     Error, HasMetadata, HasNamedMetadata,
 };
 

@@ -1,6 +1,5 @@
 //! Monitors that log aggregated stats to disk.
 
-use alloc::vec::Vec;
 use core::{
     fmt::{Debug, Formatter},
     time::Duration,
@@ -10,13 +9,12 @@ use std::{fs::OpenOptions, io::Write, path::PathBuf};
 use libafl_bolts::{current_time, ClientId};
 use serde_json::json;
 
-use crate::monitors::{Aggregator, ClientStats, Monitor};
+use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
 
 /// A monitor that wraps another monitor and logs aggregated stats to a JSON file.
 #[derive(Clone)]
 pub struct OnDiskJsonAggregateMonitor<M> {
     base: M,
-    aggregator: Aggregator,
     json_path: PathBuf,
     last_update: Duration,
     update_interval: Duration,
@@ -40,14 +38,6 @@ impl<M> Monitor for OnDiskJsonAggregateMonitor<M>
 where
     M: Monitor,
 {
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        self.base.client_stats_mut()
-    }
-
-    fn client_stats(&self) -> &[ClientStats] {
-        self.base.client_stats()
-    }
-
     fn set_start_time(&mut self, time: Duration) {
         self.base.set_start_time(time);
     }
@@ -56,14 +46,15 @@ where
         self.base.start_time()
     }
 
-    fn aggregate(&mut self, name: &str) {
-        self.aggregator.aggregate(name, self.base.client_stats());
-        self.base.aggregate(name);
-    }
-
-    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
+    fn display(
+        &mut self,
+        client_stats_manager: &mut ClientStatsManager,
+        event_msg: &str,
+        sender_id: ClientId,
+    ) {
         // First let the base monitor handle its display
-        self.base.display(event_msg, sender_id);
+        self.base
+            .display(client_stats_manager, event_msg, sender_id);
 
         // Write JSON stats if update interval has elapsed
         let cur_time = current_time();
@@ -78,18 +69,18 @@ where
 
             let mut json_value = json!({
                 "run_time": (cur_time - self.start_time()).as_secs(),
-                "clients": self.client_stats_count(),
-                "corpus": self.corpus_size(),
-                "objectives": self.objective_size(),
-                "executions": self.total_execs(),
-                "exec_sec": self.execs_per_sec(),
+                "clients": client_stats_manager.client_stats_count(),
+                "corpus": client_stats_manager.corpus_size(),
+                "objectives": client_stats_manager.objective_size(),
+                "executions": client_stats_manager.total_execs(),
+                "exec_sec": client_stats_manager.execs_per_sec(),
             });
 
             // Add all aggregated values directly to the root
             if let Some(obj) = json_value.as_object_mut() {
                 obj.extend(
-                    self.aggregator
-                        .aggregated
+                    client_stats_manager
+                        .aggregated()
                         .iter()
                         .map(|(k, v)| (k.clone(), json!(v))),
                 );
@@ -116,7 +107,6 @@ impl<M> OnDiskJsonAggregateMonitor<M> {
     {
         Self {
             base,
-            aggregator: Aggregator::new(),
             json_path: json_path.into(),
             last_update: current_time() - update_interval,
             update_interval,
