@@ -21,7 +21,9 @@ pub use tui::TuiMonitor;
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub mod prometheus;
 
-use alloc::{fmt::Debug, vec::Vec};
+use alloc::fmt::Debug;
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 use core::{fmt, fmt::Write, time::Duration};
 
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
