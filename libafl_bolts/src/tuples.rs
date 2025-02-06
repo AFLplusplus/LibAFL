@@ -22,7 +22,7 @@ use crate::Named;
 
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
 #[must_use]
-pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     typeid::of::<T>() == typeid::of::<U>()
 }
 
@@ -928,7 +928,6 @@ mod test {
     }
 
     #[test]
-    #[expect(unused_qualifications)] // for type name tests
     fn test_type_eq() {
         // An alias for equality testing
         type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
