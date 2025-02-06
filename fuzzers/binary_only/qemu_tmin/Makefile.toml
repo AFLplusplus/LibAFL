@@ -1,6 +1,8 @@
 [env]
-PROFILE = { value = "release", condition = {env_not_set = ["PROFILE"]} }
-PROFILE_DIR = {value = "release", condition = {env_not_set = ["PROFILE_DIR"] }}
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { value = "release", condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
 CROSS_CC = "x86_64-linux-gnu-gcc"
 CROSS_CXX = "x86_64-linux-gnu-g++"
 CROSS_CFLAGS = ""
@@ -66,32 +68,32 @@ LIBPNG_OPTIMIZATIONS = "no"
 FEATURE = "ppc"
 
 [tasks.unsupported]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 echo "Qemu fuzzer not supported on windows/mac"
 '''
 
 
 [tasks.target_dir]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"] }
+script_runner = "@shell"
+script = '''
 mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
 '''
 
 [tasks.deps_dir]
 dependencies = ["target_dir"]
-condition = { files_not_exist = [ "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/"] }
+script_runner = "@shell"
+script = '''
 mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/
 '''
 
 [tasks.arch_target_dir]
 dependencies = ["target_dir"]
-condition = { files_not_exist = [ "${TARGET_DIR}" ] }
-script_runner="@shell"
-script='''
+condition = { files_not_exist = ["${TARGET_DIR}"] }
+script_runner = "@shell"
+script = '''
 mkdir ${TARGET_DIR}
 '''
 
@@ -187,17 +189,19 @@ windows_alias = "unsupported"
 [tasks.build_unix]
 command = "cargo"
 args = [
-    "build",
-    "--profile",
-    "${PROFILE}",
-    "--features", "${FEATURE}",
-    "--target-dir", "${TARGET_DIR}"
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--features",
+  "${FEATURE}",
+  "--target-dir",
+  "${TARGET_DIR}",
 ]
 
 [tasks.fuzzer]
 dependencies = ["build"]
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -f ${TARGET_DIR}/${PROFILE_DIR}/qemu_tmin-${CARGO_MAKE_PROFILE}
 mv ${TARGET_DIR}/${PROFILE_DIR}/qemu_tmin ${TARGET_DIR}/${PROFILE_DIR}/qemu_tmin-${CARGO_MAKE_PROFILE}
 '''
@@ -231,14 +235,17 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_tmin-${CARGO_MAKE_PROFILE}"
-args = [    
-    "--input", "./corpus",
-    "--output", "./output",
-    "--iterations", "1000",
-    "--",
-    "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+args = [
+  "--input",
+  "./corpus",
+  "--output",
+  "./output",
+  "--iterations",
+  "1000",
+  "--",
+  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
 ]
-dependencies = [ "harness", "fuzzer" ]
+dependencies = ["harness", "fuzzer"]
 
 [tasks.test]
 linux_alias = "test_unix"
@@ -246,13 +253,10 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.test_unix]
-dependencies = [ "all" ]
+dependencies = ["all"]
 # Tidy up after we've run our tests so we don't hog all the disk space
 command = "cargo"
-args = [
-    "make",
-    "clean",
-]
+args = ["make", "clean"]
 
 [tasks.clean]
 linux_alias = "clean_unix"
@@ -262,66 +266,35 @@ windows_alias = "unsupported"
 [tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
-script_runner="@shell"
-script='''
+script_runner = "@shell"
+script = '''
 rm -rf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
 cargo clean
 '''
 
 [tasks.arm]
 command = "cargo"
-args = [
-    "make",
-    "-p", "arm",
-    "run",
-]
+args = ["make", "-p", "arm", "run"]
 
 [tasks.aarch64]
 command = "cargo"
-args = [
-    "make",
-    "-p", "aarch64",
-    "run",
-]
+args = ["make", "-p", "aarch64", "run"]
 
 [tasks.x86_64]
 command = "cargo"
-args = [
-    "make",
-    "-p", "x86_64",
-    "run",
-]
+args = ["make", "-p", "x86_64", "run"]
 
 [tasks.i386]
 command = "cargo"
-args = [
-    "make",
-    "-p", "i386",
-    "run",
-]
+args = ["make", "-p", "i386", "run"]
 
 [tasks.mips]
 command = "cargo"
-args = [
-    "make",
-    "-p", "mips",
-    "run",
-]
+args = ["make", "-p", "mips", "run"]
 
 [tasks.ppc]
 command = "cargo"
-args = [
-    "make",
-    "-p", "ppc",
-    "run",
-]
+args = ["make", "-p", "ppc", "run"]
 
 [tasks.all]
-dependencies = [
-    "arm",
-    "aarch64",
-    "x86_64",
-    "i386",
-    "mips",
-    "ppc"
-]
+dependencies = ["arm", "aarch64", "x86_64", "i386", "mips", "ppc"]
