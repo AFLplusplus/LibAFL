@@ -7,7 +7,7 @@ use std::{env, fmt::Write, fs::DirEntry, io, path::PathBuf, process, ptr::NonNul
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus, HasCurrentCorpusId},
+    corpus::{Corpus, HasCurrentCorpusId, InMemoryCorpus, InMemoryOnDiskCorpus},
     events::{
         launcher::Launcher, ClientDescription, EventConfig, LlmpRestartingEventManager, SendExiting,
     },
@@ -19,8 +19,8 @@ use libafl::{
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
+    stages::{ObserverEqualityFactory, StagesTuple, StdTMinMutationalStage},
     state::{HasCorpus, StdState},
-    stages::{ObserverEqualityFactory, StdTMinMutationalStage, StagesTuple},
     Error,
 };
 use libafl_bolts::{
@@ -138,7 +138,6 @@ pub fn fuzz() {
     let mut run_client = |state: Option<_>,
                           mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
-
         let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
         let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
@@ -152,7 +151,7 @@ pub fn fuzz() {
                     .expect("The edge map pointer is null.")
                     .cast::<[u8; EDGES_MAP_DEFAULT_SIZE]>(),
             ))
-        };        
+        };
 
         let mut feedback = MaxMapFeedback::new(&observer);
 
@@ -273,12 +272,13 @@ pub fn fuzz() {
             .unwrap()
         });
 
-
         let minimizer = StdScheduledMutator::new(havoc_mutations());
         let factory = ObserverEqualityFactory::new(&observer);
-        let mut stages = tuple_list!(
-            StdTMinMutationalStage::new(minimizer, factory, options.iterations)
-        );
+        let mut stages = tuple_list!(StdTMinMutationalStage::new(
+            minimizer,
+            factory,
+            options.iterations
+        ));
 
         let scheduler = QueueScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -305,12 +305,7 @@ pub fn fuzz() {
         let first_id = state.corpus().first().expect("Empty corpus");
         state.set_corpus_id(first_id)?;
 
-        stages.perform_all(
-            &mut fuzzer,
-            &mut executor,
-            &mut state,
-            &mut mgr,
-        )?;
+        stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
 
         mgr.send_exiting()?;
         Err(Error::ShuttingDown)?
