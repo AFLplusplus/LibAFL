@@ -198,7 +198,7 @@ impl Lock {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use errno::{errno, set_errno, Errno};
 #[cfg(target_os = "windows")]
 use winapi::shared::minwindef::DWORD;
@@ -1806,6 +1806,7 @@ impl AsanRuntime {
         } else if let Some(metadata) = self
             .allocator
             .lock()
+            .unwrap()            
             .find_metadata(fault_address, self.regs[base_reg as usize])
         {
             let asan_readwrite_error = AsanReadWriteError {
