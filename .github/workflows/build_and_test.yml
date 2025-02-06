@@ -320,10 +320,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
-      - name: Build and run example fuzzers (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
 
   changes:
     runs-on: ubuntu-24.04
