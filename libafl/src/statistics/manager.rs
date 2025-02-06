@@ -111,10 +111,7 @@ impl ClientStatsManager {
     }
 
     /// Update sepecific client stats.
-    ///
-    /// The update function is restricted as `Fn` instead of `FnMut` or `FnOnce` since in some
-    /// monitors, the `update` will be called multiple times, and is assumed as stateless.
-    pub fn update_client_stats_for<T, F: Fn(&mut ClientStats) -> T>(
+    pub fn update_client_stats_for<T, F: FnOnce(&mut ClientStats) -> T>(
         &mut self,
         client_id: ClientId,
         update: F,
