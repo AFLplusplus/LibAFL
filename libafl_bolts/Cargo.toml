@@ -186,12 +186,12 @@ windows = { workspace = true, features = [
 ] }
 once_cell = "1.10.0"
 winapi = { version = "0.3", features = [
-  "fileapi", 
-  "handleapi", 
-  "processenv", 
-  "processthreadsapi", 
-  "winbase", 
-  "winnt"
+  "fileapi",
+  "handleapi",
+  "processenv",
+  "processthreadsapi",
+  "winbase",
+  "winnt",
 ] }
 windows-result = "0.3.0"
 

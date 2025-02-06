@@ -172,8 +172,7 @@ where
     }
 }
 
-impl<'a, 'b, EM, H, I, OT, RT, S, TC, Z>
-    FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z>
+impl<'a, 'b, EM, H, I, OT, RT, S, TC, Z> FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z>
 where
     RT: FridaRuntimeTuple,
 {
