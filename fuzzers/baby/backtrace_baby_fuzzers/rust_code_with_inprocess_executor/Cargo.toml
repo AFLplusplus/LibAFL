@@ -1,6 +1,6 @@
 [package]
 name = "rust_code_with_inprocess_executor"
-version = "0.15.0"
+version = "0.15.1"
 edition = "2021"
 
 [features]

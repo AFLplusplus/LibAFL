@@ -413,7 +413,7 @@ where
                 for (index, new_byte) in mutation {
                     input_copy.mutator_bytes_mut()[index] = new_byte;
                 }
-                fuzzer.evaluate_filtered(state, executor, manager, input_copy)?;
+                fuzzer.evaluate_filtered(state, executor, manager, &input_copy)?;
             }
         }
         Ok(())

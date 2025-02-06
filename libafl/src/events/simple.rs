@@ -22,13 +22,13 @@ use libafl_bolts::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::{std_on_restart, AwaitRestartSafe, ProgressReporter};
+use super::{std_on_restart, AwaitRestartSafe, ProgressReporter, RecordSerializationTime};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
-        Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
         SendExiting,
     },
     monitors::Monitor,
@@ -71,6 +71,8 @@ where
     }
 }
 
+impl<I, MT, S> RecordSerializationTime for SimpleEventManager<I, MT, S> {}
+
 impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
@@ -94,6 +96,10 @@ impl<I, MT, S> SendExiting for SimpleEventManager<I, MT, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 impl<I, MT, S> AwaitRestartSafe for SimpleEventManager<I, MT, S> {
@@ -109,27 +115,29 @@ where
     }
 }
 
-impl<E, I, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventReceiver<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
     S: Stoppable,
 {
-    fn process(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _executor: &mut E,
-    ) -> Result<usize, Error> {
-        let count = self.events.len();
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         while let Some(event) = self.events.pop() {
-            self.handle_in_client(state, &event)?;
+            match event {
+                Event::Stop => {
+                    state.request_stop();
+                }
+                _ => {
+                    return Err(Error::unknown(format!(
+                        "Received illegal message that message should not have arrived: {event:?}."
+                    )))
+                }
+            }
         }
-        Ok(count)
+        Ok(None)
     }
-
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -201,9 +209,9 @@ where
         match event {
             Event::NewTestcase { corpus_size, .. } => {
                 monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_corpus_size(*corpus_size as u64);
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_corpus_size(*corpus_size as u64);
+                });
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -212,18 +220,18 @@ where
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(ClientId(0));
-                let client = monitor.client_stats_mut_for(ClientId(0));
-
-                client.update_executions(*executions, *time);
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_executions(*executions, *time);
+                });
 
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats { name, value, .. } => {
                 monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_user_stats(name.clone(), value.clone());
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_user_stats(name.clone(), value.clone());
+                });
                 monitor.aggregate(name);
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
@@ -237,17 +245,18 @@ where
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 monitor.client_stats_insert(ClientId(0));
-                let client = monitor.client_stats_mut_for(ClientId(0));
-                client.update_executions(*executions, *time);
-                client.update_introspection_monitor((**introspection_monitor).clone());
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_executions(*executions, *time);
+                    client_stat.update_introspection_monitor((**introspection_monitor).clone());
+                });
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size, .. } => {
                 monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_objective_size(*objective_size as u64);
+                monitor.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_objective_size(*objective_size as u64);
+                });
                 monitor.display(event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
@@ -261,20 +270,6 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Stop => Ok(BrokerEventResult::Forward),
-        }
-    }
-
-    // Handle arriving events in the client
-    #[allow(clippy::unused_self)]
-    fn handle_in_client(&mut self, state: &mut S, event: &Event<I>) -> Result<(), Error> {
-        match event {
-            Event::Stop => {
-                state.request_stop();
-                Ok(())
-            }
-            _ => Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {event:?}."
-            ))),
         }
     }
 }
@@ -291,6 +286,12 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     inner: SimpleEventManager<I, MT, S>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SHM, SP>,
+}
+
+#[cfg(feature = "std")]
+impl<I, MT, S, SHM, SP> RecordSerializationTime
+    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+{
 }
 
 #[cfg(feature = "std")]
@@ -352,6 +353,10 @@ where
         self.staterestorer.send_exiting();
         Ok(())
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 #[cfg(feature = "std")]
@@ -362,8 +367,7 @@ impl<I, MT, S, SHM, SP> AwaitRestartSafe for SimpleRestartingEventManager<I, MT,
 }
 
 #[cfg(feature = "std")]
-impl<E, I, MT, S, SHM, SP, Z> EventProcessor<E, S, Z>
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+impl<I, MT, S, SHM, SP> EventReceiver<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
@@ -371,12 +375,12 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        self.inner.process(fuzzer, state, executor)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.inner.try_receive(state)
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -539,7 +543,7 @@ where
 
                 // reload the state of the monitor to display the correct stats after restarts
                 monitor.set_start_time(start_time);
-                *monitor.client_stats_mut() = clients_stats;
+                monitor.update_all_client_stats(clients_stats);
 
                 (
                     Some(state),

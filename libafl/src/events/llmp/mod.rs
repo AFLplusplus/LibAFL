@@ -14,8 +14,6 @@ use libafl_bolts::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 
-#[cfg(feature = "share_objectives")]
-use crate::corpus::{Corpus, Testcase};
 use crate::{
     events::{Event, EventFirer},
     fuzzer::EvaluatorObservers,
@@ -262,7 +260,6 @@ where
     ) -> Result<(), Error>
     where
         ICB: InputConverter<To = I, From = DI>,
-        S: HasCurrentTestcase<I> + HasSolutions<I>,
         Z: EvaluatorObservers<E, EM, I, S>,
     {
         match event {
@@ -279,7 +276,7 @@ where
                     state,
                     executor,
                     manager,
-                    converter.convert(input)?,
+                    &converter.convert(input)?,
                     false,
                 )?;
 
@@ -297,17 +294,17 @@ where
                     return Ok(());
                 };
 
-                let converted_input = converter.convert(input)?;
-                let mut testcase = Testcase::from(converted_input);
-                testcase.set_parent_id_optional(*state.corpus().current());
+                let res = fuzzer.evaluate_input_with_observers(
+                    state,
+                    executor,
+                    manager,
+                    &converter.convert(input)?,
+                    false,
+                )?;
 
-                if let Ok(mut tc) = state.current_testcase_mut() {
-                    tc.found_objective();
+                if let Some(item) = res.1 {
+                    log::info!("Added received Objective as item #{item}");
                 }
-
-                state.solutions_mut().add(testcase)?;
-                log::info!("Added received Objective to Corpus");
-
                 Ok(())
             }
             Event::Stop => Ok(()),

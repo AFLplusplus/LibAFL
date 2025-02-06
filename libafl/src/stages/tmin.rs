@@ -238,7 +238,7 @@ where
                 let (_, corpus_id) = fuzzer.evaluate_execution(
                     state,
                     manager,
-                    input.clone(),
+                    &input,
                     &*observers,
                     &exit_kind,
                     false,
