@@ -209,7 +209,7 @@ use winapi::um::errhandlingapi::{GetLastError, SetLastError};
 struct LastErrorGuard {
     #[cfg(target_os = "windows")]
     last_error: DWORD,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     last_error: Errno,
 }
 
@@ -218,7 +218,7 @@ impl LastErrorGuard {
     fn new() -> Self {
         #[cfg(target_os = "windows")]
         let last_error = unsafe { GetLastError() };
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         let last_error = errno();
 
         LastErrorGuard { last_error }
@@ -1805,6 +1805,7 @@ impl AsanRuntime {
             }
         } else if let Some(metadata) = self
             .allocator
+            .lock()
             .find_metadata(fault_address, self.regs[base_reg as usize])
         {
             let asan_readwrite_error = AsanReadWriteError {

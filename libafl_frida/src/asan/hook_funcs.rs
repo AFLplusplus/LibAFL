@@ -751,16 +751,6 @@ impl AsanRuntime {
         _original: extern "C" fn(size: usize) -> *mut c_void,
         size: usize,
     ) -> *mut c_void {
-        unsafe { self.allocator_mut().alloc(size, 8) }
-    }
-
-    #[inline]
-    #[cfg(target_vendor = "apple")]
-    pub fn hook_valloc(
-        &mut self,
-        _original: extern "C" fn(size: usize) -> *mut c_void,
-        size: usize,
-    ) -> *mut c_void {
         unsafe {
             log::trace!("hook_malloc");
             self.allocator_mut().alloc(size, 8)
