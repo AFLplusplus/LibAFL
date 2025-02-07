@@ -1,8 +1,6 @@
-PROFILE := "release"
-TARGET_DIR := absolute_path("target")
-BUILD_DIR := TARGET_DIR / PROFILE
-FUZZER := BUILD_DIR / "qemu_baremetal"
-LIBAFL_QEMU_DIR := TARGET_DIR / "qemu-libafl-bridge"
+import "../../../just/libafl-qemu.just"
+FUZZER_NAME := "qemu_baremetal"
+
 KERNEL := TARGET_DIR / "example.elf"
 DUMMY_IMG := TARGET_DIR / "dummy.qcow2"
 

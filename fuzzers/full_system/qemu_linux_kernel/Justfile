@@ -1,10 +1,5 @@
-import "../../../just/libafl.just"
-
-PROFILE := "release"
-TARGET_DIR := absolute_path("target")
-BUILD_DIR := TARGET_DIR / PROFILE
-FUZZER := BUILD_DIR / "qemu_linux_kernel"
-LIBAFL_QEMU_DIR_DEFAULT := BUILD_DIR / "qemu-libafl-bridge"
+import "../../../just/libafl-qemu.just"
+FUZZER_NAME := "qemu_linux_kernel"
 
 LINUX_BUILDER_URL := "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR := TARGET_DIR / "linux_builder"

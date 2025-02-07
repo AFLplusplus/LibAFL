@@ -1,3 +1,8 @@
+PROFILE := env("PROFILE", "release")
+TARGET_DIR := absolute_path(env("TARGET_DIR", "target"))
+BUILD_DIR := TARGET_DIR / PROFILE
+FUZZER := BUILD_DIR / FUZZER_NAME
+
 JUSTHASHES := ".justhashes"
 
 buildfile fpath:
