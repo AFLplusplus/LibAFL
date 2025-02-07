@@ -416,7 +416,7 @@ impl Monitor for TuiMonitor {
             let execsec = client_stats_manager.execs_per_sec() as u64;
             let totalexec = client_stats_manager.total_execs();
             let run_time = cur_time - client_stats_manager.start_time();
-            let total_process_timing = self.process_timing(client_stats_manager);
+            let total_process_timing = get_process_timing(client_stats_manager);
 
             let mut ctx = self.context.write().unwrap();
             ctx.total_process_timing = total_process_timing;
@@ -552,32 +552,31 @@ impl TuiMonitor {
         }
         Self { context }
     }
+}
 
-    fn process_timing(&self, client_stats_manager: &mut ClientStatsManager) -> ProcessTiming {
-        let mut total_process_timing = ProcessTiming::new();
-        total_process_timing.exec_speed = client_stats_manager.execs_per_sec_pretty();
-        if client_stats_manager.client_stats().len() > 1 {
-            let mut new_path_time = Duration::default();
-            let mut new_objectives_time = Duration::default();
-            for client in client_stats_manager
-                .client_stats()
-                .iter()
-                .filter(|client| client.enabled)
-            {
-                new_path_time = client.last_corpus_time.max(new_path_time);
-                new_objectives_time = client.last_objective_time.max(new_objectives_time);
-            }
-            if new_path_time > client_stats_manager.start_time() {
-                total_process_timing.last_new_entry =
-                    new_path_time - client_stats_manager.start_time();
-            }
-            if new_objectives_time > client_stats_manager.start_time() {
-                total_process_timing.last_saved_solution =
-                    new_objectives_time - client_stats_manager.start_time();
-            }
+fn get_process_timing(client_stats_manager: &mut ClientStatsManager) -> ProcessTiming {
+    let mut total_process_timing = ProcessTiming::new();
+    total_process_timing.exec_speed = client_stats_manager.execs_per_sec_pretty();
+    if client_stats_manager.client_stats().len() > 1 {
+        let mut new_path_time = Duration::default();
+        let mut new_objectives_time = Duration::default();
+        for client in client_stats_manager
+            .client_stats()
+            .iter()
+            .filter(|client| client.enabled)
+        {
+            new_path_time = client.last_corpus_time.max(new_path_time);
+            new_objectives_time = client.last_objective_time.max(new_objectives_time);
         }
-        total_process_timing
+        if new_path_time > client_stats_manager.start_time() {
+            total_process_timing.last_new_entry = new_path_time - client_stats_manager.start_time();
+        }
+        if new_objectives_time > client_stats_manager.start_time() {
+            total_process_timing.last_saved_solution =
+                new_objectives_time - client_stats_manager.start_time();
+        }
     }
+    total_process_timing
 }
 
 fn get_map_density(client_stats_manager: &ClientStatsManager) -> String {
