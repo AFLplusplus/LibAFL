@@ -71,7 +71,6 @@ where
     F: FnMut(&str),
 {
     print_fn: F,
-    start_time: Duration,
     prometheus_global_stats: PrometheusStats, // global prometheus metrics
     prometheus_client_stats: PrometheusStats, // per-client prometheus metrics
 }
@@ -81,9 +80,7 @@ where
     F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PrometheusMonitor")
-            .field("start_time", &self.start_time)
-            .finish_non_exhaustive()
+        f.debug_struct("PrometheusMonitor").finish_non_exhaustive()
     }
 }
 
@@ -91,16 +88,6 @@ impl<F> Monitor for PrometheusMonitor<F>
 where
     F: FnMut(&str),
 {
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
@@ -152,7 +139,7 @@ where
             })
             .set(execs_per_sec);
 
-        let run_time = (current_time() - self.start_time).as_secs();
+        let run_time = (current_time() - client_stats_manager.start_time()).as_secs();
         self.prometheus_global_stats
             .runtime
             .get_or_create(&Labels {
@@ -177,7 +164,7 @@ where
         let mut global_fmt = format!(
             "[Prometheus] [{} #GLOBAL] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
-            format_duration_hms(&(current_time() - self.start_time)),
+            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
             client_stats_manager.client_stats_count(),
             client_stats_manager.corpus_size(),
             client_stats_manager.objective_size(),
@@ -357,33 +344,17 @@ where
         });
         Self {
             print_fn,
-            start_time: current_time(),
             prometheus_global_stats,
             prometheus_client_stats,
         }
     }
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(listener: String, print_fn: F, start_time: Duration) -> Self {
-        let prometheus_global_stats = PrometheusStats::default();
-        let prometheus_global_stats_clone = prometheus_global_stats.clone();
-        let prometheus_client_stats = PrometheusStats::default();
-        let prometheus_client_stats_clone = prometheus_client_stats.clone();
-
-        thread::spawn(move || {
-            block_on(serve_metrics(
-                listener,
-                prometheus_global_stats_clone,
-                prometheus_client_stats_clone,
-            ))
-            .map_err(|err| log::error!("{err:?}"))
-            .ok();
-        });
-        Self {
-            print_fn,
-            start_time,
-            prometheus_global_stats,
-            prometheus_client_stats,
-        }
+    #[deprecated(
+        since = "0.16.0",
+        note = "Please use new to create. start_time is useless here."
+    )]
+    pub fn with_time(listener: String, print_fn: F, _start_time: Duration) -> Self {
+        Self::new(listener, print_fn)
     }
 }
 

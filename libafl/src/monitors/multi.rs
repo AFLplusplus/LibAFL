@@ -17,7 +17,6 @@ where
     F: FnMut(&str),
 {
     print_fn: F,
-    start_time: Duration,
 }
 
 impl<F> Debug for MultiMonitor<F>
@@ -25,9 +24,7 @@ where
     F: FnMut(&str),
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("MultiMonitor")
-            .field("start_time", &self.start_time)
-            .finish_non_exhaustive()
+        f.debug_struct("MultiMonitor").finish_non_exhaustive()
     }
 }
 
@@ -35,16 +32,6 @@ impl<F> Monitor for MultiMonitor<F>
 where
     F: FnMut(&str),
 {
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
@@ -61,7 +48,7 @@ where
         let mut global_fmt = format!(
             "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
-            format_duration_hms(&(current_time() - self.start_time)),
+            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
             client_stats_manager.client_stats_count(),
             client_stats_manager.corpus_size(),
             client_stats_manager.objective_size(),
@@ -116,17 +103,15 @@ where
 {
     /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
-        Self {
-            print_fn,
-            start_time: current_time(),
-        }
+        Self { print_fn }
     }
 
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(print_fn: F, start_time: Duration) -> Self {
-        Self {
-            print_fn,
-            start_time,
-        }
+    #[deprecated(
+        since = "0.16.0",
+        note = "Please use new to create. start_time is useless here."
+    )]
+    pub fn with_time(print_fn: F, _start_time: Duration) -> Self {
+        Self::new(print_fn)
     }
 }

@@ -32,16 +32,6 @@ impl<M> Monitor for OnDiskTomlMonitor<M>
 where
     M: Monitor,
 {
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.base.start_time()
-    }
-
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration) {
-        self.base.set_start_time(time);
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
@@ -66,7 +56,7 @@ objectives = {}
 executions = {}
 exec_sec = {}
 ",
-                format_duration_hms(&(cur_time - self.start_time())),
+                format_duration_hms(&(cur_time - client_stats_manager.start_time())),
                 client_stats_manager.client_stats_count(),
                 client_stats_manager.corpus_size(),
                 client_stats_manager.objective_size(),
@@ -193,14 +183,6 @@ where
     F: FnMut(&mut M) -> bool,
     M: Monitor,
 {
-    fn start_time(&self) -> Duration {
-        self.base.start_time()
-    }
-
-    fn set_start_time(&mut self, time: Duration) {
-        self.base.set_start_time(time);
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
@@ -215,7 +197,7 @@ where
                 .expect("Failed to open logging file");
 
             let line = json!({
-                "run_time": current_time() - self.base.start_time(),
+                "run_time": current_time() - client_stats_manager.start_time(),
                 "clients": client_stats_manager.client_stats_count(),
                 "corpus": client_stats_manager.corpus_size(),
                 "objectives": client_stats_manager.objective_size(),

@@ -58,10 +58,6 @@ pub struct TuiMonitorConfig {
     /// A version string to show for this (optional)
     #[builder(default_code = r#""default".to_string()"#, setter(into))]
     pub version: String,
-    /// Creates the monitor with an explicit `start_time`.
-    /// If nothings was set, this will use [`current_time`] instead.
-    #[builder(default_code = "current_time()")]
-    pub start_time: Duration,
     /// Enables unicode TUI graphics, Looks better but may interfere with old terminals.
     #[builder(default = true)]
     pub enhanced_graphics: bool,
@@ -393,8 +389,6 @@ impl TuiContext {
 #[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
-
-    start_time: Duration,
 }
 
 impl From<TuiMonitorConfig> for TuiMonitor {
@@ -402,22 +396,12 @@ impl From<TuiMonitorConfig> for TuiMonitor {
     fn from(builder: TuiMonitorConfig) -> Self {
         Self::with_time(
             TuiUi::with_version(builder.title, builder.version, builder.enhanced_graphics),
-            builder.start_time,
+            current_time(),
         )
     }
 }
 
 impl Monitor for TuiMonitor {
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
     #[expect(clippy::cast_sign_loss)]
     fn display(
         &mut self,
@@ -431,7 +415,7 @@ impl Monitor for TuiMonitor {
             // TODO implement floating-point support for TimedStat
             let execsec = client_stats_manager.execs_per_sec() as u64;
             let totalexec = client_stats_manager.total_execs();
-            let run_time = cur_time - self.start_time;
+            let run_time = cur_time - client_stats_manager.start_time();
             let total_process_timing = self.process_timing(client_stats_manager);
 
             let mut ctx = self.context.write().unwrap();
@@ -441,6 +425,7 @@ impl Monitor for TuiMonitor {
             ctx.objective_size_timed
                 .add(run_time, client_stats_manager.objective_size());
             ctx.execs_per_sec_timed.add(run_time, execsec);
+            ctx.start_time = client_stats_manager.start_time();
             ctx.total_execs = totalexec;
             ctx.clients_num = client_stats_manager.client_stats().len();
             ctx.total_map_density = get_map_density(client_stats_manager);
@@ -565,10 +550,7 @@ impl TuiMonitor {
                 io::stdout,
             );
         }
-        Self {
-            context,
-            start_time,
-        }
+        Self { context }
     }
 
     fn process_timing(&self, client_stats_manager: &mut ClientStatsManager) -> ProcessTiming {
@@ -585,11 +567,13 @@ impl TuiMonitor {
                 new_path_time = client.last_corpus_time.max(new_path_time);
                 new_objectives_time = client.last_objective_time.max(new_objectives_time);
             }
-            if new_path_time > self.start_time {
-                total_process_timing.last_new_entry = new_path_time - self.start_time;
+            if new_path_time > client_stats_manager.start_time() {
+                total_process_timing.last_new_entry =
+                    new_path_time - client_stats_manager.start_time();
             }
-            if new_objectives_time > self.start_time {
-                total_process_timing.last_saved_solution = new_objectives_time - self.start_time;
+            if new_objectives_time > client_stats_manager.start_time() {
+                total_process_timing.last_saved_solution =
+                    new_objectives_time - client_stats_manager.start_time();
             }
         }
         total_process_timing
