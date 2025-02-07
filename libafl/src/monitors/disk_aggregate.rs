@@ -38,14 +38,6 @@ impl<M> Monitor for OnDiskJsonAggregateMonitor<M>
 where
     M: Monitor,
 {
-    fn set_start_time(&mut self, time: Duration) {
-        self.base.set_start_time(time);
-    }
-
-    fn start_time(&self) -> Duration {
-        self.base.start_time()
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
@@ -68,7 +60,7 @@ where
                 .expect("Failed to open JSON logging file");
 
             let mut json_value = json!({
-                "run_time": (cur_time - self.start_time()).as_secs(),
+                "run_time": (cur_time - client_stats_manager.start_time()).as_secs(),
                 "clients": client_stats_manager.client_stats_count(),
                 "corpus": client_stats_manager.corpus_size(),
                 "objectives": client_stats_manager.objective_size(),

@@ -34,12 +34,6 @@ use crate::statistics::manager::ClientStatsManager;
 
 /// The monitor trait keeps track of all the client's monitor, and offers methods to display them.
 pub trait Monitor {
-    /// Creation time
-    fn start_time(&self) -> Duration;
-
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration);
-
     /// Show the monitor to the user
     fn display(
         &mut self,
@@ -52,21 +46,9 @@ pub trait Monitor {
 /// Monitor that print exactly nothing.
 /// Not good for debugging, very good for speed.
 #[derive(Debug, Clone)]
-pub struct NopMonitor {
-    start_time: Duration,
-}
+pub struct NopMonitor {}
 
 impl Monitor for NopMonitor {
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    /// Time this fuzzing run stated
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
     #[inline]
     fn display(
         &mut self,
@@ -81,9 +63,7 @@ impl NopMonitor {
     /// Create new [`NopMonitor`]
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            start_time: current_time(),
-        }
+        Self {}
     }
 }
 
@@ -95,19 +75,8 @@ impl Default for NopMonitor {
 
 /// Tracking monitor during fuzzing that just prints to `stdout`.
 #[cfg(feature = "std")]
-#[derive(Debug, Clone)]
-pub struct SimplePrintingMonitor {
-    start_time: Duration,
-}
-
-#[cfg(feature = "std")]
-impl Default for SimplePrintingMonitor {
-    fn default() -> Self {
-        Self {
-            start_time: current_time(),
-        }
-    }
-}
+#[derive(Debug, Clone, Default)]
+pub struct SimplePrintingMonitor {}
 
 #[cfg(feature = "std")]
 impl SimplePrintingMonitor {
@@ -120,16 +89,6 @@ impl SimplePrintingMonitor {
 
 #[cfg(feature = "std")]
 impl Monitor for SimplePrintingMonitor {
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    /// Time this fuzzing run stated
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
@@ -146,7 +105,7 @@ impl Monitor for SimplePrintingMonitor {
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",
             event_msg,
             sender_id.0,
-            format_duration_hms(&(current_time() - self.start_time)),
+            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
             client_stats_manager.client_stats_count(),
             client_stats_manager.corpus_size(),
             client_stats_manager.objective_size(),
@@ -177,7 +136,6 @@ where
     F: FnMut(&str),
 {
     print_fn: F,
-    start_time: Duration,
     print_user_monitor: bool,
 }
 
@@ -186,9 +144,7 @@ where
     F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SimpleMonitor")
-            .field("start_time", &self.start_time)
-            .finish_non_exhaustive()
+        f.debug_struct("SimpleMonitor").finish_non_exhaustive()
     }
 }
 
@@ -196,16 +152,6 @@ impl<F> Monitor for SimpleMonitor<F>
 where
     F: FnMut(&str),
 {
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
@@ -216,7 +162,7 @@ where
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id.0,
-            format_duration_hms(&(current_time() - self.start_time)),
+            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
             client_stats_manager.client_stats_count(),
             client_stats_manager.corpus_size(),
             client_stats_manager.objective_size(),
@@ -259,25 +205,23 @@ where
     pub fn new(print_fn: F) -> Self {
         Self {
             print_fn,
-            start_time: current_time(),
             print_user_monitor: false,
         }
     }
 
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(print_fn: F, start_time: Duration) -> Self {
-        Self {
-            print_fn,
-            start_time,
-            print_user_monitor: false,
-        }
+    #[deprecated(
+        since = "0.16.0",
+        note = "Please use new to create. start_time is useless here."
+    )]
+    pub fn with_time(print_fn: F, _start_time: Duration) -> Self {
+        Self::new(print_fn)
     }
 
     /// Creates the monitor that also prints the user monitor
     pub fn with_user_monitor(print_fn: F) -> Self {
         Self {
             print_fn,
-            start_time: current_time(),
             print_user_monitor: true,
         }
     }
@@ -320,34 +264,16 @@ macro_rules! mark_feedback_time {
 pub struct CombinedMonitor<A, B> {
     first: A,
     second: B,
-    start_time: Duration,
 }
 
 impl<A: Monitor, B: Monitor> CombinedMonitor<A, B> {
     /// Create a new combined monitor
-    pub fn new(mut first: A, mut second: B) -> Self {
-        let start_time = current_time();
-        first.set_start_time(start_time);
-        second.set_start_time(start_time);
-        Self {
-            first,
-            second,
-            start_time,
-        }
+    pub fn new(first: A, second: B) -> Self {
+        Self { first, second }
     }
 }
 
 impl<A: Monitor, B: Monitor> Monitor for CombinedMonitor<A, B> {
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-        self.first.set_start_time(time);
-        self.second.set_start_time(time);
-    }
-
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
