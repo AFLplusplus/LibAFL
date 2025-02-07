@@ -18,7 +18,3 @@ runs:
     - name: install cargo-make
       shell: pwsh
       run: cargo install --force cargo-make
-    - name: install just
-      uses: extractions/setup-just@v2
-      with:
-        just-version: 1.39.0

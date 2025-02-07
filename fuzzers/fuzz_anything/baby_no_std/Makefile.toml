@@ -1,0 +1,45 @@
+[env]
+FUZZER_NAME = "fuzzer"
+PROJECT_DIR = { script = ["pwd"] }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# Fuzzer
+[tasks.build]
+command = "cargo"
+args = [
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "-Zbuild-std=core,alloc",
+  "--target",
+  "x86_64-unknown-linux-gnu",
+]
+
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script = '''
+cargo run -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu || true
+'''
+dependencies = ["build"]
+
+[tasks.build_aarch]
+script = "cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --profile ${PROFILE}"
+
+# Clean
+[tasks.clean]
+command = "cargo"
+args = ["clean"]

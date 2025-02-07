@@ -1,0 +1,112 @@
+[env]
+PROJECT_DIR = { script = ["pwd"] }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+FUZZER_NAME = "fuzzer"
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# Compilers
+[tasks.cxx]
+linux_alias = "cxx_unix"
+mac_alias = "cxx_unix"
+windows_alias = "unsupported"
+
+[tasks.cxx_unix]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
+
+[tasks.cc]
+linux_alias = "cc_unix"
+mac_alias = "cc_unix"
+windows_alias = "unsupported"
+
+[tasks.cc_unix]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
+
+# fuzz.o File
+[tasks.fuzz_o]
+linux_alias = "fuzz_o_unix"
+mac_alias = "fuzz_o_unix"
+windows_alias = "unsupported"
+
+[tasks.fuzz_o_unix]
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc"
+args = ["--libafl-no-link", "-O3", "-c", "fuzz.c", "-o", "fuzz.o"]
+dependencies = ["cc", "cxx"]
+
+# Fuzzer
+[tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_unix]
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
+args = ["--libafl", "fuzz.o", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
+dependencies = ["cc", "cxx", "fuzz_o"]
+
+# Run
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+mkdir in || true
+echo a > in/a
+./${FUZZER_NAME} -o out -i in
+'''
+dependencies = ["fuzzer"]
+
+
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+mkdir in || true
+echo a > in/a
+# Allow sigterm as exit code 
+timeout 31s ./${FUZZER_NAME} -o out -i in | tee fuzz_stdout.log || true
+if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+rm -rf out || true
+rm -rf in || true
+'''
+dependencies = ["fuzzer"]
+
+# Clean
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+script_runner = "@shell"
+script = '''
+rm ./${FUZZER_NAME} || true
+rm fuzz.o || true
+'''
