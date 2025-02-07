@@ -1,0 +1,29 @@
+[env]
+FUZZER_NAME = "fuzzer"
+PROJECT_DIR = { script = ["pwd"] }
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# Fuzzer
+[tasks.build]
+command = "wasm-pack"
+args = ["build", "--target", "web"]
+
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+command = "wasm-pack"
+args = ["test", "--chrome", "--headless"]
+
+# Clean
+[tasks.clean]
+command = "cargo"
+args = ["clean"]

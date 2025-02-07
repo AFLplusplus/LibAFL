@@ -1,0 +1,221 @@
+# Variables
+[env]
+FUZZER_NAME = 'fuzzer_libpng'
+PROJECT_DIR = { script = ["pwd"] }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
+LIBAFL_CC = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc'
+LIBAFL_CXX = '${CARGO_TARGET_DIR}/${PROFILE}/libafl_cxx'
+FUZZER = '${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME}'
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# libpng
+[tasks.libpng]
+linux_alias = "libpng_unix"
+mac_alias = "libpng_unix"
+windows_alias = "unsupported"
+
+[tasks.libpng_unix]
+condition = { files_not_exist = ["./libpng-1.6.37"] }
+script_runner = "@shell"
+script = '''
+wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
+'''
+
+# Compilers
+[tasks.cxx]
+linux_alias = "cxx_unix"
+mac_alias = "cxx_unix"
+windows_alias = "unsupported"
+
+[tasks.cxx_unix]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
+
+[tasks.cc]
+linux_alias = "cc_unix"
+mac_alias = "cc_unix"
+windows_alias = "unsupported"
+
+[tasks.cc_unix]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}"]
+
+[tasks.crash_cxx]
+linux_alias = "crash_cxx_unix"
+mac_alias = "crash_cxx_unix"
+windows_alias = "unsupported"
+
+[tasks.crash_cxx_unix]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}", "--features=crash"]
+
+[tasks.crash_cc]
+linux_alias = "crash_cc_unix"
+mac_alias = "crash_cc_unix"
+windows_alias = "unsupported"
+
+[tasks.crash_cc_unix]
+command = "cargo"
+args = ["build", "--profile", "${PROFILE}", "--features=crash"]
+
+# Library
+[tasks.lib]
+linux_alias = "lib_unix"
+mac_alias = "lib_unix"
+windows_alias = "unsupported"
+
+[tasks.lib_unix]
+script_runner = "@shell"
+script = '''
+cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+cd "${PROJECT_DIR}"
+make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc" CXX="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
+'''
+dependencies = ["libpng", "cxx", "cc"]
+
+# Library
+[tasks.crash_lib]
+linux_alias = "crash_lib_unix"
+mac_alias = "crash_lib_unix"
+windows_alias = "unsupported"
+
+[tasks.crash_lib_unix]
+script_runner = "@shell"
+script = '''
+cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+cd "${PROJECT_DIR}"
+make -C libpng-1.6.37 CC="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cc" CXX="${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
+'''
+dependencies = ["libpng", "crash_cxx", "crash_cc"]
+
+# Harness
+[tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_unix]
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
+args = [
+  "${PROJECT_DIR}/harness.cc",
+  "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a",
+  "-I",
+  "${PROJECT_DIR}/libpng-1.6.37/",
+  "-o",
+  "${FUZZER_NAME}",
+  "-lm",
+  "-lz",
+]
+dependencies = ["lib", "cxx", "cc"]
+
+# Crashing Harness
+[tasks.fuzzer_crash]
+linux_alias = "fuzzer_crash_unix"
+mac_alias = "fuzzer_crash_unix"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_crash_unix]
+command = "${CARGO_TARGET_DIR}/${PROFILE_DIR}/libafl_cxx"
+args = [
+  "${PROJECT_DIR}/harness.cc",
+  "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a",
+  "-I",
+  "${PROJECT_DIR}/libpng-1.6.37/",
+  "-o",
+  "${FUZZER_NAME}_crash",
+  "-lm",
+  "-lz",
+]
+dependencies = ["crash_lib", "crash_cxx", "crash_cc"]
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script = '''
+./${FUZZER_NAME} &
+sleep 0.2
+./${FUZZER_NAME} 2>/dev/null
+'''
+dependencies = ["fuzzer"]
+
+
+# Run the fuzzer with a crash
+[tasks.crash]
+linux_alias = "crash_unix"
+mac_alias = "crash_unix"
+windows_alias = "unsupported"
+
+[tasks.crash_unix]
+script_runner = "@shell"
+script = '''
+./${FUZZER_NAME}_crash &
+sleep 0.2
+./${FUZZER_NAME}_crash 2>/dev/null
+'''
+dependencies = ["fuzzer_crash"]
+
+
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_mac"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+(timeout 31s ./${FUZZER_NAME} | tee fuzz_stdout.log 2>/dev/null || true) &
+sleep 0.2
+timeout 30s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
+if grep -qa "corpus: 30" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+'''
+dependencies = ["fuzzer"]
+
+[tasks.test_mac]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+(timeout 31s ./${FUZZER_NAME} | tee fuzz_stdout.log 2>/dev/null || true) &
+sleep 0.2
+timeout 30s ./${FUZZER_NAME} >/dev/null 2>/dev/null || true
+'''
+dependencies = ["fuzzer"]
+
+# Clean up
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+rm -f ./${FUZZER_NAME}
+make -C libpng-1.6.37 clean
+cargo clean
+'''
