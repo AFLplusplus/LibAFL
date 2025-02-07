@@ -32,6 +32,7 @@ impl ClientStatsManager {
     }
 
     /// Time this fuzzing run stated
+    #[must_use]
     pub fn start_time(&self) -> Duration {
         self.start_time
     }
