@@ -64,6 +64,27 @@ pub type ClientMgr<M> = MonitorTypedEventManager<
     M,
 >;
 
+/*
+ * The snapshot and iterations options interact as follows:
+ *
+ * +----------+------------+-------------------------------------------+
+ * | snapshot | iterations | Functionality                             |
+ * +----------+------------+-------------------------------------------+
+ * |    N     |     N      | We set the snapshot module into manual    |
+ * |          |            | mode and never reset it.                  |
+ * +----------+------------+-------------------------------------------+
+ * |    N     |     Y      | We set the snapshot module into manual    |
+ * |          |            | mode and never reset it.                  |
+ * +----------+------------+-------------------------------------------+
+ * |    Y     |     N      | We set the snapshot module into automatic |
+ * |          |            | mode so it resets after every iteration.  |
+ * +----------+------------+-------------------------------------------+
+ * |    Y     |     Y      | We set the snapshot module into manual    |
+ * |          |            | mode and manually reset it after the      |
+ * |          |            | required number of iterations are done.   |
+ * +----------+------------+-------------------------------------------+
+ */
+
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
@@ -139,26 +160,8 @@ impl<M: Monitor> Instance<'_, M> {
          * Since the generics for the modules are already excessive when taking
          * into accout asan, asan guest mode, cmplog, and injection, we will
          * always include the SnapshotModule in all configurations, but simply
-         * not use it when it is not required.
-         *
-         * The snapshot and iterations options interact as follows:
-         *
-         * +----------+------------+-------------------------------------------+
-         * | snapshot | iterations | Functionality                             |
-         * +----------+------------+-------------------------------------------+
-         * |    N     |     N      | We set the snapshot module into manual    |
-         * |          |            | mode and never reset it.                  |
-         * +----------+------------+-------------------------------------------+
-         * |    N     |     Y      | We set the snapshot module into manual    |
-         * |          |            | mode and never reset it.                  |
-         * +----------+------------+-------------------------------------------+
-         * |    Y     |     N      | We set the snapshot module into automatic |
-         * |          |            | mode so it resets after every iteration.  |
-         * +----------+------------+-------------------------------------------+
-         * |    Y     |     Y      | We set the snapshot module into manual    |
-         * |          |            | mode and manually reset it after the      |
-         * |          |            | required number of iterations are done.   |
-         * +----------+------------+-------------------------------------------+
+         * not use it when it is not required. See the table at the top of this
+         * file for details.
          */
         if !self.options.snapshots || self.options.iterations.is_some() {
             snapshot_module.use_manual_reset();
@@ -440,24 +443,8 @@ impl<M: Monitor> Instance<'_, M> {
         }
 
         /*
-         * The snapshot and iterations options interact as follows:
-         *
-         * +----------+------------+-------------------------------------------+
-         * | snapshot | iterations | Functionality                             |
-         * +----------+------------+-------------------------------------------+
-         * |    N     |     N      | We set the snapshot module into manual    |
-         * |          |            | mode and never reset it.                  |
-         * +----------+------------+-------------------------------------------+
-         * |    N     |     Y      | We set the snapshot module into manual    |
-         * |          |            | mode and never reset it.                  |
-         * +----------+------------+-------------------------------------------+
-         * |    Y     |     N      | We set the snapshot module into automatic |
-         * |          |            | mode so it resets after every iteration.  |
-         * +----------+------------+-------------------------------------------+
-         * |    Y     |     Y      | We set the snapshot module into manual    |
-         * |          |            | mode and manually reset it after the      |
-         * |          |            | required number of iterations are done.   |
-         * +----------+------------+-------------------------------------------+
+         * See the table a the top of this file for details on how the snapshot
+         * and iterations options interact.
          */
         if let Some(iters) = self.options.iterations {
             if self.options.snapshots {
