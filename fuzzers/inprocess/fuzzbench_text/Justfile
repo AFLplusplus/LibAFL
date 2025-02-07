@@ -1,5 +1,5 @@
 FUZZER_NAME := 'fuzzbench'
-PROJECT_DIR := invocation_directory_native()
+PROJECT_DIR := absolute_path(".")
 PROFILE := env("PROFILE", "release")
 PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
