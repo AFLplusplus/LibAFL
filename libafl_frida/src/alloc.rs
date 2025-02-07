@@ -858,6 +858,8 @@ impl Default for Allocator {
 #[test]
 #[cfg(not(windows))] // not working yet
 fn check_shadow() {
+    use frida_gum::Gum;
+    let _gum = Gum::obtain();
     let mut allocator = Allocator::default();
     allocator.init();
 
