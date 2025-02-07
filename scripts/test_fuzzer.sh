@@ -64,6 +64,10 @@ do
         echo "[*] Testing $fuzzer"
         cargo make test || exit 1
         echo "[+] Done testing $fuzzer"
+    elif [ -e ./Justfile ]; then
+        echo "[*] Testing $fuzzer"
+        just test || exit 1
+        echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
         cargo build || exit 1
