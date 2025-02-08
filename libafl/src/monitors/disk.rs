@@ -133,7 +133,7 @@ impl OnDiskTomlMonitor {
 /// Continuously appends the current statistics to a Json lines file.
 pub struct OnDiskJsonMonitor<F>
 where
-    F: FnMut() -> bool,
+    F: FnMut(&mut ClientStatsManager) -> bool,
 {
     path: PathBuf,
     /// A function that has the current runtime as argument and decides, whether a record should be logged
@@ -142,7 +142,7 @@ where
 
 impl<F> OnDiskJsonMonitor<F>
 where
-    F: FnMut() -> bool,
+    F: FnMut(&mut ClientStatsManager) -> bool,
 {
     /// Create a new [`OnDiskJsonMonitor`]
     pub fn new<P>(filename: P, log_record: F) -> Self
@@ -157,7 +157,7 @@ where
 
 impl<F> Monitor for OnDiskJsonMonitor<F>
 where
-    F: FnMut() -> bool,
+    F: FnMut(&mut ClientStatsManager) -> bool,
 {
     fn display(
         &mut self,
@@ -165,7 +165,7 @@ where
         _event_msg: &str,
         _sender_id: ClientId,
     ) {
-        if (self.log_record)() {
+        if (self.log_record)(client_stats_manager) {
             let file = OpenOptions::new()
                 .append(true)
                 .create(true)
