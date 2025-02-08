@@ -1,4 +1,4 @@
-//! Monitors that wrap a base monitor and also log to disk using different formats like `JSON` and `TOML`.
+//! Monitors that log to disk using different formats like `JSON` and `TOML`.
 
 use alloc::string::String;
 use core::time::Duration;
@@ -11,32 +11,22 @@ use std::{
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 use serde_json::json;
 
-use crate::{
-    monitors::{Monitor, NopMonitor},
-    statistics::manager::ClientStatsManager,
-};
+use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
 
 /// Wrap a monitor and log the current state of the monitor into a Toml file.
 #[derive(Debug, Clone)]
-pub struct OnDiskTomlMonitor<M>
-where
-    M: Monitor,
-{
-    base: M,
+pub struct OnDiskTomlMonitor {
     filename: PathBuf,
     last_update: Duration,
     update_interval: Duration,
 }
 
-impl<M> Monitor for OnDiskTomlMonitor<M>
-where
-    M: Monitor,
-{
+impl Monitor for OnDiskTomlMonitor {
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
-        event_msg: &str,
-        sender_id: ClientId,
+        _event_msg: &str,
+        _sender_id: ClientId,
     ) {
         let cur_time = current_time();
 
@@ -100,33 +90,26 @@ exec_sec = {}
 
             drop(file);
         }
-
-        self.base
-            .display(client_stats_manager, event_msg, sender_id);
     }
 }
 
-impl<M> OnDiskTomlMonitor<M>
-where
-    M: Monitor,
-{
+impl OnDiskTomlMonitor {
     /// Create new [`OnDiskTomlMonitor`]
     #[must_use]
-    pub fn new<P>(filename: P, base: M) -> Self
+    pub fn new<P>(filename: P) -> Self
     where
         P: Into<PathBuf>,
     {
-        Self::with_update_interval(filename, base, Duration::from_secs(60))
+        Self::with_update_interval(filename, Duration::from_secs(60))
     }
 
     /// Create new [`OnDiskTomlMonitor`] with custom update interval
     #[must_use]
-    pub fn with_update_interval<P>(filename: P, base: M, update_interval: Duration) -> Self
+    pub fn with_update_interval<P>(filename: P, update_interval: Duration) -> Self
     where
         P: Into<PathBuf>,
     {
         Self {
-            base,
             filename: filename.into(),
             last_update: current_time() - update_interval,
             update_interval,
@@ -134,62 +117,55 @@ where
     }
 }
 
-impl OnDiskTomlMonitor<NopMonitor> {
+impl OnDiskTomlMonitor {
     /// Create new [`OnDiskTomlMonitor`] without a base
     #[must_use]
+    #[deprecated(since = "0.16.0", note = "Use new directly")]
     pub fn nop<P>(filename: P) -> Self
     where
         P: Into<PathBuf>,
     {
-        Self::new(filename, NopMonitor::new())
+        Self::new(filename)
     }
 }
 
 #[derive(Debug, Clone)]
-/// Wraps a base monitor and continuously appends the current statistics to a Json lines file.
-pub struct OnDiskJsonMonitor<F, M>
+/// Continuously appends the current statistics to a Json lines file.
+pub struct OnDiskJsonMonitor<F>
 where
-    F: FnMut(&mut M) -> bool,
-    M: Monitor,
+    F: FnMut() -> bool,
 {
-    base: M,
     path: PathBuf,
     /// A function that has the current runtime as argument and decides, whether a record should be logged
     log_record: F,
 }
 
-impl<F, M> OnDiskJsonMonitor<F, M>
+impl<F> OnDiskJsonMonitor<F>
 where
-    F: FnMut(&mut M) -> bool,
-    M: Monitor,
+    F: FnMut() -> bool,
 {
     /// Create a new [`OnDiskJsonMonitor`]
-    pub fn new<P>(filename: P, base: M, log_record: F) -> Self
+    pub fn new<P>(filename: P, log_record: F) -> Self
     where
         P: Into<PathBuf>,
     {
         let path = filename.into();
 
-        Self {
-            base,
-            path,
-            log_record,
-        }
+        Self { path, log_record }
     }
 }
 
-impl<F, M> Monitor for OnDiskJsonMonitor<F, M>
+impl<F> Monitor for OnDiskJsonMonitor<F>
 where
-    F: FnMut(&mut M) -> bool,
-    M: Monitor,
+    F: FnMut() -> bool,
 {
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
-        event_msg: &str,
-        sender_id: ClientId,
+        _event_msg: &str,
+        _sender_id: ClientId,
     ) {
-        if (self.log_record)(&mut self.base) {
+        if (self.log_record)() {
             let file = OpenOptions::new()
                 .append(true)
                 .create(true)
@@ -207,7 +183,5 @@ where
             });
             writeln!(&file, "{line}").expect("Unable to write Json to file");
         }
-        self.base
-            .display(client_stats_manager, event_msg, sender_id);
     }
 }
