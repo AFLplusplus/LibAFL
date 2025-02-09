@@ -20,12 +20,6 @@ backtrace_fuzzers=$(echo "$backtrace_fuzzers" | tr ' ' '\n')
 
 libafl=$(pwd)
 
-# build with a shared target dir for all fuzzers. this should speed up
-# compilation a bit, and allows for easier artifact management (caching and
-# cargo clean).
-export CARGO_TARGET_DIR="$libafl/target"
-mkdir -p "$CARGO_TARGET_DIR"
-
 git submodule init && git submodule update
 
 # override default profile settings for speed
