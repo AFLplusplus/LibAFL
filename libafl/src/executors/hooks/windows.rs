@@ -166,7 +166,7 @@ pub mod windows_exception_handler {
                 let in_handler = (*data).set_in_handler(true);
 
                 if in_handler {
-                    panic!("We crashed inside a panic hook, but this should never happen!");
+                    panic!("We crashed inside a crash handler, but this should never happen!");
                 }
 
                 if !(*data).crash_handler.is_null() {
