@@ -400,7 +400,7 @@ impl Monitor for TuiMonitor {
             for (i, client) in client_stats_manager
                 .client_stats()
                 .iter()
-                .filter(|x| x.enabled)
+                .filter(|x| x.enabled())
                 .enumerate()
             {
                 self.context

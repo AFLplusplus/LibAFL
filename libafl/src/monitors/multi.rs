@@ -89,7 +89,7 @@ where
             for (i, client) in client_stats_manager
                 .client_stats()
                 .iter()
-                .filter(|x| x.enabled)
+                .filter(|x| x.enabled())
                 .enumerate()
             {
                 let fmt = format!("Client {:03}:\n{}", i + 1, client.introspection_stats);

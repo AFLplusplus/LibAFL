@@ -140,7 +140,7 @@ where
             })
             .set(execs_per_sec);
 
-        let run_time = (current_time() - client_stats_manager.start_time()).as_secs();
+        let run_time = global_stats.run_time.as_secs();
         self.prometheus_global_stats
             .runtime
             .get_or_create(&Labels {
