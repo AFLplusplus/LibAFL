@@ -34,7 +34,7 @@ pub mod windows_asan_handler {
         Z: HasObjective<Objective = OF>,
     {
         let data = &raw mut GLOBAL_STATE;
-        (*data).set_in_handler(true);
+        let in_handler = (*data).set_in_handler(true);
 
         assert!(
             !in_handler,
@@ -207,7 +207,7 @@ pub mod windows_exception_handler {
             let in_handler = (*data).set_in_handler(true);
 
             assert!(
-                !in_hanlder,
+                !in_handler,
                 "We crashed inside a panic hook, but this should never happen!"
             );
 
