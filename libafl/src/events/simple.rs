@@ -330,7 +330,7 @@ where
         self.staterestorer.reset();
         self.staterestorer.save(&(
             state,
-            self.inner.monitor.start_time(),
+            self.inner.client_stats_manager.start_time(),
             self.inner.client_stats_manager.client_stats(),
         ))
     }
@@ -435,7 +435,7 @@ where
     /// Launch the simple restarting manager.
     /// This `EventManager` is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
-    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
+    pub fn launch(monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
         S: DeserializeOwned + Serialize + HasSolutions<I>,
         MT: Debug,
@@ -546,8 +546,8 @@ where
                 staterestorer.reset();
 
                 // reload the state of the monitor to display the correct stats after restarts
-                monitor.set_start_time(start_time);
                 let mut this = SimpleRestartingEventManager::launched(monitor, staterestorer);
+                this.inner.client_stats_manager.set_start_time(start_time);
                 this.inner
                     .client_stats_manager
                     .update_all_client_stats(clients_stats);

@@ -17,6 +17,7 @@ pub struct ClientStatsManager {
     ///
     /// This map is updated by event manager, and is read by monitors to display user-defined stats.
     pub(super) cached_aggregated_user_stats: HashMap<String, UserStatsValue>,
+    start_time: Duration,
 }
 
 impl ClientStatsManager {
@@ -26,7 +27,19 @@ impl ClientStatsManager {
         Self {
             client_stats: vec![],
             cached_aggregated_user_stats: HashMap::new(),
+            start_time: current_time(),
         }
+    }
+
+    /// Time this fuzzing run stated
+    #[must_use]
+    pub fn start_time(&self) -> Duration {
+        self.start_time
+    }
+
+    /// Time this fuzzing run stated
+    pub fn set_start_time(&mut self, time: Duration) {
+        self.start_time = time;
     }
 
     /// Get all client stats

@@ -1,4 +1,5 @@
 //! The high-level hooks
+
 #![allow(clippy::type_complexity)]
 #![allow(clippy::missing_transmute_annotations)]
 #![allow(clippy::too_many_arguments)]
@@ -928,6 +929,38 @@ pub type CrashHookClosure<ET, I, S> = Box<dyn FnMut(Qemu, &mut EmulatorModules<E
 
 /// The thin wrapper around QEMU hooks.
 /// It is considered unsafe to use it directly.
+///
+/// There are several types of hooks in place:
+///
+/// • **Instruction** hooks: as the name suggests, to hook a specific
+///   instruction given its address;
+///
+/// • **Blocks** hooks: to run code before the execution of each
+///   translation block in the target; Be aware that a translation
+///   block consist of a unique sequence of contiguous instructions encountered
+///   during execution, whereas a basic-block is a sequence of contiguous
+///   instructions without jumps AND with no incoming edge.
+///   For this reason two translation blocks can overlap.
+///
+/// • **Edges** hooks: to run code between two translation blocks, for
+///   instance, to log the execution of an edge in the CFG. In
+///   detail, it is implemented by emitting an intermediate block
+///   when chaining 1 two blocks with more than one exit;
+///
+/// • **Read and write** hooks: executed every memory read or
+///   write;
+///
+/// • **Comparisons** hooks: executed before every comparison
+///   instruction, carrying information about the operands;
+///
+/// • **Thread creation** hook: triggered when a new thread is
+///   spawned in user mode;
+///
+/// • **Syscalls** and **post-syscalls** hooks: they are triggered before
+///   or after syscalls in user mode and can be used as filters;
+///
+/// • **Crash** hooks: to hook crashes in the virtual CPU in user
+///   mode;
 #[derive(Clone, Copy, Debug)]
 pub struct QemuHooks {
     _private: (),
@@ -952,6 +985,13 @@ impl QemuHooks {
         Some(Qemu::get()?.hooks())
     }
 
+    /// Add `callback` in the instruction hooks.
+    ///
+    /// `addr` is the address of the instruction hooked.
+    ///
+    /// `callback` gets passed `data` and the current instruction address.
+    ///
+    /// Set `invalidate_block` to invalidate the virtual pages related to the translation block.
     // TODO set T lifetime to be like Emulator
     pub fn add_instruction_hooks<T: Into<HookData>>(
         &self,
@@ -973,6 +1013,9 @@ impl QemuHooks {
         }
     }
 
+    /// Remove all instruction hooks for the address `addr`.
+    ///
+    /// Set `invalidate_block` to invalidate the virtual pages related to the translation block.
     #[must_use]
     pub fn remove_instruction_hooks_at(&self, addr: GuestAddr, invalidate_block: bool) -> usize {
         unsafe {
@@ -983,6 +1026,12 @@ impl QemuHooks {
         }
     }
 
+    /// Add `gen` in the edge generation hooks and `exec` in the edge execution hooks.
+    ///
+    /// `gen` gets passed `data` and the source/destination translation blocks addresses
+    /// when this edge is reached for the first time.
+    ///
+    /// `exec` gets passed `data` and the return value of `gen` every time this edge is reached.
     pub fn add_edge_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -999,6 +1048,16 @@ impl QemuHooks {
         }
     }
 
+    /// Add `gen` in the translation block (pre-)generation hooks, `post_gen` in post-generation hooks and `exec`
+    /// in the execution hooks.
+    ///
+    /// `gen` gets passed `data` and the block start address, when this block is translated
+    /// for the first time.
+    ///
+    /// `post_gen` gets passed `data`, the block start address and the block size in bytes,
+    /// at the end of the block generation.
+    ///
+    /// `exec` gets passed `data` and the return value of `gen`, every time this block is reached.
     pub fn add_block_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1017,6 +1076,11 @@ impl QemuHooks {
         }
     }
 
+    /// Add `pre_exec` in the (pre-)execution hooks, `post_exec` in the post-execution hooks.
+    ///
+    /// `pre_exec` gets passed a pointer to the cpu state before the code is run.
+    ///
+    /// `post_exec` gets passed a pointer to the cpu state after the code is run.
     pub fn add_cpu_run_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1032,18 +1096,20 @@ impl QemuHooks {
         }
     }
 
-    /// `data` can be used to pass data that can be accessed as the first argument in the `gen` and the `exec` functions
+    /// Add hooks for memory read access.
     ///
-    /// `gen` gets passed the current programm counter, mutable access to a `TCGTemp` and information about the memory
-    /// access being performed.
-    ///  The `u64` return value is an id that gets passed to the `exec` functions as their second argument.
+    /// `data` can be used to pass data that can be accessed as the first argument in the `gen` and the `exec` functions.
     ///
-    /// `exec` hooks get invoked on every read performed by the guest
+    /// `gen` gets passed `data`, the current program counter, mutable access to the address accessed and
+    /// information about the memory access being performed.
     ///
-    /// `exec1`-`exec8` special case accesses of width 1-8
+    /// `exec` hooks get invoked on every read performed by the guest with `data`, the return value of `gen`,
+    /// the current instruction index and the address of the memory accessed.
+    ///
+    /// `exec1`-`exec8` are called for special case accesses of width 1-8.
     ///
     /// If there is no specialized hook for a given read width, the `exec_n` will be
-    /// called and its last argument will specify the access width
+    /// called and its last argument will specify the access width.
     pub fn add_read_hooks<T: Into<HookData>>(
         &self,
         data: T,
@@ -1081,6 +1147,20 @@ impl QemuHooks {
         }
     }
 
+    /// Add hooks for memory write access.
+    ///
+    /// `data` can be used to pass data that can be accessed as the first argument in the `gen` and the `exec` functions.
+    ///
+    /// `gen` gets passed `data`, the current program counter, mutable access to the address written and
+    /// information about the memory access being performed.
+    ///
+    /// `exec` hooks get invoked on every write performed by the guest with `data`, the return value of `gen`,
+    /// the current instruction index and the address of the memory written.
+    ///
+    /// `exec1`-`exec8` are called for special case write of width 1-8.
+    ///
+    /// If there is no specialized hook for a given write width, the `exec_n` will be
+    /// called and its last argument will specify the write width.
     // TODO add MemOp info
     pub fn add_write_hooks<T: Into<HookData>>(
         &self,

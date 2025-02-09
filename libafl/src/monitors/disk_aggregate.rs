@@ -11,22 +11,17 @@ use serde_json::json;
 
 use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
 
-/// A monitor that wraps another monitor and logs aggregated stats to a JSON file.
+/// A monitor that logs aggregated stats to a JSON file.
 #[derive(Clone)]
-pub struct OnDiskJsonAggregateMonitor<M> {
-    base: M,
+pub struct OnDiskJsonAggregateMonitor {
     json_path: PathBuf,
     last_update: Duration,
     update_interval: Duration,
 }
 
-impl<M> Debug for OnDiskJsonAggregateMonitor<M>
-where
-    M: Debug,
-{
+impl Debug for OnDiskJsonAggregateMonitor {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("OnDiskJsonAggregateMonitor")
-            .field("base", &self.base)
             .field("last_update", &self.last_update)
             .field("update_interval", &self.update_interval)
             .field("json_path", &self.json_path)
@@ -34,28 +29,13 @@ where
     }
 }
 
-impl<M> Monitor for OnDiskJsonAggregateMonitor<M>
-where
-    M: Monitor,
-{
-    fn set_start_time(&mut self, time: Duration) {
-        self.base.set_start_time(time);
-    }
-
-    fn start_time(&self) -> Duration {
-        self.base.start_time()
-    }
-
+impl Monitor for OnDiskJsonAggregateMonitor {
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
-        event_msg: &str,
-        sender_id: ClientId,
+        _event_msg: &str,
+        _sender_id: ClientId,
     ) {
-        // First let the base monitor handle its display
-        self.base
-            .display(client_stats_manager, event_msg, sender_id);
-
         // Write JSON stats if update interval has elapsed
         let cur_time = current_time();
         if cur_time - self.last_update >= self.update_interval {
@@ -68,7 +48,7 @@ where
                 .expect("Failed to open JSON logging file");
 
             let mut json_value = json!({
-                "run_time": (cur_time - self.start_time()).as_secs(),
+                "run_time": (cur_time - client_stats_manager.start_time()).as_secs(),
                 "clients": client_stats_manager.client_stats_count(),
                 "corpus": client_stats_manager.corpus_size(),
                 "objectives": client_stats_manager.objective_size(),
@@ -91,22 +71,21 @@ where
     }
 }
 
-impl<M> OnDiskJsonAggregateMonitor<M> {
+impl OnDiskJsonAggregateMonitor {
     /// Creates a new [`OnDiskJsonAggregateMonitor`]
-    pub fn new<P>(base: M, json_path: P) -> Self
+    pub fn new<P>(json_path: P) -> Self
     where
         P: Into<PathBuf>,
     {
-        Self::with_interval(json_path, base, Duration::from_secs(10))
+        Self::with_interval(json_path, Duration::from_secs(10))
     }
 
     /// Creates a new [`OnDiskJsonAggregateMonitor`] with custom update interval
-    pub fn with_interval<P>(json_path: P, base: M, update_interval: Duration) -> Self
+    pub fn with_interval<P>(json_path: P, update_interval: Duration) -> Self
     where
         P: Into<PathBuf>,
     {
         Self {
-            base,
             json_path: json_path.into(),
             last_update: current_time() - update_interval,
             update_interval,

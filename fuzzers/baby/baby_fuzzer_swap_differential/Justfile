@@ -1,5 +1,5 @@
 FUZZER_NAME := 'fuzzer_sd'
-PROJECT_DIR := invocation_directory_native()
+PROJECT_DIR := absolute_path(".")
 PROFILE := 'release'
 PROFILE_DIR := 'release'
 CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
