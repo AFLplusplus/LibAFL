@@ -157,7 +157,7 @@ where
                 client_stats_manager.update_client_stats_for(client_id, |client_stat| {
                     client_stat.update_user_stats(name.clone(), value.clone());
                 });
-                client_stats_manager.aggregate(name);
+                client_stats_manager.aggregate(name.clone());
                 monitor.display(client_stats_manager, event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }

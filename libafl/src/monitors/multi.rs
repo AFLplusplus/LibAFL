@@ -6,7 +6,7 @@ use core::{
     time::Duration,
 };
 
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::{current_time, ClientId};
 
 use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
 
@@ -45,15 +45,16 @@ where
             String::new()
         };
         let head = format!("{event_msg}{pad} {sender}");
+        let global_stats = client_stats_manager.global_stats();
         let mut global_fmt = format!(
             "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
-            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
-            client_stats_manager.client_stats_count(),
-            client_stats_manager.corpus_size(),
-            client_stats_manager.objective_size(),
-            client_stats_manager.total_execs(),
-            client_stats_manager.execs_per_sec_pretty()
+            global_stats.run_time_pretty,
+            global_stats.client_stats_count,
+            global_stats.corpus_size,
+            global_stats.objective_size,
+            global_stats.total_execs,
+            global_stats.execs_per_sec_pretty
         );
         for (key, val) in client_stats_manager.aggregated() {
             write!(global_fmt, ", {key}: {val}").unwrap();
@@ -70,9 +71,13 @@ where
         let pad = " ".repeat(head.len());
         let mut fmt = format!(
             " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            pad, client.corpus_size, client.objective_size, client.executions, exec_sec
+            pad,
+            client.corpus_size(),
+            client.objective_size(),
+            client.executions(),
+            exec_sec
         );
-        for (key, val) in &client.user_stats {
+        for (key, val) in client.user_stats() {
             write!(fmt, ", {key}: {val}").unwrap();
         }
         (self.print_fn)(&fmt);

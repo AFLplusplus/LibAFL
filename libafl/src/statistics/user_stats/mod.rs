@@ -1,7 +1,7 @@
 //! User-defined statistics
 
 mod user_stats_value;
-use alloc::string::ToString;
+use alloc::borrow::Cow;
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -59,11 +59,14 @@ pub enum AggregatorOps {
 }
 
 /// Aggregate user statistics according to their ops
-pub(super) fn aggregate_user_stats(client_stats_manager: &mut ClientStatsManager, name: &str) {
+pub(super) fn aggregate_user_stats(
+    client_stats_manager: &mut ClientStatsManager,
+    name: Cow<'static, str>,
+) {
     let mut gather = client_stats_manager
         .client_stats()
         .iter()
-        .filter_map(|client| client.user_stats.get(name));
+        .filter_map(|client| client.user_stats.get(name.as_ref()));
 
     let gather_count = gather.clone().count();
 
@@ -119,5 +122,5 @@ pub(super) fn aggregate_user_stats(client_stats_manager: &mut ClientStatsManager
 
     client_stats_manager
         .cached_aggregated_user_stats
-        .insert(name.to_string(), init);
+        .insert(name, init);
 }
