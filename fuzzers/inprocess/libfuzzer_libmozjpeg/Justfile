@@ -1,0 +1,92 @@
+FUZZER_NAME := 'fuzzer_mozjpeg'
+PROJECT_DIR := absolute_path(".")
+PROFILE := env("PROFILE", "release")
+PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
+LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
+
+
+alias cc := cxx
+
+[linux]
+[macos]
+mozjpg:
+    #!/bin/bash
+    if [ ! -f v4.0.3.tar.gz ]; then
+        wget https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz
+    fi
+    tar -xzvf v4.0.3.tar.gz
+
+[windows]
+mozjpg:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+cxx:
+    cargo build --profile {{PROFILE}}
+
+[windows]
+cxx:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+lib: mozjpg cxx
+    #!/bin/bash
+    cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DPNG_SUPPORTED=false -DCMAKE_C_COMPILER="{{LIBAFL_CC}}" -DCMAKE_CXX_COMPILER="{{LIBAFL_CXX}}" -G "Unix Makefiles"
+    cd {{PROJECT_DIR}}
+    make -C mozjpeg-4.0.3
+
+[windows]
+lib:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+fuzzer: lib cxx
+    pwd
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/mozjpeg-4.0.3/libjpeg.a {{PROJECT_DIR}}/mozjpeg-4.0.3/libturbojpeg.a -I {{PROJECT_DIR}}/mozjpeg-4.0.3/ -o {{FUZZER_NAME}} -lm -lz
+
+[windows]
+fuzzer:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+run: fuzzer
+    #!/bin/bash
+    ./{{FUZZER_NAME}} &
+    sleep 0.2
+    ./{{FUZZER_NAME}}
+
+[windows]
+run: fuzzer
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+test: fuzzer
+    #!/bin/bash
+    rm -rf libafl_unix_shmem_server || true
+    (timeout 31s ./{{FUZZER_NAME}} | tee fuzz_stdout.log 2>/dev/null || true) &
+    sleep 0.2
+    timeout 30s ./{{FUZZER_NAME}} >/dev/null 2>/dev/null || true
+    if grep -qa "corpus: 30" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+[windows]
+test: fuzzer
+    echo "Unsupported on this platform"
+
+clean:
+    rm -rf {{FUZZER_NAME}}
+    make -C mozjpeg-4.0.3 clean || true
+    cargo clean
+
