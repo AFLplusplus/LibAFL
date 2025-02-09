@@ -39,7 +39,7 @@ build_unicorn_mode: build_afl
     cd ../..
 
 
-test_unix: build_afl test_instr test_cmplog test_frida test_qemu test_unicorn_mode test_instr_fuzzbench
+test: build_afl test_instr test_cmplog test_frida test_qemu test_unicorn_mode test_instr_fuzzbench
     #!/bin/bash
     echo done
 
