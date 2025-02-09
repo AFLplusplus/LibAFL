@@ -27,7 +27,7 @@ use frida_gum::{
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
-use libafl_bolts::{cli::FuzzerOptions, get_thread_id};
+use libafl_bolts::{cli::FuzzerOptions, get_thread_id, has_tls};
 use libc::wchar_t;
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
@@ -60,61 +60,6 @@ extern "C" {
 #[cfg(not(target_vendor = "apple"))]
 extern "C" {
     fn tls_ptr() -> *const c_void;
-}
-
-#[cfg(target_os = "windows")]
-#[repr(C)]
-#[allow(clippy::upper_case_acronyms)]
-struct TEB {
-    reserved1: [u8; 0x58],
-    tls_pointer: *mut *mut u8,
-    reserved2: [u8; 0xC0],
-}
-
-#[cfg(target_arch = "x86_64")]
-#[inline(always)]
-#[cfg(target_os = "windows")]
-fn nt_current_teb() -> *mut TEB {
-    use std::arch::asm;
-    let teb: *mut TEB;
-    unsafe {
-        asm!("mov {}, gs:0x30", out(reg) teb);
-    }
-    teb
-}
-
-/// Some of our hooks can be invoked from threads that do not have TLS yet.
-/// Many Rust and Frida functions require TLS to be set up, so we need to check if we have TLS.
-/// This was observed on Windows, so for now for other platforms we assume that we have TLS.
-#[inline]
-#[allow(unreachable_code)]
-fn has_tls() -> bool {
-    #[cfg(target_os = "windows")]
-    unsafe {
-        let teb = nt_current_teb();
-        if teb.is_null() {
-            return false;
-        }
-
-        let tls_array = (*teb).tls_pointer;
-        if tls_array.is_null() {
-            return false;
-        }
-        return true;
-    }
-    #[cfg(target_arch = "aarch64")]
-    unsafe {
-        let mut tid: u64;
-        std::arch::asm!(
-            "mrs {tid}, TPIDRRO_EL0",
-            tid = out(reg) tid,
-        );
-        tid &= 0xffff_ffff_ffff_fff8;
-        let tlsptr = tid as *const u64;
-        return tlsptr.add(0x102).read() != 0u64;
-    }
-    // Default
-    true
 }
 
 // Reentrancy guard for the hooks
