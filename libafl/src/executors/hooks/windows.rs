@@ -36,9 +36,10 @@ pub mod windows_asan_handler {
         let data = &raw mut GLOBAL_STATE;
         (*data).set_in_handler(true);
 
-        if in_handler {
-            panic!("We crashed inside a asan death handler, but this should never happen!");
-        }
+        assert!(
+            !in_handler,
+            "We crashed inside a asan death handler, but this should never happen!"
+        );
 
         // Have we set a timer_before?
         if (*data).ptp_timer.is_some() {
@@ -165,9 +166,10 @@ pub mod windows_exception_handler {
                 let data = &raw mut GLOBAL_STATE;
                 let in_handler = (*data).set_in_handler(true);
 
-                if in_handler {
-                    panic!("We crashed inside a crash handler, but this should never happen!");
-                }
+                assert!(
+                    !in_handler,
+                    "We crashed inside a crash handler, but this should never happen!"
+                );
 
                 if !(*data).crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute((*data).crash_handler);
@@ -204,9 +206,10 @@ pub mod windows_exception_handler {
             let data = &raw mut GLOBAL_STATE;
             let in_handler = (*data).set_in_handler(true);
 
-            if in_handler {
-                panic!("We crashed inside a panic hook, but this should never happen!");
-            }
+            assert!(
+                !in_hanlder,
+                "We crashed inside a panic hook, but this should never happen!"
+            );
 
             // Have we set a timer_before?
             if (*data).ptp_timer.is_some() {

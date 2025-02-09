@@ -53,9 +53,10 @@ pub mod unix_signal_handler {
                 let data = &raw mut GLOBAL_STATE;
                 let in_handler = (*data).set_in_handler(true);
 
-                if in_handler {
-                    panic!("We crashed inside a crash handler, but this should never happen!")
-                }
+                assert!(
+                    !in_handler,
+                    "We crashed inside a crash handler, but this should never happen!"
+                );
 
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
@@ -97,9 +98,10 @@ pub mod unix_signal_handler {
             let data = &raw mut GLOBAL_STATE;
             let in_handler = (*data).set_in_handler(true);
 
-            if in_handler {
-                panic!("We crashed inside a crash panic hook, but this should never happen!")
-            }
+            assert!(
+                !in_handler,
+                "We crashed inside a crash panic hook, but this should never happen!"
+            );
 
             if (*data).is_valid() {
                 // We are fuzzing!
