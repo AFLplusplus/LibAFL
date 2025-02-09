@@ -21,8 +21,6 @@ echo "Testing" "$fuzzer_to_test"
 # build with a shared target dir for all fuzzers. this should speed up
 # compilation a bit, and allows for easier artifact management (caching and
 # cargo clean).
-export CARGO_TARGET_DIR="$libafl/target"
-mkdir -p "$CARGO_TARGET_DIR"
 
 git submodule init && git submodule update
 
