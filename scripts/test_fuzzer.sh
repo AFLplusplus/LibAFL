@@ -15,8 +15,6 @@ else
     export PROFILE_DIR=debug
 fi
 
-libafl=$(pwd)
-
 echo "Testing" "$fuzzer_to_test"
 # build with a shared target dir for all fuzzers. this should speed up
 # compilation a bit, and allows for easier artifact management (caching and
