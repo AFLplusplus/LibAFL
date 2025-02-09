@@ -202,7 +202,7 @@ where
                 .custom_stat
                 .get_or_create(&Labels {
                     client: Cow::from("global"),
-                    stat: Cow::from(key.clone()),
+                    stat: key.clone(),
                 })
                 .set(value);
         }
