@@ -854,7 +854,6 @@ where
         manager: &mut EM,
     ) -> Result<CorpusId, Error> {
         // Init timer for scheduler
-        println!("fuzz one");
         #[cfg(feature = "introspection")]
         state.introspection_stats_mut().start_timer();
 

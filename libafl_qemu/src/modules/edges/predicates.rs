@@ -378,10 +378,10 @@ where
         for (addr, mi) in mins {
             map.add_mins(addr, mi, self.was_crash);
         }
-        // map.synthesize();
+        map.synthesize();
         // println!("{:#?}", map.max);
         // println!("{:#?}", map.min);
-        // map.show();
+        map.show();
         Ok(())
     }
 }

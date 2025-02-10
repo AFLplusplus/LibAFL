@@ -56,6 +56,9 @@ use libafl_qemu::{
     Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
+
+use libafl_qemu::modules::{asan::AsanModuleBuilder, tracer::TracerModule, edges::{PredicateFeedback, Tracer}};
+
 #[cfg(unix)]
 use nix::unistd::dup;
 
