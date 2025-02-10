@@ -5,7 +5,10 @@ pub mod manager;
 pub mod perf_stats;
 pub mod user_stats;
 
-use alloc::{borrow::Cow, string::String};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 use core::time::Duration;
 
 use hashbrown::HashMap;
@@ -13,6 +16,8 @@ use libafl_bolts::current_time;
 #[cfg(feature = "introspection")]
 use perf_stats::ClientPerfStats;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use serde_json::Value;
 use user_stats::UserStats;
 
 #[cfg(feature = "afl_exec_sec")]
@@ -22,38 +27,164 @@ const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ClientStats {
     /// If this client is enabled. This is set to `true` the first time we see this client.
-    pub enabled: bool,
+    enabled: bool,
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
-    pub corpus_size: u64,
+    corpus_size: u64,
     /// The time for the last update of the corpus size
-    pub last_corpus_time: Duration,
+    last_corpus_time: Duration,
     /// The total executions for this client
-    pub executions: u64,
+    executions: u64,
     /// The number of executions of the previous state in case a client decrease the number of execution (e.g when restarting without saving the state)
-    pub prev_state_executions: u64,
+    prev_state_executions: u64,
     /// The size of the objectives corpus for this client
-    pub objective_size: u64,
+    objective_size: u64,
     /// The time for the last update of the objective size
-    pub last_objective_time: Duration,
+    last_objective_time: Duration,
     /// The last reported executions for this client
     #[cfg(feature = "afl_exec_sec")]
-    pub last_window_executions: u64,
+    last_window_executions: u64,
     /// The last executions per sec
     #[cfg(feature = "afl_exec_sec")]
-    pub last_execs_per_sec: f64,
+    last_execs_per_sec: f64,
     /// The last time we got this information
-    pub last_window_time: Duration,
+    last_window_time: Duration,
     /// the start time of the client
-    pub start_time: Duration,
+    start_time: Duration,
     /// User-defined stats
-    pub user_stats: HashMap<Cow<'static, str>, UserStats>,
+    user_stats: HashMap<Cow<'static, str>, UserStats>,
     /// Client performance statistics
     #[cfg(feature = "introspection")]
     pub introspection_stats: ClientPerfStats,
+    // This field is marked as skip_serializing and skip_deserializing,
+    // which means when deserializing, its default value, i.e. all stats
+    // is updated, will be filled in this field. This could help preventing
+    // something unexpected, since when we find they all need update, we will
+    // always invalid the cache.
+    /// Status of current client stats. This field is used to check
+    /// the validation of current cached global stats.
+    #[serde(skip_serializing, skip_deserializing)]
+    stats_status: ClientStatsStatus,
+}
+
+/// Status of client status
+#[derive(Debug, Clone)]
+struct ClientStatsStatus {
+    /// Basic stats, which could affect the global stats, have been updated
+    basic_stats_updated: bool,
+}
+
+impl Default for ClientStatsStatus {
+    fn default() -> Self {
+        ClientStatsStatus {
+            basic_stats_updated: true,
+        }
+    }
+}
+
+/// Data struct to process timings
+#[derive(Debug, Default, Clone)]
+pub struct ProcessTiming {
+    /// The start time
+    pub client_start_time: Duration,
+    /// The executions speed
+    pub exec_speed: String,
+    /// Timing of the last new corpus entry
+    pub last_new_entry: Duration,
+    /// Timing of the last new solution
+    pub last_saved_solution: Duration,
+}
+
+impl ProcessTiming {
+    /// Create a new [`ProcessTiming`] struct
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            exec_speed: "0".to_string(),
+            ..Default::default()
+        }
+    }
+}
+
+/// The geometry of a single data point
+#[expect(missing_docs)]
+#[derive(Debug, Default, Clone)]
+pub struct ItemGeometry {
+    pub pending: u64,
+    pub pend_fav: u64,
+    pub own_finds: u64,
+    pub imported: u64,
+    pub stability: String,
+}
+
+impl ItemGeometry {
+    /// Create a new [`ItemGeometry`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            stability: "0%".to_string(),
+            ..Default::default()
+        }
+    }
 }
 
 impl ClientStats {
+    /// If this client is enabled. This is set to `true` the first time we see this client.
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+    /// The corpus size for this client
+    #[must_use]
+    pub fn corpus_size(&self) -> u64 {
+        self.corpus_size
+    }
+    /// The total executions for this client
+    #[must_use]
+    pub fn last_corpus_time(&self) -> Duration {
+        self.last_corpus_time
+    }
+    /// The total executions for this client
+    #[must_use]
+    pub fn executions(&self) -> u64 {
+        self.executions
+    }
+    /// The number of executions of the previous state in case a client decrease the number of execution (e.g when restarting without saving the state)
+    #[must_use]
+    pub fn prev_state_executions(&self) -> u64 {
+        self.prev_state_executions
+    }
+    /// The size of the objectives corpus for this client
+    #[must_use]
+    pub fn objective_size(&self) -> u64 {
+        self.objective_size
+    }
+    /// The time for the last update of the objective size
+    #[must_use]
+    pub fn last_objective_time(&self) -> Duration {
+        self.last_objective_time
+    }
+    /// The last time we got this information
+    #[must_use]
+    pub fn last_window_time(&self) -> Duration {
+        self.last_window_time
+    }
+    /// the start time of the client
+    #[must_use]
+    pub fn start_time(&self) -> Duration {
+        self.start_time
+    }
+    /// User-defined stats
+    #[must_use]
+    pub fn user_stats(&self) -> &HashMap<Cow<'static, str>, UserStats> {
+        &self.user_stats
+    }
+
+    /// Clear current stats status. This is used before user update `ClientStats`.
+    fn clear_stats_status(&mut self) {
+        self.stats_status.basic_stats_updated = false;
+    }
+
     /// We got new information about executions for this client, insert them.
     #[cfg(feature = "afl_exec_sec")]
     pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
@@ -70,6 +201,7 @@ impl ClientStats {
             self.prev_state_executions = self.executions;
         }
         self.executions = self.prev_state_executions + executions;
+        self.stats_status.basic_stats_updated = true;
     }
 
     /// We got a new information about executions for this client, insert them.
@@ -80,19 +212,24 @@ impl ClientStats {
             self.prev_state_executions = self.executions;
         }
         self.executions = self.prev_state_executions + executions;
+        self.stats_status.basic_stats_updated = true;
     }
 
     /// We got new information about corpus size for this client, insert them.
     pub fn update_corpus_size(&mut self, corpus_size: u64) {
         self.corpus_size = corpus_size;
         self.last_corpus_time = current_time();
+        self.stats_status.basic_stats_updated = true;
     }
 
     /// We got a new information about objective corpus size for this client, insert them.
     pub fn update_objective_size(&mut self, objective_size: u64) {
         self.objective_size = objective_size;
+        self.stats_status.basic_stats_updated = true;
     }
 
+    // This will not update stats status, since the value this function changed
+    // does not affect global stats.
     /// Get the calculated executions per second for this client
     #[expect(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(feature = "afl_exec_sec")]
@@ -124,6 +261,7 @@ impl ClientStats {
         self.last_execs_per_sec
     }
 
+    // This will not update stats status, since there is no value changed
     /// Get the calculated executions per second for this client
     #[expect(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(not(feature = "afl_exec_sec"))]
@@ -142,11 +280,15 @@ impl ClientStats {
         (self.executions as f64) / elapsed
     }
 
+    // This will not update stats status, since the value this function changed
+    // does not affect global stats.
     /// Executions per second
     pub fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
         prettify_float(self.execs_per_sec(cur_time))
     }
 
+    // This will not update stats status, since the value this function changed
+    // does not affect global stats.
     /// Update the user-defined stat with name and value
     pub fn update_user_stats(
         &mut self,
@@ -156,8 +298,8 @@ impl ClientStats {
         self.user_stats.insert(name, value)
     }
 
-    #[must_use]
     /// Get a user-defined stat using the name
+    #[must_use]
     pub fn get_user_stats(&self, name: &str) -> Option<&UserStats> {
         self.user_stats.get(name)
     }
@@ -166,6 +308,72 @@ impl ClientStats {
     #[cfg(feature = "introspection")]
     pub fn update_introspection_stats(&mut self, introspection_stats: ClientPerfStats) {
         self.introspection_stats = introspection_stats;
+    }
+
+    /// Get process timing of current client.
+    pub fn process_timing(&mut self) -> ProcessTiming {
+        let client_start_time = self.start_time();
+        let last_new_entry = if self.last_corpus_time() > self.start_time() {
+            self.last_corpus_time() - self.start_time()
+        } else {
+            Duration::default()
+        };
+
+        let last_saved_solution = if self.last_objective_time() > self.start_time() {
+            self.last_objective_time() - self.start_time()
+        } else {
+            Duration::default()
+        };
+
+        let exec_speed = self.execs_per_sec_pretty(current_time());
+
+        ProcessTiming {
+            client_start_time,
+            exec_speed,
+            last_new_entry,
+            last_saved_solution,
+        }
+    }
+
+    /// Get map density of current client
+    #[must_use]
+    pub fn map_density(&self) -> String {
+        self.get_user_stats("edges")
+            .map_or("0%".to_string(), ToString::to_string)
+    }
+
+    /// Get item geometry of current client
+    #[cfg(feature = "std")]
+    #[must_use]
+    pub fn item_geometry(&self) -> ItemGeometry {
+        let default_json = serde_json::json!({
+            "pending": 0,
+            "pend_fav": 0,
+            "imported": 0,
+            "own_finds": 0,
+        });
+        let afl_stats = self
+            .get_user_stats("AflStats")
+            .map_or(default_json.to_string(), ToString::to_string);
+
+        let afl_stats_json: Value =
+            serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
+        let pending = afl_stats_json["pending"].as_u64().unwrap_or_default();
+        let pend_fav = afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
+        let imported = afl_stats_json["imported"].as_u64().unwrap_or_default();
+        let own_finds = afl_stats_json["own_finds"].as_u64().unwrap_or_default();
+
+        let stability = self
+            .get_user_stats("stability")
+            .map_or("0%".to_string(), ToString::to_string);
+
+        ItemGeometry {
+            pending,
+            pend_fav,
+            own_finds,
+            imported,
+            stability,
+        }
     }
 }
 

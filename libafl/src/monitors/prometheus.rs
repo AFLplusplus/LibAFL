@@ -37,7 +37,7 @@ use std::{
 
 // using thread in order to start the HTTP server in a separate thread
 use futures::executor::block_on;
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::{current_time, ClientId};
 // using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::{
     encoding::{text::encode, EncodeLabelSet},
@@ -102,8 +102,9 @@ where
         // require a fair bit of logic to handle "amount to increment given
         // time since last observation"
 
+        let global_stats = client_stats_manager.global_stats();
         // Global (aggregated) metrics
-        let corpus_size = client_stats_manager.corpus_size();
+        let corpus_size = global_stats.corpus_size;
         self.prometheus_global_stats
             .corpus_count
             .get_or_create(&Labels {
@@ -112,7 +113,7 @@ where
             })
             .set(corpus_size.try_into().unwrap());
 
-        let objective_size = client_stats_manager.objective_size();
+        let objective_size = global_stats.objective_size;
         self.prometheus_global_stats
             .objective_count
             .get_or_create(&Labels {
@@ -121,7 +122,7 @@ where
             })
             .set(objective_size.try_into().unwrap());
 
-        let total_execs = client_stats_manager.total_execs();
+        let total_execs = global_stats.total_execs;
         self.prometheus_global_stats
             .executions
             .get_or_create(&Labels {
@@ -130,7 +131,7 @@ where
             })
             .set(total_execs.try_into().unwrap());
 
-        let execs_per_sec = client_stats_manager.execs_per_sec();
+        let execs_per_sec = global_stats.execs_per_sec;
         self.prometheus_global_stats
             .exec_rate
             .get_or_create(&Labels {
@@ -139,7 +140,7 @@ where
             })
             .set(execs_per_sec);
 
-        let run_time = (current_time() - client_stats_manager.start_time()).as_secs();
+        let run_time = global_stats.run_time.as_secs();
         self.prometheus_global_stats
             .runtime
             .get_or_create(&Labels {
@@ -148,10 +149,7 @@ where
             })
             .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
 
-        let total_clients = client_stats_manager
-            .client_stats_count()
-            .try_into()
-            .unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
+        let total_clients = global_stats.client_stats_count.try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.prometheus_global_stats
             .clients_count
             .get_or_create(&Labels {
@@ -164,12 +162,12 @@ where
         let mut global_fmt = format!(
             "[Prometheus] [{} #GLOBAL] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
-            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
-            client_stats_manager.client_stats_count(),
-            client_stats_manager.corpus_size(),
-            client_stats_manager.objective_size(),
-            client_stats_manager.total_execs(),
-            client_stats_manager.execs_per_sec_pretty()
+            global_stats.run_time_pretty,
+            global_stats.client_stats_count,
+            global_stats.corpus_size,
+            global_stats.objective_size,
+            global_stats.total_execs,
+            global_stats.execs_per_sec_pretty
         );
         for (key, val) in client_stats_manager.aggregated() {
             // print global aggregated custom stats
@@ -204,7 +202,7 @@ where
                 .custom_stat
                 .get_or_create(&Labels {
                     client: Cow::from("global"),
-                    stat: Cow::from(key.clone()),
+                    stat: key.clone(),
                 })
                 .set(value);
         }
@@ -223,7 +221,7 @@ where
                 client: Cow::from(sender_id.0.to_string()),
                 stat: Cow::from(""),
             })
-            .set(cur_client_clone.corpus_size.try_into().unwrap());
+            .set(cur_client_clone.corpus_size().try_into().unwrap());
 
         self.prometheus_client_stats
             .objective_count
@@ -231,7 +229,7 @@ where
                 client: Cow::from(sender_id.0.to_string()),
                 stat: Cow::from(""),
             })
-            .set(cur_client_clone.objective_size.try_into().unwrap());
+            .set(cur_client_clone.objective_size().try_into().unwrap());
 
         self.prometheus_client_stats
             .executions
@@ -239,7 +237,7 @@ where
                 client: Cow::from(sender_id.0.to_string()),
                 stat: Cow::from(""),
             })
-            .set(cur_client_clone.executions.try_into().unwrap());
+            .set(cur_client_clone.executions().try_into().unwrap());
 
         self.prometheus_client_stats
             .exec_rate
@@ -249,7 +247,7 @@ where
             })
             .set(cur_client_clone.execs_per_sec(current_time()));
 
-        let client_run_time = (current_time() - cur_client_clone.start_time).as_secs();
+        let client_run_time = (current_time() - cur_client_clone.start_time()).as_secs();
         self.prometheus_client_stats
             .runtime
             .get_or_create(&Labels {
@@ -270,13 +268,13 @@ where
             "[Prometheus] [{} #{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id.0,
-            client.corpus_size,
-            client.objective_size,
-            client.executions,
+            client.corpus_size(),
+            client.objective_size(),
+            client.executions(),
             cur_client_clone.execs_per_sec_pretty(current_time())
         );
 
-        for (key, val) in cur_client_clone.user_stats {
+        for (key, val) in cur_client_clone.user_stats() {
             // print the custom stats for each client
             write!(fmt, ", {key}: {val}").unwrap();
             // Update metrics added to the user_stats hashmap by feedback event-fires
