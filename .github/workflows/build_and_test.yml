@@ -429,7 +429,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_libpng
-        run: cd fuzzers/binary_only/frida_libpng/ && cargo make test
+        run: cd fuzzers/binary_only/frida_libpng/ && just test
 
   windows-libfuzzer-stb-image:
     runs-on: windows-latest
@@ -471,7 +471,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/tinyinst_simple
-        run: cd fuzzers/binary_only/tinyinst_simple/ && cargo make test
+        run: cd fuzzers/binary_only/tinyinst_simple/ && just test
 
   windows-clippy:
     runs-on: windows-latest
