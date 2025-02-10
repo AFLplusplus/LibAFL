@@ -111,6 +111,7 @@ impl ClientStatsManager {
     }
 
     /// Aggregate user-defined stats
+    #[allow(clippy::ptr_arg)]
     pub fn aggregate(&mut self, name: &Cow<'static, str>) {
         super::user_stats::aggregate_user_stats(self, name);
     }
@@ -164,9 +165,7 @@ impl ClientStatsManager {
             .client_stats
             .iter_mut()
             .fold(0.0, |acc, x| acc + x.execs_per_sec(cur_time));
-        global_stats
-            .execs_per_sec_pretty
-            .push_str(&super::prettify_float(global_stats.execs_per_sec));
+        global_stats.execs_per_sec_pretty = super::prettify_float(global_stats.execs_per_sec);
 
         global_stats
     }

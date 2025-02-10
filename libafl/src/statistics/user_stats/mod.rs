@@ -58,7 +58,10 @@ pub enum AggregatorOps {
     Max,
 }
 
+// clippy::ptr_arg is allowed here to avoid one unnecessary deep clone when
+// inserting name into user_stats HashMap.
 /// Aggregate user statistics according to their ops
+#[allow(clippy::ptr_arg)]
 pub(super) fn aggregate_user_stats(
     client_stats_manager: &mut ClientStatsManager,
     name: &Cow<'static, str>,
