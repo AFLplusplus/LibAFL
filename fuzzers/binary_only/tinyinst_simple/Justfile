@@ -37,4 +37,4 @@ test: harness fuzzer
     copy .\target\{{PROFILE_DIR}}\tinyinst_simple.exe .
     start "" .\tinyinst_simple.exe
     ping -n 10 127.0.0.1>NUL && taskkill /im tinyinst_simple.exe /F
-    dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
+    dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
