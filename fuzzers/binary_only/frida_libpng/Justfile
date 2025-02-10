@@ -3,6 +3,7 @@ import "../../../just/libafl.just"
 FUZZER_NAME := "frida_fuzzer"
 
 set windows-shell := ['cmd.exe', '/c']
+set unstable
 
 [unix]
 libpng:
