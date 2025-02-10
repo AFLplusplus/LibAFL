@@ -16,6 +16,7 @@ lib: libpng
 [unix]
 harness: lib
     clang++ -O0 -c -fPIC harness.cc -o harness.o
+    clang++ -O0 harness.cc libpng-1.6.37/.libs/libpng16.a -lz -o libpng-harness -g
 
 [unix]
 build:

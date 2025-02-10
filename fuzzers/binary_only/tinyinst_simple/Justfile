@@ -1,7 +1,7 @@
 import "../../../just/libafl.just"
 FUZZER_NAME := "tinyinst_simple"
 
-set windows-shell = ["cmd.exe", "/c"]
+set windows-shell := ["cmd.exe", "/c"]
 [linux]
 harness:
     clang test/test.cpp -o test.exe

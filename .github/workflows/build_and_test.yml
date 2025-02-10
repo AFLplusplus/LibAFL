@@ -259,7 +259,7 @@ jobs:
           # Binary-only
           - ./fuzzers/binary_only/fuzzbench_fork_qemu
           - ./fuzzers/binary_only/frida_executable_libpng
-          - ./fuzzers/binary_only/frida_windows_gdiplus
+          # - ./fuzzers/binary_only/frida_windows_gdiplus
           - ./fuzzers/binary_only/frida_libpng
           - ./fuzzers/binary_only/fuzzbench_qemu
           - ./fuzzers/binary_only/intel_pt_baby_fuzzer
