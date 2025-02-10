@@ -21,7 +21,6 @@ run: build harness
     .\{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}} -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
 
 [windows]
-[script]
 test_cmplog: build harness_cmplog_test
     @echo off
 
@@ -30,18 +29,16 @@ test_cmplog: build harness_cmplog_test
       rmdir /s /q output_%%i
       start ".\{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}}" -H cmplog.dll -i corpus -o output_%%i --libs-to-instrument cmplog.dll -F %%i -C
       ping -n 3 127.0.0.1>NUL && taskkill /im {{ FUZZER }} /F
-      >nul 2>nul dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
+      dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
     )
 
     echo All tests done
 
-[script]
 [windows]
 test: build harness
     start "" ".\{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}}" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
-    #ping is for timeout
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_windows_gdiplus.exe /F
-    >nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
+    dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
 
 [unix]
 clean:
