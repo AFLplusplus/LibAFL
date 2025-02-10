@@ -102,18 +102,66 @@ harness arch=DEFAULT_ARCH: (libpng arch)
         -I"{{TARGET_DIR}}/build-zlib/zlib/lib" \
         -L"{{TARGET_DIR}}/build-zlib/zlib/lib" \
         -o"{{ HARNESS }}" \
-        -lm -static
+        -lm
 
 [unix]
 run arch=DEFAULT_ARCH: (harness arch) (build arch)
     {{ FUZZER }} \
-        --output ./output \
         --input ./corpus \
-        --verbose \
-        -- {{ HARNESS }}
+        --output ${TARGET_DIR}/output/ \
+        --log ${TARGET_DIR}/output/log.txt \
+        --cores 0-7 \
+        --asan-cores 0-3 \
+        --cmplog-cores 2-5 \
+        --iterations 1000000 \
+        --tui \
+        -- \
+        {{ HARNESS }}
+
 
 [unix]
-test: (run "x86_64") (run "arm")
+test_inner arch=DEFAULT_ARCH : (run arch)
+    #!/bin/bash
+
+    export QEMU_LAUNCHER={{ FUZZER }}
+
+    ./tests/injection/test.sh || exit 1
+
+    # complie again with simple mgr
+    cargo build --profile={{PROFILE}} --features="simplemgr" --target-dir={{ TARGET_DIR }}
+    ./tests/qasan/test.sh || exit 1
+
+[unix]
+test: (test_inner "x86_64") (test_inner "arm")
+
+single arch=DEFAULT_ARCH: (harness arch) (build arch)
+    {{ FUZZER }} \
+        --input ./corpus \
+        --output ${TARGET_DIR}/output/ \
+        --log {{ TARGET_DIR }}/output/log.txt \
+        --cores 0 \
+        -- \
+        {{ HARNESS }}
+
+asan arch=DEFAULT_ARCH: (harness arch) (build arch)
+    {{ FUZZER }} \
+        --input ./corpus \
+        --output ${TARGET_DIR}/output/ \
+        --log {{ TARGET_DIR }}/output/log.txt \
+        --cores 0 \
+        --asan-cores 0 \
+        -- \
+        {{ HARNESS }}
+
+asan_guest arch=DEFAULT_ARCH: (harness arch) (build arch)
+    {{ FUZZER }} \
+        --input ./corpus \
+        --output ${TARGET_DIR}/output/ \
+        --log {{ TARGET_DIR }}/output/log.txt \
+        --cores 0 \
+        --asan-guest-cores 0 \
+        -- \
+        {{ HARNESS }}
 
 [unix]
 clean:
