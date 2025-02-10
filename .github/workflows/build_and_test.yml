@@ -431,7 +431,7 @@ jobs:
       - name: Build fuzzers/binary_only/frida_libpng
         run: cd fuzzers/binary_only/frida_libpng/ && cargo make test
 
-  windows-frida-libfuzzer-stb-image:
+  windows-libfuzzer-stb-image:
     runs-on: windows-latest
     needs:
       - common
@@ -440,6 +440,16 @@ jobs:
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/inprocess/libfuzzer_stb_image
         run: cd fuzzers/inprocess/libfuzzer_stb_image && just test
+
+  windows-libfuzzer-asan:
+    runs-on: windows-latest
+    needs:
+      - common
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/inprocess/libfuzzer_windows_asan
+        run: cd fuzzers/inprocess/libfuzzer_windows_asan && just test
 
   windows-frida-gdiplus:
     runs-on: windows-latest
