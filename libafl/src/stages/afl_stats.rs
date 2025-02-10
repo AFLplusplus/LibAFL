@@ -24,11 +24,9 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
-    events::{
-        stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
-        Event, EventFirer,
-    },
+    events::{Event, EventFirer},
     executors::HasObservers,
+    monitors::stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},

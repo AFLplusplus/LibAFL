@@ -27,7 +27,7 @@ mod stack;
 pub use stack::StageStack;
 
 #[cfg(feature = "introspection")]
-use crate::events::stats::perf_stats::ClientPerfStats;
+use crate::monitors::stats::perf_stats::ClientPerfStats;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},

@@ -13,8 +13,6 @@ pub use centralized::*;
 #[cfg(feature = "std")]
 pub mod launcher;
 
-pub mod stats;
-
 pub mod llmp;
 pub use llmp::*;
 #[cfg(feature = "tcp_manager")]
@@ -47,9 +45,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
-    events::stats::user_stats::UserStats,
     executors::ExitKind,
     inputs::Input,
+    monitors::stats::user_stats::UserStats,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
     Error, HasMetadata,
 };
@@ -109,7 +107,7 @@ pub struct EventManagerId(
 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
-use crate::events::stats::perf_stats::ClientPerfStats;
+use crate::monitors::stats::perf_stats::ClientPerfStats;
 use crate::{observers::TimeObserver, stages::HasCurrentStageId};
 
 /// The log event severity

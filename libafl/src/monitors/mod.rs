@@ -3,6 +3,8 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
+pub mod stats;
+
 #[cfg(feature = "std")]
 pub mod disk;
 #[cfg(feature = "std")]
@@ -30,7 +32,7 @@ use libafl_bolts::ClientId;
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub use prometheus::PrometheusMonitor;
 
-use crate::events::stats::manager::ClientStatsManager;
+use crate::monitors::stats::manager::ClientStatsManager;
 
 /// The monitor trait keeps track of all the client's monitor, and offers methods to display them.
 pub trait Monitor {

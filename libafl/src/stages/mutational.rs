@@ -10,7 +10,7 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 use libafl_bolts::{rands::Rand, Named};
 
 #[cfg(feature = "introspection")]
-use crate::events::stats::perf_stats::PerfFeature;
+use crate::monitors::stats::perf_stats::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,

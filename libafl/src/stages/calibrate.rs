@@ -14,14 +14,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
-    events::{
-        stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
-        Event, EventFirer, LogSeverity,
-    },
+    events::{Event, EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
     inputs::Input,
+    monitors::stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},

@@ -25,18 +25,21 @@ use serde::Serialize;
 use super::{std_on_restart, AwaitRestartSafe, ProgressReporter, RecordSerializationTime};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
-#[cfg(feature = "std")]
-use crate::{events::stats::ClientStats, monitors::SimplePrintingMonitor, state::HasSolutions};
 use crate::{
     events::{
-        stats::manager::ClientStatsManager, std_maybe_report_progress, std_report_progress,
-        BrokerEventResult, CanSerializeObserver, Event, EventFirer, EventManagerId, EventReceiver,
-        EventRestarter, HasEventManagerId, SendExiting,
+        std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
+        Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
+        SendExiting,
     },
-    monitors::Monitor,
+    monitors::{stats::manager::ClientStatsManager, Monitor},
     stages::HasCurrentStageId,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasMetadata,
+};
+#[cfg(feature = "std")]
+use crate::{
+    monitors::{stats::ClientStats, SimplePrintingMonitor},
+    state::HasSolutions,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it

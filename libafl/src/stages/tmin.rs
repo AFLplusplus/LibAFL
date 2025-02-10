@@ -14,10 +14,10 @@ use libafl_bolts::{
 };
 use serde::Serialize;
 
-#[cfg(feature = "introspection")]
-use crate::events::stats::perf_stats::PerfFeature;
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
+#[cfg(feature = "introspection")]
+use crate::monitors::stats::perf_stats::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
