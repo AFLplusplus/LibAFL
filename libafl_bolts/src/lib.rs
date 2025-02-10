@@ -1286,6 +1286,7 @@ fn nt_current_teb() -> *mut TEB {
 /// Some of our hooks can be invoked from threads that do not have TLS yet.
 /// Many Rust and Frida functions require TLS to be set up, so we need to check if we have TLS.
 /// This was observed on Windows, so for now for other platforms we assume that we have TLS.
+#[cfg(feature = "std")]
 #[inline]
 #[allow(unreachable_code)]
 #[must_use]
