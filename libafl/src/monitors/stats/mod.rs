@@ -15,7 +15,7 @@ use hashbrown::HashMap;
 use libafl_bolts::current_time;
 pub use manager::ClientStatsManager;
 #[cfg(feature = "introspection")]
-pub use perf_stats::ClientPerfStats;
+pub use perf_stats::{ClientPerfStats, PerfFeature};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use serde_json::Value;
