@@ -6,11 +6,10 @@ CROSS_CC := env("CROSS_CC", "x86_64-linux-gnu-gcc")
 CROSS_CXX := env("CROSS_CXX", "x86_64-linux-gnu-g++")
 CROSS_CFLAGS := env("CROSS_CFLAGS", "")
 
-ARCH := env("LIBPNG_ARCH", "x86_64")
+DEFAULT_ARCH := env("LIBPNG_ARCH", "x86_64")
 OPTIMIZATIONS := env("LIBPNG_OPTIMIZATIONS", "yes")
 
 DEPS_DIR := TARGET_DIR / "deps"
-ARCH_DIR := TARGET_DIR / ARCH
 
 HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
 
@@ -26,8 +25,8 @@ deps_dir:
     mkdir -p {{ DEPS_DIR }}
 
 [unix]
-arch_dir:
-    mkdir -p {{ ARCH_DIR }}
+arch_dir arch:
+    mkdir -p {{ arch }}
 
 [unix]
 zlib_wget: deps_dir
@@ -68,7 +67,7 @@ libpng_wget: deps_dir
         -C {{ DEPS_DIR }}
 
 [unix]
-libpng: arch_dir zlib libpng_wget
+libpng arch=DEFAULT_ARCH: (arch_dir arch) zlib libpng_wget
     rm -rf {{ TARGET_DIR }}/build-png/
 
     mkdir {{TARGET_DIR}}/build-png/
@@ -81,19 +80,19 @@ libpng: arch_dir zlib libpng_wget
             --enable-shared=no \
             --with-pic=yes \
             --enable-hardware-optimizations={{OPTIMIZATIONS}} \
-            --host={{ ARCH }} \
+            --host={{ arch }} \
 
     make -j
 
 [unix]
-build:
+build arch=DEFAULT_ARCH:
     cargo build
       --profile {{ PROFILE }}
-      --features {{ ARCH }}
+      --features {{ arch }}
       --target-dir {{ TARGET_DIR }}
 
 [unix]
-harness: libpng
+harness arch=DEFAULT_ARCH: (libpng arch)
     {{ CROSS_CXX }} \
         ./harness.cc \
         {{ CROSS_CFLAGS }} \
@@ -106,7 +105,7 @@ harness: libpng
         -lm -static
 
 [unix]
-run: harness
+run arch=DEFAULT_ARCH: (harness arch)
     {{ FUZZER }} \
         --output ./output \
         --input ./corpus \
