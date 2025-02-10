@@ -44,7 +44,7 @@ zlib_wget: deps_dir
 zlib: zlib_wget
     #!/bin/bash
 
-    rm -rf {{ TARGET_DIR1 }}/build-zlib/
+    rm -rf {{ TARGET_DIR }}/build-zlib/
 
     mkdir {{ TARGET_DIR }}/build-zlib/
 
@@ -86,9 +86,9 @@ libpng arch=DEFAULT_ARCH: (arch_dir arch) zlib libpng_wget
 
 [unix]
 build arch=DEFAULT_ARCH:
-    cargo build
-      --profile {{ PROFILE }}
-      --features {{ arch }}
+    cargo build \
+      --profile {{ PROFILE }} \
+      --features {{ arch }} \
       --target-dir {{ TARGET_DIR }}
 
 [unix]
@@ -113,8 +113,7 @@ run arch=DEFAULT_ARCH: (harness arch)
         -- {{ HARNESS }}
 
 [unix]
-test:
-    TODO
+test: (run "x86_64") (run "arm")
 
 [unix]
 clean:
