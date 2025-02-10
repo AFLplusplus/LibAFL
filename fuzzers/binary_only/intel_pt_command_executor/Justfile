@@ -23,5 +23,9 @@ run: build build_target setcap
     {{ FUZZER }}
 
 [unix]
+test: build
+    echo "Build is successful."
+
+[unix]
 clean:
     cargo clean
