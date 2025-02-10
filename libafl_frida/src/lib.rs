@@ -360,11 +360,6 @@ mod tests {
     };
     #[global_allocator]
     static GLOBAL: MiMalloc = MiMalloc;
-    // #[cfg(windows)]
-    // use dlmalloc::GlobalDlmalloc;
-    // #[cfg(windows)]
-    // #[global_allocator]
-    // static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
     static GUM: OnceLock<Gum> = OnceLock::new();
 

@@ -100,7 +100,6 @@ serial_test = { workspace = true, default-features = false, features = [
 clap = { workspace = true, features = ["derive"] }
 libloading = "0.8.5"
 mimalloc = { workspace = true, default-features = false }
-dlmalloc = { version = "0.2.6", features = ["global"] }
 
 [lints]
 workspace = true
