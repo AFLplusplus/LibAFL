@@ -4,7 +4,10 @@ FUZZER_NAME := "frida_fuzzer"
 
 [unix]
 libpng:
-    wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+    #!/bin/bash
+    if [ ! -f v1.6.37.tar.gz ]; then
+        wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+    fi
     tar -xvf v1.6.37.tar.gz
 
 [unix]
@@ -32,7 +35,7 @@ run: build harness
 
 [windows]
 run: build harness
-    {{ FUZZER }} -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
+    {{ FUZZER }} -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
 
 [unix]
 test: build harness
@@ -47,14 +50,9 @@ test: build harness
         exit 1
     fi
 
-[macos]
-test: build harness
-    rm -rf libafl_unix_shmem_server || true
-    timeout 30s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so | tee fuzz_stdout.log 2>/dev/null || true
-
 [windows]
 test: build harness
-    start "" "{{ FUZZER }}" -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
+    start "{{ FUZZER }}" -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
     #ping is for timeout
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
     >nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
