@@ -439,7 +439,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/inprocess/libfuzzer_stb_image
-        run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
+        run: cd fuzzers/inprocess/libfuzzer_stb_image && just test
 
   windows-frida-gdiplus:
     runs-on: windows-latest
