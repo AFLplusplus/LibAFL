@@ -116,7 +116,7 @@ serial_test = { version = "3.1.1", default-features = false }
 serde_json = { version = "1.0.128", default-features = false }
 serde_yaml = { version = "0.9.34" } # For parsing the injections yaml file
 static_assertions = "1.1.0"
-strum = "0.26.3"
+strum = "0.27.0"
 strum_macros = "0.27.0"
 toml = "0.8.19" # For parsing the injections toml file
 typed-builder = "0.20.0" # Implement the builder pattern at compiletime
