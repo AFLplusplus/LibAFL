@@ -43,12 +43,11 @@ use super::{std_maybe_report_progress, std_report_progress, AwaitRestartSafe, Se
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
-        stats::manager::ClientStatsManager, std_on_restart, BrokerEventResult, Event, EventConfig,
-        EventFirer, EventManagerHooksTuple, EventManagerId, EventReceiver, EventRestarter,
-        HasEventManagerId, ProgressReporter,
+        std_on_restart, BrokerEventResult, Event, EventConfig, EventFirer, EventManagerHooksTuple,
+        EventManagerId, EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter,
     },
     inputs::Input,
-    monitors::Monitor,
+    monitors::{stats::ClientStatsManager, Monitor},
     stages::HasCurrentStageId,
     state::{
         HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,

@@ -31,7 +31,7 @@ use crate::{
         Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
         SendExiting,
     },
-    monitors::{stats::manager::ClientStatsManager, Monitor},
+    monitors::{stats::ClientStatsManager, Monitor},
     stages::HasCurrentStageId,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasMetadata,

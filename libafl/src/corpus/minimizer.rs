@@ -15,12 +15,10 @@ use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
     corpus::Corpus,
-    events::{
-        stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
-        Event, EventFirer, LogSeverity,
-    },
+    events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
     inputs::Input,
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasExecutions},

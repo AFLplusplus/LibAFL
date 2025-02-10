@@ -15,11 +15,11 @@ use hashbrown::HashMap;
 use libafl_bolts::current_time;
 pub use manager::ClientStatsManager;
 #[cfg(feature = "introspection")]
-use perf_stats::ClientPerfStats;
+pub use perf_stats::ClientPerfStats;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use serde_json::Value;
-use user_stats::UserStats;
+pub use user_stats::{AggregatorOps, UserStats, UserStatsValue};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds

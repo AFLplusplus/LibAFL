@@ -26,7 +26,7 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::{Event, EventFirer},
     executors::HasObservers,
-    monitors::stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},

@@ -47,7 +47,7 @@ use uuid::Uuid;
 use crate::{
     executors::ExitKind,
     inputs::Input,
-    monitors::stats::user_stats::UserStats,
+    monitors::stats::UserStats,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor},
     Error, HasMetadata,
 };
@@ -107,7 +107,7 @@ pub struct EventManagerId(
 #[cfg(all(unix, feature = "std", feature = "multi_machine"))]
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
-use crate::monitors::stats::perf_stats::ClientPerfStats;
+use crate::monitors::stats::ClientPerfStats;
 use crate::{observers::TimeObserver, stages::HasCurrentStageId};
 
 /// The log event severity

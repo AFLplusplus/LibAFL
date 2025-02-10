@@ -7,7 +7,7 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::stats::perf_stats::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     mark_feature_time,
     mutators::{MutationResult, Mutator},
