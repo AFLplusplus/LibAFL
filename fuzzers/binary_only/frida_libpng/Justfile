@@ -17,9 +17,9 @@ libpng:
 [macos]
 lib: libpng
     #!/bin/bash
-    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes --disable-dependency-tracking
     cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
+    make -C libpng-1.6.37
 
 
 [linux]
