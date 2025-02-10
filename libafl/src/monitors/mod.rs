@@ -26,7 +26,7 @@ use alloc::fmt::Debug;
 use alloc::vec::Vec;
 use core::{fmt, fmt::Write, time::Duration};
 
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::ClientId;
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub use prometheus::PrometheusMonitor;
 
@@ -96,21 +96,22 @@ impl Monitor for SimplePrintingMonitor {
         sender_id: ClientId,
     ) {
         let mut userstats = client_stats_manager.client_stats()[sender_id.0 as usize]
-            .user_stats
+            .user_stats()
             .iter()
             .map(|(key, value)| format!("{key}: {value}"))
             .collect::<Vec<_>>();
         userstats.sort();
+        let global_stats = client_stats_manager.global_stats();
         println!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",
             event_msg,
             sender_id.0,
-            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
-            client_stats_manager.client_stats_count(),
-            client_stats_manager.corpus_size(),
-            client_stats_manager.objective_size(),
-            client_stats_manager.total_execs(),
-            client_stats_manager.execs_per_sec_pretty(),
+            global_stats.run_time_pretty,
+            global_stats.client_stats_count,
+            global_stats.corpus_size,
+            global_stats.objective_size,
+            global_stats.total_execs,
+            global_stats.execs_per_sec_pretty,
             userstats.join(", ")
         );
 
@@ -158,22 +159,23 @@ where
         event_msg: &str,
         sender_id: ClientId,
     ) {
+        let global_stats = client_stats_manager.global_stats();
         let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id.0,
-            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
-            client_stats_manager.client_stats_count(),
-            client_stats_manager.corpus_size(),
-            client_stats_manager.objective_size(),
-            client_stats_manager.total_execs(),
-            client_stats_manager.execs_per_sec_pretty()
+            global_stats.run_time_pretty,
+            global_stats.client_stats_count,
+            global_stats.corpus_size,
+            global_stats.objective_size,
+            global_stats.total_execs,
+            global_stats.execs_per_sec_pretty
         );
 
         if self.print_user_monitor {
             client_stats_manager.client_stats_insert(sender_id);
             let client = client_stats_manager.client_stats_for(sender_id);
-            for (key, val) in &client.user_stats {
+            for (key, val) in client.user_stats() {
                 write!(fmt, ", {key}: {val}").unwrap();
             }
         }

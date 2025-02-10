@@ -12,11 +12,7 @@ use libafl_bolts::ClientId;
 pub fn main() {
     let mut monitor = TuiMonitor::builder().build();
 
-    let _client_stats = ClientStats {
-        corpus_size: 1024,
-        executions: 512,
-        ..ClientStats::default()
-    };
+    let _client_stats = ClientStats::default();
     let mut client_stats_manager = ClientStatsManager::default();
 
     monitor.display(&mut client_stats_manager, "Test", ClientId(0));
