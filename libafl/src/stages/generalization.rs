@@ -12,7 +12,7 @@ use libafl_bolts::{
 };
 
 #[cfg(feature = "introspection")]
-use crate::statistics::perf_stats::PerfFeature;
+use crate::events::stats::perf_stats::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},

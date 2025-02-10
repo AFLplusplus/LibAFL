@@ -4,8 +4,8 @@
 use std::{thread::sleep, time::Duration};
 
 use libafl::{
+    events::stats::{manager::ClientStatsManager, ClientStats},
     monitors::{tui::TuiMonitor, Monitor},
-    statistics::{manager::ClientStatsManager, ClientStats},
 };
 use libafl_bolts::ClientId;
 

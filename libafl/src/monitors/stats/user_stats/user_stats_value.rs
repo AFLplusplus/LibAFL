@@ -147,7 +147,7 @@ impl fmt::Display for UserStatsValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
             UserStatsValue::Number(n) => write!(f, "{n}"),
-            UserStatsValue::Float(n) => write!(f, "{}", crate::statistics::prettify_float(*n)),
+            UserStatsValue::Float(n) => write!(f, "{}", crate::events::stats::prettify_float(*n)),
             UserStatsValue::Percent(n) => write!(f, "{:.3}%", n * 100.0),
             UserStatsValue::String(s) => write!(f, "{s}"),
             UserStatsValue::Ratio(a, b) => {

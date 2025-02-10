@@ -24,14 +24,16 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
-    events::{Event, EventFirer},
+    events::{
+        stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
+        Event, EventFirer,
+    },
     executors::HasObservers,
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
-    statistics::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     std::string::ToString,
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };

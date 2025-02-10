@@ -22,11 +22,13 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::feedbacks::premature_last_result_err;
 use crate::{
     corpus::Testcase,
-    events::{Event, EventFirer},
+    events::{
+        stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
+        Event, EventFirer,
+    },
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
     observers::{CanTrack, MapObserver},
-    statistics::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     Error, HasMetadata, HasNamedMetadata,
 };
 

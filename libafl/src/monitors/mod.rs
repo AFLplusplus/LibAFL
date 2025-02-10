@@ -30,7 +30,7 @@ use libafl_bolts::ClientId;
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub use prometheus::PrometheusMonitor;
 
-use crate::statistics::manager::ClientStatsManager;
+use crate::events::stats::manager::ClientStatsManager;
 
 /// The monitor trait keeps track of all the client's monitor, and offers methods to display them.
 pub trait Monitor {

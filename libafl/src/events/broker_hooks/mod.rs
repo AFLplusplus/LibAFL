@@ -13,9 +13,10 @@ use serde::de::DeserializeOwned;
 #[cfg(feature = "llmp_compression")]
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
-    events::{llmp::LLMP_TAG_EVENT_TO_BOTH, BrokerEventResult, Event},
+    events::{
+        llmp::LLMP_TAG_EVENT_TO_BOTH, stats::manager::ClientStatsManager, BrokerEventResult, Event,
+    },
     monitors::Monitor,
-    statistics::manager::ClientStatsManager,
     Error,
 };
 

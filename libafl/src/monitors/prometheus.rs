@@ -48,8 +48,8 @@ use prometheus_client::{
 use tide::Request;
 
 use crate::{
+    events::stats::{manager::ClientStatsManager, user_stats::UserStatsValue},
     monitors::Monitor,
-    statistics::{manager::ClientStatsManager, user_stats::UserStatsValue},
 };
 
 /// Prometheus metrics for global and each client.

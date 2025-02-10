@@ -27,13 +27,13 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
-use crate::statistics::perf_stats::{ClientPerfStats, PerfFeature};
+use crate::events::stats::perf_stats::{ClientPerfStats, PerfFeature};
 use crate::{
-    monitors::Monitor,
-    statistics::{
+    events::stats::{
         manager::ClientStatsManager, user_stats::UserStats, ClientStats, ItemGeometry,
         ProcessTiming,
     },
+    monitors::Monitor,
 };
 
 #[expect(missing_docs)]

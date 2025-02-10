@@ -14,7 +14,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata},
-    events::{Event, EventFirer, LogSeverity},
+    events::{
+        stats::user_stats::{AggregatorOps, UserStats, UserStatsValue},
+        Event, EventFirer, LogSeverity,
+    },
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
@@ -23,7 +26,6 @@ use crate::{
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions},
-    statistics::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     Error, HasMetadata, HasNamedMetadata,
 };
 
