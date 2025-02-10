@@ -1262,6 +1262,7 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
     }));
 }
 
+#[cfg(feature = "std")]
 #[cfg(target_os = "windows")]
 #[repr(C)]
 #[allow(clippy::upper_case_acronyms)]
@@ -1271,6 +1272,7 @@ struct TEB {
     reserved2: [u8; 0xC0],
 }
 
+#[cfg(feature = "std")]
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
 #[cfg(target_os = "windows")]
