@@ -61,7 +61,7 @@ pub enum AggregatorOps {
 /// Aggregate user statistics according to their ops
 pub(super) fn aggregate_user_stats(
     client_stats_manager: &mut ClientStatsManager,
-    name: Cow<'static, str>,
+    name: &Cow<'static, str>,
 ) {
     let mut gather = client_stats_manager
         .client_stats()
@@ -122,5 +122,5 @@ pub(super) fn aggregate_user_stats(
 
     client_stats_manager
         .cached_aggregated_user_stats
-        .insert(name, init);
+        .insert(name.clone(), init);
 }

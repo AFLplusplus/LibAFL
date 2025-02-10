@@ -111,7 +111,7 @@ impl ClientStatsManager {
     }
 
     /// Aggregate user-defined stats
-    pub fn aggregate(&mut self, name: Cow<'static, str>) {
+    pub fn aggregate(&mut self, name: &Cow<'static, str>) {
         super::user_stats::aggregate_user_stats(self, name);
     }
 
