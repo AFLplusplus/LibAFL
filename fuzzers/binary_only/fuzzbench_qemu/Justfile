@@ -1,6 +1,7 @@
 import "../../../just/libafl.just"
 
 FUZZER_NAME := "fuzzbench_qemu"
+HARNESS_NAME := "harness"
 
 [unix]
 [macos]
@@ -9,7 +10,7 @@ harness:
     cc \
         ./fuzz.c \
         ./libfuzzer_main.o \
-        -o {{ FUZZER_NAME }} \
+        -o {{ HARNESS_NAME }} \
         -lm -lz
 
 [unix]
@@ -23,16 +24,16 @@ run: build harness
     {{ FUZZER }} \
       --libafl-in ./corpus \
       --libafl-out ./out \
-      ./{{ FUZZER_NAME }} \
+      ./{{ HARNESS_NAME }} \
       -- \
-      ./{{ FUZZER_NAME }}
+      ./{{ HARNESS_NAME }}
 
 
 [unix]
 test: build harness
     #!/bin/bash
 
-    timeout 15s {{ FUZZER }} ./harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log
+    timeout 15s {{ FUZZER }} ./harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness
     if grep -qa "corpus: 5" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
