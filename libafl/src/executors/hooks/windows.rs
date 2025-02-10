@@ -5,7 +5,7 @@ pub mod windows_asan_handler {
     use core::sync::atomic::{compiler_fence, Ordering};
 
     use windows::Win32::System::Threading::{
-        EnterCriticalSection, LeaveCriticalSection, CRITICAL_SECTION,
+        EnterCriticalSection, LeaveCriticalSection, CRITICAL_SECTION, ExitProcess
     };
 
     use crate::{
