@@ -15,7 +15,7 @@ use libafl::{
     common::HasMetadata,
     events::{EventFirer, EventRestarter},
     executors::{
-        hooks::inprocess::InProcessExecutorHandlerData,
+        hooks::inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
         inprocess::{stateful::StatefulInProcessExecutor, HasInProcessHooks},
         inprocess_fork::stateful::StatefulInProcessForkExecutor,
         Executor, ExitKind, HasObservers,
@@ -65,7 +65,7 @@ pub struct QemuExecutor<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
 ///
 /// This should be used as a crash handler, and nothing else.
 #[cfg(feature = "usermode")]
-unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
+pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
     signal: Signal,
     info: &mut siginfo_t,
     mut context: Option<&mut ucontext_t>,
@@ -166,7 +166,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     context: Option<&mut ucontext_t>,
     data: &mut InProcessExecutorHandlerData,
 ) where
-    E: HasObservers + HasInProcessHooks<I, S> + Executor<EM, I, S, Z>,
+    E: HasObservers + HasInProcessHooks<I, S>,
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     ET: EmulatorModuleTuple<I, S>,
@@ -248,25 +248,39 @@ where
         OF: Feedback<EM, I, OT, S>,
         Z: HasObjective<Objective = OF> + HasScheduler<I, S> + ExecutionProcessor<EM, I, OT, S>,
     {
-        let mut inner = StatefulInProcessExecutor::with_timeout(
+        let inner = StatefulInProcessExecutor::with_timeout(
             harness_fn, emulator, observers, fuzzer, state, event_mgr, timeout,
         )?;
 
+        let data = &raw mut GLOBAL_STATE;
         #[cfg(feature = "usermode")]
-        {
-            inner.inprocess_hooks_mut().crash_handler =
+        unsafe {
+            // rewrite the crash handler pointer
+            (*data).crash_handler =
                 inproc_qemu_crash_handler::<Self, EM, ET, I, OF, S, Z> as *const c_void;
         }
 
-        inner.inprocess_hooks_mut().timeout_handler = inproc_qemu_timeout_handler::<
-            StatefulInProcessExecutor<'a, EM, Emulator<C, CM, ED, ET, I, S, SM>, H, I, OT, S, Z>,
-            EM,
-            ET,
-            I,
-            OF,
-            S,
-            Z,
-        > as *const c_void;
+        unsafe {
+            // rewrite the timeout handler pointer
+            (*data).timeout_handler = inproc_qemu_timeout_handler::<
+                StatefulInProcessExecutor<
+                    'a,
+                    EM,
+                    Emulator<C, CM, ED, ET, I, S, SM>,
+                    H,
+                    I,
+                    OT,
+                    S,
+                    Z,
+                >,
+                EM,
+                ET,
+                I,
+                OF,
+                S,
+                Z,
+            > as *const c_void;
+        }
 
         Ok(Self {
             inner,

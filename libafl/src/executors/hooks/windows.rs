@@ -34,7 +34,13 @@ pub mod windows_asan_handler {
         Z: HasObjective<Objective = OF>,
     {
         let data = &raw mut GLOBAL_STATE;
-        (*data).set_in_handler(true);
+        let in_handler = (*data).set_in_handler(true);
+
+        assert!(
+            !in_handler,
+            "We crashed inside a asan death handler, but this should never happen!"
+        );
+
         // Have we set a timer_before?
         if (*data).ptp_timer.is_some() {
             /*
@@ -159,6 +165,12 @@ pub mod windows_exception_handler {
             unsafe {
                 let data = &raw mut GLOBAL_STATE;
                 let in_handler = (*data).set_in_handler(true);
+
+                assert!(
+                    !in_handler,
+                    "We crashed inside a crash handler, but this should never happen!"
+                );
+
                 if !(*data).crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute((*data).crash_handler);
                     (func)(exception_pointers, data);
@@ -193,6 +205,12 @@ pub mod windows_exception_handler {
         panic::set_hook(Box::new(move |panic_info| unsafe {
             let data = &raw mut GLOBAL_STATE;
             let in_handler = (*data).set_in_handler(true);
+
+            assert!(
+                !in_handler,
+                "We crashed inside a panic hook, but this should never happen!"
+            );
+
             // Have we set a timer_before?
             if (*data).ptp_timer.is_some() {
                 /*

@@ -48,20 +48,11 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
-    modules::asan::AsanModuleBuilder,
-    // asan::{init_with_asan, QemuAsanHelper},
-    modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::{PredicateFeedback, StdEdgeCoverageModule, Tracer},
-    modules::tracer::TracerModule,
-    modules::AsanModule,
-    Emulator,
-    GuestReg,
-    //snapshot::QemuSnapshotHelper,
-    MmapPerms,
-    QemuExecutor,
-    QemuExitError,
-    QemuExitReason,
-    QemuShutdownCause,
+    modules::{
+        cmplog::{CmpLogModule, CmpLogObserver},
+        edges::StdEdgeCoverageModule,
+    },
+    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};

@@ -5,7 +5,7 @@ use core::{fmt, slice};
 use std::{
     borrow::Cow,
     env,
-    fmt::{Debug, Display},
+    fmt::{Debug, Display, Write},
     fs,
     path::PathBuf,
     pin::Pin,
@@ -1680,11 +1680,11 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
                         info += &line.to_string();
                     }
                 } else {
-                    info += &format!(" ({}+{raddr:#x})", images[*idx].0);
+                    let _ = write!(&mut info, " ({}+{raddr:#x})", images[*idx].0);
                 }
             }
             if info.is_empty() {
-                info += &format!(" ({}+{raddr:#x})", images[*idx].0);
+                let _ = write!(&mut info, " ({}+{raddr:#x})", images[*idx].0);
             }
         }
         info

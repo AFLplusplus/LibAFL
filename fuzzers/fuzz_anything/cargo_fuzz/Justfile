@@ -1,0 +1,27 @@
+install_llvm_tools:
+    rustup toolchain install nightly --component llvm-tools-preview
+
+install_cargo_fuzz:
+    cargo install cargo-fuzz
+
+build: install_cargo_fuzz install_llvm_tools
+    cargo +nightly fuzz build fuzz_target_1
+
+[linux]
+test: build
+    #!/bin/bash
+    timeout 30s cargo +nightly fuzz run fuzz_target_1 2>&1 | tee fuzz_stdout.log || true
+    if grep -qa "objectives: 1" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+[macos]
+[windows]
+test: build
+    echo "Unsupported on this platform"
+
+clean:
+    rm -rf fuzz/target

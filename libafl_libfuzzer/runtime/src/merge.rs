@@ -4,7 +4,6 @@ use std::{
     fs::{rename, File},
     io::Write,
     os::fd::{AsRawFd, FromRawFd},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use libafl::{
@@ -57,15 +56,12 @@ pub fn merge(
         let new_fd = libc::dup(std::io::stderr().as_raw_fd());
         File::from_raw_fd(new_fd)
     };
-    let monitor = MultiMonitor::with_time(
-        move |s| {
-            #[cfg(unix)]
-            writeln!(stderr, "{s}").expect("Could not write to stderr???");
-            #[cfg(not(unix))]
-            eprintln!("{s}");
-        },
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-    );
+    let monitor = MultiMonitor::new(move |s| {
+        #[cfg(unix)]
+        writeln!(stderr, "{s}").expect("Could not write to stderr???");
+        #[cfg(not(unix))]
+        eprintln!("{s}");
+    });
 
     let (state, mut mgr): (
         Option<StdState<_, _, _, _>>,

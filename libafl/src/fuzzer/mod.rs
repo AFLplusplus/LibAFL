@@ -11,7 +11,7 @@ use libafl_bolts::{current_time, tuples::MatchName};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::statistics::perf_stats::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, Testcase},
     events::{
@@ -856,7 +856,7 @@ where
         // Init timer for scheduler
         println!("fuzz one");
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().start_timer();
+        state.introspection_stats_mut().start_timer();
 
         // Get the next index from the scheduler
         let id = if let Some(id) = state.current_corpus_id()? {
@@ -869,24 +869,24 @@ where
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().mark_scheduler_time();
+        state.introspection_stats_mut().mark_scheduler_time();
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().reset_stage_index();
+        state.introspection_stats_mut().reset_stage_index();
 
         // Execute all stages
         stages.perform_all(self, executor, state, manager)?;
 
         // Init timer for manager
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().start_timer();
+        state.introspection_stats_mut().start_timer();
 
         self.process_events(state, executor, manager)?;
 
         // Mark the elapsed time for the manager
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().mark_manager_time();
+        state.introspection_stats_mut().mark_manager_time();
 
         {
             if let Ok(mut testcase) = state.testcase_mut(id) {

@@ -27,7 +27,7 @@
 //!
 //! When using docker, you may need to point `prometheus.yml` to the `docker0` interface or `host.docker.internal`
 
-use alloc::{borrow::Cow, fmt::Debug, string::String, vec::Vec};
+use alloc::{borrow::Cow, fmt::Debug, string::String};
 use core::{fmt, fmt::Write, time::Duration};
 use std::{
     string::ToString,
@@ -47,8 +47,10 @@ use prometheus_client::{
 // using tide for the HTTP server library (fast, async, simple)
 use tide::Request;
 
-use super::Aggregator;
-use crate::monitors::{ClientStats, Monitor, UserStatsValue};
+use crate::{
+    monitors::Monitor,
+    statistics::{manager::ClientStatsManager, user_stats::UserStatsValue},
+};
 
 /// Prometheus metrics for global and each client.
 #[derive(Clone, Debug, Default)]
@@ -69,11 +71,8 @@ where
     F: FnMut(&str),
 {
     print_fn: F,
-    start_time: Duration,
     prometheus_global_stats: PrometheusStats, // global prometheus metrics
     prometheus_client_stats: PrometheusStats, // per-client prometheus metrics
-    client_stats: Vec<ClientStats>,           // per-client statistics
-    aggregator: Aggregator,                   // aggregator for global custom statistics
 }
 
 impl<F> Debug for PrometheusMonitor<F>
@@ -81,10 +80,7 @@ where
     F: FnMut(&str),
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PrometheusMonitor")
-            .field("start_time", &self.start_time)
-            .field("client_stats", &self.client_stats)
-            .finish_non_exhaustive()
+        f.debug_struct("PrometheusMonitor").finish_non_exhaustive()
     }
 }
 
@@ -92,32 +88,12 @@ impl<F> Monitor for PrometheusMonitor<F>
 where
     F: FnMut(&str),
 {
-    /// the client monitor, mutable
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
-
-    /// the client monitor
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
-
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
-    /// aggregate client stats
-    fn aggregate(&mut self, name: &str) {
-        self.aggregator.aggregate(name, &self.client_stats);
-    }
-
-    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
+    fn display(
+        &mut self,
+        client_stats_manager: &mut ClientStatsManager,
+        event_msg: &str,
+        sender_id: ClientId,
+    ) {
         // Update the prometheus metrics
         // The gauges must take signed i64's, with max value of 2^63-1 so it is
         // probably fair to error out at a count of nine quintillion across any
@@ -127,7 +103,7 @@ where
         // time since last observation"
 
         // Global (aggregated) metrics
-        let corpus_size = self.corpus_size();
+        let corpus_size = client_stats_manager.corpus_size();
         self.prometheus_global_stats
             .corpus_count
             .get_or_create(&Labels {
@@ -136,7 +112,7 @@ where
             })
             .set(corpus_size.try_into().unwrap());
 
-        let objective_size = self.objective_size();
+        let objective_size = client_stats_manager.objective_size();
         self.prometheus_global_stats
             .objective_count
             .get_or_create(&Labels {
@@ -145,7 +121,7 @@ where
             })
             .set(objective_size.try_into().unwrap());
 
-        let total_execs = self.total_execs();
+        let total_execs = client_stats_manager.total_execs();
         self.prometheus_global_stats
             .executions
             .get_or_create(&Labels {
@@ -154,7 +130,7 @@ where
             })
             .set(total_execs.try_into().unwrap());
 
-        let execs_per_sec = self.execs_per_sec();
+        let execs_per_sec = client_stats_manager.execs_per_sec();
         self.prometheus_global_stats
             .exec_rate
             .get_or_create(&Labels {
@@ -163,7 +139,7 @@ where
             })
             .set(execs_per_sec);
 
-        let run_time = (current_time() - self.start_time).as_secs();
+        let run_time = (current_time() - client_stats_manager.start_time()).as_secs();
         self.prometheus_global_stats
             .runtime
             .get_or_create(&Labels {
@@ -172,7 +148,10 @@ where
             })
             .set(run_time.try_into().unwrap()); // run time in seconds, which can be converted to a time format by Grafana or similar
 
-        let total_clients = self.client_stats_count().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
+        let total_clients = client_stats_manager
+            .client_stats_count()
+            .try_into()
+            .unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.prometheus_global_stats
             .clients_count
             .get_or_create(&Labels {
@@ -185,14 +164,14 @@ where
         let mut global_fmt = format!(
             "[Prometheus] [{} #GLOBAL] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
-            format_duration_hms(&(current_time() - self.start_time)),
-            self.client_stats_count(),
-            self.corpus_size(),
-            self.objective_size(),
-            self.total_execs(),
-            self.execs_per_sec_pretty()
+            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
+            client_stats_manager.client_stats_count(),
+            client_stats_manager.corpus_size(),
+            client_stats_manager.objective_size(),
+            client_stats_manager.total_execs(),
+            client_stats_manager.execs_per_sec_pretty()
         );
-        for (key, val) in &self.aggregator.aggregated {
+        for (key, val) in client_stats_manager.aggregated() {
             // print global aggregated custom stats
             write!(global_fmt, ", {key}: {val}").unwrap();
             #[expect(clippy::cast_precision_loss)]
@@ -234,8 +213,8 @@ where
 
         // Client-specific metrics
 
-        self.client_stats_insert(sender_id);
-        let client = self.client_stats_for(sender_id);
+        client_stats_manager.client_stats_insert(sender_id);
+        let client = client_stats_manager.client_stats_for(sender_id);
         let mut cur_client_clone = client.clone();
 
         self.prometheus_client_stats
@@ -297,7 +276,7 @@ where
             cur_client_clone.execs_per_sec_pretty(current_time())
         );
 
-        for (key, val) in cur_client_clone.user_monitor {
+        for (key, val) in cur_client_clone.user_stats {
             // print the custom stats for each client
             write!(fmt, ", {key}: {val}").unwrap();
             // Update metrics added to the user_stats hashmap by feedback event-fires
@@ -352,7 +331,6 @@ where
         let prometheus_global_stats_clone = prometheus_global_stats.clone();
         let prometheus_client_stats = PrometheusStats::default();
         let prometheus_client_stats_clone = prometheus_client_stats.clone();
-        let client_stats = Vec::<ClientStats>::default();
 
         // Need to run the metrics server in a different thread to avoid blocking
         thread::spawn(move || {
@@ -366,38 +344,17 @@ where
         });
         Self {
             print_fn,
-            start_time: current_time(),
             prometheus_global_stats,
             prometheus_client_stats,
-            client_stats,
-            aggregator: Aggregator::new(),
         }
     }
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(listener: String, print_fn: F, start_time: Duration) -> Self {
-        let prometheus_global_stats = PrometheusStats::default();
-        let prometheus_global_stats_clone = prometheus_global_stats.clone();
-        let prometheus_client_stats = PrometheusStats::default();
-        let prometheus_client_stats_clone = prometheus_client_stats.clone();
-        let client_stats = Vec::<ClientStats>::default();
-
-        thread::spawn(move || {
-            block_on(serve_metrics(
-                listener,
-                prometheus_global_stats_clone,
-                prometheus_client_stats_clone,
-            ))
-            .map_err(|err| log::error!("{err:?}"))
-            .ok();
-        });
-        Self {
-            print_fn,
-            start_time,
-            prometheus_global_stats,
-            prometheus_client_stats,
-            client_stats,
-            aggregator: Aggregator::new(),
-        }
+    #[deprecated(
+        since = "0.16.0",
+        note = "Please use new to create. start_time is useless here."
+    )]
+    pub fn with_time(listener: String, print_fn: F, _start_time: Duration) -> Self {
+        Self::new(listener, print_fn)
     }
 }
 
