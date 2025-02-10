@@ -1,31 +1,19 @@
 import "../../../just/libafl.just"
+
 FUZZER_NAME := "frida_fuzzer"
-FUZZER_NAME_WIN := "frida_fuzzer.exe"
 
-set windows-shell = ["cmd.exe", "/c"]
-
-[linux]
-[macos]
+[unix]
 libpng:
-    #!/bin/bash
-    if [ ! -f v1.6.37.tar.gz ]; then
-        wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
-    fi
+    wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
     tar -xvf v1.6.37.tar.gz
 
-[linux]
-[macos]
+[unix]
 lib: libpng
-    #!/bin/bash
-    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes --disable-dependency-tracking
-    cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37
+    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+    make -j -C libpng-1.6.37
 
-
-[linux]
-[macos]
+[unix]
 harness: lib
-    #!/bin/bash
     clang++ -O3 -c -fPIC harness.cc -o harness.o
     clang++ -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.so
 
@@ -33,32 +21,25 @@ harness: lib
 harness:
     cl /c harness_win.cpp && link harness_win.obj /dll
 
-[linux]
-[macos]
-fuzzer:
-    #!/bin/bash
-    cargo build --profile {{PROFILE}}
-    cp {{TARGET_DIR}}/{{PROFILE_DIR}}/{{FUZZER_NAME}} .
+[unix]
+[windows]
+build:
+    cargo build --profile {{ PROFILE }}
+
+[unix]
+run: build harness
+    {{ FUZZER }} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so
 
 [windows]
-    cargo build --profile ${PROFILE}
-    cp .\target\{{PROFILE_DIR}}\{{FUZZER_NAME_WIN}} .
+run: build harness
+    {{ FUZZER }} -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
 
-[linux]
-[macos]
-run: fuzzer harness
-    ./{{FUZZER_NAME}} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so
-
-[windows]
-run: fuzzer harness
-    .\{{FUZZER_NAME_WIN}} -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
-
-[linux]
-[macos]
-test: fuzzer harness
+[unix]
+test: build harness
     #!/bin/bash
+
     rm -rf libafl_unix_shmem_server || true
-    timeout 30s ./{{FUZZER_NAME}} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so 2>/dev/null  | tee fuzz_stdout.log || true
+    timeout 30s {{ FUZZER }} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so | tee fuzz_stdout.log 2>/dev/null || true
     if grep -qa "corpus: 70" fuzz_stdout.log; then
         echo "Fuzzer is working"
     else
@@ -66,16 +47,19 @@ test: fuzzer harness
         exit 1
     fi
 
+[macos]
+test: build harness
+    rm -rf libafl_unix_shmem_server || true
+    timeout 30s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so | tee fuzz_stdout.log 2>/dev/null || true
+
 [windows]
-test: fuzzer harness
-    start {{FUZZER_NAME_WIN}} -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
+test: build harness
+    start "" "{{ FUZZER }}" -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
     #ping is for timeout
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
-    dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
+    >nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
 
-[linux]
-[macos]
+[unix]
 clean:
-    rm -rf {{FUZZER_NAME}}
     make -C libpng-1.6.37 clean
     cargo clean

@@ -1,40 +1,36 @@
 import "../../../just/libafl.just"
 
-[linux]
+FUZZER_NAME := "frida_executable_fuzzer"
+FUZZER_LIB := FUZZER + ".so"
+
+[unix]
 libpng:
-    #!/bin/bash
-    if [ ! -f v1.6.37.tar.gz ]; then
-        wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
-    fi
+    wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
     tar -xvf v1.6.37.tar.gz
 
-[linux]
+[unix]
 lib: libpng
-    #!/bin/bash
     cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-    cd ..
-    make -C libpng-1.6.37
+    make -j -C libpng-1.6.37
 
-
-[linux]
+[unix]
 harness: lib
-    #!/bin/bash
     clang++ -O0 -c -fPIC harness.cc -o harness.o
-    clang++ -O0 harness.cc libpng-1.6.37/.libs/libpng16.a -lz -o libpng-harness -g
 
-[linux]
-fuzzer:
-    cargo build --profile {{PROFILE}}
+[unix]
+build:
+    cargo build --profile {{ PROFILE }}
 
-[linux]
-run: fuzzer harness
-LD_PRELOAD={{TARGET_DIR}}/{{PROFILE_DIR}}/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness
+[unix]
+run: build harness
+    LD_PRELOAD={{ FUZZER_LIB }} ./libpng-harness -i corpus -o out -H ./libpng-harness
 
-[linux]
-test: fuzzer harness
+[unix]
+test: build harness
     #!/bin/bash
+
     rm -rf libafl_unix_shmem_server || true
-    LD_PRELOAD={{TARGET_DIR}}/{{PROFILE_DIR}}/libfrida_executable_fuzzer.so ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
+    LD_PRELOAD={{ FUZZER_LIB }} ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
     sleep 10s && pkill libpng-harness
     if grep -qa "corpus: 30" fuzz_stdout.log; then
         echo "Fuzzer is working"
@@ -43,8 +39,8 @@ test: fuzzer harness
         exit 1
     fi
 
-[linux]
+[unix]
 clean:
-    rm -rf {{FUZZER_NAME}}
+    rm -rf ./libpng-harness
     make -C libpng-1.6.37 clean
     cargo clean
