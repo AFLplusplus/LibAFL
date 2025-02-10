@@ -1,8 +1,5 @@
 //! Client statistics manager
 
-use hashbrown::HashMap;
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
-
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
@@ -10,6 +7,8 @@ use alloc::{
 };
 use core::{cmp, time::Duration};
 
+use hashbrown::HashMap;
+use libafl_bolts::{current_time, format_duration_hms, ClientId};
 #[cfg(feature = "std")]
 use serde_json::Value;
 
