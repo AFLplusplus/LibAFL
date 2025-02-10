@@ -291,7 +291,6 @@ jobs:
 
           # In-process
           - ./fuzzers/fuzz_anything/cargo_fuzz
-          # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
           - ./fuzzers/inprocess/fuzzbench_ctx
@@ -306,7 +305,6 @@ jobs:
           - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
           - ./fuzzers/inprocess/libfuzzer_stb_image
           # - ./fuzzers/structure_aware/libfuzzer_stb_image_concolic
-          # - ./fuzzers/inprocess/libfuzzer_windows_asan
           # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
 
           # Fuzz Anything
