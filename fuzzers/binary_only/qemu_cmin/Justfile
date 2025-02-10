@@ -1,0 +1,122 @@
+import "../../../just/libafl-qemu.just"
+
+FUZZER_NAME := "qemu_cmin"
+
+CROSS_CC := env("CROSS_CC", "x86_64-linux-gnu-gcc")
+CROSS_CXX := env("CROSS_CXX", "x86_64-linux-gnu-g++")
+CROSS_CFLAGS := env("CROSS_CFLAGS", "")
+
+ARCH := env("LIBPNG_ARCH", "x86_64")
+OPTIMIZATIONS := env("LIBPNG_OPTIMIZATIONS", "yes")
+
+DEPS_DIR := TARGET_DIR / "deps"
+ARCH_DIR := TARGET_DIR / ARCH
+
+HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
+
+# FEATURE = "x86_64"
+# LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+
+[unix]
+target_dir:
+    mkdir -p {{ TARGET_DIR }}
+
+[unix]
+deps_dir:
+    mkdir -p {{ DEPS_DIR }}
+
+[unix]
+arch_dir:
+    mkdir -p {{ ARCH_DIR }}
+
+[unix]
+zlib_wget: deps_dir
+    #!/bin/bash
+
+    wget \
+        -O "{{ DEPS_DIR }}/zlib-1.2.13.tar.gz" \
+        https://zlib.net/fossils/zlib-1.2.13.tar.gz
+
+    tar \
+        zxvf {{ DEPS_DIR }}/zlib-1.2.13.tar.gz \
+        -C {{ DEPS_DIR }}
+
+[unix]
+zlib: zlib_wget
+    #!/bin/bash
+
+    rm -rf {{ TARGET_DIR1 }}/build-zlib/
+
+    mkdir {{ TARGET_DIR }}/build-zlib/
+
+    cd {{ TARGET_DIR }}/build-zlib/ && \
+        CC={{ CROSS_CC }} \
+        CFLAGS={{ CROSS_CFLAGS }} \
+        {{ DEPS_DIR }}/zlib-1.2.13/configure \
+            --prefix=./zlib
+
+    make -j install
+
+[unix]
+libpng_wget: deps_dir
+    wget \
+        -O "{{ DEPS_DIR }}/v1.6.37.tar.gz" \
+        https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+
+    tar \
+        -xvf "{{ DEPS_DIR }}/v1.6.37.tar.gz" \
+        -C {{ DEPS_DIR }}
+
+[unix]
+libpng: arch_dir zlib libpng_wget
+    rm -rf {{ TARGET_DIR }}/build-png/
+
+    mkdir {{TARGET_DIR}}/build-png/
+
+    cd {{TARGET_DIR}}/build-png/ && \
+        CC={{ CROSS_CC }} \
+        CFLAGS="{{ CROSS_CXX }} -I"{{ TARGET_DIR }}/build-zlib/zlib/lib"" \
+        LDFLAGS=-L"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
+        {{ DEPS_DIR }}/libpng-1.6.37/configure \
+            --enable-shared=no \
+            --with-pic=yes \
+            --enable-hardware-optimizations={{OPTIMIZATIONS}} \
+            --host={{ ARCH }} \
+
+    make -j
+
+[unix]
+build:
+    cargo build
+      --profile {{ PROFILE }}
+      --features {{ ARCH }}
+      --target-dir {{ TARGET_DIR }}
+
+[unix]
+harness: libpng
+    {{ CROSS_CXX }} \
+        ./harness.cc \
+        {{ CROSS_CFLAGS }} \
+        {{TARGET_DIR}}/build-png/.libs/libpng16.a" \
+        "{{TARGET_DIR}}/build-zlib/libz.a" \
+        -I"{{TARGET_DIR}}/build-png" \
+        -I"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        -L"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        -o"{{ HARNESS }}" \
+        -lm -static
+
+[unix]
+run: harness
+    {{ FUZZER }} \
+        --output ./output \
+        --input ./corpus \
+        --verbose \
+        -- {{ HARNESS }}
+
+[unix]
+test:
+    TODO
+
+[unix]
+clean:
+    cargo clean
