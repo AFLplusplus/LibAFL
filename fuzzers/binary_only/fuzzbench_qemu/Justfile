@@ -1,6 +1,6 @@
 import "../../../just/libafl.just"
 
-FUZZER_NAME := "frida_executable_fuzzer"
+FUZZER_NAME := "fuzzbench_qemu"
 
 [unix]
 [macos]
