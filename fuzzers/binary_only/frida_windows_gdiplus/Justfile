@@ -15,6 +15,7 @@ harness_cmplog_test:
 [windows]
 build:
     cargo build --profile {{ PROFILE }}
+    copy {{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}} .
 
 [windows]
 run: build harness
@@ -28,7 +29,7 @@ test_cmplog: build harness_cmplog_test
     for %%i in (t1 t2 t3 t4 t5 t6 t7) do (
       echo Testing %%i...
       rmdir /s /q output_%%i
-      start "{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}}" -H cmplog.dll -i corpus -o output_%%i --libs-to-instrument cmplog.dll -F %%i -C
+      start "" "{{FUZZER_NAME}}" -H cmplog.dll -i corpus -o output_%%i --libs-to-instrument cmplog.dll -F %%i -C
       ping -n 3 127.0.0.1>NUL && taskkill /im {{ FUZZER }} /F
       dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
     )
@@ -38,7 +39,7 @@ test_cmplog: build harness_cmplog_test
 [windows]
 [script("cmd.exe", "/c")]
 test: build harness
-    start "" "{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}}" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
+    start "" "{{FUZZER_NAME}}" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_windows_gdiplus.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
 
