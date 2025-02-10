@@ -302,6 +302,7 @@ jobs:
           - ./fuzzers/inprocess/libfuzzer_libpng_cmin
           - ./fuzzers/inprocess/libfuzzer_libpng_norestart
           # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
+          # - ./fuzzers/inprocess/libfuzzer_windows_asan
           - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
           - ./fuzzers/inprocess/libfuzzer_stb_image
           # - ./fuzzers/structure_aware/libfuzzer_stb_image_concolic
@@ -457,7 +458,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_windows_gdiplus
-        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
+        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && just test && just test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
