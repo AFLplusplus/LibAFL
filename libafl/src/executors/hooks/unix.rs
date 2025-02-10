@@ -52,6 +52,12 @@ pub mod unix_signal_handler {
             unsafe {
                 let data = &raw mut GLOBAL_STATE;
                 let in_handler = (*data).set_in_handler(true);
+
+                assert!(
+                    !in_handler,
+                    "We crashed inside a crash handler, but this should never happen!"
+                );
+
                 match signal {
                     Signal::SigUser2 | Signal::SigAlarm => {
                         if !(*data).timeout_handler.is_null() {
@@ -91,6 +97,12 @@ pub mod unix_signal_handler {
             old_hook(panic_info);
             let data = &raw mut GLOBAL_STATE;
             let in_handler = (*data).set_in_handler(true);
+
+            assert!(
+                !in_handler,
+                "We crashed inside a crash panic hook, but this should never happen!"
+            );
+
             if (*data).is_valid() {
                 // We are fuzzing!
                 let executor = (*data).executor_mut::<E>();
@@ -127,7 +139,7 @@ pub mod unix_signal_handler {
         _context: Option<&mut ucontext_t>,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasInProcessHooks<I, S> + HasObservers,
+        E: HasInProcessHooks<I, S> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,

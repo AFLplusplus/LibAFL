@@ -7,7 +7,7 @@ use libafl_bolts::{current_time, impl_serdeany, rands::Rand};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::statistics::perf_stats::PerfFeature;
 use crate::{
     mark_feature_time,
     mutators::{MutationResult, Mutator},
@@ -213,7 +213,7 @@ where
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         ret
     }

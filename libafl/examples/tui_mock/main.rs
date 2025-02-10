@@ -3,7 +3,10 @@
 
 use std::{thread::sleep, time::Duration};
 
-use libafl::monitors::{tui::TuiMonitor, ClientStats, Monitor};
+use libafl::{
+    monitors::{tui::TuiMonitor, Monitor},
+    statistics::{manager::ClientStatsManager, ClientStats},
+};
 use libafl_bolts::ClientId;
 
 pub fn main() {
@@ -14,7 +17,8 @@ pub fn main() {
         executions: 512,
         ..ClientStats::default()
     };
+    let mut client_stats_manager = ClientStatsManager::default();
 
-    monitor.display("Test", ClientId(0));
+    monitor.display(&mut client_stats_manager, "Test", ClientId(0));
     sleep(Duration::from_secs(10));
 }

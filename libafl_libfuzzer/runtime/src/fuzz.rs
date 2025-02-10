@@ -1,14 +1,7 @@
 use core::ffi::c_int;
 #[cfg(unix)]
 use std::io::{stderr, stdout, Write};
-use std::{
-    fmt::Debug,
-    fs::File,
-    net::TcpListener,
-    os::fd::AsRawFd,
-    str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{fmt::Debug, fs::File, net::TcpListener, os::fd::AsRawFd, str::FromStr};
 
 use libafl::{
     corpus::Corpus,
@@ -208,16 +201,10 @@ pub fn fuzz(
                 .build();
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         } else if forks == 1 {
-            let monitor = MultiMonitor::with_time(
-                create_monitor_closure(),
-                SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-            );
+            let monitor = MultiMonitor::new(create_monitor_closure());
             fuzz_single_forking(options, harness, shmem_provider, monitor)
         } else {
-            let monitor = MultiMonitor::with_time(
-                create_monitor_closure(),
-                SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-            );
+            let monitor = MultiMonitor::new(create_monitor_closure());
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         }
     } else if options.tui() {

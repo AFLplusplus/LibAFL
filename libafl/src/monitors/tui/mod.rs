@@ -29,8 +29,15 @@ use serde_json::Value;
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
-use super::{ClientPerfMonitor, PerfFeature};
-use crate::monitors::{Aggregator, AggregatorOps, ClientStats, Monitor, UserStats, UserStatsValue};
+use crate::statistics::perf_stats::{ClientPerfStats, PerfFeature};
+use crate::{
+    monitors::Monitor,
+    statistics::{
+        manager::ClientStatsManager,
+        user_stats::{AggregatorOps, UserStats, UserStatsValue},
+        ClientStats,
+    },
+};
 
 #[expect(missing_docs)]
 pub mod ui;
@@ -51,10 +58,6 @@ pub struct TuiMonitorConfig {
     /// A version string to show for this (optional)
     #[builder(default_code = r#""default".to_string()"#, setter(into))]
     pub version: String,
-    /// Creates the monitor with an explicit `start_time`.
-    /// If nothings was set, this will use [`current_time`] instead.
-    #[builder(default_code = "current_time()")]
-    pub start_time: Duration,
     /// Enables unicode TUI graphics, Looks better but may interfere with old terminals.
     #[builder(default = true)]
     pub enhanced_graphics: bool,
@@ -144,7 +147,7 @@ pub struct PerfTuiContext {
 impl PerfTuiContext {
     /// Get the data for performance metrics
     #[expect(clippy::cast_precision_loss)]
-    pub fn grab_data(&mut self, m: &ClientPerfMonitor) {
+    pub fn grab_data(&mut self, m: &ClientPerfStats) {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = m.elapsed_cycles() as f64;
 
@@ -315,7 +318,7 @@ impl ClientTuiContext {
             .map_or("0%".to_string(), ToString::to_string);
         self.item_geometry.stability = stability;
 
-        for (key, val) in &client.user_monitor {
+        for (key, val) in &client.user_stats {
             self.user_stats.insert(key.clone(), val.clone());
         }
     }
@@ -386,10 +389,6 @@ impl TuiContext {
 #[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
-
-    start_time: Duration,
-    client_stats: Vec<ClientStats>,
-    aggregator: Aggregator,
 }
 
 impl From<TuiMonitorConfig> for TuiMonitor {
@@ -397,66 +396,49 @@ impl From<TuiMonitorConfig> for TuiMonitor {
     fn from(builder: TuiMonitorConfig) -> Self {
         Self::with_time(
             TuiUi::with_version(builder.title, builder.version, builder.enhanced_graphics),
-            builder.start_time,
+            current_time(),
         )
     }
 }
 
 impl Monitor for TuiMonitor {
-    /// The client monitor, mutable
-    /// This also includes disabled "padding" clients.
-    /// Results should be filtered by `.enabled`.
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
-
-    /// The client monitor
-    /// This also includes disabled "padding" clients.
-    /// Results should be filtered by `.enabled`.
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
-
-    /// Time this fuzzing run stated
-    fn start_time(&self) -> Duration {
-        self.start_time
-    }
-
-    /// Set creation time
-    fn set_start_time(&mut self, time: Duration) {
-        self.start_time = time;
-    }
-
     #[expect(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: &str, sender_id: ClientId) {
+    fn display(
+        &mut self,
+        client_stats_manager: &mut ClientStatsManager,
+        event_msg: &str,
+        sender_id: ClientId,
+    ) {
         let cur_time = current_time();
 
         {
             // TODO implement floating-point support for TimedStat
-            let execsec = self.execs_per_sec() as u64;
-            let totalexec = self.total_execs();
-            let run_time = cur_time - self.start_time;
-            let total_process_timing = self.process_timing();
+            let execsec = client_stats_manager.execs_per_sec() as u64;
+            let totalexec = client_stats_manager.total_execs();
+            let run_time = cur_time - client_stats_manager.start_time();
+            let total_process_timing = get_process_timing(client_stats_manager);
 
             let mut ctx = self.context.write().unwrap();
             ctx.total_process_timing = total_process_timing;
-            ctx.corpus_size_timed.add(run_time, self.corpus_size());
+            ctx.corpus_size_timed
+                .add(run_time, client_stats_manager.corpus_size());
             ctx.objective_size_timed
-                .add(run_time, self.objective_size());
+                .add(run_time, client_stats_manager.objective_size());
             ctx.execs_per_sec_timed.add(run_time, execsec);
+            ctx.start_time = client_stats_manager.start_time();
             ctx.total_execs = totalexec;
-            ctx.clients_num = self.client_stats.len();
-            ctx.total_map_density = self.map_density();
-            ctx.total_solutions = self.objective_size();
+            ctx.clients_num = client_stats_manager.client_stats().len();
+            ctx.total_map_density = get_map_density(client_stats_manager);
+            ctx.total_solutions = client_stats_manager.objective_size();
             ctx.total_cycles_done = 0;
-            ctx.total_corpus_count = self.corpus_size();
-            ctx.total_item_geometry = self.item_geometry();
+            ctx.total_corpus_count = client_stats_manager.corpus_size();
+            ctx.total_item_geometry = get_item_geometry(client_stats_manager);
         }
 
-        self.client_stats_insert(sender_id);
-        let exec_sec =
-            self.update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time));
-        let client = self.client_stats_for(sender_id);
+        client_stats_manager.client_stats_insert(sender_id);
+        let exec_sec = client_stats_manager
+            .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time));
+        let client = client_stats_manager.client_stats_for(sender_id);
 
         let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
@@ -469,15 +451,15 @@ impl Monitor for TuiMonitor {
             "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
-        for (key, val) in &client.user_monitor {
+        for (key, val) in &client.user_stats {
             write!(fmt, ", {key}: {val}").unwrap();
         }
-        for (key, val) in &self.aggregator.aggregated {
+        for (key, val) in client_stats_manager.aggregated() {
             write!(fmt, ", {key}: {val}").unwrap();
         }
 
         {
-            let client = &self.client_stats()[sender_id.0 as usize];
+            let client = &client_stats_manager.client_stats()[sender_id.0 as usize];
             let mut ctx = self.context.write().unwrap();
             ctx.clients
                 .entry(sender_id.0 as usize)
@@ -492,20 +474,21 @@ impl Monitor for TuiMonitor {
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client IDs that have never sent anything.
-            for (i, client) in self.client_stats.iter().filter(|x| x.enabled).enumerate() {
+            for (i, client) in client_stats_manager
+                .client_stats()
+                .iter()
+                .filter(|x| x.enabled)
+                .enumerate()
+            {
                 self.context
                     .write()
                     .unwrap()
                     .introspection
                     .entry(i + 1)
                     .or_default()
-                    .grab_data(&client.introspection_monitor);
+                    .grab_data(&client.introspection_stats);
             }
         }
-    }
-
-    fn aggregate(&mut self, name: &str) {
-        self.aggregator.aggregate(name, &self.client_stats);
     }
 }
 
@@ -567,86 +550,88 @@ impl TuiMonitor {
                 io::stdout,
             );
         }
-        Self {
-            context,
-            start_time,
-            client_stats: vec![],
-            aggregator: Aggregator::new(),
-        }
+        Self { context }
     }
+}
 
-    fn map_density(&self) -> String {
-        self.client_stats()
+fn get_process_timing(client_stats_manager: &mut ClientStatsManager) -> ProcessTiming {
+    let mut total_process_timing = ProcessTiming::new();
+    total_process_timing.exec_speed = client_stats_manager.execs_per_sec_pretty();
+    if client_stats_manager.client_stats().len() > 1 {
+        let mut new_path_time = Duration::default();
+        let mut new_objectives_time = Duration::default();
+        for client in client_stats_manager
+            .client_stats()
             .iter()
             .filter(|client| client.enabled)
-            .filter_map(|client| client.get_user_stats("edges"))
-            .map(ToString::to_string)
-            .fold("0%".to_string(), cmp::max)
-    }
-
-    fn item_geometry(&self) -> ItemGeometry {
-        let mut total_item_geometry = ItemGeometry::new();
-        if self.client_stats.len() < 2 {
-            return total_item_geometry;
+        {
+            new_path_time = client.last_corpus_time.max(new_path_time);
+            new_objectives_time = client.last_objective_time.max(new_objectives_time);
         }
-        let mut ratio_a: u64 = 0;
-        let mut ratio_b: u64 = 0;
-        for client in self.client_stats().iter().filter(|client| client.enabled) {
-            let afl_stats = client
-                .get_user_stats("AflStats")
-                .map_or("None".to_string(), ToString::to_string);
-            let stability = client.get_user_stats("stability").map_or(
-                UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
-                Clone::clone,
-            );
-
-            if afl_stats != "None" {
-                let default_json = serde_json::json!({
-                    "pending": 0,
-                    "pend_fav": 0,
-                    "imported": 0,
-                    "own_finds": 0,
-                });
-                let afl_stats_json: Value =
-                    serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
-                total_item_geometry.pending +=
-                    afl_stats_json["pending"].as_u64().unwrap_or_default();
-                total_item_geometry.pend_fav +=
-                    afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
-                total_item_geometry.own_finds +=
-                    afl_stats_json["own_finds"].as_u64().unwrap_or_default();
-                total_item_geometry.imported +=
-                    afl_stats_json["imported"].as_u64().unwrap_or_default();
-            }
-
-            if let UserStatsValue::Ratio(a, b) = stability.value() {
-                ratio_a += a;
-                ratio_b += b;
-            }
+        if new_path_time > client_stats_manager.start_time() {
+            total_process_timing.last_new_entry = new_path_time - client_stats_manager.start_time();
         }
-        total_item_geometry.stability = format!("{}%", ratio_a * 100 / ratio_b);
-        total_item_geometry
-    }
-
-    fn process_timing(&mut self) -> ProcessTiming {
-        let mut total_process_timing = ProcessTiming::new();
-        total_process_timing.exec_speed = self.execs_per_sec_pretty();
-        if self.client_stats.len() > 1 {
-            let mut new_path_time = Duration::default();
-            let mut new_objectives_time = Duration::default();
-            for client in self.client_stats().iter().filter(|client| client.enabled) {
-                new_path_time = client.last_corpus_time.max(new_path_time);
-                new_objectives_time = client.last_objective_time.max(new_objectives_time);
-            }
-            if new_path_time > self.start_time {
-                total_process_timing.last_new_entry = new_path_time - self.start_time;
-            }
-            if new_objectives_time > self.start_time {
-                total_process_timing.last_saved_solution = new_objectives_time - self.start_time;
-            }
+        if new_objectives_time > client_stats_manager.start_time() {
+            total_process_timing.last_saved_solution =
+                new_objectives_time - client_stats_manager.start_time();
         }
-        total_process_timing
     }
+    total_process_timing
+}
+
+fn get_map_density(client_stats_manager: &ClientStatsManager) -> String {
+    client_stats_manager
+        .client_stats()
+        .iter()
+        .filter(|client| client.enabled)
+        .filter_map(|client| client.get_user_stats("edges"))
+        .map(ToString::to_string)
+        .fold("0%".to_string(), cmp::max)
+}
+
+fn get_item_geometry(client_stats_manager: &ClientStatsManager) -> ItemGeometry {
+    let mut total_item_geometry = ItemGeometry::new();
+    if client_stats_manager.client_stats().len() < 2 {
+        return total_item_geometry;
+    }
+    let mut ratio_a: u64 = 0;
+    let mut ratio_b: u64 = 0;
+    for client in client_stats_manager
+        .client_stats()
+        .iter()
+        .filter(|client| client.enabled)
+    {
+        let afl_stats = client
+            .get_user_stats("AflStats")
+            .map_or("None".to_string(), ToString::to_string);
+        let stability = client.get_user_stats("stability").map_or(
+            UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
+            Clone::clone,
+        );
+
+        if afl_stats != "None" {
+            let default_json = serde_json::json!({
+                "pending": 0,
+                "pend_fav": 0,
+                "imported": 0,
+                "own_finds": 0,
+            });
+            let afl_stats_json: Value =
+                serde_json::from_str(afl_stats.as_str()).unwrap_or(default_json);
+            total_item_geometry.pending += afl_stats_json["pending"].as_u64().unwrap_or_default();
+            total_item_geometry.pend_fav += afl_stats_json["pend_fav"].as_u64().unwrap_or_default();
+            total_item_geometry.own_finds +=
+                afl_stats_json["own_finds"].as_u64().unwrap_or_default();
+            total_item_geometry.imported += afl_stats_json["imported"].as_u64().unwrap_or_default();
+        }
+
+        if let UserStatsValue::Ratio(a, b) = stability.value() {
+            ratio_a += a;
+            ratio_b += b;
+        }
+    }
+    total_item_geometry.stability = format!("{}%", ratio_a * 100 / ratio_b);
+    total_item_geometry
 }
 
 fn run_tui_thread<W: Write + Send + Sync + 'static>(

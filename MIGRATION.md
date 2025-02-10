@@ -6,6 +6,11 @@
   - Since we don't evaluate testcases in the `EventManager` anymore. `on_fire` and `post_exec` have been deleted from `EventManagerHook`.
   - Similarly `pre_exec` has been renamed to `pre_receive`.
 - `AsanModule` now uses a `builder()` method for constructing its instances.
+- `Monitor` is refactored. Most statistics have been extracted into an individual module `statistics` at crate root, and `Monitor` is kept as display only.
+  - There is a `ClientStatsManager` to manage client statistics, and is owned by `EventManager`. Most of previous `Monitor`'s trait methods have been moved to the `ClientStatsManager`.
+  - `user_monitor` has been renamed to `user_stats`, and its structure definitions have been moved to `statistics` module as well.
+  - `introspection_monitor` has been renamed to `introspection_stats`, and perf-related structure definitions have been renamed and moved to `statistics` module as well.
+  - `OnDiskTomlMonitor`, `OnDiskJsonMonitor`, `OnDiskJsonAggregateMonitor` are now no longer takes a base monitor to wrap. If you want to use multiple monitors together, use `libafl::combine_monitor!`.
 
 # 0.14.1 -> 0.15.0
 - `MmapShMem::new` and `MmapShMemProvider::new_shmem_with_id` now take `AsRef<Path>` instead of a byte array for the filename/id.

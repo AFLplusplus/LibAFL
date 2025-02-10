@@ -9,7 +9,7 @@ use core::{
 };
 use std::{
     ffi::{c_void, CString},
-    fmt::{Display, Formatter},
+    fmt::{Display, Formatter, Write},
     mem::{transmute, MaybeUninit},
     ops::Range,
     pin::Pin,
@@ -460,7 +460,7 @@ impl CPU {
         for (i, r) in Regs::iter().enumerate() {
             let v: GuestAddr = self.read_reg(r).unwrap();
             let sr = format!("{r:#?}");
-            display += &format!("{sr:>maxl$}: {v:#016x} ");
+            let _ = write!(&mut display, "{sr:>maxl$}: {v:#016x} ");
             if (i + 1) % 4 == 0 {
                 display += "\n";
             }

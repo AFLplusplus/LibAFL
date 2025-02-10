@@ -26,12 +26,12 @@ use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
     events::{Event, EventFirer},
     executors::HasObservers,
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
     stages::{calibrate::UnstableEntriesMetadata, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
+    statistics::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     std::string::ToString,
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
 };
