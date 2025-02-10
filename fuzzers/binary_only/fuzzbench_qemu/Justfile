@@ -20,12 +20,11 @@ build:
 [unix]
 [macos]
 run: build harness
-    cargo run \
-      --profile {{ PROFILE }} \
-      ./{{ FUZZER_NAME }} \
-      -- \
+    {{ FUZZER }} \
       --libafl-in ./corpus \
       --libafl-out ./out \
+      ./{{ FUZZER_NAME }} \
+      -- \
       ./{{ FUZZER_NAME }}
 
 
