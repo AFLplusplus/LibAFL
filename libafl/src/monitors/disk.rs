@@ -8,7 +8,7 @@ use std::{
     path::PathBuf,
 };
 
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::{current_time, ClientId};
 use serde_json::json;
 
 use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
@@ -33,6 +33,8 @@ impl Monitor for OnDiskTomlMonitor {
         if cur_time - self.last_update >= self.update_interval {
             self.last_update = cur_time;
 
+            let global_stats = client_stats_manager.global_stats();
+
             let mut file = File::create(&self.filename).expect("Failed to open the Toml file");
             write!(
                 &mut file,
@@ -46,12 +48,12 @@ objectives = {}
 executions = {}
 exec_sec = {}
 ",
-                format_duration_hms(&(cur_time - client_stats_manager.start_time())),
-                client_stats_manager.client_stats_count(),
-                client_stats_manager.corpus_size(),
-                client_stats_manager.objective_size(),
-                client_stats_manager.total_execs(),
-                client_stats_manager.execs_per_sec()
+                global_stats.run_time_pretty,
+                global_stats.client_stats_count,
+                global_stats.corpus_size,
+                global_stats.objective_size,
+                global_stats.total_execs,
+                global_stats.execs_per_sec
             )
             .expect("Failed to write to the Toml file");
 
@@ -73,11 +75,15 @@ objectives = {}
 executions = {}
 exec_sec = {}
 ",
-                    i, client.corpus_size, client.objective_size, client.executions, exec_sec
+                    i,
+                    client.corpus_size(),
+                    client.objective_size(),
+                    client.executions(),
+                    exec_sec
                 )
                 .expect("Failed to write to the Toml file");
 
-                for (key, val) in &client.user_stats {
+                for (key, val) in client.user_stats() {
                     let k: String = key
                         .chars()
                         .map(|c| if c.is_whitespace() { '_' } else { c })
@@ -172,13 +178,14 @@ where
                 .open(&self.path)
                 .expect("Failed to open logging file");
 
+            let global_stats = client_stats_manager.global_stats();
             let line = json!({
-                "run_time": current_time() - client_stats_manager.start_time(),
-                "clients": client_stats_manager.client_stats_count(),
-                "corpus": client_stats_manager.corpus_size(),
-                "objectives": client_stats_manager.objective_size(),
-                "executions": client_stats_manager.total_execs(),
-                "exec_sec": client_stats_manager.execs_per_sec(),
+                "run_time": global_stats.run_time,
+                "clients": global_stats.client_stats_count,
+                "corpus": global_stats.corpus_size,
+                "objectives": global_stats.objective_size,
+                "executions": global_stats.total_execs,
+                "exec_sec": global_stats.execs_per_sec,
                 "client_stats": client_stats_manager.client_stats(),
             });
             writeln!(&file, "{line}").expect("Unable to write Json to file");

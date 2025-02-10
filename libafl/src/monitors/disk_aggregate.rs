@@ -47,13 +47,14 @@ impl Monitor for OnDiskJsonAggregateMonitor {
                 .open(&self.json_path)
                 .expect("Failed to open JSON logging file");
 
+            let global_stats = client_stats_manager.global_stats();
             let mut json_value = json!({
-                "run_time": (cur_time - client_stats_manager.start_time()).as_secs(),
-                "clients": client_stats_manager.client_stats_count(),
-                "corpus": client_stats_manager.corpus_size(),
-                "objectives": client_stats_manager.objective_size(),
-                "executions": client_stats_manager.total_execs(),
-                "exec_sec": client_stats_manager.execs_per_sec(),
+                "run_time": global_stats.run_time.as_secs(),
+                "clients": global_stats.client_stats_count,
+                "corpus": global_stats.corpus_size,
+                "objectives": global_stats.objective_size,
+                "executions": global_stats.total_execs,
+                "exec_sec": global_stats.execs_per_sec,
             });
 
             // Add all aggregated values directly to the root
@@ -62,7 +63,7 @@ impl Monitor for OnDiskJsonAggregateMonitor {
                     client_stats_manager
                         .aggregated()
                         .iter()
-                        .map(|(k, v)| (k.clone(), json!(v))),
+                        .map(|(k, v)| (k.clone().into_owned(), json!(v))),
                 );
             }
 
