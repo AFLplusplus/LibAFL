@@ -332,11 +332,10 @@ where
     ) -> Result<bool, libafl::Error> {
         if exit_kind == &ExitKind::Crash {
             self.was_crash = true;
-            Ok(true)
         } else {
             self.was_crash = false;
-            Ok(false)
         }
+        Ok(false)
     }
     fn append_metadata(
         &mut self,

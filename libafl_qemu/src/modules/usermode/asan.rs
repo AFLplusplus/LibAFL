@@ -28,7 +28,7 @@ use crate::{
     emu::EmulatorModules,
     modules::{
         calls::FullBacktraceCollector,
-        edges::Tracer,
+        Tracer,
         snapshot::SnapshotModule,
         utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,

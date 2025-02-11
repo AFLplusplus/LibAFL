@@ -16,7 +16,7 @@ use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
-    feedback_or,
+    feedback_or, feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -57,7 +57,7 @@ use libafl_qemu::{
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 
-use libafl_qemu::modules::{asan::AsanModuleBuilder, tracer::TracerModule, edges::{PredicateFeedback, Tracer}};
+use libafl_qemu::modules::{asan::AsanModuleBuilder, tracer::TracerModule, PredicateFeedback, Tracer};
 
 #[cfg(unix)]
 use nix::unistd::dup;

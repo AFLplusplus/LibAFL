@@ -1,7 +1,7 @@
 use libafl::HasMetadata;
 
 use crate::{
-    modules::{edges::Tracer, EmulatorModule, EmulatorModuleTuple},
+    modules::{Tracer, EmulatorModule, EmulatorModuleTuple},
     EmulatorModules, GuestAddr, Hook, Qemu,
 };
 

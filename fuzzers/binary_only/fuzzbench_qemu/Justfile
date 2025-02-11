@@ -40,6 +40,11 @@ test2:
     cargo run --profile {{PROFILE}} ./test2 -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out ./out ./test2
 
 [unix]
+test1:
+    cargo run --profile {{PROFILE}} ./test1 -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out ./out ./test1
+
+
+[unix]
 test: build harness
     #!/bin/bash
     timeout 15s {{ FUZZER }} ./harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log

@@ -23,9 +23,6 @@ pub use full::{
     EdgeCoverageFullVariant, StdEdgeCoverageFullModule, StdEdgeCoverageFullModuleBuilder,
 };
 
-pub mod predicates;
-pub use predicates::*;
-
 pub mod classic;
 pub use classic::{
     EdgeCoverageClassicVariant, StdEdgeCoverageClassicModule, StdEdgeCoverageClassicModuleBuilder,
