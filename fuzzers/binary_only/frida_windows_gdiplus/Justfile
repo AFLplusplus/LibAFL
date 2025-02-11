@@ -43,7 +43,7 @@ test: build harness
     ping -n 10 127.0.0.1>NUL && taskkill /im frida_windows_gdiplus.exe /F
     dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
 
-[unix]
+[windows]
 clean:
     make -C libpng-1.6.37 clean
     cargo clean
