@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId},
     events::{EventFirer, ProgressReporter},

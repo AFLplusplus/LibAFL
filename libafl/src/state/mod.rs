@@ -27,7 +27,7 @@ mod stack;
 pub use stack::StageStack;
 
 #[cfg(feature = "introspection")]
-use crate::monitors::ClientPerfMonitor;
+use crate::monitors::stats::ClientPerfStats;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, LogSeverity},
@@ -109,13 +109,13 @@ pub trait HasRand {
 }
 
 #[cfg(feature = "introspection")]
-/// Trait for offering a [`ClientPerfMonitor`]
+/// Trait for offering a [`ClientPerfStats`]
 pub trait HasClientPerfMonitor {
-    /// [`ClientPerfMonitor`] itself
-    fn introspection_monitor(&self) -> &ClientPerfMonitor;
+    /// [`ClientPerfStats`] itself
+    fn introspection_stats(&self) -> &ClientPerfStats;
 
-    /// Mutatable ref to [`ClientPerfMonitor`]
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
+    /// Mutatable ref to [`ClientPerfStats`]
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats;
 }
 
 /// Intermediate trait for `HasClientPerfMonitor`
@@ -225,7 +225,7 @@ pub struct StdState<C, I, R, SC> {
     max_size: usize,
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
-    introspection_monitor: ClientPerfMonitor,
+    introspection_stats: ClientPerfStats,
     #[cfg(feature = "std")]
     /// Remaining initial inputs to load, if any
     remaining_initial_files: Option<Vec<PathBuf>>,
@@ -1104,7 +1104,7 @@ where
             max_size: DEFAULT_MAX_SIZE,
             stop_requested: false,
             #[cfg(feature = "introspection")]
-            introspection_monitor: ClientPerfMonitor::new(),
+            introspection_stats: ClientPerfStats::new(),
             #[cfg(feature = "std")]
             remaining_initial_files: None,
             #[cfg(feature = "std")]
@@ -1142,12 +1142,12 @@ impl StdState<InMemoryCorpus<NopInput>, NopInput, StdRand, InMemoryCorpus<NopInp
 
 #[cfg(feature = "introspection")]
 impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
-        &self.introspection_monitor
+    fn introspection_stats(&self) -> &ClientPerfStats {
+        &self.introspection_stats
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        &mut self.introspection_monitor
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
+        &mut self.introspection_stats
     }
 }
 
@@ -1295,11 +1295,11 @@ impl<I> HasCurrentStageId for NopState<I> {
 
 #[cfg(feature = "introspection")]
 impl<I> HasClientPerfMonitor for NopState<I> {
-    fn introspection_monitor(&self) -> &ClientPerfMonitor {
+    fn introspection_stats(&self) -> &ClientPerfStats {
         unimplemented!();
     }
 
-    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
         unimplemented!();
     }
 }

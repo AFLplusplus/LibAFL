@@ -18,7 +18,7 @@ use crate::{
     events::{Event, EventFirer, LogSeverity},
     executors::{Executor, HasObservers},
     inputs::Input,
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, RemovableScheduler, Scheduler, TestcaseScore},
     state::{HasCorpus, HasExecutions},

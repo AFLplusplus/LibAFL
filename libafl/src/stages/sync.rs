@@ -152,7 +152,7 @@ where
         }
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         Ok(())
     }
@@ -315,7 +315,7 @@ where
 
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
         Ok(())
     }
 }

@@ -10,7 +10,7 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 use libafl_bolts::{rands::Rand, Named};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
@@ -166,7 +166,7 @@ where
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         ret
     }

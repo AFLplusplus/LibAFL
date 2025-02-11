@@ -1,0 +1,38 @@
+FUZZER_NAME := 'fuzzer_sd'
+PROJECT_DIR := absolute_path(".")
+PROFILE := 'release'
+PROFILE_DIR := 'release'
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+LIBAFL_CC := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
+
+
+alias build := fuzzer
+
+cc:
+    cargo build --profile={{PROFILE}} --bin libafl_cc
+
+fuzzer: cc
+	cargo build --profile={{PROFILE}}
+
+run: fuzzer
+	{{FUZZER}}
+
+[linux]
+[macos]
+test: fuzzer
+	#!/bin/bash
+	timeout 30s {{FUZZER}} | tee fuzz_stdout.log || true
+	if grep -qa "objectives: 1" fuzz_stdout.log; then
+	    echo "Fuzzer is working"
+	else
+	    echo "Fuzzer does not generate any testcases or any crashes"
+	    exit 1
+	fi
+
+[windows]
+test: fuzzer
+	echo "Unsupported on this platform"
+
+clean:
+	cargo clean

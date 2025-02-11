@@ -76,7 +76,7 @@ frida-gum = { version = "0.16.7", features = [
 os-thread-local = "0.1.3"
 dynasmrt = "3.0.1"
 
-color-backtrace = { version = "0.6.1", features = ["resolve-modules"] }
+color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
 termcolor = "1.4.1"
 serde = { workspace = true, default-features = true }
 backtrace = { workspace = true, default-features = false, features = [

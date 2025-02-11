@@ -115,7 +115,7 @@ pub trait Feedback<EM, I, OT, S>: StateInitializer<S> + Named {
 
         // Add this stat to the feedback metrics
         state
-            .introspection_monitor_mut()
+            .introspection_stats_mut()
             .update_feedback(self.name(), elapsed);
 
         ret
