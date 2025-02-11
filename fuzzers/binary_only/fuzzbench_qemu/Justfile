@@ -4,7 +4,6 @@ FUZZER_NAME := "fuzzbench_qemu"
 HARNESS_NAME := "harness"
 
 [unix]
-[macos]
 harness:
     cc -c libfuzzer_main.c
     cc \
@@ -14,12 +13,10 @@ harness:
         -lm -lz
 
 [unix]
-[macos]
 build:
     cargo build --profile {{ PROFILE }}
 
 [unix]
-[macos]
 run: build harness
     {{ FUZZER }} \
       --libafl-in ./corpus \

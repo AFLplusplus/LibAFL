@@ -3,7 +3,6 @@ import "../../../just/libafl.just"
 FUZZER_NAME := "fuzzbench_fork_qemu"
 
 [unix]
-[macos]
 harness:
     cc -c libfuzzer_main.c
     cc \
@@ -13,12 +12,10 @@ harness:
         -lm -lz
 
 [unix]
-[macos]
 build:
     cargo build --profile {{ PROFILE }}
 
 [unix]
-[macos]
 run: build harness
     cargo run \
       --profile {{ PROFILE }} \
