@@ -285,7 +285,40 @@ where
                 module_range_map.insert(range, (id, path));
             }
 
-            self.module_mapping = Some(module_range_map);
+            // Split ranges larger than 4GiB into smaller ranges, as Drcov max
+            // module size is 4GiB. This also suffices to give each range a
+            // unique id. (Before this loop, any larger ranges split into many
+            // by smaller ranges retain the same id, which isn't unique.)
+            let mut split_module_range_map: RangeMap<u64, (u16, String)> = RangeMap::new();
+            let mut i = 0;
+            for (range, (_, path)) in module_range_map {
+                let mut range_start = range.start;
+                let range_end = range.end;
+                while range_end - range_start - 1 > u64::from(u32::MAX) {
+                    let range_end_short =
+                        (range_start + u64::from(u32::MAX) + 1)
+                        & !u64::from(u32::MAX);
+                    split_module_range_map.insert(
+                        Range {
+                            start: range_start,
+                            end: range_end_short,
+                        },
+                        (i, path.clone()),
+                    );
+                    i += 1;
+                    range_start = range_end_short;
+                }
+                split_module_range_map.insert(
+                    Range {
+                        start: range_start,
+                        end: range_end,
+                    },
+                    (i, path.clone()),
+                );
+                i += 1;
+            }
+
+            self.module_mapping = Some(RangeMap::<u64, (u16, String)>::from_iter(split_module_range_map));
         } else {
             log::info!("Using user-provided module mapping for DrCov module.");
         }
