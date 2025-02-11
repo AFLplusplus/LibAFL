@@ -1,3 +1,3 @@
 import "libafl.just"
 
-LIBAFL_QEMU_DIR := env("LIBAFL_QEMU_DIR", TARGET_DIR / "qemu-libafl-bridge")
+export LIBAFL_QEMU_DIR_DEFAULT := BUILD_DIR / "qemu-libafl-bridge"
