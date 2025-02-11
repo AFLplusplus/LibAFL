@@ -36,7 +36,7 @@ use crate::monitors::{
     Monitor,
 };
 
-#[expect(missing_docs)]
+#[allow(missing_docs)]
 pub mod ui;
 use ui::TuiUi;
 
@@ -249,7 +249,7 @@ impl ClientTuiContext {
 
 /// The [`TuiContext`] for this [`TuiMonitor`]
 #[derive(Debug, Clone)]
-#[expect(missing_docs)]
+#[allow(missing_docs)]
 pub struct TuiContext {
     pub graphs: Vec<String>,
 
