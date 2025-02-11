@@ -1,8 +1,15 @@
-import "libafl.just"
+import "libafl-qemu.just"
 
-LIBAFL_QEMU_DIR := env("LIBAFL_QEMU_DIR", TARGET_DIR / "qemu-libafl-bridge")
+# Useful rules to build libpng for multiple architecture.
 
-# Useful rules to build
+CROSS_CC := env("CROSS_CC", "x86_64-linux-gnu-gcc")
+CROSS_CXX := env("CROSS_CXX", "x86_64-linux-gnu-g++")
+CROSS_CFLAGS := env("CROSS_CFLAGS", "")
+
+DEFAULT_ARCH := env("LIBPNG_ARCH", "x86_64")
+OPTIMIZATIONS := env("LIBPNG_OPTIMIZATIONS", "yes")
+
+DEPS_DIR := TARGET_DIR / "deps"
 
 [unix]
 target_dir:
@@ -71,4 +78,3 @@ libpng arch=DEFAULT_ARCH: (arch_dir arch) zlib libpng_wget
             --host={{ arch }} \
 
     make -j
-
