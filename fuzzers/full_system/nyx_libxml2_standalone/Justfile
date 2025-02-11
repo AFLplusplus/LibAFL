@@ -17,8 +17,14 @@ enable_kvm_vmware_hypercall:
     fi;
 
 [unix]
+build: libxml2
+
+[unix]
 run: libxml2 enable_kvm_vmware_hypercall
     cargo run
+
+[unix]
+test: build
 
 [unix]
 clean:
