@@ -57,7 +57,7 @@ use libafl_qemu::{
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 
-use libafl_qemu::modules::{asan::AsanModuleBuilder, tracer::TracerModule, PredicateFeedback, Tracer};
+use libafl_qemu::modules::{asan::AsanModuleBuilder, tracer::TracerModule, PredicateFeedback, Tracer, SnapshotModule};
 
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -189,6 +189,7 @@ fn fuzz(
     let mut asan = AsanModuleBuilder::default().build();
     let mut tracer = TracerModule::default();
     tracer.set_use_rca(true);
+    let snapshot = SnapshotModule::new();
 
     let modules = tuple_list!(
         StdEdgeCoverageModule::builder()
@@ -198,6 +199,7 @@ fn fuzz(
             .unwrap(),
         CmpLogModule::default(),
         asan,
+        snapshot,
         tracer,
         //QemuSnapshotHelper::new()
     );
