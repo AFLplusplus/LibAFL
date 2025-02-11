@@ -297,11 +297,11 @@ mod test {
         let mut mgr_list = tuple_list!(
             SimpleMonitor::new(|_msg| {
                 #[cfg(feature = "std")]
-                println!("{_msg}")
+                println!("{_msg}");
             }),
             SimpleMonitor::new(|_msg| {
                 #[cfg(feature = "std")]
-                println!("{_msg}")
+                println!("{_msg}");
             }),
             NopMonitor::default(),
             NopMonitor::default(),
