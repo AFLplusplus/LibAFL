@@ -5,14 +5,18 @@ FUZZER_NAME := "qemu_launcher"
 HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
 
 [unix]
-build arch=DEFAULT_ARCH:
+build:
     cargo build \
       --profile {{ PROFILE }} \
-      --features {{ arch }} \
+      --features {{ ARCH }} \
       --target-dir {{ TARGET_DIR }}
 
 [unix]
-harness arch=DEFAULT_ARCH: (libpng arch)
+harness: libpng
+    #!/bin/bash
+
+    source {{ DOTENV }}
+
     {{ CROSS_CXX }} \
         ./harness.cc \
         {{ CROSS_CFLAGS }} \
@@ -25,7 +29,7 @@ harness arch=DEFAULT_ARCH: (libpng arch)
         -lm
 
 [unix]
-run arch=DEFAULT_ARCH: (harness arch) (build arch)
+run: harness build
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
@@ -40,7 +44,7 @@ run arch=DEFAULT_ARCH: (harness arch) (build arch)
 
 
 [unix]
-test_inner arch=DEFAULT_ARCH : (run arch)
+test_inner: harness build
     #!/bin/bash
 
     export QEMU_LAUNCHER={{ FUZZER }}
@@ -52,9 +56,11 @@ test_inner arch=DEFAULT_ARCH : (run arch)
     ./tests/qasan/test.sh || exit 1
 
 [unix]
-test: (test_inner "x86_64") (test_inner "arm")
+test:
+    ARCH=x86_64 just test_inner
+    ARCH=arm just test_inner
 
-single arch=DEFAULT_ARCH: (harness arch) (build arch)
+single: harness build
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
@@ -63,7 +69,7 @@ single arch=DEFAULT_ARCH: (harness arch) (build arch)
         -- \
         {{ HARNESS }}
 
-asan arch=DEFAULT_ARCH: (harness arch) (build arch)
+asan: harness build
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \
@@ -73,7 +79,7 @@ asan arch=DEFAULT_ARCH: (harness arch) (build arch)
         -- \
         {{ HARNESS }}
 
-asan_guest arch=DEFAULT_ARCH: (harness arch) (build arch)
+asan_guest: harness build
     {{ FUZZER }} \
         --input ./corpus \
         --output {{ TARGET_DIR }}/output/ \

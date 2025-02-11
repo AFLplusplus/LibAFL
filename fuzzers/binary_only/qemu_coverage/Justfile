@@ -4,14 +4,18 @@ FUZZER_NAME := "qemu_coverage"
 HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
 
 [unix]
-build arch=DEFAULT_ARCH:
+build:
     cargo build \
       --profile {{ PROFILE }} \
-      --features {{ arch }} \
+      --features {{ ARCH }} \
       --target-dir {{ TARGET_DIR }}
 
 [unix]
-harness arch=DEFAULT_ARCH: (libpng arch)
+harness: libpng
+    #!/bin/bash
+
+    source {{ DOTENV }}
+
     {{ CROSS_CXX }} \
         ./harness.cc \
         {{ CROSS_CFLAGS }} \
@@ -24,7 +28,7 @@ harness arch=DEFAULT_ARCH: (libpng arch)
         -lm -static
 
 [unix]
-run arch=DEFAULT_ARCH: (harness arch) (build arch)
+run: harness build
     {{ FUZZER }} \
         --coverage-path {{ TARGET_DIR }}/cov.drcov \
         --input-dir ./corpus \
@@ -32,7 +36,7 @@ run arch=DEFAULT_ARCH: (harness arch) (build arch)
         -- {{ HARNESS }}
 
 [unix]
-test_inner arch=DEFAULT_ARCH : (run arch)
+test_inner: run
     #!/bin/bash
 
     cargo run --manifest-path ../../../utils/drcov_utils/Cargo.toml --bin drcov_merge -- \
@@ -52,7 +56,9 @@ test_inner arch=DEFAULT_ARCH : (run arch)
     fi
 
 [unix]
-test: (test_inner "x86_64") (test_inner "arm")
+test:
+    ARCH=x86_64 just test_inner
+    ARCH=arm just test_inner
 
 [unix]
 clean:

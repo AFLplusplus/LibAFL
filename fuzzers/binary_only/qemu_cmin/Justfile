@@ -4,17 +4,21 @@ FUZZER_NAME := "qemu_cmin"
 HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
 
 [unix]
-build arch=DEFAULT_ARCH:
+build:
     cargo build \
       --profile {{ PROFILE }} \
-      --features {{ arch }} \
+      --features {{ ARCH }} \
       --target-dir {{ TARGET_DIR }}
 
 [unix]
-harness arch=DEFAULT_ARCH: (libpng arch)
-    {{ CROSS_CXX }} \
+harness: libpng
+    #!/bin/bash
+
+    source {{ DOTENV }}
+
+    $CROSS_CXX \
         ./harness.cc \
-        {{ CROSS_CFLAGS }} \
+        $CROSS_CFLAGS \
         "{{TARGET_DIR}}/build-png/.libs/libpng16.a" \
         "{{TARGET_DIR}}/build-zlib/libz.a" \
         -I"{{TARGET_DIR}}/build-png" \
@@ -24,7 +28,7 @@ harness arch=DEFAULT_ARCH: (libpng arch)
         -lm -static
 
 [unix]
-run arch=DEFAULT_ARCH: (harness arch) (build arch)
+run: harness build
     {{ FUZZER }} \
         --output ./output \
         --input ./corpus \
@@ -32,7 +36,9 @@ run arch=DEFAULT_ARCH: (harness arch) (build arch)
         -- {{ HARNESS }}
 
 [unix]
-test: (run "x86_64") (run "arm")
+test:
+    ARCH=x86_64 just run
+    ARCH=arm just run
 
 [unix]
 clean:

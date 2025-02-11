@@ -2,14 +2,19 @@ import "libafl-qemu.just"
 
 # Useful rules to build libpng for multiple architecture.
 
-CROSS_CC := env("CROSS_CC", "x86_64-linux-gnu-gcc")
-CROSS_CXX := env("CROSS_CXX", "x86_64-linux-gnu-g++")
-CROSS_CFLAGS := env("CROSS_CFLAGS", "")
-
-DEFAULT_ARCH := env("LIBPNG_ARCH", "x86_64")
-OPTIMIZATIONS := env("LIBPNG_OPTIMIZATIONS", "yes")
+ARCH := env("ARCH", "x86_64")
+OPTIMIZATIONS := env("OPTIMIZATIONS", "yes")
 
 DEPS_DIR := TARGET_DIR / "deps"
+
+DOTENV := source_directory() / "envs" / ".env." + ARCH
+
+arch:
+    #!/bin/bash
+
+    source {{ DOTENV }}
+
+    echo $CROSS_CC
 
 [unix]
 target_dir:
@@ -20,8 +25,8 @@ deps_dir:
     mkdir -p {{ DEPS_DIR }}
 
 [unix]
-arch_dir arch:
-    mkdir -p {{ arch }}
+arch_dir:
+    mkdir -p {{ ARCH }}
 
 [unix]
 zlib_wget: deps_dir
@@ -39,13 +44,15 @@ zlib_wget: deps_dir
 zlib: zlib_wget
     #!/bin/bash
 
+    source {{ DOTENV }}
+
     rm -rf {{ TARGET_DIR }}/build-zlib/
 
     mkdir {{ TARGET_DIR }}/build-zlib/
 
     cd {{ TARGET_DIR }}/build-zlib/ && \
-        CC={{ CROSS_CC }} \
-        CFLAGS={{ CROSS_CFLAGS }} \
+        CC=$CROSS_CC \
+        CFLAGS=$CROSS_CFLAGS \
         {{ DEPS_DIR }}/zlib-1.2.13/configure \
             --prefix=./zlib
 
@@ -62,19 +69,23 @@ libpng_wget: deps_dir
         -C {{ DEPS_DIR }}
 
 [unix]
-libpng arch=DEFAULT_ARCH: (arch_dir arch) zlib libpng_wget
+libpng: arch_dir zlib libpng_wget
+    #!/bin/bash
+
+    source {{ DOTENV }}
+
     rm -rf {{ TARGET_DIR }}/build-png/
 
     mkdir {{TARGET_DIR}}/build-png/
 
     cd {{ TARGET_DIR }}/build-png/ && \
-        CC={{ CROSS_CC }} \
-        CFLAGS="{{ CROSS_CFLAGS }} -I"{{ TARGET_DIR }}/build-zlib/zlib/lib"" \
+        CC=$CROSS_CC \
+        CFLAGS="$CROSS_CFLAGS -I"{{ TARGET_DIR }}/build-zlib/zlib/lib"" \
         LDFLAGS=-L"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
         {{ DEPS_DIR }}/libpng-1.6.37/configure \
             --enable-shared=no \
             --with-pic=yes \
             --enable-hardware-optimizations={{ OPTIMIZATIONS }} \
-            --host={{ arch }} \
+            --host={{ ARCH }} \
 
     make -j -C {{ TARGET_DIR }}/build-png/
