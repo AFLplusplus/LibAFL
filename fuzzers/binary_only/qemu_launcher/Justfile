@@ -17,9 +17,9 @@ harness: libpng
 
     source {{ DOTENV }}
 
-    {{ CROSS_CXX }} \
+    $CROSS_CXX \
         ./harness.cc \
-        {{ CROSS_CFLAGS }} \
+        $CROSS_CFLAGS \
         "{{ TARGET_DIR }}/build-png/.libs/libpng16.a" \
         "{{ TARGET_DIR }}/build-zlib/libz.a" \
         -I"{{ TARGET_DIR }}/build-png" \
