@@ -6,19 +6,21 @@ use libafl::events::SimpleEventManager;
 #[cfg(not(feature = "simplemgr"))]
 use libafl::events::{LlmpRestartingEventManager, MonitorTypedEventManager};
 use libafl::{
-    corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
+    corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{ClientDescription, EventRestarter},
-    executors::{Executor, ShadowExecutor},
+    executors::{Executor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::BytesInput,
+    inputs::{BytesInput, Input},
     monitors::Monitor,
     mutators::{
         havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, StdMOptMutator,
         StdScheduledMutator, Tokens,
     },
-    observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{
+        CanTrack, HitcountsMapObserver, ObserversTuple, TimeObserver, VariableMapObserver,
+    },
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
@@ -26,7 +28,7 @@ use libafl::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
         ShadowTracingStage, StagesTuple, StdMutationalStage,
     },
-    state::{HasCorpus, StdState},
+    state::{HasCorpus, HasExecutions, HasSolutions, StdState},
     Error, HasMetadata,
 };
 #[cfg(not(feature = "simplemgr"))]
@@ -42,7 +44,7 @@ use libafl_qemu::{
         cmplog::CmpLogObserver,
         edges::EdgeCoverageFullVariant,
         utils::filters::{HasAddressFilter, NopPageFilter, StdAddressFilter},
-        EdgeCoverageModule, EmulatorModuleTuple, StdEdgeCoverageModule,
+        EdgeCoverageModule, EmulatorModuleTuple, SnapshotModule, StdEdgeCoverageModule,
     },
     Emulator, GuestAddr, Qemu, QemuExecutor,
 };
@@ -61,6 +63,27 @@ pub type ClientMgr<M> = MonitorTypedEventManager<
     LlmpRestartingEventManager<(), BytesInput, ClientState, StdShMem, StdShMemProvider>,
     M,
 >;
+
+/*
+ * The snapshot and iterations options interact as follows:
+ *
+ * +----------+------------+-------------------------------------------+
+ * | snapshot | iterations | Functionality                             |
+ * +----------+------------+-------------------------------------------+
+ * |    N     |     N      | We set the snapshot module into manual    |
+ * |          |            | mode and never reset it.                  |
+ * +----------+------------+-------------------------------------------+
+ * |    N     |     Y      | We set the snapshot module into manual    |
+ * |          |            | mode and never reset it.                  |
+ * +----------+------------+-------------------------------------------+
+ * |    Y     |     N      | We set the snapshot module into automatic |
+ * |          |            | mode so it resets after every iteration.  |
+ * +----------+------------+-------------------------------------------+
+ * |    Y     |     Y      | We set the snapshot module into manual    |
+ * |          |            | mode and manually reset it after the      |
+ * |          |            | required number of iterations are done.   |
+ * +----------+------------+-------------------------------------------+
+ */
 
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
@@ -131,7 +154,22 @@ impl<M: Monitor> Instance<'_, M> {
             .map_observer(edges_observer.as_mut())
             .build()?;
 
-        let modules = modules.prepend(edge_coverage_module);
+        let mut snapshot_module = SnapshotModule::new();
+
+        /*
+         * Since the generics for the modules are already excessive when taking
+         * into accout asan, asan guest mode, cmplog, and injection, we will
+         * always include the SnapshotModule in all configurations, but simply
+         * not use it when it is not required. See the table at the top of this
+         * file for details.
+         */
+        if !self.options.snapshots || self.options.iterations.is_some() {
+            snapshot_module.use_manual_reset();
+        }
+
+        let modules = modules
+            .prepend(edge_coverage_module)
+            .prepend(snapshot_module);
         let mut emulator = Emulator::empty()
             .qemu_parameters(args)
             .modules(modules)
@@ -266,9 +304,9 @@ impl<M: Monitor> Instance<'_, M> {
             // Create an observation channel using cmplog map
             let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
-            let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
+            let mut shadow_executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-            let tracing = ShadowTracingStage::new(&mut executor);
+            let tracing = ShadowTracingStage::new(&mut shadow_executor);
 
             // Setup a randomic Input2State stage
             let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(
@@ -289,7 +327,14 @@ impl<M: Monitor> Instance<'_, M> {
             // The order of the stages matter!
             let mut stages = tuple_list!(calibration, tracing, i2s, power, stats_stage);
 
-            self.fuzz(&mut state, &mut fuzzer, &mut executor, &mut stages)
+            self.fuzz(
+                &mut state,
+                &mut fuzzer,
+                &mut shadow_executor,
+                Self::reset_shadow_executor_snapshot_module,
+                qemu,
+                &mut stages,
+            )
         } else {
             // Create a QEMU in-process executor
             let mut executor = QemuExecutor::new(
@@ -306,25 +351,88 @@ impl<M: Monitor> Instance<'_, M> {
             let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
             let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-            self.fuzz(&mut state, &mut fuzzer, &mut executor, &mut stages)
+            self.fuzz(
+                &mut state,
+                &mut fuzzer,
+                &mut executor,
+                Self::reset_executor_snapshot_module,
+                qemu,
+                &mut stages,
+            )
         }
     }
 
-    fn fuzz<Z, E, ST>(
+    fn reset_executor_snapshot_module<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, Z>(
+        executor: &mut QemuExecutor<'a, C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
+        qemu: Qemu,
+    ) where
+        I: Input + Unpin,
+        ET: EmulatorModuleTuple<I, S>,
+        S: HasCorpus<I> + HasCurrentCorpusId + HasSolutions<I> + HasExecutions + Unpin,
+        H: for<'e, 's, 'i> FnMut(
+            &'e mut Emulator<C, CM, ED, (SnapshotModule, ET), I, S, SM>,
+            &'s mut S,
+            &'i I,
+        ) -> ExitKind,
+        OT: ObserversTuple<I, S>,
+    {
+        executor
+            .inner_mut()
+            .exposed_executor_state_mut()
+            .modules_mut()
+            .modules_mut()
+            .0
+            .reset(qemu);
+    }
+
+    fn reset_shadow_executor_snapshot_module<'a, C, CM, ED, EM, ET, H, I, OT, S, SM, SOT, Z>(
+        executor: &mut ShadowExecutor<
+            QemuExecutor<'a, C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
+            I,
+            S,
+            SOT,
+        >,
+        qemu: Qemu,
+    ) where
+        I: Input + Unpin,
+        ET: EmulatorModuleTuple<I, S>,
+        S: HasCorpus<I> + HasCurrentCorpusId + HasSolutions<I> + HasExecutions + Unpin,
+        H: for<'e, 's, 'i> FnMut(
+            &'e mut Emulator<C, CM, ED, (SnapshotModule, ET), I, S, SM>,
+            &'s mut S,
+            &'i I,
+        ) -> ExitKind,
+        OT: ObserversTuple<I, S>,
+        SOT: ObserversTuple<I, S>,
+    {
+        executor
+            .executor_mut()
+            .inner_mut()
+            .exposed_executor_state_mut()
+            .modules_mut()
+            .modules_mut()
+            .0
+            .reset(qemu);
+    }
+
+    fn fuzz<Z, E, ST, RSM>(
         &mut self,
         state: &mut ClientState,
         fuzzer: &mut Z,
         executor: &mut E,
+        reset_snapshot_module: RSM,
+        qemu: Qemu,
         stages: &mut ST,
     ) -> Result<(), Error>
     where
         Z: Fuzzer<E, ClientMgr<M>, BytesInput, ClientState, ST>
             + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
         ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
+        RSM: Fn(&mut E, Qemu),
     {
-        let corpus_dirs = [self.options.input_dir()];
-
         if state.must_load_initial_inputs() {
+            let corpus_dirs = [self.options.input_dir()];
+
             state
                 .load_initial_inputs(fuzzer, executor, &mut self.mgr, &corpus_dirs)
                 .unwrap_or_else(|_| {
@@ -334,12 +442,23 @@ impl<M: Monitor> Instance<'_, M> {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
+        /*
+         * See the table a the top of this file for details on how the snapshot
+         * and iterations options interact.
+         */
         if let Some(iters) = self.options.iterations {
-            fuzzer.fuzz_loop_for(stages, executor, state, &mut self.mgr, iters)?;
+            if self.options.snapshots {
+                loop {
+                    reset_snapshot_module(executor, qemu);
+                    fuzzer.fuzz_loop_for(stages, executor, state, &mut self.mgr, iters)?;
+                }
+            } else {
+                fuzzer.fuzz_loop_for(stages, executor, state, &mut self.mgr, iters)?;
 
-            // It's important, that we store the state before restarting!
-            // Else, the parent will not respawn a new child and quit.
-            self.mgr.on_restart(state)?;
+                // It's important, that we store the state before restarting!
+                // Else, the parent will not respawn a new child and quit.
+                self.mgr.on_restart(state)?;
+            }
         } else {
             fuzzer.fuzz_loop(stages, executor, state, &mut self.mgr)?;
         }
