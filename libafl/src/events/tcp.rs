@@ -47,13 +47,12 @@ use crate::{
         EventManagerId, EventReceiver, EventRestarter, HasEventManagerId, ProgressReporter,
     },
     inputs::Input,
-    monitors::Monitor,
+    monitors::{stats::ClientStatsManager, Monitor},
     stages::HasCurrentStageId,
     state::{
         HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
     },
-    statistics::manager::ClientStatsManager,
     Error, HasMetadata,
 };
 

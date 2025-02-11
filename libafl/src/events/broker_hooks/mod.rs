@@ -14,8 +14,7 @@ use serde::de::DeserializeOwned;
 use crate::events::llmp::COMPRESS_THRESHOLD;
 use crate::{
     events::{llmp::LLMP_TAG_EVENT_TO_BOTH, BrokerEventResult, Event},
-    monitors::Monitor,
-    statistics::manager::ClientStatsManager,
+    monitors::{stats::ClientStatsManager, Monitor},
     Error,
 };
 

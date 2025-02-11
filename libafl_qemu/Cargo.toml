@@ -115,8 +115,8 @@ num-derive = "0.4.2"
 num_enum = { workspace = true, default-features = true }
 goblin = "0.9.2"
 libc = { workspace = true }
-strum = "0.26.3"
-strum_macros = "0.26.4"
+strum = "0.27.0"
+strum_macros = "0.27.0"
 syscall-numbers = "4.0.0"
 meminterval = { workspace = true }
 thread_local = "1.1.8"
