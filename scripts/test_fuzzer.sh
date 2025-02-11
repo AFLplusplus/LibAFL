@@ -15,6 +15,11 @@ else
     export PROFILE_DIR=debug
 fi
 
+if echo "$1" | grep -q "windows"; then
+  export CARGO_BUILD_TARGET="x86_64-pc-windows-gnullvm"
+  export CC="${CC:-clang-18}" CXX="${CXX:-clang++-18}"
+fi
+
 libafl=$(pwd)
 
 echo "Testing" "$fuzzer_to_test"

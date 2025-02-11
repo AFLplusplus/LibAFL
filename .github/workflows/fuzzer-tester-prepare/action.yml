@@ -22,6 +22,9 @@ runs:
     - name: Add wasm target
       shell: bash
       run: rustup target add wasm32-unknown-unknown
+    - name: Add windows-gnullvm target
+      shell: bash
+      run: rustup target add x86_64-pc-windows-gnullvm
     - name: install cargo-make
       uses: baptiste0928/cargo-install@v3
       with:
