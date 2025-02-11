@@ -1,3 +1,4 @@
+//! The UI-specific parts of [`super::TuiMonitor`]
 use alloc::{string::ToString, vec::Vec};
 use std::{
     cmp::{max, min},
@@ -93,6 +94,7 @@ impl TuiUi {
         }
     }
 
+    /// Draw the current TUI context
     pub fn draw(&mut self, f: &mut Frame, app: &Arc<RwLock<TuiContext>>) {
         self.clients = app.read().unwrap().clients_num;
 

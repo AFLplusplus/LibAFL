@@ -27,13 +27,13 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
-use crate::statistics::perf_stats::{ClientPerfStats, PerfFeature};
-use crate::{
-    monitors::Monitor,
-    statistics::{
+use crate::monitors::stats::perf_stats::{ClientPerfStats, PerfFeature};
+use crate::monitors::{
+    stats::{
         manager::ClientStatsManager, user_stats::UserStats, ClientStats, ItemGeometry,
         ProcessTiming,
     },
+    Monitor,
 };
 
 #[expect(missing_docs)]
@@ -207,19 +207,26 @@ impl PerfTuiContext {
 }
 
 /// The context for a single client tracked in this [`TuiMonitor`]
-#[expect(missing_docs)]
 #[derive(Debug, Default, Clone)]
 pub struct ClientTuiContext {
+    /// The corpus size
     pub corpus: u64,
+    /// Amount of objectives
     pub objectives: u64,
+    /// Amount of executions
     pub executions: u64,
     /// Float value formatted as String
     pub map_density: String,
 
+    /// How many cycles have been done.
+    /// Roughly: every testcase has been scheduled once, but highly fuzzer-specific.
     pub cycles_done: u64,
 
+    /// Times for processing
     pub process_timing: ProcessTiming,
+    /// The individual entry geometry
     pub item_geometry: ItemGeometry,
+    /// Extra fuzzer-specific stats
     pub user_stats: HashMap<Cow<'static, str>, UserStats>,
 }
 
@@ -241,8 +248,8 @@ impl ClientTuiContext {
 }
 
 /// The [`TuiContext`] for this [`TuiMonitor`]
-#[expect(missing_docs)]
 #[derive(Debug, Clone)]
+#[expect(missing_docs)]
 pub struct TuiContext {
     pub graphs: Vec<String>,
 

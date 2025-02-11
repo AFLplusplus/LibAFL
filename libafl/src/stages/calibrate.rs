@@ -19,11 +19,11 @@ use crate::{
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
     inputs::Input,
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions},
-    statistics::user_stats::{AggregatorOps, UserStats, UserStatsValue},
     Error, HasMetadata, HasNamedMetadata,
 };
 

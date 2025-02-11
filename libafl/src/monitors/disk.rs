@@ -11,7 +11,7 @@ use std::{
 use libafl_bolts::{current_time, ClientId};
 use serde_json::json;
 
-use crate::{monitors::Monitor, statistics::manager::ClientStatsManager};
+use crate::monitors::{stats::ClientStatsManager, Monitor};
 
 /// Wrap a monitor and log the current state of the monitor into a Toml file.
 #[derive(Debug, Clone)]

@@ -3,9 +3,10 @@
 
 use std::{thread::sleep, time::Duration};
 
-use libafl::{
-    monitors::{tui::TuiMonitor, Monitor},
-    statistics::{manager::ClientStatsManager, ClientStats},
+use libafl::monitors::{
+    stats::{manager::ClientStatsManager, ClientStats},
+    tui::TuiMonitor,
+    Monitor,
 };
 use libafl_bolts::ClientId;
 

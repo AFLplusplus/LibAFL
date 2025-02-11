@@ -13,7 +13,7 @@ use libafl_bolts::{
 };
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
-use crate::statistics::perf_stats::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},

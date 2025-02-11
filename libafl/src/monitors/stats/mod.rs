@@ -13,12 +13,13 @@ use core::time::Duration;
 
 use hashbrown::HashMap;
 use libafl_bolts::current_time;
+pub use manager::ClientStatsManager;
 #[cfg(feature = "introspection")]
-use perf_stats::ClientPerfStats;
+pub use perf_stats::{ClientPerfStats, PerfFeature};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use serde_json::Value;
-use user_stats::UserStats;
+pub use user_stats::{AggregatorOps, UserStats, UserStatsValue};
 
 #[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
@@ -107,13 +108,17 @@ impl ProcessTiming {
 }
 
 /// The geometry of a single data point
-#[expect(missing_docs)]
 #[derive(Debug, Default, Clone)]
 pub struct ItemGeometry {
+    /// Pending entries
     pub pending: u64,
+    /// Favored pending entries
     pub pend_fav: u64,
+    /// How much entries we found
     pub own_finds: u64,
+    /// How much entries were imported
     pub imported: u64,
+    /// The stability, stringified
     pub stability: String,
 }
 
