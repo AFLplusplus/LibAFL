@@ -261,45 +261,51 @@ macro_rules! mark_feedback_time {
     }};
 }
 
-// The client stats of first and second monitor will always be maintained
-// to be consistent
-/// A combined monitor consisting of multiple [`Monitor`]s.
-#[derive(Debug, Clone)]
-pub struct CombinedMonitor<A, B> {
-    first: A,
-    second: B,
-}
-
-impl<A: Monitor, B: Monitor> CombinedMonitor<A, B> {
-    /// Create a new combined monitor
-    pub fn new(first: A, second: B) -> Self {
-        Self { first, second }
-    }
-}
-
-impl<A: Monitor, B: Monitor> Monitor for CombinedMonitor<A, B> {
+impl<A: Monitor, B: Monitor> Monitor for (A, B) {
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
     ) {
-        self.first
-            .display(client_stats_manager, event_msg, sender_id);
-        self.second
-            .display(client_stats_manager, event_msg, sender_id);
+        self.0.display(client_stats_manager, event_msg, sender_id);
+        self.1.display(client_stats_manager, event_msg, sender_id);
     }
 }
 
-/// Variadic macro to create a chain of [`Monitor`]
-#[macro_export]
-macro_rules! combine_monitor {
-    ( $last:expr ) => { $last };
+impl<A: Monitor> Monitor for (A, ()) {
+    fn display(
+        &mut self,
+        client_stats_manager: &mut ClientStatsManager,
+        event_msg: &str,
+        sender_id: ClientId,
+    ) {
+        self.0.display(client_stats_manager, event_msg, sender_id);
+    }
+}
 
-    ( $last:expr, ) => { $last };
+#[cfg(test)]
+mod test {
+    use libafl_bolts::ClientId;
+    use tuple_list::tuple_list;
 
-    ( $head:expr, $($tail:expr),+ $(,)?) => {
-        // recursive call
-        $crate::monitors::CombinedMonitor::new($head , $crate::combine_monitor!($($tail),+))
-    };
+    use super::{stats::ClientStatsManager, Monitor, NopMonitor, SimpleMonitor};
+
+    #[test]
+    fn test_monitor_tuple_list() {
+        let mut client_stats = ClientStatsManager::new();
+        let mut mgr_list = tuple_list!(
+            SimpleMonitor::new(|_msg| {
+                #[cfg(feature = "std")]
+                println!("{_msg}");
+            }),
+            SimpleMonitor::new(|_msg| {
+                #[cfg(feature = "std")]
+                println!("{_msg}");
+            }),
+            NopMonitor::default(),
+            NopMonitor::default(),
+        );
+        mgr_list.display(&mut client_stats, "test", ClientId(0));
+    }
 }
