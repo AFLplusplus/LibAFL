@@ -31,14 +31,16 @@ use crate::{
         Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
         SendExiting,
     },
-    monitors::Monitor,
+    monitors::{stats::ClientStatsManager, Monitor},
     stages::HasCurrentStageId,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
-    statistics::manager::ClientStatsManager,
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
-use crate::{monitors::SimplePrintingMonitor, state::HasSolutions, statistics::ClientStats};
+use crate::{
+    monitors::{stats::ClientStats, SimplePrintingMonitor},
+    state::HasSolutions,
+};
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";

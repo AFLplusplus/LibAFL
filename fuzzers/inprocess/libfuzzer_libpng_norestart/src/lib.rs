@@ -8,7 +8,6 @@ use std::{env, net::SocketAddr, path::PathBuf};
 
 use clap::Parser;
 use libafl::{
-    combine_monitor,
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{
         launcher::{ClientDescription, Launcher},
@@ -157,7 +156,7 @@ pub extern "C" fn libafl_main() {
 
     let shmem_provider = MmapShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = combine_monitor!(
+    let monitor = tuple_list!(
         OnDiskTomlMonitor::new("./fuzzer_stats.toml"),
         MultiMonitor::new(|s| println!("{s}"))
     );

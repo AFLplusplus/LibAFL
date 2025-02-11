@@ -3,6 +3,8 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
+pub mod stats;
+
 #[cfg(feature = "std")]
 pub mod disk;
 #[cfg(feature = "std")]
@@ -26,11 +28,11 @@ use alloc::fmt::Debug;
 use alloc::vec::Vec;
 use core::{fmt, fmt::Write, time::Duration};
 
-use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use libafl_bolts::ClientId;
 #[cfg(all(feature = "prometheus_monitor", feature = "std"))]
 pub use prometheus::PrometheusMonitor;
 
-use crate::statistics::manager::ClientStatsManager;
+use crate::monitors::stats::ClientStatsManager;
 
 /// The monitor trait keeps track of all the client's monitor, and offers methods to display them.
 pub trait Monitor {
@@ -96,21 +98,22 @@ impl Monitor for SimplePrintingMonitor {
         sender_id: ClientId,
     ) {
         let mut userstats = client_stats_manager.client_stats()[sender_id.0 as usize]
-            .user_stats
+            .user_stats()
             .iter()
             .map(|(key, value)| format!("{key}: {value}"))
             .collect::<Vec<_>>();
         userstats.sort();
+        let global_stats = client_stats_manager.global_stats();
         println!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}, {}",
             event_msg,
             sender_id.0,
-            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
-            client_stats_manager.client_stats_count(),
-            client_stats_manager.corpus_size(),
-            client_stats_manager.objective_size(),
-            client_stats_manager.total_execs(),
-            client_stats_manager.execs_per_sec_pretty(),
+            global_stats.run_time_pretty,
+            global_stats.client_stats_count,
+            global_stats.corpus_size,
+            global_stats.objective_size,
+            global_stats.total_execs,
+            global_stats.execs_per_sec_pretty,
             userstats.join(", ")
         );
 
@@ -158,22 +161,23 @@ where
         event_msg: &str,
         sender_id: ClientId,
     ) {
+        let global_stats = client_stats_manager.global_stats();
         let mut fmt = format!(
             "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id.0,
-            format_duration_hms(&(current_time() - client_stats_manager.start_time())),
-            client_stats_manager.client_stats_count(),
-            client_stats_manager.corpus_size(),
-            client_stats_manager.objective_size(),
-            client_stats_manager.total_execs(),
-            client_stats_manager.execs_per_sec_pretty()
+            global_stats.run_time_pretty,
+            global_stats.client_stats_count,
+            global_stats.corpus_size,
+            global_stats.objective_size,
+            global_stats.total_execs,
+            global_stats.execs_per_sec_pretty
         );
 
         if self.print_user_monitor {
             client_stats_manager.client_stats_insert(sender_id);
             let client = client_stats_manager.client_stats_for(sender_id);
-            for (key, val) in &client.user_stats {
+            for (key, val) in client.user_stats() {
                 write!(fmt, ", {key}: {val}").unwrap();
             }
         }
@@ -257,45 +261,51 @@ macro_rules! mark_feedback_time {
     }};
 }
 
-// The client stats of first and second monitor will always be maintained
-// to be consistent
-/// A combined monitor consisting of multiple [`Monitor`]s.
-#[derive(Debug, Clone)]
-pub struct CombinedMonitor<A, B> {
-    first: A,
-    second: B,
-}
-
-impl<A: Monitor, B: Monitor> CombinedMonitor<A, B> {
-    /// Create a new combined monitor
-    pub fn new(first: A, second: B) -> Self {
-        Self { first, second }
-    }
-}
-
-impl<A: Monitor, B: Monitor> Monitor for CombinedMonitor<A, B> {
+impl<A: Monitor, B: Monitor> Monitor for (A, B) {
     fn display(
         &mut self,
         client_stats_manager: &mut ClientStatsManager,
         event_msg: &str,
         sender_id: ClientId,
     ) {
-        self.first
-            .display(client_stats_manager, event_msg, sender_id);
-        self.second
-            .display(client_stats_manager, event_msg, sender_id);
+        self.0.display(client_stats_manager, event_msg, sender_id);
+        self.1.display(client_stats_manager, event_msg, sender_id);
     }
 }
 
-/// Variadic macro to create a chain of [`Monitor`]
-#[macro_export]
-macro_rules! combine_monitor {
-    ( $last:expr ) => { $last };
+impl<A: Monitor> Monitor for (A, ()) {
+    fn display(
+        &mut self,
+        client_stats_manager: &mut ClientStatsManager,
+        event_msg: &str,
+        sender_id: ClientId,
+    ) {
+        self.0.display(client_stats_manager, event_msg, sender_id);
+    }
+}
 
-    ( $last:expr, ) => { $last };
+#[cfg(test)]
+mod test {
+    use libafl_bolts::ClientId;
+    use tuple_list::tuple_list;
 
-    ( $head:expr, $($tail:expr),+ $(,)?) => {
-        // recursive call
-        $crate::monitors::CombinedMonitor::new($head , $crate::combine_monitor!($($tail),+))
-    };
+    use super::{stats::ClientStatsManager, Monitor, NopMonitor, SimpleMonitor};
+
+    #[test]
+    fn test_monitor_tuple_list() {
+        let mut client_stats = ClientStatsManager::new();
+        let mut mgr_list = tuple_list!(
+            SimpleMonitor::new(|_msg| {
+                #[cfg(feature = "std")]
+                println!("{_msg}");
+            }),
+            SimpleMonitor::new(|_msg| {
+                #[cfg(feature = "std")]
+                println!("{_msg}");
+            }),
+            NopMonitor::default(),
+            NopMonitor::default(),
+        );
+        mgr_list.display(&mut client_stats, "test", ClientId(0));
+    }
 }
