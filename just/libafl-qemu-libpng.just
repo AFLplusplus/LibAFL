@@ -9,13 +9,6 @@ DEPS_DIR := TARGET_DIR / "deps"
 
 DOTENV := source_directory() / "envs" / ".env." + ARCH
 
-arch:
-    #!/bin/bash
-
-    source {{ DOTENV }}
-
-    echo $CROSS_CC
-
 [unix]
 target_dir:
     mkdir -p {{ TARGET_DIR }}
