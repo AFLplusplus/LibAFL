@@ -16,11 +16,11 @@ harness arch=DEFAULT_ARCH: (libpng arch)
     {{ CROSS_CXX }} \
         ./harness.cc \
         {{ CROSS_CFLAGS }} \
-        "{{TARGET_DIR}}/build-png/.libs/libpng16.a" \
-        "{{TARGET_DIR}}/build-zlib/libz.a" \
-        -I"{{TARGET_DIR}}/build-png" \
-        -I"{{TARGET_DIR}}/build-zlib/zlib/lib" \
-        -L"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        "{{ TARGET_DIR }}/build-png/.libs/libpng16.a" \
+        "{{ TARGET_DIR }}/build-zlib/libz.a" \
+        -I"{{ TARGET_DIR }}/build-png" \
+        -I"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
+        -L"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
         -o"{{ HARNESS }}" \
         -lm
 
@@ -28,8 +28,8 @@ harness arch=DEFAULT_ARCH: (libpng arch)
 run arch=DEFAULT_ARCH: (harness arch) (build arch)
     {{ FUZZER }} \
         --input ./corpus \
-        --output ${TARGET_DIR}/output/ \
-        --log ${TARGET_DIR}/output/log.txt \
+        --output {{ TARGET_DIR }}/output/ \
+        --log {{TARGET_DIR}}/output/log.txt \
         --cores 0-7 \
         --asan-cores 0-3 \
         --cmplog-cores 2-5 \
@@ -57,7 +57,7 @@ test: (test_inner "x86_64") (test_inner "arm")
 single arch=DEFAULT_ARCH: (harness arch) (build arch)
     {{ FUZZER }} \
         --input ./corpus \
-        --output ${TARGET_DIR}/output/ \
+        --output {{ TARGET_DIR }}/output/ \
         --log {{ TARGET_DIR }}/output/log.txt \
         --cores 0 \
         -- \
@@ -66,7 +66,7 @@ single arch=DEFAULT_ARCH: (harness arch) (build arch)
 asan arch=DEFAULT_ARCH: (harness arch) (build arch)
     {{ FUZZER }} \
         --input ./corpus \
-        --output ${TARGET_DIR}/output/ \
+        --output {{ TARGET_DIR }}/output/ \
         --log {{ TARGET_DIR }}/output/log.txt \
         --cores 0 \
         --asan-cores 0 \
@@ -76,7 +76,7 @@ asan arch=DEFAULT_ARCH: (harness arch) (build arch)
 asan_guest arch=DEFAULT_ARCH: (harness arch) (build arch)
     {{ FUZZER }} \
         --input ./corpus \
-        --output ${TARGET_DIR}/output/ \
+        --output {{ TARGET_DIR }}/output/ \
         --log {{ TARGET_DIR }}/output/log.txt \
         --cores 0 \
         --asan-guest-cores 0 \
