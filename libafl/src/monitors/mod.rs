@@ -295,10 +295,14 @@ mod test {
     fn test_monitor_tuple_list() {
         let mut client_stats = ClientStatsManager::new();
         let mut mgr_list = tuple_list!(
-            #[cfg(feature = "std")]
-            SimpleMonitor::new(|x| println!("{x}")),
-            #[cfg(feature = "std")]
-            SimpleMonitor::new(|x| println!("{x}")),
+            SimpleMonitor::new(|x| {
+                #[cfg(feature = "std")]
+                println!("{x}")
+            }),
+            SimpleMonitor::new(|x| {
+                #[cfg(feature = "std")]
+                println!("{x}")
+            }),
             NopMonitor::default(),
             NopMonitor::default(),
         );
