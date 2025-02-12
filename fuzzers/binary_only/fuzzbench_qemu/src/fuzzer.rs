@@ -52,8 +52,8 @@ use libafl_qemu::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
     },
-    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuMappingsViewer,
-    QemuShutdownCause, Regs,
+    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
+    Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
@@ -259,9 +259,6 @@ fn fuzz(
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let mappings = QemuMappingsViewer::new(&qemu);
-    println!("{:#?}", mappings);
-
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -415,6 +412,8 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
     log.replace(
