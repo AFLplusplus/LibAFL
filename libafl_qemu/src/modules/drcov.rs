@@ -296,8 +296,7 @@ where
                 let range_end = range.end;
                 while range_end - range_start - 1 > u64::from(u32::MAX) {
                     let range_end_short =
-                        (range_start + u64::from(u32::MAX) + 1)
-                        & !u64::from(u32::MAX);
+                        (range_start + u64::from(u32::MAX) + 1) & !u64::from(u32::MAX);
                     split_module_range_map.insert(
                         Range {
                             start: range_start,
@@ -318,7 +317,9 @@ where
                 i += 1;
             }
 
-            self.module_mapping = Some(RangeMap::<u64, (u16, String)>::from_iter(split_module_range_map));
+            self.module_mapping = Some(RangeMap::<u64, (u16, String)>::from_iter(
+                split_module_range_map,
+            ));
         } else {
             log::info!("Using user-provided module mapping for DrCov module.");
         }
