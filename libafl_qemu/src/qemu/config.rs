@@ -107,7 +107,7 @@ pub struct Tcp {
 
 impl Display for Tcp {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "tcp:{}", self.host.as_ref().unwrap_or(&"".to_owned()))?;
+        write!(f, "tcp:{}", self.host.as_deref().unwrap_or(""))?;
         write!(f, ":{}", self.port)?;
         let server = match self.server {
             Some(true) => ",server=on",

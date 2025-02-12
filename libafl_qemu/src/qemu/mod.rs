@@ -11,7 +11,7 @@ use std::{
     ffi::{c_void, CString},
     fmt::{Display, Formatter, Write},
     mem::{transmute, MaybeUninit},
-    ops::Range,
+    ops::{Deref, Range},
     pin::Pin,
     ptr::copy_nonoverlapping,
     sync::OnceLock,
@@ -114,7 +114,8 @@ pub struct Qemu {
 
 #[derive(Clone, Debug)]
 pub enum QemuParams {
-    Config(QemuConfig),
+    // QemuConfig is quite big, at least 240 bytes so we use a Box
+    Config(Box<QemuConfig>),
     Cli(Vec<String>),
 }
 
@@ -182,7 +183,7 @@ impl Display for QemuExitReason {
 
 impl From<QemuConfig> for QemuParams {
     fn from(config: QemuConfig) -> Self {
-        QemuParams::Config(config)
+        QemuParams::Config(Box::new(config))
     }
 }
 
@@ -543,7 +544,7 @@ impl Qemu {
         match &params {
             QemuParams::Config(cfg) => {
                 QEMU_CONFIG
-                    .set(cfg.clone())
+                    .set(cfg.deref().clone())
                     .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
                     .expect("Could not set QEMU Config.");
             }
