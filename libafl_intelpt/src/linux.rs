@@ -355,7 +355,7 @@ impl IntelPT {
                 }
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
-                        log::trace!("PT error in sync forward {e:?}");
+                        log::info!("PT error in sync forward {e:?}");
                     }
                     break 'sync;
                 }
@@ -414,14 +414,31 @@ impl IntelPT {
     where
         T: SaturatingAdd + From<u8> + Debug,
     {
+        #[cfg(debug_assertions)]
+        let mut trace_entry_iters: (u64, u64) = (0, 0);
+
         'block: loop {
+            let offset = decoder.offset().map_err(error_from_pt_error)?;
+            #[cfg(debug_assertions)]
+            {
+                if trace_entry_iters.0 == offset {
+                    trace_entry_iters.1 += 1;
+                    if trace_entry_iters.1 > 1000 {
+                        log::warn!("Decoder got stuck at trace offset {offset:x}. Make sure the decoder Image has the right content and offsets.");
+                        break 'block;
+                    }
+                } else {
+                    trace_entry_iters = (offset, 0);
+                }
+            }
+
             while status.event_pending() {
                 match decoder.event() {
                     Ok((_, s)) => {
                         *status = s;
                     }
                     Err(e) => {
-                        log::trace!("PT error in event {e:?}");
+                        log::info!("PT error in event {e:?}");
                         break 'block;
                     }
                 }
@@ -430,7 +447,6 @@ impl IntelPT {
             match decoder.decode_next() {
                 Ok((b, s)) => {
                     *status = s;
-                    let offset = decoder.offset().map_err(error_from_pt_error)?;
 
                     if b.ninsn() > 0 && skip < offset {
                         let id = hash_64_fast(*previous_block_end_ip) ^ hash_64_fast(b.ip());
@@ -449,7 +465,7 @@ impl IntelPT {
                 Err(e) => {
                     if e.code() != PtErrorCode::Eos {
                         let offset = decoder.offset().map_err(error_from_pt_error)?;
-                        log::trace!(
+                        log::info!(
                             "PT error in block next {e:?} trace offset {offset:x} last decoded block end {:x}",
                             previous_block_end_ip
                         );
