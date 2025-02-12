@@ -386,7 +386,6 @@ impl SnapshotModule {
         log::info!("Snapshot check OK");
     }
 
-    #[allow(clippy::comparison_chain)]
     pub fn reset(&mut self, qemu: Qemu) {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
