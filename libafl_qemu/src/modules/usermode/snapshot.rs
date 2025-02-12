@@ -405,6 +405,10 @@ impl SnapshotModule {
                     (self.brk - aligned_new_brk) as usize,
                     MmapPerms::ReadWrite,
                 ));
+            } else if new_brk > self.brk {
+                // The heap has grown. so we want to drop those
+                let drop_sz = (new_brk - self.brk) as usize;
+                drop(qemu.unmap(self.brk, drop_sz));
             }
 
             for acc in &mut self.accesses {
