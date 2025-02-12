@@ -386,7 +386,7 @@ impl<F> DrCovModule<F> {
                         unsafe {
                             for module in self.module_mapping.as_ref().unwrap_unchecked().iter() {
                                 let (range, (_, _)) = module;
-                                if range.contains(pc.try_into().unwrap()) {
+                                if range.contains(&u64::try_from(*pc).unwrap()) {
                                     module_found = true;
                                     break;
                                 }
