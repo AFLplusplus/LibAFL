@@ -4,11 +4,13 @@ use std::{
     env,
     fmt::{self, Debug, Formatter},
     fs,
+    ops::Range,
     path::PathBuf,
 };
 
 use libafl_qemu_sys::{GuestAddr, MapInfo};
 
+use super::IntervalSnapshotFilter;
 #[cfg(not(feature = "clippy"))]
 use crate::sys::libafl_tcg_gen_asan;
 use crate::{
@@ -16,6 +18,7 @@ use crate::{
     emu::EmulatorModules,
     modules::{
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        snapshot::IntervalSnapshotFilters,
         utils::filters::{HasAddressFilter, StdAddressFilter},
     },
     qemu::{Hook, MemAccessInfo, Qemu},
@@ -83,6 +86,20 @@ impl AsanGuestModule<StdAddressFilter> {
     #[must_use]
     pub fn default(env: &[(String, String)]) -> Self {
         Self::new(env, StdAddressFilter::default())
+    }
+
+    #[must_use]
+    pub fn snapshot_filters() -> IntervalSnapshotFilters {
+        IntervalSnapshotFilters::from(vec![IntervalSnapshotFilter::ZeroList(vec![
+            Range {
+                start: Self::LOW_SHADOW_START,
+                end: Self::LOW_SHADOW_END + 1,
+            },
+            Range {
+                start: Self::HIGH_SHADOW_START,
+                end: Self::HIGH_SHADOW_END + 1,
+            },
+        ])])
     }
 }
 
