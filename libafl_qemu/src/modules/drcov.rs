@@ -210,9 +210,7 @@ pub fn exec_trace_block<ET, F, I, S>(
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    if emulator_modules.get::<DrCovModule<F>>().unwrap().full_trace {
-        DRCOV_IDS.lock().unwrap().as_mut().unwrap().push(id);
-    }
+    DRCOV_IDS.lock().unwrap().as_mut().unwrap().push(id);
 }
 
 impl<F, I, S> EmulatorModule<I, S> for DrCovModule<F>
