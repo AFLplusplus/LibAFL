@@ -11,13 +11,12 @@ use backtrace::Backtrace;
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
-use frida_gum::ModuleDetails;
+use frida_gum::{Gum, Process};
 use libafl::{
     corpus::Testcase,
     executors::ExitKind,
     feedbacks::{Feedback, StateInitializer},
     observers::Observer,
-    state::State,
     Error, HasMetadata,
 };
 use libafl_bolts::{
@@ -25,6 +24,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled, MatchNameRef},
     Named, SerdeAny,
 };
+use mmap_rs::MmapOptions;
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "aarch64")]
@@ -50,7 +50,7 @@ pub(crate) struct AsanReadWriteError {
     pub backtrace: Backtrace,
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
     OobRead(AsanReadWriteError),
@@ -108,7 +108,7 @@ impl AsanError {
 }
 
 /// A struct holding errors that occurred during frida address sanitizer runs
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
     continue_on_error: bool,
@@ -152,9 +152,9 @@ impl AsanErrors {
         self.continue_on_error = continue_on_error;
     }
 
-    /// Report an error
-    #[allow(clippy::too_many_lines)]
-    pub(crate) fn report_error(&mut self, error: AsanError) {
+    /// Report an error, returns true if the caller should panic
+    #[expect(clippy::too_many_lines)]
+    pub(crate) fn report_error(&mut self, error: AsanError) -> bool {
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
@@ -168,7 +168,7 @@ impl AsanErrors {
                 );
             }));
 
-        #[allow(clippy::non_ascii_literal)]
+        #[expect(clippy::non_ascii_literal)]
         writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -181,7 +181,9 @@ impl AsanErrors {
             | AsanError::WriteAfterFree(error) => {
                 let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
-                if let Some(module_details) = ModuleDetails::with_address(error.pc as u64) {
+                if let Some(module_details) =
+                    Process::obtain(&Gum::obtain()).find_module_by_address(error.pc)
+                {
                     writeln!(
                         output,
                         " at 0x{:x} ({}@0x{:04x}), faulting address 0x{:x}",
@@ -201,7 +203,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
@@ -248,7 +250,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "rip: 0x{:016x}", error.pc).unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -291,11 +293,13 @@ impl AsanErrors {
                     .print_trace(&error.backtrace, output)
                     .unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let fault_address: i64 = fault_address.try_into().unwrap();
                 let metadata_address: i64 = error.metadata.address.try_into().unwrap();
-                let offset: i64 = fault_address - (metadata_address + 0x1000);
+                #[allow(clippy::cast_possible_wrap)]
+                let offset: i64 =
+                    fault_address - (metadata_address + MmapOptions::page_size() as i64);
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
@@ -303,7 +307,7 @@ impl AsanErrors {
                     offset,
                     direction,
                     error.metadata.size,
-                    error.metadata.address + 0x1000
+                    error.metadata.address + MmapOptions::page_size()
                 )
                 .unwrap();
 
@@ -322,7 +326,7 @@ impl AsanErrors {
                 }
 
                 if error.metadata.freed {
-                    #[allow(clippy::non_ascii_literal)]
+                    #[expect(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                     if let Some(backtrace) = &mut release_site_backtrace {
                         writeln!(output, "free site backtrace:").unwrap();
@@ -344,7 +348,9 @@ impl AsanErrors {
                 {
                     let invocation = Interceptor::current_invocation();
                     let cpu_context = invocation.cpu_context();
-                    if let Some(module_details) = ModuleDetails::with_address(*_pc as u64) {
+                    if let Some(module_details) =
+                        Process::obtain(&Gum::obtain()).find_module_by_address(*_pc)
+                    {
                         writeln!(
                             output,
                             " at 0x{:x} ({}@0x{:04x})",
@@ -357,7 +363,7 @@ impl AsanErrors {
                         writeln!(output, " at 0x{_pc:x}").unwrap();
                     }
 
-                    #[allow(clippy::non_ascii_literal)]
+                    #[expect(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                     for reg in 0..29 {
                         let val = cpu_context.reg(reg);
@@ -384,12 +390,12 @@ impl AsanErrors {
                 output.reset().unwrap();
                 backtrace_printer.print_trace(backtrace, output).unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address + 0x1000,
+                    metadata.address + MmapOptions::page_size(),
                     metadata.size
                 )
                 .unwrap();
@@ -405,7 +411,7 @@ impl AsanErrors {
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
                 if let Some(backtrace) = &mut release_site_backtrace {
                     writeln!(output, "previous free site backtrace:").unwrap();
@@ -422,12 +428,12 @@ impl AsanErrors {
                 writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address + 0x1000,
+                    metadata.address + MmapOptions::page_size(),
                     metadata.size
                 )
                 .unwrap();
@@ -448,7 +454,9 @@ impl AsanErrors {
             | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
-                if let Some(module_details) = ModuleDetails::with_address(*pc as u64) {
+                if let Some(module_details) =
+                    Process::obtain(&Gum::obtain()).find_module_by_address(*pc)
+                {
                     writeln!(
                         output,
                         " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
@@ -463,7 +471,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -512,7 +520,7 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "Rip: 0x{pc:016x}").unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -553,14 +561,11 @@ impl AsanErrors {
                 }
                 backtrace_printer.print_trace(backtrace, output).unwrap();
             }
-        };
+        }
 
         self.errors.push(error);
 
-        #[allow(clippy::manual_assert)]
-        if !self.continue_on_error {
-            panic!("ASAN: Crashing target!");
-        }
+        !self.continue_on_error
     }
 }
 
@@ -569,7 +574,7 @@ pub static ASAN_ERRORS: Mutex<AsanErrors> = Mutex::new(AsanErrors::new(true));
 
 /// An observer for frida address sanitizer `AsanError`s for a `Frida` executor run
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub enum AsanErrorsObserver {
     /// Observer referencing a list behind a [`OwnedPtr`] pointer.
     Ptr(OwnedPtr<AsanErrors>),
@@ -648,17 +653,16 @@ pub struct AsanErrorsFeedback<S> {
 
 impl<S> StateInitializer<S> for AsanErrorsFeedback<S> {}
 
-impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for AsanErrorsFeedback<S>
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for AsanErrorsFeedback<S>
 where
-    S: State + Debug,
+    S: Debug,
     OT: MatchNameRef,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
@@ -679,7 +683,7 @@ where
         _state: &mut S,
         _manager: &mut EM,
         _observers: &OT,
-        testcase: &mut Testcase<S::Input>,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
@@ -688,7 +692,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }

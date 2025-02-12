@@ -9,12 +9,11 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::Named;
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
+    corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
     mark_feature_time,
     mutators::{MutationResult, Mutator},
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
@@ -23,9 +22,7 @@ use crate::{
         MutationalStage, RetryCountRestartHelper, Stage,
     },
     start_timer,
-    state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor, UsesState,
-    },
+    state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -39,7 +36,6 @@ pub struct PowerMutationalStage<E, F, EM, I, M, S, Z> {
     name: Cow<'static, str>,
     /// The mutators we use
     mutator: M,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, I, S, Z)>,
 }
 
@@ -51,8 +47,8 @@ impl<E, F, EM, I, M, S, Z> Named for PowerMutationalStage<E, F, EM, I, M, S, Z> 
 
 impl<E, F, EM, I, M, S, Z> MutationalStage<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    S: HasCurrentTestcase,
-    F: TestcaseScore<S>,
+    S: HasCurrentTestcase<I>,
+    F: TestcaseScore<I, S>,
 {
     type Mutator = M;
     /// The mutator, added to this stage
@@ -68,7 +64,7 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S) -> Result<usize, Error> {
         // Update handicap
         let mut testcase = state.current_testcase_mut()?;
@@ -80,25 +76,21 @@ where
 
 impl<E, F, EM, I, M, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
-    EM: UsesState<State = S>,
-    F: TestcaseScore<S>,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
-    S: HasCorpus
-        + HasMetadata
+    S: HasMetadata
         + HasRand
         + HasExecutions
         + HasNamedMetadata
-        + HasCurrentTestcase
+        + HasCurrentTestcase<I>
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
-    <S::Corpus as Corpus>::Input: Input,
+        + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I, S>,
+    I: MutatedTransform<I, S> + Clone,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
+    #[expect(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -122,20 +114,12 @@ where
 
 impl<E, F, EM, I, M, S, Z> PowerMutationalStage<E, F, EM, I, M, S, Z>
 where
-    E: Executor<EM, Z, State = S> + HasObservers,
-    EM: UsesState<State = S>,
-    F: TestcaseScore<S>,
-    I: Input,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    F: TestcaseScore<I, S>,
     M: Mutator<I, S>,
-    S: HasCorpus
-        + HasMetadata
-        + HasRand
-        + HasCurrentTestcase
-        + MaybeHasClientPerfMonitor
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone + Input,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Input,
+    S: HasMetadata + HasRand + HasCurrentTestcase<I> + MaybeHasClientPerfMonitor,
+    I: MutatedTransform<I, S> + Clone,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
@@ -155,7 +139,6 @@ where
     }
 
     /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,
@@ -191,9 +174,9 @@ where
                 continue;
             }
 
-            // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (_, corpus_id) =
+                fuzzer.evaluate_filtered(state, executor, manager, &untransformed)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, corpus_id)?;

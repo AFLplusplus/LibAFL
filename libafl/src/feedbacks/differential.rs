@@ -145,7 +145,6 @@ where
     OT: MatchName,
     C: DiffComparator<O1, O2>,
 {
-    #[allow(clippy::wrong_self_convention)]
     fn is_interesting(
         &mut self,
         _state: &mut S,
@@ -238,7 +237,7 @@ mod tests {
             DiffFeedback::<_, _, _>::is_interesting(
                 &mut diff_feedback,
                 &mut nop_state,
-                &mut NopEventManager::<NopState<BytesInput>>::default(),
+                &mut NopEventManager::default(),
                 &BytesInput::new(vec![0]),
                 &observers,
                 &ExitKind::Ok

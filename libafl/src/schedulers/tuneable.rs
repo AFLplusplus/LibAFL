@@ -18,7 +18,7 @@ use crate::{
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 struct TuneableSchedulerMetadata {
     next: Option<CorpusId>,
@@ -90,9 +90,9 @@ impl TuneableScheduler {
     }
 
     /// Gets the current corpus entry id
-    pub fn get_current<S>(state: &S) -> CorpusId
+    pub fn get_current<I, S>(state: &S) -> CorpusId
     where
-        S: HasCorpus,
+        S: HasCorpus<I>,
     {
         state
             .corpus()
@@ -105,7 +105,7 @@ impl<I, S> RemovableScheduler<I, S> for TuneableScheduler {}
 
 impl<I, S> Scheduler<I, S> for TuneableScheduler
 where
-    S: HasCorpus + HasMetadata,
+    S: HasCorpus<I> + HasMetadata,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         // Set parent id

@@ -207,7 +207,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -376,7 +376,7 @@ fn fuzz(
 
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
-                  state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
+                  state: &mut StdState<InMemoryOnDiskCorpus<_>, _, _, _>,
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;

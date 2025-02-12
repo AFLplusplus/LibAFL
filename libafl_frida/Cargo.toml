@@ -47,7 +47,11 @@ auto-download = ["frida-gum-sys/auto-download", "frida-gum/auto-download"]
 cc = { workspace = true, features = ["parallel"] }
 
 [dependencies]
-libafl = { workspace = true, features = ["std", "derive", "frida_cli"] }
+libafl = { workspace = true, features = [
+  "std",
+  "derive",
+  "frida_cli",
+], default-features = false }
 libafl_bolts = { workspace = true, features = ["std", "derive", "frida_cli"] }
 libafl_targets = { workspace = true, default-features = true, features = [
   "std",
@@ -58,19 +62,20 @@ nix = { workspace = true, default-features = true, features = ["mman"] }
 libc = { workspace = true }
 hashbrown = { workspace = true, default-features = true }
 rangemap = { workspace = true }
-frida-gum-sys = { version = "0.15.1", features = [
+frida-gum-sys = { version = "0.16.5", features = [
   "event-sink",
   "invocation-listener",
 ] }
-frida-gum = { version = "0.15.1", features = [
+frida-gum = { version = "0.16.5", features = [
   "event-sink",
   "invocation-listener",
   "module-names",
   "script",
+  "backtrace",
 ] }
 dynasmrt = "3.0.1"
 
-color-backtrace = { version = "0.6.1", features = ["resolve-modules"] }
+color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
 termcolor = "1.4.1"
 serde = { workspace = true, default-features = true }
 backtrace = { workspace = true, default-features = false, features = [
@@ -94,7 +99,6 @@ serial_test = { workspace = true, default-features = false, features = [
 clap = { workspace = true, features = ["derive"] }
 libloading = "0.8.5"
 mimalloc = { workspace = true, default-features = false }
-dlmalloc = { version = "0.2.6", features = ["global"] }
 
 [lints]
 workspace = true

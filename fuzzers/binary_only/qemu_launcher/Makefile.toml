@@ -1,3 +1,14 @@
+env_scripts = ['''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''']
+
 [env]
 PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
 PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
@@ -360,21 +371,14 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script = '''
 echo "Profile: ${PROFILE}"
-cd injection_test || exit 1
-make
-mkdir in || true
-echo aaaaaaaaaa > in/a
-timeout 10s "$(find ${TARGET_DIR} -name 'qemu_launcher')" -o out -i in -j ../injections.toml -v -- ./static >/dev/null 2>fuzz.log || true
-if [ -z "$(grep -Ei "found.*injection" fuzz.log)" ]; then
-    echo "Fuzzer does not generate any testcases or any crashes"
-    echo "Logs:"
-    cat fuzz.log
-    exit 1
-else
-    echo "Fuzzer is working"
-fi
-make clean
-#rm -rf in out fuzz.log || true
+
+export QEMU_LAUNCHER=${TARGET_DIR}/${PROFILE_DIR}/qemu_launcher
+
+./tests/injection/test.sh || exit 1
+
+# complie again with simple mgr
+cargo build --profile=${PROFILE} --features="simplemgr" --target-dir=${TARGET_DIR}
+./tests/qasan/test.sh || exit 1
 '''
 dependencies = ["build_unix"]
 

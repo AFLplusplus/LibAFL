@@ -12,9 +12,8 @@ use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedRef, AsIter, AsIterMut, AsSlice, AsSliceMut, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use super::Observer;
 use crate::{
-    observers::{MapObserver, ObserverWithHashField},
+    observers::{MapObserver, Observer, ObserverWithHashField},
     Error,
 };
 
@@ -23,7 +22,7 @@ use crate::{
 /// The intent is that the value is something with interior mutability which the target could write to even though this
 /// observer has a reference to it. Use [`RefCellValueObserver`] if using a [`RefCell`] around the value.
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct ValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
@@ -83,7 +82,7 @@ impl<T: Hash> ObserverWithHashField for ValueObserver<'_, T> {
 
 /// A simple observer with a single [`RefCell`]'d value.
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct RefCellValueObserver<'a, T> {
     /// The name of this observer.
     name: Cow<'static, str>,
@@ -289,6 +288,7 @@ impl<T> AsMut<Self> for RefCellValueObserver<'_, T> {
         self
     }
 }
+
 impl<T, A> MapObserver for RefCellValueObserver<'_, A>
 where
     T: PartialEq + Copy + Hash + Default + DeserializeOwned + Serialize + Debug,
@@ -306,12 +306,6 @@ where
     /// [`RefCell::borrow_mut`]).
     fn set(&mut self, idx: usize, val: Self::Entry) {
         self.get_ref_mut()[idx] = val;
-    }
-
-    /// Panics if the contained value is already mutably borrowed (calls
-    /// [`RefCell::borrow`]).
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Panics if the contained value is already mutably borrowed (calls

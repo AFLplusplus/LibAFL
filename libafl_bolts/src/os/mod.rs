@@ -28,7 +28,7 @@ use std::{fs::File, os::fd::AsRawFd, sync::OnceLock};
 
 // Allow a few extra features we need for the whole module
 #[cfg(all(windows, feature = "std"))]
-#[allow(missing_docs, overflowing_literals)]
+#[expect(missing_docs, overflowing_literals)]
 pub mod windows_exceptions;
 #[cfg(unix)]
 use libc::pid_t;

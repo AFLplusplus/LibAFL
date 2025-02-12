@@ -1,20 +1,19 @@
 use std::ffi::c_int;
 
 use libafl::{
-    events::{EventProcessor, ProgressReporter, SimpleEventManager},
+    events::{EventReceiver, ProgressReporter, SimpleEventManager},
     executors::HasObservers,
     feedbacks::MapFeedbackMetadata,
-    inputs::UsesInput,
     monitors::SimpleMonitor,
     stages::{HasCurrentStageId, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, Stoppable, UsesState},
+    state::{HasExecutions, HasLastReportTime, Stoppable},
     Error, Fuzzer, HasMetadata, HasNamedMetadata,
 };
 
 use crate::{fuzz_with, options::LibfuzzerOptions};
 
-#[allow(clippy::unnecessary_wraps, clippy::cast_precision_loss)]
-fn do_report<F, ST, E, S, EM>(
+#[expect(clippy::unnecessary_wraps, clippy::cast_precision_loss)]
+fn do_report<E, F, I, S, ST, EM>(
     _options: &LibfuzzerOptions,
     _fuzzer: &mut F,
     _stages: &mut ST,
@@ -23,16 +22,15 @@ fn do_report<F, ST, E, S, EM>(
     _mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, S, ST>,
+    F: Fuzzer<E, EM, I, S, ST>,
     S: HasMetadata
         + HasNamedMetadata
         + HasExecutions
-        + UsesInput
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,
-    E: HasObservers + UsesState<State = S>,
-    EM: ProgressReporter<State = S> + EventProcessor<E, F>,
+    E: HasObservers,
+    EM: ProgressReporter<S> + EventReceiver<I, S>,
     ST: StagesTuple<E, EM, S, F>,
 {
     let meta = state

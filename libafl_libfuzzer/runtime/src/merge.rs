@@ -4,12 +4,11 @@ use std::{
     fs::{rename, File},
     io::Write,
     os::fd::{AsRawFd, FromRawFd},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use libafl::{
     corpus::Corpus,
-    events::{EventRestarter, SimpleRestartingEventManager},
+    events::{SendExiting, SimpleRestartingEventManager},
     executors::{ExitKind, InProcessExecutor},
     feedback_and_fast, feedback_or_fast,
     feedbacks::{CrashFeedback, MinMapFeedback, TimeoutFeedback},
@@ -36,7 +35,7 @@ use crate::{
     schedulers::MergeScheduler,
 };
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 pub fn merge(
     options: &LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
@@ -57,19 +56,16 @@ pub fn merge(
         let new_fd = libc::dup(std::io::stderr().as_raw_fd());
         File::from_raw_fd(new_fd)
     };
-    let monitor = MultiMonitor::with_time(
-        move |s| {
-            #[cfg(unix)]
-            writeln!(stderr, "{s}").expect("Could not write to stderr???");
-            #[cfg(not(unix))]
-            eprintln!("{s}");
-        },
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-    );
+    let monitor = MultiMonitor::new(move |s| {
+        #[cfg(unix)]
+        writeln!(stderr, "{s}").expect("Could not write to stderr???");
+        #[cfg(not(unix))]
+        eprintln!("{s}");
+    });
 
     let (state, mut mgr): (
         Option<StdState<_, _, _, _>>,
-        SimpleRestartingEventManager<_, StdState<_, _, _, _>, _>,
+        SimpleRestartingEventManager<_, _, StdState<_, _, _, _>, _, _>,
     ) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider) {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,
@@ -97,7 +93,7 @@ pub fn merge(
         }
     }
 
-    let edges = unsafe { core::mem::take(&mut *&raw mut COUNTERS_MAPS) };
+    let edges = unsafe { core::mem::take(&mut COUNTERS_MAPS) };
     let edges_observer = MultiMapObserver::new("edges", edges);
 
     let time = TimeObserver::new("time");
@@ -236,7 +232,6 @@ pub fn merge(
                     .on_remove(&mut state, id, &Some(testcase))?;
             } else {
                 // False-positive: file_path is used just below
-                #[allow(clippy::needless_borrows_for_generic_args)]
                 rename(&file_path, &new_file_path)?;
                 *file_path = new_file_path;
             }

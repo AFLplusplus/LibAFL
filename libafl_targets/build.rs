@@ -13,14 +13,14 @@ fn enable_nightly() {
 #[rustversion::not(nightly)]
 fn enable_nightly() {}
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn main() {
     println!("cargo:rustc-check-cfg=cfg(nightly)");
     enable_nightly();
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     //let out_dir_path = Path::new(&out_dir);
-    #[allow(unused_variables)]
+    #[allow(unused_variables)] // feature dependent
     let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("constants.rs");
@@ -125,11 +125,11 @@ fn main() {
         {
             sancov_cmp.define("SANCOV_CMPLOG", "1");
 
-            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_memcmp");
-            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strncmp");
-            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strncasecmp");
-            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strcmp");
-            println!("cargo:rustc-link-arg=--undefined=__sanitizer_weak_hook_strcasecmp");
+            println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_memcmp");
+            println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_strncmp");
+            println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_strncasecmp");
+            println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_strcmp");
+            println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_weak_hook_strcasecmp");
         }
 
         sancov_cmp
@@ -139,17 +139,17 @@ fn main() {
             .file(src_dir.join("sancov_cmp.c"))
             .compile("sancov_cmp");
 
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp1");
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp2");
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp4");
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_cmp8");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_cmp1");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_cmp2");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_cmp4");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_cmp8");
 
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp1");
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp2");
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp4");
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_const_cmp8");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_const_cmp1");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_const_cmp2");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_const_cmp4");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_const_cmp8");
 
-        println!("cargo:rustc-link-arg=--undefined=__sanitizer_cov_trace_switch");
+        println!("cargo:rustc-link-arg=-Wl,--undefined=__sanitizer_cov_trace_switch");
     }
 
     #[cfg(feature = "libfuzzer")]

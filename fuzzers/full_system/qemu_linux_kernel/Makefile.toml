@@ -1,11 +1,21 @@
 env_scripts = ['''
 #!@duckscript
 profile = get_env PROFILE
+harness_api = get_env HARNESS_API
 
 if eq ${profile} "dev"
     set_env PROFILE_DIR debug
 else
     set_env PROFILE_DIR ${profile}
+end
+
+if eq ${harness_api} "nyx"
+    set_env FEATURE nyx
+elseif eq ${harness_api} "lqemu"
+    set_env FEATURE ""
+else
+    echo "Unknown harness API: ${harness_api}"
+    exit 1
 end
 ''', '''
 #!@duckscript
@@ -24,6 +34,7 @@ TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
 LIBAFL_QEMU_CLONE_DIR = { value = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge", condition = { env_not_set = [
   "LIBAFL_QEMU_DIR",
 ] } }
+HARNESS_API = { value = "lqemu", condition = { env_not_set = ["HARNESS_API"] } }
 
 LINUX_BUILDER_URL = "git@github.com:AFLplusplus/linux-qemu-image-builder.git"
 LINUX_BUILDER_DIR = { value = "${TARGET_DIR}/linux_builder", condition = { env_not_set = [
@@ -85,7 +96,15 @@ ${LINUX_BUILDER_DIR}/update.sh
 [tasks.build]
 dependencies = ["target_dir"]
 command = "cargo"
-args = ["build", "--profile", "${PROFILE}", "--target-dir", "${TARGET_DIR}"]
+args = [
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--target-dir",
+  "${TARGET_DIR}",
+  "--features",
+  "${FEATURE}",
+]
 
 [tasks.run]
 dependencies = ["build"]
@@ -100,21 +119,42 @@ else
   LIBAFL_QEMU_BIOS_DIR=${LIBAFL_QEMU_CLONE_DIR}/build/qemu-bundle/usr/local/share/qemu
 fi
 
-${TARGET_DIR}/${PROFILE_DIR}/qemu_systemmode_linux_kernel \
+qemu-img create -f qcow2 -o backing_file=${LINUX_BUILDER_OUT}/OVMF_CODE.4m.fd -F raw ${LINUX_BUILDER_OUT}/OVMF_CODE.4m.qcow2
+qemu-img create -f qcow2 -o backing_file=${LINUX_BUILDER_OUT}/OVMF_VARS.4m.fd -F raw ${LINUX_BUILDER_OUT}/OVMF_VARS.4m.qcow2
+qemu-img create -f qcow2 -o backing_file=${LINUX_BUILDER_OUT}/linux.qcow2 -F qcow2 ${LINUX_BUILDER_OUT}/linux.tmp.qcow2
+
+${TARGET_DIR}/${PROFILE_DIR}/qemu_linux_kernel \
   -accel tcg \
   -m 4G \
-  -drive if=pflash,format=raw,readonly=on,file="${LINUX_BUILDER_OUT}/OVMF_CODE.fd" \
-  -drive if=pflash,format=raw,snapshot=off,file="${LINUX_BUILDER_OUT}/OVMF_VARS.fd" \
-  -blockdev filename="${LINUX_BUILDER_OUT}/linux.qcow2",node-name=storage,driver=file \
-  -blockdev driver=qcow2,file=storage,node-name=disk \
-  -device virtio-scsi-pci,id=scsi0 \
-  -device scsi-hd,bus=scsi0.0,drive=disk,id=virtio-disk0,bootindex=1 \
+  -drive if=pflash,format=qcow2,file="${LINUX_BUILDER_OUT}/OVMF_CODE.4m.qcow2" `# OVMF code pflash` \
+  -drive if=pflash,format=qcow2,file="${LINUX_BUILDER_OUT}/OVMF_VARS.4m.qcow2" `# OVMF vars pflash` \
+  -device ahci,id=ahci,bus=pci.0,addr=4 \
+  -device ide-hd,bus=ahci.0,drive=disk,bootindex=1 \
+  -blockdev driver=file,filename="${LINUX_BUILDER_OUT}/linux.tmp.qcow2",node-name=storage `# Backend file of "disk"` \
+  -blockdev driver=qcow2,file=storage,node-name=disk `# QCOW2 "disk"` \
   -L "${LIBAFL_QEMU_BIOS_DIR}" \
   -nographic \
   -monitor null \
-  -serial null \
-  -snapshot
+  -serial null
 '''
+
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+# TODO: Run real test, not only building.
+
+# LibAFL QEMU API
+HARNESS_API=lqemu cargo make build
+
+# Nyx API
+HARNESS_API=nyx cargo make build
+'''
+
+[tasks.test]
+description = "Run a test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
 
 [tasks.debug]
 dependencies = ["build"]

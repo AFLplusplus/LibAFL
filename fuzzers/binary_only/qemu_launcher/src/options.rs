@@ -11,7 +11,6 @@ use crate::version::Version;
 #[readonly::make]
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
-#[allow(clippy::module_name_repetitions)]
 #[command(
     name = format!("qemu_coverage-{}",env!("CPU_TARGET")),
     version = Version::default(),
@@ -63,6 +62,9 @@ pub struct FuzzerOptions {
     #[clap(long, help = "Enable AFL++ style output", conflicts_with = "verbose")]
     pub tui: bool,
 
+    #[clap(long, help = "Enable use of snapshots to restore state")]
+    pub snapshots: bool,
+
     #[arg(long = "iterations", help = "Maximum number of iterations")]
     pub iterations: Option<u64>,
 
@@ -93,33 +95,23 @@ impl FuzzerOptions {
         Ok(Duration::from_millis(src.parse()?))
     }
 
-    fn parse_ranges(src: &str) -> Result<Vec<Range<GuestAddr>>, Error> {
-        src.split(',')
-            .map(|r| {
-                let parts = r.split('-').collect::<Vec<&str>>();
-                if parts.len() == 2 {
-                    let start = GuestAddr::from_str_radix(parts[0].trim_start_matches("0x"), 16)
-                        .map_err(|e| {
-                            Error::illegal_argument(format!(
-                                "Invalid start address: {} ({e:})",
-                                parts[0]
-                            ))
-                        })?;
-                    let end = GuestAddr::from_str_radix(parts[1].trim_start_matches("0x"), 16)
-                        .map_err(|e| {
-                            Error::illegal_argument(format!(
-                                "Invalid end address: {} ({e:})",
-                                parts[1]
-                            ))
-                        })?;
-                    Ok(Range { start, end })
-                } else {
-                    Err(Error::illegal_argument(format!(
-                        "Invalid range provided: {r:}"
-                    )))
-                }
-            })
-            .collect::<Result<Vec<Range<GuestAddr>>, Error>>()
+    fn parse_ranges(src: &str) -> Result<Range<GuestAddr>, Error> {
+        let parts = src.split('-').collect::<Vec<&str>>();
+        if parts.len() == 2 {
+            let start =
+                GuestAddr::from_str_radix(parts[0].trim_start_matches("0x"), 16).map_err(|e| {
+                    Error::illegal_argument(format!("Invalid start address: {} ({e:})", parts[0]))
+                })?;
+            let end =
+                GuestAddr::from_str_radix(parts[1].trim_start_matches("0x"), 16).map_err(|e| {
+                    Error::illegal_argument(format!("Invalid end address: {} ({e:})", parts[1]))
+                })?;
+            Ok(Range { start, end })
+        } else {
+            Err(Error::illegal_argument(format!(
+                "Invalid range provided: {src:}"
+            )))
+        }
     }
 
     pub fn is_asan_core(&self, core_id: CoreId) -> bool {

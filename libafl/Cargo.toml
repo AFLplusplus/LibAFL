@@ -39,6 +39,7 @@ default = [
   "regex",
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
+  "tui_monitor",
 ]
 document-features = ["dep:document-features"]
 
@@ -58,16 +59,18 @@ std = [
   "serial_test",
   "libafl_bolts/std",
   "typed-builder",
+  "fastbloom",
+  "fs2",
 ]
 
 ## Tracks the Feedbacks and the Objectives that were interesting for a Testcase
 track_hit_feedbacks = ["std"]
 
+## `ValueBloomFeedback` checks if an observed value has already been observed, and returns `is_interesting=true` otherwise.
+value_bloom_feedback = ["fastbloom", "fastbloom/serde"]
+
 ## Collects performance statistics of the fuzzing pipeline and displays it on `Monitor` components
 introspection = []
-
-## Collects stats about scalability
-scalability_introspection = []
 
 ## Expose `libafl::prelude` for access without additional using directives
 prelude = ["libafl_bolts/prelude"]
@@ -142,6 +145,9 @@ unicode = ["libafl_bolts/alloc", "ahash/std", "serde/rc", "bitvec"]
 ## Enable multi-part input formats and mutators
 multipart_inputs = ["arrayvec", "rand_trait"]
 
+## Share objectives across nodes
+share_objectives = []
+
 #! ## LibAFL-Bolts Features
 
 ## Provide the `#[derive(SerdeAny)]` macro.
@@ -196,6 +202,11 @@ nautilus = [
   "regex",
 ]
 
+[[example]]
+name = "tui_mock"
+path = "./examples/tui_mock/main.rs"
+required-features = ["std", "tui_monitor"]
+
 [build-dependencies]
 rustversion = "1.0.17"
 
@@ -246,7 +257,7 @@ ratatui = { version = "0.29.0", default-features = false, features = [
 ], optional = true } # Commandline rendering, for TUI Monitor
 crossterm = { version = "0.28.1", optional = true }
 
-prometheus-client = { version = "0.22.3", optional = true } # For the prometheus monitor
+prometheus-client = { version = "0.23.0", optional = true } # For the prometheus monitor
 tide = { version = "0.16.0", optional = true }
 async-std = { version = "1.13.0", features = ["attributes"], optional = true }
 futures = { version = "0.3.30", optional = true }
@@ -280,6 +291,8 @@ const_panic = { version = "0.2.9", default-features = false } # similarly, for f
 pyo3 = { workspace = true, optional = true }
 regex-syntax = { version = "0.8.4", optional = true } # For nautilus
 
+fs2 = { workspace = true, optional = true } # used by OnDisk Corpus for file locking
+
 # optional-dev deps (change when target.'cfg(accessible(::std))'.test-dependencies will be stable)
 serial_test = { workspace = true, optional = true, default-features = false, features = [
   "logging",
@@ -291,6 +304,7 @@ document-features = { workspace = true, optional = true }
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
 libipt = { workspace = true, optional = true }
+fastbloom = { workspace = true, optional = true }
 
 [lints]
 workspace = true

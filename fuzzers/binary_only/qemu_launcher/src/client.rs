@@ -9,16 +9,9 @@ use libafl::{
     Error,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
-#[cfg(feature = "injections")]
-use libafl_qemu::modules::injections::InjectionModule;
-use libafl_qemu::{
-    modules::{
-        asan::{init_qemu_with_asan, AsanModule},
-        asan_guest::{init_qemu_with_asan_guest, AsanGuestModule},
-        cmplog::CmpLogModule,
-        DrCovModule,
-    },
-    Qemu,
+use libafl_qemu::modules::{
+    asan::AsanModule, asan_guest::AsanGuestModule, cmplog::CmpLogModule, DrCovModule,
+    InjectionModule,
 };
 
 use crate::{
@@ -27,9 +20,9 @@ use crate::{
     options::FuzzerOptions,
 };
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 pub type ClientState =
-    StdState<BytesInput, InMemoryOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<InMemoryOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 pub struct Client<'a> {
     options: &'a FuzzerOptions,
@@ -50,14 +43,14 @@ impl Client<'_> {
         Ok(args)
     }
 
-    #[allow(clippy::unused_self)] // Api should look the same as args above
+    #[expect(clippy::unused_self)] // Api should look the same as args above
     pub fn env(&self) -> Vec<(String, String)> {
         env::vars()
             .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
             .collect::<Vec<(String, String)>>()
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn run<M: Monitor>(
         &self,
         state: Option<ClientState>,
@@ -67,11 +60,11 @@ impl Client<'_> {
         let core_id = client_description.core_id();
         let mut args = self.args()?;
         Harness::edit_args(&mut args);
-        log::debug!("ARGS: {:#?}", args);
+        log::info!("ARGS: {:#?}", args);
 
         let mut env = self.env();
         Harness::edit_env(&mut env);
-        log::debug!("ENV: {:#?}", env);
+        log::info!("ENV: {:#?}", env);
 
         let is_asan = self.options.is_asan_core(core_id);
         let is_asan_guest = self.options.is_asan_guest_core(core_id);
@@ -80,20 +73,8 @@ impl Client<'_> {
             Err(Error::empty_optional("Multiple ASAN modes configured"))?;
         }
 
-        let (qemu, mut asan, mut asan_lib) = {
-            if is_asan {
-                let (emu, asan) = init_qemu_with_asan(&mut args, &mut env)?;
-                (emu, Some(asan), None)
-            } else if is_asan_guest {
-                let (emu, asan_lib) = init_qemu_with_asan_guest(&mut args, &mut env)?;
-                (emu, None, Some(asan_lib))
-            } else {
-                (Qemu::init(&args)?, None, None)
-            }
-        };
-
         #[cfg(not(feature = "injections"))]
-        let injection_module = None;
+        let injection_module = Option::<InjectionModule>::None;
 
         #[cfg(feature = "injections")]
         let injection_module = self
@@ -111,47 +92,76 @@ impl Client<'_> {
                 }
             });
 
-        let harness = Harness::init(qemu).expect("Error setting up harness.");
-
         let is_cmplog = self.options.is_cmplog_core(core_id);
 
-        let extra_tokens = injection_module
-            .as_ref()
-            .map(|h| h.tokens.clone())
-            .unwrap_or_default();
+        let is_drcov = self.options.drcov.is_some();
+
+        let extra_tokens = if cfg!(feature = "injections") {
+            injection_module
+                .as_ref()
+                .map(|h| h.tokens.clone())
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
 
         let instance_builder = Instance::builder()
             .options(self.options)
-            .qemu(qemu)
-            .harness(harness)
             .mgr(mgr)
             .client_description(client_description)
             .extra_tokens(extra_tokens);
 
-        if self.options.rerun_input.is_some() && self.options.drcov.is_some() {
-            // Special code path for re-running inputs with DrCov.
-            // TODO: Add ASan support, injection support
-            let drcov = self.options.drcov.as_ref().unwrap();
-            let drcov = DrCovModule::builder()
-                .filename(drcov.clone())
-                .full_trace(true)
-                .build();
-            instance_builder.build().run(tuple_list!(drcov), state)
+        if self.options.rerun_input.is_some() {
+            if is_drcov {
+                // Special code path for re-running inputs with DrCov and Asan.
+                // TODO: Add injection support
+                let drcov = self.options.drcov.as_ref().unwrap();
+
+                if is_asan {
+                    let modules = tuple_list!(
+                        DrCovModule::builder()
+                            .filename(drcov.clone())
+                            .full_trace(true)
+                            .build(),
+                        unsafe { AsanModule::builder().env(&env).asan_report().build() }
+                    );
+
+                    instance_builder.build().run(args, modules, state)
+                } else {
+                    let modules = tuple_list!(DrCovModule::builder()
+                        .filename(drcov.clone())
+                        .full_trace(true)
+                        .build(),);
+
+                    instance_builder.build().run(args, modules, state)
+                }
+            } else if is_asan {
+                let modules =
+                    tuple_list!(unsafe { AsanModule::builder().env(&env).asan_report().build() });
+
+                instance_builder.build().run(args, modules, state)
+            } else {
+                let modules = tuple_list!();
+
+                instance_builder.build().run(args, modules, state)
+            }
         } else if is_asan && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanModule::default(asan.take().unwrap()),
+                        AsanModule::builder().env(&env).build(),
                         injection_module,
                     ),
                     state,
                 )
             } else {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanModule::default(asan.take().unwrap()),
+                        AsanModule::builder().env(&env).build()
                     ),
                     state,
                 )
@@ -159,54 +169,57 @@ impl Client<'_> {
         } else if is_asan_guest && is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(
                         CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
+                        AsanGuestModule::default(&env),
                         injection_module
                     ),
                     state,
                 )
             } else {
                 instance_builder.build().run(
-                    tuple_list!(
-                        CmpLogModule::default(),
-                        AsanGuestModule::default(qemu, &asan_lib.take().unwrap()),
-                    ),
+                    args,
+                    tuple_list!(CmpLogModule::default(), AsanGuestModule::default(&env),),
                     state,
                 )
             }
         } else if is_asan {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
-                    tuple_list!(AsanModule::default(asan.take().unwrap()), injection_module),
+                    args,
+                    tuple_list!(AsanModule::builder().env(&env).build(), injection_module),
                     state,
                 )
             } else {
                 instance_builder.build().run(
-                    tuple_list!(AsanModule::default(asan.take().unwrap()),),
+                    args,
+                    tuple_list!(AsanModule::builder().env(&env).build()),
                     state,
                 )
             }
         } else if is_asan_guest {
-            let modules = tuple_list!(AsanGuestModule::default(qemu, &asan_lib.take().unwrap()));
-            instance_builder.build().run(modules, state)
+            instance_builder
+                .build()
+                .run(args, tuple_list!(AsanGuestModule::default(&env)), state)
         } else if is_cmplog {
             if let Some(injection_module) = injection_module {
                 instance_builder.build().run(
+                    args,
                     tuple_list!(CmpLogModule::default(), injection_module),
                     state,
                 )
             } else {
                 instance_builder
                     .build()
-                    .run(tuple_list!(CmpLogModule::default()), state)
+                    .run(args, tuple_list!(CmpLogModule::default()), state)
             }
         } else if let Some(injection_module) = injection_module {
             instance_builder
                 .build()
-                .run(tuple_list!(injection_module), state)
+                .run(args, tuple_list!(injection_module), state)
         } else {
-            instance_builder.build().run(tuple_list!(), state)
+            instance_builder.build().run(args, tuple_list!(), state)
         }
     }
 }

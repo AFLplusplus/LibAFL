@@ -1,10 +1,8 @@
+#![expect(unexpected_cfgs)] // deriving NewFuzzed etc. introduces these
 use std::hash::Hash;
 
 use lain::prelude::*;
-use libafl::{
-    corpus::CorpusId,
-    inputs::{HasTargetBytes, Input},
-};
+use libafl::inputs::{HasTargetBytes, Input};
 use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
@@ -47,15 +45,7 @@ pub enum PacketType {
     Reset = 0x2,
 }
 
-impl Input for PacketData {
-    fn generate_name(&self, id: Option<CorpusId>) -> String {
-        if let Some(id) = id {
-            format!("id_{}", id.0)
-        } else {
-            "id_unknown".into()
-        }
-    }
-}
+impl Input for PacketData {}
 
 impl HasTargetBytes for PacketData {
     #[inline]

@@ -2,6 +2,7 @@
 
 use core::{
     fmt::{self, Debug, Formatter},
+    marker::PhantomData,
     time::Duration,
 };
 
@@ -10,21 +11,20 @@ use libafl_bolts::tuples::RefIndexable;
 use super::HasTimeout;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::UsesInput,
     observers::ObserversTuple,
-    state::UsesState,
     Error,
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
-pub struct ShadowExecutor<E, SOT> {
+pub struct ShadowExecutor<E, I, S, SOT> {
     /// The wrapped executor
     executor: E,
     /// The shadow observers
     shadow_observers: SOT,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<E, SOT> Debug for ShadowExecutor<E, SOT>
+impl<E, I, S, SOT> Debug for ShadowExecutor<E, I, S, SOT>
 where
     E: Debug,
     SOT: Debug,
@@ -37,16 +37,17 @@ where
     }
 }
 
-impl<E, SOT> ShadowExecutor<E, SOT>
+impl<E, I, S, SOT> ShadowExecutor<E, I, S, SOT>
 where
-    E: HasObservers + UsesState,
-    SOT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
+    E: HasObservers,
+    SOT: ObserversTuple<I, S>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
         Self {
             executor,
             shadow_observers,
+            phantom: PhantomData,
         }
     }
 
@@ -61,26 +62,37 @@ where
     pub fn shadow_observers_mut(&mut self) -> RefIndexable<&mut SOT, SOT> {
         RefIndexable::from(&mut self.shadow_observers)
     }
+
+    /// Inner executor
+    #[inline]
+    pub fn executor(&self) -> &E {
+        &self.executor
+    }
+
+    /// Inner executor
+    #[inline]
+    pub fn executor_mut(&mut self) -> &mut E {
+        &mut self.executor
+    }
 }
 
-impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
+impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
 where
-    E: Executor<EM, Z> + HasObservers,
-    SOT: ObserversTuple<Self::Input, Self::State>,
-    EM: UsesState<State = Self::State>,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    SOT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<E, SOT> HasTimeout for ShadowExecutor<E, SOT>
+impl<E, I, S, SOT> HasTimeout for ShadowExecutor<E, I, S, SOT>
 where
     E: HasTimeout,
 {
@@ -94,17 +106,10 @@ where
     }
 }
 
-impl<E, SOT> UsesState for ShadowExecutor<E, SOT>
+impl<E, I, S, SOT> HasObservers for ShadowExecutor<E, I, S, SOT>
 where
-    E: UsesState,
-{
-    type State = E::State;
-}
-
-impl<E, SOT> HasObservers for ShadowExecutor<E, SOT>
-where
-    E: HasObservers + UsesState,
-    SOT: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
+    E: HasObservers,
+    SOT: ObserversTuple<I, S>,
 {
     type Observers = E::Observers;
     #[inline]

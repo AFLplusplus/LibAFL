@@ -1,7 +1,7 @@
 //! Input for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer methods
 //!
 //!
-use alloc::{rc::Rc, string::String, vec::Vec};
+use alloc::{rc::Rc, vec::Vec};
 use core::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
@@ -15,7 +15,6 @@ use crate::{
         rule::RuleIdOrCustom,
         tree::{Tree, TreeLike},
     },
-    corpus::CorpusId,
     generators::nautilus::NautilusContext,
     inputs::{BytesInput, Input, InputConverter},
     Error,
@@ -28,23 +27,7 @@ pub struct NautilusInput {
     pub tree: Tree,
 }
 
-impl Input for NautilusInput {
-    /// Generate a name for this input
-    #[must_use]
-    fn generate_name(&self, id: Option<CorpusId>) -> String {
-        /*let mut hasher = AHasher::new_with_keys(0, 0);
-        for term in &self.terms {
-            hasher.write(term.symbol.as_bytes());
-        }
-        format!("{:016x}", hasher.finish())*/
-
-        if let Some(id) = id {
-            format!("id_{}", id.0)
-        } else {
-            "id_unknown".into()
-        }
-    }
-}
+impl Input for NautilusInput {}
 
 /// Rc Ref-cell from Input
 impl From<NautilusInput> for Rc<RefCell<NautilusInput>> {
@@ -154,10 +137,8 @@ impl<'a> NautilusTargetBytesConverter<'a> {
     }
 }
 
-impl TargetBytesConverter for NautilusTargetBytesConverter<'_> {
-    type Input = NautilusInput;
-
-    fn to_target_bytes<'a>(&mut self, input: &'a Self::Input) -> OwnedSlice<'a, u8> {
+impl TargetBytesConverter<NautilusInput> for NautilusTargetBytesConverter<'_> {
+    fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
         let mut bytes = Vec::new();
         input.unparse(self.ctx, &mut bytes);
         OwnedSlice::from(bytes)

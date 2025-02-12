@@ -190,7 +190,7 @@ where
     /// # Safety
     /// The shared memory needs to start with a valid object of type `T`.
     /// Any use of this [`OwnedRef`] will dereference a pointer to the shared memory accordingly.
-    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+    pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
         Self::from_ptr(shmem.as_mut_ptr_of().unwrap())
     }
 
@@ -325,7 +325,7 @@ where
     /// # Safety
     /// The shared memory needs to start with a valid object of type `T`.
     /// Any use of this [`OwnedRefMut`] will dereference a pointer to the shared memory accordingly.
-    pub unsafe fn from_shmem<S: ShMem>(shmem: &mut S) -> Self {
+    pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> Self {
         Self::from_mut_ptr(shmem.as_mut_ptr_of().unwrap())
     }
 
@@ -447,7 +447,7 @@ where
 /// Wrap a slice and convert to a Vec on serialize.
 /// We use a hidden inner enum so the public API can be safe,
 /// unless the user uses the unsafe [`OwnedSlice::from_raw_parts`]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnedSlice<'a, T: 'a + Sized> {
     inner: OwnedSliceInner<'a, T>,
@@ -671,7 +671,7 @@ where
 }
 
 /// Wrap a mutable slice and convert to a Vec on serialize
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnedMutSlice<'a, T: 'a + Sized> {
     inner: OwnedMutSliceInner<'a, T>,
@@ -860,7 +860,7 @@ impl<'a, T> From<&'a mut [T]> for OwnedMutSlice<'a, T> {
 }
 
 /// Create a new [`OwnedMutSlice`] from a reference to ref to a slice
-#[allow(clippy::mut_mut)] // This makes use in some iterators easier
+#[expect(clippy::mut_mut)] // This makes use in some iterators easier
 impl<'a, T> From<&'a mut &'a mut [T]> for OwnedMutSlice<'a, T> {
     fn from(r: &'a mut &'a mut [T]) -> Self {
         Self {
@@ -912,7 +912,7 @@ where
 }
 
 /// Wrap a mutable slice of constant size N and convert to a Box on serialize
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnedMutSizedSlice<'a, T: 'a + Sized, const N: usize> {
     inner: OwnedMutSizedSliceInner<'a, T, N>,
@@ -1046,7 +1046,7 @@ where
 }
 
 /// Create a new [`OwnedMutSizedSlice`] from a reference to a boxed sized slice
-#[allow(clippy::mut_mut)] // This makes use in some iterators easier
+// This makes use in some iterators easier
 impl<'a, T, const N: usize> From<&'a mut Box<[T; N]>> for OwnedMutSizedSlice<'a, T, N> {
     fn from(r: &'a mut Box<[T; N]>) -> Self {
         Self {
@@ -1065,7 +1065,7 @@ impl<'a, T, const N: usize> From<&'a mut [T; N]> for OwnedMutSizedSlice<'a, T, N
 }
 
 /// Create a new [`OwnedMutSizedSlice`] from a reference to ref to a slice
-#[allow(clippy::mut_mut)] // This makes use in some iterators easier
+#[expect(clippy::mut_mut)] // This makes use in some iterators easier
 impl<'a, T, const N: usize> From<&'a mut &'a mut [T; N]> for OwnedMutSizedSlice<'a, T, N> {
     fn from(r: &'a mut &'a mut [T; N]) -> Self {
         Self {

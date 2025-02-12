@@ -40,7 +40,7 @@ fn count_set(count: usize) {
     unsafe { LAST_COUNT[0] = count };
 }
 
-#[allow(clippy::similar_names, clippy::manual_assert)]
+#[expect(clippy::manual_assert)]
 pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &MultipartInput<BytesInput>| {
@@ -151,7 +151,7 @@ pub fn main() {
     ]);
 
     fuzzer
-        .evaluate_input(&mut state, &mut executor, &mut mgr, initial)
+        .evaluate_input(&mut state, &mut executor, &mut mgr, &initial)
         .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator

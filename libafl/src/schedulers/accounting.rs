@@ -26,7 +26,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct AccountingIndexesMetadata {
     /// The list of indexes.
@@ -77,7 +77,7 @@ impl AccountingIndexesMetadata {
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct TopAccountingMetadata {
     /// map index -> corpus index
@@ -104,17 +104,17 @@ impl TopAccountingMetadata {
 
 /// A minimizer scheduler using coverage accounting
 #[derive(Debug)]
-pub struct CoverageAccountingScheduler<'a, CS, O> {
+pub struct CoverageAccountingScheduler<'a, CS, I, O> {
     accounting_map: &'a [u32],
     skip_non_favored_prob: f64,
-    inner: IndexesLenTimeMinimizerScheduler<CS, O>,
+    inner: IndexesLenTimeMinimizerScheduler<CS, I, O>,
 }
 
-impl<CS, O, S> Scheduler<<S::Corpus as Corpus>::Input, S> for CoverageAccountingScheduler<'_, CS, O>
+impl<CS, I, O, S> Scheduler<I, S> for CoverageAccountingScheduler<'_, CS, I, O>
 where
-    CS: Scheduler<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasMetadata + HasRand,
-    <S::Corpus as Corpus>::Input: HasLen,
+    CS: Scheduler<I, S>,
+    S: HasCorpus<I> + HasMetadata + HasRand,
+    I: HasLen,
     O: CanTrack,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
@@ -122,12 +122,7 @@ where
         self.inner.on_add(state, id)
     }
 
-    fn on_evaluation<OT>(
-        &mut self,
-        state: &mut S,
-        input: &<S::Corpus as Corpus>::Input,
-        observers: &OT,
-    ) -> Result<(), Error>
+    fn on_evaluation<OT>(&mut self, state: &mut S, input: &I, observers: &OT) -> Result<(), Error>
     where
         OT: MatchName,
     {
@@ -173,16 +168,15 @@ where
     }
 }
 
-impl<'a, CS, O> CoverageAccountingScheduler<'a, CS, O>
+impl<'a, CS, I, O> CoverageAccountingScheduler<'a, CS, I, O>
 where
     O: CanTrack,
 {
     /// Update the `Corpus` score
-    #[allow(clippy::unused_self)]
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_possible_wrap)]
     pub fn update_accounting_score<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        S: HasCorpus + HasMetadata,
+        S: HasCorpus<I> + HasMetadata,
     {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
@@ -267,10 +261,9 @@ where
     }
 
     /// Cull the `Corpus`
-    #[allow(clippy::unused_self)]
     pub fn accounting_cull<S>(&self, state: &S) -> Result<(), Error>
     where
-        S: HasCorpus + HasMetadata,
+        S: HasCorpus<I> + HasMetadata,
     {
         let Some(top_rated) = state.metadata_map().get::<TopAccountingMetadata>() else {
             return Ok(());

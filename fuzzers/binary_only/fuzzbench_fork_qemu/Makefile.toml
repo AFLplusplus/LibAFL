@@ -90,7 +90,7 @@ windows_alias = "unsupported"
 script_runner = "@shell"
 script = '''
 timeout 15s ${TARGET_DIR}/${PROFILE_DIR}/fuzzbench_fork_qemu ${PROJECT_DIR}/harness -- --libafl-in ${PROJECT_DIR}/../../inprocess/libfuzzer_libpng/corpus --libafl-out ${PROJECT_DIR}/out ${PROJECT_DIR}/harness | tee fuzz_stdout.log
-if grep -qa "objectives: 1" fuzz_stdout.log; then
+if grep -qa "corpus: 5" fuzz_stdout.log; then
     echo "Fuzzer is working"
 else
     echo "Fuzzer does not generate any testcases or any crashes"

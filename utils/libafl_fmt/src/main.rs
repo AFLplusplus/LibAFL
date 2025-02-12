@@ -223,6 +223,7 @@ async fn main() -> io::Result<()> {
         r".*Little-CMS.*",
         r".*cms_transform_fuzzer.cc.*",
         r".*sqlite3.*",
+        r".*libfuzzer_libmozjpeg.*",
     ])
     .expect("Could not create the regex set from the given regex");
 
@@ -352,7 +353,7 @@ async fn get_version_string(path: &str, args: &[&str]) -> Result<String, io::Err
     Ok(from_utf8(&version).unwrap().replace('\n', ""))
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn print_warning(warning: String) {
     println!("\n{} {}\n", "Warning:".yellow().bold(), warning);
 }

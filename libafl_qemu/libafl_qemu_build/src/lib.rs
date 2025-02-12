@@ -144,7 +144,7 @@ fn exec_rustc(args: &[&str]) -> String {
 
 fn find_rustc_llvm_version() -> Option<i32> {
     let output = exec_rustc(&["--verbose", "--version"]);
-    let ver = output.split(':').last().unwrap().trim();
+    let ver = output.split(':').next_back().unwrap().trim();
     if let Some(major) = ver.split('.').collect::<Vec<&str>>().first() {
         if let Ok(res) = major.parse::<i32>() {
             return Some(res);
@@ -386,7 +386,6 @@ pub fn store_generated_content_if_different(
 //}
 
 #[rustversion::nightly]
-#[allow(unused)]
 pub fn maybe_generate_stub_bindings(
     cpu_target: &str,
     emulation_mode: &str,

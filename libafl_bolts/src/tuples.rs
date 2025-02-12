@@ -3,15 +3,13 @@
 #[cfg(feature = "alloc")]
 use alloc::{borrow::Cow, vec::Vec};
 #[cfg(feature = "alloc")]
-use core::ops::{Deref, DerefMut};
 use core::{
-    any::{type_name, TypeId},
-    cell::Cell,
+    any::type_name,
     fmt::{Debug, Formatter},
     marker::PhantomData,
-    mem::transmute,
-    ops::{Index, IndexMut},
+    ops::{Deref, DerefMut, Index, IndexMut},
 };
+use core::{any::TypeId, mem::transmute};
 
 #[cfg(feature = "alloc")]
 use serde::{Deserialize, Serialize};
@@ -24,36 +22,9 @@ use crate::HasLen;
 use crate::Named;
 
 /// Returns if the type `T` is equal to `U`, ignoring lifetimes.
-#[inline] // this entire call gets optimized away :)
 #[must_use]
 pub fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
-    // decider struct: hold a cell (which we will update if the types are unequal) and some
-    // phantom data using a function pointer to allow for Copy to be implemented
-    struct W<'a, T: ?Sized, U: ?Sized>(&'a Cell<bool>, PhantomData<fn() -> (&'a T, &'a U)>);
-
-    // default implementation: if the types are unequal, we will use the clone implementation
-    impl<T: ?Sized, U: ?Sized> Clone for W<'_, T, U> {
-        #[inline]
-        fn clone(&self) -> Self {
-            // indicate that the types are unequal
-            // unfortunately, use of interior mutability (Cell) makes this not const-compatible
-            // not really possible to get around at this time
-            self.0.set(false);
-            W(self.0, self.1)
-        }
-    }
-
-    // specialized implementation: Copy is only implemented if the types are the same
-    #[allow(clippy::mismatching_type_param_order)]
-    impl<T: ?Sized> Copy for W<'_, T, T> {}
-
-    let detected = Cell::new(true);
-    // [].clone() is *specialized* in core.
-    // Types which implement copy will have their copy implementations used, falling back to clone.
-    // If the types are the same, then our clone implementation (which sets our Cell to false)
-    // will never be called, meaning that our Cell's content remains true.
-    let res = [W::<T, U>(&detected, PhantomData)].clone();
-    res[0].0.get()
+    typeid::of::<T>() == typeid::of::<U>()
 }
 
 /// Borrow each member of the tuple
@@ -485,7 +456,7 @@ impl MatchName for () {
 }
 
 #[cfg(feature = "alloc")]
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl<Head, Tail> MatchName for (Head, Tail)
 where
     Head: Named,
@@ -585,7 +556,7 @@ pub trait MatchNameRef {
 }
 
 #[cfg(feature = "alloc")]
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl<M> MatchNameRef for M
 where
     M: MatchName,
@@ -769,10 +740,8 @@ impl<M> Map<M> for () {
 
 /// Iterate over a tuple, executing the given `expr` for each element.
 #[macro_export]
-#[allow(clippy::items_after_statements)]
 macro_rules! tuple_for_each {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
-        #[allow(clippy::items_after_statements)]
         mod $fn_name {
             pub trait ForEach {
                 fn for_each(&self);
@@ -787,7 +756,7 @@ macro_rules! tuple_for_each {
                 Head: $trait_name,
                 Tail: tuple_list::TupleList + ForEach,
             {
-                #[allow(clippy::redundant_closure_call)]
+                #[allow(clippy::redundant_closure_call)] // macro may be called on a closure or a function
                 fn for_each(&self) {
                     ($body)(&self.0);
                     self.1.for_each();
@@ -806,7 +775,6 @@ macro_rules! tuple_for_each {
 #[macro_export]
 macro_rules! tuple_for_each_mut {
     ($fn_name:ident, $trait_name:path, $tuple_name:ident, $body:expr) => {
-        #[allow(clippy::items_after_statements)]
         mod $fn_name {
             pub trait ForEachMut {
                 fn for_each_mut(&mut self);
@@ -821,7 +789,7 @@ macro_rules! tuple_for_each_mut {
                 Head: $trait_name,
                 Tail: tuple_list::TupleList + ForEachMut,
             {
-                #[allow(clippy::redundant_closure_call)]
+                #[allow(clippy::redundant_closure_call)] // macro may be called on a closure or a function
                 fn for_each_mut(&mut self) {
                     ($body)(&mut self.0);
                     self.1.for_each_mut();
@@ -833,6 +801,81 @@ macro_rules! tuple_for_each_mut {
 
             $tuple_name.for_each_mut();
         };
+    };
+}
+
+/// Maps the types of a mapping with a [`MappingFunctor`]
+///
+/// ```rust
+/// use libafl_bolts::{
+///     map_tuple_list_type,
+///     tuples::{MappingFunctor, Map, tuple_list, tuple_list_type}
+/// };
+///
+/// struct Wrapper<T>(T);
+/// struct MyMapper;
+///
+/// impl<T> MappingFunctor<T> for MyMapper {
+///     type Output = Wrapper<T>;
+///
+///     fn apply(&mut self, from: T) -> <Self as MappingFunctor<T>>::Output {
+///         Wrapper(from)
+///     }
+/// }
+///
+/// struct A;
+/// struct B;
+/// struct C;
+///
+/// type OrigType = tuple_list_type!(A, B, C);
+/// type MappedType = map_tuple_list_type!(OrigType, MyMapper);
+/// let orig: OrigType = tuple_list!(A, B, C);
+/// let _mapped: MappedType = orig.map(MyMapper);
+/// ```
+#[macro_export]
+macro_rules! map_tuple_list_type {
+    ($Tuple:ty, $Mapper:ty) => {
+        <$Tuple as $crate::tuples::Map<$Mapper>>::MapResult
+    };
+}
+
+/// Merges the types of two merged [`tuple_list!`]s
+///
+/// ```rust
+/// use libafl_bolts::{merge_tuple_list_type, tuples::{Merge, tuple_list, tuple_list_type}};
+///
+/// struct A;
+/// struct B;
+/// struct C;
+/// struct D;
+/// struct E;
+///
+/// type Lhs = tuple_list_type!(A, B, C);
+/// type Rhs = tuple_list_type!(D, E);
+/// type Merged = merge_tuple_list_type!(Lhs, Rhs);
+///
+/// let lhs: Lhs = tuple_list!(A, B, C);
+/// let rhs: Rhs = tuple_list!(D, E);
+/// let _merged: Merged = lhs.merge(rhs);
+/// ```
+#[macro_export]
+macro_rules! merge_tuple_list_type {
+   // Base case: when only two types are provided, apply the Merge trait directly
+   ($Type1:ty) => {
+        $Type1
+    };
+
+   // Base case: when only two types are provided, apply the Merge trait directly
+   ($Type1:ty, $Type2:ty) => {
+        <$Type1 as $crate::tuples::Merge<$Type2>>::MergeResult
+    };
+
+    // Recursive case: when more than two types are provided
+    ($Type1:ty, $Type2:ty, $( $rest:ty ),+) => {
+        merge_tuple_list_type!(
+            <$Type1 as $crate::tuples::Merge<$Type2>>::MergeResult,
+            $( $rest ),+
+        )
     };
 }
 
@@ -867,14 +910,16 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 
 #[cfg(test)]
 mod test {
+    use core::marker::PhantomData;
+
     use tuple_list::{tuple_list, tuple_list_type};
 
     #[cfg(feature = "alloc")]
     use crate::ownedref::OwnedMutSlice;
-    use crate::tuples::{type_eq, Map, MappingFunctor};
+    use crate::tuples::{type_eq, Map, MappingFunctor, Merge};
 
     #[test]
-    #[allow(unused_qualifications)] // for type name tests
+    // for type name tests
     fn test_type_eq_simple() {
         // test eq
         assert!(type_eq::<u64, u64>());
@@ -884,14 +929,12 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "alloc")]
-    #[allow(unused_qualifications)] // for type name tests
     fn test_type_eq() {
         // An alias for equality testing
         type OwnedMutSliceAlias<'a> = OwnedMutSlice<'a, u8>;
 
         // A function for lifetime testing
-        #[allow(clippy::extra_unused_lifetimes)]
+        #[expect(clippy::extra_unused_lifetimes)]
         fn test_lifetimes<'a, 'b>() {
             assert!(type_eq::<OwnedMutSlice<'a, u8>, OwnedMutSlice<'b, u8>>());
             assert!(type_eq::<OwnedMutSlice<'static, u8>, OwnedMutSlice<'a, u8>>());
@@ -905,23 +948,16 @@ mod test {
         // test weirder lifetime things
         assert!(type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u8>>());
         assert!(!type_eq::<OwnedMutSlice<u8>, OwnedMutSlice<u32>>());
-
-        assert!(type_eq::<
-            OwnedMutSlice<u8>,
-            crate::ownedref::OwnedMutSlice<u8>,
-        >());
-        assert!(!type_eq::<
-            OwnedMutSlice<u8>,
-            crate::ownedref::OwnedMutSlice<u32>,
-        >());
     }
 
     #[test]
     fn test_mapper() {
         struct W<T>(T);
-        struct MyMapper;
 
-        impl<T> MappingFunctor<T> for MyMapper {
+        // PhantomData shows how to deal with mappers that have generics
+        struct ExampleMapper<P>(PhantomData<P>);
+
+        impl<T, P> MappingFunctor<T> for ExampleMapper<P> {
             type Output = W<T>;
 
             fn apply(&mut self, from: T) -> Self::Output {
@@ -933,18 +969,45 @@ mod test {
         struct B;
         struct C;
 
-        let orig = tuple_list!(A, B, C);
-        let mapped = orig.map(MyMapper);
+        type OrigType = tuple_list_type!(A, B, C);
+        type MappedType = map_tuple_list_type!(OrigType, ExampleMapper<usize>);
+        let orig: OrigType = tuple_list!(A, B, C);
+        let _mapped: MappedType = orig.map(ExampleMapper(PhantomData::<usize>));
+    }
 
-        // this won't compile if the mapped type is not correct
+    #[test]
+    fn test_merge() {
+        struct A;
+        struct B;
+        struct C;
+        struct D;
+        struct E;
+
+        type Lhs = tuple_list_type!(A, B, C);
+        type Rhs = tuple_list_type!(D, E);
+        type Merged = merge_tuple_list_type!(Lhs, Rhs);
+        type IndividuallyMergedPre = merge_tuple_list_type!(
+            tuple_list_type!(A),
+            tuple_list_type!(B),
+            tuple_list_type!(C),
+            Rhs
+        );
+        type IndividuallyMergedPost =
+            merge_tuple_list_type!(Lhs, tuple_list_type!(D), tuple_list_type!(E));
+        type MergedCloned = merge_tuple_list_type!(Merged);
+
+        let lhs: Lhs = tuple_list!(A, B, C);
+        let rhs: Rhs = tuple_list!(D, E);
+        let merged: Merged = lhs.merge(rhs);
+        let merged: IndividuallyMergedPre = merged;
+        let merged: IndividuallyMergedPost = merged;
         #[allow(clippy::no_effect_underscore_binding)]
-        let _type_assert: tuple_list_type!(W<A>, W<B>, W<C>) = mapped;
+        let _merged: MergedCloned = merged;
     }
 
     /// Function that tests the tuple macros
     #[test]
     #[cfg(feature = "std")]
-    #[allow(clippy::items_after_statements)]
     fn test_macros() {
         let mut t = tuple_list!(1, "a");
 

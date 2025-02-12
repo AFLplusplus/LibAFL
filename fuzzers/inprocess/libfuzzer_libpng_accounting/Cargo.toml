@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_libpng_accounting"
-version = "0.14.1"
+version = "0.15.1"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -25,6 +25,7 @@ which = "6.0.3"
 libafl = { path = "../../../libafl", features = [
   "std",
   "derive",
+  "tcp_manager",
   "llmp_compression",
   "introspection",
 ] }

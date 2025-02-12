@@ -8,7 +8,6 @@ use core::{
     ptr::NonNull,
 };
 
-use ahash::RandomState;
 use libafl_bolts::{ownedref::OwnedMutSizedSlice, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -20,7 +19,7 @@ use crate::{
 /// Use a const size to speedup `Feedback::is_interesting` when the user can
 /// know the size of the map at compile time.
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct ConstMapObserver<'a, T, const N: usize> {
     map: OwnedMutSizedSlice<'a, T, N>,
     initial: T,
@@ -109,11 +108,6 @@ where
 
     fn usable_count(&self) -> usize {
         self.len()
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map

@@ -7,7 +7,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
 use libafl_bolts::{
     ownedref::{OwnedMutPtr, OwnedMutSlice},
     AsSlice, AsSliceMut, HasLen, Named,
@@ -21,7 +20,7 @@ use crate::{
 
 /// Overlooking a variable bitmap
 #[derive(Serialize, Deserialize, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<'a, T> {
     map: OwnedMutSlice<'a, T>,
     size: OwnedMutPtr<usize>,
@@ -111,11 +110,6 @@ where
             }
         }
         res
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     /// Reset the map

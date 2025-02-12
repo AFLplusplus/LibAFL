@@ -56,7 +56,7 @@ use libafl_qemu::{
     Emulator, GuestReg, MmapPerms, QemuExitError, QemuExitReason, QemuForkExecutor,
     QemuShutdownCause, Regs,
 };
-use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
+use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -155,7 +155,6 @@ fn fuzz(
 
     let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
     let edges = edges_shmem.as_slice_mut();
-    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
 
     // Create an observation channel using the coverage map
     let mut edges_observer = unsafe {
@@ -176,7 +175,7 @@ fn fuzz(
     );
 
     let emulator = Emulator::empty()
-        .qemu_cli(args)
+        .qemu_parameters(args)
         .modules(emulator_modules)
         .build()?;
 
@@ -243,7 +242,7 @@ fn fuzz(
     let cmplog = cmp_shmem.as_slice_mut();
 
     // Beginning of a page should be properly aligned.
-    #[allow(clippy::cast_ptr_alignment)]
+    #[expect(clippy::cast_ptr_alignment)]
     let cmplog_map_ptr = cmplog
         .as_mut_ptr()
         .cast::<libafl_qemu::modules::cmplog::CmpLogMap>();
@@ -327,7 +326,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // The wrapped harness function, calling out to the LLVM-style harness
-    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _>, input: &BytesInput| {
+    let mut harness = |_emulator: &mut Emulator<_, _, _, _, _, _, _>, input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();

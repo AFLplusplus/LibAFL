@@ -72,7 +72,7 @@ So the outgoing messages flow is like this over the outgoing broadcast `Shmem`:
 [client0]        [client1]    ...    [clientN]
 ```
 
-To use `LLMP` in LibAFL, you usually want to use an `LlmpEventManager` or its restarting variant.
+To use `LLMP` in LibAFL, you usually want to use an `LlmpRestartingEventManager` or its restarting variant.
 They are the default if using LibAFL's `Launcher`.
 
 If you should want to use `LLMP` in its raw form, without any `LibAFL` abstractions, take a look at the `llmp_test` example in [./libafl/examples](https://github.com/AFLplusplus/LibAFL/blob/main/libafl_bolts/examples/llmp_test/main.rs).

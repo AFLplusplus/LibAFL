@@ -10,11 +10,11 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 use libafl_bolts::{rands::Rand, Named};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
+    inputs::Input,
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     nonzero,
@@ -27,11 +27,10 @@ use crate::{
 // TODO multi mutators stage
 
 /// Action performed after the un-transformed input is executed (e.g., updating metadata)
-#[allow(unused_variables)]
 pub trait MutatedTransformPost<S>: Sized {
     /// Perform any post-execution steps necessary for the transformed input (e.g., updating metadata)
     #[inline]
-    fn post_exec(self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
+    fn post_exec(self, _state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -43,10 +42,7 @@ impl<S> MutatedTransformPost<S> for () {}
 ///
 /// This trait is implemented such that all testcases inherently transform to their inputs, should
 /// the input be cloneable.
-pub trait MutatedTransform<I, S>: Sized
-where
-    I: Input,
-{
+pub trait MutatedTransform<I, S>: Sized {
     /// Type indicating actions to be taken after the post-transformation input is executed
     type Post: MutatedTransformPost<S>;
 
@@ -60,9 +56,8 @@ where
 // reflexive definition
 impl<I, S> MutatedTransform<I, S> for I
 where
-    I: Input + Clone,
-    S: HasCorpus,
-    S::Corpus: Corpus<Input = I>,
+    I: Clone,
+    S: HasCorpus<I>,
 {
     type Post = ();
 
@@ -101,18 +96,17 @@ pub const DEFAULT_MUTATIONAL_MAX_ITERATIONS: usize = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<E, EM, I, M, S, Z> {
+pub struct StdMutationalStage<E, EM, I1, I2, M, S, Z> {
     /// The name
     name: Cow<'static, str>,
     /// The mutator(s) to use
     mutator: M,
     /// The maximum amount of iterations we should do each round
     max_iterations: NonZeroUsize,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, I, S, Z)>,
+    phantom: PhantomData<(E, EM, I1, I2, S, Z)>,
 }
 
-impl<E, EM, I, M, S, Z> MutationalStage<S> for StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> MutationalStage<S> for StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
     S: HasRand,
 {
@@ -141,30 +135,27 @@ static mut MUTATIONAL_STAGE_ID: usize = 0;
 /// The name for mutational stage
 pub static MUTATIONAL_STAGE_NAME: &str = "mutational";
 
-impl<E, EM, I, M, S, Z> Named for StdMutationalStage<E, EM, I, M, S, Z> {
+impl<E, EM, I1, I2, M, S, Z> Named for StdMutationalStage<E, EM, I1, I2, M, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
-        + HasRand
+    I1: Clone + MutatedTransform<I2, S>,
+    I2: Input,
+    M: Mutator<I1, S>,
+    S: HasRand
+        + HasCorpus<I2>
         + HasMetadata
         + HasExecutions
         + HasNamedMetadata
         + HasCurrentCorpusId
-        + MaybeHasClientPerfMonitor
-        + UsesInput,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
-    S::Corpus: Corpus<Input = S::Input>,
+        + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I2, S>,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -175,7 +166,7 @@ where
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         ret
     }
@@ -189,13 +180,12 @@ where
     }
 }
 
-impl<E, EM, M, S, Z> StdMutationalStage<E, EM, <S::Corpus as Corpus>::Input, M, S, Z>
+impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, I, M, S, Z>
 where
-    M: Mutator<<S::Corpus as Corpus>::Input, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasCurrentCorpusId + UsesInput + MaybeHasClientPerfMonitor,
-    <S::Corpus as Corpus>::Input: Input + Clone,
-    S::Corpus: Corpus<Input = S::Input>,
+    M: Mutator<I, S>,
+    I: MutatedTransform<I, S> + Input + Clone,
+    S: HasCorpus<I> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -210,14 +200,13 @@ where
     }
 }
 
-impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasCurrentTestcase + MaybeHasClientPerfMonitor + UsesInput,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
-    S::Corpus: Corpus<Input = S::Input>,
+    I1: MutatedTransform<I2, S> + Clone,
+    I2: Input,
+    M: Mutator<I1, S>,
+    S: HasCorpus<I2> + HasRand + HasCurrentCorpusId + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I2, S>,
 {
     /// Creates a new transforming mutational stage with the default max iterations
     pub fn transforming(mutator: M) -> Self {
@@ -226,9 +215,6 @@ where
     }
 
     /// Creates a new transforming mutational stage with the given max iterations
-    ///
-    /// # Errors
-    /// Will return [`Error::IllegalArgument`] for `max_iterations` of 0.
     #[inline]
     pub fn transforming_with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
         let stage_id = unsafe {
@@ -245,9 +231,17 @@ where
             phantom: PhantomData,
         }
     }
+}
 
+impl<E, EM, I1, I2, M, S, Z> StdMutationalStage<E, EM, I1, I2, M, S, Z>
+where
+    I1: MutatedTransform<I2, S> + Clone,
+    I2: Input,
+    M: Mutator<I1, S>,
+    S: HasRand + HasCurrentTestcase<I2> + MaybeHasClientPerfMonitor,
+    Z: Evaluator<E, EM, I2, S>,
+{
     /// Runs this (mutational) stage for the given testcase
-    #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
     fn perform_mutational(
         &mut self,
         fuzzer: &mut Z,
@@ -266,7 +260,7 @@ where
         let num = self.iterations(state)?;
         let mut testcase = state.current_testcase_mut()?;
 
-        let Ok(input) = I::try_transform_from(&mut testcase, state) else {
+        let Ok(input) = I1::try_transform_from(&mut testcase, state) else {
             return Ok(());
         };
         drop(testcase);
@@ -283,9 +277,9 @@ where
                 continue;
             }
 
-            // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = input.try_transform_into(state)?;
-            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (_, corpus_id) =
+                fuzzer.evaluate_filtered(state, executor, manager, &untransformed)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, corpus_id)?;
@@ -301,7 +295,6 @@ where
 pub struct MultiMutationalStage<E, EM, I, M, S, Z> {
     name: Cow<'static, str>,
     mutator: M,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
@@ -318,12 +311,10 @@ impl<E, EM, I, M, S, Z> Named for MultiMutationalStage<E, EM, I, M, S, Z> {
 
 impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for MultiMutationalStage<E, EM, I, M, S, Z>
 where
+    I: Clone + MutatedTransform<I, S>,
     M: MultiMutator<I, S>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus + HasRand + HasNamedMetadata + HasCurrentTestcase + HasCurrentCorpusId + UsesInput,
-    I: MutatedTransform<<S::Corpus as Corpus>::Input, S> + Clone,
-    <S::Corpus as Corpus>::Input: Input,
-    S::Corpus: Corpus<Input = S::Input>,
+    S: HasRand + HasNamedMetadata + HasCurrentTestcase<I> + HasCurrentCorpusId,
+    Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
@@ -337,8 +328,6 @@ where
     }
 
     #[inline]
-    #[allow(clippy::let_and_return)]
-    #[allow(clippy::cast_possible_wrap)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -353,15 +342,13 @@ where
         drop(testcase);
 
         let generated = self.mutator.multi_mutate(state, &input, None)?;
-        // println!("Generated {}", generated.len());
         for new_input in generated {
-            // Time is measured directly the `evaluate_input` function
             let (untransformed, post) = new_input.try_transform_into(state)?;
-            let (_, corpus_id) = fuzzer.evaluate_input(state, executor, manager, untransformed)?;
+            let (_, corpus_id) =
+                fuzzer.evaluate_filtered(state, executor, manager, &untransformed)?;
             self.mutator.multi_post_exec(state, corpus_id)?;
             post.post_exec(state, corpus_id)?;
         }
-        // println!("Found {}", found);
 
         Ok(())
     }

@@ -21,12 +21,12 @@ pub const MAX_INPUT_SIZE: usize = 1_048_576; // 1MB
 impl Harness {
     /// Change environment
     #[inline]
-    #[allow(clippy::ptr_arg)]
+    #[expect(clippy::ptr_arg)]
     pub fn edit_env(_env: &mut Vec<(String, String)>) {}
 
     /// Change arguments
     #[inline]
-    #[allow(clippy::ptr_arg)]
+    #[expect(clippy::ptr_arg)]
     pub fn edit_args(_args: &mut Vec<String>) {}
 
     /// Helper function to find the function we want to fuzz.
@@ -43,14 +43,14 @@ impl Harness {
     /// Initialize the emulator, run to the entrypoint (or jump there) and return the [`Harness`] struct
     pub fn init(qemu: Qemu) -> Result<Harness, Error> {
         let start_pc = Self::start_pc(qemu)?;
-        log::debug!("start_pc @ {start_pc:#x}");
+        log::info!("start_pc @ {start_pc:#x}");
 
         qemu.entry_break(start_pc);
 
         let ret_addr: GuestAddr = qemu
             .read_return_address()
             .map_err(|e| Error::unknown(format!("Failed to read return address: {e:?}")))?;
-        log::debug!("ret_addr = {ret_addr:#x}");
+        log::info!("ret_addr = {ret_addr:#x}");
         qemu.set_breakpoint(ret_addr);
 
         let input_addr = qemu
@@ -80,7 +80,7 @@ impl Harness {
 
     /// If we need to do extra work after forking, we can do that here.
     #[inline]
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     pub fn post_fork(&self) {}
 
     pub fn run(&self, input: &BytesInput) -> ExitKind {

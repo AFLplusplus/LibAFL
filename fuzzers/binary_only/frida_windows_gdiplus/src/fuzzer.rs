@@ -6,16 +6,9 @@
 //! going to make it compilable only for Windows, don't forget to modify the
 //! `scripts/test_fuzzer.sh` to opt-out this fuzzer from that test.
 
-#[cfg(unix)]
 use mimalloc::MiMalloc;
-#[cfg(unix)]
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-#[cfg(windows)]
-use dlmalloc::GlobalDlmalloc;
-#[cfg(windows)]
-#[global_allocator]
-static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
 use std::path::PathBuf;
 
@@ -77,7 +70,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));
@@ -85,7 +78,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<_>,
-                          mgr: LlmpRestartingEventManager<_, _, _>,
+                          mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
@@ -105,7 +98,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         if options.asan && options.asan_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 
@@ -221,7 +214,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             })(state, mgr, client_description)
         } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 
@@ -351,7 +344,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             })(state, mgr, client_description)
         } else {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 

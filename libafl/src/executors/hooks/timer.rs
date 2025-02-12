@@ -38,7 +38,7 @@ pub(crate) struct Timeval {
 
 #[cfg(all(unix, not(target_os = "linux")))]
 impl core::fmt::Debug for Timeval {
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
@@ -69,7 +69,7 @@ extern "C" {
 
 /// The strcut about all the internals of the timer.
 /// This struct absorb all platform specific differences about timer.
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 pub struct TimerStruct {
     // timeout time (windows)
     #[cfg(windows)]
@@ -103,7 +103,7 @@ pub struct TimerStruct {
 }
 
 #[cfg(windows)]
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param0: PTP_CALLBACK_INSTANCE,
     param1: *mut c_void,
@@ -201,8 +201,6 @@ impl TimerStruct {
 
     #[cfg(target_os = "linux")]
     #[must_use]
-    #[allow(unused_unsafe)]
-    #[allow(unused_mut)]
     /// Create a `TimerStruct` with the specified timeout
     pub fn new(exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
@@ -218,9 +216,10 @@ impl TimerStruct {
             it_interval,
             it_value,
         };
+        #[allow(unused_mut)] // miri doesn't mutate this
         let mut timerid: libc::timer_t = null_mut();
+        #[cfg(not(miri))]
         unsafe {
-            #[cfg(not(miri))]
             // creates a new per-process interval timer
             libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
         }
@@ -264,7 +263,7 @@ impl TimerStruct {
     }
 
     #[cfg(windows)]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     /// Set timer
     pub fn set_timer(&mut self) {
         unsafe {
@@ -290,7 +289,7 @@ impl TimerStruct {
             LeaveCriticalSection(self.critical_mut());
             compiler_fence(Ordering::SeqCst);
 
-            SetThreadpoolTimer(*self.ptp_timer(), Some(&ft), 0, 0);
+            SetThreadpoolTimer(*self.ptp_timer(), Some(&ft), 0, None);
         }
     }
 
@@ -324,7 +323,6 @@ impl TimerStruct {
 
     /// Disable the timer
     #[cfg(target_os = "linux")]
-    #[allow(unused_variables)]
     pub fn unset_timer(&mut self) {
         // # Safety
         // Just API calls, no user-provided inputs
@@ -351,9 +349,9 @@ impl TimerStruct {
                 }
             }
         } else {
+            #[cfg(not(miri))]
             unsafe {
                 let disarmed: libc::itimerspec = zeroed();
-                #[cfg(not(miri))]
                 libc::timer_settime(self.timerid, 0, &raw const disarmed, null_mut());
             }
         }
@@ -377,7 +375,7 @@ impl TimerStruct {
             compiler_fence(Ordering::SeqCst);
 
             // previously this wa post_run_reset
-            SetThreadpoolTimer(*self.ptp_timer(), None, 0, 0);
+            SetThreadpoolTimer(*self.ptp_timer(), None, 0, None);
         }
     }
 }

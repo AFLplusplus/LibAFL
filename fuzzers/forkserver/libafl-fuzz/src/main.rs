@@ -21,6 +21,7 @@
     clippy::similar_names,
     clippy::too_many_lines,
     clippy::into_iter_without_iter, // broken
+    clippy::multiple_crate_versions
 )]
 #![cfg_attr(not(test), warn(
     missing_debug_implementations,
@@ -105,7 +106,6 @@ const DEFER_SIG: &str = "##SIG_AFL_DEFER_FORKSRV##\0";
 const SHMEM_ENV_VAR: &str = "__AFL_SHM_ID";
 static AFL_HARNESS_FILE_INPUT: &str = "@@";
 
-#[allow(clippy::too_many_lines)]
 fn main() {
     env_logger::init();
     let mut opt = Opt::parse();
@@ -199,10 +199,10 @@ fn main() {
         Ok(()) => unreachable!(),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {err:?}"),
-    };
+    }
 }
 
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Parser, Clone)]
 #[command(
     name = "afl-fuzz",
@@ -358,7 +358,7 @@ struct Opt {
     non_instrumented_mode: bool,
 }
 
-#[allow(dead_code, clippy::struct_excessive_bools)]
+#[expect(dead_code, clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct CmplogOpts {
     file_size: CmplogFileSize,
@@ -387,7 +387,7 @@ impl From<&str> for CmplogFileSize {
     }
 }
 
-#[allow(clippy::unnecessary_wraps)] // we need to be compatible with Clap's value_parser
+#[expect(clippy::unnecessary_wraps)] // we need to be compatible with Clap's value_parser
 fn parse_cmplog_args(s: &str) -> Result<CmplogOpts, String> {
     Ok(CmplogOpts {
         file_size: s.into(),

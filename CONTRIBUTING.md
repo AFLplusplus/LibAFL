@@ -27,7 +27,7 @@ Before making your pull requests, try to see if your code follows these rules.
 - `PhantomData` should have the smallest set of types needed. Try not adding `PhantomData` to your struct unless it is really necessary. Also even when you really need `PhantomData`, try to keep the types `T` used in `PhantomData` as smallest as possible 
 - Wherever possible, trait implementations with lifetime specifiers should use '_ lifetime elision.
 - Complex constructors should be replaced with `typed_builder`, or write code in the builder pattern for yourself.
-- Remove generic restrictions at the definitions (e.g., we do not need to specify that types impl `Serialize`, `Deserialize`, or `Debug` anymore at the struct definitions). Therefore, try avoiding code like this unless the contraint is really necessary.
+- Remove generic restrictions at the definitions (e.g., we do not need to specify that types impl `Serialize`, `Deserialize`, or `Debug` anymore at the struct definitions). Therefore, try avoiding code like this unless the constraint is really necessary.
 ```rust
 pub struct X<A> 
     where
@@ -35,9 +35,8 @@ pub struct X<A>
 {
     fn ...
 }
-
 ```
-- Reduce generics to the least restrictive necessary. __Never overspecify the contraints__. There's no automated tool to check the useless constraints, so you have to verify this manually.
+- Reduce generics to the least restrictive necessary. __Never overspecify the constraints__. There's no automated tool to check the useless constraints, so you have to verify this manually.
 ```rust
 pub struct X<A> 
     where
@@ -45,18 +44,38 @@ pub struct X<A>
 {
     fn ...
 }
-
 ```
-- Traits which have an associated type should refer to the associated type, not the concrete/generic. In other words, you should only have the associated type when you can define a getter to it. For example, in the following code, you can define a associate type.
+
+- Prefer generic to associated types in traits definition as much as possible. They are much easier to use around, and avoid tricky caveats / type repetition in the code. It is also much easier to have unconstrained struct definitions.
+
+Try not to write this:
+```rust
+pub trait X
+{
+    type A;
+    
+    fn a(&self) -> Self::A;
+}
+```
+Try to write this instead:
+```rust
+pub trait X<A>
+{
+    fn a(&self) -> A;
+}
+```
+
+- Traits which have an associated type (if you have made sure you cannot use a generic instead) should refer to the associated type, not the concrete/generic. In other words, you should only have the associated type when you can define a getter to it. For example, in the following code, you can define a associate type.
 ```rust
 pub trait X 
 {
     type A; // <- You should(can) define it as long as you have a getter to it.
-    fn a(&self) -> A;
+    
+    fn a(&self) -> Self::A;
 }
-
 ```
-- __Ideally__ the types used in the the arguments of methods in traits should have the same as the types defined on the traits.
+
+- __Ideally__ the types used in the arguments of methods in traits should have the same as the types defined on the traits.
 ```rust
 pub trait X<A, B, C> // <- this trait have 3 generics, A, B, and C
 {
@@ -65,6 +84,22 @@ pub trait X<A, B, C> // <- this trait have 3 generics, A, B, and C
     fn do_other_stuff(&self, a: A, b: B); // <- this is not ideal because it does not have C.
 }
 ```
+- Generic naming should be consistent. Do NOT use multiple name for the same generic, it just makes things more confusing. Do:
+```rust
+pub struct X<A> {
+    phantom: PhanomData<A>,
+}
+
+impl<A> X<A> {}
+```
+But not:
+```rust
+pub struct X<A> {
+    phantom: PhanomData<A>,
+}
+
+impl<B> X<B> {} // <- Do NOT do that, use A instead of B
+```
 - Always alphabetically order the type generics. Therefore,
 ```rust
 pub struct X<E, EM, OT, S, Z> {}; // <- Generics are alphabetically ordered
@@ -72,4 +107,31 @@ pub struct X<E, EM, OT, S, Z> {}; // <- Generics are alphabetically ordered
 But not,
 ```rust
 pub struct X<S, OT, Z, EM, E> {}; // <- Generics are not ordered
+```
+- Similarly, generic bounds in `where` clauses should be alphabetically sorted. Prefer:
+```rust
+pub trait FooA {}
+pub trait FooB {}
+
+pub struct X<A, B>;
+
+impl<A, B> X<A, B>
+where
+    A: FooA,
+    B: FooB,
+{}
+```
+Over:
+```rust
+pub trait FooA {}
+pub trait FooB {}
+
+pub struct X<A, B>;
+
+impl<A, B> X<A, B>
+where
+    B: FooB, // <-|
+             //   | Generic bounds are not alphabetically ordered.
+    A: FooA, // <-|
+{}
 ```

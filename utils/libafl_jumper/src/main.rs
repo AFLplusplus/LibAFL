@@ -55,7 +55,7 @@ pub unsafe extern "C" fn libafl_jmp(target: *mut c_void) -> ! {
         options(noreturn)
     );
 
-    #[cfg(target_arch = "hexagon")]
+    #[cfg(any(target_arch = "powerpc", target_arch = "powerpc64"))]
     asm!(
         "b {target}",       // Branch instruction (PowerPC)
         target = in(reg) target,
@@ -127,7 +127,7 @@ fn decode_hex_and_jmp(hex_string: &str) -> ! {
     #[cfg(feature = "std")]
     println!("Hex: {addr:#x}");
 
-    #[allow(clippy::cast_possible_truncation)]
+    #[expect(clippy::cast_possible_truncation)]
     let addr = addr as usize;
 
     let entrypoint = addr as *mut c_void;

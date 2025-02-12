@@ -12,6 +12,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
+    inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
@@ -25,7 +26,8 @@ use libafl_intelpt::{IntelPT, PAGE_SIZE};
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-#[allow(static_mut_refs)]
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+#[allow(static_mut_refs)] // only a problem in nightly
 static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
 pub fn main() {
@@ -130,7 +132,11 @@ pub fn main() {
         .timeout(Duration::from_secs(2))
         .build();
     let mut executor =
-        command_configurator.into_executor_with_hooks(tuple_list!(observer), tuple_list!(hook));
+        <PTraceCommandConfigurator as CommandConfigurator<BytesInput, _>>::into_executor_with_hooks(
+            command_configurator,
+            tuple_list!(observer),
+            tuple_list!(hook),
+        );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());

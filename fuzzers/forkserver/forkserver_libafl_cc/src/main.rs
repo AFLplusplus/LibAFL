@@ -21,7 +21,7 @@ use libafl::{
 use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMem, ShMemProvider, UnixShMemProvider},
-    tuples::{tuple_list, Handled, MatchNameRef, Merge},
+    tuples::{tuple_list, Handled, Merge},
     AsSliceMut, Truncate,
 };
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
@@ -83,7 +83,6 @@ struct Opt {
     signal: Signal,
 }
 
-#[allow(clippy::similar_names)]
 pub fn main() {
     env_logger::init();
 

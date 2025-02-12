@@ -196,7 +196,7 @@ fn run_testcases(filenames: &[&str]) {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,

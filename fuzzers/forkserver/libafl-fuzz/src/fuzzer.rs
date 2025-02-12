@@ -22,7 +22,7 @@ use libafl::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
     },
     fuzzer::StdFuzzer,
-    inputs::{BytesInput, NopTargetBytesConverter, UsesInput},
+    inputs::{BytesInput, NopTargetBytesConverter},
     mutators::{havoc_mutations, tokens_mutations, AFLppRedQueen, StdScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
@@ -42,7 +42,7 @@ use libafl::{
     Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
 };
 #[cfg(not(feature = "fuzzbench"))]
-use libafl_bolts::shmem::StdShMemProvider;
+use libafl_bolts::shmem::{StdShMem, StdShMemProvider};
 use libafl_bolts::{
     core_affinity::CoreId,
     current_nanos, current_time,
@@ -73,17 +73,18 @@ use crate::{
 };
 
 pub type LibaflFuzzState =
-    StdState<BytesInput, CachedOnDiskCorpus<BytesInput>, StdRand, OnDiskCorpus<BytesInput>>;
+    StdState<CachedOnDiskCorpus<BytesInput>, BytesInput, StdRand, OnDiskCorpus<BytesInput>>;
 
 #[cfg(not(feature = "fuzzbench"))]
 type LibaflFuzzManager = CentralizedEventManager<
-    LlmpRestartingEventManager<(), LibaflFuzzState, StdShMemProvider>,
-    (),
+    LlmpRestartingEventManager<(), BytesInput, LibaflFuzzState, StdShMem, StdShMemProvider>,
+    BytesInput,
     LibaflFuzzState,
+    StdShMem,
     StdShMemProvider,
 >;
 #[cfg(feature = "fuzzbench")]
-type LibaflFuzzManager<F> = SimpleEventManager<SimpleMonitor<F>, LibaflFuzzState>;
+type LibaflFuzzManager<F> = SimpleEventManager<BytesInput, SimpleMonitor<F>, LibaflFuzzState>;
 
 macro_rules! define_run_client {
     ($state: ident, $mgr: ident, $fuzzer_dir: ident, $core_id: ident, $opt:ident, $is_main_node: ident, $body:block) => {
@@ -361,7 +362,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         // Enable autodict if configured
         if !opt.no_autodict {
             executor_builder = executor_builder.autotokens(&mut tokens);
-        };
+        }
 
         // Finalize and build our Executor
         SupportedExecutors::Forkserver(
@@ -521,7 +522,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         );
 
         // Run our fuzzer; WITH CmpLog
-        run_fuzzer_with_stages(
+        run_fuzzer_with_stages::<_, _, BytesInput, _, _, _>(
             opt,
             &mut fuzzer,
             &mut stages,
@@ -540,7 +541,7 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         );
 
         // Run our fuzzer; NO CmpLog
-        run_fuzzer_with_stages(
+        run_fuzzer_with_stages::<_, _, BytesInput, _, _, _>(
             opt,
             &mut fuzzer,
             &mut stages,
@@ -648,7 +649,7 @@ pub fn fuzzer_target_mode(opt: &Opt) -> Cow<'static, str> {
 #[derive(Debug, Serialize, Deserialize, SerdeAny)]
 pub struct IsInitialCorpusEntryMetadata {}
 
-pub fn run_fuzzer_with_stages<E, EM, S, ST, Z>(
+pub fn run_fuzzer_with_stages<E, EM, I, S, ST, Z>(
     opt: &Opt,
     fuzzer: &mut Z,
     stages: &mut ST,
@@ -657,10 +658,10 @@ pub fn run_fuzzer_with_stages<E, EM, S, ST, Z>(
     mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    Z: Fuzzer<E, EM, S, ST>,
-    EM: ProgressReporter<State = S>,
+    Z: Fuzzer<E, EM, I, S, ST>,
+    EM: ProgressReporter<S>,
     ST: StagesTuple<E, EM, S, Z>,
-    S: HasLastReportTime + HasExecutions + HasMetadata + UsesInput,
+    S: HasLastReportTime + HasExecutions + HasMetadata,
 {
     if opt.bench_just_one {
         fuzzer.fuzz_loop_for(stages, executor, state, mgr, 1)?;

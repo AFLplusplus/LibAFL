@@ -24,7 +24,6 @@ fn dll_extension<'a>() -> &'a str {
 include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 
 /// The supported LLVM passes
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LLVMPasses {
     //CmpLogIns,
@@ -84,7 +83,7 @@ impl LLVMPasses {
 }
 
 /// Wrap Clang
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct ClangWrapper {
     is_silent: bool,
@@ -115,9 +114,9 @@ pub struct ClangWrapper {
     passes_linking_args: Vec<String>,
 }
 
-#[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
+#[expect(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl ToolWrapper for ClangWrapper {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>,
@@ -246,7 +245,7 @@ impl ToolWrapper for ClangWrapper {
                     shared = true;
                 } // TODO dynamic list?
                 _ => (),
-            };
+            }
             new_args.push(args[i].as_ref().to_string());
             i += 1;
         }
@@ -326,7 +325,7 @@ impl ToolWrapper for ClangWrapper {
         self.command_for_configuration(crate::Configuration::Default)
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn command_for_configuration(
         &mut self,
         configuration: crate::Configuration,

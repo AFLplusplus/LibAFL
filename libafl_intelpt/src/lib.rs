@@ -39,9 +39,9 @@ use arbitrary_int::u4;
 use bitbybit::bitfield;
 #[cfg(target_os = "linux")]
 use caps::{CapSet, Capability};
-#[cfg(target_os = "linux")]
-use libafl_bolts::ownedref::OwnedRefMut;
 use libafl_bolts::Error;
+#[cfg(target_os = "linux")]
+use libafl_bolts::{hash_64_fast, ownedref::OwnedRefMut};
 use libipt::PtError;
 #[cfg(target_os = "linux")]
 use libipt::{
@@ -282,12 +282,12 @@ impl IntelPT {
             return Err(Error::unknown(
                 "Intel PT: aux buffer head is behind aux tail.",
             ));
-        };
+        }
         if self.previous_decode_head < tail {
             return Err(Error::unknown(
                 "Intel PT: aux previous head is behind aux tail.",
             ));
-        };
+        }
         let len = (head - tail) as usize;
         if len >= self.perf_aux_buffer_size {
             log::warn!(
@@ -350,7 +350,7 @@ impl IntelPT {
                     }
                     break 'sync;
                 }
-            };
+            }
         }
 
         // Advance the trace pointer up to the latest sync point, otherwise next execution's trace
@@ -398,7 +398,7 @@ impl IntelPT {
                         log::trace!("PT error in event {e:?}");
                         break 'block;
                     }
-                };
+                }
             }
 
             match decoder.next() {
@@ -407,7 +407,7 @@ impl IntelPT {
                     let offset = decoder.offset().map_err(error_from_pt_error)?;
 
                     if b.ninsn() > 0 && skip < offset {
-                        let id = hash_me(*previous_block_end_ip) ^ hash_me(b.ip());
+                        let id = hash_64_fast(*previous_block_end_ip) ^ hash_64_fast(b.ip());
                         // SAFETY: the index is < map.len() since the modulo operation is applied
                         let map_loc = unsafe { map.get_unchecked_mut(id as usize % map.len()) };
                         *map_loc = (*map_loc).saturating_add(&1u8.into());
@@ -432,6 +432,7 @@ impl IntelPT {
 
     /// Get the raw trace used in the last decoding
     #[cfg(feature = "export_raw")]
+    #[must_use]
     pub fn last_decode_trace(&self) -> Vec<u8> {
         self.last_decode_trace.clone()
     }
@@ -784,7 +785,7 @@ pub fn availability_in_qemu_kvm() -> Result<(), String> {
                     "Failed to parse KVM Intel PT mode in {kvm_pt_mode_path}"
                 )),
             }
-        };
+        }
     }
     #[cfg(not(target_os = "linux"))]
     reasons.push("Only linux hosts are supported at the moment".to_owned());
@@ -854,7 +855,7 @@ fn availability_in_linux() -> Result<(), String> {
             }
         }
         Err(e) => reasons.push(format!("Failed to read linux capabilities: {e}")),
-    };
+    }
 
     if reasons.is_empty() {
         Ok(())
@@ -959,21 +960,6 @@ fn linux_version() -> Result<(usize, usize, usize), ()> {
 #[inline]
 const fn next_page_aligned_addr(address: u64) -> u64 {
     (address + PAGE_SIZE as u64 - 1) & !(PAGE_SIZE as u64 - 1)
-}
-
-// copy pasted from libafl_qemu/src/modules/edges.rs
-// adapted from https://xorshift.di.unimi.it/splitmix64.c
-#[cfg(target_os = "linux")]
-#[inline]
-#[must_use]
-const fn hash_me(mut x: u64) -> u64 {
-    x = (x ^ (x.overflowing_shr(30).0))
-        .overflowing_mul(0xbf58476d1ce4e5b9)
-        .0;
-    x = (x ^ (x.overflowing_shr(27).0))
-        .overflowing_mul(0x94d049bb133111eb)
-        .0;
-    x ^ (x.overflowing_shr(31).0)
 }
 
 #[cfg(target_os = "linux")]

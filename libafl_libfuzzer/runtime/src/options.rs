@@ -40,7 +40,7 @@ pub enum OptionsParseError<'a> {
     OptionValueParseFailed(&'a str, &'a str),
 }
 
-impl<'a> Display for OptionsParseError<'a> {
+impl Display for OptionsParseError<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             OptionsParseError::MultipleModesSelected => {
@@ -100,7 +100,7 @@ impl Default for ArtifactPrefix {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct LibfuzzerOptions {
     fuzzer_name: String,
     mode: LibfuzzerMode,
@@ -234,7 +234,7 @@ impl LibfuzzerOptions {
 }
 
 #[derive(Debug, Default)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 struct LibfuzzerOptionsBuilder<'a> {
     mode: Option<LibfuzzerMode>,
     artifact_prefix: Option<&'a str>,

@@ -18,8 +18,8 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{map::MapFeedbackMetadata, HasObserverHandle},
     fuzzer::Evaluator,
-    inputs::{Input, UsesInput},
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    inputs::Input,
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::{RetryCountRestartHelper, Stage},
@@ -27,11 +27,19 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata,
 };
 
+/// AFL++'s `CAL_CYCLES_FAST` + 1
+const CAL_STAGE_START: usize = 4;
+/// AFL++'s `CAL_CYCLES` + 1
+const CAL_STAGE_MAX: usize = 8;
+
+/// Default name for `CalibrationStage`; derived from AFL++
+pub const CALIBRATION_STAGE_NAME: &str = "calibration";
+
 /// The metadata to keep unstable entries
 /// Formula is same as AFL++: number of unstable entries divided by the number of filled entries.
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnstableEntriesMetadata {
@@ -69,48 +77,38 @@ impl Default for UnstableEntriesMetadata {
     }
 }
 
-/// Default name for `CalibrationStage`; derived from AFL++
-pub const CALIBRATION_STAGE_NAME: &str = "calibration";
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, O, OT, S> {
+pub struct CalibrationStage<C, E, I, O, OT, S> {
     map_observer_handle: Handle<C>,
     map_name: Cow<'static, str>,
     name: Cow<'static, str>,
     stage_max: usize,
     /// If we should track stability
     track_stability: bool,
-    phantom: PhantomData<(E, O, OT, S)>,
+    phantom: PhantomData<(E, I, O, OT, S)>,
 }
 
-const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
-const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
-
-impl<C, E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, O, OT, S>
+impl<C, E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<C, E, I, O, OT, S>
 where
-    E: Executor<EM, Z, State = S> + HasObservers<Observers = OT>,
-    EM: EventFirer<State = S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<I, S>,
     O: MapObserver,
     C: AsRef<O>,
     for<'de> <O as MapObserver>::Entry:
         Serialize + Deserialize<'de> + 'static + Default + Debug + Bounded,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
+    OT: ObserversTuple<I, S>,
+    S: HasCorpus<I>
         + HasMetadata
         + HasNamedMetadata
         + HasExecutions
-        + HasCurrentTestcase
-        + HasCurrentCorpusId
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    <S::Corpus as Corpus>::Input: Input,
+        + HasCurrentTestcase<I>
+        + HasCurrentCorpusId,
+    Z: Evaluator<E, EM, I, S>,
+    I: Input,
 {
     #[inline]
-    #[allow(
-        clippy::let_and_return,
-        clippy::too_many_lines,
-        clippy::cast_precision_loss
-    )]
+    #[expect(clippy::too_many_lines, clippy::cast_precision_loss)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -200,8 +198,8 @@ where
 
                 if iter < CAL_STAGE_MAX {
                     iter += 2;
-                };
-            };
+                }
+            }
 
             total_time += current_time() - start;
 
@@ -236,7 +234,7 @@ where
                             usize::from(*history == O::Entry::default());
                         *history = O::Entry::max_value();
                         unstable_entries.push(idx);
-                    };
+                    }
                 }
 
                 if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
@@ -382,13 +380,12 @@ where
     }
 }
 
-impl<C, E, O, OT, S> CalibrationStage<C, E, O, OT, S>
+impl<C, E, I, O, OT, S> CalibrationStage<C, E, I, O, OT, S>
 where
+    C: AsRef<O>,
     O: MapObserver,
     for<'it> O: AsIter<'it, Item = O::Entry>,
-    C: AsRef<O>,
-    OT: ObserversTuple<<S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus,
+    OT: ObserversTuple<I, S>,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
@@ -421,7 +418,7 @@ where
     }
 }
 
-impl<C, E, O, OT, S> Named for CalibrationStage<C, E, O, OT, S> {
+impl<C, E, I, O, OT, S> Named for CalibrationStage<C, E, I, O, OT, S> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

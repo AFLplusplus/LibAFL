@@ -1,11 +1,10 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use libafl_targets::drcov::DrCovReader;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
-#[allow(clippy::module_name_repetitions)]
 #[command(
     name = "drcov_merge",
     about,
@@ -25,6 +24,7 @@ pub struct Opt {
 }
 
 fn main() {
+    env_logger::init();
     let opts = Opt::parse();
 
     assert!(

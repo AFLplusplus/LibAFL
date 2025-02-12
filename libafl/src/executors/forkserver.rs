@@ -22,7 +22,7 @@ use libafl_bolts::{
     fs::{get_unique_std_input_file, InputFile},
     os::{dup2, pipes::Pipe},
     ownedref::OwnedSlice,
-    shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    shmem::{ShMem, ShMemProvider, UnixShMem, UnixShMemProvider},
     tuples::{Handle, Handled, MatchNameRef, Prepend, RefIndexable},
     AsSlice, AsSliceMut, Truncate,
 };
@@ -44,53 +44,51 @@ use crate::observers::{
 };
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{
-        BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter, UsesInput,
-    },
+    inputs::{BytesInput, HasTargetBytes, Input, NopTargetBytesConverter, TargetBytesConverter},
     mutators::Tokens,
     observers::{MapObserver, Observer, ObserversTuple},
-    state::{HasExecutions, State, UsesState},
+    state::HasExecutions,
     Error,
 };
 
 const FORKSRV_FD: i32 = 198;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_ERROR: i32 = 0xeffe0000_u32 as i32;
 
 const FS_NEW_VERSION_MIN: u32 = 1;
 const FS_NEW_VERSION_MAX: u32 = 1;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_MAPSIZE: i32 = 1_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_SHDMEM_FUZZ: i32 = 2_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_NEW_OPT_AUTODTCT: i32 = 0x00000800_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_OPT_AUTODTCT: i32 = 0x10000000_u32 as i32;
 
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_MAP_SIZE: i32 = 1_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_MAP_ADDR: i32 = 2_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_SHM_OPEN: i32 = 4_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_SHMAT: i32 = 8_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_MMAP: i32 = 16_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_OLD_CMPLOG: i32 = 32_u32 as i32;
-#[allow(clippy::cast_possible_wrap)]
+#[expect(clippy::cast_possible_wrap)]
 const FS_ERROR_OLD_CMPLOG_QEMU: i32 = 64_u32 as i32;
 
 /// Forkserver message. We'll reuse it in a testcase.
@@ -209,7 +207,7 @@ impl ConfigTarget for Command {
         }
     }
 
-    #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
+    #[expect(trivial_numeric_casts)]
     fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
@@ -315,10 +313,10 @@ const fn fs_opt_get_mapsize(x: i32) -> i32 {
     ((x & 0x00fffffe) >> 1) + 1
 }
 
-#[allow(clippy::fn_params_excessive_bools)]
+#[expect(clippy::fn_params_excessive_bools)]
 impl Forkserver {
     /// Create a new [`Forkserver`]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         target: OsString,
         args: Vec<OsString>,
@@ -351,7 +349,7 @@ impl Forkserver {
     /// Create a new [`Forkserver`] that will kill child processes
     /// with the given `kill_signal`.
     /// Using `Forkserver::new(..)` will default to [`Signal::SIGTERM`].
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn with_kill_signal(
         target: OsString,
         args: Vec<OsString>,
@@ -540,7 +538,7 @@ impl Forkserver {
         #[allow(
             clippy::uninit_vec,
             reason = "The vec will be filled right after setting the length."
-        )]
+        )] // expect for some reason does not work
         unsafe {
             buf.set_len(size);
         }
@@ -608,10 +606,7 @@ impl Forkserver {
 ///
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-pub struct ForkserverExecutor<TC, OT, S, SP>
-where
-    SP: ShMemProvider,
-{
+pub struct ForkserverExecutor<I, OT, S, SHM, TC> {
     target: OsString,
     args: Vec<OsString>,
     input_file: InputFile,
@@ -619,8 +614,8 @@ where
     uses_shmem_testcase: bool,
     forkserver: Forkserver,
     observers: OT,
-    map: Option<SP::ShMem>,
-    phantom: PhantomData<S>,
+    map: Option<SHM>,
+    phantom: PhantomData<(I, S)>,
     map_size: Option<usize>,
     min_input_size: usize,
     max_input_size: usize,
@@ -630,11 +625,11 @@ where
     crash_exitcode: Option<i8>,
 }
 
-impl<TC, OT, S, SP> Debug for ForkserverExecutor<TC, OT, S, SP>
+impl<I, OT, S, SHM, TC> Debug for ForkserverExecutor<I, OT, S, SHM, TC>
 where
     TC: Debug,
     OT: Debug,
-    SP: ShMemProvider,
+    SHM: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ForkserverExecutor")
@@ -650,7 +645,7 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), (), UnixShMemProvider> {
+impl ForkserverExecutor<(), (), (), UnixShMem, ()> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
     pub fn builder(
@@ -660,12 +655,11 @@ impl ForkserverExecutor<(), (), (), UnixShMemProvider> {
     }
 }
 
-impl<TC, OT, S, SP> ForkserverExecutor<TC, OT, S, SP>
+impl<I, OT, S, SHM, TC> ForkserverExecutor<I, OT, S, SHM, TC>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-    TC: TargetBytesConverter,
+    OT: ObserversTuple<I, S>,
+    TC: TargetBytesConverter<I>,
+    SHM: ShMem,
 {
     /// The `target` binary that's going to run.
     pub fn target(&self) -> &OsString {
@@ -699,7 +693,7 @@ where
 
     /// Execute input and increase the execution counter.
     #[inline]
-    fn execute_input(&mut self, state: &mut S, input: &TC::Input) -> Result<ExitKind, Error>
+    fn execute_input(&mut self, state: &mut S, input: &I) -> Result<ExitKind, Error>
     where
         S: HasExecutions,
     {
@@ -710,7 +704,7 @@ where
 
     /// Execute input, but side-step the execution counter.
     #[inline]
-    fn execute_input_uncounted(&mut self, input: &TC::Input) -> Result<ExitKind, Error> {
+    fn execute_input_uncounted(&mut self, input: &I) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.forkserver.last_run_timed_out_raw();
@@ -806,7 +800,7 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
@@ -830,23 +824,24 @@ pub struct ForkserverExecutorBuilder<'a, TC, SP> {
     target_bytes_converter: TC,
 }
 
-impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP>
+impl<'a, TC, SHM, SP> ForkserverExecutorBuilder<'a, TC, SP>
 where
-    SP: ShMemProvider,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     /// Builds `ForkserverExecutor`.
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will pass the input to the target via `stdin`
     /// in case no input file is specified.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    #[allow(clippy::pedantic)]
-    pub fn build<OT, S>(mut self, observers: OT) -> Result<ForkserverExecutor<TC, OT, S, SP>, Error>
+    #[expect(clippy::pedantic)]
+    pub fn build<I, OT, S>(
+        mut self,
+        observers: OT,
+    ) -> Result<ForkserverExecutor<I, OT, S, SHM, TC>, Error>
     where
-        OT: ObserversTuple<S::Input, S>,
-        S: UsesInput,
-        S::Input: Input,
-        TC: TargetBytesConverter,
-        SP: ShMemProvider,
+        OT: ObserversTuple<I, S>,
+        TC: TargetBytesConverter<I>,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
@@ -902,19 +897,17 @@ where
     }
 
     /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
-    #[allow(clippy::pedantic)]
-    pub fn build_dynamic_map<A, MO, OT, S>(
+    #[expect(clippy::pedantic, clippy::type_complexity)]
+    pub fn build_dynamic_map<A, MO, OT, I, S>(
         mut self,
         mut map_observer: A,
         other_observers: OT,
-    ) -> Result<ForkserverExecutor<TC, (A, OT), S, SP>, Error>
+    ) -> Result<ForkserverExecutor<I, (A, OT), S, SHM, TC>, Error>
     where
+        A: Observer<I, S> + AsMut<MO>,
+        I: Input + HasTargetBytes,
         MO: MapObserver + Truncate, // TODO maybe enforce Entry = u8 for the cov map
-        A: Observer<S::Input, S> + AsMut<MO>,
-        OT: ObserversTuple<S::Input, S> + Prepend<MO>,
-        S: UsesInput,
-        S::Input: Input + HasTargetBytes,
-        SP: ShMemProvider,
+        OT: ObserversTuple<I, S> + Prepend<MO>,
     {
         let (forkserver, input_file, map) = self.build_helper()?;
 
@@ -967,11 +960,8 @@ where
         })
     }
 
-    #[allow(clippy::pedantic)]
-    fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SP::ShMem>), Error>
-    where
-        SP: ShMemProvider,
-    {
+    #[expect(clippy::pedantic)]
+    fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SHM>), Error> {
         let input_filename = match &self.input_filename {
             Some(name) => name.clone(),
             None => {
@@ -1040,12 +1030,12 @@ where
     }
 
     /// Intialize forkserver > v4.20c
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_sign_loss)]
     fn initialize_forkserver(
         &mut self,
         status: i32,
-        map: Option<&SP::ShMem>,
+        map: Option<&SHM>,
         forkserver: &mut Forkserver,
     ) -> Result<(), Error> {
         let keep = status;
@@ -1139,12 +1129,11 @@ where
     }
 
     /// Intialize old forkserver. < v4.20c
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn initialize_old_forkserver(
         &mut self,
         status: i32,
-        map: Option<&SP::ShMem>,
+        map: Option<&SHM>,
         forkserver: &mut Forkserver,
     ) -> Result<(), Error> {
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED && status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
@@ -1214,7 +1203,7 @@ where
         Ok(())
     }
 
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn set_map_size(&mut self, fsrv_map_size: i32) -> Result<usize, Error> {
         // When 0, we assume that map_size was filled by the user or const
         /* TODO autofill map size from the observer
@@ -1509,7 +1498,7 @@ impl<'a> ForkserverExecutorBuilder<'a, NopTargetBytesConverter<BytesInput>, Unix
 
 impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
     /// Shmem provider for forkserver's shared memory testcase feature.
-    pub fn shmem_provider<SP: ShMemProvider>(
+    pub fn shmem_provider<SP>(
         self,
         shmem_provider: &'a mut SP,
     ) -> ForkserverExecutorBuilder<'a, TC, SP> {
@@ -1542,7 +1531,7 @@ impl<'a, TC> ForkserverExecutorBuilder<'a, TC, UnixShMemProvider> {
 
 impl<'a, TC, SP> ForkserverExecutorBuilder<'a, TC, SP> {
     /// Shmem provider for forkserver's shared memory testcase feature.
-    pub fn target_bytes_converter<TC2: TargetBytesConverter>(
+    pub fn target_bytes_converter<I, TC2: TargetBytesConverter<I>>(
         self,
         target_bytes_converter: TC2,
     ) -> ForkserverExecutorBuilder<'a, TC2, SP> {
@@ -1581,54 +1570,40 @@ impl Default
     }
 }
 
-impl<EM, TC, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<TC, OT, S, SP>
+impl<EM, I, OT, S, SHM, TC, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SHM, TC>
 where
-    OT: ObserversTuple<S::Input, S>,
-    SP: ShMemProvider,
-    S: State + HasExecutions,
-    TC: TargetBytesConverter<Input = S::Input>,
-    EM: UsesState<State = S>,
+    OT: ObserversTuple<I, S>,
+    S: HasExecutions,
+    TC: TargetBytesConverter<I>,
+    SHM: ShMem,
 {
     #[inline]
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         self.execute_input(state, input)
     }
 }
 
-impl<TC, OT, S, SP> HasTimeout for ForkserverExecutor<TC, OT, S, SP>
-where
-    SP: ShMemProvider,
-{
-    #[inline]
-    fn set_timeout(&mut self, timeout: Duration) {
-        self.timeout = TimeSpec::from_duration(timeout);
-    }
-
+impl<I, OT, S, SHM, TC> HasTimeout for ForkserverExecutor<I, OT, S, SHM, TC> {
     #[inline]
     fn timeout(&self) -> Duration {
         self.timeout.into()
     }
+
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = TimeSpec::from_duration(timeout);
+    }
 }
 
-impl<TC, OT, S, SP> UsesState for ForkserverExecutor<TC, OT, S, SP>
+impl<I, OT, S, SHM, TC> HasObservers for ForkserverExecutor<I, OT, S, SHM, TC>
 where
-    S: State,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-
-impl<TC, OT, S, SP> HasObservers for ForkserverExecutor<TC, OT, S, SP>
-where
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-    SP: ShMemProvider,
+    OT: ObserversTuple<I, S>,
 {
     type Observers = OT;
 
@@ -1655,7 +1630,9 @@ mod tests {
     use serial_test::serial;
 
     use crate::{
+        corpus::NopCorpus,
         executors::forkserver::{ForkserverExecutor, FAILED_TO_START_FORKSERVER_MSG},
+        inputs::BytesInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
@@ -1685,7 +1662,7 @@ mod tests {
             .coverage_map_size(MAP_SIZE)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
-            .build::<_, ()>(tuple_list!(edges_observer));
+            .build::<BytesInput, _, NopCorpus<BytesInput>>(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {

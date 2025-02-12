@@ -51,10 +51,7 @@ const DUMMY_BYTE: u8 = 0x14;
 /// An owned TCP message for multi machine
 #[derive(Clone, Debug)]
 // #[serde(bound = "I: serde::de::DeserializeOwned")]
-pub enum MultiMachineMsg<'a, I>
-where
-    I: Input,
-{
+pub enum MultiMachineMsg<'a, I> {
     /// A raw llmp message (not deserialized)
     LlmpMsg(OwnedRef<'a, [u8]>),
 
@@ -66,10 +63,7 @@ where
 unsafe impl<I: Input> Send for MultiMachineMsg<'_, I> {}
 unsafe impl<I: Input> Sync for MultiMachineMsg<'_, I> {}
 
-impl<'a, I> MultiMachineMsg<'a, I>
-where
-    I: Input,
-{
+impl<'a, I> MultiMachineMsg<'a, I> {
     /// Create a new [`MultiMachineMsg`] as event.
     ///
     /// # Safety
@@ -122,7 +116,6 @@ impl NodeId {
 
 /// The state of the hook shared between the background threads and the main thread.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct TcpMultiMachineState<A> {
     node_descriptor: NodeDescriptor<A>,
     /// the parent to which the testcases should be forwarded when deemed interesting
@@ -166,10 +159,7 @@ pub struct NodeDescriptor<A> {
 /// passed to the `on_new_message` method (or rather, the memory it points to),
 /// lives sufficiently long for an async background task to process it.
 #[derive(Debug)]
-pub struct TcpMultiMachineHooks<A, I>
-where
-    I: Input,
-{
+pub struct TcpMultiMachineHooks<A, I> {
     /// The sender hooks
     pub sender: TcpMultiMachineLlmpSenderHook<A, I>,
     /// The hooks
@@ -364,7 +354,7 @@ where
     /// Read a [`TcpMultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
-    #[allow(clippy::uninit_vec)]
+    #[expect(clippy::uninit_vec)]
     async fn read_msg<'a, I: Input + 'a>(
         stream: &mut TcpStream,
     ) -> Result<Option<MultiMachineMsg<'a, I>>, Error> {

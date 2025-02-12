@@ -9,7 +9,6 @@ use crate::{
     corpus::Testcase,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
-    state::HasCorpus,
     Error, HasMetadata,
 };
 
@@ -26,7 +25,7 @@ pub enum GeneralizedItem {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct GeneralizedInputMetadata {
     generalized: Vec<GeneralizedItem>,
@@ -105,10 +104,7 @@ impl GeneralizedInputMetadata {
     }
 }
 
-impl<S> MutatedTransform<BytesInput, S> for GeneralizedInputMetadata
-where
-    S: HasCorpus,
-{
+impl<S> MutatedTransform<BytesInput, S> for GeneralizedInputMetadata {
     type Post = Self;
 
     fn try_transform_from(base: &mut Testcase<BytesInput>, _state: &S) -> Result<Self, Error> {
@@ -130,4 +126,4 @@ where
     }
 }
 
-impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata where S: HasCorpus {}
+impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata {}

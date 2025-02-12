@@ -7,7 +7,12 @@ use alloc::{
 use core::{marker::PhantomData, time::Duration};
 use std::path::{Path, PathBuf};
 
-use libafl_bolts::{current_time, fs::find_new_files_rec, shmem::ShMemProvider, Named};
+use libafl_bolts::{
+    current_time,
+    fs::find_new_files_rec,
+    shmem::{ShMem, ShMemProvider},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -15,9 +20,12 @@ use crate::{
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
-    inputs::{Input, InputConverter, UsesInput},
+    inputs::{Input, InputConverter},
     stages::{RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasRand, MaybeHasClientPerfMonitor, State, Stoppable},
+    state::{
+        HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
+        MaybeHasClientPerfMonitor, Stoppable,
+    },
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -27,7 +35,7 @@ pub const SYNC_FROM_DISK_STAGE_NAME: &str = "sync";
 /// Metadata used to store information about disk sync time
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromDiskMetadata {
@@ -52,32 +60,43 @@ impl SyncFromDiskMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromDiskStage<CB, E, EM, S, Z> {
+pub struct SyncFromDiskStage<CB, E, EM, I, S, Z> {
     name: Cow<'static, str>,
     sync_dirs: Vec<PathBuf>,
     load_callback: CB,
     interval: Duration,
-    phantom: PhantomData<(E, EM, S, Z)>,
+    phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<CB, E, EM, S, Z> Named for SyncFromDiskStage<CB, E, EM, S, Z> {
+impl<CB, E, EM, I, S, Z> Named for SyncFromDiskStage<CB, E, EM, I, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, S, Z>
+impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<<S::Corpus as Corpus>::Input, Error>,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
-    S: HasCorpus
+    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I>
         + HasRand
         + HasMetadata
         + HasNamedMetadata
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: Needs proper crash handling for when an imported testcase crashes
+        // For now, Make sure we don't get stuck crashing on this testcase
+        RetryCountRestartHelper::no_retry(state, &self.name)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
+    }
+
     #[inline]
     fn perform(
         &mut self,
@@ -129,29 +148,17 @@ where
                 .left_to_sync
                 .retain(|p| p != &path);
             log::debug!("Syncing and evaluating {:?}", path);
-            fuzzer.evaluate_input(state, executor, manager, input)?;
+            fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         Ok(())
     }
-
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: Needs proper crash handling for when an imported testcase crashes
-        // For now, Make sure we don't get stuck crashing on this testcase
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
 }
 
-impl<CB, E, EM, S, Z> SyncFromDiskStage<CB, E, EM, S, Z> {
+impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z> {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
     pub fn new(sync_dirs: Vec<PathBuf>, load_callback: CB, interval: Duration, name: &str) -> Self {
@@ -166,25 +173,21 @@ impl<CB, E, EM, S, Z> SyncFromDiskStage<CB, E, EM, S, Z> {
 }
 
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
-pub type SyncFromDiskFunction<S, Z> =
-    fn(&mut Z, &mut S, &Path) -> Result<<<S as HasCorpus>::Corpus as Corpus>::Input, Error>;
+pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
 
-impl<E, EM, S, Z> SyncFromDiskStage<SyncFromDiskFunction<S, Z>, E, EM, S, Z>
+impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
-    S: HasCorpus,
-    <S::Corpus as Corpus>::Input: Input,
-    Z: Evaluator<E, EM, <S::Corpus as Corpus>::Input, S>,
+    I: Input,
+    S: HasCorpus<I>,
+    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dirs: Vec<PathBuf>, interval: Duration) -> Self {
-        fn load_callback<S: HasCorpus, Z>(
-            _: &mut Z,
-            _: &mut S,
-            p: &Path,
-        ) -> Result<<S::Corpus as Corpus>::Input, Error>
+        fn load_callback<I, S, Z>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error>
         where
-            <S::Corpus as Corpus>::Input: Input,
+            I: Input,
+            S: HasCorpus<I>,
         {
             Input::from_file(p)
         }
@@ -192,7 +195,7 @@ where
             interval,
             name: Cow::Borrowed(SYNC_FROM_DISK_STAGE_NAME),
             sync_dirs,
-            load_callback: load_callback::<_, _>,
+            load_callback: load_callback::<_, _, _>,
             phantom: PhantomData,
         }
     }
@@ -201,7 +204,7 @@ where
 /// Metadata used to store information about the last sent testcase with `SyncFromBrokerStage`
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromBrokerMetadata {
@@ -221,37 +224,43 @@ impl SyncFromBrokerMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromBrokerStage<DI, IC, ICB, S, SP>
-where
-    SP: ShMemProvider + 'static,
-    S: UsesInput,
-    IC: InputConverter<From = S::Input, To = DI>,
-    ICB: InputConverter<From = DI, To = S::Input>,
-    DI: Input,
-{
-    client: LlmpEventConverter<DI, IC, ICB, S, SP>,
+pub struct SyncFromBrokerStage<I, IC, ICB, S, SHM, SP> {
+    client: LlmpEventConverter<I, IC, ICB, S, SHM, SP>,
 }
 
-impl<E, EM, IC, ICB, DI, S, SP, Z> Stage<E, EM, S, Z> for SyncFromBrokerStage<DI, IC, ICB, S, SP>
+impl<E, EM, I, IC, ICB, DI, S, SHM, SP, Z> Stage<E, EM, S, Z>
+    for SyncFromBrokerStage<I, IC, ICB, S, SHM, SP>
 where
-    EM: EventFirer<State = S>,
+    DI: Input,
+    EM: EventFirer<I, S>,
+    E: HasObservers + Executor<EM, I, S, Z>,
+    for<'a> E::Observers: Deserialize<'a>,
+    I: Input + Clone,
+    IC: InputConverter<From = I, To = DI>,
+    ICB: InputConverter<From = DI, To = I>,
     S: HasExecutions
-        + HasCorpus
         + HasRand
         + HasMetadata
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
         + Stoppable
-        + UsesInput<Input = <S::Corpus as Corpus>::Input>
-        + State,
-    SP: ShMemProvider,
-    E: HasObservers + Executor<EM, Z, State = S>,
-    for<'a> E::Observers: Deserialize<'a>,
-    Z: EvaluatorObservers<E, EM, <S::Corpus as Corpus>::Input, S>
-        + ExecutionProcessor<EM, <S::Corpus as Corpus>::Input, E::Observers, S>,
-    IC: InputConverter<From = <S::Corpus as Corpus>::Input, To = DI>,
-    ICB: InputConverter<From = DI, To = <S::Corpus as Corpus>::Input>,
-    DI: Input,
-    <<S as HasCorpus>::Corpus as Corpus>::Input: Input + Clone,
+        + MaybeHasClientPerfMonitor,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+    Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
+    #[inline]
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
+        // No restart handling needed - does not execute the target.
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
+        // Not needed - does not execute the target.
+        Ok(())
+    }
+
     #[inline]
     fn perform(
         &mut self,
@@ -306,34 +315,15 @@ where
 
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
-        Ok(())
-    }
-
-    #[inline]
-    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
-        // No restart handling needed - does not execute the target.
-        Ok(true)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
-        // Not needed - does not execute the target.
+        state.introspection_stats_mut().finish_stage();
         Ok(())
     }
 }
 
-impl<DI, IC, ICB, S, SP> SyncFromBrokerStage<DI, IC, ICB, S, SP>
-where
-    SP: ShMemProvider + 'static,
-    S: UsesInput,
-    IC: InputConverter<From = S::Input, To = DI>,
-    ICB: InputConverter<From = DI, To = S::Input>,
-    DI: Input,
-{
+impl<I, IC, ICB, S, SHM, SP> SyncFromBrokerStage<I, IC, ICB, S, SHM, SP> {
     /// Creates a new [`SyncFromBrokerStage`]
     #[must_use]
-    pub fn new(client: LlmpEventConverter<DI, IC, ICB, S, SP>) -> Self {
+    pub fn new(client: LlmpEventConverter<I, IC, ICB, S, SHM, SP>) -> Self {
         Self { client }
     }
 }
