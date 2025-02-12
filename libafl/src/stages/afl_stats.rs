@@ -1,8 +1,4 @@
 //! Stage to compute and report AFL++ stats
-use crate::events::Event;
-use crate::monitors::UserStats;
-use crate::monitors::{AggregatorOps, UserStatsValue};
-
 use alloc::{string::String, vec::Vec};
 use core::{marker::PhantomData, time::Duration};
 use std::{
@@ -28,8 +24,9 @@ use serde::{Deserialize, Serialize};
 use crate::feedbacks::{CRASH_FEEDBACK_NAME, TIMEOUT_FEEDBACK_NAME};
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, SchedulerTestcaseMetadata, Testcase},
-    events::EventFirer,
+    events::{Event, EventFirer},
     executors::HasObservers,
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
@@ -244,7 +241,7 @@ impl<C, E, EM, I, O, S, Z> Stage<E, EM, S, Z> for AflStatsStage<C, E, EM, I, O, 
 where
     C: AsRef<O> + Named,
     E: HasObservers,
-    EM: EventFirer<I, S> ,
+    EM: EventFirer<I, S>,
     Z: HasScheduler<I, S>,
     S: HasImported
         + HasCorpus<I>
@@ -277,20 +274,20 @@ where
 
         // Fire the UpdateUserStats event with the corpus index
         if self.report_current_corpus_idx {
-        manager.fire(
-            state,
-            Event::UpdateUserStats {
-                name: Cow::Borrowed("Current Testcase Index"),
-                value: UserStats::new(
-                    UserStatsValue::Number(corpus_idx_value as u64),
-                    AggregatorOps::Sum,
-                ),
-                phantom: PhantomData,
-            },
-        )?;
-    }
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: Cow::Borrowed("Current Testcase Index"),
+                    value: UserStats::new(
+                        UserStatsValue::Number(corpus_idx_value as u64),
+                        AggregatorOps::Sum,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
         let testcase = state.corpus().get(corpus_idx)?.borrow();
-        
+
         // NOTE: scheduled_count represents the amount of fuzz runs a
         // testcase has had. Since this stage is kept at the very end of stage list,
         // the entry would have been fuzzed already (and should contain IsFavoredMetadata) but would have a scheduled count of zero

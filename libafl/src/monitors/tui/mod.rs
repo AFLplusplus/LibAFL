@@ -430,14 +430,14 @@ impl Monitor for TuiMonitor {
     #[expect(clippy::cast_sign_loss)]
     fn display(&mut self, event_msg: &str, sender_id: ClientId) {
         let cur_time = current_time();
-    
+
         {
             // TODO implement floating-point support for TimedStat
             let execsec = self.execs_per_sec() as u64;
             let totalexec = self.total_execs();
             let run_time = cur_time - self.start_time;
             let total_process_timing = self.process_timing();
-    
+
             let mut ctx = self.context.write().unwrap();
             ctx.total_process_timing = total_process_timing;
             ctx.corpus_size_timed.add(run_time, self.corpus_size());
@@ -452,11 +452,11 @@ impl Monitor for TuiMonitor {
             ctx.total_corpus_count = self.corpus_size();
             ctx.total_item_geometry = self.item_geometry();
         }
-    
+
         self.client_stats_insert(sender_id);
         let client = self.client_stats_mut_for(sender_id);
         let exec_sec = client.execs_per_sec_pretty(cur_time);
-    
+
         let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
@@ -468,21 +468,21 @@ impl Monitor for TuiMonitor {
             "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
-    
+
         // Display "Current Testcase Index" if available
         if let Some(stat) = client.get_user_stats("Current Testcase Index") {
             write!(fmt, ", Testcase Index: {}", stat.value()).unwrap();
         } else {
             write!(fmt, ", Testcase Index: N/A").unwrap();
         }
-    
+
         for (key, val) in &client.user_monitor {
             write!(fmt, ", {key}: {val}").unwrap();
         }
         for (key, val) in &self.aggregator.aggregated {
             write!(fmt, ", {key}: {val}").unwrap();
         }
-    
+
         {
             let client = &self.client_stats()[sender_id.0 as usize];
             let mut ctx = self.context.write().unwrap();
@@ -495,7 +495,7 @@ impl Monitor for TuiMonitor {
             }
             ctx.client_logs.push_back(fmt);
         }
-    
+
         #[cfg(feature = "introspection")]
         {
             // Print the client performance monitor. Skip the Client IDs that have never sent anything.
@@ -510,7 +510,7 @@ impl Monitor for TuiMonitor {
             }
         }
     }
-    
+
     fn aggregate(&mut self, name: &str) {
         self.aggregator.aggregate(name, &self.client_stats);
     }
