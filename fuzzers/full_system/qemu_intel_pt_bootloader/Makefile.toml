@@ -1,6 +1,5 @@
 [env]
 TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
-USER = { script = ["logname"] }
 
 [env.development]
 PROFILE_DIR = "debug"
@@ -19,7 +18,7 @@ mkdir -p ${TARGET_DIR}
 script = """
 sudo mkdir -p /mnt/libafl_qemu_tmpfs || echo "/mnt/libafl_qemu_tmpfs creation failed";
 sudo mount -o size=128M -t tmpfs none /mnt/libafl_qemu_tmpfs || echo "tmpfs mount failed";
-sudo chown "${USER}:${USER}" "/mnt/libafl_qemu_tmpfs";
+sudo chown $(id -u):$(id -g) "/mnt/libafl_qemu_tmpfs";
 """
 
 [tasks.remove_ram_disk]
