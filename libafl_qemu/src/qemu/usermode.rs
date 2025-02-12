@@ -41,6 +41,10 @@ impl<'a> QemuMappingsViewer<'a> {
         }
         self.mappings = mappings;
     }
+
+    pub fn mappings(&self) -> &[MapInfo] {
+        &self.mappings
+    }
 }
 
 impl core::fmt::Debug for QemuMappingsViewer<'_> {

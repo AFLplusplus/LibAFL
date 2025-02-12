@@ -12,7 +12,7 @@ use libafl_bolts::{impl_serdeany, Named};
 use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
-use crate::GuestAddr;
+use crate::{GuestAddr, QemuMappingsViewer};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Edges(GuestAddr, GuestAddr);
@@ -310,6 +310,21 @@ impl PredicateFeedback {
         let stack_start = unsafe { (*image_info).stack_limit };
         ptr >= stack_start && stack_end >= ptr
     }
+
+    #[must_use]
+    // heap or mmap region
+    pub fn is_heap_ptr(&self, ptr: u64, viewer: &QemuMappingsViewer) -> bool {
+        for mp in viewer.mappings().iter() {
+            let start = mp.start();
+            let end = mp.end();
+
+            if ptr >= start && ptr >= end {
+                return false;
+            }
+        }
+        return false;
+    }
+
     #[must_use]
     pub fn is_text_ptr(&self, ptr: u64) -> bool {
         self.tracking_ip.contains(&ptr)
