@@ -48,6 +48,8 @@ run: harness build
 test_inner: harness build
     #!/bin/bash
 
+    source {{ DOTENV }}
+
     export QEMU_LAUNCHER={{ FUZZER }}
 
     ./tests/injection/test.sh || exit 1
