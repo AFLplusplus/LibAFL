@@ -152,23 +152,16 @@ where
     match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(entry) => {
             let id = *entry.get();
-            if drcov_module.full_trace {
-                Some(id)
-            } else {
-                None
-            }
+            Some(id)
         }
         Entry::Vacant(entry) => {
             let id = meta.current_id;
+
             entry.insert(id);
             meta.current_id = id + 1;
-            if drcov_module.full_trace {
-                // GuestAddress is u32 for 32 bit guests
-                #[expect(clippy::unnecessary_cast)]
-                Some(id as u64)
-            } else {
-                None
-            }
+
+            #[expect(clippy::unnecessary_cast)]
+            Some(id as u64)
         }
     }
 }
@@ -201,7 +194,7 @@ pub fn gen_block_lengths<ET, F, I, S>(
 #[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
 pub fn exec_trace_block<ET, F, I, S>(
     _qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, I, S>,
+    _emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     id: u64,
 ) where
@@ -393,9 +386,7 @@ impl<F> DrCovModule<F> {
                         unsafe {
                             for module in self.module_mapping.as_ref().unwrap_unchecked().iter() {
                                 let (range, (_, _)) = module;
-                                if *pc >= range.start.try_into().unwrap()
-                                    && *pc <= range.end.try_into().unwrap()
-                                {
+                                if range.contains(pc.try_into().unwrap()) {
                                     module_found = true;
                                     break;
                                 }
