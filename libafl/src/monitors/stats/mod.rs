@@ -118,10 +118,10 @@ pub struct ItemGeometry {
     pub own_finds: u64,
     /// How much entries were imported
     pub imported: u64,
-    /// The stability in percent, ranges from 0 to 100.
+    /// The stability, ranges from 0.0 to 1.0.
     ///
     /// If there is no such data, this field will be `None`.
-    pub stability_in_percent: Option<u8>,
+    pub stability: Option<f64>,
 }
 
 impl ItemGeometry {
@@ -363,6 +363,7 @@ impl ClientStats {
     }
 
     /// Get item geometry of current client
+    #[allow(clippy::cast_precision_loss)]
     #[cfg(feature = "std")]
     #[must_use]
     pub fn item_geometry(&self) -> ItemGeometry {
@@ -388,11 +389,11 @@ impl ClientStats {
             Clone::clone,
         );
 
-        let stability_in_percent = if let UserStatsValue::Ratio(a, b) = stability.value() {
+        let stability = if let UserStatsValue::Ratio(a, b) = stability.value() {
             if *b == 0 {
-                Some(0)
+                Some(0.0)
             } else {
-                Some((*a * 100 / *b) as u8)
+                Some((*a as f64) / (*b as f64))
             }
         } else {
             None
@@ -403,7 +404,7 @@ impl ClientStats {
             pend_fav,
             own_finds,
             imported,
-            stability_in_percent,
+            stability,
         }
     }
 }

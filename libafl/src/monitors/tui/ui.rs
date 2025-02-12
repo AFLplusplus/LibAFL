@@ -464,8 +464,8 @@ impl TuiUi {
             Row::new(vec![
                 Cell::from(Span::raw("stability")),
                 Cell::from(Span::raw(format!(
-                    "{}%",
-                    item_geometry.stability_in_percent.unwrap_or(0)
+                    "{:.2}%",
+                    item_geometry.stability.unwrap_or(0.0) * 100.0
                 ))),
             ]),
         ];

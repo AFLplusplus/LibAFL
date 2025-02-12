@@ -206,6 +206,7 @@ impl ClientStatsManager {
     }
 
     /// Get item geometry
+    #[allow(clippy::cast_precision_loss)]
     #[cfg(feature = "std")]
     #[must_use]
     pub fn item_geometry(&self) -> ItemGeometry {
@@ -248,10 +249,10 @@ impl ClientStatsManager {
                 ratio_b += b;
             }
         }
-        total_item_geometry.stability_in_percent = if ratio_b == 0 {
+        total_item_geometry.stability = if ratio_b == 0 {
             None
         } else {
-            Some((ratio_a * 100 / ratio_b) as u8)
+            Some((ratio_a as f64) / (ratio_b as f64))
         };
         total_item_geometry
     }

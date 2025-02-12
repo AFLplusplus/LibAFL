@@ -107,6 +107,7 @@ impl StatsdMonitor {
         self.statsd_client = Some(client);
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn try_display(&mut self, client_stats_manager: &mut ClientStatsManager) -> Option<()> {
         if self.statsd_client.is_none() {
             self.setup_statsd_client();
@@ -133,7 +134,7 @@ impl StatsdMonitor {
             pend_fav,
             own_finds,
             imported,
-            stability_in_percent,
+            stability,
         } = client_stats_manager.item_geometry();
         let edges_coverage = client_stats_manager.edges_coverage();
 
@@ -151,10 +152,8 @@ impl StatsdMonitor {
         statsd_client.gauge("corpus_count", corpus_size).ok()?;
         statsd_client.gauge("corpus_found", own_finds).ok()?;
         statsd_client.gauge("corpus_imported", imported).ok()?;
-        if let Some(stability_in_percent) = stability_in_percent {
-            statsd_client
-                .gauge("stability", u64::from(stability_in_percent))
-                .ok()?; // Newly added
+        if let Some(stability) = stability {
+            statsd_client.gauge("stability", stability).ok()?; // Newly added
         }
         statsd_client.gauge("pending_favs", pend_fav).ok()?;
         statsd_client.gauge("pending_total", pending).ok()?;
@@ -168,7 +167,7 @@ impl StatsdMonitor {
         {
             statsd_client.gauge("edges_found", edges_hit).ok()?;
             statsd_client
-                .gauge("map_density", edges_hit * 100 / edges_total)
+                .gauge("map_density", (edges_hit as f64) / (edges_total as f64))
                 .ok()?; // Newly added
         }
 
