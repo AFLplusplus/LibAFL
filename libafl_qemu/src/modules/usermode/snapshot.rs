@@ -386,6 +386,7 @@ impl SnapshotModule {
         log::info!("Snapshot check OK");
     }
 
+    #[allow(clippy::comparison_chain)]
     pub fn reset(&mut self, qemu: Qemu) {
         {
             let new_maps = self.new_maps.get_mut().unwrap();
@@ -404,9 +405,8 @@ impl SnapshotModule {
                     (self.brk - aligned_new_brk) as usize,
                     MmapPerms::ReadWrite,
                 ));
-            }
-            else if new_brk > self.brk {
-                // The heap has grown. so we want to drop those 
+            } else if new_brk > self.brk {
+                // The heap has grown. so we want to drop those
                 let drop_sz = (new_brk - self.brk) as usize;
                 drop(qemu.unmap(self.brk, drop_sz));
             }
