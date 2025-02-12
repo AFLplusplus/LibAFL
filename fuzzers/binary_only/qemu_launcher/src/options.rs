@@ -62,6 +62,9 @@ pub struct FuzzerOptions {
     #[clap(long, help = "Enable AFL++ style output", conflicts_with = "verbose")]
     pub tui: bool,
 
+    #[clap(long, help = "Enable use of snapshots to restore state")]
+    pub snapshots: bool,
+
     #[arg(long = "iterations", help = "Maximum number of iterations")]
     pub iterations: Option<u64>,
 
