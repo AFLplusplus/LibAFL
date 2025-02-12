@@ -269,9 +269,22 @@ where
         self.asan_lib = Some(asan_lib);
     }
 
-    fn post_qemu_init<ET>(&mut self, qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, _emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
         ET: EmulatorModuleTuple<I, S>,
+    {
+
+    }
+
+    fn first_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _state: &mut S,
+    ) where
+        ET: EmulatorModuleTuple<I, S>,
+        I: Unpin,
+        S: Unpin,
     {
         for mapping in qemu.mappings() {
             println!("mapping: {mapping:#?}");
@@ -305,18 +318,7 @@ where
         for mapping in &mappings {
             println!("asan mapping: {mapping:#?}");
         }
-    }
 
-    fn first_exec<ET>(
-        &mut self,
-        _qemu: Qemu,
-        emulator_modules: &mut EmulatorModules<ET, I, S>,
-        _state: &mut S,
-    ) where
-        ET: EmulatorModuleTuple<I, S>,
-        I: Unpin,
-        S: Unpin,
-    {
         emulator_modules.reads(
             Hook::Function(gen_readwrite_guest_asan::<ET, F, I, S>),
             Hook::Function(guest_trace_error_asan::<ET, I, S>),
