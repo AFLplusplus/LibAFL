@@ -21,15 +21,6 @@ use super::{
     Monitor,
 };
 
-/// StatsD monitor
-#[derive(Debug)]
-pub struct StatsdMonitor {
-    target_host: String,
-    target_port: u16,
-    tag_flavor: StatsdMonitorTagFlavor,
-    statsd_client: Option<StatsdClient>,
-}
-
 const METRIC_PREFIX: &str = "fuzzing";
 
 /// Flavor of StatsD tag
@@ -50,6 +41,15 @@ impl Default for StatsdMonitorTagFlavor {
             tag_identifier: "default".to_owned(),
         }
     }
+}
+
+/// StatsD monitor
+#[derive(Debug)]
+pub struct StatsdMonitor {
+    target_host: String,
+    target_port: u16,
+    tag_flavor: StatsdMonitorTagFlavor,
+    statsd_client: Option<StatsdClient>,
 }
 
 impl StatsdMonitor {
@@ -144,15 +144,11 @@ impl StatsdMonitor {
         // registered when creating queuing_sink.
         //
         // The following metrics are taken from AFLplusplus/src/afl-fuzz-statsd.c
-        // Metrics that do not have corresponding are commented.
         // Metrics followed by "Newly added" mean they are not in AFL++.
 
-        // statsd_client.gauge("cycle_done", ).ok()?;
-        // statsd_client.gauge("cycles_wo_finds", ).ok()?;
         statsd_client.gauge("execs_done", total_execs).ok()?;
         statsd_client.gauge("execs_per_sec", execs_per_sec).ok()?;
         statsd_client.gauge("corpus_count", corpus_size).ok()?;
-        // statsd_client.gauge("corpus_favored", ).ok()?;
         statsd_client.gauge("corpus_found", own_finds).ok()?;
         statsd_client.gauge("corpus_imported", imported).ok()?;
         if let Some(stability_in_percent) = stability_in_percent {
@@ -160,19 +156,11 @@ impl StatsdMonitor {
                 .gauge("stability", u64::from(stability_in_percent))
                 .ok()?; // Newly added
         }
-        // statsd_client.gauge("max_depth", ).ok()?;
-        // statsd_client.gauge("cur_item", ).ok()?;
         statsd_client.gauge("pending_favs", pend_fav).ok()?;
         statsd_client.gauge("pending_total", pending).ok()?;
-        // statsd_client.gauge("corpus_variable", ).ok()?;
-        // statsd_client.gauge("saved_crashes", ).ok()?;
-        // statsd_client.gauge("saved_hangs", ).ok()?;
         statsd_client
             .gauge("saved_solutions", objective_size)
             .ok()?; // Newly added
-
-        // statsd_client.gauge("total_crashes", ).ok()?;
-        // statsd_client.gauge("slowest_exec_ms", ).ok()?;
         if let Some(EdgeCoverage {
             edges_hit,
             edges_total,
@@ -183,8 +171,6 @@ impl StatsdMonitor {
                 .gauge("map_density", edges_hit * 100 / edges_total)
                 .ok()?; // Newly added
         }
-        // statsd_client.gauge("var_byte_count", ).ok()?;
-        // statsd_client.gauge("havoc_expansion", ).ok()?;
 
         Some(())
     }

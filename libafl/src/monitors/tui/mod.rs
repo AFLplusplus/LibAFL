@@ -30,8 +30,8 @@ use typed_builder::TypedBuilder;
 use crate::monitors::stats::perf_stats::{ClientPerfStats, PerfFeature};
 use crate::monitors::{
     stats::{
-        manager::ClientStatsManager, user_stats::UserStats, ClientStats, ItemGeometry,
-        ProcessTiming,
+        manager::ClientStatsManager, user_stats::UserStats, ClientStats, EdgeCoverage,
+        ItemGeometry, ProcessTiming,
     },
     Monitor,
 };
@@ -39,8 +39,6 @@ use crate::monitors::{
 #[expect(missing_docs)]
 pub mod ui;
 use ui::TuiUi;
-
-use super::stats::EdgeCoverage;
 
 const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
 const DEFAULT_LOGS_NUMBER: usize = 128;

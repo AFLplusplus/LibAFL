@@ -20,10 +20,10 @@ pub mod tui;
 #[cfg(all(feature = "tui_monitor", feature = "std"))]
 pub use tui::TuiMonitor;
 
-#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+#[cfg(feature = "prometheus_monitor")]
 pub mod prometheus;
 
-#[cfg(all(feature = "statsd_monitor", feature = "std"))]
+#[cfg(feature = "statsd_monitor")]
 pub mod statsd;
 
 use alloc::fmt::Debug;
@@ -32,9 +32,9 @@ use alloc::vec::Vec;
 use core::{fmt, fmt::Write, time::Duration};
 
 use libafl_bolts::ClientId;
-#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+#[cfg(feature = "prometheus_monitor")]
 pub use prometheus::PrometheusMonitor;
-#[cfg(all(feature = "statsd_monitor", feature = "std"))]
+#[cfg(feature = "statsd_monitor")]
 pub use statsd::StatsdMonitor;
 
 use crate::monitors::stats::ClientStatsManager;
