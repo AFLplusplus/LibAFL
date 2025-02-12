@@ -4,7 +4,6 @@
 #include <stdio.h>
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   char   *array = (char *)malloc(0x90);
-  printf("%p\n", array);
   uint8_t v = *(uint8_t *)Data;
 
   array[v] = 0x0;
