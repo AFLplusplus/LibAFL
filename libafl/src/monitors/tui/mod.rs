@@ -40,6 +40,8 @@ use crate::monitors::{
 pub mod ui;
 use ui::TuiUi;
 
+use super::stats::EdgeCoverage;
+
 const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
 const DEFAULT_LOGS_NUMBER: usize = 128;
 
@@ -238,7 +240,13 @@ impl ClientTuiContext {
         self.executions = client.executions();
         self.process_timing = client.process_timing();
 
-        self.map_density = client.map_density();
+        self.map_density = client.edges_coverage().map_or(
+            "0%".to_string(),
+            |EdgeCoverage {
+                 edges_hit,
+                 edges_total,
+             }| format!("{}%", edges_hit * 100 / edges_total),
+        );
         self.item_geometry = client.item_geometry();
 
         for (key, val) in client.user_stats() {
@@ -355,7 +363,13 @@ impl Monitor for TuiMonitor {
             ctx.start_time = client_stats_manager.start_time();
             ctx.total_execs = totalexec;
             ctx.clients_num = client_stats_manager.client_stats().len();
-            ctx.total_map_density = client_stats_manager.map_density();
+            ctx.total_map_density = client_stats_manager.edges_coverage().map_or(
+                "0%".to_string(),
+                |EdgeCoverage {
+                     edges_hit,
+                     edges_total,
+                 }| format!("{}%", edges_hit * 100 / edges_total),
+            );
             ctx.total_cycles_done = 0;
             ctx.total_item_geometry = client_stats_manager.item_geometry();
         }

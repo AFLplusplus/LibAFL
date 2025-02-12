@@ -118,19 +118,27 @@ pub struct ItemGeometry {
     pub own_finds: u64,
     /// How much entries were imported
     pub imported: u64,
-    /// The stability, stringified
-    pub stability: String,
+    /// The stability in percent, ranges from 0 to 100.
+    ///
+    /// If there is no such data, this field will be `None`.
+    pub stability_in_percent: Option<u8>,
 }
 
 impl ItemGeometry {
     /// Create a new [`ItemGeometry`]
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            stability: "0%".to_string(),
-            ..Default::default()
-        }
+        ItemGeometry::default()
     }
+}
+
+/// Stats of edge coverage
+#[derive(Debug, Default, Clone)]
+pub struct EdgeCoverage {
+    /// Count of hit edges
+    pub edges_hit: u64,
+    /// Count of total edges
+    pub edges_total: u64,
 }
 
 impl ClientStats {
@@ -340,11 +348,18 @@ impl ClientStats {
         }
     }
 
-    /// Get map density of current client
+    /// Get edge coverage of current client
     #[must_use]
-    pub fn map_density(&self) -> String {
-        self.get_user_stats("edges")
-            .map_or("0%".to_string(), ToString::to_string)
+    pub fn edges_coverage(&self) -> Option<EdgeCoverage> {
+        self.get_user_stats("edges").and_then(|user_stats| {
+            let UserStatsValue::Ratio(edges_hit, edges_total) = user_stats.value() else {
+                return None;
+            };
+            Some(EdgeCoverage {
+                edges_hit: *edges_hit,
+                edges_total: *edges_total,
+            })
+        })
     }
 
     /// Get item geometry of current client
@@ -368,16 +383,27 @@ impl ClientStats {
         let imported = afl_stats_json["imported"].as_u64().unwrap_or_default();
         let own_finds = afl_stats_json["own_finds"].as_u64().unwrap_or_default();
 
-        let stability = self
-            .get_user_stats("stability")
-            .map_or("0%".to_string(), ToString::to_string);
+        let stability = self.get_user_stats("stability").map_or(
+            UserStats::new(UserStatsValue::Ratio(0, 100), AggregatorOps::Avg),
+            Clone::clone,
+        );
+
+        let stability_in_percent = if let UserStatsValue::Ratio(a, b) = stability.value() {
+            if *b == 0 {
+                Some(0)
+            } else {
+                Some((*a * 100 / *b) as u8)
+            }
+        } else {
+            None
+        };
 
         ItemGeometry {
             pending,
             pend_fav,
             own_finds,
             imported,
-            stability,
+            stability_in_percent,
         }
     }
 }

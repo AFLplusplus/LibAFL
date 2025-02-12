@@ -1,18 +1,16 @@
 //! Client statistics manager
 
-use alloc::{
-    borrow::Cow,
-    string::{String, ToString},
-    vec::Vec,
-};
-use core::{cmp, time::Duration};
+#[cfg(feature = "std")]
+use alloc::string::ToString;
+use alloc::{borrow::Cow, string::String, vec::Vec};
+use core::time::Duration;
 
 use hashbrown::HashMap;
 use libafl_bolts::{current_time, format_duration_hms, ClientId};
 #[cfg(feature = "std")]
 use serde_json::Value;
 
-use super::{user_stats::UserStatsValue, ClientStats, ProcessTiming};
+use super::{user_stats::UserStatsValue, ClientStats, EdgeCoverage, ProcessTiming};
 #[cfg(feature = "std")]
 use super::{
     user_stats::{AggregatorOps, UserStats},
@@ -192,15 +190,19 @@ impl ClientStatsManager {
         total_process_timing
     }
 
-    /// Get map density
+    /// Get max edges coverage of all clients
     #[must_use]
-    pub fn map_density(&self) -> String {
+    pub fn edges_coverage(&self) -> Option<EdgeCoverage> {
         self.client_stats()
             .iter()
             .filter(|client| client.enabled())
-            .filter_map(|client| client.get_user_stats("edges"))
-            .map(ToString::to_string)
-            .fold("0%".to_string(), cmp::max)
+            .filter_map(ClientStats::edges_coverage)
+            .max_by_key(
+                |EdgeCoverage {
+                     edges_hit,
+                     edges_total,
+                 }| { *edges_hit * 100 / *edges_total },
+            )
     }
 
     /// Get item geometry
@@ -246,7 +248,11 @@ impl ClientStatsManager {
                 ratio_b += b;
             }
         }
-        total_item_geometry.stability = format!("{}%", ratio_a * 100 / ratio_b);
+        total_item_geometry.stability_in_percent = if ratio_b == 0 {
+            None
+        } else {
+            Some((ratio_a * 100 / ratio_b) as u8)
+        };
         total_item_geometry
     }
 }
