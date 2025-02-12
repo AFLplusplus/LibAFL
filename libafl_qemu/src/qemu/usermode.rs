@@ -16,24 +16,34 @@ use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
 
 use crate::{qemu::QEMU_IS_RUNNING, Qemu, CPU};
 
-pub struct QemuMappingsViewer {
+pub struct QemuMappingsViewer<'a> {
+    qemu: &'a Qemu,
     mappings: Vec<MapInfo>,
 }
 
-impl QemuMappingsViewer {
+impl<'a> QemuMappingsViewer<'a> {
     /// Capture the memory mappings of Qemu at the moment when we create this object
     /// Thus if qemu make updates to the mappings, they won't be reflected to this object.
     #[must_use]
-    pub fn new(qemu: &Qemu) -> Self {
+    pub fn new(qemu: &'a Qemu) -> Self {
         let mut mappings: Vec<MapInfo> = vec![];
         for m in qemu.mappings() {
             mappings.push(m);
         }
-        Self { mappings }
+        Self { qemu, mappings }
+    }
+
+    /// Update the mappings
+    pub fn update(&mut self) {
+        let mut mappings: Vec<MapInfo> = vec![];
+        for m in self.qemu.mappings() {
+            mappings.push(m);
+        }
+        self.mappings = mappings;
     }
 }
 
-impl core::fmt::Debug for QemuMappingsViewer {
+impl core::fmt::Debug for QemuMappingsViewer<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         for m in &self.mappings {
             let flags = format!("Flags: {:?}", m.flags());
