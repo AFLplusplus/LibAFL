@@ -116,6 +116,7 @@ pub struct AflStatsStage<C, E, EM, I, O, S, Z> {
     core_id: CoreId,
     phantom_data: PhantomData<(E, EM, I, O, S, Z)>,
     report_current_corpus_idx: bool,
+    last_sent_corpus_idx: Option<usize>,
 }
 
 /// AFL++'s `fuzzer_stats`
@@ -274,17 +275,21 @@ where
 
         // Fire the UpdateUserStats event with the corpus index
         if self.report_current_corpus_idx {
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: Cow::Borrowed("Current Testcase Index"),
-                    value: UserStats::new(
-                        UserStatsValue::Number(corpus_idx_value as u64),
-                        AggregatorOps::Sum,
-                    ),
-                    phantom: PhantomData,
-                },
-            )?;
+            if self.last_sent_corpus_idx != Some(corpus_idx_value) {
+                manager.fire(
+                    state,
+                    Event::UpdateUserStats {
+                        name: Cow::Borrowed("Current Testcase Index"),
+                        value: UserStats::new(
+                            UserStatsValue::Number(corpus_idx_value as u64),
+                            AggregatorOps::Sum,
+                        ),
+                        phantom: PhantomData,
+                    },
+                )?;
+                // Update the last_sent_corpus_idx to the current value
+                self.last_sent_corpus_idx = Some(corpus_idx_value);
+            }
         }
         let testcase = state.corpus().get(corpus_idx)?.borrow();
 
@@ -840,6 +845,7 @@ where
             autotokens_enabled: self.uses_autotokens,
             report_current_corpus_idx: self.report_current_corpus_idx, // Set field
             phantom_data: PhantomData,
+            last_sent_corpus_idx: None,
         })
     }
 }
