@@ -16,6 +16,40 @@ use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
 
 use crate::{qemu::QEMU_IS_RUNNING, Qemu, CPU};
 
+pub struct QemuMappings {
+    mappings: Vec<MapInfo>,
+}
+
+impl QemuMappings {
+    #[must_use]
+    pub fn new(qemu: &Qemu) -> Self {
+        let mut mappings: Vec<MapInfo> = vec![];
+        for m in qemu.mappings() {
+            mappings.push(m);
+        }
+        Self { mappings }
+    }
+}
+
+impl core::fmt::Debug for QemuMappings {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for m in self.mappings.iter() {
+            let flags = format!("Flags: {:?}", m.flags());
+            let padded = format!("{:<20}", flags);
+            writeln!(
+                f,
+                "Mapping: 0x{:016x}-0x{:016x}, {:>10} IsPriv: {:?} Path: {}",
+                m.start(),
+                m.end(),
+                padded,
+                m.is_priv(),
+                m.path().unwrap_or(&"<EMPTY>".to_string())
+            )?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
     self_maps_root: *mut IntervalTreeRoot,
