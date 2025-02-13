@@ -2,7 +2,10 @@ import "../../../just/libafl.just"
 
 FUZZER_NAME := "fuzzbench_qemu"
 HARNESS_NAME := "harness"
+<<<<<<< HEAD
 PROJECT_DIR := absolute_path(".")
+=======
+>>>>>>> main
 
 [unix]
 harness:
@@ -14,6 +17,7 @@ harness:
         -lm -lz
 
 [unix]
+<<<<<<< HEAD
 tests:
     cc -c {{PROJECT_DIR}}/libfuzzer_main.c
     cc -O0 ./tests/test1.c ./libfuzzer_main.o -o test1 -lm -lz
@@ -22,6 +26,8 @@ tests:
 
 
 [unix]
+=======
+>>>>>>> main
 build:
     cargo build --profile {{ PROFILE }}
 
@@ -36,6 +42,7 @@ run: build harness
 
 
 [unix]
+<<<<<<< HEAD
 test2:
     cargo run --profile {{PROFILE}} ./test2 -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out ./out ./test2
 
@@ -45,6 +52,8 @@ test1:
 
 
 [unix]
+=======
+>>>>>>> main
 test: build harness
     #!/bin/bash
     timeout 15s {{ FUZZER }} ./harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log

@@ -42,6 +42,7 @@ impl<'a> QemuMappingsViewer<'a> {
         self.mappings = mappings;
     }
 
+    #[must_use]
     pub fn mappings(&self) -> &[MapInfo] {
         &self.mappings
     }

@@ -408,15 +408,20 @@ impl SnapshotModule {
                 let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
                     & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
                 log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
-                drop(qemu.map_fixed(
+                qemu.map_fixed(
                     aligned_new_brk,
                     (self.brk - aligned_new_brk) as usize,
                     MmapPerms::ReadWrite,
-                ));
+                )
+                .unwrap();
             } else if new_brk > self.brk {
                 // The heap has grown. so we want to drop those
                 let drop_sz = (new_brk - self.brk) as usize;
-                drop(qemu.unmap(self.brk, drop_sz));
+
+                // if self.brk is not aligned this call will return an error
+                // and it will page align this drop_sz too
+                // look at target_munmap in qemu-libafl-bridge
+                qemu.unmap(self.brk, drop_sz).unwrap();
             }
 
             for acc in &mut self.accesses {
@@ -431,11 +436,12 @@ impl SnapshotModule {
                                 .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
                             {
                                 if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
-                                    drop(qemu.mprotect(
+                                    qemu.mprotect(
                                         entry.interval.start,
                                         (entry.interval.end - entry.interval.start) as usize,
                                         MmapPerms::ReadWrite,
-                                    ));
+                                    )
+                                    .unwrap();
                                     entry.value.changed = true;
                                     entry.value.perms = Some(MmapPerms::ReadWrite);
                                 }
@@ -469,11 +475,12 @@ impl SnapshotModule {
                     if !entry.value.perms.unwrap_or(MmapPerms::None).writable()
                         && !entry.value.changed
                     {
-                        drop(qemu.mprotect(
+                        qemu.mprotect(
                             entry.interval.start,
                             (entry.interval.end - entry.interval.start) as usize,
                             MmapPerms::ReadWrite,
-                        ));
+                        )
+                        .unwrap();
                         entry.value.changed = true;
                     }
                 }
@@ -492,11 +499,12 @@ impl SnapshotModule {
 
         for entry in self.maps.tree.query_mut(0..GuestAddr::MAX) {
             if entry.value.changed {
-                drop(qemu.mprotect(
+                qemu.mprotect(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
-                ));
+                )
+                .unwrap();
                 entry.value.changed = false;
             }
         }
@@ -658,26 +666,29 @@ impl SnapshotModule {
 
             if found.is_empty() {
                 //panic!("A pre-snapshot memory region was unmapped");
-                drop(qemu.map_fixed(
+                qemu.map_fixed(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
-                ));
+                )
+                .unwrap();
             } else if found.len() == 1 && found[0].0 == *entry.interval {
                 if found[0].1 && found[0].2 != entry.value.perms {
-                    drop(qemu.mprotect(
+                    qemu.mprotect(
                         entry.interval.start,
                         (entry.interval.end - entry.interval.start) as usize,
                         entry.value.perms.unwrap(),
-                    ));
+                    )
+                    .unwrap();
                 }
             } else {
                 //  TODO check for holes
-                drop(qemu.mprotect(
+                qemu.mprotect(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
-                ));
+                )
+                .unwrap();
             }
 
             for (interval, ..) in found {
@@ -690,7 +701,7 @@ impl SnapshotModule {
             to_unmap.push((*entry.interval, entry.value.changed, entry.value.perms));
         }
         for (i, ..) in to_unmap {
-            drop(qemu.unmap(i.start, (i.end - i.start) as usize));
+            qemu.unmap(i.start, (i.end - i.start) as usize).unwrap();
             new_maps.tree.delete(i);
         }
 
