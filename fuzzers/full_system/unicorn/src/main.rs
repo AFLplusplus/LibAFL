@@ -1,9 +1,9 @@
-use std::{env, fs::File, io::Read, path::PathBuf, ptr::NonNull, time::Duration};
+use std::{env, fs::File, io::Read, path::PathBuf, ptr::NonNull};
 
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind, InProcessForkExecutor},
+    executors::{ExitKind, InProcessForkExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -216,7 +216,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
                 println!("Error: {:?}", err);
 
                 memory_dump(&emu, 2);
-                debug_print(&emu, err);
+                debug_print(&emu);
             }
         }
 

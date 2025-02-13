@@ -4,7 +4,7 @@ use capstone::{
 };
 pub use libafl_targets::{EDGES_MAP, EDGES_MAP_PTR};
 use unicorn_engine::{
-    unicorn_const::{uc_error, Arch, Permission},
+    unicorn_const::{Arch, Permission},
     RegisterARM, RegisterARM64, RegisterX86, Unicorn,
 };
 
@@ -25,7 +25,7 @@ pub fn memory_dump(emu: &Unicorn<()>, len: u64) {
     }
 }
 
-pub fn debug_print(emu: &Unicorn<()>, err: uc_error) {
+pub fn debug_print(emu: &Unicorn<()>) {
     println!("Status when crash happened:");
 
     let pc = emu.pc_read().unwrap();
