@@ -1,25 +1,5 @@
 [workspace]
 members = [
-<<<<<<< HEAD
-    "libafl",
-    "libafl_derive",
-    "libafl_cc",
-    "libafl_targets",
-    "libafl_frida",
-    "libafl_qemu",
-    "libafl_tinyinst",
-    "libafl_sugar",
-    "libafl_nyx",
-    "libafl_unicorn",
-    "libafl_concolic/symcc_runtime",
-    "libafl_concolic/symcc_libafl",
-    "libafl_concolic/test/dump_constraints",
-    "libafl_concolic/test/runtime_test",
-    "utils/deexit",
-    "utils/gramatron/construct_automata",
-    "utils/libafl_benches",
-    "utils/build_and_test_fuzzers",
-=======
   "libafl",
   "libafl_bolts",
   "libafl_cc",
@@ -30,6 +10,7 @@ members = [
   "libafl_intelpt",
   "libafl_libfuzzer",
   "libafl_nyx",
+  "libafl_unicorn",
   "libafl_targets",
   "libafl_tinyinst",
   "libafl_qemu",
@@ -44,8 +25,7 @@ members = [
   "utils/gramatron/construct_automata",
   "utils/libafl_benches",
   "utils/libafl_jumper",
->>>>>>> main
-]resolver = "2"
+]
 
 default-members = [
   "libafl",

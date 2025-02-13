@@ -5,19 +5,23 @@ assembly_arm64:
 	$(arm64)-gcc -O2 -S -c foo.c -o foo_arm64.s
 
 binary_arm64:
-	$(arm64)-as foo_arm64.s -o foo_arm64
+	$(arm64)-as foo_arm64.s -o foo_arm64.elf
+	$(arm64)-objcopy -O binary -j .text.startup foo_arm64.elf foo_arm64.bin
 
 assembly_arm:
 	$(arm)-gcc -O2 -S -c foo.c -o foo_arm.s
 
 binary_arm:
-	$(arm)-as foo_arm.s -o foo_arm
+	$(arm)-as foo_arm.s -o foo_arm.elf
+	$(arm)-objcopy -O binary foo_arm.elf foo_arm.bin
 
 assembly_x86:
 	$(x64)-gcc -O2 -S -c foo.c -o foo_x86.s
 
 binary_x86:
-	$(x64)-as foo_x86.s -o foo_x86
+	$(x64)-as foo_x86.s -o foo_x86.elf
+	# Extract the .text.startup section
+	$(x64)-objcopy -O binary -j .text.startup foo_x86.elf foo_x86.bin
 
 build_arm: assembly_arm binary_arm
 build_arm64: assembly_arm64 binary_arm64

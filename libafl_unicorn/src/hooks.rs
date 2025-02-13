@@ -1,12 +1,16 @@
-pub use libafl_targets::{edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_SIZE, MAX_EDGES_NUM};
+use libafl_targets::{EDGES_MAP_DEFAULT_SIZE, EDGES_MAP_PTR};
+use unicorn_engine::Unicorn;
 
-static mut PREV_LOC: u64 = 0;
-
-pub fn block_hook(_emu: &mut unicorn_engine::Unicorn<()>, address: u64, small: u32) {
+fn coverage_hook(_emu: &mut unicorn_engine::Unicorn<()>, pc: u64, _: u32) {
     unsafe {
-        let hash = (address ^ PREV_LOC) & (EDGES_MAP_SIZE as u64 - 1);
-        //println!("Block hook: 0x{:X}\t size:{:#} hash: {:X}", address, small, hash);
-        EDGES_MAP[hash as usize] += 1;
-        PREV_LOC = address >> 1;
+        let id = pc % EDGES_MAP_DEFAULT_SIZE as u64;
+
+        let ptr = EDGES_MAP_PTR.add(id as usize);
+        let val = ptr.read().wrapping_add(1);
+        ptr.write(val);
     }
+}
+
+pub fn set_coverage_hook(emu: &mut Unicorn<()>) {
+    emu.add_block_hook(0x0, !0x0_u64, coverage_hook).unwrap();
 }
