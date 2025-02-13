@@ -1,0 +1,45 @@
+import "../../../just/libafl-qemu-libpng.just"
+
+FUZZER_NAME := "qemu_cmin"
+HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
+
+[unix]
+build:
+    cargo build \
+      --profile {{ PROFILE }} \
+      --features {{ ARCH }} \
+      --target-dir {{ TARGET_DIR }}
+
+[unix]
+harness: libpng
+    #!/bin/bash
+
+    source {{ DOTENV }}
+
+    $CROSS_CXX \
+        ./harness.cc \
+        $CROSS_CFLAGS \
+        "{{TARGET_DIR}}/build-png/.libs/libpng16.a" \
+        "{{TARGET_DIR}}/build-zlib/libz.a" \
+        -I"{{TARGET_DIR}}/build-png" \
+        -I"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        -L"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        -o"{{ HARNESS }}" \
+        -lm -static
+
+[unix]
+run: harness build
+    {{ FUZZER }} \
+        --output ./output \
+        --input ./corpus \
+        --verbose \
+        -- {{ HARNESS }}
+
+[unix]
+test:
+    ARCH=x86_64 just run
+    ARCH=arm just run
+
+[unix]
+clean:
+    cargo clean

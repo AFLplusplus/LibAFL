@@ -1,0 +1,49 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "frida_windows_gdiplus.exe"
+set windows-shell := ['cmd.exe', '/c']
+set unstable
+
+[windows]
+harness:
+    cl.exe /LD harness.cc /link /dll gdiplus.lib ole32.lib
+
+[windows]
+harness_cmplog_test:
+    ml64 cmplog_test.asm /subsystem:windows /link /dll /def:cmplog_test.def /entry:dll_main /out:cmplog.dll
+
+[windows]
+build:
+    cargo build --profile {{ PROFILE }}
+    copy {{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}} .
+
+[windows]
+run: build harness
+    .\{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME}} -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
+
+[windows]
+[script("cmd.exe", "/c")]
+test_cmplog: build harness_cmplog_test
+    @echo off
+
+    for %%i in (t1 t2 t3 t4 t5 t6 t7) do (
+      echo Testing %%i...
+      rmdir /s /q output_%%i
+      start "" "{{FUZZER_NAME}}" -H cmplog.dll -i corpus -o output_%%i --libs-to-instrument cmplog.dll -F %%i -C
+      ping -n 3 127.0.0.1>NUL && taskkill /im {{ FUZZER }} /F
+      dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
+    )
+
+    echo All tests done
+
+[windows]
+[script("cmd.exe", "/c")]
+test: build harness
+    start "" "{{FUZZER_NAME}}" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
+    ping -n 10 127.0.0.1>NUL && taskkill /im frida_windows_gdiplus.exe /F
+    dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
+
+[windows]
+clean:
+    make -C libpng-1.6.37 clean
+    cargo clean
