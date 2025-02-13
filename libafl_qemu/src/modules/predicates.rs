@@ -12,7 +12,7 @@ use libafl_bolts::{impl_serdeany, Named};
 use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
-use crate::{GuestAddr, QemuMappingsViewer};
+use crate::{GuestAddr, Qemu, QemuMappingsViewer};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Edges(GuestAddr, GuestAddr);
@@ -173,8 +173,8 @@ impl PredicatesMap {
         sorted_synthesized.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         let top10: Vec<(PredicateType, f64)> = sorted_synthesized.into_iter().take(10).collect();
 
-        for i in &top10 {
-            println!("{i:#?}");
+        for (ty, prob) in &top10 {
+            println!("{:?} \n with probability {}", ty, prob);
         }
     }
 
@@ -282,25 +282,34 @@ impl Tracer {
     }
 }
 
-#[derive(Default)]
-pub struct PredicateFeedback {
+pub struct PredicateFeedback<'a> {
     was_crash: bool,
-    tracking_ip: Range<u64>,
+    viewer: QemuMappingsViewer<'a>,
+    // caching the rwx addresses
+    executable: Vec<Range<u64>,
 }
 
-impl Named for PredicateFeedback {
+impl Named for PredicateFeedback<'_> {
     fn name(&self) -> &Cow<'static, str> {
         &Cow::Borrowed("predicates")
     }
 }
 
-impl PredicateFeedback {
+impl<'a> PredicateFeedback<'a> {
     #[must_use]
-    pub fn new(range: Range<u64>) -> Self {
+    pub fn new(viewer: QemuMappingsViewer<'a>) -> Self {
+        let mut executable = vec![];
+        for rg in viewer.mappings() {
+            if rg.flags().executable() && rg.path().is_some() {
+                executable.push(rg.start()..rg.end());
+            } 
+        }
+        println!("Executable range is {:#?}", executable);
         Self {
             was_crash: false,
-            tracking_ip: range,
-        } // sane default
+            viewer,
+            executable,
+        }
     }
 
     #[must_use]
@@ -313,27 +322,37 @@ impl PredicateFeedback {
 
     #[must_use]
     // heap or mmap region
-    pub fn is_heap_ptr(&self, ptr: u64, viewer: &QemuMappingsViewer) -> bool {
-        for mp in viewer.mappings().iter() {
+    pub fn is_heap_ptr(&self, ptr: u64) -> bool {
+        for mp in self.viewer.mappings().iter() {
             let start = mp.start();
             let end = mp.end();
 
-            if ptr >= start && ptr >= end {
+            if ptr >= start && ptr <= end {
                 return false;
             }
         }
-        return false;
+        return true;
     }
 
     #[must_use]
     pub fn is_text_ptr(&self, ptr: u64) -> bool {
-        self.tracking_ip.contains(&ptr)
+        true
+    }
+
+    #[must_use]
+    pub fn is_executable_ptr(&self, ptr: u64) -> bool {
+        for rg in self.executable {
+            if rg.contains(&ptr) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
-impl<S> StateInitializer<S> for PredicateFeedback {}
+impl<S> StateInitializer<S> for PredicateFeedback<'_> {}
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PredicateFeedback
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PredicateFeedback<'_>
 where
     S: HasMetadata,
 {
@@ -361,7 +380,7 @@ where
     ) -> Result<(), libafl::Error> {
         let tracer = state.metadata::<Tracer>().unwrap();
         // because of double borrow shit!
-        println!("{:#?}", self.tracking_ip);
+        // println!("{:#?}", self.tracking_ip);
         let mut edges = vec![];
         let mut maxes = vec![];
         let mut mins = vec![];
@@ -381,7 +400,7 @@ where
             }
         }
 
-        let map = state.metadata_or_insert_with(PredicatesMap::new);
+        let map = state.metadata_mut::<PredicatesMap>()?;
 
         for e in edges {
             map.add_edges(e, self.was_crash);

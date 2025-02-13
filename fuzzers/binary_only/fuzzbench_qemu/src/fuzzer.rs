@@ -16,8 +16,8 @@ use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
-    feedback_or, feedback_and,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedback_or,
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -42,7 +42,7 @@ use libafl_bolts::{
     ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
-    tuples::{tuple_list, MatchFirstType, Merge},
+    tuples::{tuple_list, Merge},
     AsSlice,
 };
 use libafl_qemu::{
@@ -50,7 +50,7 @@ use libafl_qemu::{
     filter_qemu_args,
     modules::{
         cmplog::{CmpLogModule, CmpLogObserver},
-        edges::StdEdgeCoverageModule,
+        edges::StdEdgeCoverageModule, PredicatesMap
     },
     Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs,
@@ -186,7 +186,7 @@ fn fuzz(
         .filter(|(k, _v)| k != "LD_LIBRARY_PATH")
         .collect::<Vec<(String, String)>>();
 
-    let mut asan = AsanModuleBuilder::default().build();
+    let asan = AsanModuleBuilder::default().build();
     let mut tracer = TracerModule::default();
     tracer.set_use_rca(true);
     let snapshot = SnapshotModule::new();
@@ -201,10 +201,9 @@ fn fuzz(
         asan,
         snapshot,
         tracer,
-        //QemuSnapshotHelper::new()
     );
 
-    let mut emulator = Emulator::empty()
+    let emulator = Emulator::empty()
         .qemu_parameters(args)
         .modules(modules)
         .build()?;
@@ -330,7 +329,9 @@ fn fuzz(
         )
         .unwrap()
     });
+
     state.add_metadata(Tracer::new());
+    state.add_metadata(PredicatesMap::new());
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 

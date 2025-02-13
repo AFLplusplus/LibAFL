@@ -2,6 +2,7 @@ import "../../../just/libafl.just"
 
 FUZZER_NAME := "fuzzbench_qemu"
 HARNESS_NAME := "harness"
+PROJECT_DIR := absolute_path(".")
 
 [unix]
 harness:
