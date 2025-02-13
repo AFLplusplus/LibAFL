@@ -416,12 +416,20 @@ impl SnapshotModule {
                 .unwrap();
             } else if new_brk > self.brk {
                 // The heap has grown. so we want to drop those
-                let drop_sz = (new_brk - self.brk) as usize;
+                // we want to align the addresses before calling unmap
+                // although it is very unlikely that the brk has an unaligned value
+                let new_page_boundary = (new_brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
+                let old_page_boundary = (self.brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
 
-                // if self.brk is not aligned this call will return an error
-                // and it will page align this drop_sz too
-                // look at target_munmap in qemu-libafl-bridge
-                qemu.unmap(self.brk, drop_sz).unwrap();
+                if new_page_boundary != old_page_boundary {
+                    let unmap_sz = (new_page_boundary - old_page_boundary) as usize;
+                    // if self.brk is not aligned this call will return an error
+                    // and it will page align this unmap_sz too (but it is already aligned for us)
+                    // look at target_munmap in qemu-libafl-bridge
+                    qemu.unmap(self.brk, unmap_sz).unwrap();
+                }
             }
 
             for acc in &mut self.accesses {
