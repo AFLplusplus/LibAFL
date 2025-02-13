@@ -21,23 +21,19 @@ sudo apt -y install qemu-utils gcc-arm-none-eabi
 
 ## Build
 
+Build one of the flavors (breakpoint by default):
+
 ```bash
-cargo make build
+just build
 ```
 
 ## Run
 
-```bash
-cargo make run
-```
-
-It is also possible to run the fuzzer with the other features:
+Run one of the flavors (breakpoint by default):
 
 ```bash
-cargo make <feature>
+just run
 ```
-
-With feature being `low_level`, `breakpoint` or `sync_exit`.
 
 This will build the desired fuzzer (src/fuzzer_<feature>.rs) and a small example binary based on FreeRTOS, which can run under a qemu emulation target.
 Since the instrumentation is based on snapshots, QEMU needs a virtual drive (even if it is unused...).
