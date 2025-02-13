@@ -1,0 +1,19 @@
+[package]
+name = "intel_pt_baby_fuzzer"
+version = "0.14.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+  "Marco Cavenati <cavenatimarco@gmail.com>",
+]
+edition = "2021"
+
+[features]
+tui = ["libafl/tui_monitor"]
+
+[dependencies]
+libafl = { path = "../../../libafl/", default-features = false, features = [
+  "intel_pt",
+] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+proc-maps = "0.4.0"

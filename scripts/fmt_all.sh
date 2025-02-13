@@ -1,28 +1,38 @@
 #!/bin/bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.." || exit 1
+LIBAFL_DIR=$(realpath "$SCRIPT_DIR/..")
 
-# TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
+cd "${LIBAFL_DIR}" || exit 1
 
-echo "Welcome to the happy fmt script. :)"
-echo "[*] Running fmt for the main crates"
-cargo +nightly fmt
+if [ "$1" = "check" ]; then
+  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- -c --verbose || exit 1
+else
+  cargo run --manifest-path "$LIBAFL_DIR/utils/libafl_fmt/Cargo.toml" --release -- --verbose || exit 1
+fi
 
-echo "[*] Formatting C(pp) files"
-# shellcheck disable=SC2046
-clang-format-13 -i --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
+if python3 -m black --version > /dev/null; then
+  BLACK_COMMAND="python3 -m black"
+elif command -v black > /dev/null; then
+  BLACK_COMMAND="black"
+fi
 
+if [ -n "$BLACK_COMMAND" ]; then
+  echo "[*] Formatting python files"
+  if [ "$1" = "check" ]; then
+    $BLACK_COMMAND --check --diff "$LIBAFL_DIR" || exit 1
+  else
+    $BLACK_COMMAND "$LIBAFL_DIR" || exit 1
+  fi
+else
+  echo -e "\n\033[1;33mWarning\033[0m: python black not found. Formatting skipped for python.\n"
+fi
 
+if [ "$1" != "check" ]; then
+  if command -v taplo > /dev/null; then
+    echo "[*] Formatting TOML files"
+    taplo format
+  fi
+fi
 
-fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
-backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
-
-# shellcheck disable=SC2116
-for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
-do
-    pushd "$fuzzer" || exit 1
-    echo "[*] Running fmt for $fuzzer"
-    cargo +nightly fmt --all
-    popd || exit 1
-done
+echo "[*] Done :)"

@@ -9,11 +9,22 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2021"
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+rust-version = "1.82"
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 [lib]
 proc-macro = true
 
 [dependencies]
-syn = { version = "1", features = ["full", "extra-traits"] }
-quote = "1"
+syn = { version = "2.0.77", features = ["full", "extra-traits"] }
+quote = "1.0.37"
+proc-macro2 = "1.0.86"
+
+[lints]
+workspace = true

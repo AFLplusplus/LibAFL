@@ -22,9 +22,9 @@ $ git clone https://github.com/AFLplusplus/LibAFL.git
 Alternatively, on a UNIX-like machine, you can download a compressed archive and extract it with:
 
 ```sh
-wget https://github.com/AFLplusplus/LibAFL/archive/main.tar.gz
-$ tar xvf LibAFL-main.tar.gz
-$ rm LibAFL-main.tar.gz
+$ wget https://github.com/AFLplusplus/LibAFL/archive/main.tar.gz
+$ tar xvf main.tar.gz
+$ rm main.tar.gz
 $ ls LibAFL-main # this is the extracted folder
 ```
 
@@ -54,6 +54,6 @@ explained [here](https://clang.llvm.org/get_started.html).
 
 If you do not have Rust installed, you can easily follow the steps described [here](https://www.rust-lang.org/tools/install)
 to install it on any supported system.
-Be aware that Rust versions shipped with Linux distributions may be outdated, LibAFL always targets the latest `stable` version available via `rustup upgrade`.
+Be aware that Rust versions shipped with Linux distributions may be outdated, LibAFL always targets the latest `stable` version available via `rustup update`.
 
 We suggest installing Clang and LLVM first.

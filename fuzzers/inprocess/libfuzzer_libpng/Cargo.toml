@@ -1,0 +1,42 @@
+[package]
+name = "libfuzzer_libpng"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+# Forces a crash
+crash = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[build-dependencies]
+cc = { version = "1.1.21", features = ["parallel"] }
+which = "6.0.3"
+
+[dependencies]
+libafl = { path = "../../../libafl", features = ["default"] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_targets = { path = "../../../libafl_targets", features = [
+  "sancov_pcguard_hitcounts",
+  "libfuzzer",
+  "sancov_cmplog",
+] }
+# TODO Include it only when building cc
+libafl_cc = { path = "../../../libafl_cc" }
+
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+mimalloc = { version = "0.1.43", default-features = false }
+
+[lib]
+name = "libfuzzer_libpng"
+crate-type = ["staticlib"]

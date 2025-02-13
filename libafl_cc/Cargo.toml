@@ -5,20 +5,57 @@ authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Commodity library to wrap compilers and link LibAFL"
 documentation = "https://docs.rs/libafl_cc"
 repository = "https://github.com/AFLplusplus/LibAFL/"
-readme = "../README.md"
+readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "compiler"]
 edition = "2021"
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+rust-version = "1.82"
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = [
+  "ddg-instr",
+  "function-logging",
+  "cmplog-routines",
+  "autotokens",
+  "coverage-accounting",
+  "cmplog-instructions",
+  "ctx",
+  "dump-cfg",
+  "profiling",
+]
+
+# llvm passes
+ddg-instr = []
+function-logging = []
+cmplog-routines = []
+autotokens = []
+coverage-accounting = []
+cmplog-instructions = []
+ctx = []
+dump-cfg = []
+profiling = []
+
 [build-dependencies]
-cc = { version = "1.0", features = ["parallel"] }
-which = "4.2.5"
+cc = { workspace = true, features = ["parallel"] }
+which = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.build-dependencies]
-glob = "0.3"
+glob = "0.3.1"
 
 [dependencies]
-serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
+serde = { workspace = true, default-features = false, features = [
+  "alloc",
+  "derive",
+] } # serialization lib
+
+[lints]
+workspace = true

@@ -1,0 +1,46 @@
+[package]
+name = "frida_fuzzer"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+panic = 'abort'
+
+[dependencies]
+libafl = { path = "../../../libafl", features = [
+  "std",
+  "llmp_compression",
+  "llmp_bind_public",
+  "frida_cli",
+  "errors_backtrace",
+] } #,  "llmp_small_maps", "llmp_debug"]}
+libafl_bolts = { path = "../../../libafl_bolts" }
+frida-gum = { version = "0.16.5", features = [
+  "auto-download",
+  "event-sink",
+  "invocation-listener",
+  "script",
+] }
+libafl_frida = { path = "../../../libafl_frida", features = ["cmplog"] }
+libafl_targets = { path = "../../../libafl_targets", features = [
+  "sancov_cmplog",
+] }
+libloading = "0.8.5"
+log = { version = "0.4.22", features = ["release_max_level_trace"] }
+mimalloc = { version = "0.1.43", default-features = true, features = [
+  "local_dynamic_tls",
+] }
+color-backtrace = { version = "0.6.1", features = ["resolve-modules"] }
+env_logger = "0.11.5"

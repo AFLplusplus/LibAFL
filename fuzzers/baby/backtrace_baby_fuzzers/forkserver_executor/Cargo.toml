@@ -1,0 +1,19 @@
+[package]
+name = "forkserver_executor"
+version = "0.15.1"
+edition = "2021"
+
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[dependencies]
+libafl = { path = "../../../../libafl" }
+libafl_bolts = { path = "../../../../libafl_bolts" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }

@@ -1,18 +1,11 @@
-use std::{
-    cell::UnsafeCell,
-    convert::{TryFrom, TryInto},
-    sync::RwLock,
-};
-
 /// Rust bindings for Apple's [`pthread_introspection`](https://opensource.apple.com/source/libpthread/libpthread-218.20.1/pthread/introspection.h.auto.html) hooks.
-use libc;
-
+use std::sync::RwLock;
 const PTHREAD_INTROSPECTION_THREAD_CREATE: libc::c_uint = 1;
 const PTHREAD_INTROSPECTION_THREAD_START: libc::c_uint = 2;
 const PTHREAD_INTROSPECTION_THREAD_TERMINATE: libc::c_uint = 3;
 const PTHREAD_INTROSPECTION_THREAD_DESTROY: libc::c_uint = 4;
 
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types)]
 type pthread_introspection_hook_t = extern "C" fn(
     event: libc::c_uint,
     thread: libc::pthread_t,
@@ -22,49 +15,45 @@ type pthread_introspection_hook_t = extern "C" fn(
 
 extern "C" {
     fn pthread_introspection_hook_install(
-        hook: *const libc::c_void,
-    ) -> pthread_introspection_hook_t;
+        hook: *const pthread_introspection_hook_t,
+    ) -> *const pthread_introspection_hook_t;
 }
 
-struct PreviousHook(UnsafeCell<Option<pthread_introspection_hook_t>>);
+struct PreviousHook(*const pthread_introspection_hook_t);
 
 impl PreviousHook {
     /// Dispatch to the previous hook, if it is set.
-    pub fn dispatch(
+    pub unsafe fn dispatch(
         &self,
         event: libc::c_uint,
         thread: libc::pthread_t,
         addr: *const libc::c_void,
         size: libc::size_t,
     ) {
-        let inner = unsafe { *self.0.get() };
-        if inner.is_none() {
+        let inner = self.0;
+        if inner.is_null() {
             return;
         }
-        let inner = inner.unwrap();
-        inner(event, thread, addr, size);
+        unsafe { (*inner)(event, thread, addr, size) };
     }
 
     /// Set the previous hook.
-    pub fn set(&self, hook: pthread_introspection_hook_t) {
-        unsafe {
-            *self.0.get() = Some(hook);
-        }
+    pub fn set(&mut self, hook: *const pthread_introspection_hook_t) {
+        self.0 = hook;
     }
 
     /// Ensure the previous hook is installed again.
-    pub fn reset(&self) {
-        let inner = unsafe { *self.0.get() };
-        if inner.is_none() {
+    pub fn reset(&mut self) {
+        let inner = self.0;
+        if inner.is_null() {
             unsafe {
                 pthread_introspection_hook_install(std::ptr::null());
             }
             return;
         }
-        let inner = inner.unwrap();
         unsafe {
-            *self.0.get() = None;
-            pthread_introspection_hook_install(inner as *const libc::c_void);
+            self.0 = std::ptr::null();
+            pthread_introspection_hook_install(inner);
         }
     }
 }
@@ -73,10 +62,17 @@ impl PreviousHook {
 // Mark it as sync.
 unsafe impl Sync for PreviousHook {}
 
-#[allow(non_upper_case_globals)]
-static PREVIOUS_HOOK: PreviousHook = PreviousHook(UnsafeCell::new(None));
+// TODO: This could use a RwLock as well
+/// The previous hook
+static mut PREVIOUS_HOOK: PreviousHook = PreviousHook(std::ptr::null());
 
+/// The currently set hook
 static CURRENT_HOOK: RwLock<Option<PthreadIntrospectionHook>> = RwLock::new(None);
+
+/// Get the pointer to the previous hook, mut
+fn previous_hook_ptr_mut() -> *mut PreviousHook {
+    &raw mut PREVIOUS_HOOK
+}
 
 extern "C" fn pthread_introspection_hook(
     event: libc::c_uint,
@@ -87,7 +83,7 @@ extern "C" fn pthread_introspection_hook(
     if let Some(ref hook) = *CURRENT_HOOK.read().unwrap() {
         hook(event.try_into().unwrap(), thread, addr, size);
     }
-    PREVIOUS_HOOK.dispatch(event, thread, addr, size);
+    unsafe { (*previous_hook_ptr_mut()).dispatch(event, thread, addr, size) };
 }
 
 /// Closure type for `pthread_introspection` hooks.
@@ -138,9 +134,11 @@ impl From<EventType> for libc::c_uint {
 ///# use libafl_frida::pthread_hook;
 ///# use std::time::Duration;
 ///# use std::thread;
-/// pthread_hook::install(|event, pthread, addr, size| {
-///     println!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
-/// });
+/// unsafe {
+///   pthread_hook::install(|event, pthread, addr, size| {
+///     log::trace!("thread id=0x{:x} event={:?} addr={:?} size={:x}", pthread, event, addr, size);
+///   });
+/// };
 ///# thread::spawn(|| {
 ///#     thread::sleep(Duration::from_millis(1));
 ///# });
@@ -153,21 +151,23 @@ impl From<EventType> for libc::c_uint {
 /// thread id=0x16bf67000 event=Terminate addr=0x16bd60000 size=208000
 /// thread id=0x16bf67000 event=Destroy addr=0x16bf67000 size=4000
 /// ```
-pub fn install<H>(hook: H)
+///
+/// # Safety
+/// Potential data race when if called at the same time as `install` or `reset` from another thread
+pub unsafe fn install<H>(hook: H)
 where
     H: Fn(EventType, libc::pthread_t, *const libc::c_void, libc::size_t) + Send + Sync + 'static,
 {
     let mut new_hook = CURRENT_HOOK.write().unwrap();
     *new_hook = Some(Box::new(hook));
 
-    let prev = unsafe {
-        pthread_introspection_hook_install(pthread_introspection_hook as *const libc::c_void)
-    };
+    let prev = unsafe { pthread_introspection_hook_install(pthread_introspection_hook as _) };
 
     // Allow because we're sure this isn't from a different code generation unit.
-    #[allow(clippy::fn_address_comparisons, clippy::fn_null_check)]
-    if !(prev as *const libc::c_void).is_null() && prev != pthread_introspection_hook {
-        PREVIOUS_HOOK.set(prev);
+    if !(prev).is_null() && prev != pthread_introspection_hook as _ {
+        unsafe {
+            (*previous_hook_ptr_mut()).set(prev as *const pthread_introspection_hook_t);
+        }
     }
 }
 
@@ -177,10 +177,15 @@ where
 ///# use libafl_frida::pthread_hook;
 ///# use std::time::Duration;
 ///# use std::thread;
-/// pthread_hook::reset();
+/// unsafe { pthread_hook::reset() };
 /// ```
-pub fn reset() {
-    PREVIOUS_HOOK.reset();
+///
+/// # Safety
+/// Potential data race when if called at the same time as `install` or `reset` from another thread
+pub unsafe fn reset() {
+    unsafe {
+        (*previous_hook_ptr_mut()).reset();
+    };
 }
 
 /// The following tests fail if they are not run sequentially.
@@ -204,7 +209,7 @@ mod test {
         });
         thread::sleep(Duration::from_millis(50));
 
-        super::reset();
+        unsafe { super::reset() };
         assert!(!*triggered.lock().unwrap());
     }
 
@@ -214,19 +219,21 @@ mod test {
         let triggered: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 
         let inner_triggered = triggered.clone();
-        super::install(move |event, _, _, _| {
-            if event == super::EventType::Create {
-                let mut triggered = inner_triggered.lock().unwrap();
-                *triggered = true;
-            }
-        });
+        unsafe {
+            super::install(move |event, _, _, _| {
+                if event == super::EventType::Create {
+                    let mut triggered = inner_triggered.lock().unwrap();
+                    *triggered = true;
+                }
+            });
+        };
 
         thread::spawn(|| {
             thread::sleep(Duration::from_millis(1));
         });
         thread::sleep(Duration::from_millis(50));
 
-        super::reset();
+        unsafe { super::reset() };
         assert!(*triggered.lock().unwrap());
     }
 
@@ -236,19 +243,21 @@ mod test {
         let triggered: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 
         let inner_triggered = triggered.clone();
-        super::install(move |event, _, _, _| {
-            if event == super::EventType::Start {
-                let mut triggered = inner_triggered.lock().unwrap();
-                *triggered = true;
-            }
-        });
+        unsafe {
+            super::install(move |event, _, _, _| {
+                if event == super::EventType::Start {
+                    let mut triggered = inner_triggered.lock().unwrap();
+                    *triggered = true;
+                }
+            });
+        };
 
         thread::spawn(|| {
             thread::sleep(Duration::from_millis(1));
         });
         thread::sleep(Duration::from_millis(50));
 
-        super::reset();
+        unsafe { super::reset() };
         assert!(*triggered.lock().unwrap());
     }
 
@@ -258,14 +267,16 @@ mod test {
         let triggered: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 
         let inner_triggered = triggered.clone();
-        super::install(move |event, _, _, _| {
-            if event == super::EventType::Start {
-                let mut triggered = inner_triggered.lock().unwrap();
-                *triggered = true;
-            }
-        });
+        unsafe {
+            super::install(move |event, _, _, _| {
+                if event == super::EventType::Start {
+                    let mut triggered = inner_triggered.lock().unwrap();
+                    *triggered = true;
+                }
+            });
+        };
 
-        super::reset();
+        unsafe { super::reset() };
 
         thread::spawn(|| {
             thread::sleep(Duration::from_millis(1));

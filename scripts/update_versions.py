@@ -4,13 +4,17 @@ import os
 import sys
 import subprocess
 
-EXCLUDE_LIST = ('AFLplusplus', 'target')
+EXCLUDE_LIST = ("AFLplusplus", "target")
 
 old_ver = sys.argv[1]
 new_ver = sys.argv[2]
 
-result = subprocess.run("git config --file .gitmodules --get-regexp path | awk '{ print $2 }'", shell=True, stdout=subprocess.PIPE)
-submodules = filter(lambda x: len(x) > 0, result.stdout.decode('utf-8').split('\n'))
+result = subprocess.run(
+    "git config --file .gitmodules --get-regexp path | awk '{ print $2 }'",
+    shell=True,
+    stdout=subprocess.PIPE,
+)
+submodules = filter(lambda x: len(x) > 0, result.stdout.decode("utf-8").split("\n"))
 
 for subdir, dirs, files in os.walk(os.getcwd()):
     exclude = False
@@ -26,23 +30,35 @@ for subdir, dirs, files in os.walk(os.getcwd()):
         continue
 
     for file in files:
-        if file != 'Cargo.toml':
+        if file not in ["Cargo.toml", "pyproject.toml"]:
             continue
         fname = os.path.join(subdir, file)
         print(fname)
-        
-        with open(fname, 'r') as f:
+
+        with open(fname, "r") as f:
             toml = f.read()
-        lines = toml.split('\n')
-        
+        lines = toml.split("\n")
+
         for i in range(len(lines)):
             if lines[i].startswith('version = "%s"' % old_ver):
                 lines[i] = 'version = "%s"' % new_ver
-            if (lines[i].startswith('libafl') or '_libafl' in lines[i]) and 'version="%s"' % old_ver in lines[i].replace('= ', '=').replace(' =', '='):
-                lines[i] = lines[i].replace('version = "%s"' % old_ver, 'version = "%s"' % new_ver)
-                lines[i] = lines[i].replace('version= "%s"' % old_ver, 'version = "%s"' % new_ver)
-                lines[i] = lines[i].replace('version ="%s"' % old_ver, 'version = "%s"' % new_ver)
-                lines[i] = lines[i].replace('version="%s"' % old_ver, 'version = "%s"' % new_ver)
-        
-        with open(fname, 'w') as f:
-            f.write('\n'.join(lines))
+            if (
+                lines[i].startswith("libafl") or "_libafl" in lines[i]
+            ) and 'version="%s"' % old_ver in lines[i].replace("= ", "=").replace(
+                " =", "="
+            ):
+                lines[i] = lines[i].replace(
+                    'version = "%s"' % old_ver, 'version = "%s"' % new_ver
+                )
+                lines[i] = lines[i].replace(
+                    'version= "%s"' % old_ver, 'version = "%s"' % new_ver
+                )
+                lines[i] = lines[i].replace(
+                    'version ="%s"' % old_ver, 'version = "%s"' % new_ver
+                )
+                lines[i] = lines[i].replace(
+                    'version="%s"' % old_ver, 'version = "%s"' % new_ver
+                )
+
+        with open(fname, "w") as f:
+            f.write("\n".join(lines))

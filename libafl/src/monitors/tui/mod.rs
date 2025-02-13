@@ -1,10 +1,12 @@
-//! Monitor based on tui-rs
+//! [`TuiMonitor`] is a fancy-looking TUI monitor similar to `AFL`.
+//!
+//! It's based on [ratatui](https://ratatui.rs/)
 
-use alloc::boxed::Box;
+use alloc::{borrow::Cow, boxed::Box, string::ToString};
 use std::{
     collections::VecDeque,
-    fmt::Write,
-    io::{self, BufRead},
+    fmt::Write as _,
+    io::{self, BufRead, Write},
     panic,
     string::String,
     sync::{Arc, RwLock},
@@ -20,34 +22,64 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use hashbrown::HashMap;
-use tui::{backend::CrosstermBackend, Terminal};
+use libafl_bolts::{current_time, format_duration_hms, ClientId};
+use ratatui::{backend::CrosstermBackend, Terminal};
+use typed_builder::TypedBuilder;
 
 #[cfg(feature = "introspection")]
-use super::{ClientPerfMonitor, PerfFeature};
-use crate::{
-    bolts::{current_time, format_duration_hms},
-    monitors::{ClientStats, Monitor, UserStats},
+use crate::monitors::stats::perf_stats::{ClientPerfStats, PerfFeature};
+use crate::monitors::{
+    stats::{
+        manager::ClientStatsManager, user_stats::UserStats, ClientStats, EdgeCoverage,
+        ItemGeometry, ProcessTiming,
+    },
+    Monitor,
 };
 
-mod ui;
-use ui::TuiUI;
+#[expect(missing_docs)]
+pub mod ui;
+use ui::TuiUi;
 
 const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
 const DEFAULT_LOGS_NUMBER: usize = 128;
 
+#[derive(Debug, Clone, TypedBuilder)]
+#[builder(build_method(into = TuiMonitor), builder_method(vis = "pub(crate)",
+    doc = "Build the [`TuiMonitor`] from the set values"))]
+/// Settings to create a new [`TuiMonitor`].
+/// Use `TuiMonitor::builder()` or create this config and call `.into()` to create a new [`TuiMonitor`].
+pub struct TuiMonitorConfig {
+    /// The title to show
+    #[builder(default_code = r#""LibAFL Fuzzer".to_string()"#, setter(into))]
+    pub title: String,
+    /// A version string to show for this (optional)
+    #[builder(default_code = r#""default".to_string()"#, setter(into))]
+    pub version: String,
+    /// Enables unicode TUI graphics, Looks better but may interfere with old terminals.
+    #[builder(default = true)]
+    pub enhanced_graphics: bool,
+}
+
+/// A single status entry for timings
 #[derive(Debug, Copy, Clone)]
 pub struct TimedStat {
+    /// The time
     pub time: Duration,
+    /// The item
     pub item: u64,
 }
 
+/// Stats for timings
 #[derive(Debug, Clone)]
 pub struct TimedStats {
+    /// Series of [`TimedStat`] entries
     pub series: VecDeque<TimedStat>,
+    /// The time window to keep track of
     pub window: Duration,
 }
 
 impl TimedStats {
+    /// Create a new [`TimedStats`] struct
     #[must_use]
     pub fn new(window: Duration) -> Self {
         Self {
@@ -56,6 +88,7 @@ impl TimedStats {
         }
     }
 
+    /// Add a stat datapoint
     pub fn add(&mut self, time: Duration, item: u64) {
         if self.series.is_empty() || self.series.back().unwrap().item != item {
             if self.series.front().is_some()
@@ -67,6 +100,7 @@ impl TimedStats {
         }
     }
 
+    /// Add a stat datapoint for the `current_time`
     pub fn add_now(&mut self, item: u64) {
         if self.series.is_empty() || self.series[self.series.len() - 1].item != item {
             let time = current_time();
@@ -79,6 +113,7 @@ impl TimedStats {
         }
     }
 
+    /// Change the window duration
     pub fn update_window(&mut self, window: Duration) {
         self.window = window;
         while !self.series.is_empty()
@@ -89,20 +124,27 @@ impl TimedStats {
     }
 }
 
+/// The context to show performance metrics
 #[cfg(feature = "introspection")]
 #[derive(Debug, Default, Clone)]
 pub struct PerfTuiContext {
+    /// Time spent in the scheduler
     pub scheduler: f64,
+    /// Time spent in the event manager
     pub manager: f64,
+    /// Additional time
     pub unmeasured: f64,
+    /// Time spent in each individual stage
     pub stages: Vec<Vec<(String, f64)>>,
+    /// Time spent in each individual feedback
     pub feedbacks: Vec<(String, f64)>,
 }
 
 #[cfg(feature = "introspection")]
 impl PerfTuiContext {
-    #[allow(clippy::cast_precision_loss)]
-    pub fn grab_data(&mut self, m: &ClientPerfMonitor) {
+    /// Get the data for performance metrics
+    #[expect(clippy::cast_precision_loss)]
+    pub fn grab_data(&mut self, m: &ClientPerfStats) {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = m.elapsed_cycles() as f64;
 
@@ -164,31 +206,56 @@ impl PerfTuiContext {
     }
 }
 
+/// The context for a single client tracked in this [`TuiMonitor`]
 #[derive(Debug, Default, Clone)]
 pub struct ClientTuiContext {
+    /// The corpus size
     pub corpus: u64,
+    /// Amount of objectives
     pub objectives: u64,
+    /// Amount of executions
     pub executions: u64,
     /// Float value formatted as String
-    pub exec_sec: String,
+    pub map_density: String,
 
-    pub user_stats: HashMap<String, UserStats>,
+    /// How many cycles have been done.
+    /// Roughly: every testcase has been scheduled once, but highly fuzzer-specific.
+    pub cycles_done: u64,
+
+    /// Times for processing
+    pub process_timing: ProcessTiming,
+    /// The individual entry geometry
+    pub item_geometry: ItemGeometry,
+    /// Extra fuzzer-specific stats
+    pub user_stats: HashMap<Cow<'static, str>, UserStats>,
 }
 
 impl ClientTuiContext {
-    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: String) {
-        self.corpus = client.corpus_size;
-        self.objectives = client.objective_size;
-        self.executions = client.executions;
-        self.exec_sec = exec_sec;
+    /// Grab data for a single client
+    pub fn grab_data(&mut self, client: &mut ClientStats) {
+        self.corpus = client.corpus_size();
+        self.objectives = client.objective_size();
+        self.executions = client.executions();
+        self.process_timing = client.process_timing();
 
-        for (key, val) in &client.user_monitor {
+        self.map_density = client.edges_coverage().map_or(
+            "0%".to_string(),
+            |EdgeCoverage {
+                 edges_hit,
+                 edges_total,
+             }| format!("{}%", edges_hit * 100 / edges_total),
+        );
+        self.item_geometry = client.item_geometry();
+
+        for (key, val) in client.user_stats() {
             self.user_stats.insert(key.clone(), val.clone());
         }
     }
 }
 
+/// The [`TuiContext`] for this [`TuiMonitor`]
 #[derive(Debug, Clone)]
+#[expect(missing_docs)]
 pub struct TuiContext {
     pub graphs: Vec<String>,
 
@@ -207,6 +274,14 @@ pub struct TuiContext {
     pub clients_num: usize,
     pub total_execs: u64,
     pub start_time: Duration,
+
+    pub total_map_density: String,
+    pub total_solutions: u64,
+    pub total_cycles_done: u64,
+    pub total_corpus_count: u64,
+
+    pub total_process_timing: ProcessTiming,
+    pub total_item_geometry: ItemGeometry,
 }
 
 impl TuiContext {
@@ -228,58 +303,81 @@ impl TuiContext {
             clients_num: 0,
             total_execs: 0,
             start_time,
+
+            total_map_density: "0%".to_string(),
+            total_solutions: 0,
+            total_cycles_done: 0,
+            total_corpus_count: 0,
+            total_item_geometry: ItemGeometry::new(),
+            total_process_timing: ProcessTiming::new(),
         }
     }
 }
 
-/// Tracking monitor during fuzzing and display with tui-rs.
+/// Tracking monitor during fuzzing and display with [`ratatui`](https://ratatui.rs/)
 #[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
+}
 
-    start_time: Duration,
-    client_stats: Vec<ClientStats>,
+impl From<TuiMonitorConfig> for TuiMonitor {
+    #[expect(deprecated)]
+    fn from(builder: TuiMonitorConfig) -> Self {
+        Self::with_time(
+            TuiUi::with_version(builder.title, builder.version, builder.enhanced_graphics),
+            current_time(),
+        )
+    }
 }
 
 impl Monitor for TuiMonitor {
-    /// the client monitor, mutable
-    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-        &mut self.client_stats
-    }
-
-    /// the client monitor
-    fn client_stats(&self) -> &[ClientStats] {
-        &self.client_stats
-    }
-
-    /// Time this fuzzing run stated
-    fn start_time(&mut self) -> Duration {
-        self.start_time
-    }
-
-    #[allow(clippy::cast_sign_loss)]
-    fn display(&mut self, event_msg: String, sender_id: u32) {
+    #[expect(clippy::cast_sign_loss)]
+    fn display(
+        &mut self,
+        client_stats_manager: &mut ClientStatsManager,
+        event_msg: &str,
+        sender_id: ClientId,
+    ) {
         let cur_time = current_time();
 
         {
+            let global_stats = client_stats_manager.global_stats();
             // TODO implement floating-point support for TimedStat
-            let execsec = self.execs_per_sec() as u64;
-            let totalexec = self.total_execs();
-            let run_time = cur_time - self.start_time;
-
+            let execsec = global_stats.execs_per_sec as u64;
+            let totalexec = global_stats.total_execs;
+            let run_time = global_stats.run_time;
+            let exec_per_sec_pretty = global_stats.execs_per_sec_pretty.clone();
             let mut ctx = self.context.write().unwrap();
-            ctx.corpus_size_timed.add(run_time, self.corpus_size());
+            ctx.total_corpus_count = global_stats.corpus_size;
+            ctx.total_solutions = global_stats.objective_size;
+            ctx.corpus_size_timed
+                .add(run_time, global_stats.corpus_size);
             ctx.objective_size_timed
-                .add(run_time, self.objective_size());
+                .add(run_time, global_stats.objective_size);
+            let total_process_timing = client_stats_manager.process_timing(exec_per_sec_pretty);
+
+            ctx.total_process_timing = total_process_timing;
             ctx.execs_per_sec_timed.add(run_time, execsec);
+            ctx.start_time = client_stats_manager.start_time();
             ctx.total_execs = totalexec;
-            ctx.clients_num = self.client_stats.len();
+            ctx.clients_num = client_stats_manager.client_stats().len();
+            ctx.total_map_density = client_stats_manager.edges_coverage().map_or(
+                "0%".to_string(),
+                |EdgeCoverage {
+                     edges_hit,
+                     edges_total,
+                 }| format!("{}%", edges_hit * 100 / edges_total),
+            );
+            ctx.total_cycles_done = 0;
+            ctx.total_item_geometry = client_stats_manager.item_geometry();
         }
 
-        let client = self.client_stats_mut_for(sender_id);
-        let exec_sec = client.execs_per_sec_pretty(cur_time);
+        client_stats_manager.client_stats_insert(sender_id);
+        let exec_sec = client_stats_manager
+            .update_client_stats_for(sender_id, |client| client.execs_per_sec_pretty(cur_time));
+        let client = client_stats_manager.client_stats_for(sender_id);
 
-        let sender = format!("#{sender_id}");
+        let sender = format!("#{}", sender_id.0);
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
@@ -288,19 +386,27 @@ impl Monitor for TuiMonitor {
         let head = format!("{event_msg}{pad} {sender}");
         let mut fmt = format!(
             "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
-            head, client.corpus_size, client.objective_size, client.executions, exec_sec
+            head,
+            client.corpus_size(),
+            client.objective_size(),
+            client.executions(),
+            exec_sec
         );
-        for (key, val) in &client.user_monitor {
+        for (key, val) in client.user_stats() {
+            write!(fmt, ", {key}: {val}").unwrap();
+        }
+        for (key, val) in client_stats_manager.aggregated() {
             write!(fmt, ", {key}: {val}").unwrap();
         }
 
         {
-            let client = &self.client_stats()[sender_id as usize];
             let mut ctx = self.context.write().unwrap();
-            ctx.clients
-                .entry(sender_id as usize)
-                .or_default()
-                .grab_data(client, exec_sec);
+            client_stats_manager.update_client_stats_for(sender_id, |client| {
+                ctx.clients
+                    .entry(sender_id.0 as usize)
+                    .or_default()
+                    .grab_data(client);
+            });
             while ctx.client_logs.len() >= DEFAULT_LOGS_NUMBER {
                 ctx.client_logs.pop_front();
             }
@@ -309,60 +415,102 @@ impl Monitor for TuiMonitor {
 
         #[cfg(feature = "introspection")]
         {
-            // Print the client performance monitor. Skip the Client 0 which is the broker
-            for (i, client) in self.client_stats.iter().skip(1).enumerate() {
+            // Print the client performance monitor. Skip the Client IDs that have never sent anything.
+            for (i, client) in client_stats_manager
+                .client_stats()
+                .iter()
+                .filter(|x| x.enabled())
+                .enumerate()
+            {
                 self.context
                     .write()
                     .unwrap()
                     .introspection
                     .entry(i + 1)
                     .or_default()
-                    .grab_data(&client.introspection_monitor);
+                    .grab_data(&client.introspection_stats);
             }
         }
     }
 }
 
 impl TuiMonitor {
-    /// Creates the monitor
+    /// Create a builder for [`TuiMonitor`]
+    pub fn builder() -> TuiMonitorConfigBuilder {
+        TuiMonitorConfig::builder()
+    }
+
+    /// Creates the monitor.
+    ///
+    /// # Deprecation Note
+    /// Use `TuiMonitor::builder()` instead.
+    #[deprecated(
+        since = "0.13.2",
+        note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
+    )]
     #[must_use]
-    pub fn new(title: String, enhanced_graphics: bool) -> Self {
-        Self::with_time(title, enhanced_graphics, current_time())
+    #[expect(deprecated)]
+    pub fn new(tui_ui: TuiUi) -> Self {
+        Self::with_time(tui_ui, current_time())
     }
 
     /// Creates the monitor with a given `start_time`.
+    ///
+    /// # Deprecation Note
+    /// Use `TuiMonitor::builder()` instead.
+    #[deprecated(
+        since = "0.13.2",
+        note = "Please use TuiMonitor::builder() instead of creating TuiUi directly."
+    )]
     #[must_use]
-    pub fn with_time(title: String, enhanced_graphics: bool, start_time: Duration) -> Self {
+    pub fn with_time(tui_ui: TuiUi, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
-        run_tui_thread(
-            context.clone(),
-            Duration::from_millis(250),
-            title,
-            enhanced_graphics,
-        );
-        Self {
-            context,
-            start_time,
-            client_stats: vec![],
+
+        enable_raw_mode().unwrap();
+        #[cfg(unix)]
+        {
+            use std::{
+                fs::File,
+                os::fd::{AsRawFd, FromRawFd},
+            };
+
+            let stdout = unsafe { libc::dup(io::stdout().as_raw_fd()) };
+            let stdout = unsafe { File::from_raw_fd(stdout) };
+            run_tui_thread(
+                context.clone(),
+                Duration::from_millis(250),
+                tui_ui,
+                move || stdout.try_clone().unwrap(),
+            );
         }
+        #[cfg(not(unix))]
+        {
+            run_tui_thread(
+                context.clone(),
+                Duration::from_millis(250),
+                tui_ui,
+                io::stdout,
+            );
+        }
+        Self { context }
     }
 }
 
-fn run_tui_thread(
+fn run_tui_thread<W: Write + Send + Sync + 'static>(
     context: Arc<RwLock<TuiContext>>,
     tick_rate: Duration,
-    title: String,
-    enhanced_graphics: bool,
+    tui_ui: TuiUi,
+    stdout_provider: impl Send + Sync + 'static + Fn() -> W,
 ) {
     thread::spawn(move || -> io::Result<()> {
         // setup terminal
-        let mut stdout = io::stdout();
-        enable_raw_mode()?;
+        let mut stdout = stdout_provider();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        let mut ui = TuiUI::new(title, enhanced_graphics);
+
+        let mut ui = tui_ui;
 
         let mut last_tick = Instant::now();
         let mut cnt = 0;
@@ -370,9 +518,10 @@ fn run_tui_thread(
         // Catching panics when the main thread dies
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
+            let mut stdout = stdout_provider();
             disable_raw_mode().unwrap();
             execute!(
-                io::stdout(),
+                stdout,
                 LeaveAlternateScreen,
                 DisableMouseCapture,
                 Show,
@@ -393,7 +542,7 @@ fn run_tui_thread(
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
                 .unwrap_or_else(|| Duration::from_secs(0));
-            if crossterm::event::poll(timeout)? {
+            if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
                         KeyCode::Char(c) => ui.on_key(c),

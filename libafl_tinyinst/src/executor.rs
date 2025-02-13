@@ -1,61 +1,62 @@
-use core::marker::PhantomData;
-use std::time::Duration;
+use core::{marker::PhantomData, ptr, time::Duration};
+use std::fmt::{Debug, Formatter};
 
 use libafl::{
-    bolts::{
-        fs::{InputFile, INPUTFILE_STD},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        AsMutSlice, AsSlice,
-    },
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, UsesInput},
-    observers::{ObserversTuple, UsesObservers},
-    state::{State, UsesState},
+    inputs::HasTargetBytes,
+    state::HasExecutions,
     Error,
+};
+use libafl_bolts::{
+    fs::{InputFile, INPUTFILE_STD},
+    shmem::{NopShMem, NopShMemProvider, ShMem, ShMemProvider},
+    tuples::RefIndexable,
+    AsSlice, AsSliceMut,
 };
 use tinyinst::tinyinst::{litecov::RunResult, TinyInst};
 
-/// Tinyinst executor
-pub struct TinyInstExecutor<'a, S, SP, OT>
-where
-    SP: ShMemProvider,
-{
+/// [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
+pub struct TinyInstExecutor<S, SHM, OT> {
     tinyinst: TinyInst,
-    coverage: &'a mut Vec<u64>,
+    coverage_ptr: *mut Vec<u64>,
     timeout: Duration,
     observers: OT,
     phantom: PhantomData<S>,
     cur_input: InputFile,
-    map: Option<<SP as ShMemProvider>::ShMem>,
+    map: Option<SHM>,
 }
 
-impl<'a, S, SP, OT> std::fmt::Debug for TinyInstExecutor<'a, S, SP, OT>
-where
-    SP: ShMemProvider,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl TinyInstExecutor<(), NopShMem, ()> {
+    /// Create a builder for [`TinyInstExecutor`]
+    #[must_use]
+    pub fn builder<'a>() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
+        TinyInstExecutorBuilder::new()
+    }
+}
+
+impl<S, SHM, OT> Debug for TinyInstExecutor<S, SHM, OT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("TinyInstExecutor")
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()
     }
 }
 
-impl<'a, EM, S, SP, OT, Z> Executor<EM, Z> for TinyInstExecutor<'a, S, SP, OT>
+impl<EM, I, OT, S, SHM, Z> Executor<EM, I, S, Z> for TinyInstExecutor<S, SHM, OT>
 where
-    EM: UsesState<State = S>,
-    S: UsesInput,
-    S::Input: HasTargetBytes,
-    SP: ShMemProvider,
-    Z: UsesState<State = S>,
+    S: HasExecutions,
+    I: HasTargetBytes,
+    SHM: ShMem,
 {
     #[inline]
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
+        *state.executions_mut() += 1;
         match &self.map {
             Some(_) => {
                 // use shmem to pass testcase
@@ -64,9 +65,9 @@ where
                 let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
-                shmem.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+                shmem.as_slice_mut()[..SHMEM_FUZZ_HDR_SIZE]
                     .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-                shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                shmem.as_slice_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                     .copy_from_slice(target_bytes.as_slice());
             }
             None => {
@@ -74,11 +75,12 @@ where
             }
         }
 
-        #[allow(unused_assignments)]
+        #[expect(unused_assignments)]
         let mut status = RunResult::OK;
         unsafe {
             status = self.tinyinst.run();
-            self.tinyinst.vec_coverage(self.coverage, false);
+            self.tinyinst
+                .vec_coverage(self.coverage_ptr.as_mut().unwrap(), false);
         }
 
         match status {
@@ -98,30 +100,49 @@ pub struct TinyInstExecutorBuilder<'a, SP> {
     tinyinst_args: Vec<String>,
     program_args: Vec<String>,
     timeout: Duration,
+    coverage_ptr: *mut Vec<u64>,
     shmem_provider: Option<&'a mut SP>,
 }
 
 const MAX_FILE: usize = 1024 * 1024;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 
-impl<'a> Default for TinyInstExecutorBuilder<'a, StdShMemProvider> {
+impl Default for TinyInstExecutorBuilder<'_, NopShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> TinyInstExecutorBuilder<'a, NopShMemProvider> {
     /// Constructor
     #[must_use]
-    pub fn new() -> TinyInstExecutorBuilder<'a, StdShMemProvider> {
+    pub fn new() -> TinyInstExecutorBuilder<'a, NopShMemProvider> {
         Self {
             tinyinst_args: vec![],
             program_args: vec![],
             timeout: Duration::new(3, 0),
             shmem_provider: None,
+            coverage_ptr: ptr::null_mut(),
         }
     }
 
+    /// Use this to enable shmem testcase passing.
+    #[must_use]
+    pub fn shmem_provider<SP>(self, shmem_provider: &'a mut SP) -> TinyInstExecutorBuilder<'a, SP> {
+        TinyInstExecutorBuilder {
+            tinyinst_args: self.tinyinst_args,
+            program_args: self.program_args,
+            timeout: self.timeout,
+            shmem_provider: Some(shmem_provider),
+            coverage_ptr: ptr::null_mut(),
+        }
+    }
+}
+
+impl<SP> TinyInstExecutorBuilder<'_, SP>
+where
+    SP: ShMemProvider,
+{
     /// Argument for tinyinst instrumentation
     #[must_use]
     pub fn tinyinst_arg(mut self, arg: String) -> Self {
@@ -205,41 +226,35 @@ impl<'a> TinyInstExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
-    /// Use this to enable shmem testcase passing.
+    /// Set the pointer to the coverage vec used to observer the execution.
+    ///
+    /// # Safety
+    /// The coverage vec pointer must point to a valid vec and outlive the time the [`TinyInstExecutor`] is alive.
+    /// The map will be dereferenced and borrowed mutably during execution. This may not happen concurrently.
     #[must_use]
-    pub fn shmem_provider<SP: ShMemProvider>(
-        self,
-        shmem_provider: &'a mut SP,
-    ) -> TinyInstExecutorBuilder<'a, SP> {
-        TinyInstExecutorBuilder {
-            tinyinst_args: self.tinyinst_args,
-            program_args: self.program_args,
-            timeout: self.timeout,
-            shmem_provider: Some(shmem_provider),
-        }
+    pub fn coverage_ptr(mut self, coverage_ptr: *mut Vec<u64>) -> Self {
+        self.coverage_ptr = coverage_ptr;
+        self
     }
-}
 
-impl<'a, SP> TinyInstExecutorBuilder<'a, SP>
-where
-    SP: ShMemProvider,
-{
-    /// Build tinyinst executor
+    /// Build [`TinyInst`](https://github.com/googleprojectzero/TinyInst) executor
     pub fn build<OT, S>(
         &mut self,
-        coverage: &'a mut Vec<u64>,
         observers: OT,
-    ) -> Result<TinyInstExecutor<'a, S, SP, OT>, Error> {
+    ) -> Result<TinyInstExecutor<S, SP::ShMem, OT>, Error> {
+        if self.coverage_ptr.is_null() {
+            return Err(Error::illegal_argument("Coverage pointer may not be null."));
+        }
         let (map, shmem_id) = match &mut self.shmem_provider {
             Some(provider) => {
                 // setup shared memory
                 let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
                 let shmem_id = shmem.id();
-                // println!("{:#?}", shmem.id());
+                // log::trace!("{:#?}", shmem.id());
                 // shmem.write_to_env("__TINY_SHM_FUZZ_ID")?;
 
                 let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+                shmem.as_slice_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
 
                 (Some(shmem), Some(shmem_id))
             }
@@ -269,7 +284,7 @@ where
                 "No input file or shmem provided".to_string(),
             ));
         }
-        println!("tinyinst args: {:#?}", &self.tinyinst_args);
+        log::info!("tinyinst args: {:#?}", &self.tinyinst_args);
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
 
@@ -283,7 +298,7 @@ where
 
         Ok(TinyInstExecutor {
             tinyinst,
-            coverage,
+            coverage_ptr: self.coverage_ptr,
             timeout: self.timeout,
             observers,
             phantom: PhantomData,
@@ -293,32 +308,14 @@ where
     }
 }
 
-impl<'a, S, SP, OT> HasObservers for TinyInstExecutor<'a, S, SP, OT>
-where
-    S: State,
-    SP: ShMemProvider,
-    OT: ObserversTuple<S>,
-{
-    fn observers(&self) -> &OT {
-        &self.observers
+impl<S, SHM, OT> HasObservers for TinyInstExecutor<S, SHM, OT> {
+    type Observers = OT;
+
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+        RefIndexable::from(&self.observers)
     }
 
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+        RefIndexable::from(&mut self.observers)
     }
-}
-impl<'a, S, SP, OT> UsesState for TinyInstExecutor<'a, S, SP, OT>
-where
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-impl<'a, S, SP, OT> UsesObservers for TinyInstExecutor<'a, S, SP, OT>
-where
-    OT: ObserversTuple<S>,
-    S: UsesInput,
-    SP: ShMemProvider,
-{
-    type Observers = OT;
 }

@@ -1,0 +1,39 @@
+[env]
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+
+[env.development]
+PROFILE_DIR = "debug"
+
+[env.release]
+PROFILE_DIR = "release"
+
+[tasks.target_dir]
+condition = { files_not_exist = ["${TARGET_DIR}"] }
+script_runner = "@shell"
+script = '''
+mkdir -p ${TARGET_DIR}
+'''
+
+[tasks.build_target]
+dependencies = ["target_dir"]
+command = "rustc"
+args = ["src/target_program.rs", "--out-dir", "${TARGET_DIR}", "-O"]
+
+[tasks.build_fuzzer]
+command = "cargo"
+args = ["build", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+
+[tasks.build]
+dependencies = ["build_fuzzer", "build_target"]
+
+[tasks.setcap]
+script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
+dependencies = ["build_fuzzer"]
+
+[tasks.run]
+command = "cargo"
+args = ["run", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+dependencies = ["build", "setcap"]
+
+[tasks.default]
+alias = "run"

@@ -1,50 +1,37 @@
 //! The tracing stage can trace the target and enrich a [`crate::corpus::Testcase`] with metadata, for example for `CmpLog`.
 
 use alloc::{
-    string::{String, ToString},
+    borrow::{Cow, ToOwned},
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData};
 
-use hashbrown::HashSet;
-use serde::{Deserialize, Serialize};
+use libafl_bolts::{
+    tuples::{Handle, Handled},
+    AsSlice, Named,
+};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
-    bolts::AsSlice,
-    corpus::{Corpus, CorpusId},
+    corpus::{Corpus, HasCurrentCorpusId},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasBytesVec, UsesInput},
+    inputs::{
+        BytesInput, GeneralizedInputMetadata, GeneralizedItem, HasMutatorBytes, ResizableMutator,
+    },
     mark_feature_time,
-    observers::{MapObserver, ObserversTuple},
-    stages::Stage,
+    observers::{CanTrack, MapObserver, ObserversTuple},
+    require_novelties_tracking,
+    stages::{RetryCountRestartHelper, Stage},
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, UsesState},
-    Error,
+    state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
+    Error, HasMetadata, HasNamedMetadata,
 };
 
 const MAX_GENERALIZED_LEN: usize = 8192;
 
-/// A state metadata holding the set of indexes related to the generalized corpus entries
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct GeneralizedIndexesMetadata {
-    /// The set of indexes
-    pub indexes: HashSet<CorpusId>,
-}
-
-crate::impl_serdeany!(GeneralizedIndexesMetadata);
-
-impl GeneralizedIndexesMetadata {
-    /// Create the metadata
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
+const fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
     idx + 1 + off as usize
 }
 
@@ -58,79 +45,94 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
     idx
 }
 
+/// The name for generalization stage
+pub static GENERALIZATION_STAGE_NAME: &str = "generalization";
+
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct GeneralizationStage<EM, O, OT, Z> {
-    map_observer_name: String,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, O, OT, Z)>,
+pub struct GeneralizationStage<C, EM, I, O, OT, S, Z> {
+    name: Cow<'static, str>,
+    map_observer_handle: Handle<C>,
+    phantom: PhantomData<(EM, I, O, OT, S, Z)>,
 }
 
-impl<EM, O, OT, Z> UsesState for GeneralizationStage<EM, O, OT, Z>
-where
-    EM: UsesState,
-    EM::State: UsesInput<Input = BytesInput>,
-{
-    type State = EM::State;
+impl<C, EM, I, O, OT, S, Z> Named for GeneralizationStage<C, EM, I, O, OT, S, Z> {
+    fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
 }
 
-impl<E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z>
+impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z>
+    for GeneralizationStage<C, EM, BytesInput, O, E::Observers, S, Z>
 where
+    C: CanTrack + AsRef<O> + Named,
+    E: Executor<EM, BytesInput, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<BytesInput, S>,
     O: MapObserver,
-    E: Executor<EM, Z> + HasObservers,
-    E::Observers: ObserversTuple<E::State>,
-    E::State: UsesInput<Input = BytesInput>
-        + HasClientPerfMonitor
-        + HasExecutions
+    S: HasExecutions
         + HasMetadata
-        + HasCorpus,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
+        + HasCorpus<BytesInput>
+        + HasNamedMetadata
+        + HasCurrentCorpusId
+        + MaybeHasClientPerfMonitor,
 {
     #[inline]
-    #[allow(clippy::too_many_lines)]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
+    }
+
+    #[inline]
+    #[expect(clippy::too_many_lines)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut E::State,
+        state: &mut S,
         manager: &mut EM,
-        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        if state
-            .metadata()
-            .get::<GeneralizedIndexesMetadata>()
-            .is_none()
-        {
-            state.add_metadata(GeneralizedIndexesMetadata::new());
-        }
+        let Some(corpus_id) = state.current_corpus_id()? else {
+            return Err(Error::illegal_state(
+                "state is not currently processing a corpus index",
+            ));
+        };
 
         let (mut payload, original, novelties) = {
             start_timer!(state);
-            state.corpus().get(corpus_idx)?.borrow_mut().load_input()?;
-            mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
-            let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
+            {
+                let corpus = state.corpus();
+                let mut testcase = corpus.get(corpus_id)?.borrow_mut();
+                if testcase.scheduled_count() > 0 {
+                    return Ok(());
+                }
 
-            if entry.metadata().contains::<GeneralizedInputMetadata>() {
-                drop(entry);
-                state
-                    .metadata_mut()
-                    .get_mut::<GeneralizedIndexesMetadata>()
-                    .unwrap()
-                    .indexes
-                    .insert(corpus_idx);
+                corpus.load_input_into(&mut testcase)?;
+            }
+            mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+            let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
+            let input = entry.input_mut().as_mut().unwrap();
+
+            let payload: Vec<_> = input.mutator_bytes().iter().map(|&x| Some(x)).collect();
+
+            if payload.len() > MAX_GENERALIZED_LEN {
                 return Ok(());
             }
 
-            let input = entry.input_mut().as_mut().unwrap();
-
-            let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
             let original = input.clone();
-            let meta = entry.metadata().get::<MapNoveltiesMetadata>().ok_or_else(|| {
+            let meta = entry.metadata_map().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_idx} (check the arguments of MapFeedback::new(...))"
+                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_id} (check the arguments of MapFeedback::new(...))"
                     ))
                 })?;
+            if meta.as_slice().is_empty() {
+                return Ok(()); // don't generalise inputs which don't have novelties
+            }
             (payload, original, meta.as_slice().to_vec())
         };
 
@@ -322,55 +324,38 @@ where
             b'"',
         )?;
 
-        if payload.len() <= MAX_GENERALIZED_LEN {
-            // Save the modified input in the corpus
-            {
-                let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
+        // Save the modified input in the corpus
+        {
+            let meta = GeneralizedInputMetadata::generalized_from_options(&payload);
 
-                debug_assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
-                debug_assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
+            assert!(meta.generalized().first() == Some(&GeneralizedItem::Gap));
+            assert!(meta.generalized().last() == Some(&GeneralizedItem::Gap));
 
-                let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
-                entry.metadata_mut().insert(meta);
-            }
-
-            state
-                .metadata_mut()
-                .get_mut::<GeneralizedIndexesMetadata>()
-                .unwrap()
-                .indexes
-                .insert(corpus_idx);
+            let mut entry = state.corpus().get(corpus_id)?.borrow_mut();
+            entry.metadata_map_mut().insert(meta);
         }
 
         Ok(())
     }
 }
 
-impl<EM, O, OT, Z> GeneralizationStage<EM, O, OT, Z>
+impl<C, EM, O, OT, S, Z> GeneralizationStage<C, EM, BytesInput, O, OT, S, Z>
 where
-    EM: UsesState,
     O: MapObserver,
-    OT: ObserversTuple<EM::State>,
-    EM::State: UsesInput<Input = BytesInput>
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasMetadata
-        + HasCorpus,
+    C: CanTrack + AsRef<O> + Named,
+    S: HasExecutions + HasMetadata + HasCorpus<BytesInput> + MaybeHasClientPerfMonitor,
+    OT: ObserversTuple<BytesInput, S>,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
-    pub fn new(map_observer: &O) -> Self {
+    pub fn new(map_observer: &C) -> Self {
+        require_novelties_tracking!("GeneralizationStage", C);
+        let name = map_observer.name().clone();
         Self {
-            map_observer_name: map_observer.name().to_string(),
-            phantom: PhantomData,
-        }
-    }
-
-    /// Create a new [`GeneralizationStage`] from name
-    #[must_use]
-    pub fn from_name(map_observer_name: &str) -> Self {
-        Self {
-            map_observer_name: map_observer_name.to_string(),
+            name: Cow::Owned(
+                GENERALIZATION_STAGE_NAME.to_owned() + ":" + name.into_owned().as_str(),
+            ),
+            map_observer_handle: map_observer.handle(),
             phantom: PhantomData,
         }
     }
@@ -379,14 +364,14 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut S,
         manager: &mut EM,
         novelties: &[usize],
         input: &BytesInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: UsesState<State = EM::State>,
+        E: Executor<EM, BytesInput, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<BytesInput, S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -396,18 +381,14 @@ where
         let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
-        *state.executions_mut() += 1;
-
         start_timer!(state);
         executor
             .observers_mut()
             .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
-        let cnt = executor
-            .observers()
-            .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+        let cnt = executor.observers()[&self.map_observer_handle]
+            .as_ref()
             .how_many_set(novelties);
 
         Ok(cnt == novelties.len())
@@ -418,12 +399,12 @@ where
         payload.retain(|&x| !(x.is_none() & core::mem::replace(&mut previous, x.is_none())));
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn find_gaps<E>(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut S,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -431,8 +412,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: UsesState<State = EM::State>,
+        E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -441,12 +421,8 @@ where
                 end = payload.len();
             }
             let mut candidate = BytesInput::new(vec![]);
-            candidate
-                .bytes_mut()
-                .extend(payload[..start].iter().flatten());
-            candidate
-                .bytes_mut()
-                .extend(payload[end..].iter().flatten());
+            candidate.extend(payload[..start].iter().flatten());
+            candidate.extend(payload[end..].iter().flatten());
 
             if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                 for item in &mut payload[start..end] {
@@ -461,12 +437,12 @@ where
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn find_gaps_in_closures<E>(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut EM::State,
+        state: &mut S,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -474,8 +450,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: UsesState<State = EM::State>,
+        E: Executor<EM, BytesInput, S, Z> + HasObservers<Observers = OT>,
     {
         let mut index = 0;
         while index < payload.len() {
@@ -494,12 +469,8 @@ where
                 if payload[end] == Some(closing_char) {
                     endings += 1;
                     let mut candidate = BytesInput::new(vec![]);
-                    candidate
-                        .bytes_mut()
-                        .extend(payload[..start].iter().flatten());
-                    candidate
-                        .bytes_mut()
-                        .extend(payload[end..].iter().flatten());
+                    candidate.extend(payload[..start].iter().flatten());
+                    candidate.extend(payload[end..].iter().flatten());
 
                     if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                         for item in &mut payload[start..end] {

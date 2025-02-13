@@ -16,6 +16,18 @@ cd .. || exit 1
 
 sleep 20
 
+cd libafl_bolts
+cargo publish "$@"
+cd .. || exit 1
+
+sleep 20
+
+cd libafl_intelpt
+cargo publish "$@"
+cd .. || exit 1
+
+sleep 20
+
 cd libafl
 cargo publish "$@"
 cd .. || exit 1
@@ -35,6 +47,14 @@ cd .. || exit 1
 sleep 20
 
 cd libafl_qemu
+
+cd libafl_qemu_build
+cargo publish "$@"
+cd ..
+cd libafl_qemu_sys
+cargo publish "$@"
+cd ..
+
 cargo publish "$@"
 cd .. || exit 1
 
@@ -60,5 +80,9 @@ if git submodule status | grep "^-">/dev/null ; then \
 fi
 
 cd libafl_concolic/symcc_runtime
-cargo publish "$@"
+cargo publish "$@" --allow-dirty
 cd ../.. || exit 1
+
+cd libafl_libfuzzer
+cargo publish "$@"
+cd .. || exit 1

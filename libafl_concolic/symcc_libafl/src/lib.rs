@@ -4,7 +4,7 @@
 /// The URL of the `LibAFL` `SymCC` fork.
 pub const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
 /// The commit of the `LibAFL` `SymCC` fork.
-pub const SYMCC_REPO_COMMIT: &str = "2a3229da6101596af220f20fef5085e59537abcb";
+pub const SYMCC_REPO_COMMIT: &str = "1330e29d28bce706d9f7c0864da3b0a5ae218e03";
 
 #[cfg(feature = "clone")]
 mod clone {
@@ -34,7 +34,7 @@ mod clone {
             cmd.arg("checkout").arg(commit).current_dir(path);
             let output = cmd.output().expect("failed to execute git checkout");
             if !output.status.success() {
-                println!("failed to checkout symcc git repository commit:");
+                eprintln!("failed to checkout symcc git repository commit:");
                 let mut stdout = stdout();
                 stdout
                     .write_all(&output.stderr)
@@ -42,7 +42,7 @@ mod clone {
                 panic!();
             }
         } else {
-            println!("failed to clone symcc git repository:");
+            eprintln!("failed to clone symcc git repository:");
             let mut stdout = stdout();
             stdout
                 .write_all(&output.stderr)
@@ -63,6 +63,8 @@ pub use clone::clone_symcc;
 
 #[cfg(feature = "build")]
 mod build {
+    #![allow(clippy::module_name_repetitions)]
+
     use std::path::{Path, PathBuf};
 
     /// Builds `SymCC` at the given directory using [`cmake`](https://crates.io/crates/cmake).

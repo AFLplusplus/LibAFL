@@ -2,14 +2,14 @@
 use alloc::{rc::Rc, string::String, vec::Vec};
 use core::{
     cell::RefCell,
-    convert::From,
     hash::{BuildHasher, Hasher},
 };
 
 use ahash::RandomState;
+use libafl_bolts::{Error, HasLen};
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::HasLen, inputs::Input, Error};
+use crate::{corpus::CorpusId, inputs::Input};
 
 /// A terminal for gramatron grammar fuzzing
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -44,7 +44,7 @@ pub struct GramatronInput {
 impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, _idx: usize) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for term in &self.terms {
             hasher.write(term.symbol.as_bytes());

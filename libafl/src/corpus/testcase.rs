@@ -1,95 +1,92 @@
-//! The testcase is a struct embedded in each corpus.
+//! The [`Testcase`] is a struct embedded in each [`Corpus`].
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
-use core::{default::Default, option::Option, time::Duration};
+#[cfg(feature = "track_hit_feedbacks")]
+use alloc::{borrow::Cow, vec::Vec};
+use core::{
+    cell::{Ref, RefMut},
+    time::Duration,
+};
+#[cfg(feature = "std")]
+use std::path::PathBuf;
 
+use libafl_bolts::{serdeany::SerdeAnyMap, HasLen};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    bolts::{serdeany::SerdeAnyMap, HasLen},
-    inputs::Input,
-    state::HasMetadata,
-    Error,
-};
+use super::Corpus;
+use crate::{corpus::CorpusId, Error, HasMetadata};
 
-/// An entry in the Testcase Corpus
+/// Shorthand to receive a [`Ref`] or [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
+/// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+pub trait HasTestcase<I> {
+    /// Shorthand to receive a [`Ref`] to a stored [`Testcase`], by [`CorpusId`].
+    /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error>;
+
+    /// Shorthand to receive a [`RefMut`] to a stored [`Testcase`], by [`CorpusId`].
+    /// For a normal state, this should return a [`Testcase`] in the corpus, not the objectives.
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error>;
+}
+
+/// An entry in the [`Testcase`] Corpus
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct Testcase<I>
-where
-    I: Input,
-{
-    /// The input of this testcase
+pub struct Testcase<I> {
+    /// The [`Input`] of this [`Testcase`], or `None`, if it is not currently in memory
     input: Option<I>,
-    /// Filename, if this testcase is backed by a file in the filesystem
+    /// The filename for this [`Testcase`]
     filename: Option<String>,
-    /// Map of metadata associated with this testcase
+    /// Complete path to the [`Input`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    #[cfg(feature = "std")]
+    file_path: Option<PathBuf>,
+    /// Map of metadata associated with this [`Testcase`]
     metadata: SerdeAnyMap,
+    /// Complete path to the metadata [`SerdeAnyMap`] on disk, if this [`Testcase`] is backed by a file in the filesystem
+    #[cfg(feature = "std")]
+    metadata_path: Option<PathBuf>,
     /// Time needed to execute the input
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
     cached_len: Option<usize>,
-    /// Number of executions done at discovery time
-    executions: usize,
-    /// Number of fuzzing iterations of this particular input updated in perform_mutational
-    fuzz_level: usize,
-    /// If it has been fuzzed
-    fuzzed: bool,
+    /// Number of fuzzing iterations of this particular input updated in `perform_mutational`
+    scheduled_count: usize,
+    /// Parent [`CorpusId`], if known
+    parent_id: Option<CorpusId>,
+    /// If the testcase is "disabled"
+    disabled: bool,
+    /// has found crash (or timeout) or not
+    objectives_found: usize,
+    /// Vector of `Feedback` names that deemed this `Testcase` as corpus worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_feedbacks: Vec<Cow<'static, str>>,
+    /// Vector of `Feedback` names that deemed this `Testcase` as solution worthy
+    #[cfg(feature = "track_hit_feedbacks")]
+    hit_objectives: Vec<Cow<'static, str>>,
 }
 
-impl<I> HasMetadata for Testcase<I>
-where
-    I: Input,
-{
+impl<I> HasMetadata for Testcase<I> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata_map(&self) -> &SerdeAnyMap {
         &self.metadata
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_map_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
     }
 }
 
 /// Impl of a testcase
-impl<I> Testcase<I>
-where
-    I: Input,
-{
-    /// Returns this testcase with a loaded input
-    pub fn load_input(&mut self) -> Result<&I, Error> {
-        if self.input.is_none() {
-            self.input = Some(I::from_file(self.filename.as_ref().unwrap())?);
-        }
+impl<I> Testcase<I> {
+    /// Returns this [`Testcase`] with a loaded `Input`]
+    pub fn load_input<C: Corpus<I>>(&mut self, corpus: &C) -> Result<&I, Error> {
+        corpus.load_input_into(self)?;
         Ok(self.input.as_ref().unwrap())
     }
 
-    /// Store the input to disk if possible
-    pub fn store_input(&mut self) -> Result<bool, Error> {
-        match self.filename() {
-            Some(fname) => {
-                let saved = match self.input() {
-                    None => false,
-                    Some(i) => {
-                        i.to_file(fname)?;
-                        true
-                    }
-                };
-                if saved {
-                    // remove the input from memory
-                    *self.input_mut() = None;
-                }
-                Ok(saved)
-            }
-            None => Ok(false),
-        }
-    }
-
-    /// Get the input, if any
+    /// Get the input, if available any
     #[inline]
     pub fn input(&self) -> &Option<I> {
         &self.input
@@ -104,8 +101,7 @@ where
 
     /// Set the input
     #[inline]
-    pub fn set_input(&mut self, mut input: I) {
-        input.wrapped_as_testcase();
+    pub fn set_input(&mut self, input: I) {
         self.input = Some(input);
     }
 
@@ -121,10 +117,32 @@ where
         &mut self.filename
     }
 
-    /// Set the filename
+    /// Get the filename path, if any
     #[inline]
-    pub fn set_filename(&mut self, filename: String) {
-        self.filename = Some(filename);
+    #[cfg(feature = "std")]
+    pub fn file_path(&self) -> &Option<PathBuf> {
+        &self.file_path
+    }
+
+    /// Get the filename path, if any (mutable)
+    #[inline]
+    #[cfg(feature = "std")]
+    pub fn file_path_mut(&mut self) -> &mut Option<PathBuf> {
+        &mut self.file_path
+    }
+
+    /// Get the metadata path, if any
+    #[inline]
+    #[cfg(feature = "std")]
+    pub fn metadata_path(&self) -> &Option<PathBuf> {
+        &self.metadata_path
+    }
+
+    /// Get the metadata path, if any (mutable)
+    #[inline]
+    #[cfg(feature = "std")]
+    pub fn metadata_path_mut(&mut self) -> &mut Option<PathBuf> {
+        &mut self.metadata_path
     }
 
     /// Get the execution time of the testcase
@@ -145,80 +163,160 @@ where
         self.exec_time = Some(time);
     }
 
-    /// Get the executions
+    /// Get the `scheduled_count`
     #[inline]
-    pub fn executions(&self) -> &usize {
-        &self.executions
+    pub fn scheduled_count(&self) -> usize {
+        self.scheduled_count
     }
 
-    /// Get the executions (mutable)
+    /// Set the `scheduled_count`
     #[inline]
-    pub fn executions_mut(&mut self) -> &mut usize {
-        &mut self.executions
+    pub fn set_scheduled_count(&mut self, scheduled_count: usize) {
+        self.scheduled_count = scheduled_count;
     }
 
-    /// Get the `fuzz_level`
+    /// Get `disabled`
     #[inline]
-    pub fn fuzz_level(&self) -> usize {
-        self.fuzz_level
+    pub fn disabled(&mut self) -> bool {
+        self.disabled
     }
 
-    /// Set the `fuzz_level`
+    /// Set the testcase as disabled
     #[inline]
-    pub fn set_fuzz_level(&mut self, fuzz_level: usize) {
-        self.fuzz_level = fuzz_level;
+    pub fn set_disabled(&mut self, disabled: bool) {
+        self.disabled = disabled;
     }
 
-    /// Get if it was fuzzed
+    /// Get the hit feedbacks
     #[inline]
-    pub fn fuzzed(&self) -> bool {
-        self.fuzzed
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_feedbacks
     }
 
-    /// Set if it was fuzzed
+    /// Get the hit feedbacks (mutable)
     #[inline]
-    pub fn set_fuzzed(&mut self, fuzzed: bool) {
-        self.fuzzed = fuzzed;
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_feedbacks_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
+        &mut self.hit_feedbacks
+    }
+
+    /// Get the hit objectives
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives(&self) -> &Vec<Cow<'static, str>> {
+        &self.hit_objectives
+    }
+
+    /// Get the hit objectives (mutable)
+    #[inline]
+    #[cfg(feature = "track_hit_feedbacks")]
+    pub fn hit_objectives_mut(&mut self) -> &mut Vec<Cow<'static, str>> {
+        &mut self.hit_objectives
     }
 
     /// Create a new Testcase instance given an input
     #[inline]
     pub fn new(input: I) -> Self {
-        let mut slf = Testcase {
+        Self {
             input: Some(input),
-            ..Testcase::default()
-        };
-        slf.input.as_mut().unwrap().wrapped_as_testcase();
-        slf
+            filename: None,
+            #[cfg(feature = "std")]
+            file_path: None,
+            metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            exec_time: None,
+            cached_len: None,
+            scheduled_count: 0,
+            parent_id: None,
+            disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
+        }
     }
 
-    /// Create a new Testcase instance given an [`Input`] and a `filename`
-    #[inline]
-    pub fn with_filename(mut input: I, filename: String) -> Self {
-        input.wrapped_as_testcase();
+    /// Creates a testcase, attaching the id of the parent
+    /// that this [`Testcase`] was derived from on creation
+    pub fn with_parent_id(input: I, parent_id: CorpusId) -> Self {
         Testcase {
+            input: Some(input),
+            filename: None,
+            #[cfg(feature = "std")]
+            file_path: None,
+            metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            exec_time: None,
+            cached_len: None,
+            scheduled_count: 0,
+            parent_id: Some(parent_id),
+            disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
+        }
+    }
+
+    /// Create a new Testcase instance given an input and a `filename`
+    /// If locking is enabled, make sure that testcases with the same input have the same filename
+    /// to prevent ending up with duplicate testcases
+    #[inline]
+    pub fn with_filename(input: I, filename: String) -> Self {
+        Self {
             input: Some(input),
             filename: Some(filename),
-            ..Testcase::default()
+            #[cfg(feature = "std")]
+            file_path: None,
+            metadata: SerdeAnyMap::default(),
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            exec_time: None,
+            cached_len: None,
+            scheduled_count: 0,
+            parent_id: None,
+            disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 
-    /// Create a new Testcase instance given an [`Input`] and the number of executions
-    #[inline]
-    pub fn with_executions(mut input: I, executions: usize) -> Self {
-        input.wrapped_as_testcase();
-        Testcase {
-            input: Some(input),
-            executions,
-            ..Testcase::default()
-        }
+    /// Get the id of the parent, that this testcase was derived from
+    #[must_use]
+    pub fn parent_id(&self) -> Option<CorpusId> {
+        self.parent_id
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id(&mut self, parent_id: CorpusId) {
+        self.parent_id = Some(parent_id);
+    }
+
+    /// Sets the id of the parent, that this testcase was derived from
+    pub fn set_parent_id_optional(&mut self, parent_id: Option<CorpusId>) {
+        self.parent_id = parent_id;
+    }
+
+    /// Gets how many objectives were found by mutating this testcase
+    pub fn objectives_found(&self) -> usize {
+        self.objectives_found
+    }
+
+    /// Adds one objectives to the `objectives_found` counter. Mostly called from crash handler or executor.
+    pub fn found_objective(&mut self) {
+        self.objectives_found = self.objectives_found.saturating_add(1);
     }
 }
 
-impl<I> Default for Testcase<I>
-where
-    I: Input,
-{
+impl<I> Default for Testcase<I> {
     /// Create a new default Testcase
     #[inline]
     fn default() -> Self {
@@ -228,9 +326,18 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
-            fuzz_level: 0,
-            executions: 0,
-            fuzzed: false,
+            scheduled_count: 0,
+            parent_id: None,
+            #[cfg(feature = "std")]
+            file_path: None,
+            #[cfg(feature = "std")]
+            metadata_path: None,
+            disabled: false,
+            objectives_found: 0,
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_feedbacks: Vec::new(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            hit_objectives: Vec::new(),
         }
     }
 }
@@ -238,35 +345,36 @@ where
 /// Impl of a testcase when the input has len
 impl<I> Testcase<I>
 where
-    I: Input + HasLen,
+    I: HasLen,
 {
-    /// Get the cached len
+    /// Get the cached `len`. Will `Error::EmptyOptional` if `len` is not yet cached.
     #[inline]
-    pub fn cached_len(&mut self) -> Result<usize, Error> {
-        Ok(match &self.input {
+    pub fn cached_len(&mut self) -> Option<usize> {
+        self.cached_len
+    }
+
+    /// Get the `len` or calculate it, if not yet calculated.
+    pub fn load_len<C: Corpus<I>>(&mut self, corpus: &C) -> Result<usize, Error> {
+        match &self.input {
             Some(i) => {
                 let l = i.len();
                 self.cached_len = Some(l);
-                l
+                Ok(l)
             }
             None => {
                 if let Some(l) = self.cached_len {
-                    l
+                    Ok(l)
                 } else {
-                    let l = self.load_input()?.len();
-                    self.cached_len = Some(l);
-                    l
+                    corpus.load_input_into(self)?;
+                    self.load_len(corpus)
                 }
             }
-        })
+        }
     }
 }
 
 /// Create a testcase from an input
-impl<I> From<I> for Testcase<I>
-where
-    I: Input,
-{
+impl<I> From<I> for Testcase<I> {
     fn from(input: I) -> Self {
         Testcase::new(input)
     }
@@ -274,19 +382,25 @@ where
 
 /// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SchedulerTestcaseMetaData {
-    /// Number of bits set in bitmap, updated in calibrate_case
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    expect(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
+pub struct SchedulerTestcaseMetadata {
+    /// Number of bits set in bitmap, updated in `calibrate_case`
     bitmap_size: u64,
     /// Number of queue cycles behind
     handicap: u64,
-    /// Path depth, initialized in on_add
+    /// Path depth, initialized in `on_add`
     depth: u64,
-    /// Offset in n_fuzz
+    /// Offset in `n_fuzz`
     n_fuzz_entry: usize,
+    /// Cycles used to calibrate this (not really needed if it were not for `on_replace` and `on_remove`)
+    cycle_and_time: (Duration, usize),
 }
 
-impl SchedulerTestcaseMetaData {
-    /// Create new [`struct@SchedulerTestcaseMetaData`]
+impl SchedulerTestcaseMetadata {
+    /// Create new [`struct@SchedulerTestcaseMetadata`]
     #[must_use]
     pub fn new(depth: u64) -> Self {
         Self {
@@ -294,151 +408,98 @@ impl SchedulerTestcaseMetaData {
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
+            cycle_and_time: (Duration::default(), 0),
+        }
+    }
+
+    /// Create new [`struct@SchedulerTestcaseMetadata`] given `n_fuzz_entry`
+    #[must_use]
+    pub fn with_n_fuzz_entry(depth: u64, n_fuzz_entry: usize) -> Self {
+        Self {
+            bitmap_size: 0,
+            handicap: 0,
+            depth,
+            n_fuzz_entry,
+            cycle_and_time: (Duration::default(), 0),
         }
     }
 
     /// Get the bitmap size
+    #[inline]
     #[must_use]
     pub fn bitmap_size(&self) -> u64 {
         self.bitmap_size
     }
 
     /// Set the bitmap size
+    #[inline]
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
     }
 
     /// Get the handicap
+    #[inline]
     #[must_use]
     pub fn handicap(&self) -> u64 {
         self.handicap
     }
 
     /// Set the handicap
+    #[inline]
     pub fn set_handicap(&mut self, val: u64) {
         self.handicap = val;
     }
 
     /// Get the depth
+    #[inline]
     #[must_use]
     pub fn depth(&self) -> u64 {
         self.depth
     }
 
     /// Set the depth
+    #[inline]
     pub fn set_depth(&mut self, val: u64) {
         self.depth = val;
     }
 
     /// Get the `n_fuzz_entry`
+    #[inline]
     #[must_use]
     pub fn n_fuzz_entry(&self) -> usize {
         self.n_fuzz_entry
     }
 
     /// Set the `n_fuzz_entry`
+    #[inline]
     pub fn set_n_fuzz_entry(&mut self, val: usize) {
         self.n_fuzz_entry = val;
     }
+
+    /// Get the cycles
+    #[inline]
+    #[must_use]
+    pub fn cycle_and_time(&self) -> (Duration, usize) {
+        self.cycle_and_time
+    }
+
+    #[inline]
+    /// Setter for cycles
+    pub fn set_cycle_and_time(&mut self, cycle_and_time: (Duration, usize)) {
+        self.cycle_and_time = cycle_and_time;
+    }
 }
 
-crate::impl_serdeany!(SchedulerTestcaseMetaData);
+libafl_bolts::impl_serdeany!(SchedulerTestcaseMetadata);
 
-#[cfg(feature = "python")]
-#[allow(missing_docs)]
-/// `Testcase` Python bindings
-pub mod pybind {
-    use alloc::{boxed::Box, vec::Vec};
-
-    use pyo3::{prelude::*, types::PyDict};
-
-    use super::{HasMetadata, Testcase};
-    use crate::{
-        bolts::ownedref::OwnedMutPtr,
-        inputs::{BytesInput, HasBytesVec},
-        pybind::PythonMetadata,
-    };
-
-    /// `PythonTestcase` with fixed generics
-    pub type PythonTestcase = Testcase<BytesInput>;
-
-    #[pyclass(unsendable, name = "Testcase")]
-    #[derive(Debug)]
-    /// Python class for Testcase
-    pub struct PythonTestcaseWrapper {
-        /// Rust wrapped Testcase object
-        pub inner: OwnedMutPtr<PythonTestcase>,
-    }
-
-    impl PythonTestcaseWrapper {
-        pub fn wrap(r: &mut PythonTestcase) -> Self {
-            Self {
-                inner: OwnedMutPtr::Ptr(r),
-            }
+#[cfg(feature = "std")]
+impl<I> Drop for Testcase<I> {
+    fn drop(&mut self) {
+        if let Some(filename) = &self.filename {
+            let mut path = PathBuf::from(filename);
+            let lockname = format!(".{}.lafl_lock", path.file_name().unwrap().to_str().unwrap());
+            path.set_file_name(lockname);
+            let _ = std::fs::remove_file(path);
         }
-
-        #[must_use]
-        pub fn unwrap(&self) -> &PythonTestcase {
-            self.inner.as_ref()
-        }
-
-        pub fn unwrap_mut(&mut self) -> &mut PythonTestcase {
-            self.inner.as_mut()
-        }
-    }
-
-    #[pymethods]
-    impl PythonTestcaseWrapper {
-        #[new]
-        fn new(input: Vec<u8>) -> Self {
-            Self {
-                inner: OwnedMutPtr::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
-            }
-        }
-
-        fn load_input(&mut self) -> &[u8] {
-            self.inner
-                .as_mut()
-                .load_input()
-                .expect("Failed to load input")
-                .bytes()
-        }
-
-        #[getter]
-        fn exec_time_ms(&self) -> Option<u128> {
-            self.inner.as_ref().exec_time().map(|t| t.as_millis())
-        }
-
-        #[getter]
-        fn executions(&self) -> usize {
-            *self.inner.as_ref().executions()
-        }
-
-        #[getter]
-        fn fuzz_level(&self) -> usize {
-            self.inner.as_ref().fuzz_level()
-        }
-
-        #[getter]
-        fn fuzzed(&self) -> bool {
-            self.inner.as_ref().fuzzed()
-        }
-
-        fn metadata(&mut self) -> PyObject {
-            let meta = self.inner.as_mut().metadata_mut();
-            if !meta.contains::<PythonMetadata>() {
-                Python::with_gil(|py| {
-                    let dict: Py<PyDict> = PyDict::new(py).into();
-                    meta.insert(PythonMetadata::new(dict.to_object(py)));
-                });
-            }
-            meta.get::<PythonMetadata>().unwrap().map.clone()
-        }
-    }
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonTestcaseWrapper>()?;
-        Ok(())
     }
 }

@@ -1,0 +1,24 @@
+name: Setup Rust Environment
+description: Sets up the Rust environment for the CI workflow
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: llvm-tools, clippy, rustfmt
+    - uses: actions/checkout@v4
+    - uses: Swatinem/rust-cache@v2
+    - name: Build docs
+      shell: pwsh
+      run: cargo doc
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: Set LIBCLANG_PATH
+      shell: pwsh
+      run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
+    - name: install cargo-make
+      shell: pwsh
+      run: cargo install --force cargo-make
+    - name: install just
+      uses: extractions/setup-just@v2
+      with:
+        just-version: 1.39.0

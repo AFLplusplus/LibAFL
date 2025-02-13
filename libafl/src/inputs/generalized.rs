@@ -2,15 +2,14 @@
 
 use alloc::vec::Vec;
 
+use libafl_bolts::impl_serdeany;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusId, Testcase},
-    impl_serdeany,
+    corpus::Testcase,
     inputs::BytesInput,
     stages::mutational::{MutatedTransform, MutatedTransformPost},
-    state::{HasCorpus, HasMetadata},
-    Error,
+    Error, HasMetadata,
 };
 
 /// An item of the generalized input
@@ -23,7 +22,11 @@ pub enum GeneralizedItem {
 }
 
 /// Metadata regarding the generalised content of an input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    expect(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct GeneralizedInputMetadata {
     generalized: Vec<GeneralizedItem>,
 }
@@ -101,25 +104,21 @@ impl GeneralizedInputMetadata {
     }
 }
 
-impl<S> MutatedTransform<BytesInput, S> for GeneralizedInputMetadata
-where
-    S: HasCorpus,
-{
+impl<S> MutatedTransform<BytesInput, S> for GeneralizedInputMetadata {
     type Post = Self;
 
-    fn try_transform_from(
-        base: &Testcase<BytesInput>,
-        _state: &S,
-        corpus_idx: CorpusId,
-    ) -> Result<Self, Error> {
-        base.metadata()
+    fn try_transform_from(base: &mut Testcase<BytesInput>, _state: &S) -> Result<Self, Error> {
+        let meta = base
+            .metadata_map()
             .get::<GeneralizedInputMetadata>()
             .ok_or_else(|| {
                 Error::key_not_found(format!(
-                    "Couldn't find the GeneralizedInputMetadata for corpus entry {corpus_idx}",
+                    "Couldn't find the GeneralizedInputMetadata for corpus entry {base:?}",
                 ))
             })
-            .cloned()
+            .cloned()?;
+
+        Ok(meta)
     }
 
     fn try_transform_into(self, _state: &S) -> Result<(BytesInput, Self::Post), Error> {
@@ -127,20 +126,4 @@ where
     }
 }
 
-impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata
-where
-    S: HasCorpus,
-{
-    fn post_exec(
-        self,
-        state: &mut S,
-        _stage_idx: i32,
-        corpus_idx: Option<CorpusId>,
-    ) -> Result<(), Error> {
-        if let Some(corpus_idx) = corpus_idx {
-            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-            testcase.metadata_mut().insert(self);
-        }
-        Ok(())
-    }
-}
+impl<S> MutatedTransformPost<S> for GeneralizedInputMetadata {}

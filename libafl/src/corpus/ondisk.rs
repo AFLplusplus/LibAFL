@@ -1,113 +1,116 @@
-//! The ondisk corpus stores [`Testcase`]s to disk.
-//! Additionally, all of them are kept in memory.
-//! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
-//! which only stores a certain number of testcases and removes additional ones in a FIFO manner.
+//! The [`OnDiskCorpus`] stores all [`Testcase`]s to disk.
+//!
+//! It _never_ keeps any of them in memory.
+//! This is a good solution for solutions that are never reused, or for *very* memory-constraint environments.
+//! For any other occasions, consider using [`CachedOnDiskCorpus`]
+//! which stores a certain number of [`Testcase`]s in memory and removes additional ones in a FIFO manner.
 
-use core::{cell::RefCell, time::Duration};
-#[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write};
-use std::{
-    fs::OpenOptions,
-    path::{Path, PathBuf},
+use alloc::string::String;
+use core::{
+    cell::{Ref, RefCell, RefMut},
+    time::Duration,
 };
+use std::path::{Path, PathBuf};
 
+use libafl_bolts::serdeany::SerdeAnyMap;
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "gzip")]
-use crate::bolts::compress::GzipCompressor;
 use crate::{
-    bolts::serdeany::SerdeAnyMap,
-    corpus::{Corpus, CorpusId, InMemoryCorpus, Testcase},
-    inputs::{Input, UsesInput},
-    state::HasMetadata,
+    corpus::{CachedOnDiskCorpus, Corpus, CorpusId, HasTestcase, Testcase},
+    inputs::Input,
     Error,
 };
 
 /// Options for the the format of the on-disk metadata
-#[cfg(feature = "std")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub enum OnDiskMetadataFormat {
     /// A binary-encoded postcard
     Postcard,
     /// JSON
     Json,
     /// JSON formatted for readability
+    #[default]
     JsonPretty,
-    #[cfg(feature = "gzip")]
     /// The same as [`OnDiskMetadataFormat::JsonPretty`], but compressed
+    #[cfg(feature = "gzip")]
     JsonGzip,
 }
 
 /// The [`Testcase`] metadata that'll be stored to disk
-#[cfg(feature = "std")]
 #[derive(Debug, Serialize)]
 pub struct OnDiskMetadata<'a> {
-    metadata: &'a SerdeAnyMap,
-    exec_time: &'a Option<Duration>,
-    executions: &'a usize,
+    /// The dynamic metadata [`SerdeAnyMap`] stored to disk
+    pub metadata: &'a SerdeAnyMap,
+    /// The exec time for this [`Testcase`]
+    pub exec_time: &'a Option<Duration>,
 }
 
 /// A corpus able to store [`Testcase`]s to disk, and load them from disk, when they are being used.
 ///
 /// Metadata is written to a `.<filename>.metadata` file in the same folder by default.
-#[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OnDiskCorpus<I>
-where
-    I: Input,
-{
-    inner: InMemoryCorpus<I>,
+pub struct OnDiskCorpus<I> {
+    /// The root directory backing this corpus
     dir_path: PathBuf,
-    meta_format: Option<OnDiskMetadataFormat>,
+    /// We wrapp a cached corpus and set its size to 1.
+    inner: CachedOnDiskCorpus<I>,
 }
 
-impl<I> UsesInput for OnDiskCorpus<I>
+impl<I> Corpus<I> for OnDiskCorpus<I>
 where
     I: Input,
 {
-    type Input = I;
-}
-
-impl<I> Corpus for OnDiskCorpus<I>
-where
-    I: Input,
-{
-    /// Returns the number of elements
+    /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
         self.inner.count()
     }
 
-    /// Add an entry to the corpus and return its index
+    /// Returns the number of all disabled entries
+    fn count_disabled(&self) -> usize {
+        self.inner.count_disabled()
+    }
+
+    /// Returns the number of all entries
+    #[inline]
+    fn count_all(&self) -> usize {
+        self.inner.count_all()
+    }
+
+    /// Add an enabled testcase to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
-        let idx = self.inner.add(testcase)?;
-        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
-        Ok(idx)
+        self.inner.add(testcase)
+    }
+
+    /// Add a disabled testcase to the corpus and return its index
+    #[inline]
+    fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
+        self.inner.add_disabled(testcase)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        let entry = self.inner.replace(idx, testcase)?;
-        self.remove_testcase(&entry)?;
-        self.save_testcase(&mut self.get(idx).unwrap().borrow_mut(), idx)?;
-        Ok(entry)
+    fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+        self.inner.replace(id, testcase)
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
-    fn remove(&mut self, idx: CorpusId) -> Result<Testcase<I>, Error> {
-        let entry = self.inner.remove(idx)?;
-        self.remove_testcase(&entry)?;
-        Ok(entry)
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
+        self.inner.remove(id)
     }
 
-    /// Get by id
+    /// Get by id; will check the disabled corpus if not available in the enabled
     #[inline]
-    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.inner.get(idx)
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get(id)
+    }
+
+    /// Get by id; considers both enabled and disabled testcases
+    #[inline]
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.inner.get_from_all(id)
     }
 
     /// Current testcase scheduled
@@ -123,13 +126,19 @@ where
     }
 
     #[inline]
-    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.next(idx)
+    fn next(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.next(id)
+    }
+
+    /// Peek the next free corpus id
+    #[inline]
+    fn peek_free_id(&self) -> CorpusId {
+        self.inner.peek_free_id()
     }
 
     #[inline]
-    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
-        self.inner.prev(idx)
+    fn prev(&self, id: CorpusId) -> Option<CorpusId> {
+        self.inner.prev(id)
     }
 
     #[inline]
@@ -142,25 +151,50 @@ where
         self.inner.last()
     }
 
+    /// Get the nth corpus id; considers only enabled testcases
     #[inline]
     fn nth(&self, nth: usize) -> CorpusId {
         self.inner.nth(nth)
     }
+    /// Get the nth corpus id; considers both enabled and disabled testcases
+    #[inline]
+    fn nth_from_all(&self, nth: usize) -> CorpusId {
+        self.inner.nth_from_all(nth)
+    }
+
+    #[inline]
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        self.inner.load_input_into(testcase)
+    }
+
+    #[inline]
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
+        self.inner.store_input_from(testcase)
+    }
 }
 
-impl<I> OnDiskCorpus<I>
+impl<I> HasTestcase<I> for OnDiskCorpus<I>
 where
     I: Input,
 {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
+        Ok(self.get(id)?.borrow())
+    }
+
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
+        Ok(self.get(id)?.borrow_mut())
+    }
+}
+
+impl<I> OnDiskCorpus<I> {
     /// Creates an [`OnDiskCorpus`].
     ///
-    /// This corpus stores all testcases to disk, and keeps all of them in memory, as well.
+    /// This corpus stores all testcases to disk.
     ///
     /// By default, it stores metadata for each [`Testcase`] as prettified json.
     /// Metadata will be written to a file named `.<testcase>.metadata`
     /// The metadata may include objective reason, specific information for a fuzz job, and more.
     ///
-    /// If you don't want metadata, use [`OnDiskCorpus::no_meta`].
     /// To pick a different metadata format, use [`OnDiskCorpus::with_meta_format`].
     ///
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
@@ -168,7 +202,27 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), Some(OnDiskMetadataFormat::JsonPretty))
+        Self::with_meta_format_and_prefix(
+            dir_path.as_ref(),
+            Some(OnDiskMetadataFormat::JsonPretty),
+            None,
+            true,
+        )
+    }
+
+    /// Creates the [`OnDiskCorpus`] with a filename prefix.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_prefix<P>(dir_path: P, prefix: Option<String>) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        Self::with_meta_format_and_prefix(
+            dir_path.as_ref(),
+            Some(OnDiskMetadataFormat::JsonPretty),
+            prefix,
+            true,
+        )
     }
 
     /// Creates the [`OnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
@@ -181,7 +235,7 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), Some(meta_format))
+        Self::with_meta_format_and_prefix(dir_path.as_ref(), Some(meta_format), None, true)
     }
 
     /// Creates an [`OnDiskCorpus`] that will not store .metadata files
@@ -191,139 +245,33 @@ where
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), None)
+        Self::with_meta_format_and_prefix(dir_path.as_ref(), None, None, true)
     }
 
-    /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
-    fn _new(dir_path: &Path, meta_format: Option<OnDiskMetadataFormat>) -> Result<Self, Error> {
-        fs::create_dir_all(dir_path)?;
+    /// Creates a new corpus at the given (non-generic) path with the given optional `meta_format`
+    /// and `prefix`.
+    ///
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn with_meta_format_and_prefix(
+        dir_path: &Path,
+        meta_format: Option<OnDiskMetadataFormat>,
+        prefix: Option<String>,
+        locking: bool,
+    ) -> Result<Self, Error> {
         Ok(OnDiskCorpus {
-            inner: InMemoryCorpus::new(),
             dir_path: dir_path.into(),
-            meta_format,
+            inner: CachedOnDiskCorpus::with_meta_format_and_prefix(
+                dir_path,
+                1,
+                meta_format,
+                prefix,
+                locking,
+            )?,
         })
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, idx: CorpusId) -> Result<(), Error> {
-        if testcase.filename().is_none() {
-            // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            let file_orig = testcase.input().as_ref().unwrap().generate_name(idx.0);
-            let mut file = file_orig.clone();
-
-            let mut ctr = 2;
-            let filename = loop {
-                let lockfile = format!(".{file}.lafl_lock");
-                // try to create lockfile.
-
-                if OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(self.dir_path.join(lockfile))
-                    .is_ok()
-                {
-                    break self.dir_path.join(file);
-                }
-
-                file = format!("{file_orig}-{ctr}");
-                ctr += 1;
-            };
-
-            let filename_str = filename.to_str().expect("Invalid Path");
-            testcase.set_filename(filename_str.into());
-        };
-        if self.meta_format.is_some() {
-            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
-            filename.set_file_name(format!(
-                ".{}.metadata",
-                filename.file_name().unwrap().to_string_lossy()
-            ));
-            let mut tmpfile_name = PathBuf::from(&filename);
-            tmpfile_name.set_file_name(format!(
-                ".{}.tmp",
-                tmpfile_name.file_name().unwrap().to_string_lossy()
-            ));
-
-            let ondisk_meta = OnDiskMetadata {
-                metadata: testcase.metadata(),
-                exec_time: testcase.exec_time(),
-                executions: testcase.executions(),
-            };
-
-            let mut tmpfile = File::create(&tmpfile_name)?;
-
-            let serialized = match self.meta_format.as_ref().unwrap() {
-                OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
-                OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
-                OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
-                #[cfg(feature = "gzip")]
-                OnDiskMetadataFormat::JsonGzip => GzipCompressor::new(0)
-                    .compress(&serde_json::to_vec_pretty(&ondisk_meta)?)?
-                    .unwrap(),
-            };
-            tmpfile.write_all(&serialized)?;
-            fs::rename(&tmpfile_name, &filename)?;
-        }
-        testcase
-            .store_input()
-            .expect("Could not save testcase to disk");
-        Ok(())
-    }
-
-    fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
-        if let Some(filename) = testcase.filename() {
-            fs::remove_file(filename)?;
-        }
-        if self.meta_format.is_some() {
-            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
-            filename.set_file_name(format!(
-                ".{}.metadata",
-                filename.file_name().unwrap().to_string_lossy()
-            ));
-            fs::remove_file(filename)?;
-        }
-        Ok(())
-    }
-}
-
-#[cfg(feature = "python")]
-/// `OnDiskCorpus` Python bindings
-pub mod pybind {
-    use alloc::string::String;
-    use std::path::PathBuf;
-
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
-
-    use crate::{
-        corpus::{pybind::PythonCorpus, OnDiskCorpus},
-        inputs::BytesInput,
-    };
-
-    #[pyclass(unsendable, name = "OnDiskCorpus")]
-    #[allow(clippy::unsafe_derive_deserialize)]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    /// Python class for OnDiskCorpus
-    pub struct PythonOnDiskCorpus {
-        /// Rust wrapped OnDiskCorpus object
-        pub inner: OnDiskCorpus<BytesInput>,
-    }
-
-    #[pymethods]
-    impl PythonOnDiskCorpus {
-        #[new]
-        fn new(path: String) -> Self {
-            Self {
-                inner: OnDiskCorpus::new(PathBuf::from(path)).unwrap(),
-            }
-        }
-
-        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
-            PythonCorpus::new_on_disk(slf)
-        }
-    }
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonOnDiskCorpus>()?;
-        Ok(())
+    /// Path to the corpus directory associated with this corpus
+    pub fn dir_path(&self) -> &PathBuf {
+        &self.dir_path
     }
 }

@@ -1,3 +1,9 @@
+//! Welcome to `LibAFL` QEMU
+//!
+//! __Warning__: The documentation is built by default for `x86_64` in `usermode`. To access the documentation of other architectures or `systemmode`, the documentation must be rebuilt with the right features.
+/*! */
+#![doc = include_str!("../README.md")]
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
 // libafl_qemu only supports Linux currently
 #![cfg(target_os = "linux")]
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
@@ -6,14 +12,6 @@
     any(cpu_target = "x86_64", cpu_target = "aarch64"),
     allow(clippy::useless_conversion)
 )]
-#![allow(clippy::needless_pass_by_value)]
-#![allow(clippy::transmute_ptr_to_ptr)]
-#![allow(clippy::too_many_arguments)]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
-// Allow only ATM, it will be evetually removed
-#![allow(clippy::missing_safety_doc)]
 // libafl_qemu_sys export types with empty struct markers (e.g. struct {} start_init_save)
 // This causes bindgen to generate empty Rust struct that are generally not FFI-safe due to C++ having empty structs with size 1
 // As the QEMU codebase is C, it is FFI-safe and we just ignore the warning
@@ -24,68 +22,31 @@ use std::env;
 pub use libafl_qemu_sys as sys;
 pub use strum::IntoEnumIterator;
 
-#[cfg(cpu_target = "aarch64")]
-pub mod aarch64;
-#[cfg(all(cpu_target = "aarch64", not(feature = "clippy")))]
-pub use aarch64::*;
-
-#[cfg(cpu_target = "arm")]
-pub mod arm;
-#[cfg(all(cpu_target = "arm", not(feature = "clippy")))]
-pub use arm::*;
-
-#[cfg(cpu_target = "i386")]
-pub mod i386;
-#[cfg(all(cpu_target = "i386", not(feature = "clippy")))]
-pub use i386::*;
-
-#[cfg(cpu_target = "x86_64")]
-pub mod x86_64;
-#[cfg(cpu_target = "x86_64")]
-pub use x86_64::*;
-
-#[cfg(cpu_target = "mips")]
-pub mod mips;
-#[cfg(cpu_target = "mips")]
-pub use mips::*;
+pub mod arch;
+pub use arch::*;
 
 pub mod elf;
 
-pub mod helper;
-pub use helper::*;
-pub mod hooks;
-pub use hooks::*;
-
-pub mod edges;
-pub use edges::QemuEdgeCoverageHelper;
-
-#[cfg(not(cpu_target = "mips"))]
-pub mod cmplog;
-#[cfg(not(cpu_target = "mips"))]
-pub use cmplog::QemuCmpLogHelper;
-
-#[cfg(emulation_mode = "usermode")]
-pub mod snapshot;
-#[cfg(emulation_mode = "usermode")]
-pub use snapshot::QemuSnapshotHelper;
-
-#[cfg(emulation_mode = "usermode")]
-pub mod asan;
-#[cfg(emulation_mode = "usermode")]
-pub use asan::{init_with_asan, QemuAsanHelper};
-
-pub mod blocks;
-
-pub mod calls;
-pub mod drcov;
+pub mod modules;
 
 pub mod executor;
 pub use executor::QemuExecutor;
 #[cfg(feature = "fork")]
 pub use executor::QemuForkExecutor;
 
+pub mod qemu;
+pub use qemu::*;
+
 pub mod emu;
 pub use emu::*;
+
+pub mod breakpoint;
+pub mod command;
+pub mod sync_exit;
+
+pub use libafl_qemu_sys::{GuestAddr, MmapPerms};
+#[cfg(feature = "systemmode")]
+pub use libafl_qemu_sys::{GuestPhysAddr, GuestVirtAddr};
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
@@ -110,26 +71,31 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
-#[allow(clippy::items_after_statements, clippy::too_many_lines)]
-pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    let regsm = PyModule::new(py, "regs")?;
+pub fn python_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    use pyo3::types::PyString;
+
+    let regsm = PyModule::new(m.py(), "regs")?;
     for r in Regs::iter() {
         let v: i32 = r.into();
-        regsm.add(&format!("{r:?}"), v)?;
+        regsm.add(PyString::new(m.py(), &format!("{r:?}")), v)?;
     }
-    m.add_submodule(regsm)?;
+    m.add_submodule(&regsm)?;
 
-    let mmapm = PyModule::new(py, "mmap")?;
-    for r in emu::MmapPerms::iter() {
+    let mmapm = PyModule::new(m.py(), "mmap")?;
+    for r in MmapPerms::iter() {
         let v: i32 = r.into();
-        mmapm.add(&format!("{r:?}"), v)?;
+        mmapm.add(PyString::new(m.py(), &format!("{r:?}")), v)?;
     }
-    m.add_submodule(mmapm)?;
+    m.add_submodule(&mmapm)?;
 
-    m.add_class::<emu::MapInfo>()?;
-    m.add_class::<emu::GuestMaps>()?;
-    m.add_class::<emu::SyscallHookResult>()?;
-    m.add_class::<emu::pybind::Emulator>()?;
+    #[cfg(feature = "usermode")]
+    m.add_class::<sys::MapInfo>()?;
+
+    #[cfg(feature = "usermode")]
+    m.add_class::<GuestMaps>()?;
+
+    m.add_class::<SyscallHookResult>()?;
+    m.add_class::<pybind::Qemu>()?;
 
     Ok(())
 }

@@ -1,12 +1,13 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 //! In comparison to the [`crate::executors::DiffExecutor`] it does not run the secondary executor in `run_target`.
 
-use core::fmt::Debug;
+use core::{fmt::Debug, time::Duration};
 
+use libafl_bolts::tuples::RefIndexable;
+
+use super::HasTimeout;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::UsesObservers,
-    state::UsesState,
     Error,
 };
 
@@ -19,13 +20,7 @@ pub struct CombinedExecutor<A, B> {
 
 impl<A, B> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, Z>(primary: A, secondary: B) -> Self
-    where
-        A: Executor<EM, Z>,
-        B: Executor<EM, Z, State = A::State>,
-        EM: UsesState<State = A::State>,
-        Z: UsesState<State = A::State>,
-    {
+    pub fn new(primary: A, secondary: B) -> Self {
         Self { primary, secondary }
     }
 
@@ -40,52 +35,56 @@ impl<A, B> CombinedExecutor<A, B> {
     }
 }
 
-impl<A, B, EM, Z> Executor<EM, Z> for CombinedExecutor<A, B>
+impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for CombinedExecutor<A, B>
 where
-    A: Executor<EM, Z>,
-    B: Executor<EM, Z, State = A::State>,
-    EM: UsesState<State = A::State>,
-    Z: UsesState<State = A::State>,
+    A: Executor<EM, I, S, Z>,
+    B: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
-        let ret = self.primary.run_target(fuzzer, state, mgr, input);
-        self.primary.post_run_reset();
-        self.secondary.post_run_reset();
-        ret
+        self.primary.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<A, B> UsesState for CombinedExecutor<A, B>
+impl<A, B> HasTimeout for CombinedExecutor<A, B>
 where
-    A: UsesState,
+    A: HasTimeout,
+    B: HasTimeout,
 {
-    type State = A::State;
-}
+    #[inline]
+    fn set_timeout(&mut self, timeout: Duration) {
+        self.primary.set_timeout(timeout);
+        self.secondary.set_timeout(timeout);
+    }
 
-impl<A, B> UsesObservers for CombinedExecutor<A, B>
-where
-    A: UsesObservers,
-{
-    type Observers = A::Observers;
+    #[inline]
+    fn timeout(&self) -> Duration {
+        assert!(
+            self.primary.timeout() == self.secondary.timeout(),
+            "Primary and Secondary Executors have different timeouts!"
+        );
+        self.primary.timeout()
+    }
 }
 
 impl<A, B> HasObservers for CombinedExecutor<A, B>
 where
     A: HasObservers,
 {
+    type Observers = A::Observers;
+
     #[inline]
-    fn observers(&self) -> &Self::Observers {
+    fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         self.primary.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut Self::Observers {
+    fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
         self.primary.observers_mut()
     }
 }

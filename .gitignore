@@ -6,7 +6,9 @@ vendor
 
 .DS_Store
 .env
+.vscode
 
+*.test
 *.tmp
 *.swp
 *.o
@@ -17,10 +19,13 @@ vendor
 *.bin
 *.dll
 *.exe
+*.dylib
 *.dSYM
 *.obj
 
 .cur_input
+.cur_input_*
+cur_input
 .venv
 
 crashes
@@ -29,15 +34,15 @@ callgrind.out.*
 perf.data
 perf.data.old
 
-.vscode
+.vscode/settings.json
 test.dict
 
+.idea/
+
 # Ignore all built fuzzers
-fuzzer_*
 AFLplusplus
 test_*
 *_fuzzer
-*_harness
 
 # Ignore common dummy and logfiles
 *.log
@@ -46,6 +51,7 @@ a
 forkserver_test
 __pycache__
 *.lafl_lock
+*.metadata
 
 *atomic_file_testfile*
 **/libxml2
@@ -54,3 +60,18 @@ __pycache__
 
 libafl_nyx/QEMU-Nyx
 libafl_nyx/packer
+
+.z3-trace
+
+# No gdb history
+.gdb_history
+# No llvm IR
+*.ll
+
+*.tar.gz
+
+# common harness names
+harness
+program
+fuzzer_libpng*
+forkserver_simple

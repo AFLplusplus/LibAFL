@@ -11,13 +11,13 @@ fi
 echo 
 
 echo "[+] Fixing build"
-cargo +nightly fix --release --workspace --all-features
+cargo +nightly fix --release --workspace --all-features --allow-dirty --allow-staged
 
 echo "[+] Done fixing build"
 echo 
 
 echo 'Fixing clippy (might need a "git commit" and a rerun, if "cargo fix" changed the source)'
-RUST_BACKTRACE=full cargo +nightly clippy --fix --release --all --all-features --tests --examples --benches -- -Z macro-backtrace \
+RUST_BACKTRACE=full cargo +nightly clippy --fix --release --all --all-features --tests --examples --benches --allow-dirty --allow-staged -- -Z macro-backtrace \
    -D clippy::all \
    -D clippy::pedantic \
    -W clippy::similar_names \

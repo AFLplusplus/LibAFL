@@ -1,0 +1,9 @@
+[package]
+name = "baby_fuzzer_listing_01"
+version = "0.15.1"
+authors = ["Your Name <you@example.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

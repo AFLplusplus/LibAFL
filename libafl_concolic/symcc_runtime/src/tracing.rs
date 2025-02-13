@@ -1,30 +1,39 @@
 //! Tracing of expressions in a serialized form.
+#![allow(no_mangle_generic_items)]
 
 pub use libafl::observers::concolic::serialization_format::StdShMemMessageFileWriter;
 use libafl::observers::concolic::SymExpr;
+use libafl_bolts::shmem::ShMem;
 
 use crate::{RSymExpr, Runtime};
 
 /// Traces the expressions according to the format described in [`libafl::observers::concolic::serialization_format`].
+///
 /// The format can be read from elsewhere to perform processing of the expressions outside of the runtime.
-pub struct TracingRuntime {
-    writer: StdShMemMessageFileWriter,
+pub struct TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
+    writer: StdShMemMessageFileWriter<SHM>,
     trace_locations: bool,
 }
 
-impl TracingRuntime {
+impl<SHM> TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
     /// Creates the runtime, tracing using the given writer.
     /// When `trace_locations` is true, location information for calls, returns and basic blocks will also be part of the trace.
     /// Tracing location information can drastically increase trace size. It is therefore recommended to not active this if not needed.
     #[must_use]
-    pub fn new(writer: StdShMemMessageFileWriter, trace_locations: bool) -> Self {
+    pub fn new(writer: StdShMemMessageFileWriter<SHM>, trace_locations: bool) -> Self {
         Self {
             writer,
             trace_locations,
         }
     }
 
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn write_message(&mut self, message: SymExpr) -> Option<RSymExpr> {
         Some(self.writer.write_message(message).unwrap())
     }
@@ -34,14 +43,14 @@ impl TracingRuntime {
 /// according to [`concolic::SymExpr`].
 macro_rules! expression_builder {
     ($method_name:ident ( $($param_name:ident : $param_type:ty ),+ ) => $message:ident) => {
-        #[allow(clippy::missing_safety_doc)]
+        // #[expect(clippy::missing_safety_doc)]
         #[no_mangle]
         fn $method_name(&mut self, $( $param_name : $param_type, )+ ) -> Option<RSymExpr> {
             self.write_message(SymExpr::$message { $($param_name,)+ })
         }
     };
     ($method_name:ident () => $message:ident) => {
-        #[allow(clippy::missing_safety_doc)]
+        // #[expect(clippy::missing_safety_doc)]
         #[no_mangle]
         fn $method_name(&mut self) -> Option<RSymExpr> {
             self.write_message(SymExpr::$message)
@@ -61,7 +70,20 @@ macro_rules! binary_expression_builder {
     };
 }
 
-impl Runtime for TracingRuntime {
+impl<SHM> Runtime for TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
+    #[no_mangle]
+    fn build_integer_from_buffer(
+        &mut self,
+        _buffer: *mut core::ffi::c_void,
+        _num_bits: core::ffi::c_uint,
+    ) -> Option<RSymExpr> {
+        // todo
+        self.write_message(SymExpr::IntegerFromBuffer {})
+    }
+
     expression_builder!(get_input_byte(offset: usize, value: u8) => InputByte);
 
     expression_builder!(build_integer(value: u64, bits: u8) => Integer);
@@ -127,6 +149,7 @@ impl Runtime for TracingRuntime {
     binary_expression_builder!(build_fp_rem, FloatRem);
 
     unary_expression_builder!(build_fp_abs, FloatAbs);
+    unary_expression_builder!(build_fp_neg, FloatNeg);
 
     unary_expression_builder!(build_not, Not);
     binary_expression_builder!(build_equal, Equal);
@@ -135,6 +158,7 @@ impl Runtime for TracingRuntime {
     binary_expression_builder!(build_bool_or, BoolOr);
     binary_expression_builder!(build_bool_xor, BoolXor);
 
+    expression_builder!(build_ite(cond: RSymExpr, a: RSymExpr, b: RSymExpr) => Ite);
     expression_builder!(build_sext(op: RSymExpr, bits: u8) => Sext);
     expression_builder!(build_zext(op: RSymExpr, bits: u8) => Zext);
     expression_builder!(build_trunc(op: RSymExpr, bits: u8) => Trunc);
@@ -188,7 +212,10 @@ impl Runtime for TracingRuntime {
     }
 }
 
-impl Drop for TracingRuntime {
+impl<SHM> Drop for TracingRuntime<SHM>
+where
+    SHM: ShMem,
+{
     fn drop(&mut self) {
         // manually end the writer to update the length prefix
         self.writer

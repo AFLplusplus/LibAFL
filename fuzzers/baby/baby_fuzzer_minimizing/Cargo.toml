@@ -1,0 +1,29 @@
+[package]
+name = "baby_fuzzer_minimizing"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+  "Addison Crump <research@addisoncrump.info>",
+]
+edition = "2021"
+
+[features]
+default = ["std"]
+tui = ["libafl/tui_monitor"]
+std = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../../libafl", features = ["prelude"] }
+libafl_bolts = { path = "../../../libafl_bolts", features = ["prelude"] }
+log = { version = "0.4.22", features = ["release_max_level_info"] }

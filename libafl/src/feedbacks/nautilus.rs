@@ -1,24 +1,20 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
-use alloc::string::String;
-use core::{fmt::Debug, marker::PhantomData};
+use alloc::{borrow::Cow, string::String};
+use core::fmt::Debug;
 use std::fs::create_dir_all;
 
-use grammartec::{chunkstore::ChunkStore, context::Context};
+use libafl_bolts::Named;
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use crate::{
-    bolts::tuples::Named,
-    corpus::Testcase,
-    events::EventFirer,
+    common::nautilus::grammartec::{chunkstore::ChunkStore, context::Context},
+    corpus::{Corpus, Testcase},
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, StateInitializer},
     generators::NautilusContext,
     inputs::NautilusInput,
-    observers::ObserversTuple,
-    prelude::UsesInput,
-    state::{HasClientPerfMonitor, HasMetadata},
-    Error,
+    state::HasCorpus,
+    Error, HasMetadata,
 };
 
 /// Metadata for Nautilus grammar mutator chunks
@@ -38,7 +34,7 @@ impl Debug for NautilusChunksMetadata {
     }
 }
 
-crate::impl_serdeany!(NautilusChunksMetadata);
+libafl_bolts::impl_serdeany!(NautilusChunksMetadata);
 
 impl NautilusChunksMetadata {
     /// Creates a new [`NautilusChunksMetadata`]
@@ -53,69 +49,77 @@ impl NautilusChunksMetadata {
 }
 
 /// A nautilus feedback for grammar fuzzing
-pub struct NautilusFeedback<'a, S> {
+#[derive(Debug)]
+pub struct NautilusFeedback<'a> {
     ctx: &'a Context,
-    phantom: PhantomData<S>,
 }
 
-impl<S> Debug for NautilusFeedback<'_, S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NautilusFeedback {{}}")
-    }
-}
-
-impl<'a, S> NautilusFeedback<'a, S> {
+impl<'a> NautilusFeedback<'a> {
     /// Create a new [`NautilusFeedback`]
     #[must_use]
     pub fn new(context: &'a NautilusContext) -> Self {
-        Self {
-            ctx: &context.ctx,
-            phantom: PhantomData,
-        }
+        Self { ctx: &context.ctx }
+    }
+
+    fn append_nautilus_metadata_to_state<S>(
+        &mut self,
+        state: &mut S,
+        testcase: &mut Testcase<NautilusInput>,
+    ) -> Result<(), Error>
+    where
+        S: HasCorpus<NautilusInput> + HasMetadata,
+    {
+        state.corpus().load_input_into(testcase)?;
+        let input = testcase.input().as_ref().unwrap().clone();
+        let meta = state
+            .metadata_map_mut()
+            .get_mut::<NautilusChunksMetadata>()
+            .expect("NautilusChunksMetadata not in the state");
+        meta.cks.add_tree(input.tree, self.ctx);
+
+        Ok(())
     }
 }
 
-impl<'a, S> Named for NautilusFeedback<'a, S> {
-    fn name(&self) -> &str {
-        "NautilusFeedback"
+impl Named for NautilusFeedback<'_> {
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusFeedback");
+        &NAME
     }
 }
 
-impl<'a, S> Feedback<S> for NautilusFeedback<'a, S>
+impl<S> StateInitializer<S> for NautilusFeedback<'_> {}
+
+impl<EM, OT, S> Feedback<EM, NautilusInput, OT, S> for NautilusFeedback<'_>
 where
-    S: HasMetadata + HasClientPerfMonitor + UsesInput<Input = NautilusInput>,
+    S: HasMetadata + HasCorpus<NautilusInput>,
 {
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _input: &NautilusInput,
         _observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         Ok(false)
     }
 
     fn append_metadata(
         &mut self,
         state: &mut S,
+        _manager: &mut EM,
+        _observers: &OT,
         testcase: &mut Testcase<NautilusInput>,
     ) -> Result<(), Error> {
-        let input = testcase.load_input()?.clone();
-        let meta = state
-            .metadata_mut()
-            .get_mut::<NautilusChunksMetadata>()
-            .expect("NautilusChunksMetadata not in the state");
-        meta.cks.add_tree(input.tree, self.ctx);
-        Ok(())
+        self.append_nautilus_metadata_to_state(state, testcase)
     }
 
     fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
         Ok(())
+    }
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(false)
     }
 }

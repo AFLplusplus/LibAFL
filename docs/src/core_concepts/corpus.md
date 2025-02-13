@@ -6,6 +6,6 @@ A Corpus can store testcases in different ways, for example on disk, or in memor
 
 Usually, a testcase is added to the Corpus when it is considered as interesting, but a Corpus is used also to store testcases that fulfill an objective (like crashing the program under test for instance).
 
-Related to the Corpus is the way in which the next testcase (the fuzzer would ask for) is retrieved from the Corpus. The taxonomy for this handling in LibAFL is CorpusScheduler, the entity representing the policy to pop testcases from the Corpus, in a FIFO fashion for instance.
+Related to the Corpus is the way in which the next testcase (the fuzzer would ask for) is retrieved from the Corpus. The taxonomy for this handling in LibAFL is Scheduler, the entity representing the policy to pop testcases from the Corpus, in a FIFO fashion for instance.
 
-Speaking about the code, [`Corpus`](https://docs.rs/libafl/0/libafl/corpus/trait.Corpus.html) and [`CorpusScheduler`](https://docs.rs/libafl/0/libafl/corpus/trait.CorpusScheduler.html) are traits.
+Speaking about the code, [`Corpus`](https://docs.rs/libafl/latest/libafl/corpus/trait.Corpus.html) and [`Scheduler`](https://docs.rs/libafl/latest/libafl/schedulers/trait.Scheduler.html) are traits.

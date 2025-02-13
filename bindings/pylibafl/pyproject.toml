@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin[patchelf]>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "PyLibAFL"
+version = "0.15.1"
+description = "Advanced Fuzzing Library for Python"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Rust",
+  "Topic :: Security",
+]
+
+[project.urls]
+repository = "https://github.com/AFLplusplus/LibAFL.git"
+
+[tool.maturin]
+bindings = "pyo3"
+manifest-path = "Cargo.toml"
+python-source = "src"
+all-features = true

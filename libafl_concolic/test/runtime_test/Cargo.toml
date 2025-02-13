@@ -1,6 +1,6 @@
 [package]
 name = "runtime_test"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 description = "Runtime test of LibAFL fuzzing with symbolicc execution"
@@ -8,14 +8,23 @@ documentation = "https://docs.rs/libafl"
 repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
-keywords = ["fuzzing", "libafl", "symbolic", "symcc", "symqemu", "fuzzer"]
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+keywords = ["fuzzing", "libafl", "symbolic", "symcc", "symqemu"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 [lib]
-crate-type   = ["cdylib"]
+crate-type = ["cdylib"]
 name = "SymRuntime"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 symcc_runtime = { path = "../../symcc_runtime" }
+
+[lints]
+workspace = true

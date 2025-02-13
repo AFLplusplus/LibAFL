@@ -1,0 +1,99 @@
+# Variables
+[env]
+CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+FUZZER_NAME = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "frida_windows_gdiplus", mapping = { "linux" = "frida_windows_gdiplus", "macos" = "frida_windows_gdiplus", "windows" = "frida_windows_gdiplus.exe" } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# Harness
+[tasks.harness]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "harness_windows"
+
+
+[tasks.harness_windows]
+script_runner = "@shell"
+script = '''
+cl.exe /LD harness.cc /link /dll gdiplus.lib ole32.lib
+'''
+
+[tasks.harness_windows_cmplog_test]
+script_runner = "@shell"
+script = '''
+ml64 cmplog_test.asm /subsystem:windows /link /dll /def:cmplog_test.def /entry:dll_main /out:cmplog.dll
+'''
+
+# Fuzzer
+[tasks.fuzzer]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "fuzzer_windows"
+
+[tasks.fuzzer_windows]
+script_runner = "@shell"
+script = '''
+cargo build --profile ${PROFILE}
+cp ./target/${PROFILE_DIR}/${FUZZER_NAME} .
+'''
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "run_windows"
+
+[tasks.run_windows]
+script_runner = "@shell"
+script = '''
+./${FUZZER_NAME} -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
+'''
+dependencies = ["fuzzer", "harness"]
+
+# Test
+[tasks.test]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "test_windows"
+
+[tasks.test_cmplog]
+linux_alias = "unsupported"
+mac_alias = "unsupported"
+windows_alias = "test_windows_cmplog"
+
+[tasks.test_windows_cmplog]
+script_runner = "@shell"
+script = '''
+@echo off
+
+for %%i in (t1 t2 t3 t4 t5 t6 t7) do (
+  echo Testing %%i...
+  rmdir /s /q output_%%i
+  start "" "frida_windows_gdiplus.exe" -H cmplog.dll -i corpus -o output_%%i --libs-to-instrument cmplog.dll -F %%i -C
+  ping -n 3 127.0.0.1>NUL && taskkill /im frida_windows_gdiplus.exe /F
+  >nul 2>nul dir /a-d "output_%%i" && (echo Files exist) || (exit /b 1337)
+)
+
+echo All tests done
+'''
+dependencies = ["fuzzer", "harness_windows_cmplog_test"]
+
+[tasks.test_windows]
+script_runner = "@shell"
+script = '''
+start "" "frida_windows_gdiplus.exe" -H harness.dll -i corpus -o output --libs-to-instrument gdi32.dll --libs-to-instrument gdi32full.dll --libs-to-instrument gdiplus.dll --libs-to-instrument WindowsCodecs.dll --disable-excludes
+#ping is for timeout
+ping -n 10 127.0.0.1>NUL && taskkill /im frida_windows_gdiplus.exe /F
+>nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
+'''
+dependencies = ["fuzzer", "harness"]

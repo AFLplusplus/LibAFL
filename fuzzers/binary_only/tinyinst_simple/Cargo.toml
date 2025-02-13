@@ -1,0 +1,14 @@
+[package]
+name = "tinyinst_simple"
+version = "0.15.1"
+edition = "2021"
+
+[dependencies]
+libafl = { path = "../../../libafl", features = ["introspection"] }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_tinyinst = { path = "../../../libafl_tinyinst" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = 3

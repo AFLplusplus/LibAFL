@@ -1,0 +1,17 @@
+[package]
+name = "nyx_libxml2_parallel"
+version = "0.15.1"
+edition = "2021"
+default-run = "nyx_libxml2_parallel"
+
+[dependencies]
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_cc = { path = "../../../libafl_cc" }
+libafl_nyx = { path = "../../../libafl_nyx" }
+
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = 3

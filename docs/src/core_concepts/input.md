@@ -10,6 +10,6 @@ But it is not always the case. A program can expect inputs that are not linear b
 
 In case of a grammar fuzzer for instance, the Input is generally an Abstract Syntax Tree because it is a data structure that can be easily manipulated while maintaining the validity, but the program expects a byte array as input, so just before the execution, the tree is serialized to a sequence of bytes.
 
-In the Rust code, an [`Input`](https://docs.rs/libafl/*/libafl/inputs/trait.Input.html) is a trait that can be implemented only by structures that are serializable and have only owned data as fields.
+In the Rust code, an [`Input`](https://docs.rs/libafl/latest/libafl/inputs/trait.Input.html) is a trait that can be implemented only by structures that are serializable and have only owned data as fields.
 
-While most fuzzers use a normal `BytesInput`, more advanced ones use inputs that include special inputs for grammar fuzzing ([GramatronInput](https://docs.rs/libafl/*/libafl/inputs/gramatron/struct.GramatronInput.html) or `NautilusInput` on Rust nightly), as well as the token-level [EncodedInput](https://docs.rs/libafl/*/libafl/inputs/encoded/struct.EncodedInput.html).
+While most fuzzers use a normal `BytesInput`, more advanced ones use inputs that include special inputs for grammar fuzzing ([GramatronInput](https://docs.rs/libafl/latest/libafl/inputs/gramatron/struct.GramatronInput.html) or `NautilusInput` on Rust nightly), as well as the token-level [EncodedInput](https://docs.rs/libafl/latest/libafl/inputs/encoded/struct.EncodedInput.html).

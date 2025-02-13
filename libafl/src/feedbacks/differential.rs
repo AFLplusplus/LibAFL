@@ -1,22 +1,20 @@
 //! Diff Feedback, comparing the content of two observers of the same type.
 //!
 
-use alloc::string::{String, ToString};
-use core::{
-    fmt::{self, Debug, Formatter},
-    marker::PhantomData,
-};
+use alloc::borrow::Cow;
+use core::fmt::{self, Debug, Formatter};
 
+use libafl_bolts::{
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
-    bolts::tuples::{MatchName, Named},
-    events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
-    inputs::Input,
-    observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata, State},
+    feedbacks::{Feedback, FeedbackFactory, StateInitializer},
     Error,
 };
 
@@ -46,200 +44,205 @@ impl DiffResult {
     }
 }
 
-/// A [`DiffFeedback`] compares the content of two [`Observer`]s using the given compare function.
-#[derive(Serialize, Deserialize)]
-pub struct DiffFeedback<F, I, O1, O2, S>
-where
-    F: FnMut(&O1, &O2) -> DiffResult,
-{
-    /// This feedback's name
-    name: String,
-    /// The first observer to compare against
-    o1_name: String,
-    /// The second observer to compare against
-    o2_name: String,
-    /// The function used to compare the two observers
-    compare_fn: F,
-    phantomm: PhantomData<(O1, O2, I, S)>,
+/// Compares two [`crate::observers::Observer`]s to see if the result should be denoted as equal
+pub trait DiffComparator<O1, O2> {
+    /// Performs the comparison between two [`crate::observers::Observer`]s
+    fn compare(&mut self, first: &O1, second: &O2) -> DiffResult;
 }
 
-impl<F, I, O1, O2, S> DiffFeedback<F, I, O1, O2, S>
+impl<F, O1, O2> DiffComparator<O1, O2> for F
 where
-    F: FnMut(&O1, &O2) -> DiffResult,
+    F: Fn(&O1, &O2) -> DiffResult,
+{
+    fn compare(&mut self, first: &O1, second: &O2) -> DiffResult {
+        self(first, second)
+    }
+}
+
+/// A [`DiffFeedback`] compares the content of two observers using the given compare function.
+#[derive(Serialize, Deserialize)]
+pub struct DiffFeedback<C, O1, O2> {
+    /// This feedback's name
+    name: Cow<'static, str>,
+    /// The first observer to compare against
+    o1_ref: Handle<O1>,
+    /// The second observer to compare against
+    o2_ref: Handle<O2>,
+    // The previous run's result of `Self::is_interesting`
+    #[cfg(feature = "track_hit_feedbacks")]
+    last_result: Option<bool>,
+    /// The comparator used to compare the two observers
+    comparator: C,
+}
+
+impl<C, O1, O2> DiffFeedback<C, O1, O2>
+where
     O1: Named,
     O2: Named,
 {
     /// Create a new [`DiffFeedback`] using two observers and a test function.
-    pub fn new(name: &str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
-        let o1_name = o1.name().to_string();
-        let o2_name = o2.name().to_string();
-        if o1_name == o2_name {
+    pub fn new(name: &'static str, o1: &O1, o2: &O2, comparator: C) -> Result<Self, Error> {
+        let o1_ref = o1.handle();
+        let o2_ref = o2.handle();
+        if o1_ref.name() == o2_ref.name() {
             Err(Error::illegal_argument(format!(
-                "DiffFeedback: observer names must be different (both were {o1_name})"
+                "DiffFeedback: observer names must be different (both were {})",
+                o1_ref.name()
             )))
         } else {
             Ok(Self {
-                o1_name,
-                o2_name,
-                name: name.to_string(),
-                compare_fn,
-                phantomm: PhantomData,
+                o1_ref,
+                o2_ref,
+                name: Cow::from(name),
+                #[cfg(feature = "track_hit_feedbacks")]
+                last_result: None,
+                comparator,
             })
         }
     }
 }
 
-impl<F, I, O1, O2, S> Named for DiffFeedback<F, I, O1, O2, S>
+impl<C, O1, O2, T> FeedbackFactory<DiffFeedback<C, O1, O2>, T> for DiffFeedback<C, O1, O2>
 where
-    F: FnMut(&O1, &O2) -> DiffResult,
-    O1: Named,
-    O2: Named,
+    C: Clone,
 {
-    fn name(&self) -> &str {
+    fn create_feedback(&self, _ctx: &T) -> DiffFeedback<C, O1, O2> {
+        Self {
+            name: self.name.clone(),
+            o1_ref: self.o1_ref.clone(),
+            o2_ref: self.o2_ref.clone(),
+            comparator: self.comparator.clone(),
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
+        }
+    }
+}
+
+impl<C, O1, O2> Named for DiffFeedback<C, O1, O2> {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<F, I, O1, O2, S> Debug for DiffFeedback<F, I, O1, O2, S>
+impl<C, O1, O2> Debug for DiffFeedback<C, O1, O2>
 where
-    F: FnMut(&O1, &O2) -> DiffResult,
-    O1: Named,
-    O2: Named,
+    O1: Debug,
+    O2: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "DiffFeedback {{ name: {}, o1: {}, o2: {} }}",
-            self.name, self.o1_name, self.o2_name
-        )
+        f.debug_struct("DiffFeedback")
+            .field("name", self.name())
+            .field("o1", &self.o1_ref)
+            .field("o2", &self.o2_ref)
+            .finish_non_exhaustive()
     }
 }
 
-impl<F, I, O1, O2, S> Feedback<S> for DiffFeedback<F, I, O1, O2, S>
+impl<C, O1, O2, S> StateInitializer<S> for DiffFeedback<C, O1, O2> {}
+
+impl<C, EM, I, O1, O2, OT, S> Feedback<EM, I, OT, S> for DiffFeedback<C, O1, O2>
 where
-    F: FnMut(&O1, &O2) -> DiffResult,
-    I: Input,
-    S: HasMetadata + HasClientPerfMonitor + State<Input = I>,
-    O1: Observer<S> + PartialEq<O2>,
-    O2: Observer<S>,
+    OT: MatchName,
+    C: DiffComparator<O1, O2>,
 {
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S> + MatchName,
-    {
+    ) -> Result<bool, Error> {
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
         }
         let o1: &O1 = observers
-            .match_name(&self.o1_name)
-            .ok_or_else(|| err(&self.o1_name))?;
+            .get(&self.o1_ref)
+            .ok_or_else(|| err(self.o1_ref.name()))?;
         let o2: &O2 = observers
-            .match_name(&self.o2_name)
-            .ok_or_else(|| err(&self.o2_name))?;
+            .get(&self.o2_ref)
+            .ok_or_else(|| err(self.o2_ref.name()))?;
+        let res = self.comparator.compare(o1, o2) == DiffResult::Diff;
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
+        }
+        Ok(res)
+    }
 
-        Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(premature_last_result_err())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::{String, ToString};
-    use core::marker::PhantomData;
+    use alloc::borrow::Cow;
+
+    use libafl_bolts::{tuples::tuple_list, Named};
 
     use crate::{
-        bolts::tuples::{tuple_list, Named},
-        events::EventFirer,
+        events::NopEventManager,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
-        inputs::{BytesInput, UsesInput},
+        inputs::BytesInput,
         observers::Observer,
-        state::{NopState, UsesState},
+        state::NopState,
     };
 
     #[derive(Debug)]
-    struct NopObserver {
-        name: String,
+    struct DummyObserver {
+        name: Cow<'static, str>,
         value: bool,
     }
-    impl NopObserver {
-        fn new(name: &str, value: bool) -> Self {
+    impl DummyObserver {
+        fn new(name: &'static str, value: bool) -> Self {
             Self {
-                name: name.to_string(),
+                name: Cow::from(name),
                 value,
             }
         }
     }
-    impl<S> Observer<S> for NopObserver where S: UsesInput {}
-    impl PartialEq for NopObserver {
+    impl<I, S> Observer<I, S> for DummyObserver {}
+    impl PartialEq for DummyObserver {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value
         }
     }
-    impl Named for NopObserver {
-        fn name(&self) -> &str {
+    impl Named for DummyObserver {
+        fn name(&self) -> &Cow<'static, str> {
             &self.name
         }
     }
 
-    struct NopEventFirer<S> {
-        phantom: PhantomData<S>,
-    }
-    impl<S> UsesState for NopEventFirer<S>
-    where
-        S: UsesInput,
-    {
-        type State = S;
-    }
-    impl<S> EventFirer for NopEventFirer<S>
-    where
-        S: UsesInput,
-    {
-        fn fire(
-            &mut self,
-            _state: &mut S,
-            _event: crate::events::Event<S::Input>,
-        ) -> Result<(), crate::Error> {
-            Ok(())
+    fn comparator(o1: &DummyObserver, o2: &DummyObserver) -> DiffResult {
+        if o1 == o2 {
+            DiffResult::Equal
+        } else {
+            DiffResult::Diff
         }
     }
 
     fn test_diff(should_equal: bool) {
-        let mut nop_state = NopState::new();
+        let mut nop_state: NopState<BytesInput> = NopState::new();
 
-        let o1 = NopObserver::new("o1", true);
-        let o2 = NopObserver::new("o2", should_equal);
+        let o1 = DummyObserver::new("o1", true);
+        let o2 = DummyObserver::new("o2", should_equal);
 
-        let mut diff_feedback = DiffFeedback::new("diff_feedback", &o1, &o2, |o1, o2| {
-            if o1 == o2 {
-                DiffResult::Equal
-            } else {
-                DiffResult::Diff
-            }
-        })
-        .unwrap();
+        let mut diff_feedback = DiffFeedback::new("diff_feedback", &o1, &o2, comparator).unwrap();
         let observers = tuple_list![o1, o2];
         assert_eq!(
             !should_equal,
-            diff_feedback
-                .is_interesting(
-                    &mut nop_state,
-                    &mut NopEventFirer {
-                        phantom: PhantomData
-                    },
-                    &BytesInput::new(vec![0]),
-                    &observers,
-                    &ExitKind::Ok
-                )
-                .unwrap()
+            DiffFeedback::<_, _, _>::is_interesting(
+                &mut diff_feedback,
+                &mut nop_state,
+                &mut NopEventManager::default(),
+                &BytesInput::new(vec![0]),
+                &observers,
+                &ExitKind::Ok
+            )
+            .unwrap()
         );
     }
 

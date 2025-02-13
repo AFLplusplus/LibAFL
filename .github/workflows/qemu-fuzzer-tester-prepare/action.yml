@@ -1,0 +1,27 @@
+name: Setup QEMU Fuzzers environment
+description: Sets up the QEMU fuzzers environment
+runs:
+  using: composite
+  steps:
+    - name: Install QEMU deps
+      shell: bash
+      run: apt-get update && apt-get install -y qemu-utils sudo python3-msgpack python3-jinja2 curl python3-dev
+    - uses: dtolnay/rust-toolchain@stable
+    - name: enable mult-thread for `make`
+      shell: bash
+      run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
+    - name: install cargo-make
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: cargo-make
+    - name: install just
+      uses: extractions/setup-just@v2
+      with:
+        just-version: 1.39.0
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+        fetch-depth: 0
+    - uses: ./.github/workflows/ubuntu-prepare
+    - uses: Swatinem/rust-cache@v2
+      with: { shared-key: "${{ runner.os }}-shared-fuzzer-cache" }

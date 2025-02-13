@@ -1,0 +1,160 @@
+# Variables
+[env]
+CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = [
+  "CARGO_TARGET_DIR",
+] } }
+FUZZER_NAME = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "frida_fuzzer", mapping = { "linux" = "frida_fuzzer", "macos" = "frida_fuzzer", "windows" = "frida_fuzzer.exe" } }
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# libpng
+[tasks.libpng]
+linux_alias = "libpng_unix"
+mac_alias = "libpng_unix"
+windows_alias = "unsupported"
+
+[tasks.libpng_unix]
+condition = { files_not_exist = ["./libpng-1.6.37"] }
+script_runner = "@shell"
+script = '''
+wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+tar -xvf v1.6.37.tar.gz
+'''
+
+# Library
+[tasks.lib]
+linux_alias = "lib_unix"
+mac_alias = "lib_unix"
+windows_alias = "unsupported"
+
+[tasks.lib_unix]
+script_runner = "@shell"
+script = '''
+cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes --disable-dependency-tracking
+cd ..
+make -C libpng-1.6.37
+'''
+dependencies = ["libpng"]
+
+# Harness
+[tasks.harness]
+linux_alias = "harness_unix"
+mac_alias = "harness_unix"
+windows_alias = "harness_windows"
+
+[tasks.harness_unix]
+script_runner = "@shell"
+script = '''
+clang++ -O3 -c -fPIC harness.cc -o harness.o
+clang++ -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.so
+'''
+dependencies = ["lib"]
+
+[tasks.harness_windows]
+script_runner = "@shell"
+script = '''
+cl /c harness_win.cpp && link harness_win.obj /dll
+'''
+
+# Fuzzer
+[tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
+windows_alias = "fuzzer_windows"
+
+[tasks.fuzzer_unix]
+script_runner = "@shell"
+script = '''
+cargo build --profile ${PROFILE}
+cp ${CARGO_TARGET_DIR}/${PROFILE_DIR}/${FUZZER_NAME} .
+'''
+
+[tasks.fuzzer_windows]
+script_runner = "@shell"
+script = '''
+cargo build --profile ${PROFILE}
+cp ./target/${PROFILE_DIR}/${FUZZER_NAME} .
+'''
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "run_windows"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script = '''
+./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so
+'''
+dependencies = ["fuzzer", "harness"]
+
+[tasks.run_windows]
+script_runner = "@shell"
+script = '''
+./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
+'''
+dependencies = ["fuzzer", "harness"]
+
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_mac"
+windows_alias = "test_windows"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+timeout 30s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so | tee fuzz_stdout.log 2>/dev/null || true
+if grep -qa "corpus: 70" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+fi
+'''
+dependencies = ["fuzzer", "harness"]
+
+# Don't grep and check the result on macOS because it's unstable
+[tasks.test_mac]
+script_runner = "@shell"
+script = '''
+rm -rf libafl_unix_shmem_server || true
+timeout 30s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so | tee fuzz_stdout.log 2>/dev/null || true
+'''
+dependencies = ["fuzzer", "harness"]
+
+[tasks.test_windows]
+script_runner = "@shell"
+script = '''
+start "" "frida_fuzzer.exe" -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
+#ping is for timeout
+ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
+>nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
+'''
+dependencies = ["fuzzer", "harness"]
+
+# Clean up
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+rm -f ./${FUZZER_NAME}
+make -C libpng-1.6.37 clean
+cargo clean
+'''

@@ -115,7 +115,7 @@ The `symcc_runtime` crate supports this use case and runtimes built with `symcc_
 
 ## Hybrid Fuzzing in LibAFL
 
-The LibAFL repository contains an [example hybrid fuzzer](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/libfuzzer_stb_image_concolic).
+The LibAFL repository contains an [example hybrid fuzzer](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic).
 
 There are three main steps involved with building a hybrid fuzzer using LibAFL:
 
@@ -130,7 +130,7 @@ For example, we need to have a runtime ready before we can do instrumentation wi
 
 Building a custom runtime can be done easily using the `symcc_runtime` crate.
 Note, that a custom runtime is a separate shared object file, which means that we need a separate crate for our runtime.
-Check out the [example hybrid fuzzer's runtime](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/libfuzzer_stb_image_concolic/runtime) and the [`symcc_runtime` docs](https://docs.rs/symcc_runtime/0.1/symcc_runtime) for inspiration.
+Check out the [example hybrid fuzzer's runtime](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic/runtime) and the [`symcc_runtime` docs](https://docs.rs/symcc_runtime/0.1/symcc_runtime) for inspiration.
 
 ### Instrumentation
 
@@ -151,7 +151,7 @@ How exactly this is done does not matter.
 However, the SymCC compiler needs to be made aware of the location of the runtime that it should instrument against.
 This is done by setting the `SYMCC_RUNTIME_DIR` environment variable to the directory which contains the runtime (typically the `target/(debug|release)` folder of your runtime crate).
 
-The example hybrid fuzzer instruments the target in its [`build.rs` build script](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/libfuzzer_stb_image_concolic/fuzzer/build.rs#L50).
+The example hybrid fuzzer instruments the target in its [`build.rs` build script](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic/fuzzer/build.rs#L50).
 It does this by cloning and building a copy of SymCC and then using this version to instrument the target.
 The [`symcc_libafl` crate](https://docs.rs/symcc_libafl) contains helper functions for cloning and building SymCC.
 
@@ -169,19 +169,19 @@ No matter the instrumentation method, the interface between the fuzzer and the i
 The only difference between using SymCC and SymQEMU should be the binary that represents the target:
 In the case of SymCC it will be the binary that was build with instrumentation and with SymQEMU it will be the emulator binary (eg. `x86_64-linux-user/symqemu-x86_64`), followed by your uninstrumented target binary and its arguments.
 
-You can use the [`CommandExecutor`](https://docs.rs/libafl/0.6.0/libafl/executors/command/struct.CommandExecutor.html) to execute your target ([example](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/libfuzzer_stb_image_concolic/fuzzer/src/main.rs#L244)).
+You can use the [`CommandExecutor`](https://docs.rs/libafl/latest/libafl/executors/command/struct.CommandExecutor.html) to execute your target ([example](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic/fuzzer/src/main.rs#L244)).
 When configuring the command, make sure you pass the `SYMCC_INPUT_FILE` environment variable (set to the input file path), if your target reads input from a file (instead of standard input).
 
 #### Serialization and Solving
 
 While it is perfectly possible to build a custom runtime that also performs the solving step of hybrid fuzzing in the context of the target process, the intended use of the LibAFL concolic tracing support is to serialize the (filtered and pre-processed) branch conditions using the [`TracingRuntime`](https://docs.rs/symcc_runtime/0.1/symcc_runtime/tracing/struct.TracingRuntime.html).
-This serialized representation can be deserialized in the fuzzer process for solving using a [`ConcolicObserver`](https://docs.rs/libafl/0.6.0/libafl/observers/concolic/struct.ConcolicObserver.html) wrapped in a [`ConcolicTracingStage`](https://docs.rs/libafl/0.6.0/libafl/stages/concolic/struct.ConcolicTracingStage.html), which will attach a [`ConcolicMetadata`](https://docs.rs/libafl/0.6.0/libafl/observers/concolic/struct.ConcolicMetadata.html) to every [`TestCase`](https://docs.rs/libafl/0.6.0/libafl/corpus/testcase/struct.Testcase.html).
+This serialized representation can be deserialized in the fuzzer process for solving using a [`ConcolicObserver`](https://docs.rs/libafl/latest/libafl/observers/concolic/struct.ConcolicObserver.html) wrapped in a [`ConcolicTracingStage`](https://docs.rs/libafl/latest/libafl/stages/concolic/struct.ConcolicTracingStage.html), which will attach a [`ConcolicMetadata`](https://docs.rs/libafl/latest/libafl/observers/concolic/struct.ConcolicMetadata.html) to every [`TestCase`](https://docs.rs/libafl/latest/libafl/corpus/testcase/struct.Testcase.html).
 
 The `ConcolicMetadata` can be used to replay the concolic trace and to solve the conditions using an SMT-Solver.
 Most use-cases involving concolic tracing, however, will need to define some policy around which branches they want to solve.
-The [`SimpleConcolicMutationalStage`](https://docs.rs/libafl/0.6.0//libafl/stages/concolic/struct.SimpleConcolicMutationalStage.html) can be used for testing purposes.
+The [`SimpleConcolicMutationalStage`](https://docs.rs/libafl/latest/libafl/stages/concolic/struct.SimpleConcolicMutationalStage.html) can be used for testing purposes.
 It will attempt to solve all branches, like the original simple backend from SymCC, using Z3.
 
 ### Example
 
-The example fuzzer shows how to use the [`ConcolicTracingStage` together with the `SimpleConcolicMutationalStage`](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/libfuzzer_stb_image_concolic/fuzzer/src/main.rs#L222) to build a basic hybrid fuzzer.
+The example fuzzer shows how to use the [`ConcolicTracingStage` together with the `SimpleConcolicMutationalStage`](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/structure_aware/libfuzzer_stb_image_concolic/fuzzer/src/main.rs#L222) to build a basic hybrid fuzzer.

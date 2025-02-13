@@ -1,0 +1,24 @@
+[package]
+name = "example_runtime"
+version = "0.15.1"
+edition = "2021"
+authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
+
+[lib]
+# the runtime needs to be a shared object -> cdylib
+crate-type = ["cdylib"]
+# this is necessary for SymCC to find the runtime.
+name = "SymRuntime"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+# this is somewhat important to ensure the runtime does not unwind into the target program.
+panic = "abort"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+symcc_runtime = { path = "../../../../libafl_concolic/symcc_runtime" }

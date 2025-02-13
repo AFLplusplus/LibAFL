@@ -1,21 +1,25 @@
 //! Mutators for the `Nautilus` grammmar fuzzer
-
+//! See <https://www.ndss-symposium.org/ndss-paper/nautilus-fishing-for-deep-bugs-with-grammars/>
+use alloc::borrow::Cow;
 use core::fmt::Debug;
 
-use grammartec::{
-    context::Context,
-    mutator::Mutator as BackingMutator,
-    tree::{Tree, TreeMutation},
+use libafl_bolts::{
+    rands::{Rand, RomuDuoJrRand},
+    Named,
 };
 
 use crate::{
-    bolts::tuples::Named,
+    common::nautilus::grammartec::{
+        context::Context,
+        mutator::Mutator as BackingMutator,
+        tree::{Tree, TreeMutation},
+    },
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasMetadata},
-    Error,
+    state::{HasCorpus, HasRand},
+    Error, HasMetadata,
 };
 
 /// The randomic mutator for `Nautilus` grammar.
@@ -30,17 +34,17 @@ impl Debug for NautilusRandomMutator<'_> {
     }
 }
 
-impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
+impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
     fn mutate(
         &mut self,
-        _state: &mut S,
+        state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO get rid of tmp
         let mut tmp = vec![];
         self.mutator
-            .mut_random::<_, ()>(
+            .mut_random::<_, _>(
+                state.rand_mut(),
                 &input.tree,
                 self.ctx,
                 &mut |t: &TreeMutation, _ctx: &Context| {
@@ -61,8 +65,9 @@ impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
 }
 
 impl Named for NautilusRandomMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusRandomMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusRandomMutator");
+        &NAME
     }
 }
 
@@ -91,19 +96,19 @@ impl Debug for NautilusRecursionMutator<'_> {
     }
 }
 
-impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
+impl<S: HasRand> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
     fn mutate(
         &mut self,
-        _state: &mut S,
+        state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // TODO don't calc recursions here
         if let Some(ref mut recursions) = input.tree.calc_recursions(self.ctx) {
             // TODO get rid of tmp
             let mut tmp = vec![];
             self.mutator
-                .mut_random_recursion::<_, ()>(
+                .mut_random_recursion::<_, _>(
+                    state.rand_mut(),
                     &input.tree,
                     recursions,
                     self.ctx,
@@ -125,8 +130,9 @@ impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
 }
 
 impl Named for NautilusRecursionMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusRecursionMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusRecursionMutator");
+        &NAME
     }
 }
 
@@ -156,22 +162,24 @@ impl Debug for NautilusSpliceMutator<'_> {
 
 impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus<Input = NautilusInput> + HasMetadata,
+    S: HasCorpus<NautilusInput> + HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
         state: &mut S,
         input: &mut NautilusInput,
-        _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
-        let meta = state
-            .metadata()
-            .get::<NautilusChunksMetadata>()
-            .expect("NautilusChunksMetadata not in the state");
         // TODO get rid of tmp
         let mut tmp = vec![];
+        // Create a fast temp mutator to get around borrowing..
+        let mut rand_cpy = { RomuDuoJrRand::with_seed(state.rand_mut().next()) };
+        let meta = state
+            .metadata_map()
+            .get::<NautilusChunksMetadata>()
+            .expect("NautilusChunksMetadata not in the state");
         self.mutator
-            .mut_splice::<_, ()>(
+            .mut_splice::<_, _>(
+                &mut rand_cpy,
                 &input.tree,
                 self.ctx,
                 &meta.cks,
@@ -193,8 +201,9 @@ where
 }
 
 impl Named for NautilusSpliceMutator<'_> {
-    fn name(&self) -> &str {
-        "NautilusSpliceMutator"
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("NautilusSpliceMutator");
+        &NAME
     }
 }
 

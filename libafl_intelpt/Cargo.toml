@@ -1,0 +1,44 @@
+[package]
+name = "libafl_intelpt"
+version.workspace = true
+authors = ["Marco Cavenati <cavenatimarco@gmail.com>"]
+description = "Intel Processor Trace wrapper for libafl"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+edition = "2021"
+license.workspace = true
+readme = "./README.md"
+keywords = ["fuzzing", "testing", "security", "intelpt"]
+categories = ["development-tools::testing", "no-std"]
+
+[features]
+default = ["std", "libipt"]
+std = ["libafl_bolts/std"]
+
+libipt = ["std", "dep:libipt"]
+## Export raw Intel PT traces on decode, useful for debug, disabled by default for best performance
+export_raw = []
+
+[dev-dependencies]
+static_assertions = { workspace = true }
+
+[target.'cfg(target_os = "linux" )'.dev-dependencies]
+nix = { workspace = true }
+proc-maps = "0.4.0"
+
+[dependencies]
+arbitrary-int = { workspace = true }
+bitbybit = { workspace = true }
+libafl_bolts = { workspace = true }
+libc = { workspace = true }
+libipt = { workspace = true, optional = true }
+log = { workspace = true }
+num_enum = { workspace = true, default-features = false }
+num-traits = { workspace = true, default-features = false }
+raw-cpuid = { version = "11.1.0" }
+
+[target.'cfg(target_os = "linux" )'.dependencies]
+caps = { version = "0.5.5" }
+perf-event-open-sys = { version = "4.0.0" }
+
+[lints]
+workspace = true

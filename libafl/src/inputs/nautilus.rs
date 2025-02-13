@@ -1,22 +1,20 @@
 //! Input for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer methods
 //!
-
-//use ahash::AHasher;
-//use core::hash::Hasher;
-
-use alloc::{rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From};
+//!
+use alloc::{rc::Rc, vec::Vec};
+use core::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
-use grammartec::{
-    newtypes::NodeID,
-    rule::RuleIDOrCustom,
-    tree::{Tree, TreeLike},
-};
+use libafl_bolts::{ownedref::OwnedSlice, HasLen};
 use serde::{Deserialize, Serialize};
 
+use super::TargetBytesConverter;
 use crate::{
-    bolts::HasLen,
+    common::nautilus::grammartec::{
+        newtypes::NodeId,
+        rule::RuleIdOrCustom,
+        tree::{Tree, TreeLike},
+    },
     generators::nautilus::NautilusContext,
     inputs::{BytesInput, Input, InputConverter},
     Error,
@@ -29,18 +27,7 @@ pub struct NautilusInput {
     pub tree: Tree,
 }
 
-impl Input for NautilusInput {
-    /// Generate a name for this input
-    #[must_use]
-    fn generate_name(&self, idx: usize) -> String {
-        /*let mut hasher = AHasher::new_with_keys(0, 0);
-        for term in &self.terms {
-            hasher.write(term.symbol.as_bytes());
-        }
-        format!("{:016x}", hasher.finish())*/
-        format!("id:{idx}")
-    }
-}
+impl Input for NautilusInput {}
 
 /// Rc Ref-cell from Input
 impl From<NautilusInput> for Rc<RefCell<NautilusInput>> {
@@ -78,7 +65,7 @@ impl NautilusInput {
     /// Generate a `Nautilus` input from the given bytes
     pub fn unparse(&self, context: &NautilusContext, bytes: &mut Vec<u8>) {
         bytes.clear();
-        self.tree.unparse(NodeID::from(0), &context.ctx, bytes);
+        self.tree.unparse(NodeId::from(0), &context.ctx, bytes);
     }
 
     /// Get the tree representation of this input
@@ -99,11 +86,11 @@ impl Hash for NautilusInput {
         self.tree().paren.hash(state);
         for r in &self.tree().rules {
             match r {
-                RuleIDOrCustom::Custom(a, b) => {
+                RuleIdOrCustom::Custom(a, b) => {
                     a.hash(state);
                     b.hash(state);
                 }
-                RuleIDOrCustom::Rule(a) => a.hash(state),
+                RuleIdOrCustom::Rule(a) => a.hash(state),
             }
         }
         self.tree().sizes.hash(state);
@@ -124,7 +111,7 @@ impl<'a> NautilusToBytesInputConverter<'a> {
     }
 }
 
-impl<'a> InputConverter for NautilusToBytesInputConverter<'a> {
+impl InputConverter for NautilusToBytesInputConverter<'_> {
     type From = NautilusInput;
     type To = BytesInput;
 
@@ -132,5 +119,28 @@ impl<'a> InputConverter for NautilusToBytesInputConverter<'a> {
         let mut bytes = vec![];
         input.unparse(self.ctx, &mut bytes);
         Ok(BytesInput::new(bytes))
+    }
+}
+
+/// A converter to convert a nautilus context to target bytes
+#[derive(Debug)]
+pub struct NautilusTargetBytesConverter<'a> {
+    /// The Nautilus Context
+    ctx: &'a NautilusContext,
+}
+
+impl<'a> NautilusTargetBytesConverter<'a> {
+    /// Create a new [`NautilusTargetBytesConverter`]
+    #[must_use]
+    pub fn new(ctx: &'a NautilusContext) -> NautilusTargetBytesConverter<'a> {
+        NautilusTargetBytesConverter { ctx }
+    }
+}
+
+impl TargetBytesConverter<NautilusInput> for NautilusTargetBytesConverter<'_> {
+    fn to_target_bytes<'a>(&mut self, input: &'a NautilusInput) -> OwnedSlice<'a, u8> {
+        let mut bytes = Vec::new();
+        input.unparse(self.ctx, &mut bytes);
+        OwnedSlice::from(bytes)
     }
 }

@@ -1,0 +1,36 @@
+name: Setup Rust Environment
+description: Sets up the Rust environment for the CI workflow
+runs:
+  using: composite
+  steps:
+    - name: Install and cache deps
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y curl lsb-release wget software-properties-common gnupg ninja-build shellcheck pax-utils nasm libsqlite3-dev libc6-dev libgtk-3-dev gcc g++ gcc-arm-none-eabi gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev libz3-dev build-essential cmake
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Add stable clippy
+      shell: bash
+      run: rustup toolchain install stable --component clippy --allow-downgrade
+    - name: Add nightly clippy
+      shell: bash
+      run: rustup toolchain install nightly --component clippy --allow-downgrade
+    - name: Remove existing clang and LLVM
+      shell: bash
+      run: sudo apt-get purge -y *llvm* *clang* lld* lldb* opt*
+    - name: Install cargo-hack
+      shell: bash
+      run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
+    - name: Add nightly
+      shell: bash
+      run: rustup toolchain install nightly --allow-downgrade
+    - name: Default to nightly
+      shell: bash
+      run: rustup default nightly
+    - name: Add LLVM in sources list
+      shell: bash
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh ${{env.MAIN_LLVM_VERSION}} all
+    - name: Symlink Headers
+      shell: bash
+      run: sudo ln -s /usr/include/asm-generic /usr/include/asm

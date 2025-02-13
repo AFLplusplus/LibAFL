@@ -1,0 +1,26 @@
+[package]
+name = "libafl-fuzz"
+version = "0.15.1"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+
+[dependencies.cargo_fuzz_test]
+path = ".."
+
+[dependencies.libfuzzer-sys]
+path = "../../../../libafl_libfuzzer"
+package = "libafl_libfuzzer"
+
+[[bin]]
+name = "fuzz_target_1"
+path = "fuzz_targets/fuzz_target_1.rs"
+test = false
+doc = false
+bench = false

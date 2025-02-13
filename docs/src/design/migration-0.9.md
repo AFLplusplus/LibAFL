@@ -169,7 +169,7 @@ from libafl_target's `EDGES_MAP`.
 In the future, instead of using:
 
 ```rust,ignore
-let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+let edges = unsafe { &mut EDGES_MAP[0..EDGES_MAP_DEFAULT_SIZE] };
 let edges_observer = StdMapObserver::new("edges", edges);
 ```
 

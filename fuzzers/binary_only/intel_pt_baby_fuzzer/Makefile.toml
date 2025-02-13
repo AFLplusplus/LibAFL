@@ -1,0 +1,26 @@
+[env]
+RUST_BACKTRACE = "0"
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+
+[env.development]
+PROFILE_DIR = "debug"
+CARGO_BUILD_ARG = ""
+
+[env.release]
+PROFILE_DIR = "release"
+CARGO_BUILD_ARG = "--release"
+
+[tasks.build]
+command = "cargo"
+args = ["build", "--profile", "${CARGO_MAKE_CARGO_PROFILE}"]
+
+[tasks.setcap]
+script = "sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
+dependencies = ["build"]
+
+[tasks.run]
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${PROFILE_DIR}/${CARGO_MAKE_CRATE_NAME}"
+dependencies = ["build", "setcap"]
+
+[tasks.default]
+alias = "run"

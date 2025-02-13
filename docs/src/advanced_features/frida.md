@@ -4,7 +4,7 @@ LibAFL supports different instrumentation engines for binary-only fuzzing.
 A potent cross-platform (Windows, MacOS, Android, Linux, iOS) option for binary-only fuzzing is Frida; the dynamic instrumentation tool.
 
 In this section, we will talk about the components in fuzzing with `libafl_frida`.
-You can take a look at a working example in our [`fuzzers/frida_libpng`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/frida_libpng) folder for Linux, and [`fuzzers/frida_gdiplus`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/frida_gdiplus) for Windows.
+You can take a look at a working example in our [`fuzzers/binary_only/frida_libpng`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/binary_only/frida_libpng) folder for Linux, and [`fuzzers/binary_only/frida_windows_gdiplus`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/binary_only/frida_windows_gdiplus) for Windows.
 
 ## Dependencies
 
@@ -73,7 +73,7 @@ You can then link this observer to `FridaInProcessExecutor` as follows:
                 tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                    AsanErrorsObserver::from_static_asan_errors()
                 ),
                 &mut fuzzer,
                 &mut state,
@@ -84,4 +84,4 @@ You can then link this observer to `FridaInProcessExecutor` as follows:
 ```
 
 And finally you can run the fuzzer.
-See the `frida_` examples in [`./fuzzers`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/) for more information and, for linux or full-system, play around with `libafl_qemu`, another binary-only tracer.
+See the `frida_` examples in [`./fuzzers/binary_only`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/binary_only/) for more information and, for linux or full-system, play around with `libafl_qemu`, another binary_only tracer.

@@ -1,95 +1,84 @@
 //! Concolic feedback for concolic fuzzing.
+//!
 //! It is used to attach concolic tracing metadata to the testcase.
 //! This feedback should be used in combination with another feedback as this feedback always considers testcases
 //! to be not interesting.
 //! Requires a [`ConcolicObserver`] to observe the concolic trace.
-use alloc::{borrow::ToOwned, string::String};
-use core::{fmt::Debug, marker::PhantomData};
+use alloc::borrow::Cow;
+use core::fmt::Debug;
+
+use libafl_bolts::{
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
+    Named,
+};
 
 use crate::{
-    bolts::tuples::Named,
     corpus::Testcase,
-    events::EventFirer,
-    executors::ExitKind,
-    feedbacks::Feedback,
-    inputs::UsesInput,
-    observers::{
-        concolic::{ConcolicMetadata, ConcolicObserver},
-        ObserversTuple,
-    },
-    state::{HasClientPerfMonitor, HasMetadata},
-    Error,
+    feedbacks::{Feedback, StateInitializer},
+    observers::concolic::ConcolicObserver,
+    Error, HasMetadata,
 };
 
 /// The concolic feedback. It is used to attach concolic tracing metadata to the testcase.
+///
 /// This feedback should be used in combination with another feedback as this feedback always considers testcases
 /// to be not interesting.
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
 #[derive(Debug)]
-pub struct ConcolicFeedback<S> {
-    name: String,
-    metadata: Option<ConcolicMetadata>,
-    phantom: PhantomData<S>,
+pub struct ConcolicFeedback<'map> {
+    observer_handle: Handle<ConcolicObserver<'map>>,
 }
 
-impl<S> ConcolicFeedback<S> {
+impl<'map> ConcolicFeedback<'map> {
     /// Creates a concolic feedback from an observer
-    #[allow(unused)]
     #[must_use]
-    pub fn from_observer(observer: &ConcolicObserver) -> Self {
+    pub fn from_observer(observer: &ConcolicObserver<'map>) -> Self {
         Self {
-            name: observer.name().to_owned(),
-            metadata: None,
-            phantom: PhantomData,
+            observer_handle: observer.handle(),
+        }
+    }
+
+    fn add_concolic_feedback_to_metadata<I, OT>(
+        &mut self,
+        observers: &OT,
+        testcase: &mut Testcase<I>,
+    ) where
+        OT: MatchName,
+    {
+        if let Some(metadata) = observers
+            .get(&self.observer_handle)
+            .map(ConcolicObserver::create_metadata_from_current_map)
+        {
+            testcase.metadata_map_mut().insert(metadata);
         }
     }
 }
 
-impl<S> Named for ConcolicFeedback<S> {
-    fn name(&self) -> &str {
-        &self.name
+impl Named for ConcolicFeedback<'_> {
+    fn name(&self) -> &Cow<'static, str> {
+        self.observer_handle.name()
     }
 }
 
-impl<S> Feedback<S> for ConcolicFeedback<S>
+impl<S> StateInitializer<S> for ConcolicFeedback<'_> {}
+
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for ConcolicFeedback<'_>
 where
-    S: UsesInput + Debug + HasClientPerfMonitor,
+    OT: MatchName,
 {
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
-        observers: &OT,
-        _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
-        self.metadata = observers
-            .match_name::<ConcolicObserver>(&self.name)
-            .map(ConcolicObserver::create_metadata_from_current_map);
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
         Ok(false)
     }
 
     fn append_metadata(
         &mut self,
         _state: &mut S,
-        _testcase: &mut Testcase<<S as UsesInput>::Input>,
+        _manager: &mut EM,
+        observers: &OT,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
-        if let Some(metadata) = self.metadata.take() {
-            _testcase.metadata_mut().insert(metadata);
-        }
-        Ok(())
-    }
-
-    fn discard_metadata(
-        &mut self,
-        _state: &mut S,
-        _input: &<S as UsesInput>::Input,
-    ) -> Result<(), Error> {
+        self.add_concolic_feedback_to_metadata(observers, testcase);
         Ok(())
     }
 }

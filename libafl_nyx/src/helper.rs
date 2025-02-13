@@ -1,25 +1,22 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
-use std::{
-    fmt::{self, Debug},
-    path::Path,
-    time::Duration,
-};
+use std::{fmt::Debug, fs::File, path::Path, time::Duration};
 
 use libafl::Error;
-use libnyx::{NyxProcess, NyxReturnValue};
+use libnyx::{NyxConfig, NyxProcess, NyxProcessRole};
 
-const INIT_TIMEOUT: Duration = Duration::new(2, 0);
+use crate::settings::NyxSettings;
+
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
-    /// real size of trace_bits
-    pub real_map_size: usize,
-    // real size of the trace_bits
-    pub map_size: usize,
-    /// shared memory with instruction bitmaps
-    pub trace_bits: *mut u8,
+    pub nyx_stdout: File,
+    pub redqueen_path: String,
+
+    pub timeout: Duration,
+
+    pub bitmap_size: usize,
+    pub bitmap_buffer: *mut u8,
 }
 
-const MAX_FILE: u32 = 1024 * 1024;
 #[derive(Clone, Copy, Debug)]
 pub enum NyxProcessType {
     /// stand alone mode
@@ -29,123 +26,71 @@ pub enum NyxProcessType {
     /// parallel mode's child, consume snapshot and execute
     CHILD,
 }
+
 impl NyxHelper {
-    /// create `NyxProcess` and do basic settings
-    /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
-    /// will fail if initial connection takes more than 2 seconds
-    pub fn new(
-        target_dir: &Path,
-        cpu_id: u32,
-        snap_mode: bool,
-        parallel_mode: bool,
-        parent_cpu_id: Option<u32>,
-    ) -> Result<Self, Error> {
-        NyxHelper::with_initial_timeout(
-            target_dir,
-            cpu_id,
-            snap_mode,
-            parallel_mode,
-            parent_cpu_id,
-            INIT_TIMEOUT,
-        )
-    }
-    /// create `NyxProcess` and do basic settings
-    /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
-    /// will fail if initial connection takes more than `initial_timeout` seconds
-    pub fn with_initial_timeout(
-        target_dir: &Path,
-        cpu_id: u32,
-        snap_mode: bool,
-        parallel_mode: bool,
-        parent_cpu_id: Option<u32>,
-        initial_timeout: Duration,
-    ) -> Result<Self, Error> {
-        let Some(sharedir) = target_dir.to_str() else { return Err(Error::illegal_argument("can't convert sharedir to str")) };
-        let work_dir = target_dir.join("workdir");
-        let work_dir = work_dir.to_str().expect("unable to convert workdir to str");
-        let nyx_type = if parallel_mode {
-            let Some(parent_cpu_id) = parent_cpu_id else {
-                return Err(Error::illegal_argument(
-                      "please set parent_cpu_id in nyx parallel mode",
-                   ))
-               };
-            if cpu_id == parent_cpu_id {
-                NyxProcessType::PARENT
-            } else {
-                NyxProcessType::CHILD
-            }
-        } else {
-            NyxProcessType::ALONE
-        };
+    /// Create [`NyxProcess`] and do basic settings. It will convert the
+    /// instance to a parent or child using `parent_cpu_id` when
+    /// `parallel_mode` is set.
+    pub fn new<P>(share_dir: P, settings: NyxSettings) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let share_dir_str = share_dir.as_ref().to_str().ok_or(Error::illegal_argument(
+            "`share_dir` contains invalid UTF-8",
+        ))?;
 
-        let nyx_process = match nyx_type {
-            NyxProcessType::ALONE => NyxProcess::new(sharedir, work_dir, cpu_id, MAX_FILE, true),
-            NyxProcessType::PARENT => {
-                NyxProcess::new_parent(sharedir, work_dir, cpu_id, MAX_FILE, true)
-            }
-            NyxProcessType::CHILD => NyxProcess::new_child(sharedir, work_dir, cpu_id, cpu_id),
-        };
+        let mut nyx_config = NyxConfig::load(share_dir_str).map_err(|e| {
+            Error::illegal_argument(format!("Failed to load Nyx config from share dir: {e}"))
+        })?;
+        nyx_config.set_input_buffer_size(settings.input_buffer_size);
+        nyx_config.set_process_role(match settings.parent_cpu_id {
+            None => NyxProcessRole::StandAlone,
+            Some(parent_cpu_id) if parent_cpu_id == settings.cpu_id => NyxProcessRole::Parent,
+            _ => NyxProcessRole::Child,
+        });
+        nyx_config.set_worker_id(settings.cpu_id);
 
-        let mut nyx_process =
-            nyx_process.map_err(|msg: String| -> Error { Error::illegal_argument(msg) })?;
-
-        let real_map_size = nyx_process.bitmap_buffer_size();
-        let map_size = ((real_map_size + 63) >> 6) << 6;
-        let trace_bits = nyx_process.bitmap_buffer_mut().as_mut_ptr();
-        nyx_process.option_set_reload_mode(snap_mode);
+        let mut nyx_process = NyxProcess::new(&mut nyx_config, settings.cpu_id)
+            .map_err(|e| Error::illegal_state(format!("Failed to create Nyx process: {e}")))?;
+        nyx_process.option_set_reload_mode(settings.snap_mode);
+        nyx_process.option_set_timeout(settings.timeout_secs, settings.timeout_micro_secs);
         nyx_process.option_apply();
 
-        // default timeout for initial dry-run
-        let sec = initial_timeout
-            .as_secs()
-            .try_into()
-            .map_err(|_| -> Error { Error::illegal_argument("can't cast time's sec to u8") })?;
+        let path = Path::new(nyx_config.workdir_path())
+            .join(format!("hprintf_{}", nyx_config.worker_id()));
+        let nyx_stdout = File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .map_err(|e| Error::illegal_state(format!("Failed to create Nyx stdout file: {e}")))?;
 
-        let micro_sec: u32 = initial_timeout.subsec_micros();
-        nyx_process.option_set_timeout(sec, micro_sec);
-        nyx_process.option_apply();
+        let bitmap_size = nyx_process.bitmap_buffer_size();
+        let bitmap_buffer = nyx_process.bitmap_buffer_mut().as_mut_ptr();
 
-        // dry run to check if qemu is spawned
-        nyx_process.set_input(b"INIT", 4);
-        match nyx_process.exec() {
-            NyxReturnValue::Error => {
-                nyx_process.shutdown();
-                let msg = "Error: Nyx runtime error has occured...";
-                return Err(Error::illegal_state(msg));
-            }
-            NyxReturnValue::IoError => {
-                let msg = "Error: QEMU-nyx died...";
-                return Err(Error::illegal_state(msg));
-            }
-            NyxReturnValue::Abort => {
-                nyx_process.shutdown();
-                let msg = "Error: Nyx abort occured...";
-                return Err(Error::illegal_state(msg));
-            }
-            _ => {}
-        }
+        let mut timeout = Duration::from_secs(u64::from(settings.timeout_secs));
+        timeout += Duration::from_micros(u64::from(settings.timeout_micro_secs));
+
+        let redqueen_path = format!(
+            "{}/redqueen_workdir_{}/redqueen_results.txt",
+            nyx_config.workdir_path(),
+            nyx_config.worker_id()
+        );
+
         Ok(Self {
             nyx_process,
-            real_map_size,
-            map_size,
-            trace_bits,
+            nyx_stdout,
+            redqueen_path,
+            timeout,
+            bitmap_size,
+            bitmap_buffer,
         })
     }
 
-    /// set timeout
-    pub fn set_timeout(mut self, time: Duration) {
-        let sec: u8 = time
-            .as_secs()
-            .try_into()
-            .expect("can't cast time's sec to u8");
-        let micro_sec: u32 = time.subsec_micros();
-        self.nyx_process.option_set_timeout(sec, micro_sec);
+    /// Set a timeout for Nyx.
+    pub fn set_timeout(&mut self, secs: u8, micro_secs: u32) {
+        self.nyx_process.option_set_timeout(secs, micro_secs);
         self.nyx_process.option_apply();
-    }
-}
-
-impl Debug for NyxHelper {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("NyxInprocessHelper").finish()
     }
 }

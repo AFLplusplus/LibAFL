@@ -1,0 +1,34 @@
+[package]
+name = "qemu_linux_kernel"
+version = "0.15.1"
+authors = [
+  "Romain Malmain <rmalmain@pm.me>",
+  "Dongjia Zhang <tokazerkje@outlook.com>",
+]
+edition = "2021"
+
+[features]
+shared = ["libafl_qemu/shared"]
+
+nyx = []
+
+[profile.release]
+incremental = true
+debug = true
+lto = "fat"
+codegen-units = 1
+
+[dependencies]
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_qemu = { path = "../../../libafl_qemu", default-features = false, features = [
+  "x86_64",
+  "systemmode",
+  #"paranoid_debug"
+] }
+libafl_targets = { path = "../../../libafl_targets" }
+env_logger = "0.11.5"
+log = "0.4.22"
+
+[build-dependencies]
+libafl_qemu_build = { path = "../../../libafl_qemu/libafl_qemu_build" }

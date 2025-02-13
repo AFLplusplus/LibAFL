@@ -1,0 +1,32 @@
+[package]
+name = "fuzzbench_forkserver"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+edition = "2021"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[profile.release-fuzzbench]
+inherits = "release"
+debug = false
+strip = true
+
+[build-dependencies]
+cc = { version = "1.1.22", features = ["parallel"] }
+which = "6.0.3"
+
+[dependencies]
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_targets = { path = "../../../libafl_targets" }
+
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+clap = { version = "4.5.18", features = ["default"] }
+nix = { version = "0.29.0", features = ["signal"] }

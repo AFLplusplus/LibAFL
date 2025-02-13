@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+mkdir in || true
+echo "a" > ./in/a
+
 timeout 10 python3 ./test.py
 export exit_code=$?
 if [ $exit_code -eq 124 ]; then

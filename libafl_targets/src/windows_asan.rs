@@ -2,9 +2,11 @@
 
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{inprocess::windows_asan_handler::asan_death_handler, Executor, HasObservers},
+    executors::{hooks::windows::windows_asan_handler::asan_death_handler, Executor, HasObservers},
     feedbacks::Feedback,
-    state::{HasClientPerfMonitor, HasSolutions},
+    inputs::Input,
+    observers::ObserversTuple,
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     HasObjective,
 };
 
@@ -12,24 +14,30 @@ use libafl::{
 pub type CB = unsafe extern "C" fn() -> ();
 
 extern "C" {
-    fn __sanitizer_set_death_callback(cb: CB);
+    fn __sanitizer_set_death_callback(cb: Option<CB>);
 }
 
+/// Setup `ASan` callback on windows
+///
+/// This is needed to intercept `ASan` error exit.
+///
+/// When we use `AddressSanitizer` on Windows, the crash handler is not called when `ASan` detects an error
+/// This is because, on linux, `ASan` runtime raises `SIGABRT` so we can rely on the signal handler
+/// but on Windows it simply calls `TerminateProcess`.
+/// so we need to call the API by `ASan` to register the callback when `ASan` is about to finish the process.
+/// See <https://github.com/AFLplusplus/LibAFL/issues/769>.
+///
 /// # Safety
-/// Setup asan callback on windows
-// See https://github.com/AFLplusplus/LibAFL/issues/769
-// This is needed to intercept asan error exit
-// When we use AddressSanitizer on windows, the crash handler is not called when ASAN detects an error
-// This is because, on linux, ASAN runtime raises SIGABRT so we can rely on the signal handler
-// but on windows it simply calls TerminateProcess.
-// so we need to call the api by asan to register the callback when asan is about to finish the process.
-pub unsafe fn setup_asan_callback<E, EM, OF, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
+/// Calls the unsafe `__sanitizer_set_death_callback` symbol, but should be safe to call otherwise.
+pub unsafe fn setup_asan_callback<E, EM, I, OF, S, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
 where
-    E: Executor<EM, Z> + HasObservers,
-    EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-    OF: Feedback<E::State>,
-    E::State: HasSolutions + HasClientPerfMonitor,
-    Z: HasObjective<Objective = OF, State = E::State>,
+    E: Executor<EM, I, S, Z> + HasObservers,
+    E::Observers: ObserversTuple<I, S>,
+    EM: EventFirer<I, S> + EventRestarter<S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+    Z: HasObjective<Objective = OF>,
+    I: Input + Clone,
 {
-    __sanitizer_set_death_callback(asan_death_handler::<E, EM, OF, Z>);
+    __sanitizer_set_death_callback(Some(asan_death_handler::<E, EM, I, OF, S, Z>));
 }

@@ -1,0 +1,77 @@
+FUZZER_NAME := 'fuzzbench'
+PROJECT_DIR := absolute_path(".")
+PROFILE := env("PROFILE", "release")
+PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+
+
+alias build := fuzzer
+
+alias cc := cxx
+
+[linux]
+[macos]
+cxx:
+	cargo build --profile={{PROFILE}}
+
+[windows]
+cxx:
+	echo "Unsupported on this platform"
+
+[linux]
+[macos]
+fuzz_o: cxx
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cc --libafl-no-link -O3 -c fuzz.c -o fuzz.o
+
+[windows]
+fuzz_o:
+	echo "Unsupported on this platform"
+
+[linux]
+[macos]
+fuzzer: cxx fuzz_o
+	{{CARGO_TARGET_DIR}}/{{PROFILE_DIR}}/libafl_cxx --libafl fuzz.o -o {{FUZZER_NAME}} -lm -lz
+
+[windows]
+fuzzer:
+	echo "Unsupported on this platform"
+	
+
+[linux]
+[macos]
+run: cxx fuzz_o
+	#!/bin/bash
+	rm -rf libafl_unix_shmem_server || true
+	mkdir in || true
+	echo a > in/a
+	./{{FUZZER_NAME}} -o out -i in
+
+[windows]
+run:
+	echo "Unsupported on this platform"
+
+[linux]
+[macos]
+test: fuzzer
+	#!/bin/bash
+	rm -rf libafl_unix_shmem_server || true
+	mkdir in || true
+	echo a > in/a
+	# Allow sigterm as exit code 
+	timeout 31s ./{{FUZZER_NAME}} -o out -i in | tee fuzz_stdout.log || true
+	if grep -qa "objectives: 1" fuzz_stdout.log; then
+		echo "Fuzzer is working"
+	else
+		echo "Fuzzer does not generate any testcases or any crashes"
+		exit 1
+	fi
+	rm -rf out || true
+	rm -rf in || true
+
+[windows]
+test: fuzzer
+	echo "Unsupported on this platform"
+
+clean:
+	cargo clean

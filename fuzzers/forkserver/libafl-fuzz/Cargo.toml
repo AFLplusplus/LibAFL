@@ -1,0 +1,42 @@
+[package]
+name = "libafl-fuzz"
+version = "0.15.1"
+description = "Reimplementation of afl-fuzz on top of LibAFL"
+documentation = "https://docs.rs/libafl"
+authors = ["Aarnav Bos <aarnavbos@gmail.com>"]
+readme = "./README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "testing", "security"]
+repository = "https://github.com/AFLplusplus/LibAFL/"
+categories = ["development-tools::testing"]
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.18", features = ["derive", "env"] }
+env_logger = "0.11.3"
+libafl = { path = "../../../libafl", features = [
+  "std",
+  "derive",
+  "track_hit_feedbacks",
+  "clap",
+  "errors_backtrace",
+] }
+libafl_bolts = { path = "../../../libafl_bolts", features = [
+  "std",
+  "errors_backtrace",
+] }
+libafl_targets = { path = "../../../libafl_targets" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+memmap2 = "0.9.4"
+nix = { version = "0.29.0", features = ["fs"] }
+regex = "1.10.5"
+serde = { version = "1.0.117", features = ["derive"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libafl_nyx = { path = "../../../libafl_nyx", optional = true }
+
+[features]
+default = ["track_hit_feedbacks"]
+track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
+fuzzbench = []
+nyx = ["dep:libafl_nyx"]

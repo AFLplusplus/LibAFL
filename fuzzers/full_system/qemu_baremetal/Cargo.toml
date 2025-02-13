@@ -1,0 +1,40 @@
+[package]
+name = "qemu_baremetal"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+  "Romain Malmain <rmalmain@pm.me>",
+]
+edition = "2021"
+
+[features]
+default = ["std", "low_level"]
+std = []
+
+low_level = [
+] # The low-level way to interact with LibAFL QEMU, with direct calls to QEMU's functions
+breakpoint = [] # Uses the command system, with breakpoints
+sync_exit = [] # Uses the command system, with sync exit.
+
+shared = ["libafl_qemu/shared"]
+
+[profile.release]
+incremental = true
+debug = true
+lto = "fat"
+codegen-units = 1
+
+[dependencies]
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_targets = { path = "../../../libafl_targets" }
+libafl_qemu = { path = "../../../libafl_qemu", features = [
+  "arm",
+  "systemmode",
+], default-features = false }
+env_logger = "0.11.5"
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+
+[build-dependencies]
+libafl_qemu_build = { path = "../../../libafl_qemu/libafl_qemu_build" }

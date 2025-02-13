@@ -1,10 +1,10 @@
 /*
-   american fuzzy lop++ - LLVM LTO instrumentation pass
-   ----------------------------------------------------
+   LibAFL - Autotokens LLVM pass
+   --------------------------------------------------
 
-   Written by Marc Heuse <mh@mh-sec.de>
+   Written by Dongjia Zhang <toka@aflplus.plus>
 
-   Copyright 2019-2020 AFLplusplus Project. All rights reserved.
+   Copyright 2022-2023 AFLplusplus Project. All rights reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -12,9 +12,7 @@
 
      http://www.apache.org/licenses/LICENSE-2.0
 
-   This library is plugged into LLVM when invoking clang through afl-clang-lto.
-
- */
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,19 +33,11 @@
 #include <fstream>
 #include <set>
 
-#include "llvm/Config/llvm-config.h"
+#include "common-llvm.h"
+
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
 
-#if USE_NEW_PM
-  #include "llvm/Passes/PassPlugin.h"
-  #include "llvm/Passes/PassBuilder.h"
-  #include "llvm/IR/PassManager.h"
-#else
-  #include "llvm/IR/LegacyPassManager.h"
-#endif
-
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DebugInfo.h"
@@ -55,7 +45,6 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
@@ -74,75 +63,9 @@
 
 #include <iostream>
 
-#define FATAL(x...)               \
-  do {                            \
-    fprintf(stderr, "FATAL: " x); \
-    exit(1);                      \
-                                  \
-  } while (0)
-
 using namespace llvm;
 
 namespace {
-
-/* Function that we never instrument or analyze */
-/* Note: this ignore check is also called in isInInstrumentList() */
-bool isIgnoreFunction(const llvm::Function *F) {
-  // Starting from "LLVMFuzzer" these are functions used in libfuzzer based
-  // fuzzing campaign installations, e.g. oss-fuzz
-
-  static constexpr const char *ignoreList[] = {
-
-      "asan.",
-      "llvm.",
-      "sancov.",
-      "__ubsan",
-      "ign.",
-      "__afl",
-      "_fini",
-      "__libc_",
-      "__asan",
-      "__msan",
-      "__cmplog",
-      "__sancov",
-      "__san",
-      "__cxx_",
-      "__decide_deferred",
-      "_GLOBAL",
-      "_ZZN6__asan",
-      "_ZZN6__lsan",
-      "msan.",
-      "LLVMFuzzerM",
-      "LLVMFuzzerC",
-      "LLVMFuzzerI",
-      "maybe_duplicate_stderr",
-      "discard_output",
-      "close_stdout",
-      "dup_and_close_stderr",
-      "maybe_close_fd_mask",
-      "ExecuteFilesOnyByOne"
-
-  };
-
-  for (auto const &ignoreListFunc : ignoreList) {
-    if (F->getName().startswith(ignoreListFunc)) { return true; }
-  }
-
-  static constexpr const char *ignoreSubstringList[] = {
-
-      "__asan",       "__msan",     "__ubsan", "__lsan",
-      "__san",        "__sanitize", "__cxx",   "_GLOBAL__",
-      "DebugCounter", "DwarfDebug", "DebugLoc"
-
-  };
-
-  for (auto const &ignoreListFunc : ignoreSubstringList) {
-    // hexcoder: F->getName().contains() not avaiilable in llvm 3.8.0
-    if (StringRef::npos != F->getName().find(ignoreListFunc)) { return true; }
-  }
-
-  return false;
-}
 
 #if USE_NEW_PM
 class AutoTokensPass : public PassInfoMixin<AutoTokensPass> {
@@ -176,14 +99,13 @@ llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "AutoTokensPass", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
-
-  #if LLVM_VERSION_MAJOR <= 13
-            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
-  #endif
             PB.registerOptimizerLastEPCallback(
-                [](ModulePassManager &MPM, OptimizationLevel OL) {
-                  MPM.addPass(AutoTokensPass());
-                });
+                [](ModulePassManager &MPM, OptimizationLevel OL
+  #if LLVM_VERSION_MAJOR >= 20
+                   ,
+                   ThinOrFullLTOPhase Phase
+  #endif
+                ) { MPM.addPass(AutoTokensPass()); });
           }};
 }
 #else
@@ -226,7 +148,6 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool AutoTokensPass::runOnModule(Module &M) {
-
 #endif
 
   DenseMap<Value *, std::string *> valueMap;
@@ -415,28 +336,30 @@ bool AutoTokensPass::runOnModule(Module &M) {
           isStrcmp &=
               FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) == IntegerType::getInt8PtrTy(M.getContext());
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
           isStrcasecmp &=
               FT->getNumParams() == 2 && FT->getReturnType()->isIntegerTy(32) &&
               FT->getParamType(0) == FT->getParamType(1) &&
-              FT->getParamType(0) == IntegerType::getInt8PtrTy(M.getContext());
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0);
           isMemcmp &= FT->getNumParams() == 3 &&
                       FT->getReturnType()->isIntegerTy(32) &&
                       FT->getParamType(0)->isPointerTy() &&
                       FT->getParamType(1)->isPointerTy() &&
                       FT->getParamType(2)->isIntegerTy();
-          isStrncmp &= FT->getNumParams() == 3 &&
-                       FT->getReturnType()->isIntegerTy(32) &&
-                       FT->getParamType(0) == FT->getParamType(1) &&
-                       FT->getParamType(0) ==
-                           IntegerType::getInt8PtrTy(M.getContext()) &&
-                       FT->getParamType(2)->isIntegerTy();
-          isStrncasecmp &= FT->getNumParams() == 3 &&
-                           FT->getReturnType()->isIntegerTy(32) &&
-                           FT->getParamType(0) == FT->getParamType(1) &&
-                           FT->getParamType(0) ==
-                               IntegerType::getInt8PtrTy(M.getContext()) &&
-                           FT->getParamType(2)->isIntegerTy();
+          isStrncmp &=
+              FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
+              FT->getParamType(0) == FT->getParamType(1) &&
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0) &&
+              FT->getParamType(2)->isIntegerTy();
+          isStrncasecmp &=
+              FT->getNumParams() == 3 && FT->getReturnType()->isIntegerTy(32) &&
+              FT->getParamType(0) == FT->getParamType(1) &&
+              FT->getParamType(0) ==
+                  IntegerType::getInt8Ty(M.getContext())->getPointerTo(0) &&
+              FT->getParamType(2)->isIntegerTy();
           isStdString &= FT->getNumParams() >= 2 &&
                          FT->getParamType(0)->isPointerTy() &&
                          FT->getParamType(1)->isPointerTy();
@@ -567,6 +490,11 @@ bool AutoTokensPass::runOnModule(Module &M) {
             Value       *op2 = callInst->getArgOperand(2);
             ConstantInt *ilen = dyn_cast<ConstantInt>(op2);
 
+            if (!ilen) {
+              op2 = callInst->getArgOperand(1);
+              ilen = dyn_cast<ConstantInt>(op2);
+            }
+
             if (ilen) {
               uint64_t literalLength = optLen;
               optLen = ilen->getZExtValue();
@@ -661,7 +589,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
       ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
       // The actual dict
       GlobalVariable *dict = new GlobalVariable(
-          M, arrayTy, true, GlobalVariable::ExternalLinkage,
+          M, arrayTy, true, GlobalVariable::WeakAnyLinkage,
           ConstantDataArray::get(Ctx,
                                  *(new ArrayRef<char>(ptrhld.get(), offset))),
           "libafl_dictionary_" + M.getName());

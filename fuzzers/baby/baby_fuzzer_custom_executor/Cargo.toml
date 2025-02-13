@@ -1,0 +1,28 @@
+[package]
+name = "fuzzer_custom_executor"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+edition = "2021"
+
+[features]
+default = ["std", "bloom_input_filter"]
+tui = ["libafl/tui_monitor"]
+bloom_input_filter = ["std"]
+std = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { path = "../../../libafl/" }
+libafl_bolts = { path = "../../../libafl_bolts/" }

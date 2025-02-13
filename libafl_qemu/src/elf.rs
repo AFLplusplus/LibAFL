@@ -1,17 +1,24 @@
 //! Utilities to parse and process ELFs
 
-use std::{convert::AsRef, fs::File, io::Read, path::Path, str};
+use std::{fs::File, io::Read, ops::Range, path::Path, str};
 
 use goblin::elf::{header::ET_DYN, Elf};
 use libafl::Error;
-
-use crate::GuestAddr;
+use libafl_qemu_sys::GuestAddr;
 
 pub struct EasyElf<'a> {
     elf: Elf<'a>,
 }
 
 impl<'a> EasyElf<'a> {
+    pub fn get_needed(&self) -> Result<Vec<&'a str>, Error> {
+        let mut v: Vec<&str> = Vec::new();
+        for dyn_lib in &self.elf.libraries {
+            v.push(dyn_lib);
+        }
+        Ok(v)
+    }
+
     pub fn from_file<P>(path: P, buffer: &'a mut Vec<u8>) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -41,7 +48,7 @@ impl<'a> EasyElf<'a> {
 
     #[must_use]
     pub fn resolve_symbol(&self, name: &str, load_addr: GuestAddr) -> Option<GuestAddr> {
-        for sym in self.elf.syms.iter() {
+        for sym in &self.elf.syms {
             if let Some(sym_name) = self.elf.strtab.get_at(sym.st_name) {
                 if sym_name == name {
                     return if sym.st_value == 0 {
@@ -67,7 +74,44 @@ impl<'a> EasyElf<'a> {
         None
     }
 
-    fn is_pic(&self) -> bool {
+    #[must_use]
+    pub fn get_section(&self, name: &str, load_addr: GuestAddr) -> Option<Range<GuestAddr>> {
+        for section in &self.elf.section_headers {
+            if let Some(section_name) = self.elf.shdr_strtab.get_at(section.sh_name) {
+                log::debug!(
+                    "section_name: {section_name:}, sh_addr: 0x{:x}, sh_size: 0x{:x}",
+                    section.sh_addr,
+                    section.sh_size
+                );
+                if section_name == name {
+                    return if section.sh_addr == 0 {
+                        None
+                    } else if self.is_pic() {
+                        let start = section.sh_addr as GuestAddr + load_addr;
+                        let end = start + section.sh_size as GuestAddr;
+                        Some(Range { start, end })
+                    } else {
+                        let start = section.sh_addr as GuestAddr;
+                        let end = start + section.sh_size as GuestAddr;
+                        Some(Range { start, end })
+                    };
+                }
+            }
+        }
+        None
+    }
+
+    #[must_use]
+    pub fn entry_point(&self, load_addr: GuestAddr) -> Option<GuestAddr> {
+        if self.elf.entry == 0 {
+            None
+        } else {
+            Some(load_addr + self.elf.entry as GuestAddr)
+        }
+    }
+
+    #[must_use]
+    pub fn is_pic(&self) -> bool {
         self.elf.header.e_type == ET_DYN
     }
 }

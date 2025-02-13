@@ -1,12 +1,12 @@
 //! Functionality regarding binary-only coverage collection.
-use core::ptr::addr_of_mut;
+
 use std::{cell::RefCell, marker::PhantomPinned, pin::Pin, rc::Rc};
 
 #[cfg(target_arch = "aarch64")]
 use dynasmrt::DynasmLabelApi;
 use dynasmrt::{dynasm, DynasmApi};
-use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
-use libafl::bolts::xxh3_rrmxmx_mixer;
+use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput, ModuleMap};
+use libafl_bolts::hash_std;
 use rangemap::RangeMap;
 
 use crate::helper::FridaRuntime;
@@ -37,28 +37,25 @@ impl FridaRuntime for CoverageRuntime {
     fn init(
         &mut self,
         _gum: &frida_gum::Gum,
-        _ranges: &RangeMap<usize, (u16, String)>,
-        _modules_to_instrument: &[&str],
+        _ranges: &RangeMap<u64, (u16, String)>,
+        _module_map: &Rc<ModuleMap>,
     ) {
     }
 
-    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
-        &mut self,
-        _input: &I,
-    ) -> Result<(), libafl::Error> {
+    fn deinit(&mut self, _gum: &frida_gum::Gum) {}
+
+    fn pre_exec(&mut self, _input_bytes: &[u8]) -> Result<(), libafl::Error> {
         Ok(())
     }
 
-    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
-        &mut self,
-        _input: &I,
-    ) -> Result<(), libafl::Error> {
+    fn post_exec(&mut self, _input_bytes: &[u8]) -> Result<(), libafl::Error> {
         Ok(())
     }
 }
 
 impl CoverageRuntime {
     /// Create a new coverage runtime
+    #[allow(clippy::large_stack_arrays)]
     #[must_use]
     pub fn new() -> Self {
         Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
@@ -77,10 +74,11 @@ impl CoverageRuntime {
     /// every time we need a copy that is within a direct branch of the start of the transformed basic
     /// block.
     #[cfg(target_arch = "aarch64")]
+    #[expect(clippy::cast_possible_wrap)]
     pub fn generate_inline_code(&mut self, h64: u64) -> Box<[u8]> {
         let mut borrow = self.0.borrow_mut();
-        let prev_loc_ptr = addr_of_mut!(borrow.previous_pc);
-        let map_addr_ptr = addr_of_mut!(borrow.map);
+        let prev_loc_ptr = &raw mut borrow.previous_pc;
+        let map_addr_ptr = &raw mut borrow.map;
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
         dynasm!(ops
             ;   .arch aarch64
@@ -120,13 +118,13 @@ impl CoverageRuntime {
             ;   b >end
 
             ;map_addr:
-            ;.qword map_addr_ptr as i64
+            ;.i64 map_addr_ptr as i64
             ;previous_loc:
-            ;.qword prev_loc_ptr as i64
+            ;.i64 prev_loc_ptr as i64
             ;loc:
-            ;.qword h64 as i64
+            ;.i64 h64 as i64
             ;loc_shr:
-            ;.qword (h64 >> 1) as i64
+            ;.i64 (h64 >> 1) as i64
             ;end:
         );
         let ops_vec = ops.finalize().unwrap();
@@ -137,8 +135,8 @@ impl CoverageRuntime {
     #[cfg(target_arch = "x86_64")]
     pub fn generate_inline_code(&mut self, h64: u64) -> Box<[u8]> {
         let mut borrow = self.0.borrow_mut();
-        let prev_loc_ptr = addr_of_mut!(borrow.previous_pc);
-        let map_addr_ptr = addr_of_mut!(borrow.map);
+        let prev_loc_ptr = &raw mut borrow.previous_pc;
+        let map_addr_ptr = &raw mut borrow.map;
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
         dynasm!(ops
             ;   .arch x64
@@ -149,7 +147,7 @@ impl CoverageRuntime {
             ; mov    QWORD [rsp-0x98], rbx
 
             // Load the previous_pc
-            ; mov rax, QWORD prev_loc_ptr as *mut u64 as _
+            ; mov rax, QWORD prev_loc_ptr as _
             ; mov rax, QWORD [rax]
 
             // Calculate the edge id
@@ -157,7 +155,7 @@ impl CoverageRuntime {
             ; xor rax, rbx
 
             // Load the map byte address
-            ; mov rbx, QWORD map_addr_ptr as *mut [u8; MAP_SIZE] as _
+            ; mov rbx, QWORD map_addr_ptr as _
             ; add rax, rbx
 
             // Update the map byte
@@ -167,7 +165,7 @@ impl CoverageRuntime {
             ; mov BYTE [rax],bl
 
             // Update the previous_pc value
-            ; mov rax, QWORD prev_loc_ptr as *mut u64 as _
+            ; mov rax, QWORD prev_loc_ptr as _
             ; mov ebx, WORD (h64 >> 1) as i32
             ; mov QWORD [rax], rbx
 
@@ -185,7 +183,7 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
-        let h64 = xxh3_rrmxmx_mixer(address);
+        let h64 = hash_std(&address.to_le_bytes());
         let writer = output.writer();
 
         // Since the AARCH64 instruction set requires that a register be used if
@@ -199,7 +197,7 @@ impl CoverageRuntime {
         //
         // Since we also need to spill some registers in order to update our
         // coverage map, in the event of a long branch, we can simply re-use
-        // these spilt registers. This, however, means we need to retard the
+        // these spilt registers. This, however, means we need to reset the
         // code writer so that we can overwrite the so-called "restoration
         // prologue".
         #[cfg(target_arch = "aarch64")]

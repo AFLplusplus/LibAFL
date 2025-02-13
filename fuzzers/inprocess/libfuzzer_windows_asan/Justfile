@@ -1,0 +1,57 @@
+FUZZER_NAME := 'libfuzzer_windows_asan'
+PROJECT_DIR := absolute_path(".")
+PROFILE := env("PROFILE", "release")
+PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+LIBAFL_CXX := CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
+
+set shell := ["cmd.exe", "/c"]
+
+alias cc := cxx
+
+[windows]
+cxx:
+    cargo build --profile {{PROFILE}}
+
+[linux]
+[macos]
+cxx:
+    echo "Unsupported on this platform"
+
+[linux]
+[macos]
+cxx:
+    cargo build --profile {{PROFILE}}
+
+[windows]
+fuzzer: cxx
+    .\target\{{PROFILE}}\libafl_cxx .\harness.cpp -o {{FUZZER_NAME}}.exe
+
+[linux]
+[macos]
+fuzzer:
+    echo "Unsupported on this platform"
+
+    
+[windows]
+test: fuzzer
+    start {{FUZZER_NAME}}.exe
+    start {{FUZZER_NAME}}.exe
+    ping -n 10 127.0.0.1>NUL && taskkill /im {{FUZZER_NAME}}.exe /F
+    dir /a-d crashes && (echo Files exist) || (exit /b 1337)
+
+[linux]
+[macos]
+test:
+    echo "Unsupported on this platform"
+
+
+[windows]
+clean:
+    del ./{{FUZZER_NAME}}
+    cargo clean
+
+[linux]
+[macos]
+clean:
+    echo "Unsupported on this platform"

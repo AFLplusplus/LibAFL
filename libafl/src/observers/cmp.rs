@@ -1,36 +1,64 @@
 //! The `CmpObserver` provides access to the logged values of CMP instructions
-
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
+use alloc::{borrow::Cow, vec::Vec};
+use core::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
 };
-use core::{fmt::Debug, marker::PhantomData};
 
-use c2rust_bitfields::BitfieldStruct;
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use arbitrary_int::{u1, u4, u5, u6};
+use bitbybit::bitfield;
+use hashbrown::HashMap;
+use libafl_bolts::{ownedref::OwnedRefMut, AsSlice, HasLen, Named};
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
-    executors::ExitKind,
-    inputs::UsesInput,
-    observers::Observer,
-    state::HasMetadata,
-    Error,
-};
+use crate::{executors::ExitKind, observers::Observer, Error, HasMetadata};
+
+/// A bytes string for cmplog with up to 32 elements.
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct CmplogBytes {
+    buf: [u8; 32],
+    len: u8,
+}
+
+impl CmplogBytes {
+    /// Creates a new [`CmplogBytes`] object from the provided buf and length.
+    /// Lengths above 32 are illegal but will be ignored.
+    #[must_use]
+    pub fn from_buf_and_len(buf: [u8; 32], len: u8) -> Self {
+        debug_assert!(len <= 32, "Len too big: {len}, max: 32");
+        CmplogBytes { buf, len }
+    }
+}
+
+impl<'a> AsSlice<'a> for CmplogBytes {
+    type Entry = u8;
+
+    type SliceRef = &'a [u8];
+
+    fn as_slice(&'a self) -> Self::SliceRef {
+        &self.buf[0..(self.len as usize)]
+    }
+}
+
+impl HasLen for CmplogBytes {
+    fn len(&self) -> usize {
+        self.len as usize
+    }
+}
 
 /// Compare values collected during a run
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
 pub enum CmpValues {
-    /// Two u8 values
-    U8((u8, u8)),
-    /// Two u16 values
-    U16((u16, u16)),
-    /// Two u32 values
-    U32((u32, u32)),
-    /// Two u64 values
-    U64((u64, u64)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U8((u8, u8, bool)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U16((u16, u16, bool)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U32((u32, u32, bool)),
+    /// (side 1 of comparison, side 2 of comparison, side 1 value is const)
+    U64((u64, u64, bool)),
     /// Two vecs of u8 values/byte
-    Bytes((Vec<u8>, Vec<u8>)),
+    Bytes((CmplogBytes, CmplogBytes)),
 }
 
 impl CmpValues {
@@ -45,11 +73,11 @@ impl CmpValues {
 
     /// Converts the value to a u64 tuple
     #[must_use]
-    pub fn to_u64_tuple(&self) -> Option<(u64, u64)> {
+    pub fn to_u64_tuple(&self) -> Option<(u64, u64, bool)> {
         match self {
-            CmpValues::U8(t) => Some((u64::from(t.0), u64::from(t.1))),
-            CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1))),
-            CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1))),
+            CmpValues::U8(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
+            CmpValues::U16(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
+            CmpValues::U32(t) => Some((u64::from(t.0), u64::from(t.1), t.2)),
             CmpValues::U64(t) => Some(*t),
             CmpValues::Bytes(_) => None,
         }
@@ -58,28 +86,28 @@ impl CmpValues {
 
 /// A state metadata holding a list of values logged from comparisons
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    expect(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
 pub struct CmpValuesMetadata {
     /// A `list` of values.
     #[serde(skip)]
     pub list: Vec<CmpValues>,
 }
 
-crate::impl_serdeany!(CmpValuesMetadata);
+libafl_bolts::impl_serdeany!(CmpValuesMetadata);
 
-impl AsSlice for CmpValuesMetadata {
-    type Entry = CmpValues;
-    /// Convert to a slice
-    #[must_use]
-    fn as_slice(&self) -> &[CmpValues] {
-        self.list.as_slice()
+impl Deref for CmpValuesMetadata {
+    type Target = [CmpValues];
+    fn deref(&self) -> &[CmpValues] {
+        &self.list
     }
 }
-impl AsMutSlice for CmpValuesMetadata {
-    type Entry = CmpValues;
-    /// Convert to a slice
-    #[must_use]
-    fn as_mut_slice(&mut self) -> &mut [CmpValues] {
-        self.list.as_mut_slice()
+
+impl DerefMut for CmpValuesMetadata {
+    fn deref_mut(&mut self) -> &mut [CmpValues] {
+        &mut self.list
     }
 }
 
@@ -89,64 +117,18 @@ impl CmpValuesMetadata {
     pub fn new() -> Self {
         Self { list: vec![] }
     }
-}
 
-/// A [`CmpMap`] traces comparisons during the current execution
-pub trait CmpMap: Debug {
-    /// Get the number of cmps
-    fn len(&self) -> usize;
-
-    /// Get if it is empty
-    #[must_use]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Get the number of executions for a cmp
-    fn executions_for(&self, idx: usize) -> usize;
-
-    /// Get the number of logged executions for a cmp
-    fn usable_executions_for(&self, idx: usize) -> usize;
-
-    /// Get the logged values for a cmp
-    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues>;
-
-    /// Reset the state
-    fn reset(&mut self) -> Result<(), Error>;
-}
-
-/// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<CM, S>: Observer<S>
-where
-    CM: CmpMap,
-    S: UsesInput,
-{
-    /// Get the number of usable cmps (all by default)
-    fn usable_count(&self) -> usize;
-
-    /// Get the `CmpMap`
-    fn cmp_map(&self) -> &CM;
-
-    /// Get the `CmpMap` (mutable)
-    fn cmp_map_mut(&mut self) -> &mut CM;
-
-    /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
-    /// This routine does a basic loop filtering because loop index cmps are not interesting.
-    fn add_cmpvalues_meta(&mut self, state: &mut S)
+    /// Add comparisons to a metadata from a `CmpObserver`. `cmp_map` is mutable in case
+    /// it is needed for a custom map, but this is not utilized for `CmpObserver` or
+    /// `AFLppCmpLogObserver`.
+    pub fn add_from<CM>(&mut self, usable_count: usize, cmp_map: &mut CM)
     where
-        S: HasMetadata,
+        CM: CmpMap,
     {
-        #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
-        let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {
-            meta
-        } else {
-            state.add_metadata(CmpValuesMetadata::new());
-            state.metadata_mut().get_mut::<CmpValuesMetadata>().unwrap()
-        };
-        meta.list.clear();
-        let count = self.usable_count();
+        self.list.clear();
+        let count = usable_count;
         for i in 0..count {
-            let execs = self.cmp_map().usable_executions_for(i);
+            let execs = cmp_map.usable_executions_for(i);
             if execs > 0 {
                 // Recongize loops and discard if needed
                 if execs > 4 {
@@ -157,7 +139,7 @@ where
 
                     let mut last: Option<CmpValues> = None;
                     for j in 0..execs {
-                        if let Some(val) = self.cmp_map().values_of(i, j) {
+                        if let Some(val) = cmp_map.values_of(i, j) {
                             if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
                                 if let Some(v) = val.to_u64_tuple() {
                                     if l.0.wrapping_add(1) == v.0 {
@@ -188,8 +170,8 @@ where
                     }
                 }
                 for j in 0..execs {
-                    if let Some(val) = self.cmp_map().values_of(i, j) {
-                        meta.list.push(val);
+                    if let Some(val) = cmp_map.values_of(i, j) {
+                        self.list.push(val);
                     }
                 }
             }
@@ -197,26 +179,60 @@ where
     }
 }
 
-/// A standard [`CmpObserver`] observer
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(bound = "CM: serde::de::DeserializeOwned")]
-pub struct StdCmpObserver<'a, CM, S>
-where
-    CM: CmpMap + Serialize,
-    S: UsesInput + HasMetadata,
-{
-    cmp_map: OwnedRefMut<'a, CM>,
-    size: Option<OwnedRefMut<'a, usize>>,
-    name: String,
-    add_meta: bool,
-    phantom: PhantomData<S>,
+/// A [`CmpMap`] traces comparisons during the current execution
+pub trait CmpMap: Debug {
+    /// Get the number of cmps
+    fn len(&self) -> usize;
+
+    /// Get if it is empty
+    #[must_use]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Get the number of executions for a cmp
+    fn executions_for(&self, idx: usize) -> usize;
+
+    /// Get the number of logged executions for a cmp
+    fn usable_executions_for(&self, idx: usize) -> usize;
+
+    /// Get the logged values for a cmp
+    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues>;
+
+    /// Reset the state
+    fn reset(&mut self) -> Result<(), Error>;
 }
 
-impl<'a, CM, S> CmpObserver<CM, S> for StdCmpObserver<'a, CM, S>
+/// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
+pub trait CmpObserver {
+    /// The underlying map
+    type Map;
+    /// Get the number of usable cmps (all by default)
+    fn usable_count(&self) -> usize;
+
+    /// Get the `CmpMap`
+    fn cmp_map(&self) -> &Self::Map;
+
+    /// Get the mut `CmpMap`
+    fn cmp_map_mut(&mut self) -> &mut Self::Map;
+}
+
+/// A standard [`CmpObserver`] observer
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(bound = "CM: serde::de::DeserializeOwned + Serialize")]
+pub struct StdCmpObserver<'a, CM> {
+    cmp_map: OwnedRefMut<'a, CM>,
+    size: Option<OwnedRefMut<'a, usize>>,
+    name: Cow<'static, str>,
+    add_meta: bool,
+}
+
+impl<CM> CmpObserver for StdCmpObserver<'_, CM>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + Debug + HasMetadata,
+    CM: HasLen,
 {
+    type Map = CM;
+
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
@@ -225,62 +241,53 @@ where
         }
     }
 
-    fn cmp_map(&self) -> &CM {
+    fn cmp_map(&self) -> &Self::Map {
         self.cmp_map.as_ref()
     }
 
-    fn cmp_map_mut(&mut self) -> &mut CM {
+    fn cmp_map_mut(&mut self) -> &mut Self::Map {
         self.cmp_map.as_mut()
     }
 }
 
-impl<'a, CM, S> Observer<S> for StdCmpObserver<'a, CM, S>
+impl<CM, I, S> Observer<I, S> for StdCmpObserver<'_, CM>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + Debug + HasMetadata,
+    CM: Serialize + CmpMap + HasLen,
+    S: HasMetadata,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        state: &mut S,
-        _input: &S::Input,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         if self.add_meta {
-            self.add_cmpvalues_meta(state);
+            let meta = state.metadata_or_insert_with(CmpValuesMetadata::new);
+
+            meta.add_from(self.usable_count(), self.cmp_map_mut());
         }
         Ok(())
     }
 }
 
-impl<'a, CM, S> Named for StdCmpObserver<'a, CM, S>
-where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + HasMetadata,
-{
-    fn name(&self) -> &str {
+impl<CM> Named for StdCmpObserver<'_, CM> {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<'a, CM, S> StdCmpObserver<'a, CM, S>
+impl<'a, CM> StdCmpObserver<'a, CM>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
-    S: UsesInput + HasMetadata,
+    CM: CmpMap,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut CM, add_meta: bool) -> Self {
+    pub fn new(name: &'static str, map: OwnedRefMut<'a, CM>, add_meta: bool) -> Self {
         Self {
-            name: name.to_string(),
+            name: Cow::from(name),
             size: None,
-            cmp_map: OwnedRefMut::Ref(map),
+            cmp_map: map,
             add_meta,
-            phantom: PhantomData,
         }
     }
 
@@ -288,16 +295,15 @@ where
     #[must_use]
     pub fn with_size(
         name: &'static str,
-        map: &'a mut CM,
+        cmp_map: OwnedRefMut<'a, CM>,
         add_meta: bool,
-        size: &'a mut usize,
+        size: OwnedRefMut<'a, usize>,
     ) -> Self {
         Self {
-            name: name.to_string(),
-            size: Some(OwnedRefMut::Ref(size)),
-            cmp_map: OwnedRefMut::Ref(map),
+            name: Cow::from(name),
+            size: Some(size),
+            cmp_map,
             add_meta,
-            phantom: PhantomData,
         }
     }
 }
@@ -348,166 +354,90 @@ struct cmp_map {
 };
 */
 
-/// The AFL++ `CMP_MAP_W`
-pub const AFL_CMP_MAP_W: usize = 65536;
-/// The AFL++ `CMP_MAP_H`
-pub const AFL_CMP_MAP_H: usize = 32;
-/// The AFL++ `CMP_MAP_RTN_H`
-pub const AFL_CMP_MAP_RTN_H: usize = AFL_CMP_MAP_H / 4;
-
-/// The AFL++ `CMP_TYPE_INS`
-pub const AFL_CMP_TYPE_INS: u32 = 1;
-/// The AFL++ `CMP_TYPE_RTN`
-pub const AFL_CMP_TYPE_RTN: u32 = 2;
-
-/// The AFL++ `cmp_header` struct
-#[derive(Debug, Copy, Clone, BitfieldStruct)]
-#[repr(C, packed)]
-pub struct AFLCmpHeader {
-    #[bitfield(name = "hits", ty = "u32", bits = "0..=23")]
-    #[bitfield(name = "id", ty = "u32", bits = "24..=47")]
-    #[bitfield(name = "shape", ty = "u32", bits = "48..=52")]
-    #[bitfield(name = "_type", ty = "u32", bits = "53..=54")]
-    #[bitfield(name = "attribute", ty = "u32", bits = "55..=58")]
-    #[bitfield(name = "overflow", ty = "u32", bits = "59..=59")]
-    #[bitfield(name = "reserved", ty = "u32", bits = "60..=63")]
-    data: [u8; 8],
+/// A state metadata holding a list of values logged from comparisons. AFL++ RQ version.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(
+    any(not(feature = "serdeany_autoreg"), miri),
+    expect(clippy::unsafe_derive_deserialize)
+)] // for SerdeAny
+pub struct AFLppCmpValuesMetadata {
+    /// The first map of `AFLppCmpLogVals` retrieved by running the un-mutated input
+    #[serde(skip)]
+    pub orig_cmpvals: HashMap<usize, Vec<CmpValues>>,
+    /// The second map of `AFLppCmpLogVals` retrieved by runnning the mutated input
+    #[serde(skip)]
+    pub new_cmpvals: HashMap<usize, Vec<CmpValues>>,
+    /// The list of logged idx and headers retrieved by runnning the mutated input
+    #[serde(skip)]
+    pub headers: Vec<(usize, AFLppCmpLogHeader)>,
 }
 
-/// The AFL++ `cmp_operands` struct
-#[derive(Default, Debug, Clone, Copy)]
-#[repr(C, packed)]
-pub struct AFLCmpOperands {
-    v0: u64,
-    v1: u64,
-    v0_128: u64,
-    v1_128: u64,
-}
+libafl_bolts::impl_serdeany!(AFLppCmpValuesMetadata);
 
-/// The AFL++ `cmpfn_operands` struct
-#[derive(Default, Debug, Clone, Copy)]
-#[repr(C, packed)]
-pub struct AFLCmpFnOperands {
-    v0: [u8; 31],
-    v0_len: u8,
-    v1: [u8; 31],
-    v1_len: u8,
-}
-
-/// A proxy union to avoid casting operands as in AFL++
-#[derive(Clone, Copy)]
-#[repr(C, packed)]
-pub union AFLCmpVals {
-    operands: [[AFLCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W],
-    fn_operands: [[AFLCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W],
-}
-
-impl Debug for AFLCmpVals {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AFLCmpVals").finish_non_exhaustive()
-    }
-}
-
-/// The AFL++ `cmp_map` struct, use with `StdCmpObserver`
-#[derive(Debug, Clone, Copy)]
-#[repr(C, packed)]
-pub struct AFLCmpMap {
-    headers: [AFLCmpHeader; AFL_CMP_MAP_W],
-    vals: AFLCmpVals,
-}
-
-impl Serialize for AFLCmpMap {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let slice = unsafe {
-            core::slice::from_raw_parts(
-                (self as *const Self) as *const u8,
-                core::mem::size_of::<Self>(),
-            )
-        };
-        serializer.serialize_bytes(slice)
-    }
-}
-
-impl<'de> Deserialize<'de> for AFLCmpMap {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let bytes = Vec::<u8>::deserialize(deserializer)?;
-        let map: Self = unsafe { core::ptr::read(bytes.as_ptr() as *const _) };
-        Ok(map)
-    }
-}
-
-impl CmpMap for AFLCmpMap {
-    fn len(&self) -> usize {
-        AFL_CMP_MAP_W
-    }
-
-    fn executions_for(&self, idx: usize) -> usize {
-        self.headers[idx].hits() as usize
-    }
-
-    fn usable_executions_for(&self, idx: usize) -> usize {
-        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
-            if self.executions_for(idx) < AFL_CMP_MAP_H {
-                self.executions_for(idx)
-            } else {
-                AFL_CMP_MAP_H
-            }
-        } else if self.executions_for(idx) < AFL_CMP_MAP_RTN_H {
-            self.executions_for(idx)
-        } else {
-            AFL_CMP_MAP_RTN_H
+impl AFLppCmpValuesMetadata {
+    /// Constructor for `AFLppCmpValuesMetadata`
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            orig_cmpvals: HashMap::new(),
+            new_cmpvals: HashMap::new(),
+            headers: Vec::new(),
         }
     }
 
-    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
-        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
-            unsafe {
-                match self.headers[idx].shape() {
-                    0 => Some(CmpValues::U8((
-                        self.vals.operands[idx][execution].v0 as u8,
-                        self.vals.operands[idx][execution].v1 as u8,
-                    ))),
-                    1 => Some(CmpValues::U16((
-                        self.vals.operands[idx][execution].v0 as u16,
-                        self.vals.operands[idx][execution].v1 as u16,
-                    ))),
-                    3 => Some(CmpValues::U32((
-                        self.vals.operands[idx][execution].v0 as u32,
-                        self.vals.operands[idx][execution].v1 as u32,
-                    ))),
-                    7 => Some(CmpValues::U64((
-                        self.vals.operands[idx][execution].v0,
-                        self.vals.operands[idx][execution].v1,
-                    ))),
-                    // TODO handle 128 bits cmps
-                    // other => panic!("Invalid CmpLog shape {}", other),
-                    _ => None,
-                }
-            }
-        } else {
-            unsafe {
-                Some(CmpValues::Bytes((
-                    self.vals.fn_operands[idx][execution].v0
-                        [..=(self.headers[idx].shape() as usize)]
-                        .to_vec(),
-                    self.vals.fn_operands[idx][execution].v1
-                        [..=(self.headers[idx].shape() as usize)]
-                        .to_vec(),
-                )))
-            }
-        }
+    /// Getter for `orig_cmpvals`
+    #[must_use]
+    pub fn orig_cmpvals(&self) -> &HashMap<usize, Vec<CmpValues>> {
+        &self.orig_cmpvals
     }
 
-    fn reset(&mut self) -> Result<(), Error> {
-        // For performance, we reset just the headers
-        self.headers = unsafe { core::mem::zeroed() };
-        // self.vals.operands = unsafe { core::mem::zeroed() };
-        Ok(())
+    /// Getter for `new_cmpvals`
+    #[must_use]
+    pub fn new_cmpvals(&self) -> &HashMap<usize, Vec<CmpValues>> {
+        &self.new_cmpvals
     }
+
+    /// Getter for `headers`
+    #[must_use]
+    pub fn headers(&self) -> &Vec<(usize, AFLppCmpLogHeader)> {
+        &self.headers
+    }
+}
+
+/// Comparison header, used to describe a set of comparison values efficiently.
+///
+/// # Bitfields
+///
+/// - hits:      The number of hits of a particular comparison
+/// - id:        Unused by ``LibAFL``, a unique ID for a particular comparison
+/// - shape:     Whether a comparison is u8/u8, u16/u16, etc.
+/// - type_:     Whether the comparison value represents an instruction (like a `cmp`) or function
+///              call arguments
+/// - attribute: OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
+/// - overflow:  Whether the comparison overflows
+/// - reserved:  Reserved for future use
+#[bitfield(u16)]
+#[derive(Debug)]
+pub struct AFLppCmpLogHeader {
+    /// The number of hits of a particular comparison
+    ///
+    /// 6 bits up to 63 entries, we have CMP_MAP_H = 32 (so using half of it)
+    #[bits(0..=5, r)]
+    hits: u6,
+    /// Whether a comparison is u8/u8, u16/u16, etc.
+    ///
+    /// 31 + 1 bytes max
+    #[bits(6..=10, r)]
+    shape: u5,
+    /// Whether the comparison value represents an instruction (like a `cmp`) or function call
+    /// arguments
+    ///
+    /// 2: cmp, rtn
+    #[bit(11, r)]
+    type_: u1,
+    /// OR-ed bitflags describing whether the comparison is <, >, =, <=, >=, or transform
+    ///
+    /// 16 types for arithmetic comparison types
+    #[bits(12..=15, r)]
+    attribute: u4,
 }

@@ -15,19 +15,23 @@
 
 OUT_DIR     ?= .
 
-CFLAGS      += -Wno-int-to-void-pointer-cast -ggdb
-LDFLAGS     += -ldl -pthread
+override CFLAGS      += -Wno-int-to-void-pointer-cast -ggdb -O1 -fno-builtin -Wno-unused-result
+override LDFLAGS     += -ldl -pthread
 
-SRC := libqasan.c hooks.c malloc.c string.c uninstrument.c patch.c dlmalloc.c
-HDR := libqasan.h
+SRC := libqasan.c hooks.c malloc.c mmap.c string.c uninstrument.c patch.c dlmalloc.c printf/printf.c
+HDR := libqasan.h qasan.h map_macro.h printf/printf.h
 
-all: libqasan.so
+all: $(OUT_DIR)/libgasan.so $(OUT_DIR)/libqasan.so
 
-libqasan.so: $(HDR) $(SRC)
-	$(CC) $(CFLAGS) -fPIC -shared $(SRC) -o $(OUT_DIR)/$@ $(LDFLAGS)
+$(OUT_DIR)/libgasan.so: $(HDR) $(SRC)
+	$(CC) $(CFLAGS) -DASAN_GUEST=1 -fPIC -shared $(SRC) -o $@ $(LDFLAGS)
+
+$(OUT_DIR)/libqasan.so: $(HDR) $(SRC)
+	$(CC) $(CFLAGS) -fPIC -shared $(SRC) -o $@ $(LDFLAGS)
 
 .NOTPARALLEL: clean
 
 clean:
 	rm -f *.o *.so *~ a.out core core.[1-9][0-9]*
-	rm -f libqasan.so
+	rm -f $(OUT_DIR)/libgasan.so
+	rm -f $(OUT_DIR)/libqasan.so

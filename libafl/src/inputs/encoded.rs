@@ -1,25 +1,26 @@
-//! The `EncodedInput` is the "normal" input, a map of codes, that can be sent directly to the client
-//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
+//! The `EncodedInput` is the "normal" input, a map of codes, that can be sent directly to the client.
+//!
+//! This is different to other, more abstract inputs, like an Grammar-Based AST Input.
 //! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 use core::str::from_utf8;
 use core::{
     cell::RefCell,
-    convert::From,
     hash::{BuildHasher, Hasher},
 };
 
 use ahash::RandomState;
 use hashbrown::HashMap;
-#[cfg(feature = "std")]
+use libafl_bolts::{Error, HasLen};
+#[cfg(feature = "regex")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::HasLen, inputs::Input, Error};
+use crate::{corpus::CorpusId, inputs::Input};
 
 /// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
@@ -33,7 +34,6 @@ where
 /// Trait to decode encoded input to bytes
 pub trait InputDecoder {
     /// Decode encoded input to bytes
-    #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
@@ -108,7 +108,7 @@ impl Default for TokenInputEncoderDecoder {
 }
 
 /// A naive tokenizer struct
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 #[derive(Clone, Debug)]
 pub struct NaiveTokenizer {
     /// Ident regex
@@ -119,7 +119,7 @@ pub struct NaiveTokenizer {
     string_re: Regex,
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 impl NaiveTokenizer {
     /// Creates a new [`NaiveTokenizer`]
     #[must_use]
@@ -132,7 +132,7 @@ impl NaiveTokenizer {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 impl Default for NaiveTokenizer {
     fn default() -> Self {
         Self {
@@ -146,7 +146,7 @@ impl Default for NaiveTokenizer {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 impl Tokenizer for NaiveTokenizer {
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
@@ -202,7 +202,7 @@ pub struct EncodedInput {
 impl Input for EncodedInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, _idx: usize) -> String {
+    fn generate_name(&self, _id: Option<CorpusId>) -> String {
         let mut hasher = RandomState::with_seeds(0, 0, 0, 0).build_hasher();
         for code in &self.codes {
             hasher.write(&code.to_le_bytes());
@@ -259,7 +259,7 @@ impl EncodedInput {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "regex")]
 #[cfg(test)]
 mod tests {
     use alloc::borrow::ToOwned;
@@ -270,6 +270,7 @@ mod tests {
     };
 
     #[test]
+    #[cfg_attr(all(miri, target_arch = "aarch64", target_vendor = "apple"), ignore)] // Regex miri fails on M1
     fn test_input() {
         let mut t = NaiveTokenizer::default();
         let mut ed = TokenInputEncoderDecoder::new();

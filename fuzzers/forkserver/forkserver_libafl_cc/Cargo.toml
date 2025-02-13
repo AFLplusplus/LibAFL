@@ -1,0 +1,39 @@
+[package]
+name = "forkserver_libafl_cc"
+version = "0.15.1"
+authors = ["ergrelet <ergrelet@users.noreply.github.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+# Forces a crash
+crash = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[build-dependencies]
+cc = { version = "1.1.21", features = ["parallel"] }
+which = { version = "6.0.3" }
+
+[dependencies]
+clap = { version = "4.5.18", features = ["derive"] }
+nix = { version = "0.29.0", features = ["signal"] }
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_cc = { path = "../../../libafl_cc" }
+libafl_targets = { path = "../../../libafl_targets", features = [
+  "sancov_pcguard_hitcounts",
+  "libfuzzer",
+  "pointer_maps",
+] }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+env_logger = "0.11.5"
+
+[lib]
+name = "libforkserver_libafl_cc"
+crate-type = ["staticlib"]

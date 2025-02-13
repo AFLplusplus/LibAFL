@@ -2,9 +2,18 @@
 name = "libafl_tinyinst"
 version.workspace = true
 edition = "2021"
-authors = ["elbiazo <eric.l.biazo@gmail.com>", "Dongjia Zhang <tokazerkje@outlook.com>"]
+authors = [
+  "elbiazo <eric.l.biazo@gmail.com>",
+  "Dongjia Zhang <tokazerkje@outlook.com>",
+]
 repository = "https://github.com/AFLplusplus/LibAFL/"
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 description = "TinyInst backend for libafl"
@@ -12,13 +21,20 @@ description = "TinyInst backend for libafl"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cxx = "1.0"
-libafl = { path = "../libafl", version = "0.9.0", features = [
-    "std",
-    "libafl_derive",
+libafl = { workspace = true, default-features = true, features = [
+  "std",
+  "libafl_derive",
+] }
+libafl_bolts = { workspace = true, default-features = true, features = [
+  "std",
+  "libafl_derive",
 ] }
 tinyinst = { git = "https://github.com/AFLplusplus/tinyinst-rs" }
 # tinyinst-rs = { path = "../../tinyinst-rs" }
+log = { workspace = true }
 
 [build-dependencies]
-cmake = "0.1"
+cmake = { workspace = true }
+
+[lints]
+workspace = true

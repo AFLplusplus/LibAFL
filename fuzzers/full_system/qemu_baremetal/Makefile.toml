@@ -1,0 +1,234 @@
+env_scripts = ['''
+#!@duckscript
+profile = get_env PROFILE
+
+if eq ${profile} "dev"
+    set_env PROFILE_DIR debug
+else
+    set_env PROFILE_DIR ${profile}
+end
+''', '''
+#!@duckscript
+runs_on_ci = get_env RUN_ON_CI
+
+if ${runs_on_ci}
+    cargo_target_dir = get_env CARGO_MAKE_CRATE_TARGET_DIRECTORY
+    set_env TARGET_DIR ${cargo_target_dir}
+    set_env KERNEL ${cargo_target_dir}/example.elf
+end
+''']
+
+[env]
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${FEATURE}"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+KERNEL = "${TARGET_DIR}/example.elf"
+
+[tasks.target_dir]
+condition = { files_not_exist = ["${TARGET_DIR}"] }
+script_runner = "@shell"
+script = '''
+mkdir -p ${TARGET_DIR}
+'''
+
+[tasks.image]
+dependencies = ["target_dir"]
+condition = { files_not_exist = ["${TARGET_DIR}/dummy.qcow2"] }
+script_runner = "@shell"
+script = '''
+qemu-img create -f qcow2 ${TARGET_DIR}/dummy.qcow2 32M
+'''
+
+[tasks.target]
+dependencies = ["target_dir"]
+condition = { env_set = ["TARGET_DEFINE"] }
+command = "arm-none-eabi-gcc"
+args = [
+  "-ggdb",
+  "-ffreestanding",
+  "-nostartfiles",
+  "-lgcc",
+  "-T",
+  "${CARGO_MAKE_WORKING_DIRECTORY}/example/mps2_m3.ld",
+  "-mcpu=cortex-m3",
+  "${CARGO_MAKE_WORKING_DIRECTORY}/example/main.c",
+  "${CARGO_MAKE_WORKING_DIRECTORY}/example/startup.c",
+  "-D",
+  "${TARGET_DEFINE}",
+  "-I",
+  "${TARGET_DIR}/${PROFILE_DIR}/include",
+  "-o",
+  "${TARGET_DIR}/example.elf",
+]
+
+[tasks.build_fuzzer]
+condition = { env_set = ["FEATURE"] }
+command = "cargo"
+args = [
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--no-default-features",
+  "--features",
+  "std,${FEATURE}",
+  "--target-dir",
+  "${TARGET_DIR}",
+]
+dependencies = ["image"]
+
+[tasks.run_fuzzer]
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_baremetal"
+args = [
+  "-icount",
+  "shift=auto,align=off,sleep=off",
+  "-machine",
+  "mps2-an385",
+  "-monitor",
+  "null",
+  "-kernel",
+  "${TARGET_DIR}/example.elf",
+  "-serial",
+  "null",
+  "-nographic",
+  "-snapshot",
+  "-drive",
+  "if=none,format=qcow2,file=${TARGET_DIR}/dummy.qcow2",
+  "-S",
+]
+dependencies = ["target"]
+
+[tasks.test_fuzzer]
+condition = { env_set = ["FEATURE"] }
+script_runner = "@shell"
+script = '''
+TMP_DIR=$(mktemp -d)
+
+cargo make build_$FEATURE
+timeout 20s ${TARGET_DIR}/${PROFILE_DIR}/qemu_baremetal -icount shift=auto,align=off,sleep=off -machine mps2-an385 -monitor null -kernel ${TARGET_DIR}/example.elf -serial null -nographic -snapshot -drive if=none,format=qcow2,file=${TARGET_DIR}/dummy.qcow2 -S | tee $TMP_DIR/fuzz.log 2>&1 || true
+
+if [ -z "$(grep 'Objective' $TMP_DIR/fuzz.log)" ]; then
+    echo "qemu_baremetal ${FEATURE}: Fuzzer did not find the objective in $TMP_DIR/fuzz.log"
+    exit 1
+else
+    echo "qemu_baremetal ${FEATURE}: Objective found."
+fi
+'''
+dependencies = ["target"]
+
+[tasks.build_low_level]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=low_level",
+  "-e",
+  "TARGET_DEFINE=TARGET_CLASSIC",
+  "build_fuzzer",
+]
+
+[tasks.test_low_level]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=low_level",
+  "-e",
+  "TARGET_DEFINE=TARGET_CLASSIC",
+  "test_fuzzer",
+]
+
+[tasks.build_breakpoint]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=breakpoint",
+  "-e",
+  "TARGET_DEFINE=TARGET_BREAKPOINT",
+  "build_fuzzer",
+]
+
+[tasks.test_breakpoint]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=breakpoint",
+  "-e",
+  "TARGET_DEFINE=TARGET_BREAKPOINT",
+  "test_fuzzer",
+]
+
+[tasks.build_sync_exit]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=sync_exit",
+  "-e",
+  "TARGET_DEFINE=TARGET_SYNC_EXIT",
+  "build_fuzzer",
+]
+
+[tasks.test_sync_exit]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=sync_exit",
+  "-e",
+  "TARGET_DEFINE=TARGET_SYNC_EXIT",
+  "test_fuzzer",
+]
+
+[tasks.low_level]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=low_level",
+  "-e",
+  "TARGET_DEFINE=TARGET_CLASSIC",
+  "run_fuzzer",
+]
+
+[tasks.breakpoint]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=breakpoint",
+  "-e",
+  "TARGET_DEFINE=TARGET_BREAKPOINT",
+  "run_fuzzer",
+]
+
+[tasks.sync_exit]
+command = "cargo"
+args = [
+  "make",
+  "-e",
+  "FEATURE=sync_exit",
+  "-e",
+  "TARGET_DEFINE=TARGET_SYNC_EXIT",
+  "run_fuzzer",
+]
+
+[tasks.test]
+clear = true
+run_task = { name = ["test_low_level", "test_breakpoint", "test_sync_exit"] }
+
+[tasks.build]
+clear = true
+run_task = { name = ["build_low_level", "build_breakpoint", "build_sync_exit"] }
+
+[tasks.run]
+alias = "low_level"
+
+[tasks.clean]
+clear = true
+script_runner = "@shell"
+script = '''
+rm -rf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+cargo clean
+'''

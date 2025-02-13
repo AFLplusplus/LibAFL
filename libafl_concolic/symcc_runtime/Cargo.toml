@@ -2,7 +2,11 @@
 name = "symcc_runtime"
 version.workspace = true
 edition = "2021"
-authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = [
+  "Julius Hohnerlein <julihoh@users.noreply.github.com>",
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
 description = "Build Concolic Tracing tools based on SymCC in Rust"
 documentation = "https://docs.rs/symcc_runtime"
 repository = "https://github.com/AFLplusplus/LibAFL/"
@@ -10,24 +14,37 @@ readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 build = "build.rs"
-categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
-# skips building and linking the C++ part of the runtime
+## skips building and linking the C++ part of the runtime
 no-cpp-runtime = []
 
 [dependencies]
-unchecked_unwrap = "4"
-ctor = "0.1"
-libc = "0.2"
-libafl = { path = "../../libafl", version = "0.9.0", default-features=false, features=["std"] }
+libafl = { workspace = true, features = ["std", "serdeany_autoreg"] }
+libafl_bolts = { workspace = true, features = ["std", "serdeany_autoreg"] }
+
+unchecked_unwrap = "4.0.0"
+ctor = "0.2.9"
+libc = { workspace = true }
 
 [build-dependencies]
-cmake = "0.1"
-bindgen = "0.63"
-regex = "1"
-lazy_static = "1.4"
-which = "4.2"
-symcc_libafl = { path = "../symcc_libafl", version = "0.9.0" }
+cmake = { workspace = true }
+bindgen = { workspace = true }
+regex = { workspace = true }
+which = { workspace = true }
+symcc_libafl = { workspace = true, default-features = true }
+
+[lints]
+workspace = true

@@ -9,22 +9,22 @@ So the Executor is for instance responsible to inform the program about the inpu
 
 In our model, it can also hold a set of Observers connected with each execution.
 
-In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/0/libafl/executors/trait.Executor.html) trait. A structure implementing this trait must implement [`HasObservers`](https://docs.rs/libafl/0/libafl/executors/trait.HasObservers.html) too if wants to hold a set of Observers.
+In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/latest/libafl/executors/trait.Executor.html) trait. A structure implementing this trait must implement [`HasObservers`](https://docs.rs/libafl/latest/libafl/executors/trait.HasObservers.html) too if wants to hold a set of Observers.
 
-By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/0/libafl/executors/inprocess/struct.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/0/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
-
-A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/0.6.1/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and installs a timeout callback before calling the original `run` function of the wrapped executor.
+By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/latest/libafl/executors/inprocess/type.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/latest/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
 
 ## InProcessExecutor
+
 Let's begin with the base case; `InProcessExecutor`.
 This executor executes the harness program (function) inside the fuzzer process.
 
 When you want to execute the harness as fast as possible, you will most probably want to use this `InprocessExecutor`.
 
- One thing to note here is, when your harness is likely to have heap corruption bugs, you want to use another allocator so that corrupted heap does not affect the fuzzer itself. (For example, we adopt MiMalloc in some of our fuzzers.). Alternatively you can compile your harness with address sanitizer to make sure you can catch these heap bugs.
+One thing to note here is, when your harness is likely to have heap corruption bugs, you want to use another allocator so that corrupted heap does not affect the fuzzer itself. (For example, we adopt MiMalloc in some of our fuzzers.). Alternatively you can compile your harness with address sanitizer to make sure you can catch these heap bugs.
 
 ## ForkserverExecutor
-Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFLplusplus/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Fortunately we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage in.
+
+Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFL/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Fortunately we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage in.
 
 As you can see from the forkserver example,
 
@@ -33,12 +33,12 @@ As you can see from the forkserver example,
 let mut shmem = StdShMemProvider::new().unwrap().new_shmem(MAP_SIZE).unwrap();
 //let the forkserver know the shmid
 shmem.write_to_env("__AFL_SHM_ID").unwrap();
-let mut shmem_buf = shmem.as_mut_slice();
+let mut shmem_buf = shmem.as_slice_mut();
 ```
 
 Here we make a shared memory region; `shmem`, and write this to environmental variable `__AFL_SHM_ID`. Then the instrumented binary, or the forkserver, finds this shared memory region (from the aforementioned env var) to record its coverage. On your fuzzer side, you can pass this shmem map to your `Observer` to obtain coverage feedbacks combined with any `Feedback`.
 
-Another feature of the `ForkserverExecutor` to mention is the shared memory testcases. In normal cases, the mutated input is passed between the forkserver and the instrumented binary via `.cur_input` file. You can improve your forkserver fuzzer's performance by passing the input with shared memory.  
+Another feature of the `ForkserverExecutor` to mention is the shared memory testcases. In normal cases, the mutated input is passed between the forkserver and the instrumented binary via `.cur_input` file. You can improve your forkserver fuzzer's performance by passing the input with shared memory.
 
 If the target is configured to use shared memory testcases, the `ForkserverExecutor` will notice this during the handshake and will automatically set up things accordingly.
 See AFL++'s [_documentation_](https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md#5-shared-memory-fuzzing) or the fuzzer example in `forkserver_simple/src/program.c` for reference.
@@ -59,12 +59,25 @@ On your fuzzer side, you can allocate a shared memory region and make the `EDGES
 ```rust,ignore
 let mut shmem;
 unsafe{
-    shmem = StdShMemProvider::new().unwrap().new_shmem(MAX_EDGES_NUM).unwrap();
+    shmem = StdShMemProvider::new().unwrap().new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
 }
-let shmem_buf = shmem.as_mut_slice();
+let shmem_buf = shmem.as_slice_mut();
 unsafe{
     EDGES_PTR = shmem_buf.as_ptr();
 }
 ```
 
 Again, you can pass this shmem map to your `Observer` and `Feedback` to obtain coverage feedbacks.
+
+Additionaly to allow the fuzzer to know when the child has crashed, the program should abort instead of unwinding upon a panic.
+Without it, no crashes are saved by the fuzzer.
+
+Cargo.toml:
+
+```toml
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+```

@@ -1,3 +1,0 @@
-[submodule "libafl_concolic/symcc_runtime/symcc"]
-	path = libafl_concolic/symcc_runtime/symcc
-	url = https://github.com/AFLplusplus/symcc.git

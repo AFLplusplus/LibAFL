@@ -1,20 +1,22 @@
-//! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
+//! The [`NewHashFeedback`] uses the backtrace hash and a hashset to only keep novel cases
 
-use alloc::string::{String, ToString};
-use std::{fmt::Debug, marker::PhantomData};
+use alloc::{borrow::Cow, string::ToString};
+use std::fmt::Debug;
 
 use hashbrown::HashSet;
+use libafl_bolts::{
+    tuples::{Handle, Handled, MatchName, MatchNameRef},
+    Named,
+};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "track_hit_feedbacks")]
+use crate::feedbacks::premature_last_result_err;
 use crate::{
-    bolts::tuples::Named,
-    events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, HasObserverName},
-    inputs::UsesInput,
-    observers::{ObserverWithHashField, ObserversTuple},
-    state::{HasClientPerfMonitor, HasNamedMetadata},
-    Error,
+    feedbacks::{Feedback, HasObserverHandle, StateInitializer},
+    observers::ObserverWithHashField,
+    Error, HasNamedMetadata,
 };
 
 /// The prefix of the metadata names
@@ -30,13 +32,14 @@ pub trait HashSetState<T> {
 
 /// The state of [`NewHashFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[expect(clippy::unsafe_derive_deserialize)]
 pub struct NewHashFeedbackMetadata {
     /// Contains information about untouched entries
-    pub hash_set: HashSet<u64>,
+    hash_set: HashSet<u64>,
 }
 
 #[rustfmt::skip]
-crate::impl_serdeany!(NewHashFeedbackMetadata);
+libafl_bolts::impl_serdeany!(NewHashFeedbackMetadata);
 
 impl NewHashFeedbackMetadata {
     /// Create a new [`NewHashFeedbackMetadata`]
@@ -58,6 +61,17 @@ impl NewHashFeedbackMetadata {
         self.hash_set.clear();
         Ok(())
     }
+
+    /// Gets the associated [`HashSet`] being used to track hashes
+    #[must_use]
+    pub fn hash_set(&self) -> &HashSet<u64> {
+        &self.hash_set
+    }
+
+    /// Gets the associated [`HashSet`] being used to track hashes, mutably
+    pub fn hash_set_mut(&mut self) -> &mut HashSet<u64> {
+        &mut self.hash_set
+    }
 }
 
 impl HashSetState<u64> for NewHashFeedbackMetadata {
@@ -69,82 +83,108 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 
     fn update_hash_set(&mut self, value: u64) -> Result<bool, Error> {
         let r = self.hash_set.insert(value);
-        // println!("Got r={}, the hashset is {:?}", r, &self.hash_set);
+        // log::trace!("Got r={}, the hashset is {:?}", r, &self.hash_set);
         Ok(r)
     }
 }
 
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewHashFeedback<O, S> {
-    name: String,
-    observer_name: String,
+pub struct NewHashFeedback<O> {
+    name: Cow<'static, str>,
+    o_ref: Handle<O>,
     /// Initial capacity of hash set
     capacity: usize,
-    o_type: PhantomData<(O, S)>,
+    #[cfg(feature = "track_hit_feedbacks")]
+    // The previous run's result of `Self::is_interesting`
+    last_result: Option<bool>,
 }
 
-impl<O, S> Feedback<S> for NewHashFeedback<O, S>
+impl<O> NewHashFeedback<O>
 where
-    O: ObserverWithHashField + Named + Debug,
-    S: UsesInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
+    O: ObserverWithHashField + Named,
 {
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(
-            NewHashFeedbackMetadata::with_capacity(self.capacity),
-            &self.name,
-        );
-        Ok(())
-    }
-
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn has_interesting_backtrace_hash_observation<OT, S: HasNamedMetadata>(
         &mut self,
         state: &mut S,
-        _manager: &mut EM,
-        _input: &<S as UsesInput>::Input,
         observers: &OT,
-        _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
+        OT: MatchName,
     {
         let observer = observers
-            .match_name::<O>(&self.observer_name)
+            .get(&self.o_ref)
             .expect("A NewHashFeedback needs a BacktraceObserver");
 
         let backtrace_state = state
-            .named_metadata_mut()
+            .named_metadata_map_mut()
             .get_mut::<NewHashFeedbackMetadata>(&self.name)
             .unwrap();
 
-        match observer.hash() {
-            Some(hash) => {
-                let res = backtrace_state
-                    .update_hash_set(hash)
-                    .expect("Failed to update the hash state");
-                Ok(res)
-            }
+        let res = match observer.hash() {
+            Some(hash) => backtrace_state.update_hash_set(hash)?,
             None => {
                 // We get here if the hash was not updated, i.e the first run or if no crash happens
-                Ok(false)
+                false
             }
+        };
+        #[cfg(feature = "track_hit_feedbacks")]
+        {
+            self.last_result = Some(res);
         }
+        Ok(res)
     }
 }
 
-impl<O, S> Named for NewHashFeedback<O, S> {
+impl<O, S> StateInitializer<S> for NewHashFeedback<O>
+where
+    S: HasNamedMetadata,
+{
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        state.add_named_metadata(
+            &self.name,
+            NewHashFeedbackMetadata::with_capacity(self.capacity),
+        );
+        Ok(())
+    }
+}
+
+impl<O, EM, I, OT, S> Feedback<EM, I, OT, S> for NewHashFeedback<O>
+where
+    O: ObserverWithHashField + Named,
+    OT: MatchName,
+    S: HasNamedMetadata,
+{
+    fn is_interesting(
+        &mut self,
+        state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error> {
+        self.has_interesting_backtrace_hash_observation(state, observers)
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        self.last_result.ok_or(premature_last_result_err())
+    }
+}
+
+impl<O> Named for NewHashFeedback<O> {
     #[inline]
-    fn name(&self) -> &str {
+    fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<O, S> HasObserverName for NewHashFeedback<O, S> {
+impl<O> HasObserverHandle for NewHashFeedback<O> {
+    type Observer = O;
+
     #[inline]
-    fn observer_name(&self) -> &str {
-        &self.observer_name
+    fn observer_handle(&self) -> &Handle<O> {
+        &self.o_ref
     }
 }
 
@@ -154,22 +194,10 @@ impl<O, S> HasObserverName for NewHashFeedback<O, S> {
 /// runs of the target, producing many different feedbacks.
 const DEFAULT_CAPACITY: usize = 4096;
 
-impl<O, S> NewHashFeedback<O, S>
+impl<O> NewHashFeedback<O>
 where
-    O: ObserverWithHashField + Named + Debug,
+    O: Named,
 {
-    /// Returns a new [`NewHashFeedback`].
-    /// Setting an observer name that doesn't exist would eventually trigger a panic.
-    #[must_use]
-    pub fn with_names(name: &str, observer_name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            observer_name: observer_name.to_string(),
-            capacity: DEFAULT_CAPACITY,
-            o_type: PhantomData,
-        }
-    }
-
     /// Returns a new [`NewHashFeedback`].
     #[must_use]
     pub fn new(observer: &O) -> Self {
@@ -181,10 +209,11 @@ where
     #[must_use]
     pub fn with_capacity(observer: &O, capacity: usize) -> Self {
         Self {
-            name: NEWHASHFEEDBACK_PREFIX.to_string() + observer.name(),
-            observer_name: observer.name().to_string(),
+            name: Cow::from(NEWHASHFEEDBACK_PREFIX.to_string() + observer.name()),
+            o_ref: observer.handle(),
             capacity,
-            o_type: PhantomData,
+            #[cfg(feature = "track_hit_feedbacks")]
+            last_result: None,
         }
     }
 }

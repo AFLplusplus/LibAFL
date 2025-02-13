@@ -1,0 +1,23 @@
+[package]
+name = "cargo_fuzz_test"
+edition = "2021"
+version = "0.15.1"
+description = "test"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+repository = "https://github.com/AFLplusplus/LibAFL/"
+keywords = ["fuzzing", "testing", "compiler"]
+categories = [
+  "development-tools::testing",
+  "emulators",
+  "embedded",
+  "os",
+  "no-std",
+]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = { version = "0.4.22", features = ["release_max_level_info"] }

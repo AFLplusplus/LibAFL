@@ -1,29 +1,45 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-use std::{fmt::Debug, io::Write, marker::PhantomData};
+use std::{
+    borrow::Cow,
+    fmt::Debug,
+    io::Write,
+    marker::PhantomData,
+    sync::{Mutex, MutexGuard},
+};
 
 use backtrace::Backtrace;
-use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
-use frida_gum::ModuleDetails;
+use frida_gum::{Gum, Process};
 use libafl::{
-    bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
-    events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
-    inputs::{HasTargetBytes, UsesInput},
-    observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata},
-    Error, SerdeAny,
+    feedbacks::{Feedback, StateInitializer},
+    observers::Observer,
+    Error, HasMetadata,
 };
+use libafl_bolts::{
+    ownedref::OwnedPtr,
+    tuples::{Handle, Handled, MatchNameRef},
+    Named, SerdeAny,
+};
+use mmap_rs::MmapOptions;
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arch::Arch;
+use yaxpeax_arch::LengthedInstruction;
+#[cfg(target_arch = "aarch64")]
+use yaxpeax_arm::armv8::a64::ARMv8;
+#[cfg(target_arch = "x86_64")]
+use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
-use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
+use crate::{
+    alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, utils::disas_count,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -34,7 +50,7 @@ pub(crate) struct AsanReadWriteError {
     pub backtrace: Backtrace,
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub(crate) enum AsanError {
     OobRead(AsanReadWriteError),
@@ -73,7 +89,7 @@ pub(crate) enum AsanError {
 }
 
 impl AsanError {
-    fn description(&self) -> &str {
+    pub fn description(&self) -> &str {
         match self {
             AsanError::OobRead(_) => "heap out-of-bounds read",
             AsanError::OobWrite(_) => "heap out-of-bounds write",
@@ -92,20 +108,20 @@ impl AsanError {
 }
 
 /// A struct holding errors that occurred during frida address sanitizer runs
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
-    options: FuzzerOptions,
-    errors: Vec<AsanError>,
+    continue_on_error: bool,
+    pub(crate) errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
     /// Creates a new `AsanErrors` struct
     #[must_use]
-    pub fn new(options: FuzzerOptions) -> Self {
+    pub const fn new(continue_on_error: bool) -> Self {
         Self {
-            options,
             errors: Vec::new(),
+            continue_on_error,
         }
     }
 
@@ -127,16 +143,18 @@ impl AsanErrors {
     }
 
     /// Get a mutable reference to the global [`struct@AsanErrors`] object
-    #[must_use]
-    pub fn get_mut<'a>() -> &'a mut Self {
-        unsafe { ASAN_ERRORS.as_mut().unwrap() }
+    pub fn get_mut_blocking() -> MutexGuard<'static, Self> {
+        ASAN_ERRORS.lock().unwrap()
     }
 
-    /// Report an error
-    #[allow(clippy::too_many_lines)]
-    pub(crate) fn report_error(&mut self, error: AsanError) {
-        self.errors.push(error.clone());
+    /// Sets if this [`AsanErrors`] variable should continue on error, or not.
+    pub fn set_continue_on_error(&mut self, continue_on_error: bool) {
+        self.continue_on_error = continue_on_error;
+    }
 
+    /// Report an error, returns true if the caller should panic
+    #[expect(clippy::too_many_lines)]
+    pub(crate) fn report_error(&mut self, error: AsanError) -> bool {
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
@@ -150,20 +168,22 @@ impl AsanErrors {
                 );
             }));
 
-        #[allow(clippy::non_ascii_literal)]
+        #[expect(clippy::non_ascii_literal)]
         writeln!(output, "{:━^100}", " Memory error detected! ").unwrap();
         output
             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
             .unwrap();
         write!(output, "{}", error.description()).unwrap();
-        match error {
-            AsanError::OobRead(mut error)
-            | AsanError::OobWrite(mut error)
-            | AsanError::ReadAfterFree(mut error)
-            | AsanError::WriteAfterFree(mut error) => {
+        match &error {
+            AsanError::OobRead(error)
+            | AsanError::OobWrite(error)
+            | AsanError::ReadAfterFree(error)
+            | AsanError::WriteAfterFree(error) => {
                 let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
-                if let Some(module_details) = ModuleDetails::with_address(error.pc as u64) {
+                if let Some(module_details) =
+                    Process::obtain(&Gum::obtain()).find_module_by_address(error.pc)
+                {
                     writeln!(
                         output,
                         " at 0x{:x} ({}@0x{:04x}), faulting address 0x{:x}",
@@ -183,7 +203,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                 #[cfg(target_arch = "aarch64")]
                 for reg in 0..=30 {
@@ -230,37 +250,34 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "rip: 0x{:016x}", error.pc).unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
-                let mut cs = Capstone::new()
-                    .x86()
-                    .mode(capstone::arch::x86::ArchMode::Mode64)
-                    .detail(true)
-                    .build()
-                    .expect("Failed to create Capstone object");
-
-                cs.set_skipdata(true).expect("failed to set skipdata");
+                let decoder = InstDecoder::minimal();
 
                 let start_pc = error.pc - 4 * 5;
-                for insn in cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                    .iter()
-                {
-                    if insn.address() as usize == error.pc {
+                #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
+                    11,
+                );
+
+                let mut inst_address = start_pc;
+
+                for insn in insts {
+                    if inst_address == error.pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -269,14 +286,20 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
+
+                    inst_address += insn.len().to_const() as usize;
                 }
                 backtrace_printer
                     .print_trace(&error.backtrace, output)
                     .unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
-                let offset: i64 = fault_address as i64 - (error.metadata.address + 0x1000) as i64;
+                let fault_address: i64 = fault_address.try_into().unwrap();
+                let metadata_address: i64 = error.metadata.address.try_into().unwrap();
+                #[allow(clippy::cast_possible_wrap)]
+                let offset: i64 =
+                    fault_address - (metadata_address + MmapOptions::page_size() as i64);
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
@@ -284,7 +307,7 @@ impl AsanErrors {
                     offset,
                     direction,
                     error.metadata.size,
-                    error.metadata.address + 0x1000
+                    error.metadata.address + MmapOptions::page_size()
                 )
                 .unwrap();
 
@@ -292,16 +315,20 @@ impl AsanErrors {
                     writeln!(output, "allocation was zero-sized").unwrap();
                 }
 
-                if let Some(backtrace) = error.metadata.allocation_site_backtrace.as_mut() {
+                let mut allocation_site_backtrace =
+                    error.metadata.allocation_site_backtrace.clone();
+                let mut release_site_backtrace = error.metadata.release_site_backtrace.clone();
+
+                if let Some(backtrace) = &mut allocation_site_backtrace {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
 
                 if error.metadata.freed {
-                    #[allow(clippy::non_ascii_literal)]
+                    #[expect(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
-                    if let Some(backtrace) = error.metadata.release_site_backtrace.as_mut() {
+                    if let Some(backtrace) = &mut release_site_backtrace {
                         writeln!(output, "free site backtrace:").unwrap();
                         backtrace.resolve();
                         backtrace_printer.print_trace(backtrace, output).unwrap();
@@ -321,7 +348,9 @@ impl AsanErrors {
                 {
                     let invocation = Interceptor::current_invocation();
                     let cpu_context = invocation.cpu_context();
-                    if let Some(module_details) = ModuleDetails::with_address(_pc as u64) {
+                    if let Some(module_details) =
+                        Process::obtain(&Gum::obtain()).find_module_by_address(*_pc)
+                    {
                         writeln!(
                             output,
                             " at 0x{:x} ({}@0x{:04x})",
@@ -334,11 +363,11 @@ impl AsanErrors {
                         writeln!(output, " at 0x{_pc:x}").unwrap();
                     }
 
-                    #[allow(clippy::non_ascii_literal)]
+                    #[expect(clippy::non_ascii_literal)]
                     writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
                     for reg in 0..29 {
                         let val = cpu_context.reg(reg);
-                        if val as usize == address {
+                        if val as usize == *address {
                             output
                                 .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                                 .unwrap();
@@ -354,19 +383,19 @@ impl AsanErrors {
                     writeln!(output, "pc : 0x{:016x} ", cpu_context.pc()).unwrap();
                 }
 
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
+                backtrace_printer.print_trace(backtrace, output).unwrap();
             }
-            AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
+            AsanError::DoubleFree((ptr, metadata, backtrace)) => {
                 writeln!(output, " of {ptr:?}").unwrap();
                 output.reset().unwrap();
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
+                backtrace_printer.print_trace(backtrace, output).unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address + 0x1000,
+                    metadata.address + MmapOptions::page_size(),
                     metadata.size
                 )
                 .unwrap();
@@ -374,14 +403,17 @@ impl AsanErrors {
                     writeln!(output, "allocation was zero-sized").unwrap();
                 }
 
-                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
+                let mut allocation_site_backtrace = metadata.allocation_site_backtrace.clone();
+                let mut release_site_backtrace = metadata.release_site_backtrace.clone();
+
+                if let Some(backtrace) = &mut allocation_site_backtrace {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
                 }
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " FREE INFO ").unwrap();
-                if let Some(backtrace) = metadata.release_site_backtrace.as_mut() {
+                if let Some(backtrace) = &mut release_site_backtrace {
                     writeln!(output, "previous free site backtrace:").unwrap();
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
@@ -390,18 +422,18 @@ impl AsanErrors {
             AsanError::UnallocatedFree((ptr, backtrace)) => {
                 writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
+                backtrace_printer.print_trace(backtrace, output).unwrap();
             }
-            AsanError::Leak((ptr, mut metadata)) => {
+            AsanError::Leak((ptr, metadata)) => {
                 writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address + 0x1000,
+                    metadata.address + MmapOptions::page_size(),
                     metadata.size
                 )
                 .unwrap();
@@ -409,7 +441,9 @@ impl AsanErrors {
                     writeln!(output, "allocation was zero-sized").unwrap();
                 }
 
-                if let Some(backtrace) = metadata.allocation_site_backtrace.as_mut() {
+                let mut allocation_site_backtrace = metadata.allocation_site_backtrace.clone();
+
+                if let Some(backtrace) = &mut allocation_site_backtrace {
                     writeln!(output, "allocation site backtrace:").unwrap();
                     backtrace.resolve();
                     backtrace_printer.print_trace(backtrace, output).unwrap();
@@ -420,7 +454,9 @@ impl AsanErrors {
             | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
-                if let Some(module_details) = ModuleDetails::with_address(pc as u64) {
+                if let Some(module_details) =
+                    Process::obtain(&Gum::obtain()).find_module_by_address(*pc)
+                {
                     writeln!(
                         output,
                         " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
@@ -435,7 +471,7 @@ impl AsanErrors {
                 }
                 output.reset().unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
@@ -484,37 +520,34 @@ impl AsanErrors {
                 #[cfg(target_arch = "x86_64")]
                 writeln!(output, "Rip: 0x{pc:016x}").unwrap();
 
-                #[allow(clippy::non_ascii_literal)]
+                #[expect(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                let mut cs = Capstone::new()
-                    .arm64()
-                    .mode(capstone::arch::arm64::ArchMode::Arm)
-                    .build()
-                    .unwrap();
+                let decoder = <ARMv8 as Arch>::Decoder::default();
 
                 #[cfg(target_arch = "x86_64")]
-                let mut cs = Capstone::new()
-                    .x86()
-                    .mode(capstone::arch::x86::ArchMode::Mode64)
-                    .detail(true)
-                    .build()
-                    .expect("Failed to create Capstone object");
-
-                cs.set_skipdata(true).expect("failed to set skipdata");
+                let decoder = InstDecoder::minimal();
 
                 let start_pc = pc;
-                for insn in cs
-                    .disasm_count(
-                        unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
-                        start_pc as u64,
-                        11,
-                    )
-                    .expect("failed to disassemble instructions")
-                    .iter()
-                {
-                    if insn.address() as usize == pc {
+
+                #[cfg(target_arch = "x86_64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(*start_pc as *mut u8, 15 * 11) },
+                    11,
+                );
+
+                #[cfg(target_arch = "aarch64")]
+                let insts = disas_count(
+                    &decoder,
+                    unsafe { std::slice::from_raw_parts(*start_pc as *mut u8, 4 * 11) },
+                    11,
+                );
+
+                let mut inst_address = *start_pc;
+                for insn in insts {
+                    if inst_address == *pc {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
@@ -523,38 +556,35 @@ impl AsanErrors {
                     } else {
                         writeln!(output, "\t    {insn}").unwrap();
                     }
-                }
-                backtrace_printer.print_trace(&backtrace, output).unwrap();
-            }
-        };
 
-        #[allow(clippy::manual_assert)]
-        if !self.options.continue_on_error {
-            panic!("ASAN: Crashing target!");
+                    inst_address += insn.len().to_const() as usize;
+                }
+                backtrace_printer.print_trace(backtrace, output).unwrap();
+            }
         }
+
+        self.errors.push(error);
+
+        !self.continue_on_error
     }
 }
 
 /// static field for `AsanErrors` for a run
-pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
+pub static ASAN_ERRORS: Mutex<AsanErrors> = Mutex::new(AsanErrors::new(true));
 
-/// An observer for frida address sanitizer `AsanError`s for a frida executor run
+/// An observer for frida address sanitizer `AsanError`s for a `Frida` executor run
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)]
-pub struct AsanErrorsObserver {
-    errors: OwnedPtr<Option<AsanErrors>>,
+#[expect(clippy::unsafe_derive_deserialize)]
+pub enum AsanErrorsObserver {
+    /// Observer referencing a list behind a [`OwnedPtr`] pointer.
+    Ptr(OwnedPtr<AsanErrors>),
+    /// Observer referencing the static [`ASAN_ERRORS`] variable.
+    Static,
 }
 
-impl<S> Observer<S> for AsanErrorsObserver
-where
-    S: UsesInput,
-{
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        unsafe {
-            if ASAN_ERRORS.is_some() {
-                ASAN_ERRORS.as_mut().unwrap().clear();
-            }
-        }
+impl<I, S> Observer<I, S> for AsanErrorsObserver {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        AsanErrors::get_mut_blocking().clear();
 
         Ok(())
     }
@@ -562,42 +592,53 @@ where
 
 impl Named for AsanErrorsObserver {
     #[inline]
-    fn name(&self) -> &str {
-        "AsanErrors"
+    fn name(&self) -> &Cow<'static, str> {
+        static ASAN_ERRORS_NAME: Cow<'static, str> = Cow::Borrowed("AsanErrors");
+        &ASAN_ERRORS_NAME
     }
 }
 
 impl AsanErrorsObserver {
-    /// Creates a new `AsanErrorsObserver`, pointing to a constant `AsanErrors` field
+    /// Creates a new [`AsanErrorsObserver`], pointing to a constant `AsanErrors` field
     #[must_use]
-    pub fn new(errors: &'static Option<AsanErrors>) -> Self {
-        Self {
-            errors: OwnedPtr::Ptr(errors as *const Option<AsanErrors>),
-        }
+    pub fn new(errors: OwnedPtr<AsanErrors>) -> Self {
+        Self::Ptr(errors)
+    }
+
+    /// Creates a new [`AsanErrorsObserver`], pointing to the [`ASAN_ERRORS`] global static field.
+    ///
+    /// # Safety
+    /// The field should not be accessed multiple times at the same time (i.e., from different threads)!
+    #[must_use]
+    pub fn from_static_asan_errors() -> Self {
+        Self::Static
     }
 
     /// Creates a new `AsanErrorsObserver`, owning the `AsanErrors`
     #[must_use]
-    pub fn new_owned(errors: Option<AsanErrors>) -> Self {
-        Self {
-            errors: OwnedPtr::Owned(Box::new(errors)),
-        }
+    pub fn owned(errors: AsanErrors) -> Self {
+        Self::Ptr(OwnedPtr::Owned(Box::new(errors)))
     }
 
     /// Creates a new `AsanErrorsObserver` from a raw ptr
+    ///
+    /// # Safety
+    /// Will dereference this pointer at a later point in time.
+    /// The pointer *must* outlive this [`AsanErrorsObserver`]'s lifetime.
     #[must_use]
-    pub fn from_mut_ptr(errors: *const Option<AsanErrors>) -> Self {
-        Self {
-            errors: OwnedPtr::Ptr(errors),
-        }
+    pub unsafe fn from_ptr(errors: *const AsanErrors) -> Self {
+        Self::Ptr(OwnedPtr::Ptr(errors))
     }
 
-    /// gets the [`struct@AsanErrors`] from the previous run
+    /// Gets the [`struct@AsanErrors`] from the previous run
     #[must_use]
-    pub fn errors(&self) -> Option<&AsanErrors> {
-        match &self.errors {
-            OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().as_ref() },
-            OwnedPtr::Owned(b) => b.as_ref().as_ref(),
+    pub fn errors(&self) -> AsanErrors {
+        match self {
+            Self::Ptr(errors) => match errors {
+                OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().clone() },
+                OwnedPtr::Owned(b) => b.as_ref().clone(),
+            },
+            Self::Static => AsanErrors::get_mut_blocking().clone(),
         }
     }
 }
@@ -606,47 +647,43 @@ impl AsanErrorsObserver {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
+    observer_handle: Handle<AsanErrorsObserver>,
     phantom: PhantomData<S>,
 }
 
-impl<S> Feedback<S> for AsanErrorsFeedback<S>
+impl<S> StateInitializer<S> for AsanErrorsFeedback<S> {}
+
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for AsanErrorsFeedback<S>
 where
-    S: UsesInput + Debug + HasClientPerfMonitor,
-    S::Input: HasTargetBytes,
+    S: Debug,
+    OT: MatchNameRef,
 {
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> Result<bool, Error>
-    where
-        EM: EventFirer<State = S>,
-        OT: ObserversTuple<S>,
-    {
+    ) -> Result<bool, Error> {
         let observer = observers
-            .match_name::<AsanErrorsObserver>("AsanErrors")
+            .get(&self.observer_handle)
             .expect("An AsanErrorsFeedback needs an AsanErrorsObserver");
-        match observer.errors() {
-            None => Ok(false),
-            Some(errors) => {
-                if errors.errors.is_empty() {
-                    Ok(false)
-                } else {
-                    self.errors = Some(errors.clone());
-                    Ok(true)
-                }
-            }
+        let errors = observer.errors();
+        if errors.is_empty() {
+            Ok(false)
+        } else {
+            self.errors = Some(errors);
+            Ok(true)
         }
     }
 
     fn append_metadata(
         &mut self,
         _state: &mut S,
-        testcase: &mut Testcase<S::Input>,
+        _manager: &mut EM,
+        _observers: &OT,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
@@ -655,32 +692,32 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.errors = None;
         Ok(())
+    }
+
+    #[cfg(feature = "track_hit_feedbacks")]
+    fn last_result(&self) -> Result<bool, Error> {
+        Ok(self.errors.is_some())
     }
 }
 
 impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
-    fn name(&self) -> &str {
-        "AsanErrors"
+    fn name(&self) -> &Cow<'static, str> {
+        self.observer_handle.name()
     }
 }
 
 impl<S> AsanErrorsFeedback<S> {
     /// Create a new `AsanErrorsFeedback`
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(obs: &AsanErrorsObserver) -> Self {
         Self {
             errors: None,
+            observer_handle: obs.handle(),
             phantom: PhantomData,
         }
-    }
-}
-
-impl<S> Default for AsanErrorsFeedback<S> {
-    fn default() -> Self {
-        Self::new()
     }
 }

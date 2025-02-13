@@ -1,0 +1,320 @@
+[env]
+PROFILE = { value = "release", condition = { env_not_set = ["PROFILE"] } }
+PROFILE_DIR = { source = "${PROFILE}", default_value = "release", mapping = { "release" = "release", "dev" = "debug" }, condition = { env_not_set = [
+  "PROFILE_DIR",
+] } }
+CROSS_CC = "x86_64-linux-gnu-gcc"
+CROSS_CXX = "x86_64-linux-gnu-g++"
+CROSS_CFLAGS = ""
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/x86_64"
+LIBPNG_ARCH = "x86_64"
+LIBPNG_OPTIMIZATIONS = "yes"
+FEATURE = "x86_64"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+#LIBAFL_DEBUG_OUTPUT = "1"
+#CUSTOM_QEMU_DIR= "~/qemu-libafl-bridge"
+
+[env.arm]
+CROSS_CC = "arm-linux-gnueabi-gcc"
+CROSS_CXX = "arm-linux-gnueabi-g++"
+CROSS_CFLAGS = ""
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/arm"
+LIBPNG_ARCH = "arm"
+LIBPNG_OPTIMIZATIONS = "yes"
+FEATURE = "arm"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+
+[env.aarch64]
+CROSS_CC = "aarch64-linux-gnu-gcc"
+CROSS_CXX = "aarch64-linux-gnu-g++"
+CROSS_CFLAGS = ""
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/aarch64"
+LIBPNG_ARCH = "aarch64"
+LIBPNG_OPTIMIZATIONS = "yes"
+FEATURE = "aarch64"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+
+[env.x86_64]
+CROSS_CC = "x86_64-linux-gnu-gcc"
+CROSS_CXX = "x86_64-linux-gnu-g++"
+CROSS_CFLAGS = ""
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/x86_64"
+LIBPNG_ARCH = "x86_64"
+LIBPNG_OPTIMIZATIONS = "yes"
+FEATURE = "x86_64"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+
+[env.i386]
+CROSS_CC = "x86_64-linux-gnu-gcc"
+CROSS_CXX = "x86_64-linux-gnu-g++"
+CROSS_CFLAGS = "-m32"
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/i386"
+LIBPNG_ARCH = "i386"
+LIBPNG_OPTIMIZATIONS = "yes"
+FEATURE = "i386"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+
+[env.mips]
+CROSS_CC = "mipsel-linux-gnu-gcc"
+CROSS_CXX = "mipsel-linux-gnu-g++"
+CROSS_CFLAGS = ""
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/mips"
+LIBPNG_ARCH = "mips"
+LIBPNG_OPTIMIZATIONS = "yes"
+FEATURE = "mips"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+
+[env.ppc]
+CROSS_CC = "powerpc-linux-gnu-gcc"
+CROSS_CXX = "powerpc-linux-gnu-g++"
+CROSS_CFLAGS = ""
+TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/ppc"
+LIBPNG_ARCH = "ppc"
+LIBPNG_OPTIMIZATIONS = "no"
+FEATURE = "ppc"
+LIBAFL_QEMU_CLONE_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/qemu-libafl-bridge"
+
+[tasks.unsupported]
+script_runner = "@shell"
+script = '''
+echo "Qemu fuzzer not supported on windows/mac"
+'''
+
+
+[tasks.target_dir]
+condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"] }
+script_runner = "@shell"
+script = '''
+mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+'''
+
+[tasks.deps_dir]
+dependencies = ["target_dir"]
+condition = { files_not_exist = ["${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/"] }
+script_runner = "@shell"
+script = '''
+mkdir ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/
+'''
+
+[tasks.arch_target_dir]
+dependencies = ["target_dir"]
+condition = { files_not_exist = ["${TARGET_DIR}"] }
+script_runner = "@shell"
+script = '''
+mkdir ${TARGET_DIR}
+'''
+
+[tasks.zlib]
+linux_alias = "zlib_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.zlib_unix_wget]
+dependencies = ["deps_dir"]
+condition = { files_not_exist = [
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/zlib-1.2.13",
+] }
+script_runner = "@shell"
+# NOTE: There's no specific reason we're using an old version of zlib,
+# but newer versions get moved to fossils/ after a while.
+script = '''
+wget \
+    -O "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/zlib-1.2.13.tar.gz" \
+    https://zlib.net/fossils/zlib-1.2.13.tar.gz
+
+tar \
+    zxvf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/zlib-1.2.13.tar.gz \
+    -C ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/
+'''
+
+[tasks.zlib_unix]
+dependencies = ["arch_target_dir", "zlib_unix_wget"]
+condition = { files_not_exist = ["${TARGET_DIR}/build-zlib/libz.a"] }
+script_runner = "@shell"
+script = '''
+rm -rf ${TARGET_DIR}/build-zlib/
+
+mkdir ${TARGET_DIR}/build-zlib/
+
+cd ${TARGET_DIR}/build-zlib/ && \
+    CC=$CROSS_CC \
+    CFLAGS=${CROSS_CFLAGS} \
+    ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/zlib-1.2.13/configure \
+        --prefix=./zlib
+
+make install
+'''
+
+[tasks.libpng]
+linux_alias = "libpng_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.libpng_unix_wget]
+dependencies = ["deps_dir"]
+condition = { files_not_exist = [
+  "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37",
+] }
+script_runner = "@shell"
+script = '''
+wget \
+    -O "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/v1.6.37.tar.gz" \
+    https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+
+tar \
+    -xvf "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/v1.6.37.tar.gz" \
+    -C ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/
+'''
+
+[tasks.libpng_unix]
+dependencies = ["arch_target_dir", "zlib", "libpng_unix_wget"]
+condition = { files_not_exist = ["${TARGET_DIR}/build-png/.libs/libpng16.a"] }
+script_runner = "@shell"
+script = '''
+rm -rf ${TARGET_DIR}/build-png/
+
+mkdir ${TARGET_DIR}/build-png/
+
+cd ${TARGET_DIR}/build-png/ && \
+    CC=$CROSS_CC \
+    CFLAGS="${CROSS_CFLAGS} -I"${TARGET_DIR}/build-zlib/zlib/lib"" \
+    LDFLAGS=-L"${TARGET_DIR}/build-zlib/zlib/lib" \
+    ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/deps/libpng-1.6.37/configure \
+        --enable-shared=no \
+        --with-pic=yes \
+        --enable-hardware-optimizations=${LIBPNG_OPTIMIZATIONS} \
+        --host=${LIBPNG_ARCH} \
+
+make
+'''
+
+[tasks.build]
+linux_alias = "build_unix"
+mac_alias = "build_unix"
+windows_alias = "unsupported"
+
+[tasks.build_unix]
+command = "cargo"
+args = [
+  "build",
+  "--profile",
+  "${PROFILE}",
+  "--features",
+  "${FEATURE}",
+  "--target-dir",
+  "${TARGET_DIR}",
+]
+
+[tasks.fuzzer]
+dependencies = ["build"]
+script_runner = "@shell"
+script = '''
+rm -f ${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin-${CARGO_MAKE_PROFILE}
+mv ${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin ${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin-${CARGO_MAKE_PROFILE}
+'''
+
+[tasks.harness]
+linux_alias = "harness_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.harness_unix]
+script_runner = "@shell"
+script = '''
+${CROSS_CXX} \
+    ./harness.cc \
+    $CROSS_CFLAGS \
+    "${TARGET_DIR}/build-png/.libs/libpng16.a" \
+	"${TARGET_DIR}/build-zlib/libz.a" \
+    -I"${TARGET_DIR}/build-png" \
+	-I"${TARGET_DIR}/build-zlib/zlib/lib" \
+	-L"${TARGET_DIR}/build-zlib/zlib/lib" \
+    -o"${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}" \
+    -lm \
+	-static
+'''
+dependencies = ["libpng"]
+
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+command = "${TARGET_DIR}/${PROFILE_DIR}/qemu_cmin-${CARGO_MAKE_PROFILE}"
+args = [
+  "--output",
+  "./output",
+  "--input",
+  "./corpus",
+  "--verbose",
+  "--",
+  "${TARGET_DIR}/libpng-harness-${CARGO_MAKE_PROFILE}",
+]
+dependencies = ["harness", "fuzzer"]
+
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+dependencies = ["lightweight"]
+# Tidy up after we've run our tests so we don't hog all the disk space
+command = "cargo"
+args = ["make", "clean"]
+
+[tasks.test_full]
+linux_alias = "test_unix_full"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.test_unix_full]
+dependencies = ["all"]
+# Tidy up after we've run our tests so we don't hog all the disk space
+command = "cargo"
+args = ["make", "clean"]
+
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+# Disable default `clean` definition
+clear = true
+script_runner = "@shell"
+script = '''
+rm -rf ${CARGO_MAKE_CRATE_TARGET_DIRECTORY}
+cargo clean
+'''
+
+[tasks.arm]
+command = "cargo"
+args = ["make", "-p", "arm", "run"]
+
+[tasks.aarch64]
+command = "cargo"
+args = ["make", "-p", "aarch64", "run"]
+
+[tasks.x86_64]
+command = "cargo"
+args = ["make", "-p", "x86_64", "run"]
+
+[tasks.i386]
+command = "cargo"
+args = ["make", "-p", "i386", "run"]
+
+[tasks.mips]
+command = "cargo"
+args = ["make", "-p", "mips", "run"]
+
+[tasks.ppc]
+command = "cargo"
+args = ["make", "-p", "ppc", "run"]
+
+[tasks.all]
+dependencies = ["arm", "aarch64", "x86_64", "i386", "mips", "ppc"]
+
+[tasks.lightweight]
+dependencies = ["arm", "x86_64"]

@@ -1,5 +1,7 @@
 #include "common.h"
 
+#include "android-ashmem.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +39,11 @@
 #define FS_ERROR_MMAP 16
 #define FS_ERROR_OLD_CMPLOG 32
 #define FS_ERROR_OLD_CMPLOG_QEMU 64
+
+#define FS_NEW_VERSION_MAX 1
+#define FS_NEW_OPT_MAPSIZE 0x1
+#define FS_NEW_OPT_SHDMEM_FUZZ 0x2
+#define FS_NEW_OPT_AUTODICT 0x800
 
 /* Reporting options */
 #define FS_OPT_ENABLED 0x80000001
@@ -218,70 +225,77 @@ void __afl_start_forkserver(void) {
   old_sigterm_handler = orig_action.sa_handler;
   signal(SIGTERM, at_exit);
 
-  uint8_t  tmp[4] = {0, 0, 0, 0};
-  uint32_t status_for_fsrv = 0;
   uint32_t already_read_first = 0;
   uint32_t was_killed;
+  uint32_t version = 0x41464c00 + FS_NEW_VERSION_MAX;
+  uint32_t tmp = version ^ 0xffffffff;
+  uint32_t status = version;
+  uint32_t status2 = version;
+
+  uint8_t *msg = (uint8_t *)&status;
+  uint8_t *reply = (uint8_t *)&status2;
 
   uint8_t child_stopped = 0;
 
   void (*old_sigchld_handler)(int) = signal(SIGCHLD, SIG_DFL);
 
-  if (__afl_map_size <= FS_OPT_MAX_MAPSIZE) {
-    status_for_fsrv |= (FS_OPT_SET_MAPSIZE(__afl_map_size) | FS_OPT_MAPSIZE);
-  }
-
-  int autodict_on = __token_start != NULL && __token_stop != NULL;
-  if (autodict_on) { status_for_fsrv |= FS_OPT_AUTODICT; }
-
-  if (__afl_sharedmem_fuzzing != 0) { status_for_fsrv |= FS_OPT_SHDMEM_FUZZ; }
-  if (status_for_fsrv) { status_for_fsrv |= FS_OPT_ENABLED; }
-
-  memcpy(tmp, &status_for_fsrv, 4);
+  int autotokens_on = __token_start != NULL && __token_stop != NULL;
 
   /* Phone home and tell the parent that we're OK. If parent isn't there,
      assume we're not running in forkserver mode and just execute program. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) { return; }
+  // return because possible non-forkserver usage
+  if (write(FORKSRV_FD + 1, msg, 4) != 4) { return; }
 
-  if (__afl_sharedmem_fuzzing || autodict_on) {
-    if (read(FORKSRV_FD, &was_killed, 4) != 4) _exit(1);
+  if (read(FORKSRV_FD, reply, 4) != 4) { _exit(1); }
 
-    if ((was_killed & (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ)) ==
-        (FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ)) {
-      map_input_shared_memory();
+  if (tmp != status2) {
+    write_error("wrong forkserver message from AFL++ tool");
+    _exit(1);
+  }
+
+  status = FS_NEW_OPT_MAPSIZE;
+  if (__afl_sharedmem_fuzzing) { status |= FS_NEW_OPT_SHDMEM_FUZZ; }
+  if (autotokens_on) { status |= FS_NEW_OPT_AUTODICT; }
+
+  if (write(FORKSRV_FD + 1, msg, 4) != 4) { _exit(1); }
+
+  // Now send the parameters for the set options, increasing by option number
+
+  // FS_NEW_OPT_MAPSIZE - we always send the map size
+  status = __afl_map_size;
+  if (write(FORKSRV_FD + 1, msg, 4) != 4) { _exit(1); }
+
+  // FS_NEW_OPT_AUTODICT - send autotokens
+  if (autotokens_on) {
+    // pass the autotokens through the forkserver FD
+    uint32_t len = (__token_stop - __token_start), offset = 0;
+
+    if (write(FORKSRV_FD + 1, &len, 4) != 4) {
+      write(2, "Error: could not send autotokens len\n",
+            strlen("Error: could not send autotokens len\n"));
+      _exit(1);
     }
 
-    if ((was_killed & (FS_OPT_ENABLED | FS_OPT_AUTODICT)) ==
-            (FS_OPT_ENABLED | FS_OPT_AUTODICT) &&
-        autodict_on) {
-      // great lets pass the dictionary through the forkserver FD
-      uint32_t len = (__token_stop - __token_start), offset = 0;
+    while (len != 0) {
+      int32_t ret;
+      ret = write(FORKSRV_FD + 1, __token_start + offset, len);
 
-      if (write(FORKSRV_FD + 1, &len, 4) != 4) {
-        write_error("could not send dictionary len");
+      if (ret < 1) {
+        write_error("could not send autotokens");
         _exit(1);
       }
 
-      while (len != 0) {
-        int32_t ret;
-        ret = write(FORKSRV_FD + 1, __token_start + offset, len);
-
-        if (ret < 1) {
-          write_error("could not send dictionary");
-          _exit(1);
-        }
-
-        len -= ret;
-        offset += ret;
-      }
-
-    } else {
-      // uh this forkserver does not understand extended option passing
-      // or does not want the dictionary
-      if (!__afl_fuzz_ptr) already_read_first = 1;
+      len -= ret;
+      offset += ret;
     }
   }
+
+  // send welcome message as final message
+  status = version;
+  if (write(FORKSRV_FD + 1, msg, 4) != 4) { _exit(1); }
+
+  if (__afl_sharedmem_fuzzing) { map_input_shared_memory(); }
 
   while (1) {
     int status;

@@ -1,6 +1,6 @@
 # The LibAFL Fuzzing Library
 
- <img align="right" src="https://github.com/AFLplusplus/Website/raw/master/static/logo_256x256.png" alt="AFL++ Logo">
+ <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/main/static/libafl_logo.svg" alt="LibAFL Logo" style="width: 256px; height: auto">
 
 *by Andrea Fioraldi and Dominik Maier*
 

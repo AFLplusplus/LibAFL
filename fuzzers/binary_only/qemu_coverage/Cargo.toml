@@ -1,0 +1,39 @@
+[package]
+name = "qemu_coverage"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+  "WorksButNotTested",
+]
+edition = "2021"
+
+[profile.release]
+#lto = true
+#codegen-units = 1
+#opt-level = 3
+debug = true
+
+[features]
+default = ["std"]
+std = []
+be = ["libafl_qemu/be"]
+arm = ["libafl_qemu/arm"]
+x86_64 = ["libafl_qemu/x86_64"]
+i386 = ["libafl_qemu/i386"]
+aarch64 = ["libafl_qemu/aarch64"]
+mips = ["libafl_qemu/mips"]
+ppc = ["libafl_qemu/ppc", "be"]
+
+[build-dependencies]
+vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
+vergen-git2 = "1.0.1"
+
+[dependencies]
+clap = { version = "4.5.18", features = ["derive", "string"] }
+env_logger = { version = "0.11.5" }
+libafl = { path = "../../../libafl" }
+libafl_bolts = { path = "../../../libafl_bolts" }
+libafl_qemu = { path = "../../../libafl_qemu", features = ["usermode"] }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+rangemap = { version = "1.5.1" }

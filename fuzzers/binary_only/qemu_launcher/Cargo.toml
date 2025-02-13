@@ -1,0 +1,56 @@
+[package]
+name = "qemu_launcher"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+edition = "2021"
+
+[features]
+default = ["std", "injections"]
+std = []
+clippy = []                     # Only for clippy, don't use.
+
+## Build with a simple event manager instead of Launcher - don't fork, and crash after the first bug.
+simplemgr = []
+
+## Enable fuzzing for injections (where supported)
+injections = ["libafl_qemu/injections"]
+
+## Set emulator to big endian
+be = ["libafl_qemu/be"]
+
+#! ## Mutually exclusive architectures
+arm = ["libafl_qemu/arm"]
+x86_64 = ["libafl_qemu/x86_64"]
+i386 = ["libafl_qemu/i386"]
+aarch64 = ["libafl_qemu/aarch64"]
+mips = ["libafl_qemu/mips"]
+ppc = ["libafl_qemu/ppc", "be"]
+hexagon = ["libafl_qemu/hexagon"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[build-dependencies]
+vergen = { version = "9.0.1", features = ["build", "cargo", "rustc", "si"] }
+vergen-git2 = "1.0.1"
+
+[dependencies]
+clap = { version = "4.5.18", features = ["derive", "string"] }
+env_logger = { version = "0.11.5" }
+libafl = { path = "../../../libafl", features = ["tui_monitor"] }
+libafl_bolts = { path = "../../../libafl_bolts", features = [
+  "errors_backtrace",
+] }
+libafl_qemu = { path = "../../../libafl_qemu", features = ["usermode"] }
+libafl_targets = { path = "../../../libafl_targets" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+nix = { version = "0.29.0", features = ["fs"] }
+rangemap = { version = "1.5.1" }
+readonly = { version = "0.2.12" }
+typed-builder = { version = "0.20.0" }

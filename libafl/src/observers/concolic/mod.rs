@@ -9,7 +9,9 @@ use core::{
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
-/// A `SymExprRef` identifies a [`SymExpr`] in a trace. Reading a `SymExpr` from a trace will always also yield its
+/// A `SymExprRef` identifies a [`SymExpr`] in a trace.
+///
+/// Reading a `SymExpr` from a trace will always also yield its
 /// `SymExprRef`, which can be used later in the trace to identify the `SymExpr`.
 /// It is also never zero, which allows for efficient use of `Option<SymExprRef>`.
 ///
@@ -17,7 +19,9 @@ use serde::{Deserialize, Serialize};
 /// `SymExprRef`s are not valid across traces.
 pub type SymExprRef = NonZeroUsize;
 
-/// [`Location`]s are code locations encountered during concolic tracing, that are constructed from pointers, but not always in a meaningful way.
+/// [`Location`]s are code locations encountered during concolic tracing
+///
+/// [`Location`]s are constructed from pointers, but not always in a meaningful way.
 /// Therefore, a location is an opaque value that can only be compared against itself.
 ///
 /// It is possible to get at the underlying value using [`Into::into`], should this restriction be too inflexible for your usecase.
@@ -28,13 +32,13 @@ pub struct Location(usize);
 
 impl Debug for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        core::fmt::Debug::fmt(&self.0, f)
+        Debug::fmt(&self.0, f)
     }
 }
 
 impl Display for Location {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        core::fmt::Display::fmt(&self.0, f)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -53,14 +57,13 @@ impl From<usize> for Location {
 /// `SymExpr` represents a message in the serialization format.
 /// The messages in the format are a perfect mirror of the methods that are called on the runtime during execution.
 #[cfg(feature = "std")]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[allow(missing_docs)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum SymExpr {
     InputByte {
         offset: usize,
         value: u8,
     },
-
     Integer {
         value: u64,
         bits: u8,
@@ -69,6 +72,7 @@ pub enum SymExpr {
         high: u64,
         low: u64,
     },
+    IntegerFromBuffer {},
     Float {
         value: f64,
         is_double: bool,
@@ -252,7 +256,9 @@ pub enum SymExpr {
         a: SymExprRef,
         b: SymExprRef,
     },
-
+    FloatNeg {
+        op: SymExprRef,
+    },
     FloatAbs {
         op: SymExprRef,
     },
@@ -277,6 +283,11 @@ pub enum SymExpr {
         b: SymExprRef,
     },
 
+    Ite {
+        cond: SymExprRef,
+        a: SymExprRef,
+        b: SymExprRef,
+    },
     Sext {
         op: SymExprRef,
         bits: u8,

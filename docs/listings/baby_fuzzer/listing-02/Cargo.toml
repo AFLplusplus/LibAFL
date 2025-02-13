@@ -1,0 +1,21 @@
+[package]
+name = "baby_fuzzer_listing_02"
+version = "0.15.1"
+authors = ["Your Name <you@example.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libafl = { path = "path/to/libafl/" }
+libafl_bolts = { path = "path/to/libafl_bolts/" }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true

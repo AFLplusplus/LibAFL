@@ -1,0 +1,27 @@
+[package]
+name = "baby_no_std"
+version = "0.15.1"
+authors = [
+  "Andrea Fioraldi <andreafioraldi@gmail.com>",
+  "Dominik Maier <domenukk@gmail.com>",
+]
+edition = "2021"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+debug = true
+
+[dependencies]
+libafl = { default-features = false, path = "../../../libafl" }
+libafl_bolts = { default-features = false, path = "../../../libafl_bolts" }
+log = { version = "0.4.22", features = ["release_max_level_info"] }
+static-alloc = "0.2.3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.159"
