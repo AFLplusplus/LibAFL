@@ -1,0 +1,50 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "libfrida_executable_fuzzer"
+FUZZER_LIB := FUZZER + ".so"
+
+[unix]
+libpng:
+    #!/bin/bash
+    if [ ! -f v1.6.37.tar.gz ]; then
+        wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+    fi
+    tar -xvf v1.6.37.tar.gz
+
+[unix]
+lib: libpng
+    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+    make -j -C libpng-1.6.37
+
+[unix]
+harness: lib
+    clang++ -O0 -c -fPIC harness.cc -o harness.o
+    clang++ -O0 harness.cc libpng-1.6.37/.libs/libpng16.a -lz -o libpng-harness -g
+
+[unix]
+build:
+    cargo build --profile {{ PROFILE }}
+
+[unix]
+run: build harness
+    LD_PRELOAD={{ FUZZER_LIB }} ./libpng-harness -i corpus -o out -H ./libpng-harness
+
+[unix]
+test: build harness
+    #!/bin/bash
+
+    rm -rf libafl_unix_shmem_server || true
+    LD_PRELOAD={{ FUZZER_LIB }} ./libpng-harness -i corpus -o out -H ./libpng-harness > fuzz_stdout.log &
+    sleep 10s && pkill libpng-harness
+    if grep -qa "corpus: 30" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+[unix]
+clean:
+    rm -rf ./libpng-harness
+    make -C libpng-1.6.37 clean
+    cargo clean
