@@ -1,14 +1,16 @@
 //! Mutator definitions for [`MultipartInput`]s. See [`crate::inputs::multi`] for details.
 
+use alloc::borrow::Cow;
 use core::{
     cmp::{min, Ordering},
     num::NonZero,
 };
 
-use libafl_bolts::{rands::Rand, Error};
+use libafl_bolts::{rands::Rand, Error, Named};
 
 use crate::{
     corpus::{Corpus, CorpusId},
+    generators::Generator,
     impl_default_multipart,
     inputs::{multi::MultipartInput, HasMutatorBytes, Input, ResizableMutator},
     mutators::{
@@ -17,7 +19,8 @@ use crate::{
             ByteIncMutator, ByteInterestingMutator, ByteNegMutator, ByteRandMutator,
             BytesCopyMutator, BytesDeleteMutator, BytesExpandMutator, BytesInsertCopyMutator,
             BytesInsertMutator, BytesRandInsertMutator, BytesRandSetMutator, BytesSetMutator,
-            BytesSwapMutator, CrossoverInsertMutator, CrossoverReplaceMutator, DwordAddMutator,
+            BytesSwapMutator, CrossoverInsertMutator as BytesInputCrossoverInsertMutator,
+            CrossoverReplaceMutator as BytesInputCrossoverReplaceMutator, DwordAddMutator,
             DwordInterestingMutator, QwordAddMutator, WordAddMutator, WordInterestingMutator,
         },
         token_mutations::{I2SRandReplace, TokenInsert, TokenReplace},
@@ -34,7 +37,7 @@ use crate::{
 /// at once.
 pub trait DefaultMultipartMutator {}
 
-impl<I, M, S> Mutator<MultipartInput<I>, S> for M
+impl<I, M, N, S> Mutator<MultipartInput<I, N>, S> for M
 where
     M: DefaultMultipartMutator + Mutator<I, S>,
     S: HasRand,
@@ -42,13 +45,13 @@ where
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I>,
+        input: &mut MultipartInput<I, N>,
     ) -> Result<MutationResult, Error> {
-        let Some(parts_len) = NonZero::new(input.parts().len()) else {
+        let Some(parts_len) = NonZero::new(input.len()) else {
             return Ok(MutationResult::Skipped);
         };
         let selected = state.rand_mut().below(parts_len);
-        let mutated = input.part_mut(selected).unwrap();
+        let mutated = input.part_by_idx_mut(selected).unwrap();
         self.mutate(state, mutated)
     }
 
@@ -116,15 +119,16 @@ impl_default_multipart!(
     I2SRandReplace,
 );
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverInsertMutator
+impl<I, N, S> Mutator<MultipartInput<I, N>, S> for BytesInputCrossoverInsertMutator
 where
-    S: HasCorpus<MultipartInput<I>> + HasMaxSize + HasRand,
+    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
     I: Input + ResizableMutator<u8> + HasMutatorBytes,
+    N: Clone + PartialEq,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I>,
+        input: &mut MultipartInput<I, N>,
     ) -> Result<MutationResult, Error> {
         // we can eat the slight bias; number of parts will be small
         let name_choice = state.rand_mut().next() as usize;
@@ -134,25 +138,26 @@ where
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if id == *cur {
-                if input.names().is_empty() {
+                let len = input.len();
+                if len == 0 {
                     return Ok(MutationResult::Skipped);
                 }
-                let choice = name_choice % input.names().len();
-                let name = input.names()[choice].clone();
+                let choice = name_choice % len;
+                let name = input.names().nth(choice).unwrap();
 
-                let other_size = input.parts()[choice].mutator_bytes().len();
+                let other_size = input.part_by_idx(choice).unwrap().mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
 
-                let parts = input.parts_by_name(&name).count() - 1;
+                let parts = input.parts_with_name(name).count() - 1;
 
                 if parts == 0 {
                     return Ok(MutationResult::Skipped);
                 }
 
                 let maybe_size = input
-                    .parts_by_name(&name)
+                    .parts_with_name(name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
                     .map(|(id, part)| (id, part.mutator_bytes().len()));
@@ -171,12 +176,12 @@ where
                     });
 
                     let [part, chosen] = match part_idx.cmp(&choice) {
-                        Ordering::Less => input.parts_mut([part_idx, choice]),
+                        Ordering::Less => input.parts_by_idxs_mut([part_idx, choice]),
                         Ordering::Equal => {
                             unreachable!("choice should never equal the part idx!")
                         }
                         Ordering::Greater => {
-                            let [chosen, part] = input.parts_mut([choice, part_idx]);
+                            let [chosen, part] = input.parts_by_idxs_mut([choice, part_idx]);
                             [part, chosen]
                         }
                     };
@@ -196,24 +201,24 @@ where
 
         let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
-
-        if other.names().is_empty() {
+        let other_len = other.len();
+        if other_len == 0 {
             return Ok(MutationResult::Skipped);
         }
 
-        let choice = name_choice % other.names().len();
-        let name = &other.names()[choice];
+        let choice = name_choice % other_len;
+        let name = other.names().nth(choice).unwrap();
 
-        let other_size = other.parts()[choice].mutator_bytes().len();
+        let other_size = other.part_by_idx(choice).unwrap().mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
 
-        let parts = input.parts_by_name(name).count();
+        let parts = input.parts_with_name(name).count();
 
         if parts > 0 {
             let (_, part) = input
-                .parts_by_name_mut(name)
+                .parts_with_name_mut(name)
                 .nth(part_choice % parts)
                 .unwrap();
             drop(other_testcase);
@@ -240,26 +245,27 @@ where
                 size,
                 target,
                 range,
-                other.parts()[choice].mutator_bytes(),
+                other.part_by_idx(choice).unwrap().mutator_bytes(),
             ))
         } else {
             // just add it!
-            input.add_part(name.clone(), other.parts()[choice].clone());
+            input.append_part(name.clone(), other.part_by_idx(choice).unwrap().clone());
 
             Ok(MutationResult::Mutated)
         }
     }
 }
 
-impl<I, S> Mutator<MultipartInput<I>, S> for CrossoverReplaceMutator
+impl<I, N, S> Mutator<MultipartInput<I, N>, S> for BytesInputCrossoverReplaceMutator
 where
-    S: HasCorpus<MultipartInput<I>> + HasMaxSize + HasRand,
+    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
     I: Input + ResizableMutator<u8> + HasMutatorBytes,
+    N: Clone + PartialEq,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I>,
+        input: &mut MultipartInput<I, N>,
     ) -> Result<MutationResult, Error> {
         // we can eat the slight bias; number of parts will be small
         let name_choice = state.rand_mut().next() as usize;
@@ -269,25 +275,26 @@ where
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if id == *cur {
-                if input.names().is_empty() {
+                let len = input.iter().count();
+                if len == 0 {
                     return Ok(MutationResult::Skipped);
                 }
-                let choice = name_choice % input.names().len();
-                let name = input.names()[choice].clone();
+                let choice = name_choice % len;
+                let name = input.names().nth(choice).unwrap();
 
-                let other_size = input.parts()[choice].mutator_bytes().len();
+                let other_size = input.part_by_idx(choice).unwrap().mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
 
-                let parts = input.parts_by_name(&name).count() - 1;
+                let parts = input.parts_with_name(name).count() - 1;
 
                 if parts == 0 {
                     return Ok(MutationResult::Skipped);
                 }
 
                 let maybe_size = input
-                    .parts_by_name(&name)
+                    .parts_with_name(name)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
                     .map(|(id, part)| (id, part.mutator_bytes().len()));
@@ -306,12 +313,12 @@ where
                     });
 
                     let [part, chosen] = match part_idx.cmp(&choice) {
-                        Ordering::Less => input.parts_mut([part_idx, choice]),
+                        Ordering::Less => input.parts_by_idxs_mut([part_idx, choice]),
                         Ordering::Equal => {
                             unreachable!("choice should never equal the part idx!")
                         }
                         Ordering::Greater => {
-                            let [chosen, part] = input.parts_mut([choice, part_idx]);
+                            let [chosen, part] = input.parts_by_idxs_mut([choice, part_idx]);
                             [part, chosen]
                         }
                     };
@@ -331,23 +338,24 @@ where
         let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
-        if other.names().is_empty() {
+        let other_len = other.iter().count();
+        if other_len == 0 {
             return Ok(MutationResult::Skipped);
         }
 
-        let choice = name_choice % other.names().len();
-        let name = &other.names()[choice];
+        let choice = name_choice % other_len;
+        let name = other.names().nth(choice).unwrap();
 
-        let other_size = other.parts()[choice].mutator_bytes().len();
+        let other_size = other.part_by_idx(choice).unwrap().mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
 
-        let parts = input.parts_by_name(name).count();
+        let parts = input.parts_with_name(name).count();
 
         if parts > 0 {
             let (_, part) = input
-                .parts_by_name_mut(name)
+                .parts_with_name_mut(name)
                 .nth(part_choice % parts)
                 .unwrap();
             drop(other_testcase);
@@ -372,13 +380,203 @@ where
                 part,
                 target,
                 range,
-                other.parts()[choice].mutator_bytes(),
+                other.part_by_idx(choice).unwrap().mutator_bytes(),
             ))
         } else {
             // just add it!
-            input.add_part(name.clone(), other.parts()[choice].clone());
+            input.append_part(name.clone(), other.part_by_idx(choice).unwrap().clone());
 
             Ok(MutationResult::Mutated)
         }
+    }
+}
+
+/// Mutator that generates a new input and appends it to the list.
+#[derive(Debug)]
+pub struct GenerateToAppendMutator<G> {
+    generator: G,
+}
+
+impl<G> GenerateToAppendMutator<G> {
+    /// Create a new `GenerateToAppendMutator`.
+    #[must_use]
+    pub fn new(generator: G) -> Self {
+        Self { generator }
+    }
+}
+
+impl<G, I, N, S> Mutator<MultipartInput<I, N>, S> for GenerateToAppendMutator<G>
+where
+    G: Generator<I, S>,
+    N: Default,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut MultipartInput<I, N>,
+    ) -> Result<MutationResult, Error> {
+        let generated = self.generator.generate(state)?;
+        input.append_part_with_default_name(generated);
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl<G> Named for GenerateToAppendMutator<G> {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("GenerateToAppendMutator")
+    }
+}
+
+/// Mutator that removes the last entry from a [`MultipartInput`].
+///
+/// Returns [`MutationResult::Skipped`] if the input is empty.
+#[derive(Debug)]
+pub struct RemoveLastEntryMutator;
+
+impl<I, N, S> Mutator<MultipartInput<I, N>, S> for RemoveLastEntryMutator
+where
+    N: Default,
+{
+    fn mutate(
+        &mut self,
+        _state: &mut S,
+        input: &mut MultipartInput<I, N>,
+    ) -> Result<MutationResult, Error> {
+        match input.pop_part() {
+            Some(_) => Ok(MutationResult::Mutated),
+            None => Ok(MutationResult::Skipped),
+        }
+    }
+}
+
+impl Named for RemoveLastEntryMutator {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("RemoveLastEntryMutator")
+    }
+}
+
+/// Mutator that removes a random entry from a [`MultipartInput`].
+///
+/// Returns [`MutationResult::Skipped`] if the input is empty.
+#[derive(Debug)]
+pub struct RemoveRandomEntryMutator;
+
+impl<I, N, S> Mutator<MultipartInput<I, N>, S> for RemoveRandomEntryMutator
+where
+    S: HasRand,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut MultipartInput<I, N>,
+    ) -> Result<MutationResult, Error> {
+        match MultipartInput::len(input) {
+            0 => Ok(MutationResult::Skipped),
+            len => {
+                // Safety: null checks are done above
+                let index = state
+                    .rand_mut()
+                    .below(unsafe { NonZero::new_unchecked(len) });
+                input.remove_part_at_idx(index);
+                Ok(MutationResult::Mutated)
+            }
+        }
+    }
+}
+
+impl Named for RemoveRandomEntryMutator {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("RemoveRandomEntryMutator")
+    }
+}
+
+/// Mutator that inserts a random part from another [`MultipartInput`] into the current input.
+#[derive(Debug)]
+pub struct CrossoverInsertMutator;
+
+impl<I, N, S> Mutator<MultipartInput<I, N>, S> for CrossoverInsertMutator
+where
+    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
+    I: Clone,
+    N: Clone,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut MultipartInput<I, N>,
+    ) -> Result<MutationResult, Error> {
+        let current_idx = match input.len() {
+            0 => return Ok(MutationResult::Skipped),
+            len => state
+                .rand_mut()
+                .below(unsafe { NonZero::new_unchecked(len) }),
+        };
+        let other_idx_raw = state.rand_mut().next() as usize;
+
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
+        let mut testcase = state.corpus().get(id)?.borrow_mut();
+        let other = testcase.load_input(state.corpus())?;
+
+        let other_len = other.len();
+
+        let (name, part) = match other_len {
+            0 => return Ok(MutationResult::Skipped),
+            len => other.parts_and_names()[other_idx_raw % len].clone(),
+        };
+
+        input.insert_part(current_idx, name, part);
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl Named for CrossoverInsertMutator {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("CrossoverInsertMutator")
+    }
+}
+
+/// Mutator that replaces a random part from the current [`MultipartInput`] with a random part from another input.
+#[derive(Debug)]
+pub struct CrossoverReplaceMutator;
+
+impl<I, N, S> Mutator<MultipartInput<I, N>, S> for CrossoverReplaceMutator
+where
+    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
+    I: Clone,
+    N: Clone,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut MultipartInput<I, N>,
+    ) -> Result<MutationResult, Error> {
+        let current_idx = match input.len() {
+            0 => return Ok(MutationResult::Skipped),
+            len => state
+                .rand_mut()
+                .below(unsafe { NonZero::new_unchecked(len) }),
+        };
+        let other_idx_raw = state.rand_mut().next() as usize;
+
+        let id = random_corpus_id!(state.corpus(), state.rand_mut());
+        let mut testcase = state.corpus().get(id)?.borrow_mut();
+        let other = testcase.load_input(state.corpus())?;
+
+        let other_len = other.len();
+
+        let (name, part) = match other_len {
+            0 => return Ok(MutationResult::Skipped),
+            len => other.parts_and_names()[other_idx_raw % len].clone(),
+        };
+
+        input.remove_part_at_idx(current_idx);
+        input.insert_part(current_idx, name, part);
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl Named for CrossoverReplaceMutator {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("CrossoverReplaceMutator")
     }
 }

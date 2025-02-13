@@ -18,9 +18,6 @@ pub use generalized::*;
 pub mod bytessub;
 pub use bytessub::BytesSubInput;
 
-pub mod list;
-pub use list::ListInput;
-
 #[cfg(feature = "multipart_inputs")]
 pub mod multi;
 #[cfg(feature = "multipart_inputs")]
