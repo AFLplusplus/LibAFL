@@ -41,7 +41,7 @@ use libc::siginfo_t;
 
 use crate::{
     command::CommandManager,
-    modules::{Tracer, EmulatorModuleTuple},
+    modules::{EmulatorModuleTuple, Tracer},
     Emulator, EmulatorDriver,
 };
 #[cfg(feature = "usermode")]

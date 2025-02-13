@@ -53,7 +53,7 @@ use libafl_qemu::{
         edges::StdEdgeCoverageModule, PredicatesMap
     },
     Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
-    Regs,
+    Regs, QemuMappingsViewer,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 
@@ -213,7 +213,7 @@ fn fuzz(
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
 
-    let text_addr = elf.get_section(".text", qemu.load_addr()).unwrap(); // 100% there is
+    let text_addr = vec![elf.get_section(".text", qemu.load_addr()).unwrap()]; // 100% there is
 
     let test_one_input_ptr = elf
         .resolve_symbol("LLVMFuzzerTestOneInput", qemu.load_addr())
@@ -299,17 +299,18 @@ fn fuzz(
 
     let calibration = CalibrationStage::new(&map_feedback);
 
+    let qemu_mappings = QemuMappingsViewer::new(&qemu);
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        PredicateFeedback::new(text_addr.clone()),
+        PredicateFeedback::new(&qemu_mappings, text_addr.clone()),
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_or!(CrashFeedback::new(), PredicateFeedback::new(text_addr));
+    let mut objective = feedback_or!(CrashFeedback::new(), PredicateFeedback::new(&qemu_mappings, text_addr));
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {

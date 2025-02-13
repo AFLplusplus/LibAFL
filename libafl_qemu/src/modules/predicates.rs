@@ -12,7 +12,7 @@ use libafl_bolts::{impl_serdeany, Named};
 use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
-use crate::{GuestAddr, Qemu, QemuMappingsViewer};
+use crate::{GuestAddr, QemuMappingsViewer};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Edges(GuestAddr, GuestAddr);
@@ -282,33 +282,39 @@ impl Tracer {
     }
 }
 
-pub struct PredicateFeedback<'a> {
+pub struct PredicateFeedback {
     was_crash: bool,
-    viewer: QemuMappingsViewer<'a>,
     // caching the rwx addresses
-    executable: Vec<Range<u64>,
+    executable: Vec<Range<u64>>,
+    mapped_initial: Vec<Range<u64>>,
+    tracking: Vec<Range<u64>>,
 }
 
-impl Named for PredicateFeedback<'_> {
+impl Named for PredicateFeedback {
     fn name(&self) -> &Cow<'static, str> {
         &Cow::Borrowed("predicates")
     }
 }
 
-impl<'a> PredicateFeedback<'a> {
+impl PredicateFeedback {
     #[must_use]
-    pub fn new(viewer: QemuMappingsViewer<'a>) -> Self {
+    pub fn new<'a>(viewer: &QemuMappingsViewer<'a>, tracking: Vec<Range<u64>>) -> Self {
         let mut executable = vec![];
+        let mut mapped_initial: Vec<Range<u64>> = vec![];
         for rg in viewer.mappings() {
             if rg.flags().executable() && rg.path().is_some() {
                 executable.push(rg.start()..rg.end());
-            } 
+            }
         }
-        println!("Executable range is {:#?}", executable);
+        for rg in viewer.mappings() {
+            mapped_initial.push(rg.start()..rg.end());
+        }
+
         Self {
             was_crash: false,
-            viewer,
             executable,
+            mapped_initial,
+            tracking,
         }
     }
 
@@ -323,11 +329,8 @@ impl<'a> PredicateFeedback<'a> {
     #[must_use]
     // heap or mmap region
     pub fn is_heap_ptr(&self, ptr: u64) -> bool {
-        for mp in self.viewer.mappings().iter() {
-            let start = mp.start();
-            let end = mp.end();
-
-            if ptr >= start && ptr <= end {
+        for mp in &self.mapped_initial {
+            if mp.contains(&ptr) {
                 return false;
             }
         }
@@ -336,12 +339,17 @@ impl<'a> PredicateFeedback<'a> {
 
     #[must_use]
     pub fn is_text_ptr(&self, ptr: u64) -> bool {
-        true
+        for rg in &self.tracking {
+            if rg.contains(&ptr) {
+                return true;
+            }
+        }
+        return false;
     }
 
     #[must_use]
     pub fn is_executable_ptr(&self, ptr: u64) -> bool {
-        for rg in self.executable {
+        for rg in &self.executable {
             if rg.contains(&ptr) {
                 return true;
             }
@@ -350,9 +358,9 @@ impl<'a> PredicateFeedback<'a> {
     }
 }
 
-impl<S> StateInitializer<S> for PredicateFeedback<'_> {}
+impl<S> StateInitializer<S> for PredicateFeedback {}
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PredicateFeedback<'_>
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PredicateFeedback
 where
     S: HasMetadata,
 {
@@ -384,11 +392,14 @@ where
         let mut edges = vec![];
         let mut maxes = vec![];
         let mut mins = vec![];
+
+        // If both is in the tracking range, then add it
         for e in tracer.edges() {
             if self.is_text_ptr(e.0) && self.is_text_ptr(e.1) {
                 edges.push(*e);
             }
         }
+
         for (addr, ma) in tracer.maxmap() {
             if !self.is_stack_ptr(*ma) && self.is_text_ptr(*addr) {
                 maxes.push((*addr, *ma));

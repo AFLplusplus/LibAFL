@@ -55,9 +55,7 @@ mod rca {
 
     use super::{super::EdgeCoverageVariant, QemuEdgesMapMetadata};
     use crate::{
-        modules::{
-            Tracer, AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter,
-        },
+        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter, Tracer},
         qemu, EmulatorModules,
     };
 

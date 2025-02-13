@@ -28,10 +28,9 @@ use crate::{
     emu::EmulatorModules,
     modules::{
         calls::FullBacktraceCollector,
-        Tracer,
         snapshot::SnapshotModule,
         utils::filters::{HasAddressFilter, StdAddressFilter},
-        AddressFilter, EmulatorModule, EmulatorModuleTuple,
+        AddressFilter, EmulatorModule, EmulatorModuleTuple, Tracer,
     },
     qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},
     sys::TCGTemp,
