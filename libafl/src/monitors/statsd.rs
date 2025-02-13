@@ -107,7 +107,7 @@ impl StatsdMonitor {
         self.statsd_client = Some(client);
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn try_display(&mut self, client_stats_manager: &mut ClientStatsManager) -> Option<()> {
         if self.statsd_client.is_none() {
             self.setup_statsd_client();

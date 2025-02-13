@@ -363,7 +363,7 @@ impl ClientStats {
     }
 
     /// Get item geometry of current client
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     #[cfg(feature = "std")]
     #[must_use]
     pub fn item_geometry(&self) -> ItemGeometry {
