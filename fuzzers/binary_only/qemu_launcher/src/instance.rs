@@ -88,7 +88,6 @@ pub type ClientMgr<M> = MonitorTypedEventManager<
 #[derive(TypedBuilder)]
 pub struct Instance<'a, M: Monitor> {
     options: &'a FuzzerOptions,
-    /// The harness. We create it before forking, then `take()` it inside the client.
     mgr: ClientMgr<M>,
     client_description: ClientDescription,
     #[builder(default)]

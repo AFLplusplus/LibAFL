@@ -463,7 +463,10 @@ impl TuiUi {
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("stability")),
-                Cell::from(Span::raw(&item_geometry.stability)),
+                Cell::from(Span::raw(format!(
+                    "{:.2}%",
+                    item_geometry.stability.unwrap_or(0.0) * 100.0
+                ))),
             ]),
         ];
 
