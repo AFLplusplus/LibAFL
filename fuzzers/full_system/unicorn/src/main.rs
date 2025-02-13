@@ -3,7 +3,7 @@ use std::{env, fs::File, io::Read, path::PathBuf, ptr::NonNull, time::Duration};
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::InProcessExecutor, ExitKind, InProcessForkExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -27,13 +27,13 @@ use libafl_bolts::{
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 pub use libafl_targets::EDGES_MAP_PTR;
 use libafl_unicorn::{
-    emu::{debug_print, init_registers, memory_dump},
+    emu::{debug_print, memory_dump},
     helper::get_stack_pointer,
     hooks::set_coverage_hook,
 };
 use unicorn_engine::{
     unicorn_const::{Arch, MemType, SECOND_SCALE},
-    Mode, Permission, RegisterARM, RegisterARM64, RegisterX86, Unicorn,
+    HookType, Mode, Permission, RegisterARM, RegisterARM64, RegisterX86, Unicorn,
 };
 
 pub const CODE_ADDRESS: u64 = 0x9000;
@@ -47,8 +47,6 @@ pub const MAX_INPUT_SIZE: usize = 0x100; //1048576; // 1MB
 
 pub const STACK_ADDRESS: u64 = 0x7000;
 pub const STACK_SIZE: u64 = 0x1000;
-
-pub const DEBUG: bool = false;
 
 fn main() {
     let args: Vec<_> = env::args().collect();
@@ -72,6 +70,24 @@ fn main() {
         emu = true;
     }
     fuzzer(emu, arch);
+}
+
+pub fn init_registers(emu: &mut Unicorn<()>, sp: u64) {
+    match emu.get_arch() {
+        Arch::ARM => {
+            emu.reg_write(RegisterARM::SP, sp)
+                .expect("Could not setup register");
+        }
+        Arch::ARM64 => {
+            emu.reg_write(RegisterARM64::SP, sp)
+                .expect("Could not setup register");
+        }
+        Arch::X86 => {
+            emu.reg_write(RegisterX86::ESP, sp)
+                .expect("Could not setup register");
+        }
+        _ => {}
+    }
 }
 
 // emulating
@@ -109,6 +125,21 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         STACK_ADDRESS,
         STACK_SIZE as usize,
         Permission::WRITE | Permission::READ,
+    )
+    .unwrap();
+
+    #[cfg(feature = "code_hook")]
+    add_code_hook(&mut emu);
+
+    #[cfg(feature = "mem_hook")]
+    emu.add_mem_hook(
+        HookType::MEM_READ
+            | HookType::MEM_READ_INVALID
+            | HookType::MEM_WRITE
+            | HookType::MEM_WRITE_UNMAPPED,
+        0x0,
+        !0x0_u64,
+        mem_callback,
     )
     .unwrap();
 
@@ -242,12 +273,14 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut executor = InProcessExecutor::new(
+    let mut executor = InProcessForkExecutor::new(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        core::time::Duration::from_millis(5000),
+        shmem_provider,
     )
     .expect("Failed to create the executor");
 
@@ -266,42 +299,6 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
-}
-
-fn callback(
-    emu: &mut unicorn_engine::Unicorn<()>,
-    mem: MemType,
-    address: u64,
-    size: usize,
-    value: i64,
-) -> bool {
-    if DEBUG {
-        match mem {
-            MemType::WRITE => println!(
-                "0x{:X}\tMemory is being WRITTEN at adress: {:X} size: {} value: {}",
-                emu.pc_read().unwrap(),
-                address,
-                size,
-                value
-            ),
-            MemType::READ => println!(
-                "0x{}\tMemory is being READ at adress: {:X} size: {}",
-                emu.pc_read().unwrap(),
-                address,
-                size
-            ),
-            _ => println!(
-                "0x{}\tMemory access type: {:?} adress: {:X} size: {} value: {}",
-                emu.pc_read().unwrap(),
-                mem,
-                address,
-                size,
-                value
-            ),
-        }
-    }
-
-    true
 }
 
 fn unicorn_map_and_load_code(emu: &mut Unicorn<()>, address: u64, size: usize, path: &str) -> u64 {
@@ -323,8 +320,32 @@ fn unicorn_map_and_load_code(emu: &mut Unicorn<()>, address: u64, size: usize, p
 
 fn add_code_hook(emu: &mut Unicorn<()>) {
     emu.add_code_hook(0x0, !0x0_u64, |emu, pc, _| {
-        let eax = emu.reg_read(RegisterX86::EAX).unwrap();
-        println!("Hook: PC: 0x{pc:x} EAX 0x:{eax:x}");
+        let sp = get_stack_pointer(emu);
+        println!("[PC: 0x{pc:x}] Hook: SP 0x:{sp:x}");
     })
     .unwrap();
+}
+fn mem_callback(
+    emu: &mut unicorn_engine::Unicorn<()>,
+    mem: MemType,
+    address: u64,
+    size: usize,
+    value: i64,
+) -> bool {
+    match mem {
+        MemType::WRITE => println!(
+            "[PC: 0x{:x}] Memory is being WRITTEN at adress: {address:x} size: {size:} value: {value:}",
+            emu.pc_read().unwrap()
+        ),
+        MemType::READ => println!(
+            "[PC: 0x{:x}] Memory is being READ at adress: {address:x} size: {size:}",
+            emu.pc_read().unwrap()
+        ),
+        _ => println!(
+            "[PC: 0x{:x}] Memory access type: {mem:?} adress: {address:x} size: {size:} value: {value:}",
+            emu.pc_read().unwrap()
+        ),
+    }
+
+    true
 }

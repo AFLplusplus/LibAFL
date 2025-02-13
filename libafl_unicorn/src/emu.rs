@@ -8,28 +8,7 @@ use unicorn_engine::{
     RegisterARM, RegisterARM64, RegisterX86, Unicorn,
 };
 
-static HEXBYTES_COLUMN_BYTE_LENGTH: usize = 10;
-
 use crate::helper::get_stack_pointer;
-
-pub fn init_registers(emu: &mut Unicorn<()>, sp: u64) {
-    match emu.get_arch() {
-        Arch::ARM => {
-            emu.reg_write(RegisterARM::SP, sp)
-                .expect("Could not setup register");
-        }
-        Arch::ARM64 => {
-            emu.reg_write(RegisterARM64::SP, sp)
-                .expect("Could not setup register");
-        }
-        Arch::X86 => {
-            emu.reg_write(RegisterX86::ESP, sp)
-                .expect("Could not setup register");
-        }
-        _ => {}
-    }
-}
-
 // TODO: For some reason, the compiled program start by substracting 0x10 to SP
 
 pub fn memory_dump(emu: &Unicorn<()>, len: u64) {

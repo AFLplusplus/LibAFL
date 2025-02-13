@@ -5,8 +5,17 @@ edition = "2021"
 
 [features]
 # Enable a code hook which log the program counter at each executed instruction
+default = []
 code_hook = []
+mem_hook = []
 
+
+# Panic configuration needed so that the InProcessForkExecutor still detect the crash when the forked process crashed
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
 
 [dependencies]
 libafl = { path = "../../../libafl/" }
