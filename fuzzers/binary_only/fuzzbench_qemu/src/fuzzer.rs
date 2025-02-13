@@ -49,16 +49,16 @@ use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
     modules::{
+        asan::AsanModuleBuilder,
         cmplog::{CmpLogModule, CmpLogObserver},
-        edges::StdEdgeCoverageModule, PredicatesMap
+        edges::StdEdgeCoverageModule,
+        tracer::TracerModule,
+        PredicateFeedback, PredicatesMap, SnapshotModule, Tracer,
     },
-    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
-    Regs, QemuMappingsViewer,
+    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuMappingsViewer,
+    QemuShutdownCause, Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
-
-use libafl_qemu::modules::{asan::AsanModuleBuilder, tracer::TracerModule, PredicateFeedback, Tracer, SnapshotModule};
-
 #[cfg(unix)]
 use nix::unistd::dup;
 
@@ -310,7 +310,10 @@ fn fuzz(
     );
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_or!(CrashFeedback::new(), PredicateFeedback::new(&qemu_mappings, text_addr));
+    let mut objective = feedback_or!(
+        CrashFeedback::new(),
+        PredicateFeedback::new(&qemu_mappings, text_addr)
+    );
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
