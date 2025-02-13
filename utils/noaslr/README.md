@@ -13,12 +13,12 @@ time it is run.
 # Test
 ## App
 ```
-$ cargo make run
+$ just run
 ```
 ## Library
 
 ```
-$ cargo make runlib
+$ just runlib
 ```
 
 # Example
