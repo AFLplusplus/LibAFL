@@ -1,9 +1,10 @@
 int main() {
   char *data = (char *)0x8000;
-  char  a = data[0];  // = 0x1;
-  char  b = data[1];  // = 0x0;
-  char  c = data[2];
-  char  result = 0;  // The result, so should be initialized at 0;
+  // Extract the input from the memory at 0x8000
+  char a = data[0];
+  char b = data[1];
+  char c = data[2];
+  char result = 0;  // The result, so should be initialized at 0;
 
   if (a > b) {
     result = 0x2;
@@ -19,10 +20,5 @@ int main() {
     }
   }
 
-  /*
-  a = 0xDE;
-  b = 0xEA;
-  c = 0xBE;
-  */
   return result;
 }

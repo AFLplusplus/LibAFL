@@ -3,6 +3,11 @@ name = "unicorn"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+# Enable a code hook which log the program counter at each executed instruction
+code_hook = []
+
+
 [dependencies]
 libafl = { path = "../../../libafl/" }
 libafl_bolts = { path = "../../../libafl_bolts/" }

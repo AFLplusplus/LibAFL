@@ -182,8 +182,6 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
                 }
             }
             Err(err) => {
-                let pc = emu.pc_read().unwrap();
-                let sp = get_stack_pointer(&emu);
                 println!("Error: {:?}", err);
 
                 memory_dump(&emu, 2);
