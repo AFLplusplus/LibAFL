@@ -331,8 +331,11 @@ fn fuzz(
         .unwrap()
     });
 
+    // data per one exec
     state.add_metadata(Tracer::new());
-    state.add_metadata(PredicatesMap::new());
+
+    // data for the whole run
+    state.metadata_or_insert_with(PredicatesMap::new);
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 

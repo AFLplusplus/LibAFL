@@ -401,12 +401,12 @@ where
         }
 
         for (addr, ma) in tracer.maxmap() {
-            if !self.is_stack_ptr(*ma) && self.is_text_ptr(*addr) {
+            if !self.is_stack_ptr(*ma) && self.is_text_ptr(*addr) && !self.is_executable_ptr(*ma) {
                 maxes.push((*addr, *ma));
             }
         }
         for (addr, mi) in tracer.minmap() {
-            if !self.is_stack_ptr(*mi) && self.is_text_ptr(*addr) {
+            if !self.is_stack_ptr(*mi) && self.is_text_ptr(*addr) && !self.is_executable_ptr(*mi) {
                 mins.push((*addr, *mi));
             }
         }
