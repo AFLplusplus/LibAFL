@@ -6,14 +6,14 @@ Processor Trace (PT) to compute code coverage.
 ## Prerequisites
 
 - A Linux host with an Intel Processor Trace (PT) compatible CPU
-- `cargo-make` installed
+- `just` installed
 - Sudo access to grant necessary capabilities to the fuzzer
 
 ## How to Run the Fuzzer
 
 To compile and run the fuzzer (and the target program) execute the following command:
 ```sh
-cargo make
+just
 ```
 
 > **Note**: This command may prompt you for your password to assign capabilities required for Intel PT. If you'd prefer
