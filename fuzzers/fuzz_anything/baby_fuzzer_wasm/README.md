@@ -3,7 +3,7 @@
 A brief demo demonstrating libafl's compatibility with WASM, and how to do it.
 
 In this example, the entire LibAFL harness and target are present in a WASM binary, which is then loaded by [the example
-webpage](pkg/index.html). To run this example, do `cargo make build`, then open [the example webpage](pkg/index.html) in
+webpage](pkg/index.html). To run this example, do `just build`, then open [the example webpage](pkg/index.html) in
 your browser (via something like `python3 -m http.server`). The fuzzer will execute until finding a solution and will
 write the fuzzer log to your console.
 
