@@ -29,7 +29,7 @@ run: fuzzer
 
 [windows]
 run: fuzzer
-    echo "Not integrated into cargo-make yet."
+    echo "Not integrated into just yet."
 
 [linux]
 [macos]

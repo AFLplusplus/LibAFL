@@ -54,11 +54,11 @@ do
     
     if [ -e ./Makefile.toml ] && grep -qF "skip_core_tasks = true" Makefile.toml; then
         echo "[*] Building $fuzzer (running tests is not supported in this context)"
-        cargo make build || exit 1
+        just build || exit 1
         echo "[+] Done building $fuzzer"
     elif [ -e ./Makefile.toml ]; then
         echo "[*] Testing $fuzzer"
-        cargo make test || exit 1
+        just test || exit 1
         echo "[+] Done testing $fuzzer"
     elif [ -e ./Justfile ]; then
         echo "[*] Testing $fuzzer"

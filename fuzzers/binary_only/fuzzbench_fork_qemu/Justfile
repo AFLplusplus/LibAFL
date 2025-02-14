@@ -1,0 +1,44 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "fuzzbench_fork_qemu"
+
+[unix]
+harness:
+    cc -c libfuzzer_main.c
+    cc \
+        ./fuzz.c \
+        ./libfuzzer_main.o \
+        -o {{ BUILD_DIR }}/harness \
+        -lm -lz
+
+[unix]
+build:
+    cargo build --profile {{ PROFILE }}
+
+[unix]
+run: build harness
+    cargo run \
+      --profile {{ PROFILE }} \
+      ./{{ FUZZER_NAME }} \
+      -- \
+      --libafl-in ./corpus \
+      --libafl-out ./out \
+      ./{{ FUZZER_NAME }}
+
+
+[unix]
+test: build harness
+    #!/bin/bash
+
+    rm -rf out/
+    timeout 15s {{ FUZZER }} {{ BUILD_DIR }}/harness -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out out ./harness | tee fuzz_stdout.log
+    if grep -qa "corpus: 5" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+[unix]
+clean:
+    cargo clean

@@ -1,0 +1,65 @@
+import "../../../just/libafl-qemu-libpng.just"
+
+FUZZER_NAME := "qemu_coverage"
+HARNESS := TARGET_DIR / ("libpng-harness-" + PROFILE)
+
+[unix]
+build:
+    cargo build \
+      --profile {{ PROFILE }} \
+      --features {{ ARCH }} \
+      --target-dir {{ TARGET_DIR }}
+
+[unix]
+harness: libpng
+    #!/bin/bash
+
+    source {{ DOTENV }}
+
+    $CROSS_CXX \
+        ./harness.cc \
+        $CROSS_CFLAGS \
+        "{{TARGET_DIR}}/build-png/.libs/libpng16.a" \
+        "{{TARGET_DIR}}/build-zlib/libz.a" \
+        -I"{{TARGET_DIR}}/build-png" \
+        -I"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        -L"{{TARGET_DIR}}/build-zlib/zlib/lib" \
+        -o"{{ HARNESS }}" \
+        -lm -static
+
+[unix]
+run: harness build
+    {{ FUZZER }} \
+        --coverage-path {{ TARGET_DIR }}/cov.drcov \
+        --input-dir ./corpus \
+        --verbose \
+        -- {{ HARNESS }}
+
+[unix]
+test_inner: run
+    #!/bin/bash
+
+    cargo run --manifest-path ../../../utils/drcov_utils/Cargo.toml --bin drcov_merge -- \
+        -i {{ TARGET_DIR }}/cov-000.drcov {{ TARGET_DIR }}/cov-001.drcov {{TARGET_DIR }}/cov-002.drcov {{ TARGET_DIR }}/cov-003.drcov \
+        --output {{ TARGET_DIR }}/cov-merged.drcov || exit 1
+
+    NB_BLOCKS=$(cargo run --manifest-path ../../../utils/drcov_utils/Cargo.toml --bin drcov_dump_addrs -- \
+        -i {{ TARGET_DIR }}/cov-merged.drcov -a | wc -l || exit 1)
+
+    echo "Nb blocks found: $NB_BLOCKS"
+
+    if [ $NB_BLOCKS -ge 1700 ]; then
+    echo "Test succeeded"
+    else
+    echo "Did not find more than 1700 blocks."
+    exit 1
+    fi
+
+[unix]
+test:
+    ARCH=x86_64 just test_inner
+    ARCH=arm just test_inner
+
+[unix]
+clean:
+    cargo clean

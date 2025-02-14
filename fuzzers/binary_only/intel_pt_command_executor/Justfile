@@ -1,0 +1,31 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "intel_pt_command_executor"
+
+[unix]
+target_dir:
+    mkdir -p {{ TARGET_DIR }}
+
+[unix]
+build_target: target_dir
+    rustc src/target_program.rs --out-dir {{ TARGET_DIR }} -O
+
+[unix]
+build:
+    cargo build --profile {{ PROFILE }}
+
+[unix]
+setcap:
+    sudo setcap cap_ipc_lock,cap_sys_ptrace,cap_sys_admin,cap_syslog=ep {{ FUZZER }}
+
+[unix]
+run: build build_target setcap
+    {{ FUZZER }}
+
+[unix]
+test: build
+    echo "Build is successful."
+
+[unix]
+clean:
+    cargo clean

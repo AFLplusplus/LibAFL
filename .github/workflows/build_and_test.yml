@@ -259,7 +259,7 @@ jobs:
           # Binary-only
           - ./fuzzers/binary_only/fuzzbench_fork_qemu
           - ./fuzzers/binary_only/frida_executable_libpng
-          - ./fuzzers/binary_only/frida_windows_gdiplus
+          # - ./fuzzers/binary_only/frida_windows_gdiplus
           - ./fuzzers/binary_only/frida_libpng
           - ./fuzzers/binary_only/fuzzbench_qemu
           - ./fuzzers/binary_only/intel_pt_baby_fuzzer
@@ -291,7 +291,6 @@ jobs:
 
           # In-process
           - ./fuzzers/fuzz_anything/cargo_fuzz
-          # - ./fuzzers/inprocess/dynamic_analysis
           - ./fuzzers/inprocess/fuzzbench
           - ./fuzzers/inprocess/fuzzbench_text
           - ./fuzzers/inprocess/fuzzbench_ctx
@@ -303,10 +302,10 @@ jobs:
           - ./fuzzers/inprocess/libfuzzer_libpng_cmin
           - ./fuzzers/inprocess/libfuzzer_libpng_norestart
           # - ./fuzzers/inprocess/libfuzzer_libpng_tcp_manager
+          # - ./fuzzers/inprocess/libfuzzer_windows_asan
           - ./fuzzers/inprocess/libfuzzer_stb_image_sugar
           - ./fuzzers/inprocess/libfuzzer_stb_image
           # - ./fuzzers/structure_aware/libfuzzer_stb_image_concolic
-          # - ./fuzzers/inprocess/libfuzzer_windows_asan
           # - ./fuzzers/inprocess/sqlite_centralized_multi_machine
 
           # Fuzz Anything
@@ -450,9 +449,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_libpng
-        run: cd fuzzers/binary_only/frida_libpng/ && cargo make test
+        run: cd fuzzers/binary_only/frida_libpng/ && just test
 
-  windows-frida-libfuzzer-stb-image:
+  windows-libfuzzer-stb-image:
     runs-on: windows-latest
     needs:
       - common
@@ -462,6 +461,16 @@ jobs:
       - name: Build fuzzers/inprocess/libfuzzer_stb_image
         run: cd fuzzers/inprocess/libfuzzer_stb_image && cargo build --release
 
+  windows-libfuzzer-asan:
+    runs-on: windows-latest
+    needs:
+      - common
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/windows-tester-prepare
+      - name: Build fuzzers/inprocess/libfuzzer_windows_asan
+        run: cd fuzzers/inprocess/libfuzzer_windows_asan && just test
+
   windows-frida-gdiplus:
     runs-on: windows-latest
     needs:
@@ -470,7 +479,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/frida_windows_gdiplus
-        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && cargo make test && cargo make test_cmplog
+        run: cd fuzzers/binary_only/frida_windows_gdiplus/ && just test && just test_cmplog
 
   windows-tinyinst-simple:
     runs-on: windows-latest
@@ -482,7 +491,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/windows-tester-prepare
       - name: Build fuzzers/binary_only/tinyinst_simple
-        run: cd fuzzers/binary_only/tinyinst_simple/ && cargo make test
+        run: cd fuzzers/binary_only/tinyinst_simple/ && just test
 
   windows-clippy:
     runs-on: windows-latest

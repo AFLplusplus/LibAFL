@@ -1,0 +1,31 @@
+import "../../just/libafl.just"
+
+
+DEMO_TARGET := "powerpc-unknown-linux-gnu"
+HOST_TARGET := "x86_64-unknown-linux-gnu"
+DEMO_DIR := {{TARGET_DIR}}/{{DEMO_TARGET}}/"debug"
+TARGET_DIR := {{TARGET_DIR}}/{{HOST_TARGET}}/"debug"
+FUZZER_NAME := ""
+
+clean:
+    cargo clean
+
+format:
+    cargo fmt -- --emit=files
+
+demo: format
+    cargo build -p gdb_demo --profile {{PROFILE}} --target powerpc-unknown-linux-gnu
+
+run_demo: demo
+    cargo run -p gdb_demo --target powerpc-unknown-linux-gnu
+
+build: format
+    cargo build -p gdb_qemu --profile {{PROFILE}}
+
+run: demo
+    cargo run -p gdb_qemu --profile {{PROFILE}} -- -p 1234 -L trace -- qemu-ppc -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo
+
+gdb:
+    gdb-multiarch -ex "set architecture powerpc:MPC8XX" -ex "set pagination off" -ex "set confirm off" -ex "file {{DEMO_DIR}}/gdb_demo" -ex "target remote | {{TARGET_DIR}}/gdb_qemu -p 1234 -L trace qemu-ppc -- -L /usr/powerpc-linux-gnu -g 1234 {{DEMO_DIR}}/gdb_demo"
+
+all: demo build
