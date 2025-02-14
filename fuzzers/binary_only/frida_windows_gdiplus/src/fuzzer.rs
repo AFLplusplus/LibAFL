@@ -502,11 +502,11 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
     #[cfg(all(unix, feature = "std"))]
     {
-        builder.stdout_file(Some(&options.stdout)).build().launch()
+        return builder.stdout_file(Some(&options.stdout)).build().launch();
     }
 
     #[cfg(not(all(unix, feature = "std")))]
     {
-        builder.build().launch()
+        return builder.build().launch();
     }
 }
