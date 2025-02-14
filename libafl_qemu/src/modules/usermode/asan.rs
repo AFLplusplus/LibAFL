@@ -1205,9 +1205,9 @@ pub fn trace_read_n_asan<ET, I, S>(
 pub fn trace_write_asan<ET, I, S, const N: usize>(
     qemu: Qemu,
     emulator_modules: &mut EmulatorModules<ET, I, S>,
-    state: Option<&mut S>,
+    _state: Option<&mut S>,
     id: u64,
-    pc: GuestAddr,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
     ET: EmulatorModuleTuple<I, S>,
