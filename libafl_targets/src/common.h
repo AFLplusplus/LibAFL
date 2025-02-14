@@ -169,4 +169,3 @@ typedef uint128_t         u128;
   #define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif  // _WIN32
 
-#endif
