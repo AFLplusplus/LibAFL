@@ -320,6 +320,12 @@ windows = { workspace = true, features = [
   "Win32_Security",
   "Win32_System_SystemInformation",
 ] }
-
+winapi = { version = "0.3", features = [
+  "dbghelp",
+  "minwindef",
+  "winnt",
+  "errhandlingapi",
+  "processthreadsapi",
+] }
 [target.'cfg(windows)'.build-dependencies]
 windows = { workspace = true }
