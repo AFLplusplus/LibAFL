@@ -29,7 +29,7 @@ After that clang should be available in the PATH.
 To build the fuzzer and link against the `harness.cpp` in this example run: 
 
 ```
-cargo make fuzzer
+just fuzzer
 ```
 
 ## Running

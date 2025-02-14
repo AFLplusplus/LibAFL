@@ -12,7 +12,7 @@ Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the C++ harness)[./har
 Afterwards, the fuzzer will be ready to run, from `target/frida_libpng`.  
 On unix platforms, you'll need [libc++](https://libcxx.llvm.org/) to build it.
 
-Alternatively you can run `cargo make run` and this command will automatically build and run the fuzzer
+Alternatively you can run `just run` and this command will automatically build and run the fuzzer
 
 ### Build For Android
 When building for android using a cross-compiler, make sure you have a [_standalone toolchain_](https://developer.android.com/ndk/guides/other_build_systems), and then add the following:
