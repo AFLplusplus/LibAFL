@@ -40,7 +40,6 @@ default = [
   "serdeany_autoreg",
   "libafl_bolts/xxh3",
   "tui_monitor",
-  "multipart_inputs",
 ]
 document-features = ["dep:document-features"]
 
