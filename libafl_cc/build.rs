@@ -333,18 +333,25 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         llvm_ar = Path::new(&llvm_ar_path).join("llvm-ar");
     }
 
+    let mut found = true;
+
     if !clang.exists() {
-        println!("cargo:warning=Failed to find clang frontend.");
-        return;
+        println!("cargo:warning=Failed to find binary: clang.");
+        found = false;
     }
 
     if !clangcpp.exists() {
-        println!("cargo:warning=Failed to find clang++ frontend.");
-        return;
+        println!("cargo:warning=Failed to find binary: clang++.");
+        found = false;
     }
+
     if !llvm_ar.exists() {
-        println!("cargo:warning=Failed to find llvm-ar archiver.");
-        return;
+        println!("cargo:warning=Failed to find binary: llvm-ar.");
+        found = false;
+    }
+
+    if !found {
+        panic!("\n\tOne of the LLVM dependencies has not been found.\n\tThe following search directory was considered: {}\n", bindir_path.display());
     }
 
     let cxxflags = if let Ok(flags) = llvm_cxxflags {
