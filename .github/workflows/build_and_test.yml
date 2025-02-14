@@ -345,6 +345,7 @@ jobs:
               - 'libafl_qemu/**'
               - 'fuzzers/**/*qemu*/**'
   fuzzer-unicorn:
+    runs-on: ubuntu-24.04
     needs:
       - fuzzers-preflight
     strategy:
