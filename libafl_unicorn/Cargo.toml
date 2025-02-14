@@ -24,13 +24,12 @@ libafl = { path = "../libafl", default-features = false, features = [
   "llmp_compression",
 ] }
 libafl_targets = { path = "../libafl_targets" }
-hashbrown = { version = "0.12", features = [
-  "serde",
-  "ahash-compile-time-rng",
-] } # A faster hashmap, nostd compatible
 
-unicorn-engine = "2.0.1"
-capstone = "0.13.0"
+# External dependencies
+capstone = { workspace = true }
+log = { workspace = true }
+unicorn-engine = { workspace = true }
+
 
 [lib]
 name = "libafl_unicorn"

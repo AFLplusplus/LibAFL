@@ -40,7 +40,6 @@ pub fn debug_print(emu: &Unicorn<()>) {
 
     log::debug!("PC: {:X}", pc);
     let arch = emu.get_arch();
-
     match arch {
         Arch::ARM => {
             log::debug!("SP: {:X}", emu.reg_read(RegisterARM::SP).unwrap());

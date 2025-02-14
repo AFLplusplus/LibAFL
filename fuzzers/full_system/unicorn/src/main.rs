@@ -51,7 +51,6 @@ pub const STACK_SIZE: u64 = 0x1000;
 fn main() {
     let args: Vec<_> = env::args().collect();
     let mut emu = false;
-
     if args.len() < 2 {
         println!("Please specify the arcghitecture");
         return;
