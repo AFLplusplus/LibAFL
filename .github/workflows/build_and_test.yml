@@ -278,7 +278,7 @@ jobs:
           - ./fuzzers/full_system/nyx_launcher
           - ./fuzzers/full_system/nyx_libxml2_standalone
           - ./fuzzers/full_system/nyx_libxml2_parallel
-
+          
           # Structure-aware
           - ./fuzzers/structure_aware/nautilus_sync
           - ./fuzzers/structure_aware/baby_fuzzer_grimoire
@@ -344,6 +344,20 @@ jobs:
               - 'libafl_targets/**'
               - 'libafl_qemu/**'
               - 'fuzzers/**/*qemu*/**'
+  fuzzer-unicorn:
+    needs:
+      - fuzzers-preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-24.04 ]
+        fuzzer:
+          - ./fuzzers/full_system/unicorn
+    steps:
+      - name: "Install dependencies"
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install gcc gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
 
   fuzzers-qemu:
     needs:

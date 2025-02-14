@@ -13,7 +13,7 @@ int main() {
     if (b < 0x20) return 0x7;
     if (b > 0x60) return 0x8;
     if (b > 0x30) return 0x9;
-    // Simple constrain on b to allow faster resolution for the test CI
+    // Simple constraint on b to allow faster resolution for the test CI
     return 0x6;
   }
 
