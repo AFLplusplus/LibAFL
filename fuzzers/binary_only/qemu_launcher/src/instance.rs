@@ -186,6 +186,7 @@ impl<M: Monitor> Instance<'_, M> {
         let time_observer = TimeObserver::new("time");
 
         let map_feedback = MaxMapFeedback::new(&edges_observer);
+        let map_objective = MaxMapFeedback::new(&edges_observer);
 
         let calibration = CalibrationStage::new(&map_feedback);
 
@@ -207,7 +208,10 @@ impl<M: Monitor> Instance<'_, M> {
         );
 
         // A feedback to choose if an input is a solution or not
-        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_and_fast!(
+            feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+            map_objective
+        );
 
         // // If not restarting, create a State from scratch
         let mut state = match state {
@@ -348,7 +352,8 @@ impl<M: Monitor> Instance<'_, M> {
 
             // Setup an havoc mutator with a mutational stage
             let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+            let mutatonal_stage = StdMutationalStage::new(mutator);
+            let mut stages = tuple_list!(calibration, power, stats_stage);
 
             self.fuzz(
                 &mut state,
