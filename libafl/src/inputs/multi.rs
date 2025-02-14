@@ -18,7 +18,7 @@ use libafl_bolts::{
     tuples::{Map, MappingFunctor},
     Error, Named,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
@@ -329,6 +329,20 @@ impl<M> Named for RandomEntryMutator<M> {
 ///
 /// It relies on a list to store the names and parts.
 pub type MultipartInput<I, N> = ListInput<(N, I)>;
+
+impl<I, N> Input for MultipartInput<I, N>
+where
+    I: Input,
+    N: PartialEq + Debug + Serialize + DeserializeOwned + Clone + Hash,
+{
+    fn generate_name(&self, id: Option<CorpusId>) -> String {
+        self.parts
+            .iter()
+            .map(|(_n, i)| i.generate_name(id))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}
 
 /// Trait for inputs composed of multiple named parts.
 pub trait NamedMultipartInput<I, N> {

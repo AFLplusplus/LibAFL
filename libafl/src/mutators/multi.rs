@@ -69,12 +69,14 @@ where
         state: &mut S,
         input: &mut MultipartInput<I, N>,
     ) -> Result<MutationResult, Error> {
-        let Some(parts_len) = NonZero::new(input.len()) else {
-            return Ok(MutationResult::Skipped);
-        };
-        let selected = state.rand_mut().below(parts_len);
-        let mutated = input.part_by_idx_mut(selected).unwrap();
-        self.mutate(state, &mut mutated.1)
+        match NonZero::new(input.len()) {
+            None => Ok(MutationResult::Skipped),
+            Some(len) => {
+                let idx = state.rand_mut().below(len);
+                let (_name, part) = &mut input.parts_mut()[idx];
+                self.mutate(state, part)
+            }
+        }
     }
 
     fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
@@ -165,9 +167,11 @@ where
                     return Ok(MutationResult::Skipped);
                 }
                 let choice = name_choice % len;
-                let name = input.names().nth(choice).unwrap();
+                // Safety: len is checked above
+                let (name, part) = &input.parts()[choice];
 
-                let other_size = input.part_by_idx(choice).unwrap().1.mutator_bytes().len();
+                let other_size = part.mutator_bytes().len();
+
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -229,9 +233,10 @@ where
         }
 
         let choice = name_choice % other_len;
-        let name = other.names().nth(choice).unwrap();
+        // Safety: choice is checked above
+        let (name, part) = &other.parts()[choice];
 
-        let other_size = other.part_by_idx(choice).unwrap().1.mutator_bytes().len();
+        let other_size = part.mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -255,7 +260,7 @@ where
             // size is larger than 0.
             // target is smaller than size -> the subtraction is larger than 0.
             let range = rand_range(state, other_size, unsafe {
-                NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+                NonZero::new_unchecked(min(other_size, size - target))
             });
 
             let other_testcase = state.corpus().get(id)?.borrow_mut();
@@ -302,9 +307,10 @@ where
                     return Ok(MutationResult::Skipped);
                 }
                 let choice = name_choice % len;
-                let name = input.names().nth(choice).unwrap();
+                // Safety: len is checked above
+                let (name, part) = &input.parts()[choice];
 
-                let other_size = input.part_by_idx(choice).unwrap().1.mutator_bytes().len();
+                let other_size = part.mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -331,7 +337,7 @@ where
                     // other_size is checked above.
                     // size is larger than than target and larger than 1. The subtraction result will always be positive.
                     let range = rand_range(state, other_size, unsafe {
-                        NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+                        NonZero::new_unchecked(min(other_size, size - target))
                     });
 
                     let [part, chosen] = match part_idx.cmp(&choice) {
@@ -366,9 +372,10 @@ where
         }
 
         let choice = name_choice % other_len;
-        let name = other.names().nth(choice).unwrap();
+        // Safety: choice is checked above
+        let (name, part) = &other.parts()[choice];
 
-        let other_size = other.part_by_idx(choice).unwrap().1.mutator_bytes().len();
+        let other_size = part.mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -391,7 +398,7 @@ where
             // other_size is checked above.
             // size is larger than than target and larger than 1. The subtraction result will always be positive.
             let range = rand_range(state, other_size, unsafe {
-                NonZero::new(min(other_size, size - target)).unwrap_unchecked()
+                NonZero::new_unchecked(min(other_size, size - target))
             });
 
             let other_testcase = state.corpus().get(id)?.borrow_mut();

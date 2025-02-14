@@ -143,11 +143,11 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // a generator here is not generalisable
-    let initial = MultipartInput::with_default_names([
-        BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o']),
-        BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o']),
-        BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o']),
-        BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o']),
+    let initial = MultipartInput::from([
+        ((), BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ((), BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ((), BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
+        ((), BytesInput::new(vec![b'h', b'e', b'l', b'l', b'o'])),
     ]);
 
     fuzzer
