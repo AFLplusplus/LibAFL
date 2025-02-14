@@ -238,7 +238,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         return;
     }
 
-    let monitor = MultiMonitor::new(|s| log::debug!("{s}"));
+    let monitor = MultiMonitor::new(|s| log::info!("{s}"));
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(monitor);
