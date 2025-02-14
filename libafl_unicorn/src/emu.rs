@@ -18,43 +18,51 @@ pub fn memory_dump(emu: &Unicorn<()>, len: u64) {
 
         let data = emu.mem_read_as_vec(pos, 4).unwrap();
 
-        println!(
+        log::debug!(
             "{:X}:\t {:02X} {:02X} {:02X} {:02X}  {:08b} {:08b} {:08b} {:08b}",
-            pos, data[0], data[1], data[2], data[3], data[0], data[1], data[2], data[3]
+            pos,
+            data[0],
+            data[1],
+            data[2],
+            data[3],
+            data[0],
+            data[1],
+            data[2],
+            data[3]
         );
     }
 }
 
 pub fn debug_print(emu: &Unicorn<()>) {
-    println!("Status when crash happened:");
+    log::debug!("Status when crash happened:");
 
     let pc = emu.pc_read().unwrap();
 
-    println!("PC: {:X}", pc);
+    log::debug!("PC: {:X}", pc);
     let arch = emu.get_arch();
 
     match arch {
         Arch::ARM => {
-            println!("SP: {:X}", emu.reg_read(RegisterARM::SP).unwrap());
-            println!("R0: {:X}", emu.reg_read(RegisterARM::R0).unwrap());
-            println!("R1: {:X}", emu.reg_read(RegisterARM::R1).unwrap());
-            println!("R2: {:X}", emu.reg_read(RegisterARM::R2).unwrap());
-            println!("R3: {:X}", emu.reg_read(RegisterARM::R3).unwrap());
+            log::debug!("SP: {:X}", emu.reg_read(RegisterARM::SP).unwrap());
+            log::debug!("R0: {:X}", emu.reg_read(RegisterARM::R0).unwrap());
+            log::debug!("R1: {:X}", emu.reg_read(RegisterARM::R1).unwrap());
+            log::debug!("R2: {:X}", emu.reg_read(RegisterARM::R2).unwrap());
+            log::debug!("R3: {:X}", emu.reg_read(RegisterARM::R3).unwrap());
         }
         Arch::ARM64 => {
-            println!("SP: {:X}", emu.reg_read(RegisterARM64::SP).unwrap());
-            println!("X0: {:X}", emu.reg_read(RegisterARM64::X0).unwrap());
-            println!("X1: {:X}", emu.reg_read(RegisterARM64::X1).unwrap());
-            println!("X2: {:X}", emu.reg_read(RegisterARM64::X2).unwrap());
-            println!("X3: {:X}", emu.reg_read(RegisterARM64::X3).unwrap());
+            log::debug!("SP: {:X}", emu.reg_read(RegisterARM64::SP).unwrap());
+            log::debug!("X0: {:X}", emu.reg_read(RegisterARM64::X0).unwrap());
+            log::debug!("X1: {:X}", emu.reg_read(RegisterARM64::X1).unwrap());
+            log::debug!("X2: {:X}", emu.reg_read(RegisterARM64::X2).unwrap());
+            log::debug!("X3: {:X}", emu.reg_read(RegisterARM64::X3).unwrap());
         }
         Arch::X86 => {
-            println!("ESP: {:X}", emu.reg_read(RegisterX86::ESP).unwrap());
-            println!("RAX: {:X}", emu.reg_read(RegisterX86::RAX).unwrap());
-            println!("RCX: {:X}", emu.reg_read(RegisterX86::RCX).unwrap());
-            println!("RDX: {:X}", emu.reg_read(RegisterX86::RDX).unwrap());
-            println!("RPB: {:X}", emu.reg_read(RegisterX86::RBP).unwrap());
-            println!("RSP: {:X}", emu.reg_read(RegisterX86::RSP).unwrap());
+            log::debug!("ESP: {:X}", emu.reg_read(RegisterX86::ESP).unwrap());
+            log::debug!("RAX: {:X}", emu.reg_read(RegisterX86::RAX).unwrap());
+            log::debug!("RCX: {:X}", emu.reg_read(RegisterX86::RCX).unwrap());
+            log::debug!("RDX: {:X}", emu.reg_read(RegisterX86::RDX).unwrap());
+            log::debug!("RPB: {:X}", emu.reg_read(RegisterX86::RBP).unwrap());
+            log::debug!("RSP: {:X}", emu.reg_read(RegisterX86::RSP).unwrap());
         }
         _ => {}
     }
@@ -101,13 +109,13 @@ pub fn debug_print(emu: &Unicorn<()>) {
                 let insns = cs.disasm_all(&bytes, begin).expect("Failed to disassemble");
 
                 if !insns.is_empty() {
-                    println!("Code dump: [0x{begin:x} -> 0x{end:x}]");
+                    log::debug!("Code dump: [0x{begin:x} -> 0x{end:x}]");
                 } else {
-                    println!("No disassembly available at PC: 0x{pc:x}");
+                    log::debug!("No disassembly available at PC: 0x{pc:x}");
                 }
 
                 for i in insns.as_ref() {
-                    println!("{}", i);
+                    log::debug!("{}", i);
                 }
             }
         }
