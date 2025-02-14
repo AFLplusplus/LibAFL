@@ -43,7 +43,7 @@ typedef uint128_t         u128;
   #define MAYBE_THREAD_LOCAL
 #endif
 
-#ifdef _WIN32
+#if defined _WIN32 && defined(_MSC_VER)
   #define RETADDR (uintptr_t) _ReturnAddress()
   #define EXPORT_FN __declspec(dllexport)
 #else
@@ -88,8 +88,8 @@ typedef uint128_t         u128;
   #define MEMCPY memcpy
 #endif
 
-#ifdef _WIN32
-
+#if defined _WIN32
+  #if _MSC_VER
   // From Libfuzzer
   // Intermediate macro to ensure the parameter is expanded before stringified.
   #define STRINGIFY_(A) #A
@@ -168,4 +168,4 @@ typedef uint128_t         u128;
 
   #define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif  // _WIN32
-
+#endif // __LIBAFL_TARGETS_COMMON__
