@@ -55,6 +55,9 @@ COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 COPY libafl_intelpt/Cargo.toml libafl_intelpt/README.md libafl_intelpt/
 COPY scripts/dummy.rs libafl_intelpt/src/lib.rs
 
+COPY libafl_unicorn/Cargo.toml libafl_unicorn/
+COPY scripts/dummy.rs libafl_unicorn/src/lib.rs
+
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/build_linux.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
 
