@@ -278,7 +278,7 @@ jobs:
           - ./fuzzers/full_system/nyx_launcher
           - ./fuzzers/full_system/nyx_libxml2_standalone
           - ./fuzzers/full_system/nyx_libxml2_parallel
- 
+
           # Structure-aware
           - ./fuzzers/structure_aware/nautilus_sync
           - ./fuzzers/structure_aware/baby_fuzzer_grimoire
