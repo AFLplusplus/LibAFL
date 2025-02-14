@@ -12,7 +12,7 @@ fuzzer:
 	cargo build --profile={{PROFILE}}
 
 run: fuzzer
-	{{FUZZER}} arm
+	RUST_LOG="debug" {{FUZZER}} arm
 
 build_bin:
   cd bin && just all
@@ -27,7 +27,7 @@ test_single arch="arm":
   #!/bin/bash
   echo "Testing {{arch}}"
 
-  timeout 30s {{FUZZER}} {{arch}} | tee fuzz_stdout.log || true
+  RUST_LOG="debug" timeout 30s {{FUZZER}} {{arch}} 2>| tee fuzz_stdout.log || true
   if grep -qa "objectives: 1" fuzz_stdout.log; then
     echo "Fuzzer is working"
   else
