@@ -90,10 +90,10 @@ typedef uint128_t         u128;
 
 #if defined _WIN32
   #if _MSC_VER
-  // From Libfuzzer
-  // Intermediate macro to ensure the parameter is expanded before stringified.
-  #define STRINGIFY_(A) #A
-  #define STRINGIFY(A) STRINGIFY_(A)
+    // From Libfuzzer
+    // Intermediate macro to ensure the parameter is expanded before stringified.
+    #define STRINGIFY_(A) #A
+    #define STRINGIFY(A) STRINGIFY_(A)
 
     // Copied from compiler-rt/lib/sanitizer_common/sanitizer_win_defs.h
     #if defined(_M_IX86) || defined(__i386__)
@@ -168,4 +168,5 @@ typedef uint128_t         u128;
 
   #define CHECK_WEAK_FN(Name) (Name != NULL)
 #endif  // _WIN32
-#endif // __LIBAFL_TARGETS_COMMON__
+
+#endif
