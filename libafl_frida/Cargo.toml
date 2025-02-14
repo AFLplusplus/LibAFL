@@ -62,17 +62,18 @@ nix = { workspace = true, default-features = true, features = ["mman"] }
 libc = { workspace = true }
 hashbrown = { workspace = true, default-features = true }
 rangemap = { workspace = true }
-frida-gum-sys = { version = "0.16.5", features = [
+frida-gum-sys = { version = "0.16.7", features = [
   "event-sink",
   "invocation-listener",
 ] }
-frida-gum = { version = "0.16.5", features = [
+frida-gum = { version = "0.16.7", features = [
   "event-sink",
   "invocation-listener",
   "module-names",
   "script",
   "backtrace",
 ] }
+os-thread-local = "0.1.3"
 dynasmrt = "3.0.1"
 
 color-backtrace = { version = "0.7.0", features = ["resolve-modules"] }
@@ -112,6 +113,15 @@ iced-x86 = { version = "1.21.0", features = ["code_asm"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winsafe = { version = "0.0.22", features = ["kernel"] }
+winapi = { version = "0.3", features = [
+  "processthreadsapi",
+  "winnt",
+  "memoryapi",
+  "errhandlingapi",
+  "debugapi",
+] }
 
+[target.'cfg(unix)'.dependencies]
+errno = "0.2"
 [target.'cfg(target_vendor="apple")'.dependencies]
 mach-sys = { version = "0.5.4" }

@@ -971,20 +971,139 @@ impl SimpleStdoutLogger {
 }
 
 #[cfg(feature = "std")]
+#[cfg(target_os = "windows")]
+#[allow(clippy::cast_ptr_alignment)]
+#[must_use]
+/// Return thread ID without using TLS
+pub fn get_thread_id() -> u64 {
+    use std::arch::asm;
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let teb: *const u8;
+        asm!("mov {}, gs:[0x30]", out(reg) teb);
+        let thread_id_ptr = teb.add(0x48) as *const u32;
+        u64::from(*thread_id_ptr)
+    }
+
+    #[cfg(target_arch = "x86")]
+    unsafe {
+        let teb: *const u8;
+        asm!("mov {}, fs:[0x18]", out(reg) teb);
+        let thread_id_ptr = teb.add(0x24) as *const u32;
+        *thread_id_ptr as u64
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[must_use]
+#[allow(clippy::cast_sign_loss)]
+/// Return thread ID without using TLS
+pub fn get_thread_id() -> u64 {
+    use libc::{syscall, SYS_gettid};
+
+    unsafe { syscall(SYS_gettid) as u64 }
+}
+
+#[cfg(feature = "std")]
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[must_use]
+/// Return thread ID using Rust's `std::thread`
+pub fn get_thread_id() -> u64 {
+    // Fallback for other platforms
+    let thread_id = std::thread::current().id();
+    unsafe { mem::transmute::<_, u64>(thread_id) }
+}
+
+#[cfg(feature = "std")]
+#[cfg(target_os = "windows")]
+mod windows_logging {
+    use std::ptr;
+
+    use once_cell::sync::OnceCell;
+    use winapi::um::{
+        fileapi::WriteFile, handleapi::INVALID_HANDLE_VALUE, processenv::GetStdHandle,
+        winbase::STD_OUTPUT_HANDLE, winnt::HANDLE,
+    };
+
+    // Safe wrapper around HANDLE
+    struct StdOutHandle(HANDLE);
+
+    // Implement Send and Sync for StdOutHandle, assuming it's safe to share
+    unsafe impl Send for StdOutHandle {}
+    unsafe impl Sync for StdOutHandle {}
+
+    static H_STDOUT: OnceCell<StdOutHandle> = OnceCell::new();
+
+    fn get_stdout_handle() -> HANDLE {
+        H_STDOUT
+            .get_or_init(|| {
+                let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+                StdOutHandle(handle)
+            })
+            .0
+    }
+    /// A function that writes directly to stdout using `WinAPI`.
+    /// Works much faster than println and does not need TLS
+    pub fn direct_log(message: &str) {
+        // Get the handle to standard output
+        let h_stdout: HANDLE = get_stdout_handle();
+
+        if h_stdout == INVALID_HANDLE_VALUE {
+            eprintln!("Failed to get standard output handle");
+            return;
+        }
+
+        let bytes = message.as_bytes();
+        let mut bytes_written = 0;
+
+        // Write the message to standard output
+        let result = unsafe {
+            WriteFile(
+                h_stdout,
+                bytes.as_ptr() as *const _,
+                bytes.len() as u32,
+                &mut bytes_written,
+                ptr::null_mut(),
+            )
+        };
+
+        if result == 0 {
+            eprintln!("Failed to write to standard output");
+        }
+    }
+}
+
+#[cfg(feature = "std")]
 impl log::Log for SimpleStdoutLogger {
     #[inline]
     fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
 
+    #[cfg(not(target_os = "windows"))]
     fn log(&self, record: &Record) {
         println!(
-            "[{:?}, {:?}] {}: {}",
+            "[{:?}, {:?}:{:?}] {}: {}",
             current_time(),
             std::process::id(),
+            get_thread_id(),
             record.level(),
             record.args()
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    fn log(&self, record: &Record) {
+        // println is not safe in TLS-less environment
+        let msg = format!(
+            "[{:?}, {:?}:{:?}] {}: {}\n",
+            current_time(),
+            std::process::id(),
+            get_thread_id(),
+            record.level(),
+            record.args()
+        );
+        windows_logging::direct_log(msg.as_str());
     }
 
     fn flush(&self) {}
@@ -1141,6 +1260,65 @@ pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
         mem::forget(f);
     }));
+}
+
+#[cfg(feature = "std")]
+#[cfg(target_os = "windows")]
+#[repr(C)]
+#[allow(clippy::upper_case_acronyms)]
+struct TEB {
+    reserved1: [u8; 0x58],
+    tls_pointer: *mut *mut u8,
+    reserved2: [u8; 0xC0],
+}
+
+#[cfg(feature = "std")]
+#[cfg(target_arch = "x86_64")]
+#[inline(always)]
+#[cfg(target_os = "windows")]
+fn nt_current_teb() -> *mut TEB {
+    use std::arch::asm;
+    let teb: *mut TEB;
+    unsafe {
+        asm!("mov {}, gs:0x30", out(reg) teb);
+    }
+    teb
+}
+
+/// Some of our hooks can be invoked from threads that do not have TLS yet.
+/// Many Rust and Frida functions require TLS to be set up, so we need to check if we have TLS.
+/// This was observed on Windows, so for now for other platforms we assume that we have TLS.
+#[cfg(feature = "std")]
+#[inline]
+#[allow(unreachable_code)]
+#[must_use]
+pub fn has_tls() -> bool {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let teb = nt_current_teb();
+        if teb.is_null() {
+            return false;
+        }
+
+        let tls_array = (*teb).tls_pointer;
+        if tls_array.is_null() {
+            return false;
+        }
+        return true;
+    }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        let mut tid: u64;
+        std::arch::asm!(
+            "mrs {tid}, TPIDRRO_EL0",
+            tid = out(reg) tid,
+        );
+        tid &= 0xffff_ffff_ffff_fff8;
+        let tlsptr = tid as *const u64;
+        return tlsptr.add(0x102).read() != 0u64;
+    }
+    // Default
+    true
 }
 
 /// Zero-cost way to construct [`core::num::NonZeroUsize`] at compile-time.

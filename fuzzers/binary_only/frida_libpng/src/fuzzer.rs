@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
-use std::path::PathBuf;
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use frida_gum::Gum;
 use libafl::{
@@ -40,6 +40,7 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
+    frida_helper_shutdown_observer::FridaHelperObserver,
     helper::{FridaInstrumentationHelper, IfElseRuntime},
 };
 use libafl_targets::cmplog::CmpLogObserver;
@@ -104,7 +105,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         let options_clone = options.clone();
         let client_description_clone2 = client_description.clone();
         let options_clone2 = options.clone();
-        let mut frida_helper = FridaInstrumentationHelper::new(
+        let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
             &gum,
             options,
             tuple_list!(
@@ -120,17 +121,22 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 ),
                 coverage
             ),
-        );
+        )));
 
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(unsafe {
-            StdMapObserver::from_mut_ptr("edges", frida_helper.map_mut_ptr().unwrap(), MAP_SIZE)
+            StdMapObserver::from_mut_ptr(
+                "edges",
+                frida_helper.borrow_mut().map_mut_ptr().unwrap(),
+                MAP_SIZE,
+            )
         })
         .track_indices();
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
         let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+        let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
@@ -187,7 +193,12 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+        let observers = tuple_list!(
+            frida_helper_observer,
+            edges_observer,
+            time_observer,
+            asan_observer
+        );
 
         // Create the executor for an in-process function with just one observer for edge coverage
         let executor = FridaInProcessExecutor::new(
@@ -200,7 +211,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 &mut mgr,
                 options.timeout,
             )?,
-            &mut frida_helper,
+            Rc::clone(&frida_helper),
         );
         // Create an observation channel using cmplog map
         let cmplog_observer = CmpLogObserver::new("cmplog", true);
