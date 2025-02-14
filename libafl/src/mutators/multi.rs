@@ -7,6 +7,7 @@ use core::{
 };
 
 use libafl_bolts::{rands::Rand, Error, Named};
+use tuple_list::{tuple_list, tuple_list_type};
 
 use crate::{
     corpus::{Corpus, CorpusId},
@@ -33,6 +34,24 @@ use crate::{
     state::{HasCorpus, HasMaxSize, HasRand},
 };
 
+/// A list of mutators that can be used on a [`ListInput`].
+pub type GenericListInputMutators = tuple_list_type!(
+    RemoveLastEntryMutator,
+    RemoveRandomEntryMutator,
+    CrossoverInsertMutator,
+    CrossoverReplaceMutator
+);
+
+/// Create a list of mutators that can be used on a [`ListInput`].
+#[must_use]
+pub fn generic_list_input_mutators() -> GenericListInputMutators {
+    tuple_list!(
+        RemoveLastEntryMutator,
+        RemoveRandomEntryMutator,
+        CrossoverInsertMutator,
+        CrossoverReplaceMutator
+    )
+}
 /// Marker trait for if the default multipart input mutator implementation is appropriate.
 ///
 /// You should implement this type for your mutator if you just want a random part of the input to
