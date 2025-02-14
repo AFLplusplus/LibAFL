@@ -23,5 +23,6 @@ libafl_bolts = { path = "../../../libafl_bolts/" }
 libafl_targets = { path = "../../../libafl_targets" }
 libafl_unicorn = { path = "../../../libafl_unicorn/" }
 
-unicorn-engine = "2.0.1"
-iced-x86 = "1.18.0"
+unicorn-engine = "2.1.2"
+log = "0.4.25"
+env_logger = "0.11.6"

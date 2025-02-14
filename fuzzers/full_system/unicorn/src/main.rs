@@ -3,7 +3,7 @@ use std::{env, fs::File, io::Read, path::PathBuf, ptr::NonNull};
 use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{ExitKind, InProcessForkExecutor},
+    executors::{ExitKind, InProcessExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -20,7 +20,7 @@ use libafl::{
 use libafl_bolts::{
     current_nanos,
     rands::StdRand,
-    shmem::{unix_shmem, ShMemProvider},
+    shmem::{ShMemProvider, StdShMemProvider},
     tuples::tuple_list,
     AsSlice, AsSliceMut,
 };
@@ -49,10 +49,12 @@ pub const STACK_ADDRESS: u64 = 0x7000;
 pub const STACK_SIZE: u64 = 0x1000;
 
 fn main() {
+    env_logger::init();
+
     let args: Vec<_> = env::args().collect();
     let mut emu = false;
     if args.len() < 2 {
-        println!("Please specify the arcghitecture");
+        log::debug!("Please specify the arcghitecture");
         return;
     }
 
@@ -142,10 +144,10 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     )
     .unwrap();
 
-    // Setting up the edge coverage tracker
-    let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
-
-    let mut shmem = shmem_provider.new_shmem(EDGES_MAP_DEFAULT_SIZE).unwrap();
+    let mut shmem = StdShMemProvider::new()
+        .unwrap()
+        .new_shmem(EDGES_MAP_DEFAULT_SIZE)
+        .unwrap();
 
     let shmem_buf = shmem.as_slice_mut();
     unsafe {
@@ -164,7 +166,12 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     // Add the coverage hook
     set_coverage_hook(&mut emu);
 
+    // Save context
+    let context = emu.context_init().unwrap();
+
     let mut harness = |input: &BytesInput| {
+        emu.context_restore(&context).unwrap();
+
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let len = buf.len();
@@ -207,12 +214,13 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
                     _ => 0,
                 };
                 if result_value == 0x6 {
-                    println!("Result found: 0x{result_value:x}");
-                    panic!("Correct input value found");
+                    log::debug!("Result found: 0x{result_value:x}");
+
+                    return ExitKind::Crash;
                 }
             }
             Err(err) => {
-                println!("Error: {:?}", err);
+                log::error!("Error: {:?}", err);
 
                 memory_dump(&emu, 2);
                 debug_print(&emu);
@@ -223,14 +231,14 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     };
 
     if should_emulate {
-        println!("Starting emulation:");
+        log::info!("Starting emulation:");
         let mem_data: Vec<u8> = vec![0x50, 0x24, 0x36, 0x0];
         harness(&BytesInput::from(mem_data));
-        println!("Done");
+        log::info!("Done");
         return;
     }
 
-    let monitor = MultiMonitor::new(|s| println!("{s}"));
+    let monitor = MultiMonitor::new(|s| log::debug!("{s}"));
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(monitor);
@@ -272,14 +280,12 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let mut executor = InProcessForkExecutor::new(
+    let mut executor = InProcessExecutor::new(
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        core::time::Duration::from_millis(5000),
-        shmem_provider,
     )
     .expect("Failed to create the executor");
 
@@ -320,7 +326,7 @@ fn unicorn_map_and_load_code(emu: &mut Unicorn<()>, address: u64, size: usize, p
 fn add_code_hook(emu: &mut Unicorn<()>) {
     emu.add_code_hook(0x0, !0x0_u64, |emu, pc, _| {
         let sp = get_stack_pointer(emu);
-        println!("[PC: 0x{pc:x}] Hook: SP 0x:{sp:x}");
+        log::debug!("[PC: 0x{pc:x}] Hook: SP 0x:{sp:x}");
     })
     .unwrap();
 }
@@ -332,15 +338,15 @@ fn mem_callback(
     value: i64,
 ) -> bool {
     match mem {
-        MemType::WRITE => println!(
+        MemType::WRITE => log::debug!(
             "[PC: 0x{:x}] Memory is being WRITTEN at adress: {address:x} size: {size:} value: {value:}",
             emu.pc_read().unwrap()
         ),
-        MemType::READ => println!(
+        MemType::READ => log::debug!(
             "[PC: 0x{:x}] Memory is being READ at adress: {address:x} size: {size:}",
             emu.pc_read().unwrap()
         ),
-        _ => println!(
+        _ => log::debug!(
             "[PC: 0x{:x}] Memory access type: {mem:?} adress: {address:x} size: {size:} value: {value:}",
             emu.pc_read().unwrap()
         ),
