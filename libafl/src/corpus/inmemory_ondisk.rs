@@ -378,8 +378,8 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let mut old_ctr = String::new();
             lockfile.read_to_string(&mut old_ctr)?;
             if !old_ctr.is_empty() {
-                ctr = old_ctr.trim().parse::<u32>()? + 1
-            };
+                ctr = old_ctr.trim().parse::<u32>()? + 1;
+            }
 
             lockfile.seek(SeekFrom::Start(0))?;
             lockfile.write_all(ctr.to_string().as_bytes())?;
