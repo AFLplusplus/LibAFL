@@ -369,7 +369,15 @@ pub mod windows_exception_handler {
 
             let exception_list = data.exceptions();
             if exception_list.contains(&code) {
-                log::error!("Crashed with {code}");
+                log::error!(
+                    "Crashed with {code} at {:?} in thread {:?}",
+                    exception_pointers
+                        .ExceptionRecord
+                        .as_mut()
+                        .unwrap()
+                        .ExceptionAddress,
+                    winapi::um::processthreadsapi::GetCurrentThreadId()
+                );
             } else {
                 // log::trace!("Exception code received, but {code} is not in CRASH_EXCEPTIONS");
                 is_crash = false;
@@ -422,7 +430,17 @@ pub mod windows_exception_handler {
 
             // Make sure we don't crash in the crash handler forever.
             if is_crash {
-                let input = data.take_current_input::<I>();
+                log::warn!("Running observers and exiting!");
+                // // I want to disable the hooks before doing anything, especially before taking a stack dump
+                let input = data.take_current_input::<I>(); // log::set_max_level(log::LevelFilter::Trace);
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
                 {
                     let mut bsod = Vec::new();
                     {
@@ -434,14 +452,6 @@ pub mod windows_exception_handler {
                     }
                     log::error!("{}", std::str::from_utf8(&bsod).unwrap());
                 }
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
-                    executor,
-                    state,
-                    input,
-                    fuzzer,
-                    event_mgr,
-                    ExitKind::Crash,
-                );
             } else {
                 // This is not worth saving
             }
