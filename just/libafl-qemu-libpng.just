@@ -73,12 +73,12 @@ libpng: arch_dir zlib libpng_wget
 
     cd {{ TARGET_DIR }}/build-png/ && \
         CC=$CROSS_CC \
-        CFLAGS="$CROSS_CFLAGS -I"{{ TARGET_DIR }}/build-zlib/zlib/lib"" \
+        CFLAGS="$CROSS_CFLAGS -I"{{ TARGET_DIR }}/build-zlib/zlib/include"" \
         LDFLAGS=-L"{{ TARGET_DIR }}/build-zlib/zlib/lib" \
         {{ DEPS_DIR }}/libpng-1.6.37/configure \
             --enable-shared=no \
             --with-pic=yes \
             --enable-hardware-optimizations={{ OPTIMIZATIONS }} \
-            --host={{ ARCH }} \
+            --host={{ ARCH }}
 
     make -j -C {{ TARGET_DIR }}/build-png/
