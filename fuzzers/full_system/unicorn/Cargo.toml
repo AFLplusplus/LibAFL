@@ -9,14 +9,6 @@ default = []
 code_hook = []
 mem_hook = []
 
-
-# Panic configuration needed so that the InProcessForkExecutor still detect the crash when the forked process crashed
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-
 [dependencies]
 libafl = { path = "../../../libafl/" }
 libafl_bolts = { path = "../../../libafl_bolts/" }
