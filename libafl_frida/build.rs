@@ -29,7 +29,7 @@ fn main() {
     // clang++ -shared -fPIC -O0 -o test_harness.so test_harness.cpp
     // Check if we have clang++ installed
 
-    if target_family == "windows" && std::env::var("CARGO_CFG_TARGET_ENV").unwrap() == "msvc" {
+    if target_family == "windows" {
         let compiler = cc::Build::new()
             .cpp(true)
             .file("test_harness.cpp")
@@ -73,7 +73,7 @@ fn main() {
         // std::fs::write("compiler_output.txt", output_str.clone()).expect("Unable to write file");
         assert!(
             output.status.success(),
-            "Failed to link test_harness.dll\n {}",
+            "Failed to link test_harness.dll\n {:?}",
             output_str.as_str()
         );
     } else {

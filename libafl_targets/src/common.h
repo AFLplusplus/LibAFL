@@ -43,7 +43,7 @@ typedef uint128_t         u128;
   #define MAYBE_THREAD_LOCAL
 #endif
 
-#if defined _WIN32 && defined(_MSC_VER)
+#ifdef _WIN32
   #define RETADDR (uintptr_t) _ReturnAddress()
   #define EXPORT_FN __declspec(dllexport)
 #else
@@ -88,12 +88,12 @@ typedef uint128_t         u128;
   #define MEMCPY memcpy
 #endif
 
-#if defined _WIN32
-  #if _MSC_VER
-    // From Libfuzzer
-    // Intermediate macro to ensure the parameter is expanded before stringified.
-    #define STRINGIFY_(A) #A
-    #define STRINGIFY(A) STRINGIFY_(A)
+#ifdef _WIN32
+
+  // From Libfuzzer
+  // Intermediate macro to ensure the parameter is expanded before stringified.
+  #define STRINGIFY_(A) #A
+  #define STRINGIFY(A) STRINGIFY_(A)
 
     // Copied from compiler-rt/lib/sanitizer_common/sanitizer_win_defs.h
     #if defined(_M_IX86) || defined(__i386__)
