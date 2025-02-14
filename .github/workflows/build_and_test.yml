@@ -273,7 +273,6 @@ jobs:
           - ./fuzzers/forkserver/fuzzbench_forkserver_cmplog
           - ./fuzzers/forkserver/libafl-fuzz
           - ./fuzzers/forkserver/baby_fuzzer_with_forkexecutor
-          - ./fuzzers/full_system/qemu_intel_pt_bootloader
 
           # Full-system
           - ./fuzzers/full_system/nyx_launcher
