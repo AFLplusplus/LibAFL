@@ -18,7 +18,7 @@ use libafl_bolts::{
     tuples::{Map, MappingFunctor},
     Error, Named,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::CorpusId,
@@ -30,18 +30,18 @@ use crate::{
 /// An input composed of multiple parts. Use in situations where subcomponents are not necessarily
 /// related, or represent distinct parts of the input.
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct MultipartInput<I, N> {
-    parts: Vec<(N, I)>,
+pub struct ListInput<I> {
+    parts: Vec<I>,
 }
 
-impl<I, N> Default for MultipartInput<I, N> {
+impl<I> Default for ListInput<I> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<I, N> MultipartInput<I, N> {
-    /// Create a new multipart input.
+impl<I> ListInput<I> {
+    /// Create a new [`ListInput`].
     #[must_use]
     #[inline]
     pub fn new() -> Self {
@@ -64,14 +64,14 @@ impl<I, N> MultipartInput<I, N> {
     /// Get the individual parts of this input.
     #[must_use]
     #[inline]
-    pub fn parts_and_names(&self) -> &[(N, I)] {
+    pub fn parts(&self) -> &[I] {
         &self.parts
     }
 
     /// Get the individual parts of this input.
     #[must_use]
     #[inline]
-    pub fn parts_and_names_mut(&mut self) -> &mut [(N, I)] {
+    pub fn parts_mut(&mut self) -> &mut [I] {
         &mut self.parts
     }
 
@@ -79,14 +79,14 @@ impl<I, N> MultipartInput<I, N> {
     #[must_use]
     #[inline]
     pub fn part_by_idx(&self, idx: usize) -> Option<&I> {
-        self.parts.get(idx).map(|(_, i)| i)
+        self.parts.get(idx)
     }
 
     /// Get a specific part of this input by index.
     #[must_use]
     #[inline]
     pub fn part_by_idx_mut(&mut self, idx: usize) -> Option<&mut I> {
-        self.parts.get_mut(idx).map(|(_, i)| i)
+        self.parts.get_mut(idx)
     }
 
     /// Access multiple parts mutably.
@@ -101,12 +101,7 @@ impl<I, N> MultipartInput<I, N> {
         let mut parts = self.parts.iter_mut();
         if let Ok(arr) = idxs
             .into_iter()
-            .map(|i| {
-                parts
-                    .nth(i)
-                    .map(|(_, i)| i)
-                    .expect("idx had an out of bounds entry")
-            })
+            .map(|i| parts.nth(i).expect("idx had an out of bounds entry"))
             .collect::<ArrayVec<_, C>>()
             .into_inner()
         {
@@ -117,24 +112,16 @@ impl<I, N> MultipartInput<I, N> {
         }
     }
 
-    /// Get the names associated with the subparts of this input. Used to distinguish between the
-    /// input components in the case where some parts may or may not be present, or in different
-    /// orders.
+    /// Adds a part to this input
     #[inline]
-    pub fn names(&self) -> impl Iterator<Item = &N> {
-        self.parts.iter().map(|(n, _)| n)
+    pub fn append_part(&mut self, part: I) {
+        self.parts.push(part);
     }
 
-    /// Adds a part to this input, potentially with the same name as an existing part.
+    /// Inserts a part to this input at the given index
     #[inline]
-    pub fn append_part(&mut self, name: N, part: I) {
-        self.parts.push((name, part));
-    }
-
-    /// Inserts a part to this input at the given index, potentially with the same name as an existing part.
-    #[inline]
-    pub fn insert_part(&mut self, idx: usize, name: N, part: I) {
-        self.parts.insert(idx, (name, part));
+    pub fn insert_part(&mut self, idx: usize, part: I) {
+        self.parts.insert(idx, part);
     }
 
     /// Removes a part from this input at the given index.
@@ -151,19 +138,19 @@ impl<I, N> MultipartInput<I, N> {
     ///
     /// Returns [`None`] if the input is empty.
     #[inline]
-    pub fn pop_part(&mut self) -> Option<(N, I)> {
+    pub fn pop_part(&mut self) -> Option<I> {
         self.parts.pop()
     }
 
     /// Iterate over the parts of this input; no order is specified.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &(N, I)> {
+    pub fn iter(&self) -> impl Iterator<Item = &I> {
         self.parts.iter()
     }
 
     /// Iterate over the parts of this input; no order is specified.
     #[inline]
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (N, I)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut I> {
         self.parts.iter_mut()
     }
 
@@ -181,7 +168,7 @@ impl<I, N> MultipartInput<I, N> {
         self.parts.is_empty()
     }
 
-    /// Map a tuple of mutators targeting [`MultipartInput`]'s inner type to a tuple of mutators able to work on the entire [`MultipartInput`],
+    /// Map a tuple of mutators targeting [`ListInput`]'s inner type to a tuple of mutators able to work on the entire [`ListInput`],
     /// by mutating on the last part. If the input is empty, [`MutationResult::Skipped`] is returned.
     #[must_use]
     #[inline]
@@ -191,7 +178,7 @@ impl<I, N> MultipartInput<I, N> {
         inner.map(ToLastEntryMutator)
     }
 
-    /// Map a tuple of mutators targeting [`MultipartInput`]'s inner type to a tuple of mutators able to work on the entire [`MultipartInput`],
+    /// Map a tuple of mutators targeting [`ListInput`]'s inner type to a tuple of mutators able to work on the entire [`ListInput`],
     /// by mutating on a random part. If the input is empty, [`MutationResult::Skipped`] is returned.
     #[must_use]
     #[inline]
@@ -202,42 +189,9 @@ impl<I, N> MultipartInput<I, N> {
     }
 }
 
-impl<I, N> MultipartInput<I, N>
+impl<I, It> From<It> for ListInput<I>
 where
-    N: PartialEq,
-{
-    /// Gets a reference to each part with the provided name.
-    pub fn parts_with_name<'a, 'b>(
-        &'b self,
-        name: &'a N,
-    ) -> impl Iterator<Item = (usize, &'b I)> + 'a
-    where
-        'b: 'a,
-    {
-        self.parts
-            .iter()
-            .enumerate()
-            .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
-    }
-
-    /// Gets a mutable reference to each part with the provided name.
-    pub fn parts_with_name_mut<'a, 'b>(
-        &'b mut self,
-        name: &'a N,
-    ) -> impl Iterator<Item = (usize, &'b mut I)> + 'a
-    where
-        'b: 'a,
-    {
-        self.parts
-            .iter_mut()
-            .enumerate()
-            .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
-    }
-}
-
-impl<I, It, N> From<It> for MultipartInput<I, N>
-where
-    It: IntoIterator<Item = (N, I)>,
+    It: IntoIterator<Item = I>,
 {
     fn from(parts: It) -> Self {
         let vec = parts.into_iter().collect();
@@ -245,43 +199,24 @@ where
     }
 }
 
-impl<I, N> MultipartInput<I, N>
-where
-    N: Default,
-{
-    /// Create a new multipart input with default names.
-    #[must_use]
-    pub fn with_default_names<It: IntoIterator<Item = I>>(parts: It) -> Self {
-        let vec = parts.into_iter().map(|i| (N::default(), i)).collect();
-        Self { parts: vec }
-    }
-
-    /// Append a part to this input with a default name.
-    #[inline]
-    pub fn append_part_with_default_name(&mut self, part: I) {
-        self.parts.push((N::default(), part));
-    }
-}
-
-impl<I, N> Input for MultipartInput<I, N>
+impl<I> Input for ListInput<I>
 where
     I: Input,
-    N: Debug + Hash + Serialize + DeserializeOwned + Clone,
 {
     fn generate_name(&self, id: Option<CorpusId>) -> String {
         if self.parts.is_empty() {
-            "empty_multipart_input".to_string() // empty strings cause issues with OnDiskCorpus
+            "empty_list_input".to_string() // empty strings cause issues with OnDiskCorpus
         } else {
             self.parts
                 .iter()
-                .map(|(name, input)| format!("{name:?}-{}", input.generate_name(id)))
+                .map(|input| input.generate_name(id))
                 .collect::<Vec<_>>()
                 .join(",")
         }
     }
 }
 
-/// Mutator that applies mutations to the last element of a [`MultipartInput`].
+/// Mutator that applies mutations to the last element of a [`ListInput`].
 ///
 ///  If the input is empty, [`MutationResult::Skipped`] is returned.
 #[derive(Debug)]
@@ -299,18 +234,14 @@ impl<M: Named> LastEntryMutator<M> {
     }
 }
 
-impl<I, M, N, S> Mutator<MultipartInput<I, N>, S> for LastEntryMutator<M>
+impl<I, M, S> Mutator<ListInput<I>, S> for LastEntryMutator<M>
 where
     M: Mutator<I, S>,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut MultipartInput<I, N>,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut ListInput<I>) -> Result<MutationResult, Error> {
         match input.parts.len() {
             0 => Ok(MutationResult::Skipped),
-            len => self.inner.mutate(state, &mut input.parts[len - 1].1),
+            len => self.inner.mutate(state, &mut input.parts[len - 1]),
         }
     }
 
@@ -337,7 +268,7 @@ impl<M> Named for LastEntryMutator<M> {
     }
 }
 
-/// Mutator that applies mutations to a random element of a [`MultipartInput`].
+/// Mutator that applies mutations to a random element of a [`ListInput`].
 ///
 ///  If the input is empty, [`MutationResult::Skipped`] is returned.
 #[derive(Debug)]
@@ -355,22 +286,18 @@ impl<M: Named> RandomEntryMutator<M> {
     }
 }
 
-impl<I, M, N, S> Mutator<MultipartInput<I, N>, S> for RandomEntryMutator<M>
+impl<I, M, S> Mutator<ListInput<I>, S> for RandomEntryMutator<M>
 where
     M: Mutator<I, S>,
     S: HasRand,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut MultipartInput<I, N>,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut ListInput<I>) -> Result<MutationResult, Error> {
         let rand = state.rand_mut();
         match input.parts.len() {
             0 => Ok(MutationResult::Skipped),
             len => {
                 let index = rand.below(unsafe { NonZero::new_unchecked(len) });
-                self.inner.mutate(state, &mut input.parts[index].1)
+                self.inner.mutate(state, &mut input.parts[index])
             }
         }
     }
@@ -398,13 +325,75 @@ impl<M> Named for RandomEntryMutator<M> {
     }
 }
 
+/// An input composed of multiple named parts.
+///
+/// It relies on a list to store the names and parts.
+pub type MultipartInput<I, N> = ListInput<(N, I)>;
+
+/// Trait for inputs composed of multiple named parts.
+pub trait NamedMultipartInput<I, N> {
+    /// Get the names of the parts of this input.
+    fn names<'a>(&'a self) -> impl Iterator<Item = &'a N>
+    where
+        N: 'a;
+    /// Get a reference to each part with the provided name.
+    fn parts_with_name<'a, 'b>(&'b self, name: &'a N) -> impl Iterator<Item = (usize, &'b I)> + 'a
+    where
+        'b: 'a,
+        I: 'b;
+
+    /// Gets a mutable reference to each part with the provided name.
+    fn parts_with_name_mut<'a, 'b>(
+        &'b mut self,
+        name: &'a N,
+    ) -> impl Iterator<Item = (usize, &'b mut I)> + 'a
+    where
+        'b: 'a,
+        I: 'b;
+}
+
+impl<I, N> NamedMultipartInput<I, N> for MultipartInput<I, N>
+where
+    N: PartialEq,
+{
+    fn names<'a>(&'a self) -> impl Iterator<Item = &'a N>
+    where
+        N: 'a,
+    {
+        self.iter().map(|(n, _)| n)
+    }
+
+    fn parts_with_name<'a, 'b>(&'b self, name: &'a N) -> impl Iterator<Item = (usize, &'b I)> + 'a
+    where
+        'b: 'a,
+        I: 'b,
+    {
+        self.iter()
+            .enumerate()
+            .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
+    }
+
+    fn parts_with_name_mut<'a, 'b>(
+        &'b mut self,
+        name: &'a N,
+    ) -> impl Iterator<Item = (usize, &'b mut I)> + 'a
+    where
+        'b: 'a,
+        I: 'b,
+    {
+        self.iter_mut()
+            .enumerate()
+            .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
 
     use tuple_list::tuple_list;
 
-    use super::MultipartInput;
+    use super::ListInput;
     use crate::{
         inputs::ValueInput,
         mutators::{numeric::IncMutator, MutationResult, MutatorsTuple as _},
@@ -414,15 +403,14 @@ mod tests {
     #[test]
     fn map_to_mutate_on_last_part() {
         let mutator = tuple_list!(IncMutator);
-        let mut mapped_mutator =
-            MultipartInput::<ValueInput<u8>, ()>::map_to_mutate_on_last_part(mutator);
-        let mut input: MultipartInput<ValueInput<u8>, ()> =
-            MultipartInput::with_default_names(vec![ValueInput::new(1_u8), ValueInput::new(2)]);
-        let mut state = NopState::<MultipartInput<ValueInput<u8>, ()>>::new();
+        let mut mapped_mutator = ListInput::<ValueInput<u8>>::map_to_mutate_on_last_part(mutator);
+        let mut input: ListInput<ValueInput<u8>> =
+            ListInput::from(vec![ValueInput::new(1_u8), ValueInput::new(2)]);
+        let mut state = NopState::<ListInput<ValueInput<u8>>>::new();
         let res = mapped_mutator.mutate_all(&mut state, &mut input);
         assert_eq!(res.unwrap(), MutationResult::Mutated);
         assert_eq!(
-            input.iter().map(|((), i)| *i).collect::<Vec<_>>(),
+            input.iter().copied().collect::<Vec<_>>(),
             vec![ValueInput::new(1), ValueInput::new(3)]
         );
     }
@@ -430,10 +418,9 @@ mod tests {
     #[test]
     fn map_to_mutate_on_last_part_empty() {
         let mutator = tuple_list!(IncMutator);
-        let mut mapped_mutator =
-            MultipartInput::<(), ValueInput<u8>>::map_to_mutate_on_last_part(mutator);
-        let mut input = MultipartInput::<ValueInput<u8>, ()>::default();
-        let mut state = NopState::<MultipartInput<ValueInput<u8>, ()>>::new();
+        let mut mapped_mutator = ListInput::<ValueInput<u8>>::map_to_mutate_on_last_part(mutator);
+        let mut input = ListInput::<ValueInput<u8>>::default();
+        let mut state = NopState::<ListInput<ValueInput<u8>>>::new();
         let res = mapped_mutator.mutate_all(&mut state, &mut input);
         assert_eq!(res.unwrap(), MutationResult::Skipped);
         assert_eq!(input.parts, vec![]);
@@ -442,12 +429,10 @@ mod tests {
     #[test]
     fn map_to_mutate_on_random_part() {
         let mutator = tuple_list!(IncMutator);
-        let mut mapped_mutator =
-            MultipartInput::<ValueInput<u8>, ()>::map_to_mutate_on_random_part(mutator);
+        let mut mapped_mutator = ListInput::<ValueInput<u8>>::map_to_mutate_on_random_part(mutator);
         let initial_input = vec![ValueInput::new(1_u8), ValueInput::new(2)];
-        let mut input =
-            MultipartInput::<ValueInput<u8>, ()>::with_default_names(initial_input.clone());
-        let mut state = NopState::<MultipartInput<ValueInput<u8>, ()>>::new();
+        let mut input = ListInput::<ValueInput<u8>>::from(initial_input.clone());
+        let mut state = NopState::<ListInput<ValueInput<u8>>>::new();
         let res = mapped_mutator.mutate_all(&mut state, &mut input);
         assert_eq!(res.unwrap(), MutationResult::Mutated);
         assert_eq!(
@@ -455,7 +440,7 @@ mod tests {
             input
                 .iter()
                 .zip(initial_input.iter())
-                .filter(|&(a, b)| a.1 != *b)
+                .filter(|&(a, b)| a != b)
                 .count()
         );
     }
@@ -463,10 +448,9 @@ mod tests {
     #[test]
     fn map_to_mutate_on_random_part_empty() {
         let mutator = tuple_list!(IncMutator);
-        let mut mapped_mutator =
-            MultipartInput::<ValueInput<u8>, ()>::map_to_mutate_on_random_part(mutator);
-        let mut input = MultipartInput::<ValueInput<u8>, ()>::default();
-        let mut state = NopState::<MultipartInput<ValueInput<u8>, ()>>::new();
+        let mut mapped_mutator = ListInput::<ValueInput<u8>>::map_to_mutate_on_random_part(mutator);
+        let mut input = ListInput::<ValueInput<u8>>::default();
+        let mut state = NopState::<ListInput<ValueInput<u8>>>::new();
         let res = mapped_mutator.mutate_all(&mut state, &mut input);
         assert_eq!(res.unwrap(), MutationResult::Skipped);
         assert_eq!(input.parts, vec![]);

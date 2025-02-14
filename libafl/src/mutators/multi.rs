@@ -12,7 +12,10 @@ use crate::{
     corpus::{Corpus, CorpusId},
     generators::Generator,
     impl_default_multipart,
-    inputs::{multi::MultipartInput, HasMutatorBytes, Input, ResizableMutator},
+    inputs::{
+        multi::MultipartInput, HasMutatorBytes, Input, ListInput, NamedMultipartInput as _,
+        ResizableMutator,
+    },
     mutators::{
         mutations::{
             rand_range, BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator,
@@ -52,7 +55,7 @@ where
         };
         let selected = state.rand_mut().below(parts_len);
         let mutated = input.part_by_idx_mut(selected).unwrap();
-        self.mutate(state, mutated)
+        self.mutate(state, &mut mutated.1)
     }
 
     fn post_exec(&mut self, state: &mut S, new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
@@ -145,7 +148,7 @@ where
                 let choice = name_choice % len;
                 let name = input.names().nth(choice).unwrap();
 
-                let other_size = input.part_by_idx(choice).unwrap().mutator_bytes().len();
+                let other_size = input.part_by_idx(choice).unwrap().1.mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -187,11 +190,11 @@ where
                     };
 
                     return Ok(Self::crossover_insert(
-                        part,
+                        &mut part.1,
                         size,
                         target,
                         range,
-                        chosen.mutator_bytes(),
+                        chosen.1.mutator_bytes(),
                     ));
                 }
 
@@ -209,7 +212,7 @@ where
         let choice = name_choice % other_len;
         let name = other.names().nth(choice).unwrap();
 
-        let other_size = other.part_by_idx(choice).unwrap().mutator_bytes().len();
+        let other_size = other.part_by_idx(choice).unwrap().1.mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -245,11 +248,11 @@ where
                 size,
                 target,
                 range,
-                other.part_by_idx(choice).unwrap().mutator_bytes(),
+                other.part_by_idx(choice).unwrap().1.mutator_bytes(),
             ))
         } else {
             // just add it!
-            input.append_part(name.clone(), other.part_by_idx(choice).unwrap().clone());
+            input.append_part(other.part_by_idx(choice).unwrap().clone());
 
             Ok(MutationResult::Mutated)
         }
@@ -282,7 +285,7 @@ where
                 let choice = name_choice % len;
                 let name = input.names().nth(choice).unwrap();
 
-                let other_size = input.part_by_idx(choice).unwrap().mutator_bytes().len();
+                let other_size = input.part_by_idx(choice).unwrap().1.mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -324,10 +327,10 @@ where
                     };
 
                     return Ok(Self::crossover_replace(
-                        part,
+                        &mut part.1,
                         target,
                         range,
-                        chosen.mutator_bytes(),
+                        chosen.1.mutator_bytes(),
                     ));
                 }
 
@@ -346,7 +349,7 @@ where
         let choice = name_choice % other_len;
         let name = other.names().nth(choice).unwrap();
 
-        let other_size = other.part_by_idx(choice).unwrap().mutator_bytes().len();
+        let other_size = other.part_by_idx(choice).unwrap().1.mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
@@ -380,11 +383,11 @@ where
                 part,
                 target,
                 range,
-                other.part_by_idx(choice).unwrap().mutator_bytes(),
+                other.part_by_idx(choice).unwrap().1.mutator_bytes(),
             ))
         } else {
             // just add it!
-            input.append_part(name.clone(), other.part_by_idx(choice).unwrap().clone());
+            input.append_part(other.part_by_idx(choice).unwrap().clone());
 
             Ok(MutationResult::Mutated)
         }
@@ -405,18 +408,14 @@ impl<G> GenerateToAppendMutator<G> {
     }
 }
 
-impl<G, I, N, S> Mutator<MultipartInput<I, N>, S> for GenerateToAppendMutator<G>
+impl<G, I, S> Mutator<ListInput<I>, S> for GenerateToAppendMutator<G>
 where
     G: Generator<I, S>,
-    N: Default,
+    I: Input,
 {
-    fn mutate(
-        &mut self,
-        state: &mut S,
-        input: &mut MultipartInput<I, N>,
-    ) -> Result<MutationResult, Error> {
+    fn mutate(&mut self, state: &mut S, input: &mut ListInput<I>) -> Result<MutationResult, Error> {
         let generated = self.generator.generate(state)?;
-        input.append_part_with_default_name(generated);
+        input.append_part(generated);
         Ok(MutationResult::Mutated)
     }
 }
@@ -521,10 +520,10 @@ where
 
         let (name, part) = match other_len {
             0 => return Ok(MutationResult::Skipped),
-            len => other.parts_and_names()[other_idx_raw % len].clone(),
+            len => other.parts()[other_idx_raw % len].clone(),
         };
 
-        input.insert_part(current_idx, name, part);
+        input.insert_part(current_idx, (name, part));
         Ok(MutationResult::Mutated)
     }
 }
@@ -566,11 +565,11 @@ where
 
         let (name, part) = match other_len {
             0 => return Ok(MutationResult::Skipped),
-            len => other.parts_and_names()[other_idx_raw % len].clone(),
+            len => other.parts()[other_idx_raw % len].clone(),
         };
 
         input.remove_part_at_idx(current_idx);
-        input.insert_part(current_idx, name, part);
+        input.insert_part(current_idx, (name, part));
         Ok(MutationResult::Mutated)
     }
 }
