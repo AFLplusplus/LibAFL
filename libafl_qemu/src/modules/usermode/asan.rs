@@ -7,11 +7,11 @@ use std::{
     env,
     fmt::{Debug, Display, Write},
     fs,
-    path::PathBuf,
     pin::Pin,
     sync::Mutex,
 };
 
+use addr2line::{fallible_iterator::FallibleIterator, Loader};
 use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::os::unix_signals::Signal;
@@ -21,7 +21,6 @@ use libc::{
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use object::Object;
 use rangemap::RangeMap;
 
 use crate::{
@@ -29,11 +28,7 @@ use crate::{
     modules::{
         calls::FullBacktraceCollector,
         snapshot::SnapshotModule,
-        utils::{
-            addr2line_legacy,
-            filters::{HasAddressFilter, StdAddressFilter},
-            load_file_section,
-        },
+        utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},
@@ -1345,10 +1340,21 @@ where
     }
 }
 
+// (almost) Copy paste from addr2line/src/bin/addr2line.rs
+fn print_function(name: Option<&str>, language: Option<addr2line::gimli::DwLang>) -> String {
+    let ret = if let Some(name) = name {
+        addr2line::demangle_auto(Cow::from(name), language).to_string()
+    } else {
+        "??".to_string()
+    };
+    println!("{ret:?}");
+    ret
+}
+
 /// # Safety
 /// Will access the global [`FullBacktraceCollector`].
 /// Calling this function concurrently might be racey.
-#[expect(clippy::too_many_lines, clippy::unnecessary_cast)]
+#[expect(clippy::too_many_lines)]
 pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &AsanError) {
     let mut regions = HashMap::new();
     for region in qemu.mappings() {
@@ -1367,7 +1373,7 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
 
     let mut resolvers = vec![];
     let mut images = vec![];
-    let mut ranges = RangeMap::new();
+    let mut ranges: RangeMap<u64, usize> = RangeMap::new();
 
     for (path, rng) in regions {
         let data = fs::read(&path);
@@ -1380,26 +1386,10 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
         ranges.insert(rng, idx);
     }
 
-    let arena_data = typed_arena::Arena::new();
-
     for img in &images {
-        if let Ok(obj) = object::read::File::parse(&*img.1) {
-            let endian = if obj.is_little_endian() {
-                addr2line::gimli::RunTimeEndian::Little
-            } else {
-                addr2line::gimli::RunTimeEndian::Big
-            };
-
-            let mut load_section = |id: addr2line::gimli::SectionId| -> Result<_, _> {
-                load_file_section(id, &obj, endian, &arena_data)
-            };
-
-            let dwarf = addr2line::gimli::Dwarf::load(&mut load_section).unwrap();
-            let ctx = addr2line::Context::from_dwarf(dwarf)
-                .expect("Failed to create an addr2line context");
-
-            //let ctx = addr2line::Context::new(&obj).expect("Failed to create an addr2line context");
-            resolvers.push(Some((obj, ctx)));
+        if object::read::File::parse(&*img.1).is_ok() {
+            let ctx = Loader::new(img.0.clone()).unwrap();
+            resolvers.push(Some(ctx));
         } else {
             resolvers.push(None);
         }
@@ -1407,44 +1397,40 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
 
     let resolve_addr = |addr: GuestAddr| -> String {
         let mut info = String::new();
-        if let Some((rng, idx)) = ranges.get_key_value(&addr) {
-            let raddr = (addr - rng.start) as u64;
-            if let Some((obj, ctx)) = resolvers[*idx].as_ref() {
-                let symbols = obj.symbol_map();
-                let mut func = symbols.get(raddr).map(|x| x.name().to_string());
+        if let Some((_, idx)) = ranges.get_key_value(&addr) {
+            if let Some(ctx) = resolvers[*idx].as_ref() {
+                let mut frames = ctx.find_frames(addr).unwrap().peekable();
 
-                if func.is_none() {
-                    let pathname = PathBuf::from(images[*idx].0.clone());
-                    let mut split_dwarf_loader = addr2line_legacy::SplitDwarfLoader::new(
-                        |data, endian| {
-                            addr2line::gimli::EndianSlice::new(
-                                arena_data.alloc(Cow::Owned(data.into_owned())),
-                                endian,
-                            )
-                        },
-                        Some(pathname),
-                    );
+                let mut fname = None;
+                while let Some(frame) = frames.next().unwrap() {
+                    // Only use the symbol table if this isn't an inlined function.
+                    let symbol = if matches!(frames.peek(), Ok(None)) {
+                        ctx.find_symbol(addr)
+                    } else {
+                        None
+                    };
 
-                    let frames = ctx.find_frames(raddr);
-                    if let Ok(mut frames) = split_dwarf_loader.run(frames) {
-                        if let Some(frame) = frames.next().unwrap_or(None) {
-                            if let Some(function) = frame.function {
-                                if let Ok(name) = function.raw_name() {
-                                    let demangled =
-                                        addr2line::demangle_auto(name, function.language);
-                                    func = Some(demangled.to_string());
-                                }
-                            }
-                        }
+                    if symbol.is_some() {
+                        // Prefer the symbol table over the DWARF name because:
+                        // - the symbol can include a clone suffix
+                        // - llvm may omit the linkage name in the DWARF with -g1
+                        fname = Some(print_function(symbol, None));
+                    } else if let Some(func) = frame.function {
+                        fname = Some(print_function(
+                            func.raw_name().ok().as_deref(),
+                            func.language,
+                        ));
+                    } else {
+                        fname = Some(print_function(None, None));
                     }
                 }
 
-                if let Some(name) = func {
+                if let Some(name) = fname {
                     info += " in ";
                     info += &name;
                 }
 
-                if let Some(loc) = ctx.find_location(raddr).unwrap_or(None) {
+                if let Some(loc) = ctx.find_location(addr).unwrap_or(None) {
                     if info.is_empty() {
                         info += " in";
                     }
@@ -1457,17 +1443,18 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
                         info += &line.to_string();
                     }
                 } else {
-                    let _ = write!(&mut info, " ({}+{raddr:#x})", images[*idx].0);
+                    let _ = write!(&mut info, " ({}+{addr:#x})", images[*idx].0);
                 }
             }
             if info.is_empty() {
-                let _ = write!(&mut info, " ({}+{raddr:#x})", images[*idx].0);
+                let _ = write!(&mut info, " ({}+{addr:#x})", images[*idx].0);
             }
+        } else {
+            println!("Not found");
         }
         info
     };
 
-    // TODO, make a class Resolver for resolving the addresses??
     eprintln!("=================================================================");
     let backtrace = FullBacktraceCollector::backtrace()
         .map(|r| {
