@@ -1347,7 +1347,7 @@ fn print_function(name: Option<&str>, language: Option<addr2line::gimli::DwLang>
     } else {
         "??".to_string()
     };
-    println!("{ret:?}");
+    // println!("{ret:?}");
     ret
 }
 
