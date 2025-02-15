@@ -12,7 +12,7 @@ use libafl_bolts::{impl_serdeany, Named};
 use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
-use crate::{GuestAddr, QemuMappingsViewer};
+use crate::{GuestAddr, Qemu, QemuMappingsViewer};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Edges(GuestAddr, GuestAddr);
@@ -329,12 +329,30 @@ impl PredicateFeedback {
     #[must_use]
     // heap or mmap region
     pub fn is_heap_ptr(&self, ptr: u64) -> bool {
+        let mut in_current = false;
+        if let Some(qemu) = Qemu::get() {
+            let mappings = qemu.mappings();
+            for m in mappings {
+                let rg = m.start()..m.end();
+                if rg.contains(&ptr) {
+                    in_current = true;
+                }
+            }
+        } else {
+            panic!("Qemu not initialized but in execution!?");
+        }
+
+        let mut in_initial = false;
         for mp in &self.mapped_initial {
             if mp.contains(&ptr) {
-                return false;
+                in_initial = true;
             }
         }
-        return true;
+        if in_current && !in_initial {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     #[must_use]
@@ -392,7 +410,6 @@ where
         let mut edges = vec![];
         let mut maxes = vec![];
         let mut mins = vec![];
-
         // If both is in the tracking range, then add it
         for e in tracer.edges() {
             if self.is_text_ptr(e.0) && self.is_text_ptr(e.1) {
@@ -401,12 +418,22 @@ where
         }
 
         for (addr, ma) in tracer.maxmap() {
-            if !self.is_stack_ptr(*ma) && self.is_text_ptr(*addr) && !self.is_executable_ptr(*ma) {
+            let addr_is_text = self.is_text_ptr(*addr);
+            let value_is_stack = self.is_stack_ptr(*ma);
+            let value_is_executable = self.is_executable_ptr(*ma);
+            let value_is_heap = self.is_heap_ptr(*ma);
+
+            if !value_is_stack && addr_is_text && !value_is_executable && !value_is_heap {
                 maxes.push((*addr, *ma));
             }
         }
         for (addr, mi) in tracer.minmap() {
-            if !self.is_stack_ptr(*mi) && self.is_text_ptr(*addr) && !self.is_executable_ptr(*mi) {
+            let addr_is_text = self.is_text_ptr(*addr);
+            let value_is_stack = self.is_stack_ptr(*mi);
+            let value_is_executable = self.is_executable_ptr(*mi);
+            let value_is_heap = self.is_heap_ptr(*mi);
+
+            if !value_is_stack && addr_is_text && !value_is_executable && !value_is_heap {
                 mins.push((*addr, *mi));
             }
         }
@@ -423,8 +450,6 @@ where
             map.add_mins(addr, mi, self.was_crash);
         }
         map.synthesize();
-        // println!("{:#?}", map.max);
-        // println!("{:#?}", map.min);
         map.show();
         Ok(())
     }
