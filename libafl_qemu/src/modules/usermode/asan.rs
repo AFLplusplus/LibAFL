@@ -1399,13 +1399,13 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
         let mut info = String::new();
         if let Some((_, idx)) = ranges.get_key_value(&addr) {
             if let Some(ctx) = resolvers[*idx].as_ref() {
-                let mut frames = ctx.find_frames(addr).unwrap().peekable();
+                let mut frames = ctx.find_frames(addr.into()).unwrap().peekable();
 
                 let mut fname = None;
                 while let Some(frame) = frames.next().unwrap() {
                     // Only use the symbol table if this isn't an inlined function.
                     let symbol = if matches!(frames.peek(), Ok(None)) {
-                        ctx.find_symbol(addr)
+                        ctx.find_symbol(addr.into())
                     } else {
                         None
                     };
@@ -1430,7 +1430,7 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
                     info += &name;
                 }
 
-                if let Some(loc) = ctx.find_location(addr).unwrap_or(None) {
+                if let Some(loc) = ctx.find_location(addr.into()).unwrap_or(None) {
                     if info.is_empty() {
                         info += " in";
                     }
