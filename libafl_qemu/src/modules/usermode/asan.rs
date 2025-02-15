@@ -1373,7 +1373,7 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
 
     let mut resolvers = vec![];
     let mut images = vec![];
-    let mut ranges: RangeMap<u64, usize> = RangeMap::new();
+    let mut ranges: RangeMap<GuestAddr, usize> = RangeMap::new();
 
     for (path, rng) in regions {
         let data = fs::read(&path);
