@@ -75,30 +75,31 @@ impl<I> TestcaseStorageMap<I> {
 
     /// Remove a testcase given a [`CorpusId`]
     #[cfg(not(feature = "corpus_btreemap"))]
-    pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
+    pub fn remove(&mut self, id: CorpusId) -> Result<RefCell<Testcase<I>>, Error> {
         if let Some(item) = self.map.remove(&id) {
             self.remove_key(id);
             if let Some(prev) = item.prev {
-                self.map.get_mut(&prev).unwrap().next = item.next;
+                self.map.get_mut(&prev).ok_or_else(|| Error::illegal_state("Unable to fetch previous CorpusId"))?.next = item.next;
             } else {
                 // first elem
                 self.first_id = item.next;
             }
             if let Some(next) = item.next {
-                self.map.get_mut(&next).unwrap().prev = item.prev;
+                self.map.get_mut(&next).ok_or_else(|| Error::illegal_state("Unable to fetch next CorpusId"))?.prev = item.prev;
             } else {
                 // last elem
                 self.last_id = item.prev;
             }
-            Some(item.testcase)
+            Ok(item.testcase)
         } else {
-            None
+            Err(Error::illegal_argument("Testcase not found in storage"))
+
         }
     }
 
     /// Remove a testcase given a [`CorpusId`]
     #[cfg(feature = "corpus_btreemap")]
-    pub fn remove(&mut self, id: CorpusId) -> Option<RefCell<Testcase<I>>> {
+    pub fn remove(&mut self, id: CorpusId) -> Result<RefCell<Testcase<I>>, Error> {
         self.remove_key(id);
         self.map.remove(&id)
     }
@@ -359,9 +360,9 @@ impl<I> Corpus<I> for InMemoryCorpus<I> {
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases
     #[inline]
     fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
-        let mut testcase = self.storage.enabled.remove(id);
+        let mut testcase = self.storage.enabled.remove(id).ok();
         if testcase.is_none() {
-            testcase = self.storage.disabled.remove(id);
+            testcase = self.storage.disabled.remove(id).ok();
         }
         testcase
             .map(|x| x.take())

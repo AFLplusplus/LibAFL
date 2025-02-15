@@ -89,7 +89,7 @@ where
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add(testcase)?;
-        let testcase = &mut self.get(id).unwrap().borrow_mut();
+        let testcase = &mut self.get(id)?.borrow_mut();
         self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
@@ -99,7 +99,7 @@ where
     #[inline]
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add_disabled(testcase)?;
-        let testcase = &mut self.get_from_all(id).unwrap().borrow_mut();
+        let testcase = &mut self.get_from_all(id)?.borrow_mut();
         self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
@@ -110,7 +110,7 @@ where
     fn replace(&mut self, id: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let entry = self.inner.replace(id, testcase)?;
         self.remove_testcase(&entry)?;
-        let testcase = &mut self.get(id).unwrap().borrow_mut();
+        let testcase = &mut self.get(id)?.borrow_mut();
         self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(entry)
@@ -330,7 +330,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if testcase.filename().is_some() {
             // We are renaming!
 
-            let old_filename = testcase.filename_mut().take().unwrap();
+            let old_filename = testcase.filename_mut().take().ok_or_else(|| Error::illegal_argument("Testcase missing filename for renaming"))?;
             let new_filename = filename;
 
             // Do operations below when new filename is specified
@@ -357,22 +357,31 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         I: Input,
     {
-        let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
-            // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name(id)
-        });
+        let file_name = match testcase.filename_mut().take() {
+            Some(name) => name,
+            None => {
+                let input = testcase.input().as_ref().ok_or_else(|| {
+                    Error::illegal_argument("Testcase missing input; cannot generate filename")
+                })?;
+                input.generate_name(id)
+            }
+        };
 
         let mut ctr = 1;
         if self.locking {
             let lockfile_name = format!(".{file_name}");
             let lockfile_path = self.dir_path.join(lockfile_name);
 
-            let mut lockfile = try_create_new(&lockfile_path)?.unwrap_or(
+            let mut lockfile = try_create_new(&lockfile_path)?.or_else(|| {
                 OpenOptions::new()
                     .write(true)
                     .read(true)
-                    .open(&lockfile_path)?,
-            );
+                    .open(&lockfile_path)
+                    .ok()
+            })
+            .ok_or_else(|| {
+                Error::illegal_state("Failed to open or create lockfile for testcase")
+            })?;
             lockfile.lock_exclusive()?;
 
             let mut old_ctr = String::new();
@@ -391,14 +400,18 @@ impl<I> InMemoryOnDiskCorpus<I> {
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {
+            let filename_ref = testcase
+                .filename()
+                .as_ref()
+                .ok_or_else(|| Error::illegal_argument("Testcase missing filename for metadata"))?;
             let metafile_name = if self.locking {
                 format!(
                     ".{}_{}.metadata",
-                    testcase.filename().as_ref().unwrap(),
+                    filename_ref,
                     ctr
                 )
             } else {
-                format!(".{}.metadata", testcase.filename().as_ref().unwrap())
+                format!(".{}.metadata", filename_ref)
             };
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
