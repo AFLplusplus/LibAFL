@@ -1351,110 +1351,129 @@ fn print_function(name: Option<&str>, language: Option<addr2line::gimli::DwLang>
     ret
 }
 
+pub struct AddressResolver {
+    ranges: RangeMap<GuestAddr, usize>,
+    images: Vec<(String, Vec<u8>)>,
+    resolvers: Vec<Option<Loader>>,
+}
+
+impl AddressResolver {
+    #[must_use]
+    pub fn new(qemu: &Qemu) -> Self {
+        let mut regions = HashMap::new();
+        for region in qemu.mappings() {
+            if let Some(path) = region.path() {
+                let start = region.start();
+                let end = region.end();
+                let entry = regions.entry(path.to_owned()).or_insert(start..end);
+                if start < entry.start {
+                    *entry = start..entry.end;
+                }
+                if end > entry.end {
+                    *entry = entry.start..end;
+                }
+            }
+        }
+
+        let mut resolvers = vec![];
+        let mut images = vec![];
+        let mut ranges: RangeMap<GuestAddr, usize> = RangeMap::new();
+
+        for (path, rng) in regions {
+            let data = fs::read(&path);
+            if data.is_err() {
+                continue;
+            }
+            let data = data.unwrap();
+            let idx = images.len();
+            images.push((path, data));
+            ranges.insert(rng, idx);
+        }
+
+        for img in &images {
+            if object::read::File::parse(&*img.1).is_ok() {
+                let ctx = Loader::new(img.0.clone()).unwrap();
+                resolvers.push(Some(ctx));
+            } else {
+                resolvers.push(None);
+            }
+        }
+        Self {
+            ranges,
+            images,
+            resolvers,
+        }
+    }
+
+    #[must_use]
+    pub fn resolve(&self, pc: GuestAddr) -> String {
+        let resolve_addr = |addr: GuestAddr| -> String {
+            let mut info = String::new();
+            if let Some((range, idx)) = self.ranges.get_key_value(&addr) {
+                if let Some(ctx) = self.resolvers[*idx].as_ref() {
+                    let raddr = addr - range.start;
+
+                    let mut frames = ctx.find_frames(raddr).unwrap().peekable();
+                    let mut fname = None;
+                    while let Some(frame) = frames.next().unwrap() {
+                        // Only use the symbol table if this isn't an inlined function.
+                        let symbol = if matches!(frames.peek(), Ok(None)) {
+                            ctx.find_symbol(raddr.into())
+                        } else {
+                            None
+                        };
+                        if symbol.is_some() {
+                            // Prefer the symbol table over the DWARF name because:
+                            // - the symbol can include a clone suffix
+                            // - llvm may omit the linkage name in the DWARF with -g1
+                            fname = Some(print_function(symbol, None));
+                        } else if let Some(func) = frame.function {
+                            fname = Some(print_function(
+                                func.raw_name().ok().as_deref(),
+                                func.language,
+                            ));
+                        } else {
+                            fname = Some(print_function(None, None));
+                        }
+                    }
+
+                    if let Some(name) = fname {
+                        info += " in ";
+                        info += &name;
+                    }
+
+                    if let Some(loc) = ctx.find_location(raddr.into()).unwrap_or(None) {
+                        if info.is_empty() {
+                            info += " in";
+                        }
+                        info += " ";
+                        if let Some(file) = loc.file {
+                            info += file;
+                        }
+                        if let Some(line) = loc.line {
+                            info += ":";
+                            info += &line.to_string();
+                        }
+                    } else {
+                        let _ = write!(&mut info, " ({}+{addr:#x})", self.images[*idx].0);
+                    }
+                }
+                if info.is_empty() {
+                    let _ = write!(&mut info, " ({}+{addr:#x})", self.images[*idx].0);
+                }
+            }
+            info
+        };
+
+        resolve_addr(pc)
+    }
+}
+
 /// # Safety
 /// Will access the global [`FullBacktraceCollector`].
 /// Calling this function concurrently might be racey.
-#[expect(clippy::too_many_lines)]
 pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &AsanError) {
-    let mut regions = HashMap::new();
-    for region in qemu.mappings() {
-        if let Some(path) = region.path() {
-            let start = region.start();
-            let end = region.end();
-            let entry = regions.entry(path.to_owned()).or_insert(start..end);
-            if start < entry.start {
-                *entry = start..entry.end;
-            }
-            if end > entry.end {
-                *entry = entry.start..end;
-            }
-        }
-    }
-
-    let mut resolvers = vec![];
-    let mut images = vec![];
-    let mut ranges: RangeMap<GuestAddr, usize> = RangeMap::new();
-
-    for (path, rng) in regions {
-        let data = fs::read(&path);
-        if data.is_err() {
-            continue;
-        }
-        let data = data.unwrap();
-        let idx = images.len();
-        images.push((path, data));
-        ranges.insert(rng, idx);
-    }
-
-    for img in &images {
-        if object::read::File::parse(&*img.1).is_ok() {
-            let ctx = Loader::new(img.0.clone()).unwrap();
-            resolvers.push(Some(ctx));
-        } else {
-            resolvers.push(None);
-        }
-    }
-
-    let resolve_addr = |addr: GuestAddr| -> String {
-        let mut info = String::new();
-        if let Some((_, idx)) = ranges.get_key_value(&addr) {
-            if let Some(ctx) = resolvers[*idx].as_ref() {
-                let mut frames = ctx.find_frames(addr.into()).unwrap().peekable();
-
-                let mut fname = None;
-                while let Some(frame) = frames.next().unwrap() {
-                    // Only use the symbol table if this isn't an inlined function.
-                    let symbol = if matches!(frames.peek(), Ok(None)) {
-                        ctx.find_symbol(addr.into())
-                    } else {
-                        None
-                    };
-
-                    if symbol.is_some() {
-                        // Prefer the symbol table over the DWARF name because:
-                        // - the symbol can include a clone suffix
-                        // - llvm may omit the linkage name in the DWARF with -g1
-                        fname = Some(print_function(symbol, None));
-                    } else if let Some(func) = frame.function {
-                        fname = Some(print_function(
-                            func.raw_name().ok().as_deref(),
-                            func.language,
-                        ));
-                    } else {
-                        fname = Some(print_function(None, None));
-                    }
-                }
-
-                if let Some(name) = fname {
-                    info += " in ";
-                    info += &name;
-                }
-
-                if let Some(loc) = ctx.find_location(addr.into()).unwrap_or(None) {
-                    if info.is_empty() {
-                        info += " in";
-                    }
-                    info += " ";
-                    if let Some(file) = loc.file {
-                        info += file;
-                    }
-                    if let Some(line) = loc.line {
-                        info += ":";
-                        info += &line.to_string();
-                    }
-                } else {
-                    let _ = write!(&mut info, " ({}+{addr:#x})", images[*idx].0);
-                }
-            }
-            if info.is_empty() {
-                let _ = write!(&mut info, " ({}+{addr:#x})", images[*idx].0);
-            }
-        } else {
-            println!("Not found");
-        }
-        info
-    };
-
+    let resolver = AddressResolver::new(&qemu);
     eprintln!("=================================================================");
     let backtrace = FullBacktraceCollector::backtrace()
         .map(|r| {
@@ -1465,7 +1484,7 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
         .unwrap_or(vec![pc]);
     eprintln!("AddressSanitizer Error: {err}");
     for (i, addr) in backtrace.iter().rev().enumerate() {
-        eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+        eprintln!("\t#{i} {addr:#x}{}", resolver.resolve(*addr));
     }
     let addr = match err {
         AsanError::Read(addr, _) | AsanError::Write(addr, _) | AsanError::BadFree(addr, _) => {
@@ -1480,13 +1499,13 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
             } else {
                 eprintln!("Freed at:");
                 for (i, addr) in item.free_backtrace.iter().rev().enumerate() {
-                    eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+                    eprintln!("\t#{i} {addr:#x}{}", resolver.resolve(*addr));
                 }
                 eprintln!("And previously allocated at:");
             }
 
             for (i, addr) in item.backtrace.iter().rev().enumerate() {
-                eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+                eprintln!("\t#{i} {addr:#x}{}", resolver.resolve(*addr));
             }
         };
 
