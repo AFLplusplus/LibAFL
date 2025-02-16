@@ -3,15 +3,13 @@
 
 use core::{fmt, slice};
 use std::{
-    borrow::Cow,
     env,
-    fmt::{Debug, Display, Write},
+    fmt::{Debug, Display},
     fs,
     pin::Pin,
     sync::Mutex,
 };
 
-use addr2line::{fallible_iterator::FallibleIterator, Loader};
 use hashbrown::{HashMap, HashSet};
 use libafl::{executors::ExitKind, observers::ObserversTuple};
 use libafl_bolts::os::unix_signals::Signal;
@@ -21,7 +19,6 @@ use libc::{
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use rangemap::RangeMap;
 
 use crate::{
     emu::EmulatorModules,
@@ -1340,140 +1337,11 @@ where
     }
 }
 
-// (almost) Copy paste from addr2line/src/bin/addr2line.rs
-fn print_function(name: Option<&str>, language: Option<addr2line::gimli::DwLang>) -> String {
-    let ret = if let Some(name) = name {
-        addr2line::demangle_auto(Cow::from(name), language).to_string()
-    } else {
-        "??".to_string()
-    };
-    // println!("{ret:?}");
-    ret
-}
-
-pub struct AddressResolver {
-    ranges: RangeMap<GuestAddr, usize>,
-    images: Vec<(String, Vec<u8>)>,
-    resolvers: Vec<Option<Loader>>,
-}
-
-impl AddressResolver {
-    #[must_use]
-    pub fn new(qemu: &Qemu) -> Self {
-        let mut regions = HashMap::new();
-        for region in qemu.mappings() {
-            if let Some(path) = region.path() {
-                let start = region.start();
-                let end = region.end();
-                let entry = regions.entry(path.to_owned()).or_insert(start..end);
-                if start < entry.start {
-                    *entry = start..entry.end;
-                }
-                if end > entry.end {
-                    *entry = entry.start..end;
-                }
-            }
-        }
-
-        let mut resolvers = vec![];
-        let mut images = vec![];
-        let mut ranges: RangeMap<GuestAddr, usize> = RangeMap::new();
-
-        for (path, rng) in regions {
-            let data = fs::read(&path);
-            if data.is_err() {
-                continue;
-            }
-            let data = data.unwrap();
-            let idx = images.len();
-            images.push((path, data));
-            ranges.insert(rng, idx);
-        }
-
-        for img in &images {
-            if object::read::File::parse(&*img.1).is_ok() {
-                let ctx = Loader::new(img.0.clone()).unwrap();
-                resolvers.push(Some(ctx));
-            } else {
-                resolvers.push(None);
-            }
-        }
-        Self {
-            ranges,
-            images,
-            resolvers,
-        }
-    }
-
-    #[must_use]
-    pub fn resolve(&self, pc: GuestAddr) -> String {
-        let resolve_addr = |addr: GuestAddr| -> String {
-            let mut info = String::new();
-            if let Some((range, idx)) = self.ranges.get_key_value(&addr) {
-                if let Some(ctx) = self.resolvers[*idx].as_ref() {
-                    let raddr = addr - range.start;
-
-                    let mut frames = ctx.find_frames(raddr.into()).unwrap().peekable();
-                    let mut fname = None;
-                    while let Some(frame) = frames.next().unwrap() {
-                        // Only use the symbol table if this isn't an inlined function.
-                        let symbol = if matches!(frames.peek(), Ok(None)) {
-                            ctx.find_symbol(raddr.into())
-                        } else {
-                            None
-                        };
-                        if symbol.is_some() {
-                            // Prefer the symbol table over the DWARF name because:
-                            // - the symbol can include a clone suffix
-                            // - llvm may omit the linkage name in the DWARF with -g1
-                            fname = Some(print_function(symbol, None));
-                        } else if let Some(func) = frame.function {
-                            fname = Some(print_function(
-                                func.raw_name().ok().as_deref(),
-                                func.language,
-                            ));
-                        } else {
-                            fname = Some(print_function(None, None));
-                        }
-                    }
-
-                    if let Some(name) = fname {
-                        info += " in ";
-                        info += &name;
-                    }
-
-                    if let Some(loc) = ctx.find_location(raddr.into()).unwrap_or(None) {
-                        if info.is_empty() {
-                            info += " in";
-                        }
-                        info += " ";
-                        if let Some(file) = loc.file {
-                            info += file;
-                        }
-                        if let Some(line) = loc.line {
-                            info += ":";
-                            info += &line.to_string();
-                        }
-                    } else {
-                        let _ = write!(&mut info, " ({}+{addr:#x})", self.images[*idx].0);
-                    }
-                }
-                if info.is_empty() {
-                    let _ = write!(&mut info, " ({}+{addr:#x})", self.images[*idx].0);
-                }
-            }
-            info
-        };
-
-        resolve_addr(pc)
-    }
-}
-
 /// # Safety
 /// Will access the global [`FullBacktraceCollector`].
 /// Calling this function concurrently might be racey.
 pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &AsanError) {
-    let resolver = AddressResolver::new(&qemu);
+    let resolver = crate::modules::utils::addr2line::AddressResolver::new(&qemu);
     eprintln!("=================================================================");
     let backtrace = FullBacktraceCollector::backtrace()
         .map(|r| {
