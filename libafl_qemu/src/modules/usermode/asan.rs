@@ -1413,7 +1413,7 @@ impl AddressResolver {
                 if let Some(ctx) = self.resolvers[*idx].as_ref() {
                     let raddr = addr - range.start;
 
-                    let mut frames = ctx.find_frames(raddr).unwrap().peekable();
+                    let mut frames = ctx.find_frames(raddr.into()).unwrap().peekable();
                     let mut fname = None;
                     while let Some(frame) = frames.next().unwrap() {
                         // Only use the symbol table if this isn't an inlined function.
