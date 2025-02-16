@@ -1,3 +1,6 @@
-pub mod addr2lines;
 pub mod filters;
-pub use addr2lines::*;
+
+#[cfg(feature = "usermode")]
+pub use addr2line::*;
+#[cfg(feature = "usermode")]
+pub mod addr2line;
