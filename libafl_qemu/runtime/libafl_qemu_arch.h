@@ -30,12 +30,12 @@
       // Linux kernel
       #include <asm-generic/int-ll64.h>
 
-      #if defined(__x86_64__) || defined(__aarch64__)
+      #if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
         typedef __u64 libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
 
-      #ifdef __arm__
+      #if defined(__arm__) || (defined(__riscv) && __riscv_xlen == 32)
         typedef __u32 libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
@@ -47,12 +47,12 @@
 
       #define noinline __attribute__((noinline))
 
-      #if defined(__x86_64__) || defined(__aarch64__)
+      #if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
         typedef uint64_t libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
 
-      #ifdef __arm__
+      #if defined(__arm__) || (defined(__riscv) && __riscv_xlen == 32)
         typedef uint32_t libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
@@ -66,12 +66,12 @@
 
     #define noinline __attribute__((noinline))
 
-    #if defined(__x86_64__) || defined(__aarch64__)
+    #if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
       typedef uint64_t libafl_word;
       #define LIBAFL_CALLING_CONVENTION __attribute__(())
     #endif
 
-    #ifdef __arm__
+    #if defined(__arm__) || (defined(__riscv) && __riscv_xlen == 32)
       typedef uint32_t libafl_word;
       #define LIBAFL_CALLING_CONVENTION __attribute__(())
     #endif

@@ -26,14 +26,17 @@ use libafl_bolts::{
 };
 use libafl_targets::EDGES_MAP_DEFAULT_SIZE;
 pub use libafl_targets::EDGES_MAP_PTR;
+#[cfg(feature = "code_hook")]
+use libafl_unicorn::helper::get_stack_pointer;
 use libafl_unicorn::{
     emu::{debug_print, memory_dump},
-    helper::get_stack_pointer,
     hooks::set_coverage_hook,
 };
+#[cfg(feature = "mem_hook")]
+use unicorn_engine::{unicorn_const::MemType, HookType};
 use unicorn_engine::{
-    unicorn_const::{Arch, MemType, SECOND_SCALE},
-    HookType, Mode, Permission, RegisterARM, RegisterARM64, RegisterX86, Unicorn,
+    unicorn_const::{Arch, SECOND_SCALE},
+    Mode, Permission, RegisterARM, RegisterARM64, RegisterX86, Unicorn,
 };
 
 pub const CODE_ADDRESS: u64 = 0x9000;
@@ -223,7 +226,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
                 log::error!("Error: {:?}", err);
 
                 memory_dump(&emu, 2);
-                debug_print(&emu);
+                debug_print(&emu, true);
             }
         }
 
@@ -323,6 +326,7 @@ fn unicorn_map_and_load_code(emu: &mut Unicorn<()>, address: u64, size: usize, p
     buffer.len() as u64
 }
 
+#[cfg(feature = "code_hook")]
 fn add_code_hook(emu: &mut Unicorn<()>) {
     emu.add_code_hook(0x0, !0x0_u64, |emu, pc, _| {
         let sp = get_stack_pointer(emu);
@@ -330,6 +334,8 @@ fn add_code_hook(emu: &mut Unicorn<()>) {
     })
     .unwrap();
 }
+
+#[cfg(feature = "mem_hook")]
 fn mem_callback(
     emu: &mut unicorn_engine::Unicorn<()>,
     mem: MemType,
