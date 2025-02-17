@@ -319,7 +319,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/fuzzer-tester-prepare
-      - uses: lhotari/action-upterm@v1
       - name: Build and run example fuzzers (Linux)
         if: runner.os == 'Linux'
         shell: bash
