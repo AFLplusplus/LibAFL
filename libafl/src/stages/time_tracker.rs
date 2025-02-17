@@ -51,15 +51,4 @@ where
     fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.clear_progress(state)
     }
-
-    fn perform_restartable(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut M,
-    ) -> Result<(), Error> {
-        self.inner
-            .perform_restartable(fuzzer, executor, state, manager)
-    }
 }

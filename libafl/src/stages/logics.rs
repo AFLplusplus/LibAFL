@@ -3,7 +3,8 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{HasNestedStageStatus, Stage, StageId, StagesTuple},
+    stages::{Stage, StageId, StagesTuple},
+    state::HasNestedStage,
     Error,
 };
 
@@ -14,7 +15,7 @@ pub struct NestedStageRetryCountRestartHelper;
 impl NestedStageRetryCountRestartHelper {
     fn should_restart<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
     where
-        S: HasNestedStageStatus,
+        S: HasNestedStage,
     {
         state.enter_inner_stage()?;
         Ok(true)
@@ -22,7 +23,7 @@ impl NestedStageRetryCountRestartHelper {
 
     fn clear_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
     where
-        S: HasNestedStageStatus,
+        S: HasNestedStage,
     {
         state.exit_inner_stage()?;
         Ok(())
@@ -41,7 +42,7 @@ impl<CB, E, EM, ST, S, Z> Stage<E, EM, S, Z> for WhileStage<CB, E, EM, ST, S, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
     ST: StagesTuple<E, EM, S, Z>,
-    S: HasNestedStageStatus,
+    S: HasNestedStage,
 {
     fn perform(
         &mut self,
@@ -95,7 +96,7 @@ impl<CB, E, EM, ST, S, Z> Stage<E, EM, S, Z> for IfStage<CB, E, EM, ST, S, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
     ST: StagesTuple<E, EM, S, Z>,
-    S: HasNestedStageStatus,
+    S: HasNestedStage,
 {
     fn perform(
         &mut self,
@@ -150,7 +151,7 @@ where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM) -> Result<bool, Error>,
     ST1: StagesTuple<E, EM, S, Z>,
     ST2: StagesTuple<E, EM, S, Z>,
-    S: HasNestedStageStatus,
+    S: HasNestedStage,
 {
     fn perform(
         &mut self,
@@ -161,10 +162,12 @@ where
     ) -> Result<(), Error> {
         let current = state.current_stage_id()?;
 
+        // this is None if you didn't recover from restart
+        // because should_restart() which is called right before this will create a new stage stack
         let fresh = current.is_none();
-        let closure_return = fresh && (self.closure)(fuzzer, executor, state, manager)?;
+        let closure_res = fresh && (self.closure)(fuzzer, executor, state, manager)?;
 
-        if current == Some(StageId(0)) || closure_return {
+        if current == Some(StageId(0)) || closure_res {
             if fresh {
                 state.set_current_stage_id(StageId(0))?;
             }
@@ -220,7 +223,7 @@ pub struct OptionalStage<E, EM, ST, S, Z> {
 impl<E, EM, ST, S, Z> Stage<E, EM, S, Z> for OptionalStage<E, EM, ST, S, Z>
 where
     ST: StagesTuple<E, EM, S, Z>,
-    S: HasNestedStageStatus,
+    S: HasNestedStage,
 {
     fn perform(
         &mut self,

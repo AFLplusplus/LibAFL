@@ -35,7 +35,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::{Input, NopInput},
-    stages::{HasCurrentStageId, HasNestedStageStatus, StageId},
+    stages::StageId,
     Error, HasMetadata, HasNamedMetadata,
 };
 
@@ -547,7 +547,35 @@ impl<C, I, R, SC> HasCurrentStageId for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasNestedStageStatus for StdState<C, I, R, SC> {
+/// Trait for types which track the current stage
+pub trait HasCurrentStageId {
+    /// Set the current stage; we have started processing this stage
+    fn set_current_stage_id(&mut self, id: StageId) -> Result<(), Error>;
+
+    /// Clear the current stage; we are done processing this stage
+    fn clear_stage_id(&mut self) -> Result<(), Error>;
+
+    /// Fetch the current stage -- typically used after a state recovery or transfer
+    fn current_stage_id(&self) -> Result<Option<StageId>, Error>;
+
+    /// Notify of a reset from which we may recover
+    fn on_restart(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Trait for types which track nested stages. Stages which themselves contain stage tuples should
+/// ensure that they constrain the state with this trait accordingly.
+pub trait HasNestedStage: HasCurrentStageId {
+    /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
+    /// resumed.
+    fn enter_inner_stage(&mut self) -> Result<(), Error>;
+
+    /// Exit a stage scope
+    fn exit_inner_stage(&mut self) -> Result<(), Error>;
+}
+
+impl<C, I, R, SC> HasNestedStage for StdState<C, I, R, SC> {
     fn enter_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_stack.enter_inner_stage()
     }

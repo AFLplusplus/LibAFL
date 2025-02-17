@@ -49,7 +49,7 @@ pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
     events::SendExiting,
-    state::{HasExecutions, Stoppable},
+    state::{HasCurrentStageId, HasExecutions, Stoppable},
     Error, HasNamedMetadata,
 };
 
@@ -98,8 +98,6 @@ pub trait Stage<E, EM, S, Z> {
     ///
     /// Before a call to perform, [`Stage::should_restart`] will be (must be!) called.
     /// After returning (so non-target crash or timeout in a restarting case), [`Stage::clear_progress`] gets called.
-    /// A call to [`Stage::perform_restartable`] will do these things implicitly.
-    /// DON'T call this function directly except from `preform_restartable` !!
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -107,20 +105,6 @@ pub trait Stage<E, EM, S, Z> {
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error>;
-
-    /// Run the stage, calling [`Stage::should_restart`] and [`Stage::clear_progress`] appropriately
-    fn perform_restartable(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
-    ) -> Result<(), Error> {
-        if self.should_restart(state)? {
-            self.perform(fuzzer, executor, state, manager)?;
-        }
-        self.clear_progress(state)
-    }
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
@@ -182,7 +166,10 @@ where
 
                 let stage = &mut self.0;
 
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+                if stage.should_restart(state)? {
+                    stage.perform(fuzzer, executor, state, manager)?;
+                }
+                stage.clear_progress(state)?;
 
                 state.clear_stage_id()?;
             }
@@ -194,7 +181,11 @@ where
                 state.set_current_stage_id(StageId(Self::LEN))?;
 
                 let stage = &mut self.0;
-                stage.perform_restartable(fuzzer, executor, state, manager)?;
+
+                if stage.should_restart(state)? {
+                    stage.perform(fuzzer, executor, state, manager)?;
+                }
+                stage.clear_progress(state)?;
 
                 state.clear_stage_id()?;
             }
@@ -261,13 +252,16 @@ where
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
-        self.iter_mut().try_for_each(|x| {
+        self.iter_mut().try_for_each(|stage| {
             if state.stop_requested() {
                 state.discard_stop_request();
                 manager.on_shutdown()?;
                 return Err(Error::shutting_down());
             }
-            x.perform_restartable(fuzzer, executor, state, manager)
+            if stage.should_restart(state)? {
+                stage.perform(fuzzer, executor, state, manager)?;
+            }
+            stage.clear_progress(state)
         })
     }
 }
@@ -416,34 +410,6 @@ impl fmt::Display for StageId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
-}
-
-/// Trait for types which track the current stage
-pub trait HasCurrentStageId {
-    /// Set the current stage; we have started processing this stage
-    fn set_current_stage_id(&mut self, id: StageId) -> Result<(), Error>;
-
-    /// Clear the current stage; we are done processing this stage
-    fn clear_stage_id(&mut self) -> Result<(), Error>;
-
-    /// Fetch the current stage -- typically used after a state recovery or transfer
-    fn current_stage_id(&self) -> Result<Option<StageId>, Error>;
-
-    /// Notify of a reset from which we may recover
-    fn on_restart(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-/// Trait for types which track nested stages. Stages which themselves contain stage tuples should
-/// ensure that they constrain the state with this trait accordingly.
-pub trait HasNestedStageStatus: HasCurrentStageId {
-    /// Enter a stage scope, potentially resuming to an inner stage status. Returns Ok(true) if
-    /// resumed.
-    fn enter_inner_stage(&mut self) -> Result<(), Error>;
-
-    /// Exit a stage scope
-    fn exit_inner_stage(&mut self) -> Result<(), Error>;
 }
 
 impl_serdeany!(ExecutionCountRestartHelperMetadata);
