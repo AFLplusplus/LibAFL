@@ -226,7 +226,7 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
                 log::error!("Error: {:?}", err);
 
                 memory_dump(&emu, 2);
-                debug_print(&emu);
+                debug_print(&emu, true);
             }
         }
 

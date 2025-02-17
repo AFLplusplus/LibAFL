@@ -33,7 +33,9 @@ pub fn memory_dump(emu: &Unicorn<()>, len: u64) {
     }
 }
 
-pub fn debug_print(emu: &Unicorn<()>) {
+// Display some register values and disassemble the instructions around the program counter
+// address. The thumb_mode parameter is only taken into account when the architecture used is ARM.
+pub fn debug_print(emu: &Unicorn<()>, thumb_mode: bool) {
     log::debug!("Status when crash happened:");
 
     let pc = emu.pc_read().unwrap();
@@ -85,7 +87,10 @@ pub fn debug_print(emu: &Unicorn<()>) {
             let cs = match emu.get_arch() {
                 Arch::ARM => Capstone::new()
                     .arm()
-                    .mode(arch::arm::ArchMode::Thumb)
+                    .mode(match thumb_mode {
+                        true => arch::arm::ArchMode::Thumb,
+                        false => arch::arm::ArchMode::Arm,
+                    })
                     .detail(true)
                     .build()
                     .expect("Failed to create Capstone object"),
