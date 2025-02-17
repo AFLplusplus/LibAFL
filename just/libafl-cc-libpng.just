@@ -23,45 +23,30 @@ deps_dir:
 
 [unix]
 zlib_wget: deps_dir
-    #!/bin/bash
+    wget -O "{{ DEPS_DIR }}/zlib-1.2.13.tar.gz" https://zlib.net/fossils/zlib-1.2.13.tar.gz
 
-    wget \
-        -O "{{ DEPS_DIR }}/zlib-1.2.13.tar.gz" \
-        https://zlib.net/fossils/zlib-1.2.13.tar.gz
-
-    tar \
-        zxvf {{ DEPS_DIR }}/zlib-1.2.13.tar.gz \
-        -C {{ DEPS_DIR }}
+    tar zxvf {{ DEPS_DIR }}/zlib-1.2.13.tar.gz -C {{ DEPS_DIR }}
 
 [unix]
-zlib: zlib_wget
-    #!/bin/bash
-
+zlib feat: zlib_wget (cc feat)
     rm -rf {{ ZLIB_BUILD }}
     mkdir {{ ZLIB_BUILD }}
 
-    cd {{ ZLIB_BUILD }} && \
-        CC={{LIBAFL_CC}} \
-        {{ ZLIB_ROOT }}/configure \
-            --prefix=./zlib
+    cd {{ ZLIB_BUILD }} && CC={{ LIBAFL_CC }} {{ ZLIB_ROOT }}/configure --prefix=./zlib
 
-    make -j install
+    make -j -C {{ ZLIB_BUILD }} install
 
 [unix]
 libpng_wget: deps_dir
-    wget \
-        -O "{{ DEPS_DIR }}/v1.6.37.tar.gz" \
-        https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+    wget -O "{{ DEPS_DIR }}/v1.6.37.tar.gz" https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
 
-    tar \
-        -xvf "{{ DEPS_DIR }}/v1.6.37.tar.gz" \
-        -C {{ DEPS_DIR }}
+    tar -xvf "{{ DEPS_DIR }}/v1.6.37.tar.gz" -C {{ DEPS_DIR }}
 
     rm -rf {{ LIBPNG_BUILD }}
     mkdir {{ LIBPNG_BUILD }}
 
 [unix]
-libpng: zlib libpng_wget
+libpng feat: (zlib feat) libpng_wget (cc feat)
     cd {{ LIBPNG_BUILD }}/ && \
         CC="{{LIBAFL_CC}}" \
         CFLAGS="-I{{ ZLIB_INCLUDE }}" \
@@ -72,4 +57,4 @@ libpng: zlib libpng_wget
             --with-pic=yes \
             --enable-hardware-optimizations={{ OPTIMIZATIONS }}
 
-    make -j -C {{ TARGET_DIR }}/build-png/
+    make -j -C {{ LIBPNG_BUILD }}

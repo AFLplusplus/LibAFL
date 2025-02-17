@@ -2,24 +2,20 @@ import "../../../just/libafl-cc-libpng.just"
 
 FUZZER_NAME := 'fuzzer_libpng'
 
-alias cc := cxx
+[unix]
+cc feat:
+    cargo build --profile {{PROFILE}} --features="{{feat}}"
 
 [unix]
-cxx:
-    cargo build --profile {{PROFILE}}
+cxx feat:
+    cargo build --profile {{PROFILE}} --features="{{feat}}"
 
 [unix]
-crash_cxx:
-    cargo build --profile {{PROFILE}} --features=crash
+lib feat: (libpng feat) (cxx feat)
 
+# Feat is either nothing or "crash"
 [unix]
-lib: libpng cxx
-
-[unix]
-crash_lib: libpng crash_cxx
-
-[unix]
-fuzzer: lib cxx
+fuzzer feat="": (lib feat) (cxx feat)
     {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc \
         "{{LIBPNG_BUILD}}/.libs/libpng16.a" \
         "{{ZLIB_BUILD}}/libz.a" \
@@ -30,28 +26,9 @@ fuzzer: lib cxx
         -o {{FUZZER_NAME}} \
         -lm -lz
 
+# Feat is either nothing or "crash"
 [unix]
-crash_fuzzer: crash_lib crash_cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc \
-        "{{LIBPNG_BUILD}}/.libs/libpng16.a" \
-        "{{ZLIB_BUILD}}/libz.a" \
-        -I"{{LIBPNG_INCLUDE}}" \
-        -I"{{LIBPNG_BUILD}}" \
-        -I"{{ZLIB_INCLUDE}}" \
-        -L"{{ZLIB_LIB}}" \
-        -o {{FUZZER_NAME}} \
-        -lm -lz
-
-
-[unix]
-run: fuzzer
-    #!/bin/bash
-    ./{{FUZZER_NAME}} &
-    sleep 0.2
-    ./{{FUZZER_NAME}} 2>/dev/null
-
-[unix]
-crash: crash_fuzzer
+run feat="": (fuzzer feat)
     #!/bin/bash
     ./{{FUZZER_NAME}} &
     sleep 0.2
