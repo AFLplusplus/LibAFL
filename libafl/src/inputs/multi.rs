@@ -16,7 +16,7 @@ use crate::{corpus::CorpusId, inputs::Input};
 
 /// An input composed of multiple parts. Use in situations where subcomponents are not necessarily
 /// related, or represent distinct parts of the input.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct MultipartInput<I> {
     parts: Vec<I>,
     names: Vec<String>,
@@ -154,12 +154,16 @@ where
     I: Input,
 {
     fn generate_name(&self, id: Option<CorpusId>) -> String {
-        self.names
-            .iter()
-            .cloned()
-            .zip(self.parts.iter().map(|i| i.generate_name(id)))
-            .map(|(name, generated)| format!("{name}-{generated}"))
-            .collect::<Vec<_>>()
-            .join(",")
+        if self.names().is_empty() {
+            "empty_multipart_input".to_string() // empty strings cause issues with OnDiskCorpus
+        } else {
+            self.names
+                .iter()
+                .cloned()
+                .zip(self.parts.iter().map(|i| i.generate_name(id)))
+                .map(|(name, generated)| format!("{name}-{generated}"))
+                .collect::<Vec<_>>()
+                .join(",")
+        }
     }
 }

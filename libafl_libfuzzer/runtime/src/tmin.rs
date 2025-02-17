@@ -13,7 +13,7 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
     state::{HasCorpus, StdState},
-    Error, Fuzzer, StdFuzzer,
+    Error, ExecutesInput, Fuzzer, StdFuzzer,
 };
 use libafl_bolts::{
     rands::{RomuDuoJrRand, StdRand},
@@ -26,7 +26,7 @@ use libafl_targets::LLVMCustomMutator;
 use crate::{options::LibfuzzerOptions, CustomMutationStatus};
 
 type TMinState =
-    StdState<BytesInput, InMemoryCorpus<BytesInput>, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
+    StdState<InMemoryCorpus<BytesInput>, BytesInput, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
 
 fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     options: &LibfuzzerOptions,
@@ -110,7 +110,10 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     }
 
     let mut testcase = state.testcase_mut(id)?;
-    let input = testcase.load_input(state.corpus())?.bytes().to_vec();
+    let input = testcase
+        .load_input(state.corpus())?
+        .mutator_bytes()
+        .to_vec();
     drop(testcase);
     if input.len() >= size {
         eprintln!(

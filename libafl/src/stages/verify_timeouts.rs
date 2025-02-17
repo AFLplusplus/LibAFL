@@ -1,4 +1,4 @@
-#![allow(clippy::too_long_first_doc_paragraph)]
+#![expect(clippy::too_long_first_doc_paragraph)]
 //! Stage that re-runs captured Timeouts with double the timeout to verify
 //! Note: To capture the timeouts, use in conjunction with `CaptureTimeoutFeedback`
 //! Note: Will NOT work with in process executors due to the potential for restarts/crashes when
@@ -10,12 +10,10 @@ use libafl_bolts::Error;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    corpus::Corpus,
     executors::{Executor, HasObservers, HasTimeout},
-    inputs::{BytesInput, UsesInput},
+    inputs::BytesInput,
     observers::ObserversTuple,
     stages::Stage,
-    state::{HasCorpus, State, UsesState},
     Evaluator, HasMetadata,
 };
 
@@ -24,14 +22,14 @@ use crate::{
 /// Note: Will NOT work with in process executors due to the potential for restarts/crashes when
 /// running inputs.
 #[derive(Debug)]
-pub struct VerifyTimeoutsStage<E, S> {
+pub struct VerifyTimeoutsStage<E, I, S> {
     doubled_timeout: Duration,
     original_timeout: Duration,
     capture_timeouts: Rc<RefCell<bool>>,
-    phantom: PhantomData<(E, S)>,
+    phantom: PhantomData<(E, I, S)>,
 }
 
-impl<E, S> VerifyTimeoutsStage<E, S> {
+impl<E, I, S> VerifyTimeoutsStage<E, I, S> {
     /// Create a `VerifyTimeoutsStage`
     pub fn new(capture_timeouts: Rc<RefCell<bool>>, configured_timeout: Duration) -> Self {
         Self {
@@ -41,13 +39,6 @@ impl<E, S> VerifyTimeoutsStage<E, S> {
             phantom: PhantomData,
         }
     }
-}
-
-impl<E, S> UsesState for VerifyTimeoutsStage<E, S>
-where
-    S: State,
-{
-    type State = S;
 }
 
 /// Timeouts that `VerifyTimeoutsStage` will read from
@@ -88,25 +79,23 @@ impl<I> TimeoutsToVerify<I> {
     }
 }
 
-impl<E, EM, Z, S> Stage<E, EM, Z> for VerifyTimeoutsStage<E, S>
+impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for VerifyTimeoutsStage<E, I, S>
 where
-    E::Observers: ObserversTuple<<Self as UsesInput>::Input, <Self as UsesState>::State>,
-    E: Executor<EM, Z, State = S> + HasObservers + HasTimeout,
-    EM: UsesState<State = S>,
-    Z: UsesState<State = S> + Evaluator<E, EM>,
-    S: HasCorpus + State + HasMetadata,
-    Self::Input: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
-    <<E as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
+    E::Observers: ObserversTuple<I, S>,
+    E: Executor<EM, I, S, Z> + HasObservers + HasTimeout,
+    Z: Evaluator<E, EM, I, S>,
+    S: HasMetadata,
+    I: Debug + Serialize + DeserializeOwned + Default + 'static + Clone,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         let mut timeouts = state
-            .metadata_or_insert_with(TimeoutsToVerify::<<S::Corpus as Corpus>::Input>::new)
+            .metadata_or_insert_with(TimeoutsToVerify::<I>::new)
             .clone();
         if timeouts.count() == 0 {
             return Ok(());
@@ -114,19 +103,19 @@ where
         executor.set_timeout(self.doubled_timeout);
         *self.capture_timeouts.borrow_mut() = false;
         while let Some(input) = timeouts.pop() {
-            fuzzer.evaluate_input(state, executor, manager, input)?;
+            fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
         executor.set_timeout(self.original_timeout);
         *self.capture_timeouts.borrow_mut() = true;
-        let res = state.metadata_mut::<TimeoutsToVerify<E::Input>>().unwrap();
-        *res = TimeoutsToVerify::<E::Input>::new();
+        let res = state.metadata_mut::<TimeoutsToVerify<I>>().unwrap();
+        *res = TimeoutsToVerify::<I>::new();
         Ok(())
     }
-    fn should_restart(&mut self, _state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }
 
-    fn clear_progress(&mut self, _state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 }

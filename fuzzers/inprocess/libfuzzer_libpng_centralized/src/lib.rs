@@ -141,7 +141,7 @@ pub extern "C" fn libafl_main() {
 
     let mut secondary_run_client =
         |state: Option<_>,
-         mut mgr: CentralizedEventManager<_, _, _, _>,
+         mut mgr: CentralizedEventManager<_, _, _, _, _>,
          _client_description: ClientDescription| {
             // Create an observation channel using the coverage map
             let edges_observer =
@@ -262,7 +262,7 @@ pub extern "C" fn libafl_main() {
             Ok(())
         };
 
-    let mut main_run_client = secondary_run_client.clone(); // clone it just for borrow checker
+    let mut main_run_client = secondary_run_client; // clone it just for borrow checker
 
     match CentralizedLauncher::builder()
         .shmem_provider(shmem_provider)

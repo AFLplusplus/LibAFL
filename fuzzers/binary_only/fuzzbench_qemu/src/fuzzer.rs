@@ -48,18 +48,11 @@ use libafl_bolts::{
 use libafl_qemu::{
     elf::EasyElf,
     filter_qemu_args,
-    // asan::{init_with_asan, QemuAsanHelper},
-    modules::cmplog::{CmpLogModule, CmpLogObserver},
-    modules::edges::StdEdgeCoverageModule,
-    Emulator,
-    GuestReg,
-    //snapshot::QemuSnapshotHelper,
-    MmapPerms,
-    Qemu,
-    QemuExecutor,
-    QemuExitError,
-    QemuExitReason,
-    QemuShutdownCause,
+    modules::{
+        cmplog::{CmpLogModule, CmpLogObserver},
+        edges::StdEdgeCoverageModule,
+    },
+    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuShutdownCause,
     Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
@@ -175,8 +168,33 @@ fn fuzz(
     env::remove_var("LD_LIBRARY_PATH");
 
     let args: Vec<String> = env::args().collect();
-    let qemu = Qemu::init(&args).expect("QEMU init failed");
-    // let (emu, asan) = init_with_asan(&mut args, &mut env).unwrap();
+
+    // Create an observation channel using the coverage map
+    let mut edges_observer = unsafe {
+        HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
+            "edges",
+            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
+            &raw mut MAX_EDGES_FOUND,
+        ))
+        .track_indices()
+    };
+
+    let modules = tuple_list!(
+        StdEdgeCoverageModule::builder()
+            .map_observer(edges_observer.as_mut())
+            .build()
+            .unwrap(),
+        CmpLogModule::default(),
+        // QemuAsanHelper::default(asan),
+        //QemuSnapshotHelper::new()
+    );
+
+    let emulator = Emulator::empty()
+        .qemu_parameters(args)
+        .modules(modules)
+        .build()?;
+
+    let qemu = emulator.qemu();
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(qemu.binary_path(), &mut elf_buffer)?;
@@ -255,16 +273,6 @@ fn fuzz(
         },
     };
 
-    // Create an observation channel using the coverage map
-    let mut edges_observer = unsafe {
-        HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
-            "edges",
-            OwnedMutSlice::from_raw_parts_mut(edges_map_mut_ptr(), EDGES_MAP_ALLOCATED_SIZE),
-            &raw mut MAX_EDGES_FOUND,
-        ))
-        .track_indices()
-    };
-
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
@@ -317,7 +325,7 @@ fn fuzz(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
@@ -331,7 +339,7 @@ fn fuzz(
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness =
-        |_emulator: &mut Emulator<_, _, _, _, _>, _state: &mut _, input: &BytesInput| {
+        |_emulator: &mut Emulator<_, _, _, _, _, _, _>, _state: &mut _, input: &BytesInput| {
             let target = input.target_bytes();
             let mut buf = target.as_slice();
             let mut len = buf.len();
@@ -363,18 +371,6 @@ fn fuzz(
 
             ExitKind::Ok
         };
-
-    let modules = tuple_list!(
-        StdEdgeCoverageModule::builder()
-            .map_observer(edges_observer.as_mut())
-            .build()
-            .unwrap(),
-        CmpLogModule::default(),
-        // QemuAsanHelper::default(asan),
-        //QemuSnapshotHelper::new()
-    );
-
-    let emulator = Emulator::empty().qemu(qemu).modules(modules).build()?;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = QemuExecutor::new(

@@ -75,3 +75,5 @@ harness
 program
 fuzzer_libpng*
 forkserver_simple
+
+*.patch

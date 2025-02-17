@@ -66,12 +66,12 @@ cmplog_extended_instrumentation = [
 function-logging = ["common"]
 track_hit_feedbacks = ["libafl/track_hit_feedbacks"]
 [build-dependencies]
-bindgen = "0.70.1"
+bindgen = "0.71.1"
 cc = { version = "1.1.21", features = ["parallel"] }
 rustversion = "1.0.17"
 
 [dependencies]
-libafl = { workspace = true, features = [] }
+libafl = { workspace = true, features = [], default-features = false }
 libafl_bolts = { workspace = true, features = [] }
 libc = { workspace = true }
 hashbrown = { workspace = true, default-features = true }

@@ -7,7 +7,6 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use ahash::RandomState;
 use libafl_bolts::{AsSlice, AsSliceMut, HasLen, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -18,7 +17,6 @@ use crate::{
 
 /// Exact copy of `StdMapObserver` that owns its map
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[allow(clippy::unsafe_derive_deserialize)]
 pub struct OwnedMapObserver<T> {
     map: Vec<T>,
     initial: T,
@@ -104,11 +102,6 @@ where
     #[inline]
     fn usable_count(&self) -> usize {
         self.as_slice().len()
-    }
-
-    #[inline]
-    fn hash_simple(&self) -> u64 {
-        RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
     }
 
     #[inline]

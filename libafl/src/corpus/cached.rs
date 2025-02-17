@@ -1,7 +1,7 @@
 //! The [`CachedOnDiskCorpus`] stores [`Testcase`]s to disk, keeping a subset of them in memory/cache, evicting in a FIFO manner.
 
 use alloc::{collections::vec_deque::VecDeque, string::String};
-use core::cell::RefCell;
+use core::cell::{Ref, RefCell, RefMut};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,6 @@ use crate::{
 /// A corpus that keeps a maximum number of [`Testcase`]s in memory
 /// and load them from disk, when they are being used.
 /// The eviction policy is FIFO.
-#[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 pub struct CachedOnDiskCorpus<I> {
     inner: InMemoryOnDiskCorpus<I>,
@@ -56,12 +55,11 @@ where
         Ok(())
     }
 }
-impl<I> Corpus for CachedOnDiskCorpus<I>
+
+impl<I> Corpus<I> for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    type Input = I;
-
     /// Returns the number of all enabled entries
     #[inline]
     fn count(&self) -> usize {
@@ -99,7 +97,7 @@ where
     }
 
     /// Removes an entry from the corpus, returning it if it was present; considers both enabled and disabled testcases.
-    fn remove(&mut self, id: CorpusId) -> Result<Testcase<Self::Input>, Error> {
+    fn remove(&mut self, id: CorpusId) -> Result<Testcase<I>, Error> {
         let testcase = self.inner.remove(id)?;
         self.cached_indexes.borrow_mut().retain(|e| *e != id);
         Ok(testcase)
@@ -114,7 +112,7 @@ where
     }
     /// Get by id; considers both enabled and disabled testcases
     #[inline]
-    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+    fn get_from_all(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get_from_all(id)? };
         self.cache_testcase(testcase, id)?;
         Ok(testcase)
@@ -170,25 +168,25 @@ where
     }
 
     #[inline]
-    fn load_input_into(&self, testcase: &mut Testcase<Self::Input>) -> Result<(), Error> {
+    fn load_input_into(&self, testcase: &mut Testcase<I>) -> Result<(), Error> {
         self.inner.load_input_into(testcase)
     }
 
     #[inline]
-    fn store_input_from(&self, testcase: &Testcase<Self::Input>) -> Result<(), Error> {
+    fn store_input_from(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.store_input_from(testcase)
     }
 }
 
-impl<I> HasTestcase for CachedOnDiskCorpus<I>
+impl<I> HasTestcase<I> for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
-    fn testcase(&self, id: CorpusId) -> Result<core::cell::Ref<Testcase<I>>, Error> {
+    fn testcase(&self, id: CorpusId) -> Result<Ref<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow())
     }
 
-    fn testcase_mut(&self, id: CorpusId) -> Result<core::cell::RefMut<Testcase<I>>, Error> {
+    fn testcase_mut(&self, id: CorpusId) -> Result<RefMut<Testcase<I>>, Error> {
         Ok(self.get(id)?.borrow_mut())
     }
 }

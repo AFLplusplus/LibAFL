@@ -18,26 +18,28 @@ use libafl::{
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
-    state::{HasExecutions, State, StdState, UsesState},
+    stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
+    state::{HasCorpus, HasExecutions, StdState},
 };
 use libafl_bolts::{current_nanos, nonzero, rands::StdRand, tuples::tuple_list, AsSlice};
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
 static mut SIGNALS_PTR: *mut u8 = &raw mut SIGNALS as _;
-static SIGNALS_LEN: usize = unsafe { (*&raw const (SIGNALS)).len() };
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+#[allow(static_mut_refs)] // only a problem in nightly
+static SIGNALS_LEN: usize = unsafe { SIGNALS.len() };
 
 /// Assign a signal to the signals map
 fn signals_set(idx: usize) {
     unsafe { write(SIGNALS_PTR.add(idx), 1) };
 }
 
-struct CustomExecutor<S: State> {
+struct CustomExecutor<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S: State> CustomExecutor<S> {
+impl<S> CustomExecutor<S> {
     pub fn new(_state: &S) -> Self {
         Self {
             phantom: PhantomData,
@@ -45,23 +47,17 @@ impl<S: State> CustomExecutor<S> {
     }
 }
 
-impl<S: State> UsesState for CustomExecutor<S> {
-    type State = S;
-}
-
-impl<EM, S, Z> Executor<EM, Z> for CustomExecutor<S>
+impl<EM, I, S, Z> Executor<EM, I, S, Z> for CustomExecutor<S>
 where
-    EM: UsesState<State = S>,
-    S: State + HasExecutions,
-    Z: UsesState<State = S>,
-    Self::Input: HasTargetBytes,
+    S: HasCorpus<I> + HasExecutions,
+    I: HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut Self::State,
+        state: &mut S,
         _mgr: &mut EM,
-        input: &Self::Input,
+        input: &I,
     ) -> Result<ExitKind, libafl::Error> {
         // We need to keep track of the exec count.
         *state.executions_mut() += 1;
@@ -82,13 +78,18 @@ where
     }
 }
 
-#[allow(clippy::similar_names, clippy::manual_assert)]
 pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { StdMapObserver::from_mut_ptr("signals", SIGNALS_PTR, SIGNALS_LEN) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
+
+    let calibration_stage = CalibrationStage::new(&feedback);
+    let stats_stage = AflStatsStage::builder()
+        .map_observer(&observer)
+        .build()
+        .unwrap();
 
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and_fast!(
@@ -134,7 +135,11 @@ pub fn main() {
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
+    #[cfg(not(feature = "bloom_input_filter"))]
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    #[cfg(feature = "bloom_input_filter")]
+    let mut fuzzer =
+        StdFuzzer::with_bloom_input_filter(scheduler, feedback, objective, 10_000_000, 0.001);
 
     // Create the executor for an in-process function with just one observer
     let executor = CustomExecutor::new(&state);
@@ -151,7 +156,11 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut stages = tuple_list!(
+        calibration_stage,
+        StdMutationalStage::new(mutator),
+        stats_stage
+    );
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)

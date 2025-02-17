@@ -4,7 +4,7 @@
 # Test
 ```
 rustup target add powerpc-unknown-linux-gnu
-$ cargo make gdb
+$ just gdb
 ```
 
 # Example

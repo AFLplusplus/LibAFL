@@ -1,11 +1,17 @@
-use std::{
-    env,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-    process::Command,
-    str,
-};
+#[cfg(any(
+    target_vendor = "apple",
+    feature = "ddg-instr",
+    feature = "function-logging",
+    feature = "cmplog-routines",
+    feature = "autotokens",
+    feature = "coverage-accounting",
+    feature = "cmplog-instructions",
+    feature = "ctx",
+    feature = "dump-cfg",
+    feature = "profiling",
+))]
+use std::path::PathBuf;
+use std::{env, fs::File, io::Write, path::Path, process::Command, str};
 
 #[cfg(target_vendor = "apple")]
 use glob::glob;
@@ -20,6 +26,17 @@ const LLVM_VERSION_MAX: u32 = 33;
 const LLVM_VERSION_MIN: u32 = 6;
 
 /// Get the extension for a shared object
+#[cfg(any(
+    feature = "ddg-instr",
+    feature = "function-logging",
+    feature = "cmplog-routines",
+    feature = "autotokens",
+    feature = "coverage-accounting",
+    feature = "cmplog-instructions",
+    feature = "ctx",
+    feature = "dump-cfg",
+    feature = "profiling",
+))]
 fn dll_extension<'a>() -> &'a str {
     if let Ok(vendor) = env::var("CARGO_CFG_TARGET_VENDOR") {
         if vendor == "apple" {
@@ -80,7 +97,7 @@ fn find_llvm_config() -> Result<String, String> {
         Err(err) => {
             println!("cargo:warning={err}");
         }
-    };
+    }
 
     #[cfg(any(target_os = "solaris", target_os = "illumos"))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
@@ -143,8 +160,18 @@ fn find_llvm_version() -> Option<i32> {
     None
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(unused)]
+#[cfg(any(
+    feature = "ddg-instr",
+    feature = "function-logging",
+    feature = "cmplog-routines",
+    feature = "autotokens",
+    feature = "coverage-accounting",
+    feature = "cmplog-instructions",
+    feature = "ctx",
+    feature = "dump-cfg",
+    feature = "profiling",
+))]
+#[expect(clippy::too_many_arguments)]
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,
@@ -224,8 +251,7 @@ fn build_pass(
     }
 }
 
-#[allow(clippy::single_element_loop)]
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
@@ -236,6 +262,7 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
     println!("cargo:rerun-if-env-changed=LLVM_BINDIR");
+    println!("cargo:rerun-if-env-changed=LLVM_AR_PATH");
     println!("cargo:rerun-if-env-changed=LLVM_CXXFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_LDFLAGS");
     println!("cargo:rerun-if-env-changed=LLVM_VERSION");
@@ -246,6 +273,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let llvm_bindir = env::var("LLVM_BINDIR");
+    let llvm_ar_path = env::var("LLVM_AR_PATH");
     let llvm_cxxflags = env::var("LLVM_CXXFLAGS");
     let llvm_ldflags = env::var("LLVM_LDFLAGS");
     let llvm_version = env::var("LLVM_VERSION");
@@ -268,6 +296,8 @@ fn main() {
 pub const CLANG_PATH: &str = \"clang\";
 /// The path to the `clang++` executable
 pub const CLANGXX_PATH: &str = \"clang++\";
+/// The path to the `llvm-ar` executable
+pub const LLVM_AR_PATH: &str = \"llvm-ar\";
 /// The llvm version used to build llvm passes
 pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     "
@@ -283,27 +313,44 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         exec_llvm_config(&["--bindir"])
     };
     let bindir_path = Path::new(&llvm_bindir);
+    let llvm_ar_path = if let Ok(ar_path) = llvm_ar_path {
+        ar_path
+    } else {
+        exec_llvm_config(&["--bindir"])
+    };
 
     let clang;
     let clangcpp;
+    let llvm_ar;
 
     if cfg!(windows) {
         clang = bindir_path.join("clang.exe");
         clangcpp = bindir_path.join("clang++.exe");
+        llvm_ar = Path::new(&llvm_ar_path).join("llvm-ar.exe");
     } else {
         clang = bindir_path.join("clang");
         clangcpp = bindir_path.join("clang++");
+        llvm_ar = Path::new(&llvm_ar_path).join("llvm-ar");
     }
 
+    let mut found = true;
+
     if !clang.exists() {
-        println!("cargo:warning=Failed to find clang frontend.");
-        return;
+        println!("cargo:warning=Failed to find binary: clang.");
+        found = false;
     }
 
     if !clangcpp.exists() {
-        println!("cargo:warning=Failed to find clang++ frontend.");
-        return;
+        println!("cargo:warning=Failed to find binary: clang++.");
+        found = false;
     }
+
+    if !llvm_ar.exists() {
+        println!("cargo:warning=Failed to find binary: llvm-ar.");
+        found = false;
+    }
+
+    assert!(found, "\n\tAt least one of the LLVM dependencies could not be found.\n\tThe following search directory was considered: {}\n", bindir_path.display());
 
     let cxxflags = if let Ok(flags) = llvm_cxxflags {
         flags
@@ -346,6 +393,8 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         pub const CLANG_PATH: &str = {clang:?};
         /// The path to the `clang++` executable
         pub const CLANGXX_PATH: &str = {clangcpp:?};
+        /// The path to the `llvm-ar` executable
+        pub const LLVM_AR_PATH: &str = {llvm_ar:?};
 
         /// The default size of the edges map the fuzzer uses
         pub const EDGES_MAP_DEFAULT_SIZE: usize = {edge_map_default_size};
@@ -415,7 +464,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         // In case the system is configured oddly, we may have trouble finding the SDK. Manually add the linker flag, just in case.
         sdk_path = find_macos_sdk_libs();
         ldflags.push(&sdk_path);
-    };
+    }
 
     #[cfg(feature = "ddg-instr")]
     build_pass(

@@ -25,7 +25,7 @@ pub struct ProbabilitySamplingScheduler<F> {
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct ProbabilityMetadata {
     /// corpus index -> probability
@@ -63,12 +63,10 @@ impl<F> ProbabilitySamplingScheduler<F> {
     }
 
     /// Calculate the score and store in `ProbabilityMetadata`
-    #[allow(clippy::cast_precision_loss)]
-    #[allow(clippy::unused_self)]
-    pub fn store_probability<S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
+    pub fn store_probability<I, S>(&self, state: &mut S, id: CorpusId) -> Result<(), Error>
     where
-        F: TestcaseScore<S>,
-        S: HasCorpus + HasMetadata + HasRand,
+        F: TestcaseScore<I, S>,
+        S: HasCorpus<I> + HasMetadata + HasRand,
     {
         let prob = F::compute(state, &mut *state.corpus().get(id)?.borrow_mut())?;
         debug_assert!(
@@ -85,16 +83,16 @@ impl<F> ProbabilitySamplingScheduler<F> {
     }
 }
 
-impl<F, S> RemovableScheduler<<S::Corpus as Corpus>::Input, S> for ProbabilitySamplingScheduler<F>
+impl<F, I, S> RemovableScheduler<I, S> for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
+    F: TestcaseScore<I, S>,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     fn on_remove(
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _testcase: &Option<Testcase<<S::Corpus as Corpus>::Input>>,
+        _testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -110,7 +108,7 @@ where
         &mut self,
         state: &mut S,
         id: CorpusId,
-        _prev: &Testcase<<S::Corpus as Corpus>::Input>,
+        _prev: &Testcase<I>,
     ) -> Result<(), Error> {
         let meta = state
             .metadata_map_mut()
@@ -124,10 +122,10 @@ where
     }
 }
 
-impl<F, S> Scheduler<<S::Corpus as Corpus>::Input, S> for ProbabilitySamplingScheduler<F>
+impl<F, I, S> Scheduler<I, S> for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
+    F: TestcaseScore<I, S>,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     fn on_add(&mut self, state: &mut S, id: CorpusId) -> Result<(), Error> {
         let current_id = *state.corpus().current();
@@ -144,7 +142,6 @@ where
     }
 
     /// Gets the next entry
-    #[allow(clippy::cast_precision_loss)]
     fn next(&mut self, state: &mut S) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from(
@@ -205,14 +202,11 @@ mod tests {
     #[derive(Debug, Clone)]
     pub struct UniformDistribution {}
 
-    impl<S> TestcaseScore<S> for UniformDistribution
+    impl<I, S> TestcaseScore<I, S> for UniformDistribution
     where
-        S: HasCorpus,
+        S: HasCorpus<I>,
     {
-        fn compute(
-            _state: &S,
-            _: &mut Testcase<<S::Corpus as Corpus>::Input>,
-        ) -> Result<f64, Error> {
+        fn compute(_state: &S, _: &mut Testcase<I>) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }

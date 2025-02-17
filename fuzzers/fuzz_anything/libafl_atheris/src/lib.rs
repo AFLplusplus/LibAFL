@@ -47,7 +47,6 @@ use libafl_targets::{extra_counters, CmpLogObserver};
 /// The `harness_fn` parameter is the function that will be called by `LibAFL` for each iteration
 /// and jumps back into `Atheris'` instrumented python code.
 #[no_mangle]
-#[allow(non_snake_case)]
 pub extern "C" fn LLVMFuzzerRunDriver(
     _argc: *const c_int,
     _argv: *const *const c_char,

@@ -24,26 +24,22 @@ Additional documentation is available in [the `LibAFL` book](https://aflplus.plu
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
+    unfulfilled_lint_expectations,
     unused_must_use,
-    //unused_results
-))]
-#![cfg_attr(
-    test,
-    deny(
-        bad_style,
-        dead_code,
-        improper_ctypes,
-        non_shorthand_field_patterns,
-        no_mangle_generic_items,
-        overflowing_literals,
-        path_statements,
-        patterns_in_fns_without_body,
-        unconditional_recursion,
-        unused,
-        unused_allocation,
-        unused_comparisons,
-        unused_parens,
-        while_true
+    bad_style,
+    dead_code,
+    improper_ctypes,
+    non_shorthand_field_patterns,
+    no_mangle_generic_items,
+    overflowing_literals,
+    path_statements,
+    patterns_in_fns_without_body,
+    unconditional_recursion,
+    unused,
+    unused_allocation,
+    unused_comparisons,
+    unused_parens,
+    while_true
     )
 )]
 
@@ -65,7 +61,7 @@ pub mod pthread_hook;
 #[cfg(feature = "cmplog")]
 pub mod cmplog_rt;
 
-/// The `LibAFL` firda helper
+/// The `LibAFL` frida helper
 pub mod helper;
 
 pub mod drcov_rt;
@@ -76,12 +72,15 @@ pub mod executor;
 /// Utilities
 pub mod utils;
 
+/// The frida helper shutdown observer, needed to remove the instrumentation upon crashing
+pub mod frida_helper_shutdown_observer;
+
 // for parsing asan and cmplog cores
 
 use libafl_bolts::core_affinity::{get_core_ids, CoreId, Cores};
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FridaOptions {
     enable_asan: bool,
     enable_asan_leak_detection: bool,
@@ -104,7 +103,7 @@ impl FridaOptions {
     /// # Panics
     /// Panics, if no `=` sign exists in input, or or `value` behind `=` has zero length.
     #[must_use]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     pub fn parse_env_options() -> Self {
         let mut options = Self::default();
         let mut asan_cores = None;
@@ -327,7 +326,7 @@ impl Default for FridaOptions {
 #[cfg(test)]
 mod tests {
     use core::num::NonZero;
-    use std::sync::OnceLock;
+    use std::{cell::RefCell, rc::Rc, sync::OnceLock};
 
     use clap::Parser;
     use frida_gum::Gum;
@@ -347,7 +346,6 @@ mod tests {
     use libafl_bolts::{
         cli::FuzzerOptions, rands::StdRand, tuples::tuple_list, AsSlice, SimpleStdoutLogger,
     };
-    #[cfg(unix)]
     use mimalloc::MiMalloc;
 
     use crate::{
@@ -357,20 +355,15 @@ mod tests {
         },
         coverage_rt::CoverageRuntime,
         executor::FridaInProcessExecutor,
+        frida_helper_shutdown_observer::FridaHelperObserver,
         helper::FridaInstrumentationHelper,
     };
-    #[cfg(unix)]
     #[global_allocator]
     static GLOBAL: MiMalloc = MiMalloc;
-    #[cfg(windows)]
-    use dlmalloc::GlobalDlmalloc;
-    #[cfg(windows)]
-    #[global_allocator]
-    static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
     static GUM: OnceLock<Gum> = OnceLock::new();
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     unsafe fn test_asan(options: &FuzzerOptions) {
         // The names of the functions to run
         let tests = vec![
@@ -408,6 +401,14 @@ mod tests {
             ),
             ("malloc_heap_uaf_write", Some("heap use-after-free write")),
             ("malloc_heap_uaf_read", Some("heap use-after-free read")),
+            (
+                "heap_oob_memcpy_read",
+                Some("function arg resulting in bad read"),
+            ),
+            (
+                "heap_oob_memcpy_write",
+                Some("function arg resulting in bad write"),
+            ),
         ];
 
         //NOTE: RTLD_NOW is required on linux as otherwise the hooks will NOT work
@@ -424,11 +425,16 @@ mod tests {
 
         let coverage = CoverageRuntime::new();
         let asan = AsanRuntime::new(options);
-        let mut frida_helper = FridaInstrumentationHelper::new(
+        // let mut frida_helper = FridaInstrumentationHelper::new(
+        //     GUM.get().expect("Gum uninitialized"),
+        //     options,
+        //     tuple_list!(coverage, asan),
+        // );
+        let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
             GUM.get().expect("Gum uninitialized"),
             options,
             tuple_list!(coverage, asan),
-        );
+        )));
 
         // Run the tests for each function
         for test in tests {
@@ -446,6 +452,7 @@ mod tests {
             let mut feedback = ConstFeedback::new(true);
 
             let asan_obs = AsanErrorsObserver::from_static_asan_errors();
+            let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
             // Feedbacks to recognize an input as solution
             let mut objective = feedback_or_fast!(
@@ -470,6 +477,7 @@ mod tests {
             let mut fuzzer = StdFuzzer::new(StdScheduler::new(), feedback, objective);
 
             let observers = tuple_list!(
+                frida_helper_observer,
                 asan_obs //,
             );
 
@@ -501,7 +509,8 @@ mod tests {
                         &mut event_manager,
                     )
                     .unwrap(),
-                    &mut frida_helper,
+                    // &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 let mutator = StdScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
@@ -527,7 +536,9 @@ mod tests {
             }
         }
 
-        frida_helper.deinit(GUM.get().expect("Gum uninitialized"));
+        frida_helper
+            .borrow_mut()
+            .deinit(GUM.get().expect("Gum uninitialized"));
     }
 
     #[test]
@@ -549,8 +560,14 @@ mod tests {
 
         SimpleStdoutLogger::set_logger().unwrap();
 
-        let out_dir = std::env::var_os("OUT_DIR").unwrap();
-        let out_dir = out_dir.to_string_lossy().to_string();
+        if let Ok(out_dir) = std::env::var("OUT_DIR") {
+            println!("OUT_DIR is set to: {out_dir}");
+        } else {
+            println!("OUT_DIR is not set!");
+            return;
+        }
+
+        let out_dir = std::env::var("OUT_DIR").unwrap();
         // Check if the harness dynamic library is present, if not - skip the test
         #[cfg(unix)]
         let test_harness_name = "test_harness.so";

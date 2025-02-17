@@ -32,25 +32,50 @@ pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 use crate::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix, not(target_os = "haiku")))]
-pub use crate::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
+pub use crate::os::unix_shmem_server::{ServedShMem, ServedShMemProvider, ShMemService};
 use crate::Error;
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemProvider = Win32ShMemProvider;
+/// The standard sharedmem
+#[cfg(all(windows, feature = "std"))]
+pub type StdShMem = Win32ShMem;
+
+/// The standard sharedmem
+#[cfg(all(target_os = "android", feature = "std"))]
+pub type StdShMem = RcShMem<
+    ServedShMem<unix_shmem::ashmem::AshmemShMem>,
+    ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>,
+>;
+
 /// The standard sharedmem provider
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider =
     RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
+
 /// The standard sharedmem service
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemService = ShMemService<unix_shmem::ashmem::AshmemShMemProvider>;
+
+/// The standard sharedmem
+#[cfg(all(feature = "std", target_vendor = "apple"))]
+pub type StdShMem = RcShMem<ServedShMem<MmapShMem>, ServedShMemProvider<MmapShMemProvider>>;
+
 /// The standard sharedmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 /// The standard sharedmem service
 pub type StdShMemService = ShMemService<MmapShMemProvider>;
+
+/// The default [`ShMem`].
+#[cfg(all(
+    feature = "std",
+    unix,
+    not(any(target_os = "android", target_vendor = "apple", target_os = "haiku"))
+))]
+pub type StdShMem = UnixShMem;
 /// The default [`ShMemProvider`] for this os.
 #[cfg(all(
     feature = "std",
@@ -392,15 +417,19 @@ impl Deref for NopShMem {
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[cfg(feature = "alloc")]
 #[derive(Debug, Clone, Default)]
-pub struct RcShMem<T: ShMemProvider> {
-    internal: ManuallyDrop<T::ShMem>,
-    provider: Rc<RefCell<T>>,
+pub struct RcShMem<SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
+    internal: ManuallyDrop<SHM>,
+    provider: Rc<RefCell<SP>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<T> ShMem for RcShMem<T>
+impl<SP> ShMem for RcShMem<SP::ShMem, SP>
 where
-    T: ShMemProvider + Debug,
+    SP: ShMemProvider,
 {
     fn id(&self) -> ShMemId {
         self.internal.id()
@@ -408,9 +437,10 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T> Deref for RcShMem<T>
+impl<SHM, SP> Deref for RcShMem<SHM, SP>
 where
-    T: ShMemProvider + Debug,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     type Target = [u8];
 
@@ -420,9 +450,10 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T> DerefMut for RcShMem<T>
+impl<SHM, SP> DerefMut for RcShMem<SHM, SP>
 where
-    T: ShMemProvider + Debug,
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
 {
     fn deref_mut(&mut self) -> &mut [u8] {
         &mut self.internal
@@ -430,7 +461,11 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<T: ShMemProvider> Drop for RcShMem<T> {
+impl<SHM, SP> Drop for RcShMem<SHM, SP>
+where
+    SHM: ShMem,
+    SP: ShMemProvider<ShMem = SHM>,
+{
     fn drop(&mut self) {
         self.provider.borrow_mut().release_shmem(&mut self.internal);
     }
@@ -441,10 +476,7 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-pub struct RcShMemProvider<SP>
-where
-    SP: ShMemProvider,
-{
+pub struct RcShMemProvider<SP> {
     /// The wrapped [`ShMemProvider`].
     internal: Rc<RefCell<SP>>,
     /// A pipe the child uses to communicate progress to the parent after fork.
@@ -457,15 +489,12 @@ where
     parent_child_pipe: Option<Pipe>,
 }
 
-//#[cfg(all(unix, feature = "std"))]
-//unsafe impl<SP: ShMemProvider> Send for RcShMemProvider<SP> {}
-
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
     SP: ShMemProvider + Debug,
 {
-    type ShMem = RcShMem<SP>;
+    type ShMem = RcShMem<SP::ShMem, SP>;
 
     fn new() -> Result<Self, Error> {
         Ok(Self {
@@ -535,10 +564,7 @@ where
 }
 
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-impl<SP> RcShMemProvider<SP>
-where
-    SP: ShMemProvider,
-{
+impl<SP> RcShMemProvider<SP> {
     /// "set" the "latch"
     /// (we abuse `pipes` as `semaphores`, as they don't need an additional shared mem region.)
     fn pipe_set(pipe: &mut Option<Pipe>) -> Result<(), Error> {
@@ -599,7 +625,7 @@ where
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
 impl<SP> Default for RcShMemProvider<SP>
 where
-    SP: ShMemProvider + Debug,
+    SP: ShMemProvider,
 {
     fn default() -> Self {
         Self::new().unwrap()
@@ -607,10 +633,7 @@ where
 }
 
 #[cfg(all(unix, feature = "std", not(target_os = "haiku")))]
-impl<SP> RcShMemProvider<ServedShMemProvider<SP>>
-where
-    SP: ShMemProvider + Debug,
-{
+impl<SP> RcShMemProvider<ServedShMemProvider<SP>> {
     /// Forward to `ServedShMemProvider::on_restart`
     pub fn on_restart(&mut self) {
         self.internal.borrow_mut().on_restart();
@@ -626,10 +649,7 @@ where
 pub mod unix_shmem {
     /// Mmap [`ShMem`] for Unix
     #[cfg(not(target_os = "android"))]
-    pub use default::MmapShMem;
-    /// Mmap [`ShMemProvider`] for Unix
-    #[cfg(not(target_os = "android"))]
-    pub use default::MmapShMemProvider;
+    pub use default::{MmapShMem, MmapShMemProvider, MAX_MMAP_FILENAME_LEN};
 
     #[cfg(doc)]
     use crate::shmem::{ShMem, ShMemProvider};
@@ -669,7 +689,8 @@ pub mod unix_shmem {
             Error,
         };
 
-        const MAX_MMAP_FILENAME_LEN: usize = 20;
+        /// The max number of bytes used when generating names for [`MmapShMem`]s.
+        pub const MAX_MMAP_FILENAME_LEN: usize = 20;
 
         /// Mmap-based The sharedmap impl for unix using [`shm_open`] and [`mmap`].
         /// Default on `MacOS` and `iOS`, where we need a central point to unmap
@@ -771,7 +792,7 @@ pub mod unix_shmem {
                 }
             }
 
-            #[allow(clippy::unnecessary_wraps)]
+            #[allow(clippy::unnecessary_wraps)] // cfg dependent
             fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 // # Safety
                 // No user-provided potentially unsafe parameters.
@@ -1012,16 +1033,15 @@ pub mod unix_shmem {
 
         impl CommonUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
-            #[allow(unused_qualifications)]
             pub fn new(map_size: usize) -> Result<Self, Error> {
                 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
-                const SHM_R: libc::c_int = 0o400;
+                const SHM_R: c_int = 0o400;
                 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
-                const SHM_R: libc::c_int = libc::SHM_R;
+                const SHM_R: c_int = libc::SHM_R;
                 #[cfg(any(target_os = "solaris", target_os = "illumos"))]
-                const SHM_W: libc::c_int = 0o200;
+                const SHM_W: c_int = 0o200;
                 #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
-                const SHM_W: libc::c_int = libc::SHM_W;
+                const SHM_W: c_int = libc::SHM_W;
 
                 unsafe {
                     let os_id = shmget(
@@ -1136,7 +1156,7 @@ pub mod unix_shmem {
     }
 
     /// Module containing `ashmem` shared memory support, commonly used on Android.
-    #[cfg(all(unix, feature = "std"))]
+    #[cfg(all(any(target_os = "linux", target_os = "android"), feature = "std"))]
     pub mod ashmem {
         use alloc::string::ToString;
         use core::{
@@ -1156,7 +1176,6 @@ pub mod unix_shmem {
         };
 
         /// An ashmem based impl for linux/android
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMem {
             id: ShMemId,
@@ -1164,9 +1183,9 @@ pub mod unix_shmem {
             map_size: usize,
         }
 
+        #[allow(non_camel_case_types)] // expect somehow breaks here
         #[derive(Copy, Clone)]
         #[repr(C)]
-        #[allow(non_camel_case_types)]
         struct ashmem_pin {
             pub offset: c_uint,
             pub len: c_uint,
@@ -1215,7 +1234,7 @@ pub mod unix_shmem {
                         return Err(Error::unknown(
                             "Failed to set the ashmem mapping's size".to_string(),
                         ));
-                    };
+                    }
 
                     let map = mmap(
                         ptr::null_mut(),
@@ -1244,12 +1263,13 @@ pub mod unix_shmem {
             pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
-                    #[allow(trivial_numeric_casts, clippy::cast_sign_loss)]
+                    #[allow(trivial_numeric_casts)]
+                    #[expect(clippy::cast_sign_loss)]
                     if ioctl(fd, ASHMEM_GET_SIZE as _) as u32 as usize != map_size {
                         return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
                         ));
-                    };
+                    }
 
                     let map = mmap(
                         ptr::null_mut(),
@@ -1275,7 +1295,6 @@ pub mod unix_shmem {
             }
         }
 
-        #[cfg(unix)]
         impl ShMem for AshmemShMem {
             fn id(&self) -> ShMemId {
                 self.id
@@ -1297,7 +1316,6 @@ pub mod unix_shmem {
         }
 
         /// [`Drop`] implementation for [`AshmemShMem`], which cleans up the mapping.
-        #[cfg(unix)]
         impl Drop for AshmemShMem {
             #[allow(trivial_numeric_casts)]
             fn drop(&mut self) {
@@ -1305,7 +1323,7 @@ pub mod unix_shmem {
                     let fd: i32 = self.id.to_string().parse().unwrap();
 
                     #[allow(trivial_numeric_casts)]
-                    #[allow(clippy::cast_sign_loss)]
+                    #[expect(clippy::cast_sign_loss)]
                     let length = ioctl(fd, ASHMEM_GET_SIZE as _) as u32;
 
                     let ap = ashmem_pin {
@@ -1320,13 +1338,11 @@ pub mod unix_shmem {
         }
 
         /// A [`ShMemProvider`] which uses ashmem to provide shared memory mappings.
-        #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct AshmemShMemProvider {}
 
         unsafe impl Send for AshmemShMemProvider {}
 
-        #[cfg(unix)]
         impl Default for AshmemShMemProvider {
             fn default() -> Self {
                 Self::new().unwrap()
@@ -1334,7 +1350,6 @@ pub mod unix_shmem {
         }
 
         /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
-        #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
             type ShMem = AshmemShMem;
 
@@ -1400,7 +1415,7 @@ pub mod unix_shmem {
                     };
                     let fd = fd.into_raw_fd();
 
-                    #[allow(clippy::cast_possible_wrap)]
+                    #[expect(clippy::cast_possible_wrap)]
                     if ftruncate(fd, map_size as i64) == -1 {
                         close(fd);
                         return Err(Error::last_os_error(format!(
@@ -1438,7 +1453,7 @@ pub mod unix_shmem {
                             "Failed to map the memfd mapping".to_string(),
                         ));
                     }
-                    #[allow(clippy::cast_sign_loss)]
+                    #[expect(clippy::cast_sign_loss)]
                     if stat.st_size as usize != map_size {
                         return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
@@ -1490,7 +1505,6 @@ pub mod unix_shmem {
         /// [`Drop`] implementation for [`MemfdShMem`], which cleans up the mapping.
         #[cfg(unix)]
         impl Drop for MemfdShMem {
-            #[allow(trivial_numeric_casts)]
             fn drop(&mut self) {
                 let fd = i32::from(self.id);
 
@@ -1555,7 +1569,7 @@ pub mod win32_shmem {
     use windows::{
         core::PCSTR,
         Win32::{
-            Foundation::{CloseHandle, BOOL, HANDLE},
+            Foundation::{CloseHandle, HANDLE},
             System::Memory::{
                 CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
                 FILE_MAP_ALL_ACCESS, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
@@ -1630,7 +1644,7 @@ pub mod win32_shmem {
                 // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS.0,
-                    BOOL(0),
+                    false,
                     PCSTR(map_str_bytes.as_ptr().cast_mut()),
                 )?;
 
@@ -1738,15 +1752,15 @@ impl DummyShMemService {
 /// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`] in std environments.
 #[cfg(feature = "std")]
 #[derive(Debug)]
-pub struct ShMemCursor<T: ShMem> {
-    inner: T,
+pub struct ShMemCursor<SHM> {
+    inner: SHM,
     pos: usize,
 }
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-impl<T: ShMem> ShMemCursor<T> {
+impl<SHM> ShMemCursor<SHM> {
     /// Create a new [`ShMemCursor`] around [`ShMem`]
-    pub fn new(shmem: T) -> Self {
+    pub fn new(shmem: SHM) -> Self {
         Self {
             inner: shmem,
             pos: 0,
@@ -1754,14 +1768,20 @@ impl<T: ShMem> ShMemCursor<T> {
     }
 
     /// Slice from the current location on this map to the end, mutable
-    fn empty_slice_mut(&mut self) -> &mut [u8] {
+    fn empty_slice_mut(&mut self) -> &mut [u8]
+    where
+        SHM: DerefMut<Target = [u8]>,
+    {
         use crate::AsSliceMut;
         &mut (self.inner.as_slice_mut()[self.pos..])
     }
 }
 
 #[cfg(all(feature = "std", not(target_os = "haiku")))]
-impl<T: ShMem> Write for ShMemCursor<T> {
+impl<SHM> Write for ShMemCursor<SHM>
+where
+    SHM: DerefMut<Target = [u8]>,
+{
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self.empty_slice_mut().write(buf) {
             Ok(w) => {
@@ -1772,10 +1792,6 @@ impl<T: ShMem> Write for ShMemCursor<T> {
         }
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
     fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
         match self.empty_slice_mut().write_vectored(bufs) {
             Ok(w) => {
@@ -1784,6 +1800,10 @@ impl<T: ShMem> Write for ShMemCursor<T> {
             }
             Err(e) => Err(e),
         }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 
     fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
@@ -1798,7 +1818,10 @@ impl<T: ShMem> Write for ShMemCursor<T> {
 }
 
 #[cfg(feature = "std")]
-impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
+impl<SHM> std::io::Seek for ShMemCursor<SHM>
+where
+    SHM: DerefMut<Target = [u8]>,
+{
     fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
         let effective_new_pos = match pos {
             std::io::SeekFrom::Start(s) => s,

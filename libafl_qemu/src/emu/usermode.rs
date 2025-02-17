@@ -1,15 +1,10 @@
-use libafl::inputs::UsesInput;
 use libafl_qemu_sys::{GuestAddr, MmapPerms, VerifyAccess};
 
-use crate::{command::CommandManager, Emulator, GuestMaps, NopSnapshotManager};
+use crate::{Emulator, GuestMaps, NopSnapshotManager};
 
 pub type StdSnapshotManager = NopSnapshotManager;
 
-impl<CM, ED, ET, S, SM> Emulator<CM, ED, ET, S, SM>
-where
-    CM: CommandManager<ED, ET, S, SM>,
-    S: UsesInput,
-{
+impl<C, CM, ED, ET, I, S, SM> Emulator<C, CM, ED, ET, I, S, SM> {
     /// This function gets the memory mappings from the emulator.
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
@@ -48,6 +43,11 @@ where
     #[must_use]
     pub fn get_brk(&self) -> GuestAddr {
         self.qemu.get_brk()
+    }
+
+    #[must_use]
+    pub fn get_initial_brk(&self) -> GuestAddr {
+        self.qemu.get_initial_brk()
     }
 
     pub fn set_brk(&self, brk: GuestAddr) {

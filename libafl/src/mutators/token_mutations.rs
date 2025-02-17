@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
-    inputs::HasMutatorBytes,
+    inputs::{HasMutatorBytes, ResizableMutator},
     mutators::{
         buffer_self_copy, mutations::buffer_copy, MultiMutator, MutationResult, Mutator, Named,
     },
@@ -36,7 +36,7 @@ use crate::{
 };
 
 /// A state metadata holding a list of tokens
-#[allow(clippy::unsafe_derive_deserialize)]
+#[expect(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Tokens {
     // We keep a vec and a set, set for faster deduplication, vec for access
@@ -145,7 +145,7 @@ impl Tokens {
 
     /// Adds a token to a dictionary, checking it is not a duplicate
     /// Returns `false` if the token was already present and did not get added.
-    #[allow(clippy::ptr_arg)]
+    #[expect(clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
         if !self.tokens_set.insert(token.clone()) {
             return false;
@@ -306,7 +306,7 @@ pub struct TokenInsert;
 impl<I, S> Mutator<I, S> for TokenInsert
 where
     S: HasMetadata + HasRand + HasMaxSize,
-    I: HasMutatorBytes,
+    I: ResizableMutator<u8> + HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -322,7 +322,7 @@ where
         };
         let token_idx = state.rand_mut().below(tokens_len);
 
-        let size = input.bytes().len();
+        let size = input.mutator_bytes().len();
         // # Safety
         // after saturating add it's always above 0
 
@@ -344,8 +344,8 @@ where
 
         input.resize(size + len, 0);
         unsafe {
-            buffer_self_copy(input.bytes_mut(), off, off + len, size - off);
-            buffer_copy(input.bytes_mut(), token, 0, off, len);
+            buffer_self_copy(input.mutator_bytes_mut(), off, off + len, size - off);
+            buffer_copy(input.mutator_bytes_mut(), token, 0, off, len);
         }
 
         Ok(MutationResult::Mutated)
@@ -375,10 +375,10 @@ pub struct TokenReplace;
 impl<I, S> Mutator<I, S> for TokenReplace
 where
     S: HasMetadata + HasRand + HasMaxSize,
-    I: HasMutatorBytes,
+    I: ResizableMutator<u8> + HasMutatorBytes,
 {
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes().len();
+        let size = input.mutator_bytes().len();
         let off = if let Some(nz) = NonZero::new(size) {
             state.rand_mut().below(nz)
         } else {
@@ -405,7 +405,7 @@ where
         }
 
         unsafe {
-            buffer_copy(input.bytes_mut(), token, 0, off, len);
+            buffer_copy(input.mutator_bytes_mut(), token, 0, off, len);
         }
 
         Ok(MutationResult::Mutated)
@@ -435,11 +435,11 @@ pub struct I2SRandReplace;
 impl<I, S> Mutator<I, S> for I2SRandReplace
 where
     S: HasMetadata + HasRand + HasMaxSize,
-    I: HasMutatorBytes,
+    I: ResizableMutator<u8> + HasMutatorBytes,
 {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let size = input.bytes().len();
+        let size = input.mutator_bytes().len();
         let Some(size) = NonZero::new(size) else {
             return Ok(MutationResult::Skipped);
         };
@@ -459,8 +459,8 @@ where
         let idx = state.rand_mut().below(cmps_len);
 
         let off = state.rand_mut().below(size);
-        let len = input.bytes().len();
-        let bytes = input.bytes_mut();
+        let len = input.mutator_bytes().len();
+        let bytes = input.mutator_bytes_mut();
 
         let meta = state.metadata_map().get::<CmpValuesMetadata>().unwrap();
         let cmp_values = &meta.list[idx];
@@ -571,9 +571,9 @@ where
                 'outer: for i in off..len {
                     let mut size = core::cmp::min(v.0.len(), len - i);
                     while size != 0 {
-                        if v.0.as_slice()[0..size] == input.bytes()[i..i + size] {
+                        if v.0.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.bytes_mut(), v.1.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.1.as_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -582,9 +582,9 @@ where
                     }
                     size = core::cmp::min(v.1.len(), len - i);
                     while size != 0 {
-                        if v.1.as_slice()[0..size] == input.bytes()[i..i + size] {
+                        if v.1.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.bytes_mut(), v.0.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.0.as_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -636,11 +636,11 @@ where
 impl<I, S> Mutator<I, S> for I2SRandReplaceBinonly
 where
     S: HasMetadata + HasRand + HasMaxSize,
-    I: HasMutatorBytes,
+    I: ResizableMutator<u8> + HasMutatorBytes,
 {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
-        let Some(size) = NonZero::new(input.bytes().len()) else {
+        let Some(size) = NonZero::new(input.mutator_bytes().len()) else {
             return Ok(MutationResult::Skipped);
         };
         let Some(meta) = state.metadata_map().get::<CmpValuesMetadata>() else {
@@ -654,8 +654,8 @@ where
         let idx = state.rand_mut().below(cmps_len);
 
         let off = state.rand_mut().below(size);
-        let len = input.bytes().len();
-        let bytes = input.bytes_mut();
+        let len = input.mutator_bytes().len();
+        let bytes = input.mutator_bytes_mut();
 
         let meta = state.metadata_map().get::<CmpValuesMetadata>().unwrap();
         let cmp_values = &meta.list[idx];
@@ -779,9 +779,9 @@ where
                 'outer: for i in off..len {
                     let mut size = core::cmp::min(v.0.len(), len - i);
                     while size != 0 {
-                        if v.0.as_slice()[0..size] == input.bytes()[i..i + size] {
+                        if v.0.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.bytes_mut(), v.1.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.1.as_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -790,9 +790,9 @@ where
                     }
                     size = core::cmp::min(v.1.len(), len - i);
                     while size != 0 {
-                        if v.1.as_slice()[0..size] == input.bytes()[i..i + size] {
+                        if v.1.as_slice()[0..size] == input.mutator_bytes()[i..i + size] {
                             unsafe {
-                                buffer_copy(input.bytes_mut(), v.0.as_slice(), 0, i, size);
+                                buffer_copy(input.mutator_bytes_mut(), v.0.as_slice(), 0, i, size);
                             }
                             result = MutationResult::Mutated;
                             break 'outer;
@@ -847,12 +847,13 @@ impl AFLppRedQueen {
     }
 
     /// Cmplog Pattern Matching
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(clippy::too_many_arguments)]
-    #[allow(clippy::too_many_lines)]
-    #[allow(clippy::cast_possible_wrap)]
-    #[allow(clippy::if_not_else)]
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(
+        clippy::cast_sign_loss,
+        clippy::too_many_arguments,
+        clippy::too_many_lines,
+        clippy::cast_possible_wrap,
+        clippy::cast_precision_loss
+    )]
     pub fn cmp_extend_encoding(
         &self,
         pattern: u64,
@@ -1058,7 +1059,7 @@ impl AFLppRedQueen {
                     if buf_16 == pattern as u16 && another_buf_16 == another_pattern as u16 {
                         let mut cloned = buf.to_vec();
                         cloned[buf_idx + 1] = (repl & 0xff) as u8;
-                        cloned[buf_idx] = (repl >> 8 & 0xff) as u8;
+                        cloned[buf_idx] = ((repl >> 8) & 0xff) as u8;
                         vec.push(cloned);
                         return Ok(true);
                     }
@@ -1073,9 +1074,9 @@ impl AFLppRedQueen {
                     if buf_32 == pattern as u32 && another_buf_32 == another_pattern as u32 {
                         let mut cloned = buf.to_vec();
                         cloned[buf_idx + 3] = (repl & 0xff) as u8;
-                        cloned[buf_idx + 2] = (repl >> 8 & 0xff) as u8;
-                        cloned[buf_idx + 1] = (repl >> 16 & 0xff) as u8;
-                        cloned[buf_idx] = (repl >> 24 & 0xff) as u8;
+                        cloned[buf_idx + 2] = ((repl >> 8) & 0xff) as u8;
+                        cloned[buf_idx + 1] = ((repl >> 16) & 0xff) as u8;
+                        cloned[buf_idx] = ((repl >> 24) & 0xff) as u8;
                         vec.push(cloned);
 
                         return Ok(true);
@@ -1092,13 +1093,13 @@ impl AFLppRedQueen {
                         let mut cloned = buf.to_vec();
 
                         cloned[buf_idx + 7] = (repl & 0xff) as u8;
-                        cloned[buf_idx + 6] = (repl >> 8 & 0xff) as u8;
-                        cloned[buf_idx + 5] = (repl >> 16 & 0xff) as u8;
-                        cloned[buf_idx + 4] = (repl >> 24 & 0xff) as u8;
-                        cloned[buf_idx + 3] = (repl >> 32 & 0xff) as u8;
-                        cloned[buf_idx + 2] = (repl >> 32 & 0xff) as u8;
-                        cloned[buf_idx + 1] = (repl >> 40 & 0xff) as u8;
-                        cloned[buf_idx] = (repl >> 48 & 0xff) as u8;
+                        cloned[buf_idx + 6] = ((repl >> 8) & 0xff) as u8;
+                        cloned[buf_idx + 5] = ((repl >> 16) & 0xff) as u8;
+                        cloned[buf_idx + 4] = ((repl >> 24) & 0xff) as u8;
+                        cloned[buf_idx + 3] = ((repl >> 32) & 0xff) as u8;
+                        cloned[buf_idx + 2] = ((repl >> 32) & 0xff) as u8;
+                        cloned[buf_idx + 1] = ((repl >> 40) & 0xff) as u8;
+                        cloned[buf_idx] = ((repl >> 48) & 0xff) as u8;
 
                         vec.push(cloned);
                         return Ok(true);
@@ -1244,7 +1245,7 @@ impl AFLppRedQueen {
     }
 
     /// rtn part from AFL++
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn rtn_extend_encoding(
         &self,
         pattern: &[u8],
@@ -1304,11 +1305,10 @@ impl AFLppRedQueen {
 
 impl<I, S> MultiMutator<I, S> for AFLppRedQueen
 where
-    S: HasMetadata + HasRand + HasMaxSize + HasCorpus + HasCurrentCorpusId,
-    I: HasMutatorBytes + From<Vec<u8>>,
+    S: HasMetadata + HasRand + HasMaxSize + HasCorpus<I> + HasCurrentCorpusId,
+    I: ResizableMutator<u8> + From<Vec<u8>> + HasMutatorBytes,
 {
-    #[allow(clippy::needless_range_loop)]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::needless_range_loop, clippy::too_many_lines)]
     fn multi_mutate(
         &mut self,
         state: &mut S,
@@ -1317,7 +1317,7 @@ where
     ) -> Result<Vec<I>, Error> {
         // TODO
         // handle 128-bits logs
-        let size = input.bytes().len();
+        let size = input.mutator_bytes().len();
         if size == 0 {
             return Ok(vec![]);
         }
@@ -1342,9 +1342,9 @@ where
         let orig_cmpvals = cmp_meta.orig_cmpvals();
         let new_cmpvals = cmp_meta.new_cmpvals();
         let headers = cmp_meta.headers();
-        let input_len = input.bytes().len();
+        let input_len = input.mutator_bytes().len();
         let new_bytes = taint_meta.input_vec();
-        let orig_bytes = input.bytes();
+        let orig_bytes = input.mutator_bytes();
 
         let taint = taint_meta.ranges();
         let mut ret = max_count.map_or_else(Vec::new, Vec::with_capacity);
@@ -1932,7 +1932,7 @@ impl AFLppRedQueen {
         }
     }
 
-    #[allow(clippy::needless_range_loop)]
+    #[expect(clippy::needless_range_loop)]
     fn try_add_autotokens(tokens: &mut Tokens, b: &[u8], shape: usize) {
         let mut cons_ff = 0;
         let mut cons_0 = 0;
@@ -2083,7 +2083,7 @@ fn check_if_text(buf: &[u8], max_len: usize) -> TextType {
     }
     if percent_ascii >= 99 {
         return TextType::Ascii(ascii);
-    };
+    }
     TextType::None
 }
 

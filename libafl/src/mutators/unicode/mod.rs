@@ -10,8 +10,8 @@ use core::{
 use libafl_bolts::{rands::Rand, Error, HasLen, Named};
 
 use crate::{
-    corpus::{Corpus, CorpusId, HasTestcase, Testcase},
-    inputs::{BytesInput, HasMutatorBytes},
+    corpus::{CorpusId, HasTestcase, Testcase},
+    inputs::{BytesInput, HasMutatorBytes, ResizableMutator},
     mutators::{rand_range, MutationResult, Mutator, Tokens},
     nonzero,
     stages::{
@@ -24,9 +24,7 @@ use crate::{
 };
 
 /// Unicode category data, as used by string analysis and mutators.
-#[allow(unused)]
-#[allow(missing_docs)]
-#[allow(clippy::redundant_static_lifetimes)]
+#[expect(missing_docs, clippy::redundant_static_lifetimes)]
 pub mod unicode_categories;
 
 /// Input which contains the context necessary to perform unicode mutations
@@ -34,8 +32,7 @@ pub type UnicodeInput = (BytesInput, UnicodeIdentificationMetadata);
 
 impl<S> MutatedTransform<BytesInput, S> for UnicodeInput
 where
-    S: HasCorpus + HasTestcase,
-    S::Corpus: Corpus<Input = BytesInput>,
+    S: HasCorpus<BytesInput> + HasTestcase<BytesInput>,
 {
     type Post = UnicodeIdentificationMetadata;
 
@@ -52,7 +49,7 @@ where
 
 impl<S> MutatedTransformPost<S> for UnicodeIdentificationMetadata
 where
-    S: HasTestcase,
+    S: HasTestcase<BytesInput>,
 {
     fn post_exec(self, state: &mut S, corpus_id: Option<CorpusId>) -> Result<(), Error> {
         if let Some(corpus_id) = corpus_id {
@@ -236,7 +233,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
 ) -> MutationResult {
     let temp_range = rand_range(state, range.end - range.start, nonzero!(MAX_CHARS));
     let range = (range.start + temp_range.start)..(range.start + temp_range.end);
-    let range = match core::str::from_utf8(&input.0.bytes()[range.clone()]) {
+    let range = match core::str::from_utf8(&input.0.mutator_bytes()[range.clone()]) {
         Ok(_) => range,
         Err(e) => range.start..(range.start + e.valid_up_to()),
     };
@@ -245,7 +242,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     println!(
         "mutating range: {:?} ({:?})",
         range,
-        core::str::from_utf8(&input.0.bytes()[range.clone()])
+        core::str::from_utf8(&input.0.mutator_bytes()[range.clone()])
     );
     if range.start == range.end {
         return MutationResult::Skipped;
@@ -273,7 +270,7 @@ fn rand_replace_range<S: HasRand + HasMaxSize, F: Fn(&mut S) -> char>(
     }
 
     input.0.splice(range, replacement);
-    input.1 = extract_metadata(input.0.bytes());
+    input.1 = extract_metadata(input.0.mutator_bytes());
 
     MutationResult::Mutated
 }
@@ -295,11 +292,11 @@ where
     S: HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.mutator_bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.mutator_bytes();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -357,11 +354,11 @@ where
     S: HasRand + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.mutator_bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.mutator_bytes();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -407,7 +404,7 @@ where
     S: HasRand + HasMaxSize + HasMetadata,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.mutator_bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
@@ -421,7 +418,7 @@ where
 
         let token_idx = state.rand_mut().below(tokens_len);
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.mutator_bytes();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -442,7 +439,7 @@ where
             }
 
             input.0.splice(range, token.iter().copied());
-            input.1 = extract_metadata(input.0.bytes());
+            input.1 = extract_metadata(input.0.mutator_bytes());
             return Ok(MutationResult::Mutated);
         }
 
@@ -466,7 +463,7 @@ where
     S: HasRand + HasMaxSize + HasMetadata,
 {
     fn mutate(&mut self, state: &mut S, input: &mut UnicodeInput) -> Result<MutationResult, Error> {
-        if input.0.bytes().is_empty() {
+        if input.0.mutator_bytes().is_empty() {
             return Ok(MutationResult::Skipped);
         }
 
@@ -480,7 +477,7 @@ where
 
         let token_idx = state.rand_mut().below(tokens_len);
 
-        let bytes = input.0.bytes();
+        let bytes = input.0.mutator_bytes();
         let meta = &input.1;
         if let Some((base, len)) = choose_start(state.rand_mut(), bytes, meta) {
             let substring = core::str::from_utf8(&bytes[base..][..len])?;
@@ -501,7 +498,7 @@ where
             }
 
             input.0.splice(range, token.iter().copied());
-            input.1 = extract_metadata(input.0.bytes());
+            input.1 = extract_metadata(input.0.mutator_bytes());
             return Ok(MutationResult::Mutated);
         }
 
@@ -539,10 +536,13 @@ mod test {
             )?;
 
             for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.bytes());
+                let metadata = extract_metadata(bytes.mutator_bytes());
                 let mut input = (bytes, metadata);
                 let _ = mutator.mutate(&mut state, &mut input);
-                println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
+                println!(
+                    "{:?}",
+                    core::str::from_utf8(input.0.mutator_bytes()).unwrap()
+                );
                 bytes = input.0;
             }
 
@@ -571,10 +571,13 @@ mod test {
             )?;
 
             for _ in 0..(1 << 12) {
-                let metadata = extract_metadata(bytes.bytes());
+                let metadata = extract_metadata(bytes.mutator_bytes());
                 let mut input = (bytes, metadata);
                 let _ = mutator.mutate(&mut state, &mut input);
-                println!("{:?}", core::str::from_utf8(input.0.bytes()).unwrap());
+                println!(
+                    "{:?}",
+                    core::str::from_utf8(input.0.mutator_bytes()).unwrap()
+                );
                 bytes = input.0;
             }
 

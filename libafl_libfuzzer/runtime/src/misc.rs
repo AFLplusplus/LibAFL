@@ -60,7 +60,7 @@ where
                 } else if entry.is_file()
                     && entry
                         .extension()
-                        .map_or(true, |ext| ext != "metadata" && ext != "lafl_lock")
+                        .is_none_or(|ext| ext != "metadata" && ext != "lafl_lock")
                     && !metadata.checked.contains(&entry)
                 {
                     let mut reader = std::io::BufReader::new(std::fs::File::open(&entry)?);

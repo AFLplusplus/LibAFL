@@ -600,7 +600,7 @@ pub(crate) unsafe fn setup_ctrl_handler<T: 'static + CtrlHandler>(
     compiler_fence(Ordering::SeqCst);
 
     // Log the result of SetConsoleCtrlHandler
-    let result = SetConsoleCtrlHandler(Some(ctrl_handler), true);
+    let result = SetConsoleCtrlHandler(Some(Some(ctrl_handler)), true);
     match result {
         Ok(()) => {
             log::info!("SetConsoleCtrlHandler succeeded");

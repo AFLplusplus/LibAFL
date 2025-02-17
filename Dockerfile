@@ -14,9 +14,9 @@ ENV SCCACHE_DIR=$HOME/.cache/sccache
 ENV RUSTC_WRAPPER="/usr/local/cargo/bin/sccache"
 ENV IS_DOCKER="1"
 RUN sh -c 'echo set encoding=utf-8 > /root/.vimrc' \
-    echo "export PS1='"'[LibAFL \h] \w$(__git_ps1) \$ '"'" >> ~/.bashrc && \
-    mkdir ~/.cargo && \
-    echo "[build]\nrustc-wrapper = \"${RUSTC_WRAPPER}\"" >> ~/.cargo/config
+  echo "export PS1='"'[LibAFL \h] \w$(__git_ps1) \$ '"'" >> ~/.bashrc && \
+  mkdir ~/.cargo && \
+  echo "[build]\nrustc-wrapper = \"${RUSTC_WRAPPER}\"" >> ~/.cargo/config
 
 RUN rustup default nightly
 RUN rustup component add rustfmt clippy
@@ -25,9 +25,9 @@ RUN rustup component add rustfmt clippy
 ENV LLVM_VERSION=18
 RUN apt update && apt install -y build-essential gdb git wget python3-venv ninja-build lsb-release software-properties-common gnupg cmake
 RUN set -ex &&\
-    wget https://apt.llvm.org/llvm.sh &&\
-    chmod +x llvm.sh &&\
-    ./llvm.sh ${LLVM_VERSION}
+  wget https://apt.llvm.org/llvm.sh &&\
+  chmod +x llvm.sh &&\
+  ./llvm.sh ${LLVM_VERSION}
 
 
 # Copy a dummy.rs and Cargo.toml first, so that dependencies are cached
@@ -54,6 +54,9 @@ COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
 COPY libafl_intelpt/Cargo.toml libafl_intelpt/README.md libafl_intelpt/
 COPY scripts/dummy.rs libafl_intelpt/src/lib.rs
+
+COPY libafl_unicorn/Cargo.toml libafl_unicorn/
+COPY scripts/dummy.rs libafl_unicorn/src/lib.rs
 
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/build_linux.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
@@ -149,6 +152,8 @@ COPY libafl_libfuzzer/build.rs libafl_libfuzzer/build.rs
 RUN touch libafl_libfuzzer/src/lib.rs
 COPY libafl_intelpt/src libafl_intelpt/src
 RUN touch libafl_intelpt/src/lib.rs
+COPY libafl_unicorn/src libafl_unicorn/src
+RUN touch libafl_unicorn/src/lib.rs
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over

@@ -61,7 +61,6 @@
 #include "llvm/Support/ScopedPrinter.h"
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/Support/Debug.h>
-#include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Utils/ASanStackFrameLayout.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Local.h"
@@ -774,13 +773,12 @@ llvmGetPassPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "DDGInstrPass", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
-
-#if LLVM_VERSION_MAJOR <= 13
-            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
-#endif
             PB.registerOptimizerLastEPCallback(
-                [](ModulePassManager &MPM, OptimizationLevel OL) {
-                  MPM.addPass(DDGInstrModulePass());
-                });
+                [](ModulePassManager &MPM, OptimizationLevel OL
+#if LLVM_VERSION_MAJOR >= 20
+                   ,
+                   ThinOrFullLTOPhase Phase
+#endif
+                ) { MPM.addPass(DDGInstrModulePass()); });
           }};
 }

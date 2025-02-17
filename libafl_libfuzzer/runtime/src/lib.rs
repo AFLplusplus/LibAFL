@@ -107,7 +107,7 @@ mod harness_wrap {
 
 pub(crate) use harness_wrap::libafl_libfuzzer_test_one_input;
 
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 struct CustomMutationStatus {
     std_mutational: bool,
     std_no_mutate: bool,
@@ -151,12 +151,13 @@ macro_rules! fuzz_with {
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
             feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
-            inputs::{BytesInput, HasTargetBytes},
+            inputs::{BytesInput, HasTargetBytes, GeneralizedInputMetadata},
             mutators::{
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
                 I2SRandReplace, StdScheduledMutator, UnicodeCategoryRandMutator, UnicodeSubcategoryRandMutator,
-                UnicodeCategoryTokenReplaceMutator, UnicodeSubcategoryTokenReplaceMutator, Tokens, tokens_mutations
+                UnicodeCategoryTokenReplaceMutator, UnicodeSubcategoryTokenReplaceMutator, Tokens, tokens_mutations,
+                UnicodeInput,
             },
             observers::{stacktrace::BacktraceObserver, TimeObserver, CanTrack},
             schedulers::{
@@ -173,7 +174,6 @@ macro_rules! fuzz_with {
         use libafl_bolts::nonzero;
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf};
-        use core::num::NonZeroUsize;
         use crate::{
             CustomMutationStatus,
             corpus::{ArtifactCorpus, LibfuzzerCorpus},
@@ -319,8 +319,8 @@ macro_rules! fuzz_with {
                     UnicodeSubcategoryTokenReplaceMutator,
                 )
             );
-            let unicode_power = StdMutationalStage::transforming(unicode_mutator);
-            let unicode_replace_power = StdMutationalStage::transforming(unicode_replace_mutator);
+            let unicode_power = StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(unicode_mutator);
+            let unicode_replace_power = StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(unicode_replace_mutator);
 
             let unicode_analysis = UnicodeIdentificationStage::new();
             let unicode_analysis = IfStage::new(|_, _, _, _| Ok((unicode_used && mutator_status.std_mutational).into()), tuple_list!(unicode_analysis, unicode_power, unicode_replace_power));
@@ -356,7 +356,7 @@ macro_rules! fuzz_with {
             // TODO configure with mutation stacking options from libfuzzer
             let std_mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-            let std_power: StdPowerMutationalStage<_, _, BytesInput, _, _> = StdPowerMutationalStage::new(std_mutator);
+            let std_power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> = StdPowerMutationalStage::new(std_mutator);
             let std_power = IfStage::new(|_, _, _, _| Ok(mutator_status.std_mutational.into()), (std_power, ()));
 
             // for custom mutator and crossover, each have access to the LLVMFuzzerMutate -- but it appears
@@ -378,7 +378,7 @@ macro_rules! fuzz_with {
             // Safe to unwrap: stack pow is not 0.
             let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(),3);
 
-            let cm_power: StdPowerMutationalStage<_, _, BytesInput, _, _> = StdPowerMutationalStage::new(custom_mutator);
+            let cm_power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> = StdPowerMutationalStage::new(custom_mutator);
             let cm_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_mutation.into()), (cm_power, ()));
             let cm_std_power = StdMutationalStage::new(std_mutator_no_mutate);
             let cm_std_power =
@@ -398,7 +398,7 @@ macro_rules! fuzz_with {
 
             let cc_power = StdMutationalStage::new(custom_crossover);
             let cc_power = IfStage::new(|_, _, _, _| Ok(mutator_status.custom_crossover.into()), (cc_power, ()));
-            let cc_std_power: StdPowerMutationalStage<_, _, BytesInput, _, _> = StdPowerMutationalStage::new(std_mutator_no_crossover);
+            let cc_std_power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> = StdPowerMutationalStage::new(std_mutator_no_crossover);
             let cc_std_power =
                 IfStage::new(|_, _, _, _| Ok(mutator_status.std_no_crossover.into()), (cc_std_power, ()));
 
@@ -414,7 +414,7 @@ macro_rules! fuzz_with {
                 ),
                 3,
             );
-            let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::transforming(grimoire_mutator), ()));
+            let grimoire = IfStage::new(|_, _, _, _| Ok(grimoire.into()), (StdMutationalStage::<_, _, GeneralizedInputMetadata, BytesInput, _, _, _>::transforming(grimoire_mutator), ()));
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()));
@@ -512,11 +512,9 @@ macro_rules! fuzz_with {
                 grimoire,
             );
 
-            #[allow(clippy::unnecessary_mut_passed)] // the functions may not require these many `mut`s
             $operation(&$options, &mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
         };
 
-        #[allow(clippy::redundant_closure_call)]
         $and_then(closure)
     }};
 
@@ -592,7 +590,7 @@ pub const STDERR_FD_VAR: &str = "_LIBAFL_LIBFUZZER_STDERR_FD";
 /// Will dereference all parameters.
 /// This will then call the (potentially unsafe) harness.
 /// The fuzzer itself should catch any side effects and, hence be reasonably safe, if the `harness_fn` parameter is correct.
-#[allow(non_snake_case, clippy::similar_names, clippy::missing_safety_doc)]
+#[expect(clippy::similar_names)]
 #[no_mangle]
 pub unsafe extern "C" fn LLVMFuzzerRunDriver(
     argc: *mut c_int,

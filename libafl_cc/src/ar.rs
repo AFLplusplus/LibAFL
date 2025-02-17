@@ -5,8 +5,10 @@ use std::{env, path::PathBuf, str::FromStr};
 
 use crate::{Error, ToolWrapper, LIB_EXT, LIB_PREFIX};
 
+include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
+
 /// Wrap Clang
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct ArWrapper {
     is_silent: bool,
@@ -21,9 +23,8 @@ pub struct ArWrapper {
     base_args: Vec<String>,
 }
 
-#[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
+#[expect(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl ToolWrapper for ArWrapper {
-    #[allow(clippy::too_many_lines)]
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>,
@@ -101,7 +102,7 @@ impl ToolWrapper for ArWrapper {
                     }
                 }
                 _ => (),
-            };
+            }
             new_args.push(args[i].as_ref().to_string());
             i += 1;
         }
@@ -185,11 +186,7 @@ impl ToolWrapper for ArWrapper {
             })
             .collect::<Vec<_>>();
 
-        let Ok(ar_path) = env::var("LLVM_AR_PATH") else {
-            panic!("Couldn't find llvm-ar. Specify the `LLVM_AR_PATH` environment variable");
-        };
-
-        args.push(ar_path);
+        args.push(LLVM_AR_PATH.to_string());
 
         args.extend_from_slice(base_args.as_slice());
 

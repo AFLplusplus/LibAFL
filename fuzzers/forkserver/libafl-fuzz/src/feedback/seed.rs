@@ -13,7 +13,7 @@ use crate::Opt;
 /// A wrapper feedback used to determine actions for initial seeds.
 /// Handles `AFL_EXIT_ON_SEED_ISSUES`, `AFL_IGNORE_SEED_ISSUES` & default afl-fuzz behavior
 /// then, essentially becomes benign
-#[allow(clippy::module_name_repetitions, clippy::struct_excessive_bools)]
+#[expect(clippy::module_name_repetitions, clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct SeedFeedback<A, S> {
     /// Inner [`Feedback`]

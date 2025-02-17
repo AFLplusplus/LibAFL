@@ -2,7 +2,6 @@ use std::env;
 
 use libafl_cc::{ClangWrapper, CompilerWrapper, ToolWrapper};
 
-#[allow(clippy::missing_panics_doc)]
 pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
@@ -19,7 +18,8 @@ pub fn main() {
 
         let mut cc = ClangWrapper::new();
         if let Some(code) = cc
-            .cpp(is_cpp)
+            .cpp(true) // Link with C++ standard library (Frida links to it in order to hook C++ functions)
+            // .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
             .parse_args(&args)

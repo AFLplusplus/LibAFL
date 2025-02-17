@@ -6,18 +6,11 @@
 //! going to make it compilable only for Windows, don't forget to modify the
 //! `scripts/test_fuzzer.sh` to opt-out this fuzzer from that test.
 
-#[cfg(unix)]
 use mimalloc::MiMalloc;
-#[cfg(unix)]
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
-#[cfg(windows)]
-use dlmalloc::GlobalDlmalloc;
-#[cfg(windows)]
-#[global_allocator]
-static GLOBAL: GlobalDlmalloc = GlobalDlmalloc;
 
-use std::path::PathBuf;
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use frida_gum::Gum;
 use libafl::{
@@ -57,6 +50,7 @@ use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
     executor::FridaInProcessExecutor,
+    frida_helper_shutdown_observer::FridaHelperObserver,
     helper::FridaInstrumentationHelper,
 };
 use libafl_targets::cmplog::CmpLogObserver;
@@ -77,7 +71,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{s}"));
@@ -85,7 +79,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
     let shmem_provider = StdShMemProvider::new()?;
 
     let mut run_client = |state: Option<_>,
-                          mgr: LlmpRestartingEventManager<_, _, _>,
+                          mgr: LlmpRestartingEventManager<_, _, _, _, _>,
                           client_description: ClientDescription| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
@@ -105,20 +99,23 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         if options.asan && options.asan_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
                 let asan = AsanRuntime::new(options);
 
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, asan));
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage, asan),
+                )));
                 //
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -127,6 +124,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let time_observer = TimeObserver::new("time");
 
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -187,7 +186,12 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer,);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer,
+                );
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -200,7 +204,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         &mut mgr,
                         options.timeout,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset
@@ -221,20 +225,22 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             })(state, mgr, client_description)
         } else if options.cmplog && options.cmplog_cores.contains(client_description.core_id()) {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
-
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage, cmplog));
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage, cmplog),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -242,6 +248,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -301,7 +308,12 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -313,7 +325,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         &mut state,
                         &mut mgr,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset
@@ -351,19 +363,22 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             })(state, mgr, client_description)
         } else {
             (|state: Option<_>,
-              mut mgr: LlmpRestartingEventManager<_, _, _>,
+              mut mgr: LlmpRestartingEventManager<_, _, _, _, _>,
               _client_description| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
 
-                let mut frida_helper =
-                    FridaInstrumentationHelper::new(&gum, options, tuple_list!(coverage));
+                let frida_helper = Rc::new(RefCell::new(FridaInstrumentationHelper::new(
+                    &gum,
+                    options,
+                    tuple_list!(coverage),
+                )));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(StdMapObserver::from_mut_ptr(
                     "edges",
-                    frida_helper.map_mut_ptr().unwrap(),
+                    frida_helper.borrow_mut().map_mut_ptr().unwrap(),
                     MAP_SIZE,
                 ))
                 .track_indices();
@@ -372,6 +387,8 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 let time_observer = TimeObserver::new("time");
 
                 let asan_observer = AsanErrorsObserver::from_static_asan_errors();
+
+                let frida_helper_observer = FridaHelperObserver::new(Rc::clone(&frida_helper));
 
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
@@ -431,7 +448,12 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-                let observers = tuple_list!(edges_observer, time_observer, asan_observer);
+                let observers = tuple_list!(
+                    frida_helper_observer,
+                    edges_observer,
+                    time_observer,
+                    asan_observer
+                );
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -444,7 +466,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
                         &mut mgr,
                         options.timeout,
                     )?,
-                    &mut frida_helper,
+                    Rc::clone(&frida_helper),
                 );
 
                 // In case the corpus is empty (on first run), reset

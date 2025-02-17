@@ -1,24 +1,97 @@
 use std::{
-    intrinsics::copy_nonoverlapping, mem::MaybeUninit, slice::from_raw_parts_mut,
+    ffi::c_void, mem::MaybeUninit, ops::Range, ptr::copy_nonoverlapping, slice::from_raw_parts_mut,
     str::from_utf8_unchecked_mut,
 };
 
+use libafl_bolts::os::unix_signals::Signal;
 use libafl_qemu_sys::{
-    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk, libafl_load_addr,
-    libafl_maps_first, libafl_maps_next, libafl_qemu_run, libafl_set_brk, mmap_next_start,
-    pageflags_get_root, read_self_maps, GuestAddr, GuestUsize, IntervalTreeNode, IntervalTreeRoot,
-    MapInfo, MmapPerms, VerifyAccess,
+    exec_path, free_self_maps, guest_base, libafl_force_dfl, libafl_get_brk,
+    libafl_get_initial_brk, libafl_load_addr, libafl_maps_first, libafl_maps_next, libafl_qemu_run,
+    libafl_set_brk, mmap_next_start, pageflags_get_root, read_self_maps, GuestAddr, GuestUsize,
+    IntervalTreeNode, IntervalTreeRoot, MapInfo, MmapPerms, VerifyAccess,
 };
-use libc::{c_int, c_uchar, strlen};
+use libc::{c_int, c_uchar, siginfo_t, strlen};
 #[cfg(feature = "python")]
 use pyo3::{pyclass, pymethods, IntoPyObject, Py, PyRef, PyRefMut, Python};
 
-use crate::{Qemu, CPU};
+use crate::{qemu::QEMU_IS_RUNNING, Qemu, CPU};
+
+pub struct QemuMappingsViewer<'a> {
+    qemu: &'a Qemu,
+    mappings: Vec<MapInfo>,
+}
+
+impl<'a> QemuMappingsViewer<'a> {
+    /// Capture the memory mappings of Qemu at the moment when we create this object
+    /// Thus if qemu make updates to the mappings, they won't be reflected to this object.
+    #[must_use]
+    pub fn new(qemu: &'a Qemu) -> Self {
+        let mut mappings: Vec<MapInfo> = vec![];
+        for m in qemu.mappings() {
+            mappings.push(m);
+        }
+        Self { qemu, mappings }
+    }
+
+    /// Update the mappings
+    pub fn update(&mut self) {
+        let mut mappings: Vec<MapInfo> = vec![];
+        for m in self.qemu.mappings() {
+            mappings.push(m);
+        }
+        self.mappings = mappings;
+    }
+
+    #[must_use]
+    pub fn mappings(&self) -> &[MapInfo] {
+        &self.mappings
+    }
+}
+
+impl core::fmt::Debug for QemuMappingsViewer<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for m in &self.mappings {
+            let flags = format!("Flags: {:?}", m.flags());
+            let padded = format!("{flags:<20}");
+            writeln!(
+                f,
+                "Mapping: 0x{:016x}-0x{:016x}, {:>10} IsPriv: {:?} Path: {}",
+                m.start(),
+                m.end(),
+                padded,
+                m.is_priv(),
+                m.path().unwrap_or(&"<EMPTY>".to_string())
+            )?;
+        }
+        Ok(())
+    }
+}
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
     self_maps_root: *mut IntervalTreeRoot,
     pageflags_node: *mut IntervalTreeNode,
+}
+
+/// Information about the image loaded by QEMU.
+pub struct ImageInfo {
+    pub code: Range<GuestAddr>,
+    pub data: Range<GuestAddr>,
+    pub stack: Range<GuestAddr>,
+    pub vdso: GuestAddr,
+    pub entry: GuestAddr,
+    pub brk: GuestAddr,
+    pub alignment: GuestAddr,
+    pub exec_stack: bool,
+}
+
+pub enum QemuSignalContext {
+    /// We are not in QEMU's signal handler, no signal is being propagated.
+    OutOfQemuSignalHandler,
+    /// We are propagating a host signal from QEMU signal handler.
+    InQemuSignalHandlerHost,
+    /// We are propagating a target signal from QEMU signal handler
+    InQemuSignalHandlerTarget,
 }
 
 // Consider a private new only for Emulator
@@ -40,7 +113,6 @@ impl GuestMaps {
 impl Iterator for GuestMaps {
     type Item = MapInfo;
 
-    #[allow(clippy::uninit_assumed_init)]
     fn next(&mut self) -> Option<Self::Item> {
         unsafe {
             let mut ret = MaybeUninit::uninit();
@@ -123,11 +195,38 @@ impl CPU {
     }
 }
 
-#[allow(clippy::unused_self)]
+#[expect(clippy::unused_self)]
 impl Qemu {
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
         GuestMaps::new()
+    }
+
+    #[must_use]
+    pub fn image_info(&self) -> ImageInfo {
+        // # Safety
+        // Safe because QEMU has been correctly initialized since it takes self as parameter.
+        let image_info = unsafe { *libafl_qemu_sys::libafl_get_image_info() };
+
+        let code_start = image_info.start_code;
+        let code_end = image_info.end_code;
+
+        let data_start = image_info.start_data;
+        let data_end = image_info.end_data;
+
+        let stack_start = image_info.stack_limit;
+        let stack_end = image_info.start_stack;
+
+        ImageInfo {
+            code: code_start..code_end,
+            data: data_start..data_end,
+            stack: stack_start..stack_end,
+            vdso: image_info.vdso,
+            entry: image_info.entry,
+            brk: image_info.brk,
+            alignment: image_info.alignment,
+            exec_stack: image_info.exec_stack,
+        }
     }
 
     #[must_use]
@@ -177,6 +276,11 @@ impl Qemu {
         unsafe { libafl_get_brk() as GuestAddr }
     }
 
+    #[must_use]
+    pub fn get_initial_brk(&self) -> GuestAddr {
+        unsafe { libafl_get_initial_brk() as GuestAddr }
+    }
+
     pub fn set_brk(&self, brk: GuestAddr) {
         unsafe { libafl_set_brk(brk.into()) };
     }
@@ -190,7 +294,7 @@ impl Qemu {
         unsafe { mmap_next_start = start };
     }
 
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     fn mmap(
         self,
         addr: GuestAddr,
@@ -253,6 +357,54 @@ impl Qemu {
             Err(format!("Failed to unmap {addr}"))
         }
     }
+
+    #[must_use]
+    pub fn signal_ctx(&self) -> QemuSignalContext {
+        unsafe {
+            let qemu_signal_ctx = *libafl_qemu_sys::libafl_qemu_signal_context();
+
+            if qemu_signal_ctx.in_qemu_sig_hdlr {
+                if qemu_signal_ctx.is_target_signal {
+                    QemuSignalContext::InQemuSignalHandlerTarget
+                } else {
+                    QemuSignalContext::InQemuSignalHandlerHost
+                }
+            } else {
+                QemuSignalContext::OutOfQemuSignalHandler
+            }
+        }
+    }
+
+    /// Runs QEMU signal's handler
+    /// If it is already running, returns true.
+    /// In that case, it would most likely mean we are in a signal loop.
+    ///
+    /// # Safety
+    ///
+    /// Run QEMU's native signal handler.
+    ///
+    /// Needlessly to say, it should be used very carefully.
+    /// It will run QEMU's signal handler, and maybe propagate new signals.
+    pub(crate) unsafe fn run_signal_handler(
+        &self,
+        host_sig: c_int,
+        info: *mut siginfo_t,
+        puc: *mut c_void,
+    ) {
+        libafl_qemu_sys::libafl_qemu_native_signal_handler(host_sig, info, puc);
+    }
+
+    /// Emulate a signal coming from the target
+    ///
+    /// # Safety
+    ///
+    /// This may raise a signal to host. Some signals could have a funky behaviour.
+    /// SIGSEGV is safe to use.
+    pub unsafe fn target_signal(&self, signal: Signal) {
+        QEMU_IS_RUNNING = true;
+        libafl_qemu_sys::libafl_set_in_target_signal_ctx();
+        libc::raise(signal.into());
+    }
 }
 
 #[cfg(feature = "python")]
@@ -282,7 +434,7 @@ pub mod pybind {
         a6: u64,
         a7: u64,
     ) -> SyscallHookResult {
-        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+        unsafe { (&raw const PY_SYSCALL_HOOK).read() }.map_or_else(
             || SyscallHookResult::new(None),
             |obj| {
                 let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);

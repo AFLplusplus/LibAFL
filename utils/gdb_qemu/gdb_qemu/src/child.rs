@@ -1,10 +1,12 @@
-use {
-    crate::{args::ChildArgs, exit::Exit},
-    anyhow::{anyhow, Result},
-    nix::unistd::{dup2, execvp},
-    std::ffi::CString,
-    std::os::fd::{AsRawFd, RawFd},
+use std::{
+    ffi::CString,
+    os::fd::{AsRawFd, RawFd},
 };
+
+use anyhow::{anyhow, Result};
+use nix::unistd::{dup2, execvp};
+
+use crate::{args::ChildArgs, exit::Exit};
 
 pub struct Child {
     argv: Vec<String>,

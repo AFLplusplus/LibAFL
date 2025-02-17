@@ -1,0 +1,29 @@
+import "../../just/libafl.just"
+FUZZER_NAME := ""
+
+clean:
+    cargo clean
+
+format:
+    cargo fmt -- --emit=files
+
+demo: format
+    cargo build -p noaslr_demo --profile {{PROFILE}}
+
+run_demo: demo
+    cargo run -p noaslr_demo
+
+build: format
+    cargo build -p noaslr --profile {{PROFILE}}
+
+buildlib: format
+    cargo build -p libnoaslr --profile {{PROFILE}}
+
+run: demo
+    cargo run -p noaslr --profile {{PROFILE}} -- {{BUILD_DIR}}/demo -- -f /proc/self/maps -- test
+
+
+runlib: demo buildlib
+    LD_PRELOAD={{BUILD_DIR}}/libnoaslr.so cargo run -p noaslr_demo --profile {{PROFILE}} -- -f /proc/self/maps -- test
+
+all: demo build buildlib

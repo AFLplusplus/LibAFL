@@ -29,8 +29,8 @@ LibAFL is fast, multi-platform, no_std compatible, and scales over cores and mac
 - **LLVM tools**
     - The LLVM tools (including clang, clang++) are needed (newer than LLVM 15.0.0 up to LLVM 18.1.3) If you are using Debian/Ubuntu, again, we highly recommmend that you install the package from [here](https://apt.llvm.org/)
     - (In `libafl_concolic`, we only support LLVM version newer than 18)
-- Cargo-make:
-    - We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with `cargo install cargo-make`
+- Just:
+    - We use [just](https://github.com/casey/just) to build the fuzzers in `fuzzers/` directory. You can find instructions to install it in your environment [in the Just Programmer's Manual](https://just.systems/man/en/packages.html).
  
 #### Clone the LibAFL repository with
 ```sh
@@ -52,9 +52,9 @@ cd docs && mdbook serve
 We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*
 ```sh
-cargo make run
+just run
 ```
-You can run each example fuzzer with this following command, as long as the fuzzer directory has `Makefile.toml` file. The best-tested fuzzer is [`./fuzzers/inprocess/libfuzzer_libpng`](./fuzzers/inprocess/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
+You can run each example fuzzer with this following command, as long as the fuzzer directory has a `Justfile` file. The best-tested fuzzer is [`./fuzzers/inprocess/libfuzzer_libpng`](./fuzzers/inprocess/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
 
 ### Resources 
 - [Installation guide](./docs/src/getting_started/setup.md)
@@ -78,7 +78,13 @@ LibAFL is written and maintained by
  * [Addison Crump](https://github.com/addisoncrump) <me@addisoncrump.info>
  * [Romain Malmain](https://github.com/rmalmain) <rmalmain@pm.me>
 
-Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for the contributing guideline.
+## Contributing
+
+Please check out **[CONTRIBUTING.md](CONTRIBUTING.md)** for the contributing guideline.
+
+## Debugging
+
+Your fuzzer doesn't work as expected? Try reading [DEBUGGING.md](./docs/src/DEBUGGING.md) to understand how to debug your problems.
 
 ## Cite
 If you use LibAFL for your academic work, please cite the following paper:

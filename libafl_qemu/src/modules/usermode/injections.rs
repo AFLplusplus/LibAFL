@@ -14,7 +14,7 @@
 use std::{ffi::CStr, fmt::Display, fs, os::raw::c_char, path::Path};
 
 use hashbrown::HashMap;
-use libafl::{inputs::UsesInput, Error};
+use libafl::Error;
 use libafl_qemu_sys::GuestAddr;
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +23,10 @@ use crate::SYS_execve;
 use crate::{
     elf::EasyElf,
     emu::EmulatorModules,
-    modules::{EmulatorModule, EmulatorModuleTuple, NopAddressFilter, NOP_ADDRESS_FILTER},
+    modules::{
+        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
+        EmulatorModule, EmulatorModuleTuple,
+    },
     qemu::{ArchExtras, Hook, SyscallHookResult},
     CallingConvention, Qemu,
 };
@@ -31,6 +34,7 @@ use crate::{
 #[cfg(cpu_target = "hexagon")]
 /// Hexagon syscalls are not currently supported by the `syscalls` crate, so we just paste this here for now.
 /// <https://github.com/qemu/qemu/blob/11be70677c70fdccd452a3233653949b79e97908/linux-user/hexagon/syscall_nr.h#L230>
+#[expect(non_upper_case_globals)]
 const SYS_execve: u8 = 221;
 
 /// Parses `injections.yaml`
@@ -211,12 +215,16 @@ impl InjectionModule {
         })
     }
 
-    fn on_call_check<ET, S>(emulator_modules: &mut EmulatorModules<ET, S>, id: usize, parameter: u8)
-    where
-        ET: EmulatorModuleTuple<S>,
-        S: Unpin + UsesInput,
+    fn on_call_check<ET, I, S>(
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        id: usize,
+        parameter: u8,
+    ) where
+        ET: EmulatorModuleTuple<I, S>,
+        I: Unpin,
+        S: Unpin,
     {
-        let qemu = emulator_modules.qemu();
         let reg: GuestAddr = qemu
             .current_cpu()
             .unwrap()
@@ -256,24 +264,26 @@ impl InjectionModule {
     }
 }
 
-impl<S> EmulatorModule<S> for InjectionModule
+impl<I, S> EmulatorModule<I, S> for InjectionModule
 where
-    S: Unpin + UsesInput,
+    I: Unpin,
+    S: Unpin,
 {
-    type ModuleAddressFilter = NopAddressFilter;
-
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
-        emulator_modules.syscalls(Hook::Function(syscall_hook::<ET, S>));
+        emulator_modules.pre_syscalls(Hook::Function(syscall_hook::<ET, I, S>));
     }
 
-    fn first_exec<ET>(&mut self, emulator_modules: &mut EmulatorModules<ET, S>, _state: &mut S)
-    where
-        ET: EmulatorModuleTuple<S>,
+    fn first_exec<ET>(
+        &mut self,
+        qemu: Qemu,
+        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _state: &mut S,
+    ) where
+        ET: EmulatorModuleTuple<I, S>,
     {
-        let qemu = emulator_modules.qemu();
         let mut libs: Vec<LibInfo> = Vec::new();
 
         for region in qemu.mappings() {
@@ -324,8 +334,8 @@ where
                 for hook_addr in hook_addrs {
                     emulator_modules.instructions(
                         hook_addr,
-                        Hook::Closure(Box::new(move |hooks, _state, _guest_addr| {
-                            Self::on_call_check(hooks, id, param);
+                        Hook::Closure(Box::new(move |qemu, hooks, _state, _guest_addr| {
+                            Self::on_call_check(qemu, hooks, id, param);
                         })),
                         true,
                     );
@@ -333,6 +343,10 @@ where
             }
         }
     }
+}
+
+impl HasAddressFilter for InjectionModule {
+    type ModuleAddressFilter = NopAddressFilter;
 
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &NopAddressFilter
@@ -343,10 +357,12 @@ where
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn syscall_hook<ET, S>(
+#[expect(clippy::too_many_arguments)]
+#[allow(clippy::needless_pass_by_value)] // no longer a problem with nightly
+fn syscall_hook<ET, I, S>(
     // Our instantiated [`EmulatorModules`]
-    emulator_modules: &mut EmulatorModules<ET, S>,
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     // Syscall number
     syscall: i32,
@@ -361,8 +377,9 @@ fn syscall_hook<ET, S>(
     _x7: GuestAddr,
 ) -> SyscallHookResult
 where
-    ET: EmulatorModuleTuple<S>,
-    S: Unpin + UsesInput,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     log::trace!("syscall_hook {syscall} {SYS_execve}");
     debug_assert!(i32::try_from(SYS_execve).is_ok());

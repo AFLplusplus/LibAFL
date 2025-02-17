@@ -12,8 +12,9 @@ run_clippy() {
    local dir="$1"
    local features="$2"
    echo "Running Clippy on $dir"
+   echo "$CLIPPY_CMD ${features:+"$features"} -- $RUSTC_FLAGS"
    pushd "$dir" || return 1
-
+   
    eval "$CLIPPY_CMD ${features:+"$features"} -- $RUSTC_FLAGS"
 
    popd || return 1
@@ -22,10 +23,14 @@ run_clippy() {
 # Define projects based on the operating system
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
    ALL_PROJECTS=(
+      "libafl_bolts"
+      "libafl_cc"
       "libafl_concolic/symcc_runtime"
       "libafl_concolic/symcc_libafl"
       "libafl_frida"
       "libafl_libfuzzer"
+      "libafl_libfuzzer_runtime"
+      "libafl_intelpt"
       "libafl_nyx"
       "libafl_qemu"
       "libafl_tinyinst"
@@ -59,7 +64,7 @@ for project in "${PROJECTS[@]}"; do
       features="--features=clippy"
    fi
    if [ -d "$project" ]; then
-      run_clippy "$project" $features
+      run_clippy "$project" "$features"
    else
       echo "Warning: Directory $project does not exist. Skipping."
    fi

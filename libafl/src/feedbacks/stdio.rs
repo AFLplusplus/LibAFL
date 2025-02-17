@@ -19,8 +19,7 @@ use crate::{
 /// Metadata for [`StdOutToMetadataFeedback`].
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdOutMetadata {
-    #[allow(missing_docs)]
-    pub stdout: String,
+    stdout: String,
 }
 
 impl_serdeany!(StdOutMetadata);
@@ -47,7 +46,7 @@ impl StdOutToMetadataFeedback {
             .get(&self.o_ref)
             .ok_or(Error::illegal_state("StdOutObserver is missing"))?;
         let buffer = observer
-            .stdout
+            .output
             .as_ref()
             .ok_or(Error::illegal_state("StdOutObserver has no stdout"))?;
         let stdout = String::from_utf8_lossy(buffer).into_owned();
@@ -104,8 +103,7 @@ impl StdOutToMetadataFeedback {
 /// Metadata for [`StdErrToMetadataFeedback`].
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StdErrMetadata {
-    #[allow(missing_docs)]
-    pub stderr: String,
+    stderr: String,
 }
 
 impl_serdeany!(StdErrMetadata);
@@ -141,7 +139,7 @@ where
             .get(&self.o_ref)
             .ok_or(Error::illegal_state("StdErrObserver is missing"))?;
         let buffer = observer
-            .stderr
+            .output
             .as_ref()
             .ok_or(Error::illegal_state("StdErrObserver has no stderr"))?;
         let stderr = String::from_utf8_lossy(buffer).into_owned();

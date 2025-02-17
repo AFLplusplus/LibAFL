@@ -7,11 +7,12 @@ use libafl::{
     events::SimpleEventManager,
     executors::{
         command::{CommandConfigurator, PTraceCommandConfigurator},
-        hooks::intel_pt::{IntelPTHook, Section},
+        hooks::intel_pt::{IntelPTHook, SectionInfo},
     },
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
+    inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
@@ -25,7 +26,8 @@ use libafl_intelpt::{IntelPT, PAGE_SIZE};
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-#[allow(static_mut_refs)]
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+#[allow(static_mut_refs)] // only a problem in nightly
 static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
 pub fn main() {
@@ -36,7 +38,10 @@ pub fn main() {
     // Enable logging
     env_logger::init();
 
+    // path of the program we want to fuzz
     let target_path = PathBuf::from(env::args().next().unwrap())
+        .parent()
+        .unwrap()
         .parent()
         .unwrap()
         .join("target_program");
@@ -100,9 +105,9 @@ pub fn main() {
         .build()
         .unwrap();
 
-    let sections = [Section {
-        file_path: target_path.to_string_lossy().to_string(),
-        file_offset: 0x14000,
+    let sections = [SectionInfo {
+        filename: target_path.to_string_lossy().to_string(),
+        offset: 0x14000,
         size: (*code_memory_addresses.end() - *code_memory_addresses.start() + 1) as u64,
         virtual_address: *code_memory_addresses.start() as u64,
     }];
@@ -127,7 +132,11 @@ pub fn main() {
         .timeout(Duration::from_secs(2))
         .build();
     let mut executor =
-        command_configurator.into_executor_with_hooks(tuple_list!(observer), tuple_list!(hook));
+        <PTraceCommandConfigurator as CommandConfigurator<BytesInput, _>>::into_executor_with_hooks(
+            command_configurator,
+            tuple_list!(observer),
+            tuple_list!(hook),
+        );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(NonZero::new(32).unwrap());

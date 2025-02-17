@@ -8,7 +8,7 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{Feedback, MinMapFeedback, StateInitializer},
     inputs::{BytesInput, Input},
-    state::State,
+    state::HasCorpus,
     Error, HasMetadata,
 };
 use libafl_bolts::{impl_serdeany, tuples::MatchNameRef, Named};
@@ -43,15 +43,15 @@ impl Named for LibfuzzerKeepFeedback {
 
 impl<S> StateInitializer<S> for LibfuzzerKeepFeedback {}
 
-impl<EM, OT, S> Feedback<EM, S::Input, OT, S> for LibfuzzerKeepFeedback
+impl<EM, I, OT, S> Feedback<EM, I, OT, S> for LibfuzzerKeepFeedback
 where
-    S: State,
+    S: HasCorpus<I>,
 {
     fn is_interesting(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &S::Input,
+        _input: &I,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error> {
@@ -119,7 +119,6 @@ impl<S> StateInitializer<S> for LibfuzzerCrashCauseFeedback {}
 
 impl<EM, OT, S> Feedback<EM, BytesInput, OT, S> for LibfuzzerCrashCauseFeedback
 where
-    S: State<Input = BytesInput>,
     OT: MatchNameRef,
 {
     fn is_interesting(

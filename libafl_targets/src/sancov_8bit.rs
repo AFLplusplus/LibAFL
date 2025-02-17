@@ -40,8 +40,7 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 /// # Safety
 /// Start and stop are being dereferenced.
 #[no_mangle]
-#[allow(clippy::cast_sign_loss)]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
+#[expect(clippy::cast_sign_loss)]
 pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
     unsafe {
         let counter_maps = &mut *counter_maps_ptr_mut();
@@ -84,7 +83,6 @@ mod observers {
         slice::{from_raw_parts, Iter, IterMut},
     };
 
-    use ahash::RandomState;
     use libafl::{
         observers::{DifferentialObserver, MapObserver, Observer},
         Error,
@@ -129,7 +127,7 @@ mod observers {
     /// The [`CountersMultiMapObserver`] observes all the counters that may be set by
     /// `SanitizerCoverage` in [`super::COUNTERS_MAPS`]
     #[derive(Serialize, Deserialize, Debug)]
-    #[allow(clippy::unsafe_derive_deserialize)]
+    #[expect(clippy::unsafe_derive_deserialize)]
     pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool> {
         intervals: IntervalTree<usize, usize>,
         len: usize,
@@ -229,11 +227,6 @@ mod observers {
                 }
             }
             res
-        }
-
-        #[inline]
-        fn hash_simple(&self) -> u64 {
-            RandomState::with_seeds(0, 0, 0, 0).hash_one(self)
         }
 
         fn reset_map(&mut self) -> Result<(), Error> {

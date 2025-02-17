@@ -7,8 +7,7 @@ use std::{
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, HasTimeout},
-    observers::ObserversTuple,
-    state::{State, UsesState},
+    state::HasCorpus,
     Error,
 };
 use libafl_bolts::tuples::RefIndexable;
@@ -201,7 +200,7 @@ pub fn find_afl_binary(filename: &str, same_dir_as: Option<PathBuf>) -> Result<P
         false
     };
 
-    #[allow(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
+    #[expect(clippy::useless_conversion)] // u16 on MacOS, u32 on Linux
     let permission = if is_library {
         u32::from(S_IRUSR) // user can read
     } else {
@@ -253,34 +252,23 @@ fn check_file_found(file: &Path, perm: u32) -> bool {
 }
 
 #[cfg(feature = "nyx")]
-pub enum SupportedExecutors<S, OT, FSV, NYX> {
-    Forkserver(FSV, PhantomData<(S, OT, NYX)>),
+pub enum SupportedExecutors<FSV, I, OT, NYX> {
+    Forkserver(FSV, PhantomData<(FSV, I, OT)>),
     Nyx(NYX),
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX> UsesState for SupportedExecutors<S, OT, FSV, NYX>
+impl<S, I, OT, FSV, NYX, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<FSV, I, OT, NYX>
 where
-    S: State,
-{
-    type State = S;
-}
-
-#[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV, NYX>
-where
-    S: State,
-    Z: UsesState<State = S>,
-    EM: UsesState<State = S>,
-    FSV: Executor<EM, Z, State = S>,
-    NYX: Executor<EM, Z, State = S>,
+    NYX: Executor<EM, I, S, Z>,
+    FSV: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
@@ -291,12 +279,10 @@ where
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX> HasObservers for SupportedExecutors<S, OT, FSV, NYX>
+impl<FSV, I, OT, NYX> HasObservers for SupportedExecutors<FSV, I, OT, NYX>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
-    FSV: HasObservers<Observers = OT>,
     NYX: HasObservers<Observers = OT>,
+    FSV: HasObservers<Observers = OT>,
 {
     type Observers = OT;
     #[inline]
@@ -319,7 +305,7 @@ where
 }
 
 #[cfg(feature = "nyx")]
-impl<S, OT, FSV, NYX> HasTimeout for SupportedExecutors<S, OT, FSV, NYX>
+impl<FSV, I, OT, NYX> HasTimeout for SupportedExecutors<FSV, I, OT, NYX>
 where
     FSV: HasTimeout,
     NYX: HasTimeout,
@@ -341,32 +327,22 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV> UsesState for SupportedExecutors<S, OT, FSV>
-where
-    S: State,
-{
-    type State = S;
+pub enum SupportedExecutors<FSV, I, OT, S> {
+    Forkserver(FSV, PhantomData<(I, OT, S)>),
 }
 
 #[cfg(not(feature = "nyx"))]
-pub enum SupportedExecutors<S, OT, FSV> {
-    Forkserver(FSV, PhantomData<(S, OT)>),
-}
-
-#[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV, EM, Z> Executor<EM, Z> for SupportedExecutors<S, OT, FSV>
+impl<S, I, OT, FSV, EM, Z> Executor<EM, I, S, Z> for SupportedExecutors<FSV, I, OT, S>
 where
-    S: State,
-    Z: UsesState<State = S>,
-    EM: UsesState<State = S>,
-    FSV: Executor<EM, Z, State = S>,
+    S: HasCorpus<I>,
+    FSV: Executor<EM, I, S, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         match self {
             Self::Forkserver(fsrv, _) => fsrv.run_target(fuzzer, state, mgr, input),
@@ -375,10 +351,8 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV> HasObservers for SupportedExecutors<S, OT, FSV>
+impl<FSV, I, OT, S> HasObservers for SupportedExecutors<FSV, I, OT, S>
 where
-    OT: ObserversTuple<S::Input, S>,
-    S: State,
     FSV: HasObservers<Observers = OT>,
 {
     type Observers = OT;
@@ -398,7 +372,7 @@ where
 }
 
 #[cfg(not(feature = "nyx"))]
-impl<S, OT, FSV> HasTimeout for SupportedExecutors<S, OT, FSV>
+impl<FSV, I, OT, S> HasTimeout for SupportedExecutors<FSV, I, OT, S>
 where
     FSV: HasTimeout,
 {

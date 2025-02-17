@@ -25,8 +25,7 @@ use crate::{
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverHandle, StateInitializer},
-    inputs::UsesInput,
-    monitors::{AggregatorOps, UserStats, UserStatsValue},
+    monitors::stats::{AggregatorOps, UserStats, UserStatsValue},
     observers::{CanTrack, MapObserver},
     Error, HasMetadata, HasNamedMetadata,
 };
@@ -216,7 +215,7 @@ where
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
+#[expect(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
@@ -261,7 +260,7 @@ impl MapIndexesMetadata {
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
+#[expect(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub struct MapNoveltiesMetadata {
     /// A `list` of novelties.
     pub list: Vec<usize>,
@@ -296,7 +295,7 @@ impl MapNoveltiesMetadata {
 
 /// The state of [`MapFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[allow(clippy::unsafe_derive_deserialize)] // for SerdeAny
+#[expect(clippy::unsafe_derive_deserialize)] // for SerdeAny
 pub struct MapFeedbackMetadata<T> {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
@@ -374,7 +373,7 @@ pub struct MapFeedback<C, N, O, R> {
     #[cfg(feature = "track_hit_feedbacks")]
     last_result: Option<bool>,
     /// Phantom Data of Reducer
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     phantom: PhantomData<fn() -> (N, O, R)>,
 }
 
@@ -395,13 +394,13 @@ where
 impl<C, EM, I, N, O, OT, R, S> Feedback<EM, I, OT, S> for MapFeedback<C, N, O, R>
 where
     C: CanTrack + AsRef<O>,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<I, S>,
     N: IsNovel<O::Entry>,
     O: MapObserver + for<'it> AsIter<'it, Item = O::Entry>,
     O::Entry: 'static + Default + Debug + DeserializeOwned + Serialize,
     OT: MatchName,
     R: Reducer<O::Entry>,
-    S: HasNamedMetadata + UsesInput, // delete me
+    S: HasNamedMetadata,
 {
     #[rustversion::nightly]
     default fn is_interesting(
@@ -538,13 +537,11 @@ where
 impl<C, O, EM, I, OT, S> Feedback<EM, I, OT, S> for MapFeedback<C, DifferentIsNovel, O, MaxReducer>
 where
     C: CanTrack + AsRef<O>,
-    EM: EventFirer<State = S>,
+    EM: EventFirer<I, S>,
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     OT: MatchName,
-    S: HasNamedMetadata + UsesInput,
+    S: HasNamedMetadata,
 {
-    #[allow(clippy::wrong_self_convention)]
-    #[allow(clippy::needless_range_loop)]
     fn is_interesting(
         &mut self,
         state: &mut S,
@@ -564,7 +561,7 @@ impl<C, N, O, R> Named for MapFeedback<C, N, O, R> {
     }
 }
 
-#[allow(clippy::ptr_arg)]
+#[expect(clippy::ptr_arg)]
 fn create_stats_name(name: &Cow<'static, str>) -> Cow<'static, str> {
     if name.chars().all(char::is_lowercase) {
         name.clone()
@@ -616,8 +613,6 @@ where
     O: MapObserver<Entry = u8> + for<'a> AsSlice<'a, Entry = u8> + for<'a> AsIter<'a, Item = u8>,
     C: CanTrack + AsRef<O>,
 {
-    #[allow(clippy::wrong_self_convention)]
-    #[allow(clippy::needless_range_loop)]
     fn is_interesting_u8_simd_optimized<S, OT>(&mut self, state: &mut S, observers: &OT) -> bool
     where
         S: HasNamedMetadata,
@@ -739,9 +734,6 @@ where
     N: IsNovel<O::Entry>,
     C: AsRef<O>,
 {
-    #[allow(clippy::wrong_self_convention)]
-    #[allow(clippy::needless_range_loop)]
-    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_interesting_default<OT, S>(&mut self, state: &mut S, observers: &OT) -> bool
     where
         S: HasNamedMetadata,

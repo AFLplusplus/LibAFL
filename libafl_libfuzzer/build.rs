@@ -13,7 +13,7 @@ const NAMESPACE: &str = "🐇";
 const NAMESPACE: &str = "__libafl";
 const NAMESPACE_LEN: usize = NAMESPACE.len();
 
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 fn main() -> Result<(), Box<dyn Error>> {
     if cfg!(any(clippy, docsrs)) {
         return Ok(()); // skip when clippy or docs is running
@@ -102,36 +102,39 @@ fn main() -> Result<(), Box<dyn Error>> {
         {
             todo!("copy all the source files"); // we don't support libafl_libfuzzer for others rn
         }
-        let mut template: toml::Value =
-            toml::from_str(&fs::read_to_string("runtime/Cargo.toml.template")?)?;
-        let toml::Value::Table(root) = &mut template else {
-            unreachable!("Invalid Cargo.toml");
-        };
-        root.insert(
-            "workspace".to_string(),
-            toml::Value::Table(toml::Table::new()),
-        );
-        let Some(toml::Value::Table(deps)) = root.get_mut("dependencies") else {
-            unreachable!("Invalid Cargo.toml");
-        };
-        let version = env!("CARGO_PKG_VERSION");
-        for (_name, spec) in deps {
-            if let toml::Value::Table(spec) = spec {
-                // replace all path deps with version deps
-                if spec.remove("path").is_some() {
-                    spec.insert(
-                        "version".to_string(),
-                        toml::Value::String(version.to_string()),
-                    );
+        #[cfg(unix)]
+        {
+            let mut template: toml::Value =
+                toml::from_str(&fs::read_to_string("runtime/Cargo.toml.template")?)?;
+            let toml::Value::Table(root) = &mut template else {
+                unreachable!("Invalid Cargo.toml");
+            };
+            root.insert(
+                "workspace".to_string(),
+                toml::Value::Table(toml::Table::new()),
+            );
+            let Some(toml::Value::Table(deps)) = root.get_mut("dependencies") else {
+                unreachable!("Invalid Cargo.toml");
+            };
+            let version = env!("CARGO_PKG_VERSION");
+            for (_name, spec) in deps {
+                if let toml::Value::Table(spec) = spec {
+                    // replace all path deps with version deps
+                    if spec.remove("path").is_some() {
+                        spec.insert(
+                            "version".to_string(),
+                            toml::Value::String(version.to_string()),
+                        );
+                    }
                 }
             }
+
+            let serialized = toml::to_string(&template)?;
+            fs::write(custom_lib_dir.join("Cargo.toml"), serialized)?;
+
+            // build in this filled out template
+            command.current_dir(custom_lib_dir);
         }
-
-        let serialized = toml::to_string(&template)?;
-        fs::write(custom_lib_dir.join("Cargo.toml"), serialized)?;
-
-        // build in this filled out template
-        command.current_dir(custom_lib_dir);
     }
 
     assert!(
@@ -161,7 +164,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .arg(&archive_path)
         .stdout(Stdio::piped())
         .spawn()
-        .expect("llvm-nm works (are you using nightly?)");
+        .expect("llvm-nm does not work (are you using nightly? or did you install by rustup component add llvm-tools?)");
 
     let mut redefinitions_file = BufWriter::new(File::create(&redefined_symbols).unwrap());
 

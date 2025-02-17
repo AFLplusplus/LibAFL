@@ -268,7 +268,7 @@ impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
         let size = input.codes().len();
         if size <= 1 {
             return Ok(MutationResult::Skipped);
-        };
+        }
 
         // # Safety
         // it's larger than 1
@@ -313,8 +313,7 @@ pub struct EncodedCrossoverInsertMutator;
 
 impl<S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator
 where
-    S: HasRand + HasCorpus + HasMaxSize,
-    S::Corpus: Corpus<Input = EncodedInput>,
+    S: HasRand + HasCorpus<EncodedInput> + HasMaxSize,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();
@@ -397,8 +396,7 @@ pub struct EncodedCrossoverReplaceMutator;
 
 impl<S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator
 where
-    S: HasRand + HasCorpus,
-    S::Corpus: Corpus<Input = EncodedInput>,
+    S: HasRand + HasCorpus<EncodedInput>,
 {
     fn mutate(&mut self, state: &mut S, input: &mut EncodedInput) -> Result<MutationResult, Error> {
         let size = input.codes().len();

@@ -1,37 +1,25 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use libafl::{
-    corpus::Corpus,
-    inputs::Input,
-    mutators::Mutator,
-    stages::{mutational::MutatedTransform, MutationalStage, Stage},
-    state::{HasCorpus, HasRand, State, UsesState},
-    Error, Evaluator, HasNamedMetadata,
+    stages::{MutationalStage, Stage},
+    Error,
 };
 use libafl_bolts::Named;
 
 #[derive(Debug)]
-pub enum SupportedMutationalStages<S, SM, P, E, EM, M, I, Z> {
-    StdMutational(SM, PhantomData<(S, I, M, EM, Z, E)>),
-    PowerMutational(P, PhantomData<(S, I, M, EM, Z, E)>),
+pub enum SupportedMutationalStages<SM, P> {
+    StdMutational(SM, PhantomData<P>),
+    PowerMutational(P, PhantomData<SM>),
 }
 
-impl<S, SM, P, E, EM, M, I, Z> MutationalStage<E, EM, I, M, Z>
-    for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
+impl<S, SM, P> MutationalStage<S> for SupportedMutationalStages<SM, P>
 where
-    E: UsesState<State = S>,
-    EM: UsesState<State = S>,
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, State = S>,
-    I: MutatedTransform<S::Input, S> + Clone + Input,
-    SM: MutationalStage<E, EM, I, M, Z, State = S>,
-    P: MutationalStage<E, EM, I, M, Z, State = S>,
-    S: State<Input = I> + HasRand + HasCorpus + HasNamedMetadata,
-    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
+    SM: MutationalStage<S>,
+    P: MutationalStage<S, Mutator = SM::Mutator>,
 {
+    type Mutator = SM::Mutator;
     /// The mutator, added to this stage
-    #[inline]
-    fn mutator(&self) -> &M {
+    fn mutator(&self) -> &Self::Mutator {
         match self {
             Self::StdMutational(m, _) => m.mutator(),
             Self::PowerMutational(p, _) => p.mutator(),
@@ -40,7 +28,7 @@ where
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::Mutator {
         match self {
             Self::StdMutational(m, _) => m.mutator_mut(),
             Self::PowerMutational(p, _) => p.mutator_mut(),
@@ -56,14 +44,7 @@ where
     }
 }
 
-impl<S, SM, P, E, EM, M, I, Z> UsesState for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
-where
-    S: State + HasRand,
-{
-    type State = S;
-}
-
-impl<S, SM, P, E, EM, M, I, Z> Named for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
+impl<SM, P> Named for SupportedMutationalStages<SM, P>
 where
     SM: Named,
     P: Named,
@@ -76,21 +57,12 @@ where
     }
 }
 
-impl<S, SM, P, E, EM, M, I, Z> Stage<E, EM, Z>
-    for SupportedMutationalStages<S, SM, P, E, EM, M, I, Z>
+impl<E, EM, S, SM, P, Z> Stage<E, EM, S, Z> for SupportedMutationalStages<SM, P>
 where
-    E: UsesState<State = S>,
-    EM: UsesState<State = S>,
-    M: Mutator<I, S>,
-    Z: Evaluator<E, EM, State = S>,
-    I: MutatedTransform<S::Input, S> + Clone + Input,
-    SM: MutationalStage<E, EM, I, M, Z, State = S>,
-    P: MutationalStage<E, EM, I, M, Z, State = S>,
-    S: State<Input = I> + HasRand + HasCorpus + HasNamedMetadata,
-    <<Self as UsesState>::State as HasCorpus>::Corpus: Corpus<Input = Self::Input>, //delete me
+    SM: Stage<E, EM, S, Z>,
+    P: Stage<E, EM, S, Z>,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,

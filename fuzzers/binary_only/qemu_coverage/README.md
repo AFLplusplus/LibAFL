@@ -2,7 +2,7 @@
 
 This folder contains an example fuzzer which runs each entry in the input corpus and collects
 the cumuative coverage data in drcov format. This fuzzer also distributes the test cases in
-the input corupus evenly across the selected cores.
+the input corpus evenly across the selected cores.
 
 The following architectures are supported:
 * arm
@@ -31,9 +31,9 @@ sudo apt install \
 
 Defaults to `x86_64` architecture
 ```bash
-cargo make run
+just run
 ```
 
 ```bash
-cargo make <arch>
+just <arch>
 ```

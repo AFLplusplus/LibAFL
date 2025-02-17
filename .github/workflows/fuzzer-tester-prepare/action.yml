@@ -22,10 +22,10 @@ runs:
     - name: Add wasm target
       shell: bash
       run: rustup target add wasm32-unknown-unknown
-    - name: install cargo-make
-      uses: baptiste0928/cargo-install@v3
+    - name: install just
+      uses: extractions/setup-just@v2
       with:
-        crate: cargo-make
+        just-version: 1.39.0
     - name: install wasm-pack
       uses: baptiste0928/cargo-install@v3
       with:

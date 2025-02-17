@@ -1,7 +1,7 @@
-use std::{cell::UnsafeCell, mem::MaybeUninit, sync::Mutex};
+#![allow(clippy::needless_pass_by_value)] // default compiler complains about Option<&mut T> otherwise, and this is used extensively.
+use std::{cell::UnsafeCell, mem::MaybeUninit, ops::Range, sync::Mutex};
 
 use hashbrown::{HashMap, HashSet};
-use libafl::inputs::UsesInput;
 use libafl_qemu_sys::{GuestAddr, MmapPerms};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
@@ -23,8 +23,9 @@ use crate::SYS_newfstatat;
 use crate::{
     emu::EmulatorModules,
     modules::{
-        asan::AsanModule, EmulatorModule, EmulatorModuleTuple, NopAddressFilter, Range,
-        NOP_ADDRESS_FILTER,
+        asan::AsanModule,
+        utils::filters::{HasAddressFilter, NopAddressFilter, NOP_ADDRESS_FILTER},
+        EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{Hook, SyscallHookResult},
     Qemu, SYS_brk, SYS_mprotect, SYS_mremap, SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat,
@@ -89,6 +90,7 @@ pub struct SnapshotModule {
     pub maps: MappingInfo,
     pub new_maps: Mutex<MappingInfo>,
     pub pages: HashMap<GuestAddr, SnapshotPageInfo>,
+    pub initial_brk: GuestAddr,
     pub brk: GuestAddr,
     pub mmap_start: GuestAddr,
     pub mmap_limit: usize,
@@ -96,6 +98,7 @@ pub struct SnapshotModule {
     pub empty: bool,
     pub accurate_unmap: bool,
     pub interval_filter: Vec<IntervalSnapshotFilter>,
+    auto_reset: bool,
 }
 
 impl core::fmt::Debug for SnapshotModule {
@@ -120,6 +123,7 @@ impl SnapshotModule {
             maps: MappingInfo::default(),
             new_maps: Mutex::new(MappingInfo::default()),
             pages: HashMap::default(),
+            initial_brk: 0,
             brk: 0,
             mmap_start: 0,
             mmap_limit: 0,
@@ -127,6 +131,7 @@ impl SnapshotModule {
             empty: true,
             accurate_unmap: false,
             interval_filter: Vec::<IntervalSnapshotFilter>::new(),
+            auto_reset: true,
         }
     }
 
@@ -137,6 +142,7 @@ impl SnapshotModule {
             maps: MappingInfo::default(),
             new_maps: Mutex::new(MappingInfo::default()),
             pages: HashMap::default(),
+            initial_brk: 0,
             brk: 0,
             mmap_start: 0,
             mmap_limit: 0,
@@ -144,6 +150,7 @@ impl SnapshotModule {
             empty: true,
             accurate_unmap: false,
             interval_filter,
+            auto_reset: true,
         }
     }
 
@@ -154,6 +161,7 @@ impl SnapshotModule {
             maps: MappingInfo::default(),
             new_maps: Mutex::new(MappingInfo::default()),
             pages: HashMap::default(),
+            initial_brk: 0,
             brk: 0,
             mmap_start: 0,
             mmap_limit,
@@ -161,11 +169,16 @@ impl SnapshotModule {
             empty: true,
             accurate_unmap: false,
             interval_filter: Vec::<IntervalSnapshotFilter>::new(),
+            auto_reset: true,
         }
     }
 
     pub fn use_accurate_unmapping(&mut self) {
         self.accurate_unmap = true;
+    }
+
+    pub fn use_manual_reset(&mut self) {
+        self.auto_reset = false;
     }
 
     pub fn to_skip(&self, addr: GuestAddr) -> bool {
@@ -187,10 +200,10 @@ impl SnapshotModule {
         false
     }
 
-    #[allow(clippy::uninit_assumed_init)]
     pub fn snapshot(&mut self, qemu: Qemu) {
         log::info!("Start snapshot");
         self.brk = qemu.get_brk();
+        self.initial_brk = qemu.get_initial_brk();
         self.mmap_start = qemu.get_mmap_start();
         self.pages.clear();
         for map in qemu.mappings() {
@@ -387,6 +400,37 @@ impl SnapshotModule {
 
             log::debug!("Start restore");
 
+            let new_brk = qemu.get_brk();
+            if new_brk < self.brk {
+                // The heap has shrunk below the snapshotted brk value. We need to remap those pages in the target.
+                // The next for loop will restore their content if needed.
+                let aligned_new_brk = (new_brk + ((SNAPSHOT_PAGE_SIZE - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
+                log::debug!("New brk ({:#x?}) < snapshotted brk ({:#x?})! Mapping back in the target {:#x?} - {:#x?}", new_brk, self.brk, aligned_new_brk, aligned_new_brk + (self.brk - aligned_new_brk));
+                qemu.map_fixed(
+                    aligned_new_brk,
+                    (self.brk - aligned_new_brk) as usize,
+                    MmapPerms::ReadWrite,
+                )
+                .unwrap();
+            } else if new_brk > self.brk {
+                // The heap has grown. so we want to drop those
+                // we want to align the addresses before calling unmap
+                // although it is very unlikely that the brk has an unaligned value
+                let new_page_boundary = (new_brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
+                let old_page_boundary = (self.brk + ((SNAPSHOT_PAGE_MASK - 1) as GuestAddr))
+                    & (!(SNAPSHOT_PAGE_SIZE - 1) as GuestAddr);
+
+                if new_page_boundary != old_page_boundary {
+                    let unmap_sz = (new_page_boundary - old_page_boundary) as usize;
+                    // if self.brk is not aligned this call will return an error
+                    // and it will page align this unmap_sz too (but it is already aligned for us)
+                    // look at target_munmap in qemu-libafl-bridge
+                    qemu.unmap(self.brk, unmap_sz).unwrap();
+                }
+            }
+
             for acc in &mut self.accesses {
                 unsafe { &mut (*acc.get()) }.dirty.retain(|page| {
                     if let Some(info) = self.pages.get_mut(page) {
@@ -399,11 +443,12 @@ impl SnapshotModule {
                                 .query_mut(*page..(page + SNAPSHOT_PAGE_SIZE as GuestAddr))
                             {
                                 if !entry.value.perms.unwrap_or(MmapPerms::None).writable() {
-                                    drop(qemu.mprotect(
+                                    qemu.mprotect(
                                         entry.interval.start,
                                         (entry.interval.end - entry.interval.start) as usize,
                                         MmapPerms::ReadWrite,
-                                    ));
+                                    )
+                                    .unwrap();
                                     entry.value.changed = true;
                                     entry.value.perms = Some(MmapPerms::ReadWrite);
                                 }
@@ -437,11 +482,12 @@ impl SnapshotModule {
                     if !entry.value.perms.unwrap_or(MmapPerms::None).writable()
                         && !entry.value.changed
                     {
-                        drop(qemu.mprotect(
+                        qemu.mprotect(
                             entry.interval.start,
                             (entry.interval.end - entry.interval.start) as usize,
                             MmapPerms::ReadWrite,
-                        ));
+                        )
+                        .unwrap();
                         entry.value.changed = true;
                     }
                 }
@@ -460,11 +506,12 @@ impl SnapshotModule {
 
         for entry in self.maps.tree.query_mut(0..GuestAddr::MAX) {
             if entry.value.changed {
-                drop(qemu.mprotect(
+                qemu.mprotect(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
-                ));
+                )
+                .unwrap();
                 entry.value.changed = false;
             }
         }
@@ -518,7 +565,12 @@ impl SnapshotModule {
         }
     }
 
-    pub fn change_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn change_mapped_perms(
+        &mut self,
+        start: GuestAddr,
+        mut size: usize,
+        perms: Option<MmapPerms>,
+    ) {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
@@ -621,26 +673,29 @@ impl SnapshotModule {
 
             if found.is_empty() {
                 //panic!("A pre-snapshot memory region was unmapped");
-                drop(qemu.map_fixed(
+                qemu.map_fixed(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
-                ));
+                )
+                .unwrap();
             } else if found.len() == 1 && found[0].0 == *entry.interval {
                 if found[0].1 && found[0].2 != entry.value.perms {
-                    drop(qemu.mprotect(
+                    qemu.mprotect(
                         entry.interval.start,
                         (entry.interval.end - entry.interval.start) as usize,
                         entry.value.perms.unwrap(),
-                    ));
+                    )
+                    .unwrap();
                 }
             } else {
                 //  TODO check for holes
-                drop(qemu.mprotect(
+                qemu.mprotect(
                     entry.interval.start,
                     (entry.interval.end - entry.interval.start) as usize,
                     entry.value.perms.unwrap(),
-                ));
+                )
+                .unwrap();
             }
 
             for (interval, ..) in found {
@@ -653,7 +708,7 @@ impl SnapshotModule {
             to_unmap.push((*entry.interval, entry.value.changed, entry.value.perms));
         }
         for (i, ..) in to_unmap {
-            drop(qemu.unmap(i.start, (i.end - i.start) as usize));
+            qemu.unmap(i.start, (i.end - i.start) as usize).unwrap();
             new_maps.tree.delete(i);
         }
 
@@ -669,49 +724,52 @@ impl Default for SnapshotModule {
     }
 }
 
-impl<S> EmulatorModule<S> for SnapshotModule
+impl<I, S> EmulatorModule<I, S> for SnapshotModule
 where
-    S: Unpin + UsesInput,
+    I: Unpin,
+    S: Unpin,
 {
-    type ModuleAddressFilter = NopAddressFilter;
-
-    fn post_qemu_init<ET>(&self, emulator_modules: &mut EmulatorModules<ET, S>)
+    fn post_qemu_init<ET>(&mut self, _qemu: Qemu, emulator_modules: &mut EmulatorModules<ET, I, S>)
     where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         if emulator_modules.get::<AsanModule>().is_none() {
             // The ASan module, if present, will call the tracer hook for the snapshot helper as opt
             emulator_modules.writes(
                 Hook::Empty,
-                Hook::Function(trace_write_snapshot::<ET, S, 1>),
-                Hook::Function(trace_write_snapshot::<ET, S, 2>),
-                Hook::Function(trace_write_snapshot::<ET, S, 4>),
-                Hook::Function(trace_write_snapshot::<ET, S, 8>),
-                Hook::Function(trace_write_n_snapshot::<ET, S>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 1>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 2>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 4>),
+                Hook::Function(trace_write_snapshot::<ET, I, S, 8>),
+                Hook::Function(trace_write_n_snapshot::<ET, I, S>),
             );
         }
 
         if !self.accurate_unmap {
-            emulator_modules.syscalls(Hook::Function(filter_mmap_snapshot::<ET, S>));
+            emulator_modules.pre_syscalls(Hook::Function(filter_mmap_snapshot::<ET, I, S>));
         }
-        emulator_modules.after_syscalls(Hook::Function(trace_mmap_snapshot::<ET, S>));
+        emulator_modules.post_syscalls(Hook::Function(trace_mmap_snapshot::<ET, I, S>));
     }
 
     fn pre_exec<ET>(
         &mut self,
-        emulator_modules: &mut EmulatorModules<ET, S>,
+        qemu: Qemu,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         _state: &mut S,
-        _input: &S::Input,
+        _input: &I,
     ) where
-        ET: EmulatorModuleTuple<S>,
+        ET: EmulatorModuleTuple<I, S>,
     {
         if self.empty {
-            self.snapshot(emulator_modules.qemu());
-        } else {
-            self.reset(emulator_modules.qemu());
+            self.snapshot(qemu);
+        } else if self.auto_reset {
+            self.reset(qemu);
         }
     }
+}
 
+impl HasAddressFilter for SnapshotModule {
+    type ModuleAddressFilter = NopAddressFilter;
     fn address_filter(&self) -> &Self::ModuleAddressFilter {
         &NopAddressFilter
     }
@@ -721,37 +779,43 @@ where
     }
 }
 
-pub fn trace_write_snapshot<ET, S, const SIZE: usize>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+pub fn trace_write_snapshot<ET, I, S, const SIZE: usize>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, SIZE);
 }
 
-pub fn trace_write_n_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+pub fn trace_write_n_snapshot<ET, I, S>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     _id: u64,
+    _pc: GuestAddr,
     addr: GuestAddr,
     size: usize,
 ) where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
     h.access(addr, size);
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(non_upper_case_globals)]
-pub fn filter_mmap_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+#[expect(clippy::too_many_arguments)]
+pub fn filter_mmap_snapshot<ET, I, S>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: GuestAddr,
@@ -764,8 +828,9 @@ pub fn filter_mmap_snapshot<ET, S>(
     _a7: GuestAddr,
 ) -> SyscallHookResult
 where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     if i64::from(sys_num) == SYS_munmap {
         let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
@@ -776,10 +841,10 @@ where
     SyscallHookResult::new(None)
 }
 
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-#[allow(non_upper_case_globals)]
-pub fn trace_mmap_snapshot<ET, S>(
-    emulator_modules: &mut EmulatorModules<ET, S>,
+#[expect(non_upper_case_globals, clippy::too_many_arguments)]
+pub fn trace_mmap_snapshot<ET, I, S>(
+    _qemu: Qemu,
+    emulator_modules: &mut EmulatorModules<ET, I, S>,
     _state: Option<&mut S>,
     result: GuestAddr,
     sys_num: i32,
@@ -793,8 +858,9 @@ pub fn trace_mmap_snapshot<ET, S>(
     _a7: GuestAddr,
 ) -> GuestAddr
 where
-    S: Unpin + UsesInput,
-    ET: EmulatorModuleTuple<S>,
+    ET: EmulatorModuleTuple<I, S>,
+    I: Unpin,
+    S: Unpin,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {
@@ -842,14 +908,8 @@ where
             h.access(a0, a1 as usize);
         }
         SYS_brk => {
-            let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-            if h.brk != result && result != 0 {
-                /* brk has changed. we change mapping from the snapshotted brk address to the new target_brk
-                 * If no brk mapping has been made until now, change_mapped won't change anything and just create a new mapping.
-                 * It is safe to assume RW perms here
-                 */
-                h.change_mapped(h.brk, (result - h.brk) as usize, Some(MmapPerms::ReadWrite));
-            }
+            // We don't handle brk here. It is handled in the reset function only when it's needed.
+            log::debug!("New brk ({:#x?}) received.", result);
         }
         // mmap syscalls
         sys_const => {
@@ -885,7 +945,7 @@ where
             } else if sys_const == SYS_mprotect {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();
-                    h.change_mapped(a0, a1 as usize, Some(prot));
+                    h.change_mapped_perms(a0, a1 as usize, Some(prot));
                 }
             } else if sys_const == SYS_munmap {
                 let h = emulator_modules.get_mut::<SnapshotModule>().unwrap();

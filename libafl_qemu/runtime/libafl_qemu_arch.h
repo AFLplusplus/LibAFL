@@ -30,12 +30,12 @@
       // Linux kernel
       #include <asm-generic/int-ll64.h>
 
-      #if defined(__x86_64__) || defined(__aarch64__)
+      #if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
         typedef __u64 libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
 
-      #ifdef __arm__
+      #if defined(__arm__) || (defined(__riscv) && __riscv_xlen == 32)
         typedef __u32 libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
@@ -47,12 +47,12 @@
 
       #define noinline __attribute__((noinline))
 
-      #if defined(__x86_64__) || defined(__aarch64__)
+      #if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
         typedef uint64_t libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
 
-      #ifdef __arm__
+      #if defined(__arm__) || (defined(__riscv) && __riscv_xlen == 32)
         typedef uint32_t libafl_word;
         #define LIBAFL_CALLING_CONVENTION __attribute__(())
       #endif
@@ -66,35 +66,40 @@
 
     #define noinline __attribute__((noinline))
 
-    #if defined(__x86_64__) || defined(__aarch64__)
+    #if defined(__x86_64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
       typedef uint64_t libafl_word;
       #define LIBAFL_CALLING_CONVENTION __attribute__(())
     #endif
 
-    #ifdef __arm__
+    #if defined(__arm__) || (defined(__riscv) && __riscv_xlen == 32)
       typedef uint32_t libafl_word;
       #define LIBAFL_CALLING_CONVENTION __attribute__(())
     #endif
 #endif
 #endif
 
+#define LIBAFL_DECLARE(name) \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(libafl_word action); \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(libafl_word action, \
+                                                               libafl_word arg1); \
+      libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(libafl_word action, \
+                                                               libafl_word arg1, \
+                                                               libafl_word arg2);
+
 #ifdef _WIN32
     #define LIBAFL_DEFINE_FUNCTIONS(name, _opcode) \
       #ifdef __cplusplus \
         extern "C" { \
       #endif \
-          libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(libafl_word action); \
-          libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call1(libafl_word action, \
-                                                        ##name##  libafl_word arg1); \
-          libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call2(libafl_word action, \
-                                                                   libafl_word arg1, \
-                                                                   libafl_word arg2); \
+        LIBAFL_DECLARE(name) \
       #ifdef __cplusplus \
         } \
       #endif
 #else
   #if defined(__x86_64__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
+      LIBAFL_DECLARE(name) \
+                            \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
         libafl_word ret;                                                                            \
@@ -142,6 +147,8 @@
 
   #elif defined(__arm__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
+      LIBAFL_DECLARE(name) \
+                            \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
         libafl_word ret;                                                                            \
@@ -189,6 +196,8 @@
 
   #elif defined(__aarch64__)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
+      LIBAFL_DECLARE(name) \
+                            \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
         libafl_word ret;                                                                            \
@@ -235,6 +244,8 @@
       }
   #elif defined(__riscv)
     #define LIBAFL_DEFINE_FUNCTIONS(name, opcode)                                                   \
+      LIBAFL_DECLARE(name) \
+                            \
       libafl_word LIBAFL_CALLING_CONVENTION _libafl_##name##_call0(                                 \
           libafl_word action) {                                                                     \
         libafl_word ret;                                                                            \

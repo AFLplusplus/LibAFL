@@ -2,12 +2,12 @@ use alloc::borrow::{Cow, ToOwned};
 use core::marker::PhantomData;
 
 use libafl::{
-    corpus::Corpus,
+    corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
-    inputs::{BytesInput, UsesInput},
+    inputs::BytesInput,
     observers::ObserversTuple,
     stages::{colorization::TaintMetadata, RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasCurrentTestcase, HasExecutions, UsesState},
+    state::{HasCorpus, HasCurrentTestcase},
     Error, HasMetadata, HasNamedMetadata,
 };
 use libafl_bolts::{
@@ -19,56 +19,37 @@ use crate::cmps::observers::AFLppCmpLogObserver;
 
 /// Trace with tainted input
 #[derive(Clone, Debug)]
-pub struct AFLppCmplogTracingStage<'a, EM, TE, Z>
-where
-    TE: UsesState,
-{
+pub struct AFLppCmplogTracingStage<'a, EM, TE, S, Z> {
     name: Cow<'static, str>,
     tracer_executor: TE,
     cmplog_observer_handle: Handle<AFLppCmpLogObserver<'a>>,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, TE, Z)>,
+    phantom: PhantomData<(EM, TE, S, Z)>,
 }
 /// The name for aflpp tracing stage
 pub static AFLPP_CMPLOG_TRACING_STAGE_NAME: &str = "aflpptracing";
 
-impl<EM, TE, Z> UsesState for AFLppCmplogTracingStage<'_, EM, TE, Z>
-where
-    TE: UsesState,
-{
-    type State = TE::State;
-}
-
-impl<EM, TE, Z> Named for AFLppCmplogTracingStage<'_, EM, TE, Z>
-where
-    TE: UsesState,
-{
+impl<EM, TE, S, Z> Named for AFLppCmplogTracingStage<'_, EM, TE, S, Z> {
     fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, Z> for AFLppCmplogTracingStage<'_, EM, TE, Z>
+impl<E, EM, TE, S, Z> Stage<E, EM, S, Z> for AFLppCmplogTracingStage<'_, EM, TE, S, Z>
 where
-    E: UsesState<State = Self::State>,
-    TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasExecutions
-        + HasCorpus
+    TE: HasObservers + Executor<EM, BytesInput, S, Z>,
+    TE::Observers: MatchNameRef + ObserversTuple<BytesInput, S>,
+    S: HasCorpus<BytesInput>
+        + HasCurrentTestcase<BytesInput>
         + HasMetadata
-        + UsesInput<Input = BytesInput>
         + HasNamedMetadata
-        + HasCurrentTestcase,
-    TE::Observers: MatchNameRef + ObserversTuple<BytesInput, TE::State>,
-    EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
-    <Self::State as HasCorpus>::Corpus: Corpus<Input = BytesInput>, //delete me
+        + HasCurrentCorpusId,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         _executor: &mut E,
-        state: &mut TE::State,
+        state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error> {
         // First run with the un-mutated input
@@ -131,22 +112,19 @@ where
         Ok(())
     }
 
-    fn should_restart(&mut self, state: &mut Self::State) -> Result<bool, Error> {
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Tracing stage is always deterministic
         // don't restart
         RetryCountRestartHelper::no_retry(state, &self.name)
     }
 
-    fn clear_progress(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         // TODO: this may need better resumption? (Or is it always used with a forkserver?)
         RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
-impl<'a, EM, TE, Z> AFLppCmplogTracingStage<'a, EM, TE, Z>
-where
-    TE: UsesState,
-{
+impl<'a, EM, TE, S, Z> AFLppCmplogTracingStage<'a, EM, TE, S, Z> {
     /// With cmplog observer
     pub fn new(tracer_executor: TE, observer_handle: Handle<AFLppCmpLogObserver<'a>>) -> Self {
         let observer_name = observer_handle.name().clone();

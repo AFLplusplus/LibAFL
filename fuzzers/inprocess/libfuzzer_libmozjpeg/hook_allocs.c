@@ -7,9 +7,9 @@
 #ifdef _WIN32
   #define posix_memalign(p, a, s) \
     (((*(p)) = _aligned_malloc((s), (a))), *(p) ? 0 : errno)
-  #define RETADDR (uintptr_t)_ReturnAddress()
+  #define RETADDR (uintptr_t) _ReturnAddress()
 #else
-  #define RETADDR (uintptr_t)__builtin_return_address(0)
+  #define RETADDR (uintptr_t) __builtin_return_address(0)
 #endif
 
 #ifdef __GNUC__

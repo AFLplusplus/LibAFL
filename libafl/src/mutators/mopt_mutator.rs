@@ -29,7 +29,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(
     any(not(feature = "serdeany_autoreg"), miri),
-    allow(clippy::unsafe_derive_deserialize)
+    expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
 pub struct MOpt {
     /// Random number generator
@@ -189,7 +189,6 @@ impl MOpt {
     }
 
     /// initialize pso
-    #[allow(clippy::cast_precision_loss)]
     pub fn pso_initialize(&mut self) -> Result<(), Error> {
         if self.g_now > self.g_max {
             self.g_now = 0.0;
@@ -245,7 +244,7 @@ impl MOpt {
 
     /// Update the `PSO` algorithm parameters
     /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L10623>
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
         self.g_now += 1.0;
         if self.g_now > self.g_max {
@@ -311,7 +310,6 @@ impl MOpt {
 
     /// This function is used to decide the operator that we want to apply next
     /// see <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L397>
-    #[allow(clippy::cast_precision_loss)]
     pub fn select_algorithm(&mut self) -> Result<MutationId, Error> {
         let mut res = 0;
         let mut sentry = 0;
@@ -373,7 +371,7 @@ pub struct StdMOptMutator<MT> {
 impl<I, MT, S> Mutator<I, S> for StdMOptMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     #[inline]
     fn mutate(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
@@ -381,7 +379,7 @@ where
         self.scheduled_mutate(state, input)
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     fn post_exec(&mut self, state: &mut S, _new_corpus_id: Option<CorpusId>) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();
@@ -430,7 +428,6 @@ where
                     }
                 }
 
-                #[allow(clippy::cast_lossless)]
                 if mopt.pilot_time > mopt.period_pilot {
                     let new_finds = mopt.total_finds - mopt.finds_until_last_swarm;
                     let f = (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));
@@ -522,7 +519,7 @@ impl<MT> StdMOptMutator<MT> {
     }
     fn core_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>
     where
-        S: HasMetadata + HasRand + HasSolutions + HasCorpus,
+        S: HasMetadata + HasRand + HasSolutions<I> + HasCorpus<I>,
         MT: MutatorsTuple<I, S>,
     {
         let mut r = MutationResult::Skipped;
@@ -549,7 +546,7 @@ impl<MT> StdMOptMutator<MT> {
 
     fn pilot_mutate<I, S>(&mut self, state: &mut S, input: &mut I) -> Result<MutationResult, Error>
     where
-        S: HasMetadata + HasRand + HasSolutions + HasCorpus,
+        S: HasMetadata + HasRand + HasSolutions<I> + HasCorpus<I>,
         MT: MutatorsTuple<I, S>,
     {
         let mut r = MutationResult::Skipped;
@@ -607,11 +604,11 @@ impl<MT> Named for StdMOptMutator<MT> {
 impl<I, MT, S> ScheduledMutator<I, S> for StdMOptMutator<MT>
 where
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus + HasSolutions,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().zero_upto(self.max_stack_pow))
+        1 << (1 + state.rand_mut().below_or_zero(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply

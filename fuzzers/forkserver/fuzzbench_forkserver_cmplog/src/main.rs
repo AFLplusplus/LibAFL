@@ -207,7 +207,7 @@ pub fn main() {
 }
 
 /// The actual fuzzer
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
@@ -300,7 +300,7 @@ fn fuzz(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
         StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
@@ -371,11 +371,12 @@ fn fuzz(
         let tracing = AFLppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Setup a randomic Input2State stage
-        let rq = MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
+        let rq: MultiMutationalStage<_, _, BytesInput, _, _, _> =
+            MultiMutationalStage::new(AFLppRedQueen::with_cmplog_options(true, true));
 
         let cb = |_fuzzer: &mut _,
                   _executor: &mut _,
-                  state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
+                  state: &mut StdState<InMemoryOnDiskCorpus<_>, _, _, _>,
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;

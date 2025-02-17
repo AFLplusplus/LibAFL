@@ -30,9 +30,9 @@ sudo apt install \
 
 Defaults to `x86_64` architecture
 ```bash
-cargo make run
+just run
 ```
 
 ```bash
-cargo make <arch>
+just <arch>
 ```

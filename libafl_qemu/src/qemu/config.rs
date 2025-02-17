@@ -2,19 +2,12 @@ use core::{
     fmt,
     fmt::{Display, Formatter},
 };
-use std::{
-    path::{Path, PathBuf},
-    sync::OnceLock,
-};
+use std::path::{Path, PathBuf};
 
 use getset::Getters;
 use libafl_derive;
 use strum_macros;
 use typed_builder::TypedBuilder;
-
-use crate::{Qemu, QemuInitError};
-
-pub(super) static QEMU_CONFIG: OnceLock<QemuConfig> = OnceLock::new();
 
 #[cfg(feature = "systemmode")]
 #[derive(Debug, strum_macros::Display, Clone)]
@@ -44,6 +37,16 @@ pub enum DiskImageFileFormat {
     Raw,
 }
 
+#[derive(Debug, strum_macros::Display, Clone)]
+#[strum(prefix = "cache=", serialize_all = "lowercase")]
+pub enum DriveCache {
+    WriteBack,
+    None,
+    WriteThrough,
+    DirectSync,
+    Unsafe,
+}
+
 #[derive(Debug, Clone, Default, TypedBuilder)]
 pub struct Drive {
     #[builder(default, setter(strip_option, into))]
@@ -52,6 +55,8 @@ pub struct Drive {
     format: Option<DiskImageFileFormat>,
     #[builder(default, setter(strip_option))]
     interface: Option<DriveInterface>,
+    #[builder(default, setter(strip_option))]
+    cache: Option<DriveCache>,
 }
 
 impl Display for Drive {
@@ -77,25 +82,96 @@ impl Display for Drive {
         if let Some(interface) = &self.interface {
             write!(f, "{}{interface}", separator())?;
         }
+        if let Some(cache) = &self.cache {
+            write!(f, "{}{cache}", separator())?;
+        }
 
         Ok(())
     }
 }
 
-#[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "-serial ", serialize_all = "lowercase")]
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct Tcp {
+    #[builder(default, setter(strip_option))]
+    host: Option<String>,
+    port: u16,
+    #[builder(default, setter(strip_option))]
+    server: Option<bool>,
+    #[builder(default, setter(strip_option))]
+    wait: Option<bool>,
+    #[builder(default, setter(strip_option))]
+    nodelay: Option<bool>,
+    #[builder(default, setter(strip_option))]
+    reconnect_ms: Option<usize>,
+}
+
+impl Display for Tcp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "tcp:{}", self.host.as_deref().unwrap_or(""))?;
+        write!(f, ":{}", self.port)?;
+        let server = match self.server {
+            Some(true) => ",server=on",
+            Some(false) => ",server=off",
+            None => "",
+        };
+        write!(f, "{server}")?;
+        let wait = match self.wait {
+            Some(true) => ",wait=on",
+            Some(false) => ",wait=off",
+            None => "",
+        };
+        write!(f, "{wait}")?;
+        let nodelay = match self.nodelay {
+            Some(true) => ",nodelay=on",
+            Some(false) => ",nodelay=off",
+            None => "",
+        };
+        write!(f, "{nodelay}")?;
+        if let Some(ms) = self.reconnect_ms {
+            write!(f, "{ms}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Serial {
     None,
     Null,
     Stdio,
+    Tcp(Tcp),
 }
 
-#[derive(Debug, strum_macros::Display, Clone)]
-#[strum(prefix = "-monitor ", serialize_all = "lowercase")]
+impl Display for Serial {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "-serial ")?;
+        match self {
+            Serial::None => write!(f, "none"),
+            Serial::Null => write!(f, "null"),
+            Serial::Stdio => write!(f, "stdio"),
+            Serial::Tcp(tcp) => write!(f, "{tcp}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Monitor {
     None,
     Null,
     Stdio,
+    Tcp(Tcp),
+}
+
+impl Display for Monitor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "-monitor ")?;
+        match self {
+            Monitor::None => write!(f, "none"),
+            Monitor::Null => write!(f, "null"),
+            Monitor::Stdio => write!(f, "stdio"),
+            Monitor::Tcp(tcp) => write!(f, "{tcp}"),
+        }
+    }
 }
 
 /// Set the directory for the BIOS, VGA BIOS and keymaps.
@@ -144,6 +220,50 @@ impl<R: AsRef<Path>> From<R> for Kernel {
     }
 }
 
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone)]
+pub struct AppendKernelCmd {
+    cmdline: String,
+}
+
+#[cfg(feature = "systemmode")]
+impl Display for AppendKernelCmd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-append {}", self.cmdline)
+    }
+}
+
+#[cfg(feature = "systemmode")]
+impl<R: AsRef<str>> From<R> for AppendKernelCmd {
+    fn from(cmdline: R) -> Self {
+        Self {
+            cmdline: cmdline.as_ref().to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone)]
+pub struct InitRD {
+    path: PathBuf,
+}
+
+#[cfg(feature = "systemmode")]
+impl Display for InitRD {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-initrd {}", self.path.to_str().unwrap())
+    }
+}
+
+#[cfg(feature = "systemmode")]
+impl<R: AsRef<Path>> From<R> for InitRD {
+    fn from(path: R) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LoadVM {
     path: PathBuf,
@@ -178,6 +298,25 @@ impl<R: AsRef<str>> From<R> for Machine {
     fn from(name: R) -> Self {
         Self {
             name: name.as_ref().to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Cpu {
+    model: String,
+}
+
+impl Display for Cpu {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "-cpu {}", self.model)
+    }
+}
+
+impl<R: AsRef<str>> From<R> for Cpu {
+    fn from(model: R) -> Self {
+        Self {
+            model: model.as_ref().to_string(),
         }
     }
 }
@@ -281,6 +420,26 @@ impl From<bool> for VgaPci {
     }
 }
 
+#[cfg(feature = "systemmode")]
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum DefaultDevices {
+    #[strum(serialize = "")]
+    ENABLE,
+    #[strum(serialize = "-nodefaults")]
+    DISABLE,
+}
+
+#[cfg(feature = "systemmode")]
+impl From<bool> for DefaultDevices {
+    fn from(default_devices: bool) -> Self {
+        if default_devices {
+            DefaultDevices::ENABLE
+        } else {
+            DefaultDevices::DISABLE
+        }
+    }
+}
+
 #[cfg(feature = "usermode")]
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -304,15 +463,6 @@ impl<R: AsRef<Path>> From<R> for Program {
 }
 
 #[derive(Debug, Clone, libafl_derive::Display, TypedBuilder, Getters)]
-#[builder(build_method(into = Result<Qemu, QemuInitError>), builder_method(vis = "pub(crate)",
-    doc = "Since Qemu is a zero sized struct, this is not a completely standard builder pattern. \
-    The Qemu configuration is not stored in the Qemu struct after build() but in QEMU_CONFIG \
-    Therefore, to use the derived builder and avoid boilerplate a builder for QemuConfig is \
-    derived. \
-    The QemuConfig::builder is called in Qemu::builder() which is the only place where it should \
-    be called, in this way the one to one matching of Qemu and QemuConfig is enforced. Therefore \
-    its visibility is pub(crate)"))]
-#[getset(get = "pub")]
 pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option))]
@@ -320,6 +470,8 @@ pub struct QemuConfig {
     #[cfg(feature = "systemmode")]
     #[builder(default, setter(strip_option, into))]
     bios: Option<Bios>,
+    #[builder(default, setter(strip_option, into))]
+    cpu: Option<Cpu>,
     #[builder(default, setter(into))]
     drives: Vec<Drive>,
     #[cfg(feature = "systemmode")]
@@ -345,45 +497,32 @@ pub struct QemuConfig {
     vga_pci: Option<VgaPci>,
     #[builder(default, setter(strip_option, into))]
     start_cpu: Option<StartCPU>,
+    #[cfg(feature = "systemmode")]
+    #[builder(default, setter(strip_option, into))]
+    default_devices: Option<DefaultDevices>,
+    #[cfg(feature = "systemmode")]
+    #[builder(default, setter(strip_option, into))]
+    append_kernel_cmd: Option<AppendKernelCmd>,
+    #[cfg(feature = "systemmode")]
+    #[builder(default, setter(strip_option, into))]
+    initrd: Option<InitRD>,
     #[cfg(feature = "usermode")]
     #[builder(setter(into))]
     program: Program,
 } // Adding something here? Please leave Program as the last field
 
-impl From<QemuConfig> for Result<Qemu, QemuInitError> {
-    /// This method is necessary to make the API resemble a typical builder pattern, i.e.
-    /// `Qemu::builder().foo(bar).build()`, while still leveraging `TypedBuilder` for this
-    /// non-standard use case where `Qemu` doesn't store the configuration.
-    /// Internally, `TypedBuilder` is used to generate a builder for `QemuConfig`.
-    /// This `QemuConfig.into()` method is used by the derived `QemuConfigBuilder.build()`
-    /// to go from `QemuConfigBuilder` to `QemuConfig`, and finally to `Qemu` in one fn.
-    ///
-    /// # Errors
-    /// returns `QemuInitError` if the Qemu initialization fails, including cases where Qemu has
-    /// already been initialized.
-    fn from(config: QemuConfig) -> Self {
-        let args = config
-            .to_string()
-            .split(' ')
-            .map(ToString::to_string)
-            .collect::<Vec<String>>();
-        let qemu = Qemu::init(&args)?;
-        QEMU_CONFIG
-            .set(config)
-            .map_err(|_| unreachable!("BUG: QEMU_CONFIG was already set but Qemu was not init!"))?;
-        Ok(qemu)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
+    #[cfg(feature = "usermode")]
+    use crate::Qemu;
 
     #[test]
     #[cfg(feature = "usermode")]
     fn usermode() {
         let program = "/bin/pwd";
-        let qemu = Qemu::builder().program("/bin/pwd").build().unwrap();
+        let qemu_config = QemuConfig::builder().program("/bin/pwd").build();
+        let qemu = Qemu::init(qemu_config).unwrap();
         let config = qemu.get_config().unwrap();
         assert_eq!(config.to_string().trim(), program.trim());
     }

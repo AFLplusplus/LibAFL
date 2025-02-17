@@ -4,8 +4,7 @@
 
 use std::{arch::asm, process};
 
-use libafl_intelpt::{availability, IntelPT};
-use libipt::Image;
+use libafl_intelpt::{availability, Image, IntelPT};
 use nix::{
     sys::{
         signal::{kill, raise, Signal},
@@ -69,11 +68,7 @@ fn intel_pt_trace_fork() {
                 None,
                 map.start() as u64,
             ) {
-                Err(e) => println!(
-                    "Error adding mapping for {:?}: {:?}, skipping",
-                    map.filename().unwrap(),
-                    e
-                ),
+                Err(e) => println!("skipping mapping of {:?}: {:?}", map.filename().unwrap(), e),
                 Ok(()) => println!(
                     "mapping for {:?} added successfully {:#x} - {:#x}",
                     map.filename().unwrap(),
@@ -85,7 +80,8 @@ fn intel_pt_trace_fork() {
     }
 
     let mut map = vec![0u16; 0x10_00];
-    pt.decode_traces_into_map(&mut image, &mut map).unwrap();
+    pt.decode_traces_into_map(&mut image, map.as_mut_ptr(), map.len())
+        .unwrap();
 
     let assembly_jump_id = map.iter().position(|count| *count >= 254);
     assert!(

@@ -8,7 +8,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{
-        hooks::intel_pt::{IntelPTHook, Section},
+        hooks::intel_pt::{IntelPTHook, SectionInfo},
         inprocess::GenericInProcessExecutor,
         ExitKind,
     },
@@ -28,7 +28,8 @@ use proc_maps::get_process_maps;
 // Coverage map
 const MAP_SIZE: usize = 4096;
 static mut MAP: [u8; MAP_SIZE] = [0; MAP_SIZE];
-#[allow(static_mut_refs)]
+// TODO: This will break soon, fix me! See https://github.com/AFLplusplus/LibAFL/issues/2786
+#[allow(static_mut_refs)] // only a problem in nightly
 static mut MAP_PTR: *mut u8 = unsafe { MAP.as_mut_ptr() };
 
 pub fn main() {
@@ -99,10 +100,10 @@ pub fn main() {
     let sections = process_maps
         .iter()
         .filter_map(|pm| {
-            if pm.is_exec() && pm.filename().is_some() {
-                Some(Section {
-                    file_path: pm.filename().unwrap().to_string_lossy().to_string(),
-                    file_offset: pm.offset as u64,
+            if pm.is_exec() && pm.filename().is_some() && pm.inode != 0 {
+                Some(SectionInfo {
+                    filename: pm.filename().unwrap().to_string_lossy().to_string(),
+                    offset: pm.offset as u64,
                     size: pm.size() as u64,
                     virtual_address: pm.start() as u64,
                 })
@@ -121,8 +122,8 @@ pub fn main() {
     }
     .build();
 
-    type PTInProcessExecutor<'a, H, OT, S, T> =
-        GenericInProcessExecutor<H, &'a mut H, (IntelPTHook<T>, ()), OT, S>;
+    type PTInProcessExecutor<'a, EM, H, I, OT, S, T, Z> =
+        GenericInProcessExecutor<EM, H, &'a mut H, (IntelPTHook<T>, ()), I, OT, S, Z>;
     // Create the executor for an in-process function with just one observer
     let mut executor = PTInProcessExecutor::with_timeout_generic(
         tuple_list!(pt_hook),
