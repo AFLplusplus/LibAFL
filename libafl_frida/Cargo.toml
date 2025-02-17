@@ -122,6 +122,6 @@ winapi = { version = "0.3", features = [
 ] }
 
 [target.'cfg(unix)'.dependencies]
-errno = "0.2"
+errno = "0.3"
 [target.'cfg(target_vendor="apple")'.dependencies]
 mach-sys = { version = "0.5.4" }
