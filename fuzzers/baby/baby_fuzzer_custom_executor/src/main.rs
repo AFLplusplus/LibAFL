@@ -7,7 +7,7 @@ use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,

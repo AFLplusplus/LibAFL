@@ -10,7 +10,7 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 use libafl_bolts::{rands::Rand, Named};
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, Testcase},
     fuzzer::Evaluator,
@@ -166,7 +166,7 @@ where
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         ret
     }
@@ -279,7 +279,7 @@ where
 
             let (untransformed, post) = input.try_transform_into(state)?;
             let (_, corpus_id) =
-                fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
+                fuzzer.evaluate_filtered(state, executor, manager, &untransformed)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, corpus_id)?;
@@ -345,7 +345,7 @@ where
         for new_input in generated {
             let (untransformed, post) = new_input.try_transform_into(state)?;
             let (_, corpus_id) =
-                fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
+                fuzzer.evaluate_filtered(state, executor, manager, &untransformed)?;
             self.mutator.multi_post_exec(state, corpus_id)?;
             post.post_exec(state, corpus_id)?;
         }

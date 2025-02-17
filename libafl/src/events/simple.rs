@@ -22,23 +22,23 @@ use libafl_bolts::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::{std_on_restart, AwaitRestartSafe, ProgressReporter};
+use super::{std_on_restart, AwaitRestartSafe, ProgressReporter, RecordSerializationTime};
 #[cfg(all(unix, feature = "std", not(miri)))]
 use crate::events::EVENTMGR_SIGHANDLER_STATE;
 use crate::{
     events::{
         std_maybe_report_progress, std_report_progress, BrokerEventResult, CanSerializeObserver,
-        Event, EventFirer, EventManagerId, EventProcessor, EventRestarter, HasEventManagerId,
+        Event, EventFirer, EventManagerId, EventReceiver, EventRestarter, HasEventManagerId,
         SendExiting,
     },
-    monitors::Monitor,
+    monitors::{stats::ClientStatsManager, Monitor},
     stages::HasCurrentStageId,
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
 use crate::{
-    monitors::{ClientStats, SimplePrintingMonitor},
+    monitors::{stats::ClientStats, SimplePrintingMonitor},
     state::HasSolutions,
 };
 
@@ -55,6 +55,7 @@ pub struct SimpleEventManager<I, MT, S> {
     /// The events that happened since the last `handle_in_broker`
     events: Vec<Event<I>>,
     phantom: PhantomData<S>,
+    client_stats_manager: ClientStatsManager,
 }
 
 impl<I, MT, S> Debug for SimpleEventManager<I, MT, S>
@@ -71,6 +72,8 @@ where
     }
 }
 
+impl<I, MT, S> RecordSerializationTime for SimpleEventManager<I, MT, S> {}
+
 impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
@@ -82,10 +85,10 @@ where
     }
 
     fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        match Self::handle_in_broker(&mut self.monitor, &event)? {
+        match Self::handle_in_broker(&mut self.monitor, &mut self.client_stats_manager, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
-        };
+        }
         Ok(())
     }
 }
@@ -93,6 +96,10 @@ where
 impl<I, MT, S> SendExiting for SimpleEventManager<I, MT, S> {
     fn send_exiting(&mut self) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
     }
 }
 
@@ -109,27 +116,29 @@ where
     }
 }
 
-impl<E, I, MT, S, Z> EventProcessor<E, S, Z> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventReceiver<I, S> for SimpleEventManager<I, MT, S>
 where
     I: Debug,
     MT: Monitor,
     S: Stoppable,
 {
-    fn process(
-        &mut self,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _executor: &mut E,
-    ) -> Result<usize, Error> {
-        let count = self.events.len();
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
         while let Some(event) = self.events.pop() {
-            self.handle_in_client(state, &event)?;
+            match event {
+                Event::Stop => {
+                    state.request_stop();
+                }
+                _ => {
+                    return Err(Error::unknown(format!(
+                        "Received illegal message that message should not have arrived: {event:?}."
+                    )))
+                }
+            }
         }
-        Ok(count)
+        Ok(None)
     }
-
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -191,64 +200,70 @@ where
         Self {
             monitor,
             events: vec![],
+            client_stats_manager: ClientStatsManager::default(),
             phantom: PhantomData,
         }
     }
 
     /// Handle arriving events in the broker
     #[expect(clippy::unnecessary_wraps)]
-    fn handle_in_broker(monitor: &mut MT, event: &Event<I>) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(
+        monitor: &mut MT,
+        client_stats_manager: &mut ClientStatsManager,
+        event: &Event<I>,
+    ) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase { corpus_size, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_corpus_size(*corpus_size as u64);
-                monitor.display(event.name(), ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_corpus_size(*corpus_size as u64);
+                });
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateExecStats {
                 time, executions, ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_insert(ClientId(0));
-                let client = monitor.client_stats_mut_for(ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_executions(*executions, *time);
+                });
 
-                client.update_executions(*executions, *time);
-
-                monitor.display(event.name(), ClientId(0));
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats { name, value, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_user_stats(name.clone(), value.clone());
-                monitor.aggregate(name);
-                monitor.display(event.name(), ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_user_stats(name.clone(), value.clone());
+                });
+                client_stats_manager.aggregate(name);
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
             Event::UpdatePerfMonitor {
                 time,
                 executions,
-                introspection_monitor,
+                introspection_stats,
                 ..
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_insert(ClientId(0));
-                let client = monitor.client_stats_mut_for(ClientId(0));
-                client.update_executions(*executions, *time);
-                client.update_introspection_monitor((**introspection_monitor).clone());
-                monitor.display(event.name(), ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_executions(*executions, *time);
+                    client_stat.update_introspection_stats((**introspection_stats).clone());
+                });
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size, .. } => {
-                monitor.client_stats_insert(ClientId(0));
-                monitor
-                    .client_stats_mut_for(ClientId(0))
-                    .update_objective_size(*objective_size as u64);
-                monitor.display(event.name(), ClientId(0));
+                client_stats_manager.client_stats_insert(ClientId(0));
+                client_stats_manager.update_client_stats_for(ClientId(0), |client_stat| {
+                    client_stat.update_objective_size(*objective_size as u64);
+                });
+                monitor.display(client_stats_manager, event.name(), ClientId(0));
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -261,20 +276,6 @@ where
                 Ok(BrokerEventResult::Handled)
             }
             Event::Stop => Ok(BrokerEventResult::Forward),
-        }
-    }
-
-    // Handle arriving events in the client
-    #[allow(clippy::unused_self)]
-    fn handle_in_client(&mut self, state: &mut S, event: &Event<I>) -> Result<(), Error> {
-        match event {
-            Event::Stop => {
-                state.request_stop();
-                Ok(())
-            }
-            _ => Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {event:?}."
-            ))),
         }
     }
 }
@@ -291,6 +292,12 @@ pub struct SimpleRestartingEventManager<I, MT, S, SHM, SP> {
     inner: SimpleEventManager<I, MT, S>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SHM, SP>,
+}
+
+#[cfg(feature = "std")]
+impl<I, MT, S, SHM, SP> RecordSerializationTime
+    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+{
 }
 
 #[cfg(feature = "std")]
@@ -325,8 +332,8 @@ where
         self.staterestorer.reset();
         self.staterestorer.save(&(
             state,
-            self.inner.monitor.start_time(),
-            self.inner.monitor.client_stats(),
+            self.inner.client_stats_manager.start_time(),
+            self.inner.client_stats_manager.client_stats(),
         ))
     }
 }
@@ -352,6 +359,10 @@ where
         self.staterestorer.send_exiting();
         Ok(())
     }
+
+    fn on_shutdown(&mut self) -> Result<(), Error> {
+        self.send_exiting()
+    }
 }
 
 #[cfg(feature = "std")]
@@ -362,8 +373,7 @@ impl<I, MT, S, SHM, SP> AwaitRestartSafe for SimpleRestartingEventManager<I, MT,
 }
 
 #[cfg(feature = "std")]
-impl<E, I, MT, S, SHM, SP, Z> EventProcessor<E, S, Z>
-    for SimpleRestartingEventManager<I, MT, S, SHM, SP>
+impl<I, MT, S, SHM, SP> EventReceiver<I, S> for SimpleRestartingEventManager<I, MT, S, SHM, SP>
 where
     I: Debug,
     MT: Monitor,
@@ -371,12 +381,12 @@ where
     SHM: ShMem,
     SP: ShMemProvider<ShMem = SHM>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
-        self.inner.process(fuzzer, state, executor)
+    fn try_receive(&mut self, state: &mut S) -> Result<Option<(Event<I>, bool)>, Error> {
+        self.inner.try_receive(state)
     }
 
-    fn on_shutdown(&mut self) -> Result<(), Error> {
-        self.send_exiting()
+    fn on_interesting(&mut self, _state: &mut S, _event_vec: Event<I>) -> Result<(), Error> {
+        Ok(())
     }
 }
 
@@ -427,7 +437,7 @@ where
     /// Launch the simple restarting manager.
     /// This `EventManager` is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
-    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
+    pub fn launch(monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
         S: DeserializeOwned + Serialize + HasSolutions<I>,
         MT: Debug,
@@ -538,13 +548,13 @@ where
                 staterestorer.reset();
 
                 // reload the state of the monitor to display the correct stats after restarts
-                monitor.set_start_time(start_time);
-                *monitor.client_stats_mut() = clients_stats;
+                let mut this = SimpleRestartingEventManager::launched(monitor, staterestorer);
+                this.inner.client_stats_manager.set_start_time(start_time);
+                this.inner
+                    .client_stats_manager
+                    .update_all_client_stats(clients_stats);
 
-                (
-                    Some(state),
-                    SimpleRestartingEventManager::launched(monitor, staterestorer),
-                )
+                (Some(state), this)
             }
         };
 

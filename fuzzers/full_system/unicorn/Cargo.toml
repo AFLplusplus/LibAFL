@@ -1,0 +1,20 @@
+[package]
+name = "unicorn"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+# Enable a code hook which log the program counter at each executed instruction
+default = []
+code_hook = []
+mem_hook = []
+
+[dependencies]
+libafl = { path = "../../../libafl/" }
+libafl_bolts = { path = "../../../libafl_bolts/" }
+libafl_targets = { path = "../../../libafl_targets" }
+libafl_unicorn = { path = "../../../libafl_unicorn/" }
+
+unicorn-engine = "2.1.2"
+log = "0.4.25"
+env_logger = "0.11.6"

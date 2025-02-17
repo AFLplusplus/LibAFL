@@ -1,0 +1,43 @@
+FUZZER_NAME := 'unicorn'
+PROJECT_DIR := absolute_path(".")
+PROFILE := 'release'
+PROFILE_DIR := 'release'
+CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
+FUZZER := CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
+
+
+alias build := fuzzer
+
+fuzzer:
+	cargo build --profile={{PROFILE}}
+
+run: fuzzer
+	RUST_LOG="debug" {{FUZZER}} arm
+
+build_bin:
+  cd bin && just all
+
+
+[linux]
+[macos]
+test: fuzzer build_bin (test_single "arm") (test_single "arm64") (test_single "x86")
+    echo "Done"
+
+test_single arch="arm":
+  #!/bin/bash
+  echo "Testing {{arch}}"
+
+  RUST_LOG="debug" timeout 30s {{FUZZER}} {{arch}} 2>&1 | tee fuzz_stdout.log || true
+  if grep -qa "objectives: 1" fuzz_stdout.log; then
+    echo "Fuzzer is working"
+  else
+    echo "Fuzzer does not generate any testcases or any crashes"
+    exit 1
+  fi
+
+[windows]
+test: fuzzer
+	echo "Unsupported on this platform"
+
+clean:
+	cargo clean

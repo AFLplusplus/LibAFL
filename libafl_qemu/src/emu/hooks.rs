@@ -73,7 +73,7 @@ macro_rules! hook_to_repr {
 static mut EMULATOR_MODULES: *mut () = ptr::null_mut();
 
 #[cfg(feature = "usermode")]
-pub extern "C" fn crash_hook_wrapper<ET, I, S>(target_sig: i32)
+pub extern "C" fn run_target_crash_hooks<ET, I, S>(target_sig: i32)
 where
     ET: EmulatorModuleTuple<I, S>,
     S: Unpin,
@@ -455,22 +455,42 @@ where
             let exec1 = get_raw_hook!(
                 execution_hook_1,
                 read_0_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, ReadHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
                 read_1_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, ReadHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
                 read_2_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, ReadHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
                 read_3_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, ReadHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, ReadHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let execn = get_raw_hook!(
                 execution_hook_n,
@@ -478,6 +498,7 @@ where
                 unsafe extern "C" fn(
                     &mut TcgHookState<5, ReadHookId>,
                     id: u64,
+                    pc: GuestAddr,
                     addr: GuestAddr,
                     size: usize,
                 )
@@ -547,22 +568,42 @@ where
             let exec1 = get_raw_hook!(
                 execution_hook_1,
                 write_0_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, WriteHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let exec2 = get_raw_hook!(
                 execution_hook_2,
                 write_1_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, WriteHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let exec4 = get_raw_hook!(
                 execution_hook_4,
                 write_2_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, WriteHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let exec8 = get_raw_hook!(
                 execution_hook_8,
                 write_3_exec_hook_wrapper::<ET, I, S>,
-                unsafe extern "C" fn(&mut TcgHookState<5, WriteHookId>, id: u64, addr: GuestAddr)
+                unsafe extern "C" fn(
+                    &mut TcgHookState<5, WriteHookId>,
+                    id: u64,
+                    pc: GuestAddr,
+                    addr: GuestAddr,
+                )
             );
             let execn = get_raw_hook!(
                 execution_hook_n,
@@ -570,6 +611,7 @@ where
                 unsafe extern "C" fn(
                     &mut TcgHookState<5, WriteHookId>,
                     id: u64,
+                    pc: GuestAddr,
                     addr: GuestAddr,
                     size: usize,
                 )
@@ -932,8 +974,6 @@ where
     pub fn crash_function(&mut self, hook: CrashHookFn<ET, I, S>) {
         // # Safety
         // Will cast the valid hook to a ptr.
-        self.qemu_hooks
-            .set_crash_hook(crash_hook_wrapper::<ET, I, S>);
         self.hook_collection
             .crash_hooks
             .push(HookRepr::Function(hook as *const libc::c_void));
@@ -943,8 +983,6 @@ where
         // # Safety
         // Will cast the hook to a [`FatPtr`].
         unsafe {
-            self.qemu_hooks
-                .set_crash_hook(crash_hook_wrapper::<ET, I, S>);
             self.hook_collection
                 .crash_hooks
                 .push(HookRepr::Closure(transmute(hook)));

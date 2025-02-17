@@ -58,6 +58,6 @@ For more examples, you can check out `qemu_launcher` and `libfuzzer_libpng_launc
 
 ## Other ways
 
-The `LlmpEventManager` family is the easiest way to spawn instances, but for obscure targets, you may need to come up with other solutions.
+The `LlmpRestartEventManager` is the easiest way to spawn instances, but for obscure targets, you may need to come up with other solutions.
 LLMP is even, in theory, `no_std` compatible, and even completely different EventManagers can be used for message passing.
 If you are in this situation, please either read through the current implementations and/or reach out to us.

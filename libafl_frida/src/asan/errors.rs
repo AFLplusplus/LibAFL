@@ -11,7 +11,7 @@ use backtrace::Backtrace;
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
-use frida_gum::ModuleDetails;
+use frida_gum::{Gum, Process};
 use libafl::{
     corpus::Testcase,
     executors::ExitKind,
@@ -24,6 +24,7 @@ use libafl_bolts::{
     tuples::{Handle, Handled, MatchNameRef},
     Named, SerdeAny,
 };
+use mmap_rs::MmapOptions;
 use serde::{Deserialize, Serialize};
 use termcolor::{Color, ColorSpec, WriteColor};
 #[cfg(target_arch = "aarch64")]
@@ -151,9 +152,9 @@ impl AsanErrors {
         self.continue_on_error = continue_on_error;
     }
 
-    /// Report an error
+    /// Report an error, returns true if the caller should panic
     #[expect(clippy::too_many_lines)]
-    pub(crate) fn report_error(&mut self, error: AsanError) {
+    pub(crate) fn report_error(&mut self, error: AsanError) -> bool {
         let mut out_stream = default_output_stream();
         let output = out_stream.as_mut();
 
@@ -180,7 +181,9 @@ impl AsanErrors {
             | AsanError::WriteAfterFree(error) => {
                 let (basereg, indexreg, _displacement, fault_address) = error.fault;
 
-                if let Some(module_details) = ModuleDetails::with_address(error.pc as u64) {
+                if let Some(module_details) =
+                    Process::obtain(&Gum::obtain()).find_module_by_address(error.pc)
+                {
                     writeln!(
                         output,
                         " at 0x{:x} ({}@0x{:04x}), faulting address 0x{:x}",
@@ -294,7 +297,9 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
                 let fault_address: i64 = fault_address.try_into().unwrap();
                 let metadata_address: i64 = error.metadata.address.try_into().unwrap();
-                let offset: i64 = fault_address - (metadata_address + 0x1000);
+                #[allow(clippy::cast_possible_wrap)]
+                let offset: i64 =
+                    fault_address - (metadata_address + MmapOptions::page_size() as i64);
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
@@ -302,7 +307,7 @@ impl AsanErrors {
                     offset,
                     direction,
                     error.metadata.size,
-                    error.metadata.address + 0x1000
+                    error.metadata.address + MmapOptions::page_size()
                 )
                 .unwrap();
 
@@ -343,7 +348,9 @@ impl AsanErrors {
                 {
                     let invocation = Interceptor::current_invocation();
                     let cpu_context = invocation.cpu_context();
-                    if let Some(module_details) = ModuleDetails::with_address(*_pc as u64) {
+                    if let Some(module_details) =
+                        Process::obtain(&Gum::obtain()).find_module_by_address(*_pc)
+                    {
                         writeln!(
                             output,
                             " at 0x{:x} ({}@0x{:04x})",
@@ -388,7 +395,7 @@ impl AsanErrors {
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address + 0x1000,
+                    metadata.address + MmapOptions::page_size(),
                     metadata.size
                 )
                 .unwrap();
@@ -426,7 +433,7 @@ impl AsanErrors {
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address + 0x1000,
+                    metadata.address + MmapOptions::page_size(),
                     metadata.size
                 )
                 .unwrap();
@@ -447,7 +454,9 @@ impl AsanErrors {
             | AsanError::StackOobWrite((registers, pc, fault, backtrace)) => {
                 let (basereg, indexreg, _displacement, fault_address) = fault;
 
-                if let Some(module_details) = ModuleDetails::with_address(*pc as u64) {
+                if let Some(module_details) =
+                    Process::obtain(&Gum::obtain()).find_module_by_address(*pc)
+                {
                     writeln!(
                         output,
                         " at 0x{:x} ({}:0x{:04x}), faulting address 0x{:x}",
@@ -552,14 +561,11 @@ impl AsanErrors {
                 }
                 backtrace_printer.print_trace(backtrace, output).unwrap();
             }
-        };
+        }
 
         self.errors.push(error);
 
-        #[expect(clippy::manual_assert)]
-        if !self.continue_on_error {
-            panic!("ASAN: Crashing target!");
-        }
+        !self.continue_on_error
     }
 }
 

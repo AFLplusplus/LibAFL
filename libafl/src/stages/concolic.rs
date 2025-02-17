@@ -13,7 +13,7 @@ use libafl_bolts::{
 };
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
@@ -413,7 +413,7 @@ where
                 for (index, new_byte) in mutation {
                     input_copy.mutator_bytes_mut()[index] = new_byte;
                 }
-                fuzzer.evaluate_filtered(state, executor, manager, input_copy)?;
+                fuzzer.evaluate_filtered(state, executor, manager, &input_copy)?;
             }
         }
         Ok(())

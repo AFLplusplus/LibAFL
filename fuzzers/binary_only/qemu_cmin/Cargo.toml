@@ -1,6 +1,6 @@
 [package]
 name = "qemu_cmin"
-version = "0.15.0"
+version = "0.15.1"
 authors = [
   "Andrea Fioraldi <andreafioraldi@gmail.com>",
   "Dominik Maier <domenukk@gmail.com>",
@@ -15,7 +15,9 @@ edition = "2021"
 debug = true
 
 [features]
-default = ["std"]
+default = ["std", "snapshot"]
+fork = []
+snapshot = []
 std = []
 be = ["libafl_qemu/be"]
 arm = ["libafl_qemu/arm"]

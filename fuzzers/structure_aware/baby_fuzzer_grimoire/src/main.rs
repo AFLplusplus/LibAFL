@@ -164,7 +164,7 @@ pub fn main() {
 
     for input in initial_inputs {
         fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut mgr, input)
+            .evaluate_input(&mut state, &mut executor, &mut mgr, &input)
             .unwrap();
     }
 

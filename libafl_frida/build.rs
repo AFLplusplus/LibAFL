@@ -14,6 +14,7 @@ fn main() {
     let target_family = std::env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
 
     // Force linking against libc++
+    #[cfg(not(target_vendor = "apple"))]
     if target_family == "unix" {
         println!("cargo:rustc-link-lib=dylib=c++");
     }
@@ -56,7 +57,7 @@ fn main() {
         cmd.arg("/dll").arg(format!(
             "/OUT:{}",
             Path::new(&out_dir)
-                .join("test_harness.so")
+                .join("test_harness.dll")
                 .to_str()
                 .unwrap()
         ));

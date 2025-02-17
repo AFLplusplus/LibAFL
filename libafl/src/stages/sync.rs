@@ -148,11 +148,11 @@ where
                 .left_to_sync
                 .retain(|p| p != &path);
             log::debug!("Syncing and evaluating {:?}", path);
-            fuzzer.evaluate_input(state, executor, manager, input)?;
+            fuzzer.evaluate_input(state, executor, manager, &input)?;
         }
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         Ok(())
     }
@@ -315,7 +315,7 @@ where
 
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
         Ok(())
     }
 }

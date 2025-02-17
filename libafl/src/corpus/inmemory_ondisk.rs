@@ -4,16 +4,17 @@
 //! For a lower memory footprint, consider using [`crate::corpus::CachedOnDiskCorpus`]
 //! which only stores a certain number of [`Testcase`]s and removes additional ones in a FIFO manner.
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::cell::{Ref, RefCell, RefMut};
 use std::{
     fs,
     fs::{File, OpenOptions},
     io,
-    io::Write,
+    io::{Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
 
+use fs2::FileExt;
 #[cfg(feature = "gzip")]
 use libafl_bolts::compress::GzipCompressor;
 use serde::{Deserialize, Serialize};
@@ -33,7 +34,11 @@ use crate::{
 /// If the create fails for _any_ reason, including, but not limited to, a preexisting existing file of that name,
 /// it will instead return the respective [`io::Error`].
 fn create_new<P: AsRef<Path>>(path: P) -> Result<File, io::Error> {
-    OpenOptions::new().write(true).create_new(true).open(path)
+    OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create_new(true)
+        .open(path)
 }
 
 /// Tries to create the given `path` and returns `None` _only_ if the file already existed.
@@ -85,7 +90,7 @@ where
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add(testcase)?;
         let testcase = &mut self.get(id).unwrap().borrow_mut();
-        self.save_testcase(testcase, id)?;
+        self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
     }
@@ -95,7 +100,7 @@ where
     fn add_disabled(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         let id = self.inner.add_disabled(testcase)?;
         let testcase = &mut self.get_from_all(id).unwrap().borrow_mut();
-        self.save_testcase(testcase, id)?;
+        self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(id)
     }
@@ -106,7 +111,7 @@ where
         let entry = self.inner.replace(id, testcase)?;
         self.remove_testcase(&entry)?;
         let testcase = &mut self.get(id).unwrap().borrow_mut();
-        self.save_testcase(testcase, id)?;
+        self.save_testcase(testcase, Some(id))?;
         *testcase.input_mut() = None;
         Ok(entry)
     }
@@ -309,12 +314,19 @@ impl<I> InMemoryOnDiskCorpus<I> {
 
     /// Sets the filename for a [`Testcase`].
     /// If an error gets returned from the corpus (i.e., file exists), we'll have to retry with a different filename.
+    /// Renaming testcases will most likely cause duplicate testcases to not be handled correctly
+    /// if testcases with the same input are not given the same filename.
+    /// Only rename when you know what you are doing.
     #[inline]
     pub fn rename_testcase(
         &self,
         testcase: &mut Testcase<I>,
         filename: String,
-    ) -> Result<(), Error> {
+        id: Option<CorpusId>,
+    ) -> Result<(), Error>
+    where
+        I: Input,
+    {
         if testcase.filename().is_some() {
             // We are renaming!
 
@@ -327,36 +339,10 @@ impl<I> InMemoryOnDiskCorpus<I> {
                 return Ok(());
             }
 
-            if self.locking {
-                let new_lock_filename = format!(".{new_filename}.lafl_lock");
-
-                // Try to create lock file for new testcases
-                if let Err(err) = create_new(self.dir_path.join(&new_lock_filename)) {
-                    *testcase.filename_mut() = Some(old_filename);
-                    return Err(Error::illegal_state(format!(
-                        "Unable to create lock file {new_lock_filename} for new testcase: {err}"
-                    )));
-                }
-            }
-
             let new_file_path = self.dir_path.join(&new_filename);
-
-            fs::rename(testcase.file_path().as_ref().unwrap(), &new_file_path)?;
-
-            let new_metadata_path = {
-                if let Some(old_metadata_path) = testcase.metadata_path() {
-                    // We have metadata. Let's rename it.
-                    let new_metadata_path = self.dir_path.join(format!(".{new_filename}.metadata"));
-                    fs::rename(old_metadata_path, &new_metadata_path)?;
-
-                    Some(new_metadata_path)
-                } else {
-                    None
-                }
-            };
-
-            *testcase.metadata_path_mut() = new_metadata_path;
+            self.remove_testcase(testcase)?;
             *testcase.filename_mut() = Some(new_filename);
+            self.save_testcase(testcase, id)?;
             *testcase.file_path_mut() = Some(new_file_path);
 
             Ok(())
@@ -367,34 +353,37 @@ impl<I> InMemoryOnDiskCorpus<I> {
         }
     }
 
-    fn save_testcase(&self, testcase: &mut Testcase<I>, id: CorpusId) -> Result<(), Error>
+    fn save_testcase(&self, testcase: &mut Testcase<I>, id: Option<CorpusId>) -> Result<(), Error>
     where
         I: Input,
     {
-        let file_name_orig = testcase.filename_mut().take().unwrap_or_else(|| {
+        let file_name = testcase.filename_mut().take().unwrap_or_else(|| {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            testcase.input().as_ref().unwrap().generate_name(Some(id))
+            testcase.input().as_ref().unwrap().generate_name(id)
         });
 
-        // New testcase, we need to save it.
-        let mut file_name = file_name_orig.clone();
+        let mut ctr = 1;
+        if self.locking {
+            let lockfile_name = format!(".{file_name}");
+            let lockfile_path = self.dir_path.join(lockfile_name);
 
-        let mut ctr = 2;
-        let file_name = if self.locking {
-            loop {
-                let lockfile_name = format!(".{file_name}.lafl_lock");
-                let lockfile_path = self.dir_path.join(lockfile_name);
+            let mut lockfile = try_create_new(&lockfile_path)?.unwrap_or(
+                OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .open(&lockfile_path)?,
+            );
+            lockfile.lock_exclusive()?;
 
-                if try_create_new(lockfile_path)?.is_some() {
-                    break file_name;
-                }
-
-                file_name = format!("{file_name_orig}-{ctr}");
-                ctr += 1;
+            let mut old_ctr = String::new();
+            lockfile.read_to_string(&mut old_ctr)?;
+            if !old_ctr.is_empty() {
+                ctr = old_ctr.trim().parse::<u32>()? + 1;
             }
-        } else {
-            file_name
-        };
+
+            lockfile.seek(SeekFrom::Start(0))?;
+            lockfile.write_all(ctr.to_string().as_bytes())?;
+        }
 
         if testcase.file_path().is_none() {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
@@ -402,7 +391,15 @@ impl<I> InMemoryOnDiskCorpus<I> {
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {
-            let metafile_name = format!(".{}.metadata", testcase.filename().as_ref().unwrap());
+            let metafile_name = if self.locking {
+                format!(
+                    ".{}_{}.metadata",
+                    testcase.filename().as_ref().unwrap(),
+                    ctr
+                )
+            } else {
+                format!(".{}.metadata", testcase.filename().as_ref().unwrap())
+            };
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();
             tmpfile_path.set_file_name(format!(".{metafile_name}.tmp",));
@@ -434,26 +431,54 @@ impl<I> InMemoryOnDiskCorpus<I> {
             *testcase.metadata_path_mut() = Some(metafile_path);
         }
 
-        if let Err(err) = self.store_input_from(testcase) {
-            if self.locking {
-                return Err(err);
+        // Only try to write the data if the counter is 1.
+        // Otherwise we already have a file with this name, and
+        // we can assume the data has already been written.
+        if ctr == 1 {
+            if let Err(err) = self.store_input_from(testcase) {
+                if self.locking {
+                    return Err(err);
+                }
+                log::error!(
+                    "An error occurred when trying to write a testcase without locking: {err}"
+                );
             }
-            log::error!("An error occurred when trying to write a testcase without locking: {err}");
         }
         Ok(())
     }
 
     fn remove_testcase(&self, testcase: &Testcase<I>) -> Result<(), Error> {
         if let Some(filename) = testcase.filename() {
+            let mut ctr = String::new();
+            if self.locking {
+                let lockfile_path = self.dir_path.join(format!(".{filename}"));
+                let mut lockfile = OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .open(&lockfile_path)?;
+
+                lockfile.lock_exclusive()?;
+                lockfile.read_to_string(&mut ctr)?;
+                ctr = ctr.trim().to_string();
+
+                if ctr == "1" {
+                    FileExt::unlock(&lockfile)?;
+                    drop(fs::remove_file(lockfile_path));
+                } else {
+                    lockfile.seek(SeekFrom::Start(0))?;
+                    lockfile.write_all(&(ctr.parse::<u32>()? - 1).to_le_bytes())?;
+                    return Ok(());
+                }
+            }
+
             fs::remove_file(self.dir_path.join(filename))?;
             if self.meta_format.is_some() {
-                fs::remove_file(self.dir_path.join(format!(".{filename}.metadata")))?;
+                if self.locking {
+                    fs::remove_file(self.dir_path.join(format!(".{filename}_{ctr}.metadata")))?;
+                } else {
+                    fs::remove_file(self.dir_path.join(format!(".{filename}.metadata")))?;
+                }
             }
-            // also try to remove the corresponding `.lafl_lock` file if it still exists
-            // (even though it shouldn't exist anymore, at this point in time)
-            drop(fs::remove_file(
-                self.dir_path.join(format!(".{filename}.lafl_lock")),
-            ));
         }
         Ok(())
     }
@@ -486,7 +511,7 @@ mod tests {
             Ok(None) => (),
             Ok(_) => panic!("File {path:?} did not exist even though it should have?"),
             Err(e) => panic!("An unexpected error occurred: {e}"),
-        };
+        }
         drop(f);
         fs::remove_file(path).unwrap();
     }

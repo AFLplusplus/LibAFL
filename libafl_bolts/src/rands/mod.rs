@@ -136,8 +136,8 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
         fast_bound(self.next(), upper_bound_excl)
     }
 
-    /// Gets a value between [0, n]
-    fn zero_upto(&mut self, n: usize) -> usize {
+    /// Gets a value below the given one or zero
+    fn below_or_zero(&mut self, n: usize) -> usize {
         fast_bound_usize(self.next(), n)
     }
 
@@ -263,10 +263,6 @@ macro_rules! impl_rng_core {
             fn fill_bytes(&mut self, dest: &mut [u8]) {
                 rand_core::impls::fill_bytes_via_next(self, dest)
             }
-
-            fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-                Ok(self.fill_bytes(dest))
-            }
         }
     };
 }
@@ -371,7 +367,7 @@ impl Rand for Lehmer64Rand {
     #[inline]
     #[expect(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
-        self.s *= 0xda942042e4dd58b5;
+        self.s = self.s.wrapping_mul(0xda942042e4dd58b5);
         (self.s >> 64) as u64
     }
 }

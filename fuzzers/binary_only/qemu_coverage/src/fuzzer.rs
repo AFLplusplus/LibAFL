@@ -31,7 +31,7 @@ use libafl_qemu::{
     elf::EasyElf,
     modules::{drcov::DrCovModule, SnapshotModule},
     ArchExtras, CallingConvention, Emulator, GuestAddr, GuestReg, MmapPerms, Qemu, QemuExecutor,
-    QemuExitReason, QemuRWError, QemuShutdownCause, Regs,
+    QemuExitReason, QemuMappingsViewer, QemuRWError, QemuShutdownCause, Regs,
 };
 
 #[derive(Default)]
@@ -136,7 +136,7 @@ pub fn fuzz() {
 
         let emulator_modules = tuple_list!(
             DrCovModule::builder().filename(cov_path.clone()).build(),
-            SnapshotModule::new()
+            SnapshotModule::new(),
         );
 
         let emulator = Emulator::empty()
@@ -156,14 +156,8 @@ pub fn fuzz() {
 
         qemu.entry_break(test_one_input_ptr);
 
-        for m in qemu.mappings() {
-            log::info!(
-                "Mapping: 0x{:016x}-0x{:016x}, {}",
-                m.start(),
-                m.end(),
-                m.path().unwrap_or(&"<EMPTY>".to_string())
-            );
-        }
+        let mappings = QemuMappingsViewer::new(&qemu);
+        println!("{:#?}", mappings);
 
         let pc: GuestReg = qemu.read_reg(Regs::Pc).unwrap();
         log::info!("Break at {pc:#x}");
@@ -288,11 +282,6 @@ pub fn fuzz() {
         .monitor(MultiMonitor::new(|s| println!("{s}")))
         .run_client(&mut run_client)
         .cores(&options.cores)
-        .stdout_file(if options.verbose {
-            None
-        } else {
-            Some("/dev/null")
-        })
         .build()
         .launch()
     {

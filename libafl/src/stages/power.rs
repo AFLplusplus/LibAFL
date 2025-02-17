@@ -9,7 +9,7 @@ use core::{fmt::Debug, marker::PhantomData};
 use libafl_bolts::Named;
 
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::HasCurrentCorpusId,
     executors::{Executor, HasObservers},
@@ -176,7 +176,7 @@ where
 
             let (untransformed, post) = input.try_transform_into(state)?;
             let (_, corpus_id) =
-                fuzzer.evaluate_filtered(state, executor, manager, untransformed)?;
+                fuzzer.evaluate_filtered(state, executor, manager, &untransformed)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, corpus_id)?;

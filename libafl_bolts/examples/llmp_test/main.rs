@@ -60,7 +60,7 @@ fn adder_loop(port: u16) -> Result<(), Box<dyn std::error::Error>> {
                     sender,
                     buf.len()
                 ),
-            };
+            }
         }
 
         if current_result != last_result {

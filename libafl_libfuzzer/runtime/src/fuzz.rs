@@ -1,19 +1,12 @@
 use core::ffi::c_int;
 #[cfg(unix)]
 use std::io::{stderr, stdout, Write};
-use std::{
-    fmt::Debug,
-    fs::File,
-    net::TcpListener,
-    os::fd::AsRawFd,
-    str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{fmt::Debug, fs::File, net::TcpListener, os::fd::AsRawFd, str::FromStr};
 
 use libafl::{
     corpus::Corpus,
     events::{
-        launcher::Launcher, EventConfig, EventProcessor, ProgressReporter, SimpleEventManager,
+        launcher::Launcher, EventConfig, EventReceiver, ProgressReporter, SimpleEventManager,
         SimpleRestartingEventManager,
     },
     executors::ExitKind,
@@ -68,7 +61,7 @@ where
         + HasLastReportTime
         + HasCurrentStageId
         + Stoppable,
-    EM: ProgressReporter<S> + EventProcessor<E, S, F>,
+    EM: ProgressReporter<S> + EventReceiver<I, S>,
     ST: StagesTuple<E, EM, S, F>,
 {
     if let Some(solution) = state.solutions().last() {
@@ -208,16 +201,10 @@ pub fn fuzz(
                 .build();
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         } else if forks == 1 {
-            let monitor = MultiMonitor::with_time(
-                create_monitor_closure(),
-                SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-            );
+            let monitor = MultiMonitor::new(create_monitor_closure());
             fuzz_single_forking(options, harness, shmem_provider, monitor)
         } else {
-            let monitor = MultiMonitor::with_time(
-                create_monitor_closure(),
-                SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
-            );
+            let monitor = MultiMonitor::new(create_monitor_closure());
             fuzz_many_forking(options, harness, shmem_provider, forks, monitor)
         }
     } else if options.tui() {

@@ -15,14 +15,10 @@ else
     export PROFILE_DIR=debug
 fi
 
-libafl=$(pwd)
-
 echo "Testing" "$fuzzer_to_test"
 # build with a shared target dir for all fuzzers. this should speed up
 # compilation a bit, and allows for easier artifact management (caching and
 # cargo clean).
-export CARGO_TARGET_DIR="$libafl/target"
-mkdir -p "$CARGO_TARGET_DIR"
 
 git submodule init && git submodule update
 
@@ -58,28 +54,19 @@ do
     
     if [ -e ./Makefile.toml ] && grep -qF "skip_core_tasks = true" Makefile.toml; then
         echo "[*] Building $fuzzer (running tests is not supported in this context)"
-        cargo make build || exit 1
+        just build || exit 1
         echo "[+] Done building $fuzzer"
     elif [ -e ./Makefile.toml ]; then
         echo "[*] Testing $fuzzer"
-        cargo make test || exit 1
+        just test || exit 1
+        echo "[+] Done testing $fuzzer"
+    elif [ -e ./Justfile ]; then
+        echo "[*] Testing $fuzzer"
+        just test || exit 1
         echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
         cargo build || exit 1
         echo "[+] Done building $fuzzer"
     fi
-    du -sh "$CARGO_TARGET_DIR"
-    # Save disk space
-    cargo clean -p "$(basename "$fuzzer")"
-    cargo clean --release -p "$(basename "$fuzzer")" 2> /dev/null
-    # Leaving these in the cache results in lots of duplicate build artifacts
-    # (many different feature flag combinations, ...), so let's prune them.
-    for clean_pkgid in libafl libafl_targets libafl_sugar; do
-        cargo clean -p "$clean_pkgid" 2> /dev/null
-        cargo clean --release -p "$clean_pkgid" 2> /dev/null
-    done
-    du -sh "$CARGO_TARGET_DIR"
-    cd "$libafl" || exit 1
-    echo ""
 done

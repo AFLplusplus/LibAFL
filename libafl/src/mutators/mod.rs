@@ -407,3 +407,22 @@ impl Named for NopMutator {
         &Cow::Borrowed("NopMutator")
     }
 }
+
+/// [`Mutator`] that inverts a boolean value.
+///
+/// Mostly useful in combination with [`mapping::MappingMutator`]s to mutate parts of a complex input.
+#[derive(Debug)]
+pub struct BoolInvertMutator;
+
+impl<S> Mutator<bool, S> for BoolInvertMutator {
+    fn mutate(&mut self, _state: &mut S, input: &mut bool) -> Result<MutationResult, Error> {
+        *input = !*input;
+        Ok(MutationResult::Mutated)
+    }
+}
+
+impl Named for BoolInvertMutator {
+    fn name(&self) -> &Cow<'static, str> {
+        &Cow::Borrowed("BoolInvertMutator")
+    }
+}

@@ -330,7 +330,7 @@ where
                                 client_description,
                             );
                         }
-                    };
+                    }
                 }
             }
         }
@@ -461,7 +461,7 @@ where
                                 if self.stdout_file.is_some() || self.stderr_file.is_some() {
                                     stdout = Stdio::inherit();
                                     stderr = Stdio::inherit();
-                                };
+                                }
                             }
 
                             std::thread::sleep(Duration::from_millis(
@@ -637,7 +637,6 @@ where
             Option<S>,
             CentralizedEventManager<
                 StdCentralizedInnerMgr<I, S, SP::ShMem, SP>,
-                (),
                 I,
                 S,
                 SP::ShMem,
@@ -649,7 +648,6 @@ where
             Option<S>,
             CentralizedEventManager<
                 StdCentralizedInnerMgr<I, S, SP::ShMem, SP>,
-                (),
                 I,
                 S,
                 SP::ShMem,
@@ -696,13 +694,13 @@ where
         I: Input + Send + Sync + 'static,
         CF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SP::ShMem, SP>,
+            CentralizedEventManager<EM, I, S, SP::ShMem, SP>,
             ClientDescription,
         ) -> Result<(), Error>,
         EMB: FnOnce(&Self, ClientDescription) -> Result<(Option<S>, EM), Error>,
         MF: FnOnce(
             Option<S>,
-            CentralizedEventManager<EM, (), I, S, SP::ShMem, SP>, // No broker_hooks for centralized EM
+            CentralizedEventManager<EM, I, S, SP::ShMem, SP>, // No broker_hooks for centralized EM
             ClientDescription,
         ) -> Result<(), Error>,
     {
@@ -788,7 +786,6 @@ where
                                 let c_mgr = centralized_event_manager_builder.build_on_port(
                                     mgr,
                                     // tuple_list!(multi_machine_event_manager_hook.take().unwrap()),
-                                    tuple_list!(),
                                     self.shmem_provider.clone(),
                                     self.centralized_broker_port,
                                     self.time_obs.clone(),
@@ -815,7 +812,6 @@ where
 
                                 let c_mgr = centralized_builder.build_on_port(
                                     mgr,
-                                    tuple_list!(),
                                     self.shmem_provider.clone(),
                                     self.centralized_broker_port,
                                     self.time_obs.clone(),
@@ -829,7 +825,7 @@ where
                                 Err(Error::shutting_down())
                             }
                         }?,
-                    };
+                    }
                 }
             }
         }
@@ -902,7 +898,7 @@ where
             if let Some(remote_broker_addr) = self.remote_broker_addr {
                 log::info!("B2b: Connecting to {:?}", &remote_broker_addr);
                 broker.inner_mut().connect_b2b(remote_broker_addr)?;
-            };
+            }
 
             broker.set_exit_after(exit_cleanly_after);
 

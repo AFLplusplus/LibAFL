@@ -17,7 +17,7 @@ use serde::Serialize;
 #[cfg(feature = "track_hit_feedbacks")]
 use crate::feedbacks::premature_last_result_err;
 #[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
+use crate::monitors::stats::PerfFeature;
 use crate::{
     corpus::{Corpus, HasCurrentCorpusId, Testcase},
     events::EventFirer,
@@ -100,7 +100,7 @@ where
         self.perform_minification(fuzzer, executor, state, manager)?;
 
         #[cfg(feature = "introspection")]
-        state.introspection_monitor_mut().finish_stage();
+        state.introspection_stats_mut().finish_stage();
 
         Ok(())
     }
@@ -238,7 +238,7 @@ where
                 let (_, corpus_id) = fuzzer.evaluate_execution(
                     state,
                     manager,
-                    input.clone(),
+                    &input,
                     &*observers,
                     &exit_kind,
                     false,

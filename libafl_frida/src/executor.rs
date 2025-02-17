@@ -1,23 +1,19 @@
 use core::fmt::{self, Debug, Formatter};
 #[cfg(all(windows, not(test)))]
 use std::process::abort;
-use std::{ffi::c_void, marker::PhantomData};
+use std::{cell::RefCell, ffi::c_void, marker::PhantomData, rc::Rc};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
 };
 #[cfg(windows)]
-use libafl::{
-    executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks},
-    inputs::Input,
-    state::{HasCurrentTestcase, HasSolutions},
-};
+use libafl::executors::{hooks::inprocess::InProcessHooks, inprocess::HasInProcessHooks};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{NopTargetBytesConverter, TargetBytesConverter},
+    inputs::{Input, NopTargetBytesConverter, TargetBytesConverter},
     observers::ObserversTuple,
-    state::HasExecutions,
+    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
     Error,
 };
 use libafl_bolts::{tuples::RefIndexable, AsSlice};
@@ -29,37 +25,41 @@ use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 use crate::windows_hooks::initialize;
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC> {
-    base: InProcessExecutor<'a, H, I, OT, S>,
+pub struct FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z> {
+    base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
     /// `thread_id` for the Stalker
     thread_id: Option<u32>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker,
     /// User provided callback for instrumentation
-    helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+    helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
     target_bytes_converter: TC,
     followed: bool,
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<H, I, OT, RT, S, TC> Debug for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
+impl<EM, H, I, OT, RT, S, TC, Z> Debug
+    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, TC, Z>
 where
     OT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
             .field("base", &self.base)
-            .field("helper", &self.helper)
+            .field("helper", &self.helper.borrow_mut())
             .field("followed", &self.followed)
             .finish_non_exhaustive()
     }
 }
 
 impl<EM, H, I, OT, RT, S, TC, Z> Executor<EM, I, S, Z>
-    for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC>
+    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, TC, Z>
 where
     H: FnMut(&I) -> ExitKind,
+    I: Input,
     S: HasExecutions,
+    S: HasCurrentTestcase<I>,
+    S: HasSolutions<I>,
     TC: TargetBytesConverter<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
@@ -74,13 +74,12 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let target_bytes = self.target_bytes_converter.to_target_bytes(input);
-        self.helper.pre_exec(target_bytes.as_slice())?;
-        if self.helper.stalker_enabled() {
-            if self.followed {
-                self.stalker.activate(NativePointer(core::ptr::null_mut()));
-            } else {
+        self.helper.borrow_mut().pre_exec(target_bytes.as_slice())?;
+        if self.helper.borrow_mut().stalker_enabled() {
+            if !(self.followed) {
                 self.followed = true;
-                let transformer = self.helper.transformer();
+                let helper_binding = self.helper.borrow_mut();
+                let transformer = helper_binding.transformer();
                 if let Some(thread_id) = self.thread_id {
                     self.stalker.follow::<NoneEventSink>(
                         thread_id.try_into().unwrap(),
@@ -89,11 +88,19 @@ where
                     );
                 } else {
                     self.stalker.follow_me::<NoneEventSink>(transformer, None);
+                    self.stalker.deactivate();
                 }
             }
+            // We removed the fuzzer from the stalked ranges,
+            // but we need to pass the harness entry point
+            // so that Stalker knows to pick it despite the module being excluded
+            let harness_fn_ref: &H = self.base.harness();
+            let ptr: *const H = harness_fn_ref as *const H;
+            log::info!("Activating Stalker for {:p}", ptr);
+            self.stalker.activate(NativePointer(ptr as *mut c_void));
         }
         let res = self.base.run_target(fuzzer, state, mgr, input);
-        if self.helper.stalker_enabled() {
+        if self.helper.borrow_mut().stalker_enabled() {
             self.stalker.deactivate();
         }
 
@@ -106,12 +113,16 @@ where
                 abort();
             }
         }
-        self.helper.post_exec(target_bytes.as_slice())?;
+        self.helper
+            .borrow_mut()
+            .post_exec(target_bytes.as_slice())?;
         res
     }
 }
 
-impl<H, I, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H, I, OT, RT, S, TC> {
+impl<EM, H, I, OT, RT, S, TC, Z> HasObservers
+    for FridaInProcessExecutor<'_, '_, EM, H, I, OT, RT, S, TC, Z>
+{
     type Observers = OT;
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
@@ -124,16 +135,16 @@ impl<H, I, OT, RT, S, TC> HasObservers for FridaInProcessExecutor<'_, '_, '_, H,
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S>
-    FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, NopTargetBytesConverter<I>>
+impl<'a, 'b, EM, H, I, OT, RT, S, Z>
+    FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, NopTargetBytesConverter<I>, Z>
 where
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
-        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(
             gum,
@@ -147,8 +158,8 @@ where
     /// Creates a new [`FridaInProcessExecutor`] tracking the given `thread_id`.
     pub fn on_thread(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
-        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
         thread_id: u32,
     ) -> Self {
         FridaInProcessExecutor::with_target_bytes_converter(
@@ -161,37 +172,47 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S, TC> FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
+impl<'a, 'b, EM, H, I, OT, RT, S, TC, Z> FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z>
 where
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`].
     pub fn with_target_bytes_converter(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
-        helper: &'c mut FridaInstrumentationHelper<'b, RT>,
+        base: InProcessExecutor<'a, EM, H, I, OT, S, Z>,
+        helper: Rc<RefCell<FridaInstrumentationHelper<'b, RT>>>,
         thread_id: Option<u32>,
         target_bytes_converter: TC,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
-        // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
-        // we don't add it to the INSTRUMENTED ranges.
-        let mut ranges = helper.ranges().clone();
-        for module in frida_gum::Module::obtain(gum).enumerate_modules() {
-            if module.base_address < Self::with_target_bytes_converter as usize
+        let ranges = helper.borrow_mut().ranges().clone();
+        for module in frida_gum::Process::obtain(gum).enumerate_modules() {
+            let range = module.range();
+            if (range.base_address().0 as usize) < Self::with_target_bytes_converter as usize
                 && (Self::with_target_bytes_converter as usize as u64)
-                    < module.base_address as u64 + module.size as u64
+                    < range.base_address().0 as u64 + range.size() as u64
             {
-                ranges.insert(
-                    module.base_address as u64..(module.base_address as u64 + module.size as u64),
-                    (0xffff, "fuzzer".to_string()),
+                log::info!(
+                    "Fuzzer range: {:x}-{:x}",
+                    range.base_address().0 as u64,
+                    range.base_address().0 as u64 + range.size() as u64
                 );
+                // Exclude the fuzzer from the stalked ranges, it is really unnecessary and harmfull.
+                // Otherwise, Stalker starts messing with our hooks and their callbacks
+                // wrecking havoc and causing deadlocks
+                stalker.exclude(&MemoryRange::new(
+                    NativePointer(range.base_address().0),
+                    range.size(),
+                ));
                 break;
             }
         }
 
-        log::info!("disable_excludes: {:}", helper.disable_excludes);
-        if !helper.disable_excludes {
+        log::info!(
+            "disable_excludes: {:}",
+            helper.borrow_mut().disable_excludes
+        );
+        if !helper.borrow_mut().disable_excludes {
             for range in ranges.gaps(&(0..u64::MAX)) {
                 log::info!("excluding range: {:x}-{:x}", range.start, range.end);
                 stalker.exclude(&MemoryRange::new(
@@ -219,8 +240,8 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, I, OT, RT, S, TC> HasInProcessHooks<I, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S, TC>
+impl<'a, 'b, EM, H, I, OT, RT, S, TC, Z> HasInProcessHooks<I, S>
+    for FridaInProcessExecutor<'a, 'b, EM, H, I, OT, RT, S, TC, Z>
 where
     H: FnMut(&I) -> ExitKind,
     S: HasSolutions<I> + HasCurrentTestcase<I> + HasExecutions,

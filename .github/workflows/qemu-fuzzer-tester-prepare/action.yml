@@ -10,10 +10,10 @@ runs:
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
-    - name: install cargo-make
-      uses: baptiste0928/cargo-install@v3
+    - name: install just
+      uses: extractions/setup-just@v2
       with:
-        crate: cargo-make
+        just-version: 1.39.0
     - uses: actions/checkout@v4
       with:
         submodules: true

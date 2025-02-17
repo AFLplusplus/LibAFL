@@ -11,7 +11,6 @@ use std::{collections::BTreeMap, ffi::c_void};
 
 use backtrace::Backtrace;
 use frida_gum::{PageProtection, RangeDetails};
-use hashbrown::HashMap;
 use libafl_bolts::cli::FuzzerOptions;
 #[cfg(target_vendor = "apple")]
 use mach_sys::{
@@ -59,9 +58,9 @@ pub struct Allocator {
     /// Whether we've pre allocated a shadow mapping:
     using_pre_allocated_shadow_mapping: bool,
     /// All tracked allocations
-    allocations: HashMap<usize, AllocationMetadata>,
+    allocations: BTreeMap<usize, AllocationMetadata>,
     /// All mappings
-    mappings: HashMap<usize, MmapMut>,
+    mappings: BTreeMap<usize, MmapMut>,
     /// The shadow memory pages
     shadow_pages: RangeSet<usize>,
     /// A list of allocations
@@ -171,7 +170,6 @@ impl Allocator {
     #[must_use]
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
-        log::trace!("alloc");
         let mut is_malloc_zero = false;
         let size = if size == 0 {
             is_malloc_zero = true;
@@ -202,7 +200,10 @@ impl Allocator {
             }
             metadata
         } else {
-            // log::trace!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
+            // log::info!(
+            //     "Mapping {:x}, size {rounded_up_size:x}",
+            //     self.current_mapping_addr
+            // );
             let mapping = match MmapOptions::new(rounded_up_size)
                 .unwrap()
                 .with_address(self.current_mapping_addr)
@@ -249,32 +250,32 @@ impl Allocator {
         let address = (metadata.address + self.page_size) as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
-        log::trace!(
-            "serving address: {:#x}, size: {:#x}",
-            address as usize,
-            size
-        );
+        // log::info!("serving address: {address:?}, size: {size:x}");
         address
     }
 
     /// Releases the allocation at the given address.
     #[expect(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
-        log::trace!("release {:?}", ptr);
+        // log::info!("releasing {:?}", ptr);
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
-            if !ptr.is_null() {
-                AsanErrors::get_mut_blocking()
-                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
+            if !ptr.is_null()
+                && AsanErrors::get_mut_blocking()
+                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())))
+            {
+                panic!("ASAN: Crashing target!");
             }
             return;
         };
 
-        if metadata.freed {
-            AsanErrors::get_mut_blocking().report_error(AsanError::DoubleFree((
+        if metadata.freed
+            && AsanErrors::get_mut_blocking().report_error(AsanError::DoubleFree((
                 ptr as usize,
                 metadata.clone(),
                 Backtrace::new(),
-            )));
+            )))
+        {
+            panic!("ASAN: Crashing target!");
         }
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
@@ -316,7 +317,7 @@ impl Allocator {
     /// Resets the allocator contents
     pub fn reset(&mut self) {
         let mut tmp_allocations = Vec::new();
-        for (address, mut allocation) in self.allocations.drain() {
+        while let Some((address, mut allocation)) = self.allocations.pop_first() {
             if !allocation.freed {
                 tmp_allocations.push(allocation);
                 continue;
@@ -403,14 +404,14 @@ impl Allocator {
         unpoison: bool,
     ) -> (usize, usize) {
         let shadow_mapping_start = map_to_shadow!(self, start);
-        log::trace!("map_shadow_for_region: {:x}, {:x}", start, end);
+        // log::trace!("map_shadow_for_region: {:x}, {:x}", start, end);
         let shadow_start = self.round_down_to_page(shadow_mapping_start);
         let shadow_end = self.round_up_to_page((end - start) / 8 + self.page_size + shadow_start);
-        log::trace!(
-            "map_shadow_for_region: shadow_start {:x}, shadow_end {:x}",
-            shadow_start,
-            shadow_end
-        );
+        // log::trace!(
+        //     "map_shadow_for_region: shadow_start {:x}, shadow_end {:x}",
+        //     shadow_start,
+        //     shadow_end
+        // );
         if self.using_pre_allocated_shadow_mapping {
             let mut newly_committed_regions = Vec::new();
             for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
@@ -439,11 +440,11 @@ impl Allocator {
                 }
             }
             for newly_committed_region in newly_committed_regions {
-                log::trace!(
-                    "committed shadow pages: start {:x}, end {:x}",
-                    newly_committed_region.start(),
-                    newly_committed_region.end()
-                );
+                // log::trace!(
+                //     "committed shadow pages: start {:x}, end {:x}",
+                //     newly_committed_region.start(),
+                //     newly_committed_region.end()
+                // );
                 self.shadow_pages
                     .insert(newly_committed_region.start()..newly_committed_region.end());
                 self.mappings
@@ -569,7 +570,21 @@ impl Allocator {
         map_to_shadow!(self, start)
     }
 
-    /// Checks if the current address is one of ours - is this address in the allocator region
+    /// Is this a valid and mapped shadow address?
+    #[must_use]
+    pub fn valid_shadow(&self, start: usize, size: usize) -> bool {
+        let range_to_check = start..(start + size);
+        let valid = self
+            .shadow_pages
+            .overlapping(&range_to_check)
+            .any(|r| r.start <= start && r.end >= start + size);
+
+        if !valid {
+            log::error!("Not a valid shadow: {:#x}!", start);
+        }
+        valid
+    }
+    /// Checks if the currennt address is one of ours
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))
@@ -579,9 +594,17 @@ impl Allocator {
     /// Checks if any of the allocations has not been freed
     pub fn check_for_leaks(&self) {
         for metadata in self.allocations.values() {
-            if !metadata.freed {
-                AsanErrors::get_mut_blocking()
-                    .report_error(AsanError::Leak((metadata.address, metadata.clone())));
+            if !metadata.freed
+                && AsanErrors::get_mut_blocking()
+                    .report_error(AsanError::Leak((metadata.address, metadata.clone())))
+            {
+                unsafe {
+                    println!(
+                        "{:x?}",
+                        std::slice::from_raw_parts(metadata.address as *const u8, metadata.size)
+                    );
+                };
+                panic!("ASAN: Crashing target!");
             }
         }
     }
@@ -654,7 +677,7 @@ impl Allocator {
                 if self.shadow_offset <= start && end <= self.current_mapping_addr {
                     log::trace!("Reached the shadow/allocator region - skipping");
                 } else {
-                    log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
+                    // log::trace!("Unpoisoning: {:#x}-{:#x}", start, end);
                     self.map_shadow_for_region(start, end, true);
                 }
                 true
@@ -818,10 +841,10 @@ impl Default for Allocator {
             page_size,
             pre_allocated_shadow_mappings: Vec::new(),
             using_pre_allocated_shadow_mapping: false,
-            mappings: HashMap::new(),
+            mappings: BTreeMap::new(),
             shadow_offset: 0,
             shadow_bit: 0,
-            allocations: HashMap::new(),
+            allocations: BTreeMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: BTreeMap::new(),
             largest_allocation: 0,
@@ -833,8 +856,9 @@ impl Default for Allocator {
 }
 
 #[test]
-#[cfg(not(windows))] // not working yet
 fn check_shadow() {
+    use frida_gum::Gum;
+    let _gum = Gum::obtain();
     let mut allocator = Allocator::default();
     allocator.init();
 

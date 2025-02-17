@@ -1,0 +1,67 @@
+import "../../../just/libafl.just"
+
+FUZZER_NAME := "frida_fuzzer"
+FUZZER_NAME_WIN := "frida_fuzzer.exe"
+
+set windows-shell := ['cmd.exe', '/c']
+set unstable
+
+[unix]
+libpng:
+    #!/bin/bash
+    if [ ! -f v1.6.37.tar.gz ]; then
+        wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
+    fi
+    tar -xvf v1.6.37.tar.gz
+
+[unix]
+lib: libpng
+    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+    make -j -C libpng-1.6.37
+
+[unix]
+harness: lib
+    clang++ -O3 -c -fPIC harness.cc -o harness.o
+    clang++ -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harness.so
+
+[windows]
+harness:
+    cl /c harness_win.cpp && link harness_win.obj /dll
+
+[unix]
+[windows]
+build:
+    cargo build --profile {{ PROFILE }}
+
+[unix]
+run: build harness
+    {{ FUZZER }} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so
+
+[windows]
+run: build harness
+    {{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}} -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
+
+[unix]
+test: build harness
+    #!/bin/bash
+
+    rm -rf libafl_unix_shmem_server || true
+    timeout 30s {{ FUZZER }} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so | tee fuzz_stdout.log 2>/dev/null || true
+    if grep -qa "corpus: 70" fuzz_stdout.log; then
+        echo "Fuzzer is working"
+    else
+        echo "Fuzzer does not generate any testcases or any crashes"
+        exit 1
+    fi
+
+[windows]
+[script("cmd.exe", "/c")]
+test: build harness
+    start "" "{{TARGET_DIR}}\{{PROFILE}}\{{FUZZER_NAME_WIN}}" -F LLVMFuzzerTestOneInput -H .\harness_win.dll -l .\harness_win.dll --cores=0
+    ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
+    dir /a-d corpus_discovered && (echo Files exist) || (exit /b 1337)
+
+[unix]
+clean:
+    make -C libpng-1.6.37 clean
+    cargo clean
