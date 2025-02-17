@@ -68,54 +68,52 @@ pub fn debug_print(emu: &Unicorn<()>) {
 
     // Provide disassembly at instant of crash
     let regions = emu.mem_regions().expect("Could not get memory regions");
-    for i in 0..regions.len() {
-        if regions[i].perms.contains(Permission::EXEC) {
-            if pc >= regions[i].begin && pc <= regions[i].end {
-                let mut begin = pc - 32;
-                let mut end = pc + 32;
-                if begin < regions[i].begin {
-                    begin = regions[i].begin;
-                }
-                if end > regions[i].end {
-                    end = regions[i].end;
-                }
+    for region in regions {
+        if region.perms.contains(Permission::EXEC) && pc >= region.begin && pc <= region.end {
+            let mut begin = pc - 32;
+            let mut end = pc + 32;
+            if begin < region.begin {
+                begin = region.begin;
+            }
+            if end > region.end {
+                end = region.end;
+            }
 
-                let bytes = emu
-                    .mem_read_as_vec(begin, (end - begin) as usize)
-                    .expect("Could not get program code");
-                let cs = match emu.get_arch() {
-                    Arch::ARM => Capstone::new()
-                        .arm()
-                        .mode(arch::arm::ArchMode::Thumb)
-                        .detail(true)
-                        .build()
-                        .expect("Failed to create Capstone object"),
-                    Arch::ARM64 => Capstone::new()
-                        .arm64()
-                        .mode(arch::arm64::ArchMode::Arm)
-                        .detail(true)
-                        .build()
-                        .expect("Failed to create Capstone object"),
+            let bytes = emu
+                .mem_read_as_vec(begin, (end - begin) as usize)
+                .expect("Could not get program code");
+            let cs = match emu.get_arch() {
+                Arch::ARM => Capstone::new()
+                    .arm()
+                    .mode(arch::arm::ArchMode::Thumb)
+                    .detail(true)
+                    .build()
+                    .expect("Failed to create Capstone object"),
+                Arch::ARM64 => Capstone::new()
+                    .arm64()
+                    .mode(arch::arm64::ArchMode::Arm)
+                    .detail(true)
+                    .build()
+                    .expect("Failed to create Capstone object"),
 
-                    _ => Capstone::new()
-                        .x86()
-                        .mode(arch::x86::ArchMode::Mode64)
-                        .syntax(arch::x86::ArchSyntax::Intel)
-                        .detail(true)
-                        .build()
-                        .expect("Failed to create Capstone object"),
-                };
-                let insns = cs.disasm_all(&bytes, begin).expect("Failed to disassemble");
+                _ => Capstone::new()
+                    .x86()
+                    .mode(arch::x86::ArchMode::Mode64)
+                    .syntax(arch::x86::ArchSyntax::Intel)
+                    .detail(true)
+                    .build()
+                    .expect("Failed to create Capstone object"),
+            };
+            let insns = cs.disasm_all(&bytes, begin).expect("Failed to disassemble");
 
-                if !insns.is_empty() {
-                    log::debug!("Code dump: [0x{begin:x} -> 0x{end:x}]");
-                } else {
-                    log::debug!("No disassembly available at PC: 0x{pc:x}");
-                }
+            if !insns.is_empty() {
+                log::debug!("Code dump: [0x{begin:x} -> 0x{end:x}]");
+            } else {
+                log::debug!("No disassembly available at PC: 0x{pc:x}");
+            }
 
-                for i in insns.as_ref() {
-                    log::debug!("{}", i);
-                }
+            for i in insns.as_ref() {
+                log::debug!("{}", i);
             }
         }
     }
