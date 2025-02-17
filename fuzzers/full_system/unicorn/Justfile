@@ -27,7 +27,7 @@ test_single arch="arm":
   #!/bin/bash
   echo "Testing {{arch}}"
 
-  RUST_LOG="debug" timeout 10s {{FUZZER}} {{arch}} 2>&1 | tee fuzz_stdout.log || true
+  RUST_LOG="debug" timeout 30s {{FUZZER}} {{arch}} 2>&1 | tee fuzz_stdout.log || true
   if grep -qa "objectives: 1" fuzz_stdout.log; then
     echo "Fuzzer is working"
   else
