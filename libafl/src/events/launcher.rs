@@ -461,7 +461,7 @@ where
                                 if self.stdout_file.is_some() || self.stderr_file.is_some() {
                                     stdout = Stdio::inherit();
                                     stderr = Stdio::inherit();
-                                };
+                                }
                             }
 
                             std::thread::sleep(Duration::from_millis(

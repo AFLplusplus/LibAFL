@@ -344,6 +344,27 @@ jobs:
               - 'libafl_targets/**'
               - 'libafl_qemu/**'
               - 'fuzzers/**/*qemu*/**'
+  fuzzer-unicorn:
+    runs-on: ubuntu-24.04
+    needs:
+      - fuzzers-preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-24.04 ]
+        fuzzer:
+          - ./fuzzers/full_system/unicorn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/fuzzer-tester-prepare
+      - name: "Install dependencies"
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install gcc gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+      - name: Build and run example fuzzers (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: RUN_ON_CI=1 LLVM_CONFIG=llvm-config-${{env.MAIN_LLVM_VERSION}} ./scripts/test_fuzzer.sh ${{ matrix.fuzzer }}
 
   fuzzers-qemu:
     needs:

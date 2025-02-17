@@ -3,11 +3,9 @@
 
 use core::{fmt, slice};
 use std::{
-    borrow::Cow,
     env,
-    fmt::{Debug, Display, Write},
+    fmt::{Debug, Display},
     fs,
-    path::PathBuf,
     pin::Pin,
     sync::Mutex,
 };
@@ -21,19 +19,13 @@ use libc::{
 };
 use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use object::Object;
-use rangemap::RangeMap;
 
 use crate::{
     emu::EmulatorModules,
     modules::{
         calls::FullBacktraceCollector,
         snapshot::SnapshotModule,
-        utils::{
-            addr2line_legacy,
-            filters::{HasAddressFilter, StdAddressFilter},
-            load_file_section,
-        },
+        utils::filters::{HasAddressFilter, StdAddressFilter},
         AddressFilter, EmulatorModule, EmulatorModuleTuple,
     },
     qemu::{Hook, MemAccessInfo, QemuHooks, SyscallHookResult},
@@ -1348,126 +1340,8 @@ where
 /// # Safety
 /// Will access the global [`FullBacktraceCollector`].
 /// Calling this function concurrently might be racey.
-#[expect(clippy::too_many_lines, clippy::unnecessary_cast)]
 pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &AsanError) {
-    let mut regions = HashMap::new();
-    for region in qemu.mappings() {
-        if let Some(path) = region.path() {
-            let start = region.start();
-            let end = region.end();
-            let entry = regions.entry(path.to_owned()).or_insert(start..end);
-            if start < entry.start {
-                *entry = start..entry.end;
-            }
-            if end > entry.end {
-                *entry = entry.start..end;
-            }
-        }
-    }
-
-    let mut resolvers = vec![];
-    let mut images = vec![];
-    let mut ranges = RangeMap::new();
-
-    for (path, rng) in regions {
-        let data = fs::read(&path);
-        if data.is_err() {
-            continue;
-        }
-        let data = data.unwrap();
-        let idx = images.len();
-        images.push((path, data));
-        ranges.insert(rng, idx);
-    }
-
-    let arena_data = typed_arena::Arena::new();
-
-    for img in &images {
-        if let Ok(obj) = object::read::File::parse(&*img.1) {
-            let endian = if obj.is_little_endian() {
-                addr2line::gimli::RunTimeEndian::Little
-            } else {
-                addr2line::gimli::RunTimeEndian::Big
-            };
-
-            let mut load_section = |id: addr2line::gimli::SectionId| -> Result<_, _> {
-                load_file_section(id, &obj, endian, &arena_data)
-            };
-
-            let dwarf = addr2line::gimli::Dwarf::load(&mut load_section).unwrap();
-            let ctx = addr2line::Context::from_dwarf(dwarf)
-                .expect("Failed to create an addr2line context");
-
-            //let ctx = addr2line::Context::new(&obj).expect("Failed to create an addr2line context");
-            resolvers.push(Some((obj, ctx)));
-        } else {
-            resolvers.push(None);
-        }
-    }
-
-    let resolve_addr = |addr: GuestAddr| -> String {
-        let mut info = String::new();
-        if let Some((rng, idx)) = ranges.get_key_value(&addr) {
-            let raddr = (addr - rng.start) as u64;
-            if let Some((obj, ctx)) = resolvers[*idx].as_ref() {
-                let symbols = obj.symbol_map();
-                let mut func = symbols.get(raddr).map(|x| x.name().to_string());
-
-                if func.is_none() {
-                    let pathname = PathBuf::from(images[*idx].0.clone());
-                    let mut split_dwarf_loader = addr2line_legacy::SplitDwarfLoader::new(
-                        |data, endian| {
-                            addr2line::gimli::EndianSlice::new(
-                                arena_data.alloc(Cow::Owned(data.into_owned())),
-                                endian,
-                            )
-                        },
-                        Some(pathname),
-                    );
-
-                    let frames = ctx.find_frames(raddr);
-                    if let Ok(mut frames) = split_dwarf_loader.run(frames) {
-                        if let Some(frame) = frames.next().unwrap_or(None) {
-                            if let Some(function) = frame.function {
-                                if let Ok(name) = function.raw_name() {
-                                    let demangled =
-                                        addr2line::demangle_auto(name, function.language);
-                                    func = Some(demangled.to_string());
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if let Some(name) = func {
-                    info += " in ";
-                    info += &name;
-                }
-
-                if let Some(loc) = ctx.find_location(raddr).unwrap_or(None) {
-                    if info.is_empty() {
-                        info += " in";
-                    }
-                    info += " ";
-                    if let Some(file) = loc.file {
-                        info += file;
-                    }
-                    if let Some(line) = loc.line {
-                        info += ":";
-                        info += &line.to_string();
-                    }
-                } else {
-                    let _ = write!(&mut info, " ({}+{raddr:#x})", images[*idx].0);
-                }
-            }
-            if info.is_empty() {
-                let _ = write!(&mut info, " ({}+{raddr:#x})", images[*idx].0);
-            }
-        }
-        info
-    };
-
-    // TODO, make a class Resolver for resolving the addresses??
+    let resolver = crate::modules::utils::addr2line::AddressResolver::new(&qemu);
     eprintln!("=================================================================");
     let backtrace = FullBacktraceCollector::backtrace()
         .map(|r| {
@@ -1478,7 +1352,7 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
         .unwrap_or(vec![pc]);
     eprintln!("AddressSanitizer Error: {err}");
     for (i, addr) in backtrace.iter().rev().enumerate() {
-        eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+        eprintln!("\t#{i} {addr:#x}{}", resolver.resolve(*addr));
     }
     let addr = match err {
         AsanError::Read(addr, _) | AsanError::Write(addr, _) | AsanError::BadFree(addr, _) => {
@@ -1493,13 +1367,13 @@ pub unsafe fn asan_report(rt: &AsanGiovese, qemu: Qemu, pc: GuestAddr, err: &Asa
             } else {
                 eprintln!("Freed at:");
                 for (i, addr) in item.free_backtrace.iter().rev().enumerate() {
-                    eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+                    eprintln!("\t#{i} {addr:#x}{}", resolver.resolve(*addr));
                 }
                 eprintln!("And previously allocated at:");
             }
 
             for (i, addr) in item.backtrace.iter().rev().enumerate() {
-                eprintln!("\t#{i} {addr:#x}{}", resolve_addr(*addr));
+                eprintln!("\t#{i} {addr:#x}{}", resolver.resolve(*addr));
             }
         };
 

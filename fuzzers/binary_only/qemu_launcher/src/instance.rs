@@ -1,5 +1,5 @@
 use core::fmt::Debug;
-use std::{fs, marker::PhantomData, ops::Range, path::PathBuf, process};
+use std::{fs, marker::PhantomData, ops::Range, process};
 
 #[cfg(feature = "simplemgr")]
 use libafl::events::SimpleEventManager;
@@ -9,7 +9,7 @@ use libafl::{
     corpus::{Corpus, HasCurrentCorpusId, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::{ClientDescription, EventRestarter},
     executors::{Executor, ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
+    feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{BytesInput, Input},
@@ -185,15 +185,22 @@ impl<M: Monitor> Instance<'_, M> {
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
-        let map_feedback = MaxMapFeedback::new(&edges_observer);
+        let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);
+        let map_objective = MaxMapFeedback::with_name("map_objective", &edges_observer);
 
         let calibration = CalibrationStage::new(&map_feedback);
+        let calibration_cmplog = CalibrationStage::new(&map_feedback);
 
         let stats_stage = IfStage::new(
             |_, _, _, _| Ok(self.options.tui),
             tuple_list!(AflStatsStage::builder()
                 .map_observer(&edges_observer)
-                .stats_file(PathBuf::from("stats.txt"))
+                .build()?),
+        );
+        let stats_stage_cmplog = IfStage::new(
+            |_, _, _, _| Ok(self.options.tui),
+            tuple_list!(AflStatsStage::builder()
+                .map_observer(&edges_observer)
                 .build()?),
         );
 
@@ -207,7 +214,10 @@ impl<M: Monitor> Instance<'_, M> {
         );
 
         // A feedback to choose if an input is a solution or not
-        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_and_fast!(
+            feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new()),
+            map_objective
+        );
 
         // // If not restarting, create a State from scratch
         let mut state = match state {
@@ -324,7 +334,8 @@ impl<M: Monitor> Instance<'_, M> {
                 StdPowerMutationalStage::new(mutator);
 
             // The order of the stages matter!
-            let mut stages = tuple_list!(calibration, tracing, i2s, power, stats_stage);
+            let mut stages =
+                tuple_list!(calibration_cmplog, tracing, i2s, power, stats_stage_cmplog);
 
             self.fuzz(
                 &mut state,
@@ -348,7 +359,9 @@ impl<M: Monitor> Instance<'_, M> {
 
             // Setup an havoc mutator with a mutational stage
             let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+            let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
+                StdPowerMutationalStage::new(mutator);
+            let mut stages = tuple_list!(calibration, power, stats_stage);
 
             self.fuzz(
                 &mut state,
