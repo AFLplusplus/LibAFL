@@ -350,9 +350,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         found = false;
     }
 
-    if !found {
-        panic!("\n\tOne of the LLVM dependencies has not been found.\n\tThe following search directory was considered: {}\n", bindir_path.display());
-    }
+    assert!(found, "\n\tAt least one of the LLVM dependencies could not be found.\n\tThe following search directory was considered: {}\n", bindir_path.display());
 
     let cxxflags = if let Ok(flags) = llvm_cxxflags {
         flags
