@@ -378,15 +378,15 @@ impl<M: Monitor> Instance<'_, M> {
         executor: &mut QemuExecutor<'a, C, CM, ED, EM, (SnapshotModule, ET), H, I, OT, S, SM, Z>,
         qemu: Qemu,
     ) where
-        I: Input + Unpin,
         ET: EmulatorModuleTuple<I, S>,
-        S: HasCorpus<I> + HasCurrentCorpusId + HasSolutions<I> + HasExecutions + Unpin,
         H: for<'e, 's, 'i> FnMut(
             &'e mut Emulator<C, CM, ED, (SnapshotModule, ET), I, S, SM>,
             &'s mut S,
             &'i I,
         ) -> ExitKind,
+        I: Input + Unpin,
         OT: ObserversTuple<I, S>,
+        S: HasCorpus<I> + HasCurrentCorpusId + HasSolutions<I> + HasExecutions + Unpin,
     {
         executor
             .inner_mut()
@@ -406,15 +406,15 @@ impl<M: Monitor> Instance<'_, M> {
         >,
         qemu: Qemu,
     ) where
-        I: Input + Unpin,
         ET: EmulatorModuleTuple<I, S>,
-        S: HasCorpus<I> + HasCurrentCorpusId + HasSolutions<I> + HasExecutions + Unpin,
         H: for<'e, 's, 'i> FnMut(
             &'e mut Emulator<C, CM, ED, (SnapshotModule, ET), I, S, SM>,
             &'s mut S,
             &'i I,
         ) -> ExitKind,
+        I: Input + Unpin,
         OT: ObserversTuple<I, S>,
+        S: HasCorpus<I> + HasCurrentCorpusId + HasSolutions<I> + HasExecutions + Unpin,
         SOT: ObserversTuple<I, S>,
     {
         executor
@@ -427,7 +427,7 @@ impl<M: Monitor> Instance<'_, M> {
             .reset(qemu);
     }
 
-    fn fuzz<Z, E, ST, RSM>(
+    fn fuzz<Z, E, RSM, ST>(
         &mut self,
         state: &mut ClientState,
         fuzzer: &mut Z,
@@ -437,10 +437,10 @@ impl<M: Monitor> Instance<'_, M> {
         stages: &mut ST,
     ) -> Result<(), Error>
     where
-        Z: Fuzzer<E, ClientMgr<M>, BytesInput, ClientState, ST>
-            + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
         ST: StagesTuple<E, ClientMgr<M>, ClientState, Z>,
         RSM: Fn(&mut E, Qemu),
+        Z: Fuzzer<E, ClientMgr<M>, BytesInput, ClientState, ST>
+            + Evaluator<E, ClientMgr<M>, BytesInput, ClientState>,
     {
         if state.must_load_initial_inputs() {
             let corpus_dirs = [self.options.input_dir()];
