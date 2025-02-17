@@ -273,7 +273,6 @@ where
     where
         ET: EmulatorModuleTuple<I, S>,
     {
-
     }
 
     fn first_exec<ET>(
