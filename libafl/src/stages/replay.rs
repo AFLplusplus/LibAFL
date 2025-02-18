@@ -132,6 +132,10 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
+        let solution_ids: Vec<CorpusId> = state.solutions().ids().collect();
+        println!("{:?}", corpus_ids);
+        println!("{:?}", solution_ids);
+
         for id in corpus_ids {
             if self.restart_helper.corpus_probe(&id) {
                 continue;
@@ -148,7 +152,6 @@ where
             self.restart_helper.corpus_finish(id);
         }
 
-        let solution_ids: Vec<CorpusId> = state.solutions().ids().collect();
         for id in solution_ids {
             if self.restart_helper.solution_probe(&id) {
                 continue;
