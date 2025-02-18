@@ -79,6 +79,6 @@ libpng: arch_dir zlib libpng_wget
             --enable-shared=no \
             --with-pic=yes \
             --enable-hardware-optimizations={{ OPTIMIZATIONS }} \
-            --host={{ ARCH }} \
+            --host={{ ARCH }}
 
     make -j -C {{ TARGET_DIR }}/build-png/

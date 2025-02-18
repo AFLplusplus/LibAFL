@@ -11,13 +11,15 @@ use std::{
     ffi::{c_void, CString},
     fmt::{Display, Formatter, Write},
     mem::{transmute, MaybeUninit},
-    ops::Range,
+    ops::{Deref, Range},
     pin::Pin,
     ptr::copy_nonoverlapping,
     sync::OnceLock,
 };
 
 use libafl_bolts::os::unix_signals::Signal;
+#[cfg(feature = "systemmode")]
+use libafl_bolts::Error;
 use libafl_qemu_sys::{
     libafl_flush_jit, libafl_get_exit_reason, libafl_page_from_addr, libafl_qemu_add_gdb_cmd,
     libafl_qemu_cpu_index, libafl_qemu_current_cpu, libafl_qemu_gdb_reply, libafl_qemu_get_cpu,
@@ -26,6 +28,8 @@ use libafl_qemu_sys::{
     libafl_qemu_write_reg, CPUArchState, CPUStatePtr, FatPtr, GuestAddr, GuestPhysAddr, GuestUsize,
     GuestVirtAddr,
 };
+#[cfg(feature = "systemmode")]
+use libafl_qemu_sys::{libafl_qemu_remove_hw_breakpoint, libafl_qemu_set_hw_breakpoint};
 use num_traits::Num;
 use strum::IntoEnumIterator;
 
@@ -110,7 +114,8 @@ pub struct Qemu {
 
 #[derive(Clone, Debug)]
 pub enum QemuParams {
-    Config(QemuConfig),
+    // QemuConfig is quite big, at least 240 bytes so we use a Box
+    Config(Box<QemuConfig>),
     Cli(Vec<String>),
 }
 
@@ -178,7 +183,7 @@ impl Display for QemuExitReason {
 
 impl From<QemuConfig> for QemuParams {
     fn from(config: QemuConfig) -> Self {
-        QemuParams::Config(config)
+        QemuParams::Config(Box::new(config))
     }
 }
 
@@ -539,7 +544,7 @@ impl Qemu {
         match &params {
             QemuParams::Config(cfg) => {
                 QEMU_CONFIG
-                    .set(cfg.clone())
+                    .set(cfg.deref().clone())
                     .map_err(|_| unreachable!("QEMU_CONFIG was already set but Qemu was not init!"))
                     .expect("Could not set QEMU Config.");
             }
@@ -858,6 +863,28 @@ impl Qemu {
 
         unsafe {
             libafl_qemu_remove_breakpoint(addr.into());
+        }
+    }
+
+    #[cfg(feature = "systemmode")]
+    pub fn set_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
+        let ret = unsafe { libafl_qemu_set_hw_breakpoint(addr.into()) };
+        match ret {
+            0 => Ok(()),
+            errno => Err(Error::unsupported(format!(
+                "Failed to set hw breakpoint errno: {errno}"
+            ))),
+        }
+    }
+
+    #[cfg(feature = "systemmode")]
+    pub fn remove_hw_breakpoint(&self, addr: GuestAddr) -> Result<(), Error> {
+        let ret = unsafe { libafl_qemu_remove_hw_breakpoint(addr.into()) };
+        match ret {
+            0 => Ok(()),
+            errno => Err(Error::unsupported(format!(
+                "Failed to set hw breakpoint errno: {errno}"
+            ))),
         }
     }
 
