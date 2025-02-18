@@ -274,7 +274,7 @@ pub extern "C" fn libafl_main() {
             &mut restarting_mgr,
             opt.loop_iters,
         )?;
-        restarting_mgr.mgr_on_restart(&mut state)?;
+        restarting_mgr.on_restart(&mut state)?;
 
         Ok(())
     };

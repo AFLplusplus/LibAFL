@@ -559,10 +559,10 @@ pub trait EventRestarter<S> {
     /// You *must* ensure that [`HasCurrentStageId::on_restart`] will be invoked in this method, by you
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
     /// [`std_on_restart`] is the standard implementation that you can call.
-    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error>;
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
-/// Default implementation of [`EventRestarter::mgr_on_restart`] for implementors with the given
+/// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
 /// constraints
 pub fn std_on_restart<EM, S>(restarter: &mut EM, state: &mut S) -> Result<(), Error>
 where
@@ -644,7 +644,7 @@ impl<S> EventRestarter<S> for NopEventManager
 where
     S: HasCurrentStageId,
 {
-    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         std_on_restart(self, state)
     }
 }
@@ -769,8 +769,8 @@ where
     EM: EventRestarter<S>,
 {
     #[inline]
-    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        self.inner.mgr_on_restart(state)
+    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+        self.inner.on_restart(state)
     }
 }
 
