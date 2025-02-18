@@ -148,7 +148,7 @@ where
 
             self.restart_helper.corpus_finish(id);
         }
-        
+
         let solution_ids: Vec<CorpusId> = state.solutions().ids().collect();
         for id in solution_ids {
             if self.restart_helper.solution_probe(&id) {
