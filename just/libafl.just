@@ -12,11 +12,13 @@
 #   - `FUZZER`: Executable path.
 
 PROFILE := env("PROFILE", "release")
+FUZZER_EXTENSION := if os_family() == "windows" { ".exe" } else { "" }
+FUZZER := BUILD_DIR / FUZZER_NAME + FUZZER_EXTENSION
+
+PROJECT_DIR := absolute_path(".")
 PROFILE_DIR := if PROFILE == "dev" { "debug" } else { "release" }
 TARGET_DIR := absolute_path(env("TARGET_DIR", "target"))
 BUILD_DIR := TARGET_DIR / PROFILE_DIR
-FUZZER_EXTENSION := if os_family() == "windows" { ".exe" } else { "" }
-FUZZER := BUILD_DIR / FUZZER_NAME + FUZZER_EXTENSION
 
 JUSTHASHES := ".justhashes"
 
