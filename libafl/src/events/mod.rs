@@ -562,7 +562,7 @@ pub trait EventRestarter<S> {
     fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
-/// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
+/// Default implementation of [`EventRestarter::mgr_on_restart`] for implementors with the given
 /// constraints
 pub fn std_on_restart<EM, S>(restarter: &mut EM, state: &mut S) -> Result<(), Error>
 where

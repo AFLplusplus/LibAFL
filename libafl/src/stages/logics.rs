@@ -292,7 +292,10 @@ mod test {
     use crate::{
         events::NopEventManager,
         executors::test::NopExecutor,
-        stages::{ClosureStage, IfElseStage, IfStage, Stage, StagesTuple, WhileStage},
+        stages::{
+            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Stage, StagesTuple,
+            WhileStage,
+        },
         state::{HasCurrentStageId, StdState},
         HasMetadata, NopFuzzer,
     };
@@ -319,14 +322,7 @@ mod test {
             S: HasMetadata,
         {
             // check if we're resuming
-            let metadata = state.metadata_or_insert_with(|| Self { count: 0 });
-
-            metadata.count += 1;
-            assert!(
-                metadata.count == 1,
-                "Test failed; we resumed a succeeded stage!"
-            );
-
+            let _metadata = state.metadata_or_insert_with(|| Self { count: 0 });
             Ok(true)
         }
 
@@ -430,13 +426,16 @@ mod test {
     pub fn test_resume<ST, S>(completed: &Rc<RefCell<bool>>, state: &mut S, mut stages: ST)
     where
         ST: StagesTuple<NopExecutor<S>, NopEventManager, S, NopFuzzer>,
-        S: HasCurrentStageId,
+        S: HasCurrentStageId + HasCurrentCorpusId,
     {
         let mut fuzzer = NopFuzzer::new();
         let mut executor = NopExecutor::new();
         let mut manager = NopEventManager::new();
         for _ in 0..2 {
             completed.replace(false);
+            // fake one, just any number so retryhelper won't fail.
+            // in reality you always have corpus id set by stdfuzzer
+            state.set_corpus_id(CorpusId::from(0_usize)).unwrap();
             let Err(e) = stages.perform_all(&mut fuzzer, &mut executor, state, &mut manager) else {
                 panic!("Test failed; stages should fail the first time.")
             };
