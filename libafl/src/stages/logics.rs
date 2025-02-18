@@ -289,6 +289,8 @@ mod test {
     };
     use serde::{Deserialize, Serialize};
 
+    #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+    use crate::stages::RetryCountRestartHelper;
     use crate::{
         events::NopEventManager,
         executors::test::NopExecutor,
@@ -299,6 +301,7 @@ mod test {
         state::{HasCurrentStageId, StdState},
         HasMetadata, NopFuzzer,
     };
+
     #[derive(Debug)]
     pub struct ResumeSucceededStage<S> {
         phantom: PhantomData<S>,
