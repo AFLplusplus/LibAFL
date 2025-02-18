@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId},
-    stages::Stage,
+    stages::{Restartable, Stage},
     state::{HasCorpus, HasSolutions},
     Error, Evaluator,
 };
@@ -114,15 +114,6 @@ where
     Z: Evaluator<E, EM, I, S>,
     I: Clone,
 {
-    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
-        Ok(true)
-    }
-
-    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
-        self.restart_helper.clear();
-        Ok(())
-    }
-
     #[inline]
     fn perform(
         &mut self,
@@ -166,6 +157,17 @@ where
             self.restart_helper.solution_finish(id);
         }
 
+        Ok(())
+    }
+}
+
+impl<I, S> Restartable<S> for ReplayStage<I> {
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
+        Ok(true)
+    }
+
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
+        self.restart_helper.clear();
         Ok(())
     }
 }

@@ -19,7 +19,7 @@ use crate::{
     schedulers::{testcase_score::CorpusPowerTestcaseScore, TestcaseScore},
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost},
-        MutationalStage, RetryCountRestartHelper, Stage,
+        MutationalStage, Restartable, RetryCountRestartHelper, Stage,
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
@@ -101,7 +101,12 @@ where
         let ret = self.perform_mutational(fuzzer, executor, state, manager);
         ret
     }
+}
 
+impl<E, F, EM, I, M, S, Z> Restartable<S> for PowerMutationalStage<E, F, EM, I, M, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // Make sure we don't get stuck crashing on a single testcase
         RetryCountRestartHelper::should_restart(state, &self.name, 3)

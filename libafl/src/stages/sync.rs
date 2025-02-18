@@ -15,6 +15,7 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::Restartable;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
@@ -86,18 +87,6 @@ where
         + MaybeHasClientPerfMonitor,
 {
     #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: Needs proper crash handling for when an imported testcase crashes
-        // For now, Make sure we don't get stuck crashing on this testcase
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
-
-    #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -155,6 +144,23 @@ where
         state.introspection_stats_mut().finish_stage();
 
         Ok(())
+    }
+}
+
+impl<CB, E, EM, I, S, Z> Restartable<S> for SyncFromDiskStage<CB, E, EM, I, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: Needs proper crash handling for when an imported testcase crashes
+        // For now, Make sure we don't get stuck crashing on this testcase
+        RetryCountRestartHelper::no_retry(state, &self.name)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
@@ -250,18 +256,6 @@ where
     Z: EvaluatorObservers<E, EM, I, S> + ExecutionProcessor<EM, I, E::Observers, S>,
 {
     #[inline]
-    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
-        // No restart handling needed - does not execute the target.
-        Ok(true)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
-        // Not needed - does not execute the target.
-        Ok(())
-    }
-
-    #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -316,6 +310,20 @@ where
         self.client.process(fuzzer, state, executor, manager)?;
         #[cfg(feature = "introspection")]
         state.introspection_stats_mut().finish_stage();
+        Ok(())
+    }
+}
+
+impl<I, IC, ICB, S, SHM, SP> Restartable<S> for SyncFromBrokerStage<I, IC, ICB, S, SHM, SP> {
+    #[inline]
+    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
+        // No restart handling needed - does not execute the target.
+        Ok(true)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
+        // Not needed - does not execute the target.
         Ok(())
     }
 }

@@ -7,6 +7,7 @@ use bitvec::{bitvec, vec::BitVec};
 use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
+use super::Restartable;
 use crate::{
     inputs::{BytesInput, HasTargetBytes},
     stages::Stage,
@@ -112,6 +113,18 @@ impl<E, EM, S, Z> Stage<E, EM, S, Z> for UnicodeIdentificationStage<BytesInput, 
 where
     S: HasCorpus<BytesInput> + HasCurrentTestcase<BytesInput>,
 {
+    fn perform(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut S,
+        _manager: &mut EM,
+    ) -> Result<(), Error> {
+        UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
+    }
+}
+
+impl<S> Restartable<S> for UnicodeIdentificationStage<BytesInput, S> {
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Stage does not run the target. No reset helper needed.
@@ -122,15 +135,5 @@ where
     fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
         // Stage does not run the target. No reset helper needed.
         Ok(())
-    }
-
-    fn perform(
-        &mut self,
-        _fuzzer: &mut Z,
-        _executor: &mut E,
-        state: &mut S,
-        _manager: &mut EM,
-    ) -> Result<(), Error> {
-        UnicodeIdentificationStage::identify_unicode_in_current_testcase(state)
     }
 }

@@ -18,7 +18,7 @@ use crate::{
     mark_feature_time,
     mutators::{MultiMutator, MutationResult, Mutator},
     nonzero,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
@@ -170,7 +170,12 @@ where
 
         ret
     }
+}
 
+impl<E, EM, I, M, S, Z> Restartable<S> for StdMutationalStage<E, EM, I, I, M, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::should_restart(state, &self.name, 3)
     }
@@ -317,17 +322,6 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // Make sure we don't get stuck crashing on a single testcase
-        RetryCountRestartHelper::should_restart(state, &self.name, 3)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
-
-    #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -351,6 +345,22 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl<E, EM, I, M, S, Z> Restartable<S> for MultiMutationalStage<E, EM, I, M, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // Make sure we don't get stuck crashing on a single testcase
+        RetryCountRestartHelper::should_restart(state, &self.name, 3)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 

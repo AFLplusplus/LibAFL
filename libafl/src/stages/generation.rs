@@ -6,6 +6,7 @@
 
 use core::marker::PhantomData;
 
+use super::Restartable;
 use crate::{generators::Generator, stages::Stage, state::HasRand, Error, Evaluator};
 
 /// A [`Stage`] that generates a single input via a [`Generator`] and evaluates
@@ -40,7 +41,9 @@ where
         fuzzer.evaluate_filtered(state, executor, manager, &input)?;
         Ok(())
     }
+}
 
+impl<G, I, S, Z> Restartable<S> for GenStage<G, I, S, Z> {
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // It's a random generation stage
         // so you can restart for whatever times you want
