@@ -53,7 +53,7 @@ build_libafl_fuzz_fuzzbench:
 
 test_instr: build_afl build_libafl_fuzz
     #!/bin/bash
-    AFL_PATH={{AFL_DIR}} {{AFL_CC_PATH}} ./test/test-instr.c -o ./test/out-instr
+    AFL_PATH={{AFL_DIR}} {{AFL_CC_PATH}} -O0 ./test/test-instr.c -o ./test/out-instr
 
     export LIBAFL_DEBUG_OUTPUT=1 
     export AFL_CORES=0

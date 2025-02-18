@@ -256,14 +256,15 @@ struct Opt {
     #[arg(short = 't', default_value_t = 1000)]
     hang_timeout: u64,
 
+    #[arg(short = 'd')]
+    debug_child: bool,
+
     // Environment Variables
     #[clap(skip)]
     bench_just_one: bool,
     #[clap(skip)]
     bench_until_crash: bool,
 
-    #[clap(skip)]
-    debug_child: bool,
     #[clap(skip)]
     is_persistent: bool,
     #[clap(skip)]
