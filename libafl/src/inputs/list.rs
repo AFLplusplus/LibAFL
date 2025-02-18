@@ -1,7 +1,7 @@
 //! Definitions for inputs which have multiple distinct subcomponents.
 //!
 //! Unfortunately, since both [`serde::de::Deserialize`] and [`Clone`] require [`Sized`], it is not
-//! possible to dynamically define a single input with dynamic typing. As such, [`MultipartInput`]
+//! possible to dynamically define a single input with dynamic typing. As such, [`ListInput`]
 //! requires that each subcomponent be the same subtype.
 
 use alloc::{
