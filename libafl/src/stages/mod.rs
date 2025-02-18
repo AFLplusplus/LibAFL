@@ -494,86 +494,15 @@ impl ExecutionCountRestartHelper {
 #[cfg(test)]
 mod test {
     use alloc::borrow::Cow;
-    use core::marker::PhantomData;
 
-    use libafl_bolts::{impl_serdeany, Error, Named};
-    use serde::{Deserialize, Serialize};
+    use libafl_bolts::{Error, Named};
 
     use crate::{
         corpus::{Corpus, HasCurrentCorpusId, Testcase},
         inputs::NopInput,
-        stages::{RetryCountRestartHelper, Stage},
+        stages::RetryCountRestartHelper,
         state::{HasCorpus, StdState},
-        HasMetadata,
     };
-
-    /// A stage that succeeds to resume
-    #[derive(Debug)]
-    pub struct ResumeSucceededStage<S> {
-        phantom: PhantomData<S>,
-    }
-
-    /// A progress state for testing
-    #[derive(Serialize, Deserialize, Debug)]
-    pub struct TestProgress {
-        count: usize,
-    }
-
-    impl_serdeany!(TestProgress);
-
-    impl TestProgress {
-        #[expect(clippy::unnecessary_wraps)]
-        fn should_restart<S, ST>(state: &mut S, _stage: &ST) -> Result<bool, Error>
-        where
-            S: HasMetadata,
-        {
-            // check if we're resuming
-            let metadata = state.metadata_or_insert_with(|| Self { count: 0 });
-
-            metadata.count += 1;
-            assert!(
-                metadata.count == 1,
-                "Test failed; we resumed a succeeded stage!"
-            );
-
-            Ok(true)
-        }
-
-        fn clear_progress<S, ST>(state: &mut S, _stage: &ST) -> Result<(), Error>
-        where
-            S: HasMetadata,
-        {
-            if state.remove_metadata::<Self>().is_none() {
-                return Err(Error::illegal_state(
-                    "attempted to clear status metadata when none was present",
-                ));
-            }
-            Ok(())
-        }
-    }
-
-    impl<E, EM, S, Z> Stage<E, EM, S, Z> for ResumeSucceededStage<S>
-    where
-        S: HasMetadata,
-    {
-        fn perform(
-            &mut self,
-            _fuzzer: &mut Z,
-            _executor: &mut E,
-            _state: &mut S,
-            _manager: &mut EM,
-        ) -> Result<(), Error> {
-            Ok(())
-        }
-
-        fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-            TestProgress::should_restart(state, self)
-        }
-
-        fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-            TestProgress::clear_progress(state, self)
-        }
-    }
 
     /// Test to test retries in stages
     #[test]
