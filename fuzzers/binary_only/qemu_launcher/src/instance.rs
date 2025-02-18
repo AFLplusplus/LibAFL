@@ -469,7 +469,7 @@ impl<M: Monitor> Instance<'_, M> {
 
                 // It's important, that we store the state before restarting!
                 // Else, the parent will not respawn a new child and quit.
-                self.mgr.on_restart(state)?;
+                self.mgr.mgr_on_restart(state)?;
             }
         } else {
             fuzzer.fuzz_loop(stages, executor, state, &mut self.mgr)?;
