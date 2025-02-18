@@ -172,7 +172,7 @@ where
     }
 }
 
-impl<E, EM, I, M, S, Z> Restartable<S> for StdMutationalStage<E, EM, I, I, M, S, Z>
+impl<E, EM, I1, I2, M, S, Z> Restartable<S> for StdMutationalStage<E, EM, I1, I2, M, S, Z>
 where
     S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
