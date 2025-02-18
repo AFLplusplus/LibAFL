@@ -43,8 +43,7 @@ where
 
         if let Ok(meta) = state.metadata_mut::<T>() {
             *meta = T::from(self.count);
-        }
-        else {
+        } else {
             state.add_metadata::<T>(T::from(self.count));
         }
         Ok(())
