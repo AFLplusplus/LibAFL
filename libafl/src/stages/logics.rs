@@ -428,6 +428,11 @@ mod test {
         ST: StagesTuple<NopExecutor<S>, NopEventManager, S, NopFuzzer>,
         S: HasCurrentStageId + HasCurrentCorpusId,
     {
+        #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
+        unsafe {
+            TestProgress::register();
+        }
+
         let mut fuzzer = NopFuzzer::new();
         let mut executor = NopExecutor::new();
         let mut manager = NopEventManager::new();
