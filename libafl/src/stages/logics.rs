@@ -293,8 +293,8 @@ mod test {
         events::NopEventManager,
         executors::test::NopExecutor,
         stages::{
-            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Stage, StagesTuple,
-            WhileStage,
+            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage,
+            RetryCountRestartHelper, Stage, StagesTuple, WhileStage,
         },
         state::{HasCurrentStageId, StdState},
         HasMetadata, NopFuzzer,
@@ -431,6 +431,7 @@ mod test {
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
         unsafe {
             TestProgress::register();
+            RetryCountRestartHelper::register();
         }
 
         let mut fuzzer = NopFuzzer::new();
