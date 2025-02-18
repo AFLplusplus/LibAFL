@@ -40,7 +40,13 @@ where
         self.inner.perform(fuzzer, executor, state, manager)?;
         let after_run = current_time();
         self.count += after_run - before_run;
-        *state.metadata_mut::<T>()? = T::from(self.count);
+
+        if let Ok(meta) = state.metadata_mut::<T>() {
+            *meta = T::from(self.count);
+        }
+        else {
+            state.add_metadata::<T>(T::from(self.count));
+        }
         Ok(())
     }
 
