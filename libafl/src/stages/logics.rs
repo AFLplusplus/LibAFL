@@ -293,8 +293,8 @@ mod test {
         events::NopEventManager,
         executors::test::NopExecutor,
         stages::{
-            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage,
-            RetryCountRestartHelper, Stage, StagesTuple, WhileStage,
+            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Stage, StagesTuple,
+            WhileStage,
         },
         state::{HasCurrentStageId, StdState},
         HasMetadata, NopFuzzer,
