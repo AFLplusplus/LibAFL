@@ -39,6 +39,8 @@ pub mod unicode;
 pub use unicode::*;
 
 #[cfg(feature = "multipart_inputs")]
+pub mod list;
+#[cfg(feature = "multipart_inputs")]
 pub mod multi;
 
 #[cfg(feature = "nautilus")]
