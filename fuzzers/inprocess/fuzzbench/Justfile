@@ -40,12 +40,13 @@ fuzzer:
 
 [linux]
 [macos]
-run: cxx fuzz_o
+run: cxx fuzz_o fuzzer
 	#!/bin/bash
 	rm -rf libafl_unix_shmem_server || true
 	mkdir in || true
 	echo a > in/a
 	./{{FUZZER_NAME}} -o out -i in
+	RUST_LOG=info ./{{FUZZER_NAME}} -o out -i seed
 
 [windows]
 run:

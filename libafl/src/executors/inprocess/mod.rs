@@ -430,7 +430,7 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     }
 
     // Serialize the state and wait safely for the broker to read pending messages
-    event_mgr.mgr_on_restart(state).unwrap();
+    event_mgr.on_restart(state).unwrap();
 
     log::info!("Bye!");
 }

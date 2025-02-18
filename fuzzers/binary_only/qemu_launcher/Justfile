@@ -55,7 +55,7 @@ test_inner: harness build
     ./tests/injection/test.sh || exit 1
 
     # complie again with simple mgr
-    cargo build --profile={{PROFILE}} --features="simplemgr,{{ARCH}}" --target-dir={{ TARGET_DIR }}
+    cargo build --profile={{PROFILE}} --features="simplemgr,{{ARCH}}" --target-dir={{ TARGET_DIR }} || exit 1
     ./tests/qasan/test.sh || exit 1
 
 [unix]

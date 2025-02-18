@@ -58,6 +58,9 @@ pub mod mutational;
 pub mod push;
 pub mod tmin;
 
+pub mod replay;
+pub use replay::*;
+
 #[cfg(feature = "std")]
 pub mod afl_stats;
 pub mod calibrate;

@@ -40,7 +40,7 @@ fuzzer:
 
 [linux]
 [macos]
-run: cxx fuzz_o
+run: cxx fuzz_o fuzzer
 	#!/bin/bash
 	rm -rf libafl_unix_shmem_server || true
 	mkdir in || true
