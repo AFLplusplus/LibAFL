@@ -30,7 +30,6 @@ rustc-args = ["--cfg", "docsrs"]
 default = [
   "std",
   "derive",
-  "concolic_mutation",
   "llmp_compression",
   "llmp_small_maps",
   "llmp_broker_timeouts",
