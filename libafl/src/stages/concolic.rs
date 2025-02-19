@@ -425,7 +425,10 @@ where
     }
 }
 
-impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, S, Z> {
+impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // This is a deterministic stage
