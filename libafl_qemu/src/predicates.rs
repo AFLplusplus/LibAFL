@@ -1,68 +1,52 @@
 use core::fmt;
 use std::borrow::Cow;
 
-use libafl::{
-    corpus::Testcase,
-    executors::ExitKind,
-    feedbacks::{Feedback, StateInitializer},
-    HasMetadata,
-};
+use libafl::{executors::ExitKind, observers::Observer, Error, HasMetadata};
 use libafl_bolts::Named;
+use serde::{Deserialize, Serialize};
 
 use crate::{Edges, PredicatesMap, QemuMappingsCache, Tracer, IS_RCA};
-#[derive(Debug, Clone, Copy, Default)]
-pub struct PredicateFeedback {
-    was_crash: bool,
-}
+/// Observe prdicates
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PredicateObserver {}
 
-impl Named for PredicateFeedback {
-    fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("predicates")
-    }
-}
-
-impl PredicateFeedback {
-    #[must_use]
-    pub fn new() -> Self {
-        Self { was_crash: false }
-    }
-
-    #[must_use]
-    pub fn is_rca(&self) -> bool {
+impl PredicateObserver {
+    #[expect(clippy::unused_self)]
+    fn is_rca(&self) -> bool {
         unsafe { IS_RCA }
     }
 }
 
-impl<S> StateInitializer<S> for PredicateFeedback {}
+impl Named for PredicateObserver {
+    fn name(&self) -> &Cow<'static, str> {
+        static NAME: Cow<'static, str> = Cow::Borrowed("PredicateObserver");
+        &NAME
+    }
+}
 
-impl<EM, I, OT, S> Feedback<EM, I, OT, S> for PredicateFeedback
+impl<I, S> Observer<I, S> for PredicateObserver
 where
     S: HasMetadata,
 {
-    fn is_interesting(
-        &mut self,
-        _state: &mut S,
-        _manager: &mut EM,
-        _input: &I,
-        _observers: &OT,
-        exit_kind: &ExitKind,
-    ) -> Result<bool, libafl::Error> {
-        if self.is_rca() {
-            return Ok(false);
-        }
-        self.was_crash = exit_kind == &ExitKind::Crash;
-        Ok(false)
-    }
-    fn append_metadata(
-        &mut self,
-        state: &mut S,
-        _manager: &mut EM,
-        _observers: &OT,
-        _testcase: &mut Testcase<I>,
-    ) -> Result<(), libafl::Error> {
-        if self.is_rca() {
+    fn pre_exec(&mut self, state: &mut S, _input: &I) -> Result<(), Error> {
+        if !self.is_rca() {
             return Ok(());
         }
+
+        if let Ok(meta) = state.metadata_mut::<Tracer>() {
+            meta.clear();
+        } else {
+            state.add_metadata(Tracer::new());
+        }
+        Ok(())
+    }
+
+    fn post_exec(&mut self, state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+        if !self.is_rca() {
+            return Ok(());
+        }
+
+        let was_crash = exit_kind == &ExitKind::Crash;
 
         let tracer = state.metadata::<Tracer>().unwrap();
         // because of double borrow shit!
@@ -106,13 +90,13 @@ where
         let map = state.metadata_mut::<PredicatesMap>()?;
 
         for e in edges {
-            map.add_edges(e, self.was_crash);
+            map.add_edges(e, was_crash);
         }
         for (addr, ma) in maxes {
-            map.add_maxes(addr, ma, self.was_crash);
+            map.add_maxes(addr, ma, was_crash);
         }
         for (addr, mi) in mins {
-            map.add_mins(addr, mi, self.was_crash);
+            map.add_mins(addr, mi, was_crash);
         }
         Ok(())
     }
