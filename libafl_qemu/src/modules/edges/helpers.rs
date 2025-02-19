@@ -55,13 +55,13 @@ mod rca {
 
     use super::{super::EdgeCoverageVariant, QemuEdgesMapMetadata};
     use crate::{
-        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
-        qemu, EmulatorModules, Tracer,
+        modules::{AddressFilter, EmulatorModuleTuple, PageFilter},
+        qemu, EmulatorModules, Tracer, IS_RCA,
     };
 
     pub fn exec_edges<AF, ET, PF, I, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(
         _qemu: qemu::Qemu,
-        emulator_modules: &mut EmulatorModules<ET, I, S>,
+        _emulator_modules: &mut EmulatorModules<ET, I, S>,
         state: Option<&mut S>,
         id: u64,
     ) where
@@ -72,13 +72,7 @@ mod rca {
         S: HasMetadata + Unpin,
         V: EdgeCoverageVariant<AF, PF, IS_CONST_MAP, MAP_SIZE>,
     {
-        let use_rca = if let Some(module) =
-            emulator_modules.get::<EdgeCoverageModule<AF, PF, V, IS_CONST_MAP, MAP_SIZE>>()
-        {
-            module.use_rca()
-        } else {
-            false
-        };
+        let use_rca = unsafe { IS_RCA };
 
         if use_rca {
             let state = state.expect("state missing for exec_edges");
