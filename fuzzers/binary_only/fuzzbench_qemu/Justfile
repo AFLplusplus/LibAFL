@@ -2,7 +2,6 @@ import "../../../just/libafl.just"
 
 FUZZER_NAME := "fuzzbench_qemu"
 HARNESS_NAME := "harness"
-PROJECT_DIR := absolute_path(".")
 
 [unix]
 harness:
@@ -37,7 +36,7 @@ run: build harness
 
 [unix]
 test2:
-    cargo run --profile {{PROFILE}} ./test2 -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out ./out ./test2
+    RUST_LOG=info cargo run --profile {{PROFILE}} ./test2 -- --libafl-in ../../inprocess/libfuzzer_libpng/corpus --libafl-out ./out ./test2
 
 [unix]
 test1:

@@ -53,10 +53,10 @@ use libafl_qemu::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
         tracer::TracerModule,
-        SnapshotModule, Tracer,
+        SnapshotModule,
     },
     Emulator, GuestReg, MmapPerms, PredicateFeedback, PredicatesMap, QemuExecutor, QemuExitError,
-    QemuExitReason, QemuMappingsViewer, QemuShutdownCause, Regs,
+    QemuExitReason, QemuMappingsViewer, QemuShutdownCause, RCAStage, Regs, Tracer, Qemu, QemuMappingsCache,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
@@ -193,7 +193,6 @@ fn fuzz(
     let modules = tuple_list!(
         StdEdgeCoverageModule::builder()
             .map_observer(edges_observer.as_mut())
-            .rca(true)
             .build()
             .unwrap(),
         CmpLogModule::default(),
@@ -305,13 +304,13 @@ fn fuzz(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         // Time feedback, this one does not need a feedback state
-        PredicateFeedback::new(&qemu_mappings, text_addr.clone()),
+        PredicateFeedback::new(),
     );
 
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_or!(
         CrashFeedback::new(),
-        PredicateFeedback::new(&qemu_mappings, text_addr)
+        PredicateFeedback::new()
     );
 
     // create a State from scratch
@@ -335,6 +334,15 @@ fn fuzz(
 
     // data per one exec
     state.add_metadata(Tracer::new());
+    // data per whole exec
+    state.metadata_or_insert_with(PredicatesMap::new);
+
+    // clear map or create map if it is not there
+    // to move this out of this stage.
+    let qemu = Qemu::get().expect("qemu not initialized??");
+    let viewer = QemuMappingsViewer::new(&qemu);
+    state.add_metadata(QemuMappingsCache::new(&viewer, text_addr));
+
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
@@ -426,9 +434,9 @@ fn fuzz(
     }
 
     let tracing = ShadowTracingStage::new(&mut executor);
-
+    let rca = RCAStage::new();
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power, rca);
 
     // reopen file to make sure we're at the end
     log.replace(

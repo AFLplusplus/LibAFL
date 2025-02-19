@@ -1,7 +1,7 @@
 use core::{fmt, marker::PhantomData};
-use std::ops::Range;
+use std::{ops::Range, time::Duration};
 
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use libafl::{
     corpus::{Corpus, CorpusId},
     fuzzer::Evaluator,
@@ -9,7 +9,7 @@ use libafl::{
     state::{HasCorpus, HasSolutions},
     Error, HasMetadata,
 };
-use libafl_bolts::impl_serdeany;
+use libafl_bolts::{current_time, impl_serdeany};
 use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,8 @@ pub static mut IS_RCA: bool = false;
 #[derive(Debug, Default)]
 pub struct RCAStage<I> {
     restart_helper: ReplayRestartingHelper,
+    // time keeper
+    last: Duration,
     phantom: PhantomData<I>,
 }
 
@@ -28,6 +30,7 @@ impl<I> RCAStage<I> {
     pub fn new() -> Self {
         Self {
             restart_helper: ReplayRestartingHelper::new(),
+            last: current_time(),
             phantom: PhantomData,
         }
     }
@@ -58,21 +61,18 @@ where
         manager: &mut EM,
     ) -> Result<(), libafl::Error> {
         // enable rca mode
+        if current_time() - self.last < Duration::from_secs(15) {
+            log::info!("no.. not now..");
+            return Ok(());
+        }
+
+        log::info!("Starting RCA");
         unsafe {
             IS_RCA = true;
         }
 
-        // clear map or create map if it is not there
-        {
-            let map = state.metadata_or_insert_with(PredicatesMap::new);
-            map.clear();
-        }
-
-        log::info!("Begining RCA");
-
         // scan corpus
         let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
-
         for id in corpus_ids {
             if self.restart_helper.corpus_probe(&id) {
                 continue;
@@ -97,7 +97,7 @@ where
             }
             log::info!("Replaying solution: {id}");
             let input = {
-                let mut tc = state.corpus().get(id)?.borrow_mut();
+                let mut tc = state.solutions().get(id)?.borrow_mut();
                 let input = tc.load_input(state.corpus())?;
                 input.clone()
             };
@@ -111,6 +111,14 @@ where
         map.synthesize();
         map.show();
 
+        // disable rca mode
+        unsafe {
+            IS_RCA = true;
+        }
+
+        self.last = current_time();
+
+        log::info!("Finished RCA!");
         Ok(())
     }
 }
@@ -336,6 +344,8 @@ pub struct PredicatesMap {
     edges: HashMap<Edges, (usize, usize)>,
     max: HashMap<GuestAddr, Vec<(u64, bool)>>,
     min: HashMap<GuestAddr, Vec<(u64, bool)>>,
+    seen_corpus: HashSet<CorpusId>,
+    seen_objectives: HashSet<CorpusId>,
     synthesized: Vec<(PredicateType, f64)>,
 }
 
@@ -346,6 +356,8 @@ impl PredicatesMap {
             edges: HashMap::default(),
             max: HashMap::default(),
             min: HashMap::default(),
+            seen_corpus: HashSet::default(),
+            seen_objectives: HashSet::default(),
             synthesized: Vec::new(),
         }
     }
