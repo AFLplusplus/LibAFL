@@ -12,7 +12,7 @@ use libafl_bolts::{impl_serdeany, Named};
 use libafl_qemu_sys::libafl_get_image_info;
 use serde::{Deserialize, Serialize};
 
-use crate::{GuestAddr, Qemu, QemuMappingsViewer};
+use crate::{GuestAddr, Qemu, QemuMappingsViewer, IS_RCA};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Edges(GuestAddr, GuestAddr);
@@ -327,6 +327,11 @@ impl PredicateFeedback {
     }
 
     #[must_use]
+    pub fn is_rca(&self) -> bool {
+        unsafe {IS_RCA}
+    }
+
+    #[must_use]
     // heap or mmap region
     pub fn is_heap_ptr(&self, ptr: u64) -> bool {
         let mut in_current = false;
@@ -390,6 +395,9 @@ where
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, libafl::Error> {
+        if self.is_rca() {
+            return Ok(false);
+        }
         if exit_kind == &ExitKind::Crash {
             self.was_crash = true;
         } else {
@@ -404,6 +412,10 @@ where
         _observers: &OT,
         _testcase: &mut Testcase<I>,
     ) -> Result<(), libafl::Error> {
+        if self.is_rca() {
+            return Ok(());
+        }
+
         let tracer = state.metadata::<Tracer>().unwrap();
         // because of double borrow shit!
         // println!("{:#?}", self.tracking_ip);

@@ -25,6 +25,9 @@ pub use strum::IntoEnumIterator;
 pub mod arch;
 pub use arch::*;
 
+pub mod rca;
+pub use rca::*;
+
 pub mod elf;
 
 pub mod modules;

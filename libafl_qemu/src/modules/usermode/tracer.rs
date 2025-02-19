@@ -2,7 +2,7 @@ use libafl::HasMetadata;
 
 use crate::{
     modules::{EmulatorModule, EmulatorModuleTuple, Tracer},
-    EmulatorModules, GuestAddr, Hook, Qemu,
+    EmulatorModules, GuestAddr, Hook, Qemu, IS_RCA,
 };
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -18,11 +18,7 @@ impl TracerModule {
 
     #[must_use]
     pub fn use_rca(&self) -> bool {
-        self.use_rca
-    }
-
-    pub fn set_use_rca(&mut self, use_rca: bool) {
-        self.use_rca = use_rca;
+        unsafe { IS_RCA }
     }
 }
 
@@ -52,7 +48,7 @@ where
 
 pub fn tracer_read<ET, I, S, const N: usize>(
     qemu: Qemu,
-    emulator_modules: &mut EmulatorModules<ET, I, S>,
+    _emulator_modules: &mut EmulatorModules<ET, I, S>,
     state: Option<&mut S>,
     _id: u64,
     pc: GuestAddr,
@@ -62,8 +58,8 @@ pub fn tracer_read<ET, I, S, const N: usize>(
     I: Unpin,
     S: Unpin + HasMetadata,
 {
-    let h = emulator_modules.get_mut::<TracerModule>().unwrap();
-    if h.use_rca() {
+    let is_rca = unsafe { IS_RCA };
+    if is_rca {
         let state = state.expect("state missing for rca");
         let predicates = state
             .metadata_mut::<Tracer>()

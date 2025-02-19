@@ -188,7 +188,6 @@ fn fuzz(
 
     let asan = AsanModuleBuilder::default().build();
     let mut tracer = TracerModule::default();
-    tracer.set_use_rca(true);
     let snapshot = SnapshotModule::new();
 
     let modules = tuple_list!(
