@@ -111,13 +111,7 @@ regex = ["std", "dep:regex"]
 casr = ["libcasr", "std", "regex"]
 
 ## Intel Processor Trace
-intel_pt = [
-  "std",
-  "dep:libafl_intelpt",
-  "dep:libipt",
-  "dep:nix",
-  "dep:num_enum",
-]
+intel_pt = ["std", "dep:libafl_intelpt", "dep:nix", "dep:num_enum"]
 ## Save all the Intel PT raw traces to files, use only for debug
 intel_pt_export_raw = ["intel_pt", "libafl_intelpt/export_raw"]
 
@@ -307,7 +301,6 @@ document-features = { workspace = true, optional = true }
 # Optional
 clap = { workspace = true, optional = true }
 num_enum = { workspace = true, optional = true }
-libipt = { workspace = true, optional = true }
 fastbloom = { workspace = true, optional = true }
 
 [lints]

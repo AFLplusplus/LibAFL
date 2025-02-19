@@ -1,4 +1,5 @@
-//! Newtype pattern style wrapper for [`super::Input`]s
+//! Newtype pattern style wrapper for [`Input`]s
+//! This allows us to wrap common types as [`Input`], such as [`alloc::vec::Vec<u8>`] as [`crate::inputs::BytesInput`] and use those for mutations.
 
 use alloc::vec::Vec;
 use core::{fmt::Debug, hash::Hash};
@@ -11,46 +12,45 @@ use {
     std::{fs::File, io::Read, path::Path},
 };
 
-use super::Input;
-use crate::mutators::numeric::Numeric;
+use crate::{inputs::Input, mutators::numeric::Numeric};
 
 /// Newtype pattern wrapper around an underlying structure to implement inputs
 ///
 /// This does not blanket implement [`super::Input`], because for certain inputs, writing them to disk does not make sense, because they don't own their data (like [`super::MutVecInput`])
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
-pub struct ValueInput<I>(I);
+pub struct ValueInput<T>(T);
 
-impl<I> From<I> for ValueInput<I> {
-    fn from(value: I) -> Self {
+impl<T> From<T> for ValueInput<T> {
+    fn from(value: T) -> Self {
         Self(value)
     }
 }
 
-impl<I> ValueInput<I> {
+impl<T> ValueInput<T> {
     /// Create a new [`ValueInput`]
-    pub const fn new(value: I) -> Self {
+    pub const fn new(value: T) -> Self {
         Self(value)
     }
 
     /// Extract the inner value
-    pub fn into_inner(self) -> I {
+    pub fn into_inner(self) -> T {
         self.0
     }
 }
 
-impl<I> AsRef<I> for ValueInput<I> {
-    fn as_ref(&self) -> &I {
+impl<T> AsRef<T> for ValueInput<T> {
+    fn as_ref(&self) -> &T {
         &self.0
     }
 }
 
-impl<I> AsMut<I> for ValueInput<I> {
-    fn as_mut(&mut self) -> &mut I {
+impl<T> AsMut<T> for ValueInput<T> {
+    fn as_mut(&mut self) -> &mut T {
         &mut self.0
     }
 }
 
-impl<I: Copy> Copy for ValueInput<I> {}
+impl<T: Copy> Copy for ValueInput<T> {}
 
 // Macro to implement the `Input` trait and create type aliases for `WrappingInput<T>`
 macro_rules! impl_input_for_value_input {
@@ -105,9 +105,9 @@ impl Input for ValueInput<Vec<u8>> {
     }
 }
 
-impl<I> Numeric for ValueInput<I>
+impl<T> Numeric for ValueInput<T>
 where
-    I: Numeric,
+    T: Numeric,
 {
     fn flip_all_bits(&mut self) {
         self.as_mut().flip_all_bits();
@@ -179,26 +179,26 @@ mod tests {
 
             $prep
             let mut j = $value;
-            j.flip_bit_at(size_of::<I>() * 8 - 1);
+            j.flip_bit_at(size_of::<T>() * 8 - 1);
             $prep
-            assert_ne!(j, $value, "{:?}.flip_bit_at({}) for {}", j, size_of::<I>() * 8 - 1, type_name::<$type>());
+            assert_ne!(j, $value, "{:?}.flip_bit_at({}) for {}", j, size_of::<T>() * 8 - 1, type_name::<$type>());
         }};
     }
 
     #[cfg(feature = "std")]
     #[expect(unused_mut)]
-    fn take_numeric<I: Numeric + Clone + PartialEq + Debug>(i: &I, check_twos_complement: bool) {
-        apply_all_ops!({}, i.clone(), I, check_twos_complement);
+    fn take_numeric<T: Numeric + Clone + PartialEq + Debug>(val: &T, check_twos_complement: bool) {
+        apply_all_ops!({}, val.clone(), T, check_twos_complement);
         apply_all_ops!(
             {},
-            ValueInput::from(i.clone()),
-            ValueInput<I>,
+            ValueInput::from(val.clone()),
+            ValueInput<T>,
             check_twos_complement
         );
         apply_all_ops!(
-            let mut i_clone = i.clone(),
-            &mut i_clone,
-            &mut I,
+            let mut val_clone = val.clone(),
+            &mut val_clone,
+            &mut T,
             check_twos_complement
         );
     }

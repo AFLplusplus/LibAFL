@@ -3,7 +3,10 @@ use alloc::vec::Vec;
 use libafl_bolts::Error;
 use serde::{Deserialize, Serialize};
 
-use crate::stages::{HasCurrentStageId, HasNestedStageStatus, StageId};
+use crate::{
+    stages::StageId,
+    state::{HasCurrentStageId, HasNestedStage},
+};
 
 /// A stack to keep track of which stage is executing
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -41,7 +44,7 @@ impl HasCurrentStageId for StageStack {
     }
 }
 
-impl HasNestedStageStatus for StageStack {
+impl HasNestedStage for StageStack {
     fn enter_inner_stage(&mut self) -> Result<(), Error> {
         self.stage_depth += 1;
         Ok(())

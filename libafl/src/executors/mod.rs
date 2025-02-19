@@ -157,7 +157,8 @@ pub fn common_signals() -> Vec<Signal> {
 }
 
 #[cfg(test)]
-mod test {
+/// Tester for executor
+pub mod test {
     use core::marker::PhantomData;
 
     use libafl_bolts::{AsSlice, Error};

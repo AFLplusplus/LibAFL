@@ -84,6 +84,12 @@ static void __libqasan_map_shadow(void *addr, void *limit) {
               addr, limit + 1, errno);
     abort();
   }
+
+  if (madvise(addr, size, MADV_DONTDUMP) != 0) {
+    QASAN_LOG("Failed to madvise (MADV_DONTDUMP) shadow: %p-%p, errno: %d",
+              addr, limit + 1, errno);
+    abort();
+  }
 }
 #endif
 
