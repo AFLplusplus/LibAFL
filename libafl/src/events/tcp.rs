@@ -48,10 +48,9 @@ use crate::{
     },
     inputs::Input,
     monitors::{stats::ClientStatsManager, Monitor},
-    stages::HasCurrentStageId,
     state::{
-        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        MaybeHasClientPerfMonitor, Stoppable,
+        HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime,
+        HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -627,7 +626,7 @@ impl<EMH, I, S> EventRestarter<S> for TcpEventManager<EMH, I, S>
 where
     S: HasCurrentStageId,
 {
-    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         std_on_restart(self, state)
     }
 }
@@ -861,7 +860,7 @@ where
     SP: ShMemProvider<ShMem = SHM>,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
-    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         state.on_restart()?;
 
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page

@@ -32,8 +32,9 @@ use crate::{
         SendExiting,
     },
     monitors::{stats::ClientStatsManager, Monitor},
-    stages::HasCurrentStageId,
-    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
+    state::{
+        HasCurrentStageId, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable,
+    },
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]
@@ -111,7 +112,7 @@ impl<I, MT, S> EventRestarter<S> for SimpleEventManager<I, MT, S>
 where
     S: HasCurrentStageId,
 {
-    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         std_on_restart(self, state)
     }
 }
@@ -325,7 +326,7 @@ where
     MT: Monitor,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
-    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         state.on_restart()?;
 
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page

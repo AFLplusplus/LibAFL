@@ -272,9 +272,9 @@ where
     SP: ShMemProvider<ShMem = SHM>,
 {
     #[inline]
-    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
+    fn mgr_on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         self.client.await_safe_to_unmap_blocking();
-        self.inner.on_restart(state)?;
+        self.inner.mgr_on_restart(state)?;
         Ok(())
     }
 }

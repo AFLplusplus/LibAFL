@@ -24,11 +24,11 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{HasCurrentStageId, StagesTuple},
+    stages::StagesTuple,
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastFoundTime,
-        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+        HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
+        HasLastFoundTime, HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };
@@ -207,7 +207,7 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
-    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
+    /// before exiting, make sure you call `event_mgr.mgr_on_restart(&mut state)?;`.
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_one(
         &mut self,
@@ -233,7 +233,7 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
-    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
+    /// before exiting, make sure you call `event_mgr.mgr_on_restart(&mut state)?;`.
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_loop_for(
         &mut self,
