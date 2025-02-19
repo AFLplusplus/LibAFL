@@ -13,7 +13,7 @@ use crate::{
     executors::{Executor, HasObservers, HasTimeout},
     inputs::BytesInput,
     observers::ObserversTuple,
-    stages::Stage,
+    stages::{Restartable, Stage},
     Evaluator, HasMetadata,
 };
 
@@ -111,6 +111,9 @@ where
         *res = TimeoutsToVerify::<I>::new();
         Ok(())
     }
+}
+
+impl<E, I, S> Restartable<S> for VerifyTimeoutsStage<E, I, S> {
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }
