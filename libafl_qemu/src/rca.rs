@@ -5,7 +5,7 @@ use hashbrown::{HashMap, HashSet};
 use libafl::{
     corpus::{Corpus, CorpusId},
     fuzzer::Evaluator,
-    stages::{replay::ReplayRestartingHelper, Restartable, Stage},
+    stages::{Restartable, Stage},
     state::{HasCorpus, HasSolutions},
     Error, HasMetadata,
 };
@@ -17,11 +17,56 @@ use crate::{GuestAddr, Qemu, QemuMappingsViewer};
 
 pub static mut IS_RCA: bool = false;
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+/// Maintains the list of processed corpus or solution entries till now
+pub struct RCARestarterMetadata {
+    last: Duration,
+    done_corpus: HashSet<CorpusId>,
+    done_solution: HashSet<CorpusId>,
+}
+
+impl_serdeany!(RCARestarterMetadata);
+
+impl RCARestarterMetadata {
+    /// constructor
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            last: current_time(),
+            done_corpus: HashSet::default(),
+            done_solution: HashSet::default(),
+        }
+    }
+
+    /// clear history
+    pub fn clear(&mut self) {
+        self.done_corpus.clear();
+        self.done_solution.clear();
+    }
+
+    /// check we've scaned this corpus entry
+    pub fn corpus_probe(&mut self, id: &CorpusId) -> bool {
+        self.done_corpus.contains(id)
+    }
+
+    /// check we've scaned this solution entry
+    pub fn solution_probe(&mut self, id: &CorpusId) -> bool {
+        self.done_solution.contains(id)
+    }
+
+    /// mark this corpus entry as finished
+    pub fn corpus_finish(&mut self, id: CorpusId) {
+        self.done_corpus.insert(id);
+    }
+
+    /// mark this solution entry as finished
+    pub fn solution_finish(&mut self, id: CorpusId) {
+        self.done_solution.insert(id);
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct RCAStage<I> {
-    restart_helper: ReplayRestartingHelper,
-    // time keeper
-    last: Duration,
     phantom: PhantomData<I>,
 }
 
@@ -29,20 +74,21 @@ impl<I> RCAStage<I> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            restart_helper: ReplayRestartingHelper::new(),
-            last: current_time(),
             phantom: PhantomData,
         }
     }
 }
 
-impl<I, S> Restartable<S> for RCAStage<I> {
-    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
+impl<I, S> Restartable<S> for RCAStage<I>
+where
+    S: HasMetadata,
+{
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        state.metadata_or_insert_with(RCARestarterMetadata::default);
         Ok(true)
     }
 
     fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
-        self.restart_helper.clear();
         Ok(())
     }
 }
@@ -61,7 +107,8 @@ where
         manager: &mut EM,
     ) -> Result<(), libafl::Error> {
         // enable rca mode
-        if current_time() - self.last < Duration::from_secs(15) {
+        let helper = state.metadata::<RCARestarterMetadata>()?;
+        if current_time() - helper.last < Duration::from_secs(15) {
             log::info!("no.. not now..");
             return Ok(());
         }
@@ -74,8 +121,12 @@ where
         // scan corpus
         let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
         for id in corpus_ids {
-            if self.restart_helper.corpus_probe(&id) {
-                continue;
+            {
+                let helper = state.metadata_mut::<RCARestarterMetadata>()?;
+                if helper.corpus_probe(&id) {
+                    continue;
+                }
+                helper.corpus_finish(id);
             }
             log::info!("Replaying corpus: {id}");
             let input = {
@@ -85,15 +136,17 @@ where
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;
-
-            self.restart_helper.corpus_finish(id);
         }
 
         // scan solutions
         let solution_ids: Vec<CorpusId> = state.solutions().ids().collect();
         for id in solution_ids {
-            if self.restart_helper.solution_probe(&id) {
-                continue;
+            {
+                let helper = state.metadata_mut::<RCARestarterMetadata>()?;
+                if helper.solution_probe(&id) {
+                    continue;
+                }
+                helper.solution_finish(id);
             }
             log::info!("Replaying solution: {id}");
             let input = {
@@ -103,8 +156,6 @@ where
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;
-
-            self.restart_helper.solution_finish(id);
         }
 
         let map = state.metadata_mut::<PredicatesMap>()?;
@@ -116,7 +167,8 @@ where
             IS_RCA = true;
         }
 
-        self.last = current_time();
+        let helper = state.metadata_mut::<RCARestarterMetadata>()?;
+        helper.last = current_time();
 
         log::info!("Finished RCA!");
         Ok(())
