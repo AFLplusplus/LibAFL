@@ -426,7 +426,7 @@ where
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, S, Z>
+impl<I, S, Z> Restartable<S> for SimpleConcolicMutationalStage<I, Z>
 where
     S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
 {
