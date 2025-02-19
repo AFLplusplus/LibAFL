@@ -1,19 +1,17 @@
 use libafl::HasMetadata;
 
 use crate::{
-    modules::{EmulatorModule, EmulatorModuleTuple, Tracer},
-    EmulatorModules, GuestAddr, Hook, Qemu, IS_RCA,
+    modules::{EmulatorModule, EmulatorModuleTuple},
+    EmulatorModules, GuestAddr, Hook, Qemu, Tracer, IS_RCA,
 };
 
 #[derive(Debug, Default, Copy, Clone)]
-pub struct TracerModule {
-    use_rca: bool,
-}
+pub struct TracerModule {}
 
 impl TracerModule {
     #[must_use]
     pub fn new() -> Self {
-        Self { use_rca: false }
+        Self {}
     }
 
     #[must_use]

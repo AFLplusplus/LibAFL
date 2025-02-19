@@ -47,9 +47,6 @@ pub use drcov::{DrCovMetadata, DrCovModule, DrCovModuleBuilder};
 pub mod logger;
 pub use logger::LoggerModule;
 
-pub mod predicates;
-pub use predicates::*;
-
 pub mod utils;
 
 /// [`EmulatorModule`] is a trait designed to define modules that interact with the QEMU emulator

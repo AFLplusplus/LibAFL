@@ -55,8 +55,8 @@ mod rca {
 
     use super::{super::EdgeCoverageVariant, QemuEdgesMapMetadata};
     use crate::{
-        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter, Tracer},
-        qemu, EmulatorModules,
+        modules::{AddressFilter, EdgeCoverageModule, EmulatorModuleTuple, PageFilter},
+        qemu, EmulatorModules, Tracer,
     };
 
     pub fn exec_edges<AF, ET, PF, I, S, V, const IS_CONST_MAP: bool, const MAP_SIZE: usize>(

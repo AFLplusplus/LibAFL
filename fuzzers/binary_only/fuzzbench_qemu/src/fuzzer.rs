@@ -53,10 +53,10 @@ use libafl_qemu::{
         cmplog::{CmpLogModule, CmpLogObserver},
         edges::StdEdgeCoverageModule,
         tracer::TracerModule,
-        PredicateFeedback, PredicatesMap, SnapshotModule, Tracer,
+        SnapshotModule, Tracer,
     },
-    Emulator, GuestReg, MmapPerms, QemuExecutor, QemuExitError, QemuExitReason, QemuMappingsViewer,
-    QemuShutdownCause, Regs,
+    Emulator, GuestReg, MmapPerms, PredicateFeedback, PredicatesMap, QemuExecutor, QemuExitError,
+    QemuExitReason, QemuMappingsViewer, QemuShutdownCause, Regs,
 };
 use libafl_targets::{edges_map_mut_ptr, EDGES_MAP_ALLOCATED_SIZE, MAX_EDGES_FOUND};
 #[cfg(unix)]
@@ -336,8 +336,6 @@ fn fuzz(
     // data per one exec
     state.add_metadata(Tracer::new());
 
-    // data for the whole run
-    state.metadata_or_insert_with(PredicatesMap::new);
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 

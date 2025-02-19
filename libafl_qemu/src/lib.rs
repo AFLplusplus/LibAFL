@@ -28,6 +28,9 @@ pub use arch::*;
 pub mod rca;
 pub use rca::*;
 
+pub mod predicates;
+pub use predicates::*;
+
 pub mod elf;
 
 pub mod modules;
