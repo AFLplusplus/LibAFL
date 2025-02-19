@@ -330,7 +330,10 @@ impl<I> InMemoryOnDiskCorpus<I> {
         if testcase.filename().is_some() {
             // We are renaming!
 
-            let old_filename = testcase.filename_mut().take().ok_or_else(|| Error::illegal_argument("Testcase missing filename for renaming"))?;
+            let old_filename = testcase
+                .filename_mut()
+                .take()
+                .ok_or_else(|| Error::illegal_argument("Testcase missing filename for renaming"))?;
             let new_filename = filename;
 
             // Do operations below when new filename is specified
@@ -357,14 +360,13 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         I: Input,
     {
-        let file_name = match testcase.filename_mut().take() {
-            Some(name) => name,
-            None => {
-                let input = testcase.input().as_ref().ok_or_else(|| {
-                    Error::illegal_argument("Testcase missing input; cannot generate filename")
-                })?;
-                input.generate_name(id)
-            }
+        let file_name = if let Some(name) = testcase.filename_mut().take() {
+            name
+        } else {
+            let input = testcase.input().as_ref().ok_or_else(|| {
+                Error::illegal_argument("Testcase missing input; cannot generate filename")
+            })?;
+            input.generate_name(id)
         };
 
         let mut ctr = 1;
@@ -372,16 +374,17 @@ impl<I> InMemoryOnDiskCorpus<I> {
             let lockfile_name = format!(".{file_name}");
             let lockfile_path = self.dir_path.join(lockfile_name);
 
-            let mut lockfile = try_create_new(&lockfile_path)?.or_else(|| {
-                OpenOptions::new()
-                    .write(true)
-                    .read(true)
-                    .open(&lockfile_path)
-                    .ok()
-            })
-            .ok_or_else(|| {
-                Error::illegal_state("Failed to open or create lockfile for testcase")
-            })?;
+            let mut lockfile = try_create_new(&lockfile_path)?
+                .or_else(|| {
+                    OpenOptions::new()
+                        .write(true)
+                        .read(true)
+                        .open(&lockfile_path)
+                        .ok()
+                })
+                .ok_or_else(|| {
+                    Error::illegal_state("Failed to open or create lockfile for testcase")
+                })?;
             lockfile.lock_exclusive()?;
 
             let mut old_ctr = String::new();
@@ -405,13 +408,9 @@ impl<I> InMemoryOnDiskCorpus<I> {
                 .as_ref()
                 .ok_or_else(|| Error::illegal_argument("Testcase missing filename for metadata"))?;
             let metafile_name = if self.locking {
-                format!(
-                    ".{}_{}.metadata",
-                    filename_ref,
-                    ctr
-                )
+                format!(".{filename_ref}_{ctr}.metadata")
             } else {
-                format!(".{}.metadata", filename_ref)
+                format!(".{filename_ref}.metadata")
             };
             let metafile_path = self.dir_path.join(&metafile_name);
             let mut tmpfile_path = metafile_path.clone();

@@ -79,13 +79,19 @@ impl<I> TestcaseStorageMap<I> {
         if let Some(item) = self.map.remove(&id) {
             self.remove_key(id);
             if let Some(prev) = item.prev {
-                self.map.get_mut(&prev).ok_or_else(|| Error::illegal_state("Unable to fetch previous CorpusId"))?.next = item.next;
+                self.map
+                    .get_mut(&prev)
+                    .ok_or_else(|| Error::illegal_state("Unable to fetch next CorpusId"))?
+                    .next = item.next;
             } else {
                 // first elem
                 self.first_id = item.next;
             }
             if let Some(next) = item.next {
-                self.map.get_mut(&next).ok_or_else(|| Error::illegal_state("Unable to fetch next CorpusId"))?.prev = item.prev;
+                self.map
+                    .get_mut(&next)
+                    .ok_or_else(|| Error::illegal_state("Unable to fetch previous CorpusId"))?
+                    .prev = item.prev;
             } else {
                 // last elem
                 self.last_id = item.prev;
@@ -93,7 +99,6 @@ impl<I> TestcaseStorageMap<I> {
             Ok(item.testcase)
         } else {
             Err(Error::illegal_argument("Testcase not found in storage"))
-
         }
     }
 

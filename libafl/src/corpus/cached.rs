@@ -38,9 +38,13 @@ where
             self.load_input_into(&mut testcase.borrow_mut())?;
             let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
-                let removed = self.cached_indexes.borrow_mut().pop_front().ok_or_else(|| {
-                    Error::illegal_state("Cached indexes queue was unexpectedly empty")
-                })?;
+                let removed = self
+                    .cached_indexes
+                    .borrow_mut()
+                    .pop_front()
+                    .ok_or_else(|| {
+                        Error::illegal_state("Cached indexes queue was unexpectedly empty")
+                    })?;
 
                 if let Ok(mut borrowed) = self.inner.get_from_all(removed)?.try_borrow_mut() {
                     *borrowed.input_mut() = None;
