@@ -26,6 +26,23 @@ pub trait HasMetadata {
         self.metadata_map_mut().insert(meta);
     }
 
+    /// Add a metadata to the metadata map
+    /// Returns error if the metadata is already there
+    #[inline]
+    fn add_metadata_checked<M>(&mut self, meta: M) -> Result<(), Error>
+    where
+        M: SerdeAny,
+    {
+        if self.has_metadata::<M>() {
+            return Err(Error::illegal_argument(format!(
+                "Tried to add a metadata of {}. But this will overwrite the existing metadata",
+                type_name::<M>()
+            )));
+        }
+        self.metadata_map_mut().insert(meta);
+        Ok(())
+    }
+
     /// Gets metadata, or inserts it using the given construction function `default`
     fn metadata_or_insert_with<M>(&mut self, default: impl FnOnce() -> M) -> &mut M
     where
@@ -92,6 +109,20 @@ pub trait HasNamedMetadata {
         M: SerdeAny,
     {
         self.named_metadata_map_mut().insert(name, meta);
+    }
+
+    /// Add a metadata to the metadata map
+    /// Return an error if there already is the metadata with the same name
+    #[inline]
+    fn add_named_metadata_checked<M>(&mut self, name: &str, meta: M) -> Result<(), Error>
+    where
+        M: SerdeAny,
+    {
+        if self.has_named_metadata::<M>(name) {
+            return Err(Error::illegal_argument(format!("Tried to add a metadata of {} named {}. But this will overwrite the existing metadata", type_name::<M>(), name)));
+        }
+        self.named_metadata_map_mut().insert(name, meta);
+        Ok(())
     }
 
     /// Add a metadata to the metadata map
