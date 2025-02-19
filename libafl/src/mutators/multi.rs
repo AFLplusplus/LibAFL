@@ -280,7 +280,7 @@ where
         let id = random_corpus_id!(state.corpus(), state.rand_mut());
         if let Some(cur) = state.corpus().current() {
             if id == *cur {
-                let len = input.iter().count();
+                let len = input.len();
                 if len == 0 {
                     return Ok(MutationResult::Skipped);
                 }
@@ -344,7 +344,7 @@ where
         let mut other_testcase = state.corpus().get(id)?.borrow_mut();
         let other = other_testcase.load_input(state.corpus())?;
 
-        let other_len = other.iter().count();
+        let other_len = other.len();
         if other_len == 0 {
             return Ok(MutationResult::Skipped);
         }

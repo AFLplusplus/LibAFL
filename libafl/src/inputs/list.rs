@@ -35,16 +35,23 @@ pub struct ListInput<I> {
 
 impl<I> Default for ListInput<I> {
     fn default() -> Self {
-        Self::new()
+        Self::empty()
     }
 }
 
 impl<I> ListInput<I> {
-    /// Create a new [`ListInput`].
+    /// Create a new empty [`ListInput`].
     #[must_use]
     #[inline]
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self { parts: Vec::new() }
+    }
+
+    /// Create a new [`ListInput`] with the given parts.
+    #[must_use]
+    #[inline]
+    pub fn new(parts: Vec<I>) -> Self {
+        Self { parts }
     }
 
     fn idxs_to_skips(idxs: &mut [usize]) {
@@ -139,18 +146,6 @@ impl<I> ListInput<I> {
     #[inline]
     pub fn pop_part(&mut self) -> Option<I> {
         self.parts.pop()
-    }
-
-    /// Iterate over the parts of this input; no order is specified.
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = &I> {
-        self.parts.iter()
-    }
-
-    /// Iterate over the parts of this input; no order is specified.
-    #[inline]
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut I> {
-        self.parts.iter_mut()
     }
 
     /// Get the number of parts in this input.
@@ -326,8 +321,6 @@ impl<M> Named for RandomEntryMutator<M> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
-
     use tuple_list::tuple_list;
 
     use super::ListInput;
@@ -346,10 +339,7 @@ mod tests {
         let mut state = NopState::<ListInput<ValueInput<u8>>>::new();
         let res = mapped_mutator.mutate_all(&mut state, &mut input);
         assert_eq!(res.unwrap(), MutationResult::Mutated);
-        assert_eq!(
-            input.iter().copied().collect::<Vec<_>>(),
-            vec![ValueInput::new(1), ValueInput::new(3)]
-        );
+        assert_eq!(input.parts, vec![ValueInput::new(1), ValueInput::new(3)]);
     }
 
     #[test]
@@ -375,6 +365,7 @@ mod tests {
         assert_eq!(
             1,
             input
+                .parts
                 .iter()
                 .zip(initial_input.iter())
                 .filter(|&(a, b)| a != b)

@@ -59,7 +59,7 @@ where
     where
         N: 'a,
     {
-        self.iter().map(|(n, _)| n)
+        self.parts().iter().map(|(n, _)| n)
     }
 
     fn parts_with_name<'a, 'b>(&'b self, name: &'a N) -> impl Iterator<Item = (usize, &'b I)> + 'a
@@ -67,7 +67,8 @@ where
         'b: 'a,
         I: 'b,
     {
-        self.iter()
+        self.parts()
+            .iter()
             .enumerate()
             .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
     }
@@ -80,7 +81,8 @@ where
         'b: 'a,
         I: 'b,
     {
-        self.iter_mut()
+        self.parts_mut()
+            .iter_mut()
             .enumerate()
             .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
     }
