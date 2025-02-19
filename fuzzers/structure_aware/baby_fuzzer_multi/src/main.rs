@@ -45,8 +45,8 @@ pub fn main() {
     // The closure that we want to fuzz
     let mut harness = |input: &MultipartInput<BytesInput, String>| {
         let mut count = input.len();
-        for (i, input) in input.iter().enumerate() {
-            let target = input.1.target_bytes();
+        for (i, (_name, input)) in input.parts().iter().enumerate() {
+            let target = input.target_bytes();
             let buf = target.as_slice();
             signals_set(i * 8);
             if !buf.is_empty() && buf[0] == b'a' {
