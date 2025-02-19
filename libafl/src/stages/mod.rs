@@ -174,7 +174,6 @@ where
                 let stage = &mut self.0;
 
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
-                stage.clear_progress(state)?;
 
                 state.clear_stage_id()?;
             }
@@ -188,7 +187,6 @@ where
                 let stage = &mut self.0;
 
                 stage.perform_restartable(fuzzer, executor, state, manager)?;
-                stage.clear_progress(state)?;
 
                 state.clear_stage_id()?;
             }

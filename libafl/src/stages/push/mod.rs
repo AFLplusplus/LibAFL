@@ -21,7 +21,6 @@ use core::{
 use libafl_bolts::Named;
 pub use mutational::StdMutationalPushStage;
 
-use super::Restartable;
 use crate::{
     common::HasNamedMetadata,
     corpus::{CorpusId, HasCurrentCorpusId},
@@ -29,7 +28,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
 };

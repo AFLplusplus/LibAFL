@@ -7,10 +7,9 @@ use bitvec::{bitvec, vec::BitVec};
 use libafl_bolts::{impl_serdeany, Error};
 use serde::{Deserialize, Serialize};
 
-use super::Restartable;
 use crate::{
     inputs::{BytesInput, HasTargetBytes},
-    stages::Stage,
+    stages::{Restartable, Stage},
     state::{HasCorpus, HasCurrentTestcase},
     HasMetadata,
 };

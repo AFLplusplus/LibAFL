@@ -6,8 +6,12 @@
 
 use core::marker::PhantomData;
 
-use super::Restartable;
-use crate::{generators::Generator, stages::Stage, state::HasRand, Error, Evaluator};
+use crate::{
+    generators::Generator,
+    stages::{Restartable, Stage},
+    state::HasRand,
+    Error, Evaluator,
+};
 
 /// A [`Stage`] that generates a single input via a [`Generator`] and evaluates
 /// it using the fuzzer, possibly adding it to the corpus.

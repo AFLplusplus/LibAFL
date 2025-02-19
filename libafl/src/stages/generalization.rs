@@ -11,7 +11,6 @@ use libafl_bolts::{
     AsSlice, Named,
 };
 
-use super::Restartable;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::PerfFeature;
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,

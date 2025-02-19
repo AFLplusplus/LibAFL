@@ -15,14 +15,13 @@ use libafl_bolts::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::Restartable;
 use crate::{
     corpus::{Corpus, CorpusId, HasCurrentCorpusId},
     events::{llmp::LlmpEventConverter, Event, EventConfig, EventFirer},
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, InputConverter},
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,
