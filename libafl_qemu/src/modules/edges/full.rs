@@ -107,7 +107,6 @@ impl Default for StdEdgeCoverageFullModuleBuilder {
             page_filter: StdPageFilter::default(),
             use_hitcounts: true,
             use_jit: true,
-            use_rca: false,
         }
     }
 }
