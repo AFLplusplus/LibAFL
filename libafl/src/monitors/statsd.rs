@@ -31,6 +31,9 @@ pub enum StatsdMonitorTagFlavor {
         /// Identifier to distinguish this fuzzing instance with others.
         tag_identifier: Cow<'static, str>,
         /// Other custom tags (key, value) pairs.
+        ///
+        /// Key should not be one of "afl_version", "banner", "instance", "job"
+        /// and "type", which are reserved for internal usage.
         custom_tags: Vec<(Cow<'static, str>, Cow<'static, str>)>,
     },
     /// No tag
