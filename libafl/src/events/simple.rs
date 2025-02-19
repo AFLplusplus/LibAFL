@@ -32,8 +32,9 @@ use crate::{
         SendExiting,
     },
     monitors::{stats::ClientStatsManager, Monitor},
-    stages::HasCurrentStageId,
-    state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
+    state::{
+        HasCurrentStageId, HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable,
+    },
     Error, HasMetadata,
 };
 #[cfg(feature = "std")]

@@ -48,10 +48,9 @@ use crate::{
     },
     inputs::Input,
     monitors::{stats::ClientStatsManager, Monitor},
-    stages::HasCurrentStageId,
     state::{
-        HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime, HasSolutions,
-        MaybeHasClientPerfMonitor, Stoppable,
+        HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported, HasLastReportTime,
+        HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };

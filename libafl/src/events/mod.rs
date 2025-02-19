@@ -108,7 +108,7 @@ pub struct EventManagerId(
 use crate::events::multi_machine::NodeId;
 #[cfg(feature = "introspection")]
 use crate::monitors::stats::ClientPerfStats;
-use crate::{observers::TimeObserver, stages::HasCurrentStageId};
+use crate::{observers::TimeObserver, state::HasCurrentStageId};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]

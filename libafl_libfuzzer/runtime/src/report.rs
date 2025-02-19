@@ -5,8 +5,8 @@ use libafl::{
     executors::HasObservers,
     feedbacks::MapFeedbackMetadata,
     monitors::SimpleMonitor,
-    stages::{HasCurrentStageId, StagesTuple},
-    state::{HasExecutions, HasLastReportTime, Stoppable},
+    stages::StagesTuple,
+    state::{HasCurrentStageId, HasExecutions, HasLastReportTime, Stoppable},
     Error, Fuzzer, HasMetadata, HasNamedMetadata,
 };
 

@@ -1,117 +1,40 @@
+import "../../../just/libafl-cc-libpng.just"
+
 FUZZER_NAME := 'fuzzer_libpng'
-PROJECT_DIR := absolute_path(".")
-PROFILE := env("PROFILE", "release")
-PROFILE_DIR := if PROFILE == "release" { "release" } else if PROFILE == "dev" { "debug" } else { "debug" }
-CARGO_TARGET_DIR := env("CARGO_TARGET_DIR", "target")
-FUZZER := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / FUZZER_NAME
-LIBAFL_CC := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cc"
-LIBAFL_CXX := PROJECT_DIR / CARGO_TARGET_DIR / PROFILE_DIR / "libafl_cxx"
 
+[unix]
+cc feat:
+    cargo build --profile {{PROFILE}} --features="{{feat}}"
 
-alias cc := cxx
+[unix]
+cxx feat:
+    cargo build --profile {{PROFILE}} --features="{{feat}}"
 
-[linux]
-[macos]
-libpng:
-    #!/bin/bash
-    if [ ! -f v1.6.37.tar.gz ]; then
-        wget https://github.com/glennrp/libpng/archive/refs/tags/v1.6.37.tar.gz
-    fi
-    tar -xvf v1.6.37.tar.gz
+[unix]
+lib feat: (libpng feat) (cxx feat)
 
-[windows]
-libpng:
-    echo "Unsupported on this platform"
+# Feat is either nothing or "crash"
+[unix]
+fuzzer feat="": (lib feat) (cxx feat)
+    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc \
+        "{{LIBPNG_BUILD}}/.libs/libpng16.a" \
+        "{{ZLIB_BUILD}}/libz.a" \
+        -I"{{LIBPNG_INCLUDE}}" \
+        -I"{{LIBPNG_BUILD}}" \
+        -I"{{ZLIB_INCLUDE}}" \
+        -L"{{ZLIB_LIB}}" \
+        -o {{FUZZER_NAME}} \
+        -lm -lz
 
-[linux]
-[macos]
-cxx:
-    cargo build --profile {{PROFILE}}
-
-[windows]
-cxx:
-    echo "Unsupported on this platform"
-
-[linux]
-[macos]
-crash_cxx:
-    cargo build --profile {{PROFILE}} --features=crash
-
-[windows]
-crash_cxx:
-    echo "Unsupported on this platform"
-
-[linux]
-[macos]
-lib: libpng cxx
-    #!/bin/bash
-    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-    cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
-
-[windows]
-lib:
-    echo "Unsupported on this platform"
-
-[linux]
-[macos]
-crash_lib: libpng crash_cxx
-    #!/bin/bash
-    cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-    cd {{PROJECT_DIR}}
-    make -C libpng-1.6.37 CC="{{LIBAFL_CC}}" CXX="{{LIBAFL_CXX}}"
-
-[windows]
-crash_lib:
-    echo "Unsupported on this platform"
-
-[linux]
-[macos]
-fuzzer: lib cxx
-    pwd
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
-
-[windows]
-fuzzer:
-    echo "Unsupported on this platform"
-
-[linux]
-[macos]
-crash_fuzzer: crash_lib crash_cxx
-    {{LIBAFL_CXX}} {{PROJECT_DIR}}/harness.cc {{PROJECT_DIR}}/libpng-1.6.37/.libs/libpng16.a -I {{PROJECT_DIR}}/libpng-1.6.37/ -o {{FUZZER_NAME}} -lm -lz
-
-[windows]
-crash_fuzzer:
-    echo "Unsupported on this platform"
-
-
-[linux]
-[macos]
-run: fuzzer
+# Feat is either nothing or "crash"
+[unix]
+run feat="": (fuzzer feat)
     #!/bin/bash
     ./{{FUZZER_NAME}} &
     sleep 0.2
     ./{{FUZZER_NAME}} 2>/dev/null
 
-[windows]
-run: fuzzer
-    echo "Unsupported on this platform"
-
-[linux]
-[macos]
-crash: crash_fuzzer
-    #!/bin/bash
-    ./{{FUZZER_NAME}} &
-    sleep 0.2
-    ./{{FUZZER_NAME}} 2>/dev/null
-
-[windows]
-crash: fuzzer
-    echo "Unsupported on this platform"
-
-
-[linux]
-[macos]
+[unix]
 test: fuzzer
     #!/bin/bash
     rm -rf libafl_unix_shmem_server || true
@@ -125,12 +48,7 @@ test: fuzzer
         exit 1
     fi
 
-[windows]
-test: fuzzer
-    echo "Unsupported on this platform"
-
 clean:
     rm -rf {{FUZZER_NAME}}
     make -C libpng-1.6.37 clean || true
     cargo clean
-

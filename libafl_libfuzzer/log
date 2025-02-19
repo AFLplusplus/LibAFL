@@ -1,0 +1,4 @@
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root:
+package:   /home/toka/LibAFL/bindings/pylibafl/Cargo.toml
+workspace: /home/toka/LibAFL/Cargo.toml
+   Compiling libafl_libfuzzer v0.15.0 (/home/toka/LibAFL/libafl_libfuzzer)
