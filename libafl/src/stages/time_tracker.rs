@@ -3,7 +3,10 @@ use std::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{current_time, Error};
 
-use crate::{stages::Stage, HasMetadata};
+use crate::{
+    stages::{Restartable, Stage},
+    HasMetadata,
+};
 /// Track an inner Stage's execution time
 #[derive(Debug)]
 pub struct TimeTrackingStageWrapper<T, S, ST> {
@@ -40,26 +43,25 @@ where
         self.inner.perform(fuzzer, executor, state, manager)?;
         let after_run = current_time();
         self.count += after_run - before_run;
-        *state.metadata_mut::<T>()? = T::from(self.count);
+
+        if let Ok(meta) = state.metadata_mut::<T>() {
+            *meta = T::from(self.count);
+        } else {
+            state.add_metadata::<T>(T::from(self.count));
+        }
         Ok(())
     }
+}
 
+impl<T, S, ST> Restartable<S> for TimeTrackingStageWrapper<T, S, ST>
+where
+    ST: Restartable<S>,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.inner.should_restart(state)
     }
 
     fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
         self.inner.clear_progress(state)
-    }
-
-    fn perform_restartable(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut M,
-    ) -> Result<(), Error> {
-        self.inner
-            .perform_restartable(fuzzer, executor, state, manager)
     }
 }

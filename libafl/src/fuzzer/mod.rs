@@ -24,11 +24,11 @@ use crate::{
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{HasCurrentStageId, StagesTuple},
+    stages::StagesTuple,
     start_timer,
     state::{
-        HasCorpus, HasCurrentTestcase, HasExecutions, HasImported, HasLastFoundTime,
-        HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+        HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasImported,
+        HasLastFoundTime, HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
     },
     Error, HasMetadata,
 };

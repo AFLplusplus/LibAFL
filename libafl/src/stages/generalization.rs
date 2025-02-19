@@ -23,7 +23,7 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasMetadata, HasNamedMetadata,
@@ -62,6 +62,23 @@ impl<C, EM, I, O, OT, S, Z> Named for GeneralizationStage<C, EM, I, O, OT, S, Z>
     }
 }
 
+impl<C, EM, I, O, OT, S, Z> Restartable<S> for GeneralizationStage<C, EM, I, O, OT, S, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        // TODO: We need to be able to resume better if something crashes or times out
+        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
+    }
+}
+
 impl<C, E, EM, O, S, Z> Stage<E, EM, S, Z>
     for GeneralizationStage<C, EM, BytesInput, O, E::Observers, S, Z>
 where
@@ -76,18 +93,6 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::should_restart::<S>(state, &self.name, 3)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        // TODO: We need to be able to resume better if something crashes or times out
-        RetryCountRestartHelper::clear_progress::<S>(state, &self.name)
-    }
-
     #[inline]
     #[expect(clippy::too_many_lines)]
     fn perform(

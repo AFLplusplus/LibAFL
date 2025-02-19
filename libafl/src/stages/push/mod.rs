@@ -28,7 +28,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
     schedulers::Scheduler,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
 };
@@ -244,6 +244,22 @@ impl<CS, EM, I, OT, PS, Z> Named for PushStageAdapter<CS, EM, I, OT, PS, Z> {
     }
 }
 
+impl<CS, EM, I, OT, PS, S, Z> Restartable<S> for PushStageAdapter<CS, EM, I, OT, PS, Z>
+where
+    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
+{
+    #[inline]
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        // TODO: Proper restart handling - call post_exec at the right time, etc...
+        RetryCountRestartHelper::no_retry(state, &self.name)
+    }
+
+    #[inline]
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
+    }
+}
+
 impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, Z>
 where
     CS: Scheduler<I, S>,
@@ -263,17 +279,6 @@ where
         + EvaluatorObservers<E, EM, I, OT>
         + HasScheduler<I, S>,
 {
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: Proper restart handling - call post_exec at the right time, etc...
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
-
     fn perform(
         &mut self,
         fuzzer: &mut Z,
