@@ -16,7 +16,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
     Error, HasNamedMetadata,
@@ -93,7 +93,12 @@ where
     ) -> Result<(), Error> {
         self.trace(fuzzer, state, manager)
     }
+}
 
+impl<EM, I, TE, S, Z> Restartable<S> for TracingStage<EM, I, TE, S, Z>
+where
+    S: HasNamedMetadata + HasCurrentCorpusId,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         RetryCountRestartHelper::no_retry(state, &self.name)
     }
@@ -174,14 +179,6 @@ where
         + HasCurrentCorpusId
         + MaybeHasClientPerfMonitor,
 {
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
-
     #[inline]
     fn perform(
         &mut self,
@@ -216,6 +213,19 @@ where
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(())
+    }
+}
+
+impl<E, EM, I, SOT, S, Z> Restartable<S> for ShadowTracingStage<E, EM, I, SOT, S, Z>
+where
+    S: HasNamedMetadata + HasCurrentCorpusId,
+{
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        RetryCountRestartHelper::no_retry(state, &self.name)
+    }
+
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        RetryCountRestartHelper::clear_progress(state, &self.name)
     }
 }
 
