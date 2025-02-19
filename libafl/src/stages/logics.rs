@@ -3,7 +3,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    stages::{Stage, StageId, StagesTuple},
+    stages::{Restartable, Stage, StageId, StagesTuple},
     state::HasNestedStage,
     Error,
 };
@@ -59,7 +59,12 @@ where
 
         Ok(())
     }
+}
 
+impl<CB, E, EM, ST, S, Z> Restartable<S> for WhileStage<CB, E, EM, ST, S, Z>
+where
+    S: HasNestedStage,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
@@ -112,7 +117,12 @@ where
         }
         Ok(())
     }
+}
 
+impl<CB, E, EM, ST, S, Z> Restartable<S> for IfStage<CB, E, EM, ST, S, Z>
+where
+    S: HasNestedStage,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
@@ -188,7 +198,12 @@ where
 
         Ok(())
     }
+}
 
+impl<CB, E, EM, ST1, ST2, S, Z> Restartable<S> for IfElseStage<CB, E, EM, ST1, ST2, S, Z>
+where
+    S: HasNestedStage,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
@@ -238,7 +253,12 @@ where
             Ok(())
         }
     }
+}
 
+impl<E, EM, ST, S, Z> Restartable<S> for OptionalStage<E, EM, ST, S, Z>
+where
+    S: HasNestedStage,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         NestedStageRetryCountRestartHelper::should_restart(state, self)
     }
@@ -295,8 +315,8 @@ mod test {
         events::NopEventManager,
         executors::test::NopExecutor,
         stages::{
-            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Stage, StagesTuple,
-            WhileStage,
+            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Restartable, Stage,
+            StagesTuple, WhileStage,
         },
         state::{HasCurrentStageId, StdState},
         HasMetadata, NopFuzzer,
@@ -362,7 +382,12 @@ mod test {
             );
             Ok(())
         }
+    }
 
+    impl<S> Restartable<S> for ResumeSucceededStage<S>
+    where
+        S: HasMetadata,
+    {
         fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
             TestProgress::should_restart(state, self)
         }
@@ -395,7 +420,12 @@ mod test {
             }
             Ok(())
         }
+    }
 
+    impl<S> Restartable<S> for ResumeFailedStage<S>
+    where
+        S: HasMetadata,
+    {
         fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
             TestProgress::should_restart(state, self)
         }
@@ -546,7 +576,9 @@ mod test {
         ) -> Result<(), Error> {
             panic!("Test failed; panic stage should never be executed.");
         }
+    }
 
+    impl<S> Restartable<S> for PanicStage<S> {
         fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
             Ok(true)
         }
@@ -555,7 +587,6 @@ mod test {
             Ok(())
         }
     }
-
     #[test]
     fn check_resumability_if_else_if() {
         let once = RefCell::new(true);

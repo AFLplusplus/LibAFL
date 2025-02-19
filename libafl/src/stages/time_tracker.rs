@@ -3,7 +3,10 @@ use std::{marker::PhantomData, time::Duration};
 
 use libafl_bolts::{current_time, Error};
 
-use crate::{stages::Stage, HasMetadata};
+use crate::{
+    stages::{Restartable, Stage},
+    HasMetadata,
+};
 /// Track an inner Stage's execution time
 #[derive(Debug)]
 pub struct TimeTrackingStageWrapper<T, S, ST> {
@@ -48,7 +51,12 @@ where
         }
         Ok(())
     }
+}
 
+impl<T, S, ST> Restartable<S> for TimeTrackingStageWrapper<T, S, ST>
+where
+    ST: Restartable<S>,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.inner.should_restart(state)
     }

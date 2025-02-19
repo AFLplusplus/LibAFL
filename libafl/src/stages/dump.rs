@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     inputs::Input,
-    stages::Stage,
+    stages::{Restartable, Stage},
     state::{HasCorpus, HasRand, HasSolutions},
     Error, HasMetadata,
 };
@@ -60,7 +60,11 @@ where
     ) -> Result<(), Error> {
         self.dump_state_to_disk(state)
     }
+}
 
+impl<CB1, EM, I, S, Z> Restartable<S>
+    for DumpToDiskStage<CB1, fn(&Testcase<I>, &CorpusId) -> String, EM, I, S, Z>
+{
     #[inline]
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         // Not executing the target, so restart safety is not needed

@@ -207,7 +207,7 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
-    /// before exiting, make sure you call `event_mgr.mgr_on_restart(&mut state)?;`.
+    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_one(
         &mut self,
@@ -233,7 +233,7 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
-    /// before exiting, make sure you call `event_mgr.mgr_on_restart(&mut state)?;`.
+    /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_loop_for(
         &mut self,
