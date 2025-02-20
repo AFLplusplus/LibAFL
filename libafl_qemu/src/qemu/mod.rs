@@ -961,6 +961,26 @@ impl Qemu {
     pub fn is_running(&self) -> bool {
         unsafe { QEMU_IS_RUNNING }
     }
+
+    /// Write the function arguments by following calling convention `conv`.
+    /// Assume that every arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
+    pub fn write_function_arguments<T>(
+        &self,
+        conv: CallingConvention,
+        idx: u8,
+        val: &[T],
+    ) -> Result<(), QemuRWError>
+    where
+        T: Into<GuestReg> + Copy,
+    {
+        self.current_cpu()
+            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
+            .write_function_argument::<T>(conv, idx, val)
+    }
 }
 
 impl ArchExtras for Qemu {

@@ -128,6 +128,7 @@ impl crate::ArchExtras for crate::CPU {
                 #[cfg(not(feature = "be"))]
                 Ok(GuestReg::from_le(buf).into());
             }
+        }
     }
 
     fn write_function_argument<T>(

@@ -141,6 +141,9 @@ impl crate::ArchExtras for crate::CPU {
         QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
 
         // TODO
-        Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, idx))
+        Err(QemuRWError::new_argument_error(
+            QemuRWErrorKind::Write,
+            i32::from(idx),
+        ))
     }
 }
