@@ -346,18 +346,12 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            match self.raw_entry_mut::<T>() {
-                hashbrown::hash_map::RawEntryMut::Occupied(_) => {
-                    return Err(Error::key_exists(format!(
-                        "Tried to add a metadata of {}. But this will overwrite the existing metadata",
-                        core::any::type_name::<T>()
-                    )));
-                }
-                hashbrown::hash_map::RawEntryMut::Vacant(entry) => {
-                    entry.insert(type_repr_owned::<T>(), value);
+            match self.map.try_insert(type_repr_owned::<T>(), value) {
+                Ok(_) => (), // then it's fine
+                Err(hashbrown::hash_map::OccupiedError { entry: _, value }) => {
+                    return Err(Error::key_exists(format!("Tried to add a metadata of type {:?}. But this will overwrite the existing metadata value {:?}", core::any::type_name::<T>(), value)));
                 }
             }
-
             Ok(())
         }
 
@@ -637,13 +631,11 @@ pub mod serdeany_registry {
         where
             T: crate::serdeany::SerdeAny,
         {
-            let outer = self.raw_entry_mut::<T>(name);
-            match outer {
-                hashbrown::hash_map::RawEntryMut::Occupied(_) => {
-                    return Err(Error::key_exists(format!("Tried to add a metadata of {} named {}. But this will overwrite the existing metadata", core::any::type_name::<T>(), name)));
-                }
-                hashbrown::hash_map::RawEntryMut::Vacant(entry) => {
-                    entry.insert(name.into(), Box::new(val));
+            let outer = self.outer_map_mut::<T>();
+            match outer.try_insert(name.into(), Box::new(val)) {
+                Ok(_) => (), // then it's fine
+                Err(hashbrown::hash_map::OccupiedError { entry, value }) => {
+                    return Err(Error::key_exists(format!("Tried to add a metadata of type {:?} named {:?}. But this will overwrite the existing metadata value {:?}", core::any::type_name::<T>(), entry.key(), value)));
                 }
             }
             Ok(())
