@@ -969,17 +969,17 @@ impl Qemu {
     /// of the called function, in case the argument is written in the stack.
     /// Support downward-growing stack only.
     pub fn write_function_arguments<T>(
-        &self,
-        conv: CallingConvention,
-        idx: u8,
+        qemu: &mut Qemu,
+        conv: &CallingConvention,
         val: &[T],
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg> + Copy,
     {
-        self.current_cpu()
-            .ok_or(QemuRWError::current_cpu_not_found(QemuRWErrorKind::Write))?
-            .write_function_argument::<T>(conv, idx, val)
+        for (idx, elem) in val.iter().enumerate() {
+            qemu.write_function_argument(conv.clone(), idx as u8, elem.to_owned())?;
+        }
+        Ok(())
     }
 }
 
