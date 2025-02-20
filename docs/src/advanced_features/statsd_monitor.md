@@ -160,6 +160,19 @@ If you still have no idea why things went wrong, please [file an issue](https://
 
 Thanks to the [`cadence`](https://crates.io/crates/cadence) crate which we used as StatsD client implementation, the network interaction is conduct in an individual thread, so the affect from network interactions could be negligible.
 
+### Can I optionally enable the `StatsdMonitor` via something like commandline options?
+
+You can wrap the `StatsdMonitor` with an `OptionalMonitor`:
+
+```rust,ignore
+let statsd_monitor = if commandline_is_set {
+    Some(StatsdMonitor::new(/* ... */))
+} else {
+    None
+};
+let optional_statsd_monitor = OptionalMonitor::new(statsd_monitor);
+```
+
 ### What is the different between `StatsdMonitor` and `PrometheusMonitor`?
 
 The `PrometheusMonitor` could be used to view detailed statistics about one fuzzing instance (with multiple clients maybe), since it can show the statistics about individual clients. And `PrometheusMonitor` is implemented as a Prometheus datasource, which will, based on the pull-architecture of Prometheus, occupy a port for each instance for Prometheus server to access.
