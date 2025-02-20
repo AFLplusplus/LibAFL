@@ -49,7 +49,7 @@ pub use verify_timeouts::{TimeoutsToVerify, VerifyTimeoutsStage};
 use crate::{
     corpus::{CorpusId, HasCurrentCorpusId},
     events::SendExiting,
-    state::{HasCurrentStageId, HasExecutions, Stoppable},
+    state::{HasCurrentStageId, HasExecutions, MaybeHasClientPerfMonitor, Stoppable},
     Error, HasNamedMetadata,
 };
 
@@ -151,7 +151,7 @@ impl<Head, Tail, E, EM, S, Z> StagesTuple<E, EM, S, Z> for (Head, Tail)
 where
     Head: Stage<E, EM, S, Z> + Restartable<S>,
     Tail: StagesTuple<E, EM, S, Z> + HasConstLen,
-    S: HasCurrentStageId + Stoppable,
+    S: HasCurrentStageId + Stoppable + MaybeHasClientPerfMonitor,
     EM: SendExiting,
 {
     /// Performs all stages in the tuple,
@@ -191,6 +191,10 @@ where
                 state.clear_stage_id()?;
             }
         }
+
+        // Mark the elapsed time for the scheduler
+        #[cfg(feature = "introspection")]
+        state.introspection_stats_mut().finish_stage();
 
         if state.stop_requested() {
             state.discard_stop_request();
