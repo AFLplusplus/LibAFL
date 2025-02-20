@@ -144,7 +144,7 @@ pub fn main() {
 
     // a generator here is not generalisable
     let initial = MultipartInput::from(
-        iter::repeat(("part".to_string(), BytesInput::new(b"hello".to_vec()))).take(4),
+        iter::repeat(("part".to_string(), BytesInput::from(&b"hello"[..]))).take(4),
     );
 
     fuzzer
