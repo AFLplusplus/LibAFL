@@ -82,7 +82,7 @@ pub trait ArchExtras {
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
     ) -> Result<(), QemuRWError>
     where
@@ -155,7 +155,31 @@ pub struct CPU {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CallingConvention {
+    SystemV,
     Cdecl,
+    Aapcs64,
+    Aapcs,
+}
+
+/// alias registers
+#[expect(non_upper_case_globals)]
+impl CallingConvention {
+    #[cfg(target_arch = "x86_64")]
+    pub const Default: CallingConvention = CallingConvention::SystemV;
+    #[cfg(target_arch = "x86")]
+    pub const Default: CallingConvention = CallingConvention::Cdecl;
+    #[cfg(target_arch = "aarch64")]
+    pub const Default: CallingConvention = CallingConvention::Aapcs64;
+    #[cfg(target_arch = "arm")]
+    pub const Default: CallingConvention = CallingConvention::Aapcs;
+    #[cfg(not(any(
+        target_arch = "x86_64",
+        target_arch = "x86",
+        target_arch = "aarch64",
+        target_arch = "arm",
+    )))]
+    //TODO: Assign default calling convention for every architectures
+    pub const Default: CallingConvention = CallingConvention::Cdecl;
 }
 
 #[derive(Debug)]
@@ -955,6 +979,12 @@ impl ArchExtras for Qemu {
             .write_return_address::<T>(val)
     }
 
+    /// Read the function `idx` argument by following calling convention `conv`.
+    /// Assume that this argument and every prior arguments has integer/pointer type, otherwise
+    /// it may return a wrong value because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the value is in the stack.
+    /// Support downward-growing stack only.
     fn read_function_argument(
         &self,
         conv: CallingConvention,
@@ -965,10 +995,16 @@ impl ArchExtras for Qemu {
             .read_function_argument(conv, idx)
     }
 
+    /// Write the function `val` into `idx` argument by following calling convention `conv`.
+    /// Assume that `val` and every prior arguments has integer/pointer type, otherwise the value
+    /// may be stored at wrong place because of different rules for complex types.
+    /// Note that the stack pointer register must point the top of the stack at the start
+    /// of the called function, in case the argument is written in the stack.
+    /// Support downward-growing stack only.
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
     ) -> Result<(), QemuRWError>
     where

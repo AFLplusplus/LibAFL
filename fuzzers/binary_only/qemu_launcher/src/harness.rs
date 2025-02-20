@@ -118,11 +118,11 @@ impl Harness {
             .map_err(|e| Error::unknown(format!("Failed to write return address: {e:?}")))?;
 
         self.qemu
-            .write_function_argument(CallingConvention::Cdecl, 0, self.input_addr)
+            .write_function_argument(CallingConvention::Default, 0, self.input_addr)
             .map_err(|e| Error::unknown(format!("Failed to write argument 0: {e:?}")))?;
 
         self.qemu
-            .write_function_argument(CallingConvention::Cdecl, 1, len)
+            .write_function_argument(CallingConvention::Default, 1, len)
             .map_err(|e| Error::unknown(format!("Failed to write argument 1: {e:?}")))?;
         unsafe {
             let _ = self.qemu.run();

@@ -108,7 +108,7 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Default, conv)?;
 
         // Note that 64 bit values may be passed in two registers (and may have padding), then this mapping is off.
         let reg_id = match idx {
@@ -132,13 +132,13 @@ impl crate::ArchExtras for crate::CPU {
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         _val: T,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
 
         // TODO
         Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, idx))

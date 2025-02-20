@@ -2,6 +2,7 @@ use std::{mem::size_of, sync::OnceLock};
 
 use capstone::arch::BuildsCapstone;
 use enum_map::{enum_map, EnumMap};
+use libafl_qemu_sys::GuestAddr;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86_64::*;
@@ -84,47 +85,70 @@ impl crate::ArchExtras for crate::CPU {
         Ok(())
     }
 
+    #[allow(clippy::cast_lossless)]
     fn read_function_argument(
         &self,
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::SystemV, conv)?;
 
-        let reg_id = match idx {
-            0 => Regs::Rdi,
-            1 => Regs::Rsi,
-            2 => Regs::Rdx,
-            3 => Regs::Rcx,
-            4 => Regs::R8,
-            5 => Regs::R9,
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
+        match idx {
+            0 => self.read_reg(Regs::Rdi),
+            1 => self.read_reg(Regs::Rsi),
+            2 => self.read_reg(Regs::Rdx),
+            3 => self.read_reg(Regs::Rcx),
+            4 => self.read_reg(Regs::R8),
+            5 => self.read_reg(Regs::R9),
+            _ => {
+                const SIZE: usize = size_of::<GuestReg>();
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                /*
+                 * Stack is full and descending. SP points to return address, arguments
+                 * are in reverse order above that. 6th argument is at SP + 8.
+                 */
+
+                let offset = (SIZE as GuestAddr) * (idx as GuestAddr - 5);
+                let mut buf = [0; SIZE];
+                self.read_mem(stack_ptr + offset, &mut buf)?;
+
+                Ok(GuestAddr::from_le_bytes(buf))
             }
-        };
-
-        self.read_reg(reg_id)
+        }
     }
 
+    #[allow(clippy::cast_lossless)]
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::SystemV, conv)?;
 
         let val: GuestReg = val.into();
         match idx {
             0 => self.write_reg(Regs::Rdi, val),
             1 => self.write_reg(Regs::Rsi, val),
-            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
+            2 => self.write_reg(Regs::Rdx, val),
+            3 => self.write_reg(Regs::Rcx, val),
+            4 => self.write_reg(Regs::R8, val),
+            5 => self.write_reg(Regs::R9, val),
+            _ => {
+                let val: GuestReg = val.into();
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Rsp)?;
+                /*
+                 * Stack is full and descending. SP points to return address, arguments
+                 * are in reverse order above that. 6th argument is at SP + 8.
+                 */
+                let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
+                let offset = size * (idx as GuestAddr - 5);
+                let arg = val.to_le_bytes();
+                self.write_mem(stack_ptr + offset, &arg)
+            }
         }
     }
 }

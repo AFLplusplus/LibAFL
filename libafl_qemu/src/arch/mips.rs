@@ -96,7 +96,7 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Default, conv)?;
 
         let reg_id = match idx {
             0 => Regs::A0,
@@ -118,13 +118,13 @@ impl crate::ArchExtras for crate::CPU {
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
 
         let val: GuestReg = val.into();
         match idx {

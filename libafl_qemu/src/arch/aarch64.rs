@@ -99,42 +99,76 @@ impl crate::ArchExtras for crate::CPU {
         conv: CallingConvention,
         idx: u8,
     ) -> Result<GuestReg, QemuRWError> {
-        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Read, CallingConvention::Aapcs64, conv)?;
 
-        let reg_id = match idx {
-            0 => Regs::X0,
-            1 => Regs::X1,
-            2 => Regs::X2,
-            3 => Regs::X3,
-            4 => Regs::X4,
-            5 => Regs::X5,
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
+        match idx {
+            0 => self.read_reg(Regs::X0),
+            1 => self.read_reg(Regs::X1),
+            2 => self.read_reg(Regs::X2),
+            3 => self.read_reg(Regs::X3),
+            4 => self.read_reg(Regs::X4),
+            5 => self.read_reg(Regs::X5),
+            6 => self.read_reg(Regs::X6),
+            7 => self.read_reg(Regs::X7),
+            _ => {
+                const SIZE: usize = size_of::<GuestReg>();
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Rsp)?;
+                /*
+                 * Stack is full and descending. SP points to return address, arguments
+                 * are in reverse order above that. 8th argument is at SP + 8.
+                 */
+
+                let offset = (SIZE as GuestAddr) * (idx as GuestAddr - 7);
+                let mut buf = [0; SIZE];
+                self.read_mem(stack_ptr + offset, &mut buf)?;
+
+                #[cfg(feature = "be")]
+                Ok(GuestReg::from_be(buf).into());
+
+                #[cfg(not(feature = "be"))]
+                Ok(GuestReg::from_le(buf).into());
             }
-        };
-
-        self.read_reg(reg_id)
     }
 
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,
-        idx: i32,
+        idx: u8,
         val: T,
     ) -> Result<(), QemuRWError>
     where
         T: Into<GuestReg>,
     {
-        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Cdecl, conv)?;
+        QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Aapcs64, conv)?;
 
         let val: GuestReg = val.into();
         match idx {
             0 => self.write_reg(Regs::X0, val),
             1 => self.write_reg(Regs::X1, val),
-            r => Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, r)),
+            2 => self.write_reg(Regs::X2, val),
+            3 => self.write_reg(Regs::X3, val),
+            4 => self.write_reg(Regs::X4, val),
+            5 => self.write_reg(Regs::X5, val),
+            6 => self.write_reg(Regs::X6, val),
+            7 => self.write_reg(Regs::X7, val),
+            _ => {
+                let val: GuestReg = val.into();
+                let stack_ptr: GuestAddr = self.read_reg(Regs::Sp)?;
+                /*
+                 * Stack is full and descending. SP points to return address, arguments
+                 * are in reverse order above that. 8th argument is at SP + 8.
+                 */
+                let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
+                let offset = size * (idx as GuestAddr - 7);
+                #[cfg(feature = "be")]
+                let arg = val.to_be_bytes();
+
+                #[cfg(not(feature = "be"))]
+                let arg = val.to_le_bytes();
+                self.write_mem(stack_ptr + offset, &arg)?;
+
+                Ok(())
+            }
         }
     }
 }
