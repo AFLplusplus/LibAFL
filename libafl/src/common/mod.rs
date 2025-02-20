@@ -29,18 +29,11 @@ pub trait HasMetadata {
     /// Add a metadata to the metadata map
     /// Returns error if the metadata is already there
     #[inline]
-    fn add_metadata_checked<M>(&mut self, meta: M) -> Result<(), Error>
+    fn try_add_metadata<M>(&mut self, meta: M) -> Result<(), Error>
     where
         M: SerdeAny,
     {
-        if self.has_metadata::<M>() {
-            return Err(Error::illegal_argument(format!(
-                "Tried to add a metadata of {}. But this will overwrite the existing metadata",
-                type_name::<M>()
-            )));
-        }
-        self.metadata_map_mut().insert(meta);
-        Ok(())
+        self.metadata_map_mut().try_insert(meta)
     }
 
     /// Gets metadata, or inserts it using the given construction function `default`
@@ -118,11 +111,7 @@ pub trait HasNamedMetadata {
     where
         M: SerdeAny,
     {
-        if self.has_named_metadata::<M>(name) {
-            return Err(Error::illegal_argument(format!("Tried to add a metadata of {} named {}. But this will overwrite the existing metadata", type_name::<M>(), name)));
-        }
-        self.named_metadata_map_mut().insert(name, meta);
-        Ok(())
+        self.named_metadata_map_mut().try_insert(name, meta)
     }
 
     /// Add a metadata to the metadata map
