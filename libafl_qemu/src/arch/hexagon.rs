@@ -118,12 +118,7 @@ impl crate::ArchExtras for crate::CPU {
             3 => Regs::R3,
             4 => Regs::R4,
             5 => Regs::R5,
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
-            }
+            r => return Err(QemuRWError::new_argument_error(QemuRWErrorKind::Read, r)),
         };
 
         self.read_reg(reg_id)
@@ -141,9 +136,6 @@ impl crate::ArchExtras for crate::CPU {
         QemuRWError::check_conv(QemuRWErrorKind::Write, CallingConvention::Default, conv)?;
 
         // TODO
-        Err(QemuRWError::new_argument_error(
-            QemuRWErrorKind::Write,
-            i32::from(idx),
-        ))
+        Err(QemuRWError::new_argument_error(QemuRWErrorKind::Write, idx))
     }
 }

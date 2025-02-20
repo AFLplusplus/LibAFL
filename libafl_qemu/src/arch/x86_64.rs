@@ -85,7 +85,6 @@ impl crate::ArchExtras for crate::CPU {
         Ok(())
     }
 
-    #[allow(clippy::cast_lossless)]
     fn read_function_argument(
         &self,
         conv: CallingConvention,
@@ -117,7 +116,6 @@ impl crate::ArchExtras for crate::CPU {
         }
     }
 
-    #[allow(clippy::cast_lossless)]
     fn write_function_argument<T>(
         &self,
         conv: CallingConvention,

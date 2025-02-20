@@ -145,12 +145,7 @@ impl crate::ArchExtras for crate::CPU {
             3 => Regs::R6,
             4 => Regs::R7,
             5 => Regs::R8,
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
-            }
+            r => return Err(QemuRWError::new_argument_error(QemuRWErrorKind::Read, r)),
         };
 
         self.read_reg(reg_id)

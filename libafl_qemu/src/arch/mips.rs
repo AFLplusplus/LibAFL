@@ -104,12 +104,7 @@ impl crate::ArchExtras for crate::CPU {
             2 => Regs::A2,
             3 => Regs::A3,
             // 4.. would be on the stack, let's not do this for now
-            r => {
-                return Err(QemuRWError::new_argument_error(
-                    QemuRWErrorKind::Read,
-                    i32::from(r),
-                ))
-            }
+            r => return Err(QemuRWError::new_argument_error(QemuRWErrorKind::Read, r)),
         };
 
         self.read_reg(reg_id)
