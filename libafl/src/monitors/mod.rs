@@ -6,6 +6,7 @@ pub use multi::MultiMonitor;
 pub mod stats;
 
 pub mod logics;
+pub use logics::{IfElseMonitor, IfMonitor, OptionalMonitor, WhileMonitor};
 
 #[cfg(feature = "std")]
 pub mod disk;
