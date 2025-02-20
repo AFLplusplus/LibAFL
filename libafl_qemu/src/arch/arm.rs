@@ -149,7 +149,7 @@ impl crate::ArchExtras for crate::CPU {
                  * are in reverse order above that. 4th argument is at SP + 4.
                  */
                 let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
-                let offset = size * (idx as GuestAddr - 3);
+                let offset = size * (GuestAddr::from(idx) - 3);
 
                 #[cfg(feature = "be")]
                 let arg = val.to_be_bytes();

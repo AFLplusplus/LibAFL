@@ -93,7 +93,7 @@ impl crate::ArchExtras for crate::CPU {
                  * are in reverse order above that.
                  */
 
-                let offset = (SIZE as GuestAddr) * (idx as GuestAddr + 1);
+                let offset = (SIZE as GuestAddr) * (GuestAddr::from(idx) + 1);
                 let mut val = [0u8; SIZE];
                 unsafe {
                     self.read_mem(stack_ptr + offset, &mut val);
@@ -123,7 +123,7 @@ impl crate::ArchExtras for crate::CPU {
                  * are in reverse order above that.
                  */
                 let size: GuestAddr = size_of::<GuestReg>() as GuestAddr;
-                let offset = size * (idx as GuestAddr + 1);
+                let offset = size * (GuestAddr::from(idx) + 1);
 
                 let arg = val.to_le_bytes();
                 unsafe {
