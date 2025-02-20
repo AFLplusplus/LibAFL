@@ -5,6 +5,8 @@ pub use multi::MultiMonitor;
 
 pub mod stats;
 
+pub mod logics;
+
 #[cfg(feature = "std")]
 pub mod disk;
 #[cfg(feature = "std")]
