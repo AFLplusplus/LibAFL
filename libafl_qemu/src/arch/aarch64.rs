@@ -123,8 +123,9 @@ impl crate::ArchExtras for crate::CPU {
                 self.read_mem(stack_ptr + offset, &mut buf)?;
 
                 #[cfg(feature = "be")]
-                Ok(GuestReg::from_le_bytes(buf).into())
-
+                {
+                    Ok(GuestReg::from_le_bytes(buf).into())
+                }
                 #[cfg(not(feature = "be"))]
                 Ok(GuestReg::from_le_bytes(buf).into())
             }
