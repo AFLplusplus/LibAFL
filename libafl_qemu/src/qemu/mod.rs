@@ -161,7 +161,7 @@ pub enum CallingConvention {
     Aapcs,
 }
 
-/// alias registers
+/// alias calling conventions
 #[expect(non_upper_case_globals)]
 impl CallingConvention {
     #[cfg(target_arch = "x86_64")]

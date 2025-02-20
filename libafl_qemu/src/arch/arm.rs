@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
-use crate::{sync_exit::ExitArgs, CallingConvention, QemuRWError, QemuRWErrorKind};
+use crate::{sync_exit::ExitArgs, CallingConvention, GuestAddr, QemuRWError, QemuRWErrorKind};
 
 /// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -116,10 +116,10 @@ impl crate::ArchExtras for crate::CPU {
                 self.read_mem(stack_ptr + offset, &mut buf)?;
 
                 #[cfg(feature = "be")]
-                Ok(GuestReg::from_be(buf).into());
+                Ok(GuestReg::from_le_bytes(buf).into())
 
                 #[cfg(not(feature = "be"))]
-                Ok(GuestReg::from_le(buf).into());
+                Ok(GuestReg::from_le_bytes(buf).into())
             }
         }
     }
