@@ -10,9 +10,7 @@ use libafl_bolts::{rands::Rand, Error};
 use crate::{
     corpus::{Corpus, CorpusId},
     impl_default_multipart,
-    inputs::{
-        multi::MultipartInput, HasMutatorBytes, Input, NamedMultipartInput as _, ResizableMutator,
-    },
+    inputs::{multi::MultipartInput, HasMutatorBytes, Input, Keyed as _, ResizableMutator},
     mutators::{
         mutations::{
             rand_range, BitFlipMutator, ByteAddMutator, ByteDecMutator, ByteFlipMutator,
@@ -37,7 +35,7 @@ use crate::{
 /// at once.
 pub trait DefaultMultipartMutator {}
 
-impl<I, M, N, S> Mutator<MultipartInput<I, N>, S> for M
+impl<I, K, M, S> Mutator<MultipartInput<I, K>, S> for M
 where
     M: DefaultMultipartMutator + Mutator<I, S>,
     S: HasRand,
@@ -45,13 +43,13 @@ where
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I, N>,
+        input: &mut MultipartInput<I, K>,
     ) -> Result<MutationResult, Error> {
         match NonZero::new(input.len()) {
             None => Ok(MutationResult::Skipped),
             Some(len) => {
                 let idx = state.rand_mut().below(len);
-                let (_name, part) = &mut input.parts_mut()[idx];
+                let (_key, part) = &mut input.parts_mut()[idx];
                 self.mutate(state, part)
             }
         }
@@ -121,19 +119,19 @@ impl_default_multipart!(
     I2SRandReplace,
 );
 
-impl<I, N, S> Mutator<MultipartInput<I, N>, S> for BytesInputCrossoverInsertMutator
+impl<I, K, S> Mutator<MultipartInput<I, K>, S> for BytesInputCrossoverInsertMutator
 where
-    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
+    S: HasCorpus<MultipartInput<I, K>> + HasMaxSize + HasRand,
     I: Input + ResizableMutator<u8> + HasMutatorBytes,
-    N: Clone + PartialEq,
+    K: Clone + PartialEq,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I, N>,
+        input: &mut MultipartInput<I, K>,
     ) -> Result<MutationResult, Error> {
         // we can eat the slight bias; number of parts will be small
-        let name_choice = state.rand_mut().next() as usize;
+        let key_choice = state.rand_mut().next() as usize;
         let part_choice = state.rand_mut().next() as usize;
 
         // We special-case crossover with self
@@ -144,9 +142,9 @@ where
                 if len == 0 {
                     return Ok(MutationResult::Skipped);
                 }
-                let choice = name_choice % len;
+                let choice = key_choice % len;
                 // Safety: len is checked above
-                let (name, part) = &input.parts()[choice];
+                let (key, part) = &input.parts()[choice];
 
                 let other_size = part.mutator_bytes().len();
 
@@ -154,14 +152,14 @@ where
                     return Ok(MutationResult::Skipped);
                 }
 
-                let parts = input.parts_with_name(name).count() - 1;
+                let parts = input.with_key(key).count() - 1;
 
                 if parts == 0 {
                     return Ok(MutationResult::Skipped);
                 }
 
                 let maybe_size = input
-                    .parts_with_name(name)
+                    .with_key(key)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
                     .map(|(id, part)| (id, part.mutator_bytes().len()));
@@ -210,22 +208,19 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let choice = name_choice % other_len;
+        let choice = key_choice % other_len;
         // Safety: choice is checked above
-        let (name, part) = &other.parts()[choice];
+        let (key, part) = &other.parts()[choice];
 
         let other_size = part.mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
 
-        let parts = input.parts_with_name(name).count();
+        let parts = input.with_key(key).count();
 
         if parts > 0 {
-            let (_, part) = input
-                .parts_with_name_mut(name)
-                .nth(part_choice % parts)
-                .unwrap();
+            let (_, part) = input.with_key_mut(key).nth(part_choice % parts).unwrap();
             drop(other_testcase);
             let size = part.mutator_bytes().len();
             let Some(nz) = NonZero::new(size) else {
@@ -261,19 +256,19 @@ where
     }
 }
 
-impl<I, N, S> Mutator<MultipartInput<I, N>, S> for BytesInputCrossoverReplaceMutator
+impl<I, K, S> Mutator<MultipartInput<I, K>, S> for BytesInputCrossoverReplaceMutator
 where
-    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
+    S: HasCorpus<MultipartInput<I, K>> + HasMaxSize + HasRand,
     I: Input + ResizableMutator<u8> + HasMutatorBytes,
-    N: Clone + PartialEq,
+    K: Clone + PartialEq,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I, N>,
+        input: &mut MultipartInput<I, K>,
     ) -> Result<MutationResult, Error> {
         // we can eat the slight bias; number of parts will be small
-        let name_choice = state.rand_mut().next() as usize;
+        let key_choice = state.rand_mut().next() as usize;
         let part_choice = state.rand_mut().next() as usize;
 
         // We special-case crossover with self
@@ -284,23 +279,23 @@ where
                 if len == 0 {
                     return Ok(MutationResult::Skipped);
                 }
-                let choice = name_choice % len;
+                let choice = key_choice % len;
                 // Safety: len is checked above
-                let (name, part) = &input.parts()[choice];
+                let (key, part) = &input.parts()[choice];
 
                 let other_size = part.mutator_bytes().len();
                 if other_size < 2 {
                     return Ok(MutationResult::Skipped);
                 }
 
-                let parts = input.parts_with_name(name).count() - 1;
+                let parts = input.with_key(key).count() - 1;
 
                 if parts == 0 {
                     return Ok(MutationResult::Skipped);
                 }
 
                 let maybe_size = input
-                    .parts_with_name(name)
+                    .with_key(key)
                     .filter(|&(p, _)| p != choice)
                     .nth(part_choice % parts)
                     .map(|(id, part)| (id, part.mutator_bytes().len()));
@@ -349,22 +344,19 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let choice = name_choice % other_len;
+        let choice = key_choice % other_len;
         // Safety: choice is checked above
-        let (name, part) = &other.parts()[choice];
+        let (key, part) = &other.parts()[choice];
 
         let other_size = part.mutator_bytes().len();
         if other_size < 2 {
             return Ok(MutationResult::Skipped);
         }
 
-        let parts = input.parts_with_name(name).count();
+        let parts = input.with_key(key).count();
 
         if parts > 0 {
-            let (_, part) = input
-                .parts_with_name_mut(name)
-                .nth(part_choice % parts)
-                .unwrap();
+            let (_, part) = input.with_key_mut(key).nth(part_choice % parts).unwrap();
             drop(other_testcase);
             let size = part.mutator_bytes().len();
             let Some(nz) = NonZero::new(size) else {

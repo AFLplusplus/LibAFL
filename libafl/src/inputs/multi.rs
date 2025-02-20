@@ -1,4 +1,4 @@
-//! An input composed of multiple named parts.
+//! An input composed of multiple parts identified by a key.
 
 use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::hash::Hash;
@@ -10,59 +10,62 @@ use crate::{
     inputs::{Input, ListInput},
 };
 
-/// An input composed of multiple named parts.
+/// An input composed of multiple parts, each identified by a key.
 ///
-/// It relies on a list to store the names and parts.
-pub type MultipartInput<I, N> = ListInput<(N, I)>;
+/// It relies on a list to store the keys and parts. Keys may appear multiple times.
+pub type MultipartInput<I, K> = ListInput<(K, I)>;
 
-impl<I, N> Input for MultipartInput<I, N>
+impl<I, K> Input for MultipartInput<I, K>
 where
     I: Input,
-    N: PartialEq + Debug + Serialize + DeserializeOwned + Clone + Hash,
+    K: PartialEq + Debug + Serialize + DeserializeOwned + Clone + Hash,
 {
     fn generate_name(&self, id: Option<CorpusId>) -> String {
         self.parts()
             .iter()
-            .map(|(_n, i)| i.generate_name(id))
+            .map(|(_k, i)| i.generate_name(id))
             .collect::<Vec<_>>()
             .join(",")
     }
 }
 
-/// Trait for inputs composed of multiple named parts.
-pub trait NamedMultipartInput<I, N> {
-    /// Get the names of the parts of this input.
-    fn names<'a>(&'a self) -> impl Iterator<Item = &'a N>
+/// Trait for types that provide a way to access parts by key.
+pub trait Keyed<K, V> {
+    /// Get the keys of the parts of this input.
+    ///
+    /// Keys may appear multiple times if they are used multiple times in the input.
+    fn keys<'a>(&'a self) -> impl Iterator<Item = &'a K>
     where
-        N: 'a;
-    /// Get a reference to each part with the provided name.
-    fn parts_with_name<'a, 'b>(&'b self, name: &'a N) -> impl Iterator<Item = (usize, &'b I)> + 'a
-    where
-        'b: 'a,
-        I: 'b;
+        K: 'a;
 
-    /// Gets a mutable reference to each part with the provided name.
-    fn parts_with_name_mut<'a, 'b>(
-        &'b mut self,
-        name: &'a N,
-    ) -> impl Iterator<Item = (usize, &'b mut I)> + 'a
+    /// Get a reference to each part with the provided key along with its index.
+    fn with_key<'a, 'b>(&'b self, key: &'a K) -> impl Iterator<Item = (usize, &'b V)> + 'a
     where
         'b: 'a,
-        I: 'b;
+        V: 'b;
+
+    /// Gets a mutable reference to each part with the provided key along with its index.
+    fn with_key_mut<'a, 'b>(
+        &'b mut self,
+        key: &'a K,
+    ) -> impl Iterator<Item = (usize, &'b mut V)> + 'a
+    where
+        'b: 'a,
+        V: 'b;
 }
 
-impl<I, N> NamedMultipartInput<I, N> for MultipartInput<I, N>
+impl<I, K> Keyed<K, I> for MultipartInput<I, K>
 where
-    N: PartialEq,
+    K: PartialEq,
 {
-    fn names<'a>(&'a self) -> impl Iterator<Item = &'a N>
+    fn keys<'a>(&'a self) -> impl Iterator<Item = &'a K>
     where
-        N: 'a,
+        K: 'a,
     {
-        self.parts().iter().map(|(n, _)| n)
+        self.parts().iter().map(|(k, _)| k)
     }
 
-    fn parts_with_name<'a, 'b>(&'b self, name: &'a N) -> impl Iterator<Item = (usize, &'b I)> + 'a
+    fn with_key<'a, 'b>(&'b self, key: &'a K) -> impl Iterator<Item = (usize, &'b I)> + 'a
     where
         'b: 'a,
         I: 'b,
@@ -70,12 +73,12 @@ where
         self.parts()
             .iter()
             .enumerate()
-            .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
+            .filter_map(move |(i, (k, input))| (key == k).then_some((i, input)))
     }
 
-    fn parts_with_name_mut<'a, 'b>(
+    fn with_key_mut<'a, 'b>(
         &'b mut self,
-        name: &'a N,
+        key: &'a K,
     ) -> impl Iterator<Item = (usize, &'b mut I)> + 'a
     where
         'b: 'a,
@@ -84,6 +87,6 @@ where
         self.parts_mut()
             .iter_mut()
             .enumerate()
-            .filter_map(move |(i, (n, input))| (name == n).then_some((i, input)))
+            .filter_map(move |(i, (k, input))| (key == k).then_some((i, input)))
     }
 }

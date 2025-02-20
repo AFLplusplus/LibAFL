@@ -74,14 +74,14 @@ impl<G> Named for GenerateToAppendMutator<G> {
 #[derive(Debug)]
 pub struct RemoveLastEntryMutator;
 
-impl<I, N, S> Mutator<MultipartInput<I, N>, S> for RemoveLastEntryMutator
+impl<I, K, S> Mutator<MultipartInput<I, K>, S> for RemoveLastEntryMutator
 where
-    N: Default,
+    K: Default,
 {
     fn mutate(
         &mut self,
         _state: &mut S,
-        input: &mut MultipartInput<I, N>,
+        input: &mut MultipartInput<I, K>,
     ) -> Result<MutationResult, Error> {
         match input.pop_part() {
             Some(_) => Ok(MutationResult::Mutated),
@@ -102,14 +102,14 @@ impl Named for RemoveLastEntryMutator {
 #[derive(Debug)]
 pub struct RemoveRandomEntryMutator;
 
-impl<I, N, S> Mutator<MultipartInput<I, N>, S> for RemoveRandomEntryMutator
+impl<I, K, S> Mutator<MultipartInput<I, K>, S> for RemoveRandomEntryMutator
 where
     S: HasRand,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I, N>,
+        input: &mut MultipartInput<I, K>,
     ) -> Result<MutationResult, Error> {
         match MultipartInput::len(input) {
             0 => Ok(MutationResult::Skipped),
@@ -135,16 +135,16 @@ impl Named for RemoveRandomEntryMutator {
 #[derive(Debug)]
 pub struct CrossoverInsertMutator;
 
-impl<I, N, S> Mutator<MultipartInput<I, N>, S> for CrossoverInsertMutator
+impl<I, K, S> Mutator<MultipartInput<I, K>, S> for CrossoverInsertMutator
 where
-    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
+    S: HasCorpus<MultipartInput<I, K>> + HasMaxSize + HasRand,
     I: Clone,
-    N: Clone,
+    K: Clone,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I, N>,
+        input: &mut MultipartInput<I, K>,
     ) -> Result<MutationResult, Error> {
         let current_idx = match input.len() {
             0 => return Ok(MutationResult::Skipped),
@@ -160,12 +160,12 @@ where
 
         let other_len = other.len();
 
-        let (name, part) = match other_len {
+        let (key, part) = match other_len {
             0 => return Ok(MutationResult::Skipped),
             len => other.parts()[other_idx_raw % len].clone(),
         };
 
-        input.insert_part(current_idx, (name, part));
+        input.insert_part(current_idx, (key, part));
         Ok(MutationResult::Mutated)
     }
 }
@@ -180,16 +180,16 @@ impl Named for CrossoverInsertMutator {
 #[derive(Debug)]
 pub struct CrossoverReplaceMutator;
 
-impl<I, N, S> Mutator<MultipartInput<I, N>, S> for CrossoverReplaceMutator
+impl<I, K, S> Mutator<MultipartInput<I, K>, S> for CrossoverReplaceMutator
 where
-    S: HasCorpus<MultipartInput<I, N>> + HasMaxSize + HasRand,
+    S: HasCorpus<MultipartInput<I, K>> + HasMaxSize + HasRand,
     I: Clone,
-    N: Clone,
+    K: Clone,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut MultipartInput<I, N>,
+        input: &mut MultipartInput<I, K>,
     ) -> Result<MutationResult, Error> {
         let current_idx = match input.len() {
             0 => return Ok(MutationResult::Skipped),
@@ -205,13 +205,13 @@ where
 
         let other_len = other.len();
 
-        let (name, part) = match other_len {
+        let (key, part) = match other_len {
             0 => return Ok(MutationResult::Skipped),
             len => other.parts()[other_idx_raw % len].clone(),
         };
 
         input.remove_part_at_index(current_idx);
-        input.insert_part(current_idx, (name, part));
+        input.insert_part(current_idx, (key, part));
         Ok(MutationResult::Mutated)
     }
 }
