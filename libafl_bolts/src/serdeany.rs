@@ -321,6 +321,15 @@ pub mod serdeany_registry {
             self.insert_boxed(Box::new(t));
         }
 
+        /// Insert an element into the map if it doesn't exist, else return error.
+        #[inline]
+        pub fn try_insert<T>(&mut self, t: T) -> Result<(), Error>
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            self.try_insert_boxed(Box::new(t))
+        }
+
         /// Insert a boxed element into the map.
         #[inline]
         pub fn insert_boxed<T>(&mut self, value: Box<T>)
@@ -329,6 +338,21 @@ pub mod serdeany_registry {
         {
             self.raw_entry_mut::<T>()
                 .insert(type_repr_owned::<T>(), value);
+        }
+
+        /// Insert a boxed element into the map if it doesn't exist, else return error.
+        #[inline]
+        pub fn try_insert_boxed<T>(&mut self, value: Box<T>) -> Result<(), Error>
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            match self.map.try_insert(type_repr_owned::<T>(), value) {
+                Ok(_) => (), // then it's fine
+                Err(hashbrown::hash_map::OccupiedError { entry: _, value }) => {
+                    return Err(Error::key_exists(format!("Tried to add a metadata of type {:?}. But this will overwrite the existing metadata value {:?}", core::any::type_name::<T>(), value)));
+                }
+            }
+            Ok(())
         }
 
         /// Get an entry to an element in this map.
@@ -598,6 +622,23 @@ pub mod serdeany_registry {
             T: crate::serdeany::SerdeAny,
         {
             self.entry::<T>(name.into()).insert(Box::new(val));
+        }
+
+        /// Insert an element into the map if it doesn't exist, else return error.
+        #[inline]
+        #[expect(unused_qualifications)]
+        pub fn try_insert<T>(&mut self, name: &str, val: T) -> Result<(), Error>
+        where
+            T: crate::serdeany::SerdeAny,
+        {
+            let outer = self.outer_map_mut::<T>();
+            match outer.try_insert(name.into(), Box::new(val)) {
+                Ok(_) => (), // then it's fine
+                Err(hashbrown::hash_map::OccupiedError { entry, value }) => {
+                    return Err(Error::key_exists(format!("Tried to add a metadata of type {:?} named {:?}. But this will overwrite the existing metadata value {:?}", core::any::type_name::<T>(), entry.key(), value)));
+                }
+            }
+            Ok(())
         }
 
         /// Get a reference to the type map.

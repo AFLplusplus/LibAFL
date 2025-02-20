@@ -46,7 +46,7 @@ run: cxx fuzz_o fuzzer
 	mkdir in || true
 	echo a > in/a
 	./{{FUZZER_NAME}} -o out -i in
-	RUST_LOG=info ./{{FUZZER_NAME}} -o out -i seed
+	# RUST_LOG=info ./{{FUZZER_NAME}} -o out -i seed
 
 [windows]
 run:

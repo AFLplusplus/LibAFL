@@ -13,6 +13,9 @@
   - There is a `ClientStatsManager` to manage client statistics, and is owned by `EventManager`. Most of previous `Monitor`'s trait methods have been moved to the `ClientStatsManager`.
   - `user_monitor` has been renamed to `user_stats`, `introspection_monitor` has been renamed to `introspection_stats`, perf-related structure definitions have been renamed, and all were moved to the `stats` module.
   - `OnDiskTomlMonitor`, `OnDiskJsonMonitor`, `OnDiskJsonAggregateMonitor` are now no longer takes a base monitor to wrap. If you want to use multiple monitors together, simply use a `tuple_list`.
+- `MultipartInput` is now implemented as key-value tuples in a `ListInput`. The interface slightly changed, all functionality is maintained.
+  - Instead of names, `MultipartInput` uses generic `key`s (function names were changed accordingly).
+  - If you don't need the keys to identify individual parts, consider using `ListInput` directly.
 
 ## 0.14.1 -> 0.15.0
 

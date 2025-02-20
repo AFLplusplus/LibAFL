@@ -13,16 +13,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusId},
-    stages::Stage,
+    stages::{Restartable, Stage},
     state::{HasCorpus, HasSolutions},
-    Error, Evaluator,
+    Error, Evaluator, HasMetadata,
 };
 
 /// Replay all inputs
 #[derive(Debug)]
 pub struct ReplayStage<I> {
     name: Cow<'static, str>,
-    restart_helper: ReplayRestartingHelper,
     phantom: PhantomData<I>,
 }
 
@@ -38,14 +37,16 @@ impl<I> Named for ReplayStage<I> {
     }
 }
 
-/// Restart helper for replay stage
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct ReplayRestartingHelper {
+/// Maintains the list of processed corpus or solution entries till now
+pub struct ReplayRestarterMetadata {
     done_corpus: HashSet<CorpusId>,
     done_solution: HashSet<CorpusId>,
 }
 
-impl ReplayRestartingHelper {
+impl_serdeany!(ReplayRestarterMetadata);
+
+impl ReplayRestarterMetadata {
     /// constructor
     #[must_use]
     pub fn new() -> Self {
@@ -82,8 +83,6 @@ impl ReplayRestartingHelper {
     }
 }
 
-impl_serdeany!(ReplayRestartingHelper);
-
 /// The counter for giving this stage unique id
 static mut REPLAY_STAGE_ID: usize = 0;
 /// The name for tracing stage
@@ -102,7 +101,6 @@ impl<I> ReplayStage<I> {
 
         Self {
             name: Cow::Owned(REPLAY_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
-            restart_helper: ReplayRestartingHelper::new(),
             phantom: PhantomData,
         }
     }
@@ -110,19 +108,10 @@ impl<I> ReplayStage<I> {
 
 impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for ReplayStage<I>
 where
-    S: HasCorpus<I> + HasSolutions<I>,
+    S: HasCorpus<I> + HasSolutions<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
     I: Clone,
 {
-    fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
-        Ok(true)
-    }
-
-    fn clear_progress(&mut self, _state: &mut S) -> Result<(), Error> {
-        self.restart_helper.clear();
-        Ok(())
-    }
-
     #[inline]
     fn perform(
         &mut self,
@@ -132,11 +121,15 @@ where
         manager: &mut EM,
     ) -> Result<(), Error> {
         let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
-
         for id in corpus_ids {
-            if self.restart_helper.corpus_probe(&id) {
-                continue;
+            {
+                let helper = state.metadata_mut::<ReplayRestarterMetadata>()?;
+                if helper.corpus_probe(&id) {
+                    continue;
+                }
+                helper.corpus_finish(id);
             }
+
             log::info!("Replaying corpus: {id}");
             let input = {
                 let mut tc = state.corpus().get(id)?.borrow_mut();
@@ -145,27 +138,42 @@ where
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;
-
-            self.restart_helper.corpus_finish(id);
         }
 
         let solution_ids: Vec<CorpusId> = state.solutions().ids().collect();
         for id in solution_ids {
-            if self.restart_helper.solution_probe(&id) {
-                continue;
+            {
+                let helper = state.metadata_mut::<ReplayRestarterMetadata>()?;
+                if helper.solution_probe(&id) {
+                    continue;
+                }
+                helper.solution_finish(id);
             }
             log::info!("Replaying solution: {id}");
             let input = {
-                let mut tc = state.corpus().get(id)?.borrow_mut();
+                let mut tc = state.solutions().get(id)?.borrow_mut();
                 let input = tc.load_input(state.corpus())?;
                 input.clone()
             };
 
             fuzzer.evaluate_input(state, executor, manager, &input)?;
-
-            self.restart_helper.solution_finish(id);
         }
+        log::info!("DONE :)");
+        Ok(())
+    }
+}
 
+impl<I, S> Restartable<S> for ReplayStage<I>
+where
+    S: HasMetadata,
+{
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
+        state.metadata_or_insert_with(ReplayRestarterMetadata::default);
+        Ok(true)
+    }
+
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
+        state.remove_metadata::<ReplayRestarterMetadata>();
         Ok(())
     }
 }

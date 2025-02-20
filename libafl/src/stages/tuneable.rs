@@ -14,7 +14,7 @@ use crate::{
     nonzero,
     stages::{
         mutational::{MutatedTransform, MutatedTransformPost, DEFAULT_MUTATIONAL_MAX_ITERATIONS},
-        ExecutionCountRestartHelper, MutationalStage, Stage,
+        ExecutionCountRestartHelper, MutationalStage, Restartable, Stage,
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
@@ -217,7 +217,12 @@ where
 
         ret
     }
+}
 
+impl<E, EM, I, M, S, Z> Restartable<S> for TuneableMutationalStage<E, EM, I, M, S, Z>
+where
+    S: HasNamedMetadata + HasExecutions,
+{
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         self.restart_helper.should_restart(state, &self.name)
     }

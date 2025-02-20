@@ -68,7 +68,6 @@ pub use owned_map::*;
 /// // inform the feedback to track indices (required by IndexesLenTimeMinimizerScheduler), but not novelties
 /// // this *MUST* be done before it is passed to MaxMapFeedback!
 /// let edges_observer = edges_observer.track_indices();
-///
 /// // init the feedback
 /// let mut feedback = MaxMapFeedback::new(&edges_observer);
 /// #
@@ -80,9 +79,6 @@ pub use owned_map::*;
 /// #     &mut feedback,
 /// #     &mut (),
 /// # ).unwrap();
-///
-/// # feedback.init_state(&mut state).unwrap();
-///
 /// let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 /// # scheduler.cull(&state).unwrap();
 /// ```

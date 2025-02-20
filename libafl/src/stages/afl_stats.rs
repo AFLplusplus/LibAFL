@@ -30,7 +30,7 @@ use crate::{
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{minimizer::IsFavoredMetadata, HasQueueCycles},
-    stages::{calibrate::UnstableEntriesMetadata, Stage},
+    stages::{calibrate::UnstableEntriesMetadata, Restartable, Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
     std::string::ToString,
     Error, HasMetadata, HasNamedMetadata, HasScheduler,
@@ -432,7 +432,9 @@ where
 
         Ok(())
     }
+}
 
+impl<C, E, EM, I, O, S, Z> Restartable<S> for AflStatsStage<C, E, EM, I, O, S, Z> {
     fn should_restart(&mut self, _state: &mut S) -> Result<bool, Error> {
         Ok(true)
     }

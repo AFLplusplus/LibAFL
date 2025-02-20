@@ -87,20 +87,11 @@ pub mod verify_timeouts;
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
 pub trait Stage<E, EM, S, Z> {
-    /// This method will be called before every call to [`Stage::perform`].
-    /// Initialize the restart tracking for this stage, _if it is not yet initialized_.
-    /// On restart, this will be called again.
-    /// As long as [`Stage::clear_progress`], all subsequent calls happen on restart.
-    /// Returns `true`, if the stage's [`Stage::perform`] method should run, else `false`.
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error>;
-
-    /// Clear the current status tracking of the associated stage
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error>;
-
     /// Run the stage.
     ///
-    /// Before a call to perform, [`Stage::should_restart`] will be (must be!) called.
-    /// After returning (so non-target crash or timeout in a restarting case), [`Stage::clear_progress`] gets called.
+    /// If you want this stage to restart, then
+    /// Before a call to perform, [`Restartable::should_restart`] will be (must be!) called.
+    /// After returning (so non-target crash or timeout in a restarting case), [`Restartable::clear_progress`] gets called.
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -108,6 +99,19 @@ pub trait Stage<E, EM, S, Z> {
         state: &mut S,
         manager: &mut EM,
     ) -> Result<(), Error>;
+}
+
+/// Restartable trait takes care of stage restart.
+pub trait Restartable<S> {
+    /// This method will be called before every call to [`Stage::perform`].
+    /// Initialize the restart tracking for this stage, _if it is not yet initialized_.
+    /// On restart, this will be called again.
+    /// As long as [`Restartable::clear_progress`], all subsequent calls happen on restart.
+    /// Returns `true`, if the stage's [`Stage::perform`] method should run, else `false`.
+    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error>;
+
+    /// Clear the current status tracking of the associated stage
+    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error>;
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
@@ -145,7 +149,7 @@ where
 
 impl<Head, Tail, E, EM, S, Z> StagesTuple<E, EM, S, Z> for (Head, Tail)
 where
-    Head: Stage<E, EM, S, Z>,
+    Head: Stage<E, EM, S, Z> + Restartable<S>,
     Tail: StagesTuple<E, EM, S, Z> + HasConstLen,
     S: HasCurrentStageId + Stoppable,
     EM: SendExiting,
@@ -169,10 +173,7 @@ where
 
                 let stage = &mut self.0;
 
-                if stage.should_restart(state)? {
-                    stage.perform(fuzzer, executor, state, manager)?;
-                }
-                stage.clear_progress(state)?;
+                stage.perform_restartable(fuzzer, executor, state, manager)?;
 
                 state.clear_stage_id()?;
             }
@@ -185,10 +186,7 @@ where
 
                 let stage = &mut self.0;
 
-                if stage.should_restart(state)? {
-                    stage.perform(fuzzer, executor, state, manager)?;
-                }
-                stage.clear_progress(state)?;
+                stage.perform_restartable(fuzzer, executor, state, manager)?;
 
                 state.clear_stage_id()?;
             }
@@ -240,7 +238,36 @@ impl<E, EM, S, Z> IntoVec<Box<dyn Stage<E, EM, S, Z>>> for Vec<Box<dyn Stage<E, 
     }
 }
 
-impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn Stage<E, EM, S, Z>>>
+trait RestartableStage<E, EM, S, Z>: Stage<E, EM, S, Z> + Restartable<S> {
+    fn perform_restartable(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<(), Error>;
+}
+
+impl<E, EM, S, ST, Z> RestartableStage<E, EM, S, Z> for ST
+where
+    ST: Stage<E, EM, S, Z> + Restartable<S>,
+{
+    /// Run the stage, calling [`Stage::should_restart`] and [`Stage::clear_progress`] appropriately
+    fn perform_restartable(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<(), Error> {
+        if self.should_restart(state)? {
+            self.perform(fuzzer, executor, state, manager)?;
+        }
+        self.clear_progress(state)
+    }
+}
+
+impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for Vec<Box<dyn RestartableStage<E, EM, S, Z>>>
 where
     EM: SendExiting,
     S: HasCurrentStageId + Stoppable,
@@ -261,10 +288,7 @@ where
                 manager.on_shutdown()?;
                 return Err(Error::shutting_down());
             }
-            if stage.should_restart(state)? {
-                stage.perform(fuzzer, executor, state, manager)?;
-            }
-            stage.clear_progress(state)
+            stage.perform_restartable(fuzzer, executor, state, manager)
         })
     }
 }
@@ -301,7 +325,12 @@ where
     ) -> Result<(), Error> {
         (self.closure)(fuzzer, executor, state, manager)
     }
+}
 
+impl<CB, E, EM, S, Z> Restartable<S> for ClosureStage<CB, E, EM, Z>
+where
+    S: HasNamedMetadata + HasCurrentCorpusId,
+{
     #[inline]
     fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
         // There's no restart safety in the content of the closure.
